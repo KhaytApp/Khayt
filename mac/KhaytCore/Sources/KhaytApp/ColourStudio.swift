@@ -59,7 +59,7 @@ struct ColourStudio: View {
                     blender
                 }
             }
-            .padding(20)
+            .padding(Metric.screen)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Khayt.ground)

@@ -32,10 +32,22 @@ import AppKit
 /// white surface — `styles.css` says so in as many words — and that work is
 /// taken rather than redone.
 ///
-/// Measured on this palette, foreground on the surface it sits on:
+/// Measured on this palette, foreground on the surface it sits on — re-measured
+/// against `Khayt.surface` when `Surface.swift` gave cards a colour of their
+/// own, because the surface is half of every one of these figures and changing
+/// it silently moved them all:
 ///
 ///     done  5.35   attention 5.29   late 5.50   note 5.54   cyan 4.88   (light)
-///     done  6.38   attention 8.23   late 4.68   note 4.98   cyan 8.70   (dark)
+///     done  6.31   attention 8.13   late 4.63   note 4.92   cyan 8.60   (dark)
+///
+/// The dark column is the tight one and `late` is the tightest thing in it, so
+/// **`late` on `Khayt.surface` is the number to re-check** after any change to
+/// either. A first draft of the card surface put it at 4.25 — under the 4.5 that
+/// AA asks of text — and nothing looked wrong.
+///
+/// With Increase Contrast turned on every one of these is blended 30% toward
+/// the far end of its surface, taking the whole palette to roughly 8:1. See
+/// `adaptive(light:dark:name:)`.
 ///
 /// ── COLOUR IS NEVER THE ONLY SIGNAL ──────────────────────────────────────
 ///
@@ -54,8 +66,30 @@ enum Khayt {
     static func adaptive(light: Int, dark: Int, name: String) -> Color {
         Color(nsColor: NSColor(name: NSColor.Name(name)) { appearance in
             let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            return NSColor(hex: isDark ? dark : light)
+            let base = NSColor(hex: isDark ? dark : light)
+            guard isHighContrast(appearance) else { return base }
+            // Toward the far end of the surface it sits on: black under light
+            // appearance, white under dark. A blend rather than twelve more
+            // hand-picked hexes, because a blend cannot drift out of step with
+            // the colour it strengthens, and 30% takes the whole palette from
+            // roughly 5:1 to roughly 8:1 without changing any hue.
+            return base.blended(towards: isDark ? .white : .black, by: 0.30)
         })
+    }
+
+    /// Has the reader asked for more contrast?
+    ///
+    /// **`bestMatch(from:)` cannot answer this**, and that was checked rather
+    /// than assumed: asked to match against all four names, macOS returns
+    /// `NSAppearanceNameAqua` for `NSAppearanceNameAccessibilityAqua` and
+    /// `NSAppearanceNameDarkAqua` for the dark one. Written the obvious way,
+    /// this would have compiled, run, and done nothing at all for the people
+    /// it exists for. The name has to be read directly.
+    private static func isHighContrast(_ appearance: NSAppearance) -> Bool {
+        appearance.name == .accessibilityHighContrastAqua
+            || appearance.name == .accessibilityHighContrastDarkAqua
+            || appearance.name == .accessibilityHighContrastVibrantLight
+            || appearance.name == .accessibilityHighContrastVibrantDark
     }
 
     /// The app's own colour: the letter in the icon.
@@ -119,6 +153,18 @@ enum Khayt {
 }
 
 extension NSColor {
+    /// A straight sRGB blend towards another colour. Used for the increased
+    /// contrast variants; `blended(withFraction:of:)` works in the receiver's
+    /// own space, which for a colour built from hex is already sRGB, but this
+    /// says so rather than relying on it.
+    func blended(towards other: NSColor, by t: CGFloat) -> NSColor {
+        guard let a = usingColorSpace(.sRGB), let b = other.usingColorSpace(.sRGB) else { return self }
+        return NSColor(srgbRed: a.redComponent   + (b.redComponent   - a.redComponent)   * t,
+                       green:   a.greenComponent + (b.greenComponent - a.greenComponent) * t,
+                       blue:    a.blueComponent  + (b.blueComponent  - a.blueComponent)  * t,
+                       alpha: 1)
+    }
+
     /// `0xRRGGBB`, in sRGB. The palette above is written as hex because that is
     /// how both CSS files it was taken from are written, and a number that can
     /// be compared to its source by eye is one fewer place to introduce a

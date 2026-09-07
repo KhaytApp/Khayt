@@ -90,7 +90,18 @@ extension Khayt {
     /// over it: `.quinary` on white is a grey box, and a column of grey boxes
     /// is what this file exists to stop. Dark lifts, because in dark appearance
     /// a raised surface is lighter than its ground.
-    static let surface = adaptive(light: 0xFDFCFA, dark: 0x24262B, name: "khaytSurface")
+    /// The dark value is not a taste decision: it is the LIGHTEST background a
+    /// palette colour is ever drawn on in dark appearance, so it is the one
+    /// that sets their contrast. The first attempt at this file used `#24262B`
+    /// and quietly broke two of them — `late` fell to **4.25:1** and `note` to
+    /// 4.52 where AA text needs 4.5, against the 4.68 and 4.98 the palette
+    /// documents. Measured, not noticed by eye. `#1D1F24` puts them back at
+    /// 4.63 and 4.92, and the whole dark ramp moved down with it to keep the
+    /// steps between the three tones visible.
+    ///
+    /// Anything that darkens `late` further, or lightens this, has to be
+    /// measured against it again.
+    static let surface = adaptive(light: 0xFDFCFA, dark: 0x1D1F24, name: "khaytSurface")
 
     /// The ground a screen is drawn on, and the reason the two above work.
     ///
@@ -110,7 +121,7 @@ extension Khayt {
     ///
     /// Dark barely moves — `#1E1E1E` is already a ground and only needs to be
     /// a shade below `surface`.
-    static let ground = adaptive(light: 0xF2F0EC, dark: 0x1A1B1F, name: "khaytGround")
+    static let ground = adaptive(light: 0xF2F0EC, dark: 0x141518, name: "khaytGround")
 
     /// The line around a card. Low contrast on purpose — it is there to say
     /// where the card ends, not to be seen.
@@ -202,7 +213,7 @@ extension Khayt {
     /// rather than assumed: in dark appearance "further away" is DARKER, so
     /// this goes down from the window while `surface` goes up from it. A lane
     /// lightened in dark would come forward and swap the two depths over.
-    static let recessed = adaptive(light: 0xE7E4DE, dark: 0x141518, name: "khaytRecessed")
+    static let recessed = adaptive(light: 0xE7E4DE, dark: 0x090A0C, name: "khaytRecessed")
 }
 
 extension View {
@@ -211,4 +222,28 @@ extension View {
         self.padding(padding)
             .background(Khayt.recessed, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
+}
+
+
+/// The spacing this app is laid out on, and where the numbers come from.
+///
+/// Before this existed, the margin around a screen's content was 14 on
+/// Reports, 16 on the library, the machines, the board and the portfolio, and
+/// 20 on the dashboard and Colour Studio — four values for one decision, none
+/// of them chosen. Nobody notices a 20pt margin; everybody notices that two
+/// screens in the same app do not agree, which is a large part of what makes
+/// software look like it was assembled rather than designed.
+///
+/// The values are Apple's layout guidance for macOS rather than this app's
+/// taste: 20pt margins at the edges of a window's content, and grouping done
+/// with white space of 12 to 24 points.
+enum Metric {
+    /// The margin between a screen's content and the edges of its pane.
+    static let screen: CGFloat = 20
+    /// The margin inside an inspector or summary pane. Tighter on purpose:
+    /// these are narrow, dense and read at arm's length beside the thing they
+    /// describe, and 20 on a 280pt pane spends a seventh of it on air.
+    static let pane: CGFloat = 14
+    /// Between one group of things and the next.
+    static let gap: CGFloat = 14
 }

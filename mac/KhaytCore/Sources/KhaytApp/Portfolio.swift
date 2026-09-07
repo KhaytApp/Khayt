@@ -55,7 +55,7 @@ struct Portfolio: View {
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(shown) { snap in cell(snap) }
                     }
-                    .padding(16)
+                    .padding(Metric.screen)
                 }
                 .background(Khayt.ground)
             }

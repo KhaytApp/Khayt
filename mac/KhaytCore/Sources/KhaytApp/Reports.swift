@@ -45,6 +45,7 @@ struct Reports: View {
                 }
             }
         }
+        .background(Khayt.ground)
         // Only the Best page reads the period, so only it offers the control.
         // A picker on a screen it does not move is a control that teaches a
         // shop it does nothing.
@@ -119,6 +120,12 @@ struct Reports: View {
         // cannot here, because there will never be forty quarters, and the
         // separators already carry the eye across a row this short.
         .tableStyle(.inset(alternatesRowBackgrounds: false))
+        // The app's ground shows through rather than the system's white.
+        //
+        // A `Table` paints an opaque background of its own, and beside a pane
+        // on `Khayt.ground` that drew a hard seam down the middle of the
+        // window — two halves of one screen looking like two documents.
+        .scrollContentBackground(.hidden)
     }
 
     private func recompute() async {
@@ -153,15 +160,19 @@ struct Reports: View {
         let best: KhaytEngine.TopLists?
 
         var body: some View {
-            HStack(alignment: .top, spacing: 0) {
+            // Two cards rather than two halves of one pane divided by a rule.
+            // The rule was doing the work a gap and two edges do better, and it
+            // left both lists sitting directly on the window with nothing to
+            // say where either began.
+            HStack(alignment: .top, spacing: 14) {
                 Ranking(title: shop.words.callIt("an.top_clients"),
                         rows: best?.clients ?? [], empty: "an.no_top_clients",
                         shop: shop, showing: .revenue)
-                Divider()
                 Ranking(title: shop.words.callIt("an.top_products"),
                         rows: best?.products ?? [], empty: "an.no_top_products",
                         shop: shop, showing: .count)
             }
+            .padding(Metric.screen)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
 
@@ -178,15 +189,11 @@ struct Reports: View {
             let showing: Ranked
 
             var body: some View {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title)
-                        .font(.headline)
-                        .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 8)
+                DetailSection(title) {
                     if rows.isEmpty {
                         Text(shop.words.callIt(empty))
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 14)
-                        Spacer()
+                            .card()
                     } else {
                         ScrollView {
                             VStack(spacing: 0) {
@@ -195,6 +202,7 @@ struct Reports: View {
                                     if place < rows.count - 1 { Divider().padding(.leading, 40) }
                                 }
                             }
+                            .card(padding: 0)
                         }
                     }
                 }
@@ -273,9 +281,7 @@ struct Reports: View {
                                 Text(shop.words.callIt("an.aged_orders_n", ["n": .number(Double(bucket.count))]))
                                     .font(.caption2).foregroundStyle(.tertiary)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(10)
-                            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+                            .card(rail: bucket.count == 0 ? nil : Self.rail(bucket.label), padding: 10)
                         }
                     }
                     .padding(.horizontal, 14)
@@ -316,6 +322,10 @@ struct Reports: View {
                         }
                         .width(min: 60, ideal: 80)
                     }
+                    // As the P&L table above: the bucket cards over it sit on
+                    // the app's ground, and an opaque white table under them
+                    // cut the screen in half.
+                    .scrollContentBackground(.hidden)
                 }
             } else {
                 ContentUnavailableView(shop.words.callIt("an.aged_none"),
@@ -325,11 +335,38 @@ struct Reports: View {
         }
 
         /// Older is louder. The oldest bucket is the one a shop acts on.
+        /// How old a debt is, in the palette's own colours.
+        ///
+        /// `.yellow` was here for the 31-60 bucket — picked at the call site,
+        /// which is the exact habit `Palette.swift` was written to stop, and it
+        /// was measurably wrong rather than merely off-brand: SwiftUI's yellow
+        /// is `#FFCC00`, which is **1.51:1 on white**. Text needs 4.5. That
+        /// figure has been all but invisible in light appearance; the palette's
+        /// amber is 5.29:1.
+        ///
+        /// Two buckets share the amber and that is deliberate. Both are "wants
+        /// a person, and will keep working if it does not get one", which is
+        /// what the colour means; a fourth hue invented to keep them apart
+        /// would be a colour standing for nothing. The buckets are already told
+        /// apart by their labels, and the table sorts by age.
+        /// The rail on a bucket's card. Nil for the youngest, which is the
+        /// bucket a healthy book keeps most of its money in — a rail on every
+        /// tile would say all four are equally worth acting on. The caller also
+        /// passes nil for an EMPTY bucket: nothing owed for 31-60 days is not a
+        /// thing to chase, and the board applies the same rule to a column with
+        /// no cards in it.
+        static func rail(_ bucket: String) -> Color? {
+            switch bucket {
+            case "90+": Khayt.late
+            case "61-90", "31-60": Khayt.attention
+            default: nil
+            }
+        }
+
         static func tint(_ bucket: String) -> AnyShapeStyle {
             switch bucket {
             case "90+": AnyShapeStyle(Khayt.late)
-            case "61-90": AnyShapeStyle(Khayt.attention)
-            case "31-60": AnyShapeStyle(.yellow)
+            case "61-90", "31-60": AnyShapeStyle(Khayt.attention)
             default: AnyShapeStyle(.secondary)
             }
         }
@@ -341,36 +378,75 @@ struct Reports: View {
         let rows: [PnlPeriod]
 
         var body: some View {
+            let net = rows.reduce(0) { $0 + $1.net }
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    DetailSection(shop.words.callIt("an.pnl_title")) {
-                        DetailLine(shop.words.callIt("an.revenue"),
-                                   Money.text(rows.reduce(0) { $0 + $1.revenue }, shop.currency))
-                        DetailLine(shop.words.callIt("an.pnl_expenses"),
-                                   Money.text(rows.reduce(0) { $0 + $1.expenses + $1.fixed }, shop.currency), dim: true)
-                        DetailLine(shop.words.callIt("an.pnl_vat"),
-                                   Money.text(rows.reduce(0) { $0 + $1.vatCollected }, shop.currency), dim: true)
-                        DetailLine(shop.words.callIt("an.pnl_net"),
-                                   Money.text(rows.reduce(0) { $0 + $1.net }, shop.currency), strong: true)
+                    // ── THE ANSWER, FIRST AND LARGEST ─────────────────────
+                    //
+                    // What a shop opens this screen to find out is whether it
+                    // made money, and that figure was the fourth line of a
+                    // four-line list, set at the same size as the VAT it is
+                    // not. It is the one number on the page worth reading from
+                    // across a desk.
+                    //
+                    // Red when it is negative and otherwise uncoloured —
+                    // NOT green for a profit. A shop that made money knows
+                    // that is the ordinary case; a shop that lost money is
+                    // being told something, and if both states were coloured
+                    // neither would be news. The table beside this already
+                    // colours a negative quarter the same red.
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(shop.words.callIt("an.pnl_net"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .textCase(.uppercase).tracking(0.6)
+                            .foregroundStyle(Khayt.cyan)
+                        BigFigure(value: Money.figure(net), unit: Money.mark(shop.currency),
+                                  tint: net < 0 ? Khayt.late : nil, size: 28)
+                        Text(shop.words.callIt("an.pnl_title"))
+                            .font(.caption).foregroundStyle(.secondary)
                     }
+                    .card(rail: net < 0 ? Khayt.late : Khayt.cyan, padding: 14)
+
+                    // The components it is made of. Net is deliberately NOT
+                    // repeated here — it is the card above, and one figure
+                    // under one word twice on one pane is how two answers to
+                    // the same question get to disagree.
+                    DetailSection(shop.words.callIt("an.pnl_title")) {
+                        VStack(spacing: 6) {
+                            DetailLine(shop.words.callIt("an.revenue"),
+                                       Money.text(rows.reduce(0) { $0 + $1.revenue }, shop.currency))
+                            DetailLine(shop.words.callIt("an.pnl_expenses"),
+                                       Money.text(rows.reduce(0) { $0 + $1.expenses + $1.fixed }, shop.currency), dim: true)
+                            DetailLine(shop.words.callIt("an.pnl_vat"),
+                                       Money.text(rows.reduce(0) { $0 + $1.vatCollected }, shop.currency), dim: true)
+                        }
+                        .card()
+                    }
+
                     if let latest = rows.first {
                         DetailSection(latest.period) {
-                            DetailLine(shop.words.callIt("an.pnl_orders"), "\(latest.orders)")
-                            DetailLine(shop.words.callIt("an.revenue"),
-                                       Money.text(latest.revenue, shop.currency))
-                            DetailLine(shop.words.callIt("an.pnl_net"),
-                                       Money.text(latest.net, shop.currency), strong: true)
-                            // The quarter in progress is charged only the part
-                            // of its overhead that has elapsed, so its net is
-                            // comparable with the finished ones beside it.
-                            if latest.fixed > 0 {
-                                Text(shop.words.callIt("mac.quarter_in_progress"))
-                                    .font(.caption).foregroundStyle(.secondary)
+                            VStack(spacing: 6) {
+                                DetailLine(shop.words.callIt("an.pnl_orders"), "\(latest.orders)")
+                                DetailLine(shop.words.callIt("an.revenue"),
+                                           Money.text(latest.revenue, shop.currency))
+                                DetailLine(shop.words.callIt("an.pnl_net"),
+                                           Money.text(latest.net, shop.currency), strong: true,
+                                           tint: latest.net < 0 ? Khayt.late : nil)
+                                // The quarter in progress is charged only the part
+                                // of its overhead that has elapsed, so its net is
+                                // comparable with the finished ones beside it.
+                                if latest.fixed > 0 {
+                                    Text(shop.words.callIt("mac.quarter_in_progress"))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
                             }
+                            .card()
                         }
                     }
                 }
-                .padding(14)
+                .padding(Metric.pane)
             }
         }
     }

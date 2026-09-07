@@ -37,7 +37,7 @@ struct Kanban: View {
                         Column(stage: stage, jobs: shop.board[stage] ?? [], shop: shop)
                     }
                 }
-                .padding(16)
+                .padding(Metric.screen)
             }
             // Said out loud rather than filtered away. A job whose status has no
             // column is not on this board, and the board saying so is the

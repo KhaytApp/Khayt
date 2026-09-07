@@ -49,10 +49,17 @@ struct DetailLine: View {
     var dim = false
     var strong = false
     var warn = false
+    /// An explicit colour for the value, where neither "ordinary" nor `warn`
+    /// is the right thing to say. `warn` means amber, which is the palette's
+    /// "wants a person" — a quarter that lost money is not that, and passing
+    /// `warn` for it would put a third meaning on the one colour this app
+    /// already had to rescue from meaning everything.
+    var tint: Color?
 
-    init(_ label: String, _ value: String, dim: Bool = false, strong: Bool = false, warn: Bool = false) {
+    init(_ label: String, _ value: String, dim: Bool = false, strong: Bool = false,
+         warn: Bool = false, tint: Color? = nil) {
         self.label = label; self.value = value
-        self.dim = dim; self.strong = strong; self.warn = warn
+        self.dim = dim; self.strong = strong; self.warn = warn; self.tint = tint
     }
 
     var body: some View {
@@ -65,8 +72,9 @@ struct DetailLine: View {
                 .font(.callout.weight(strong ? .semibold : .regular))
                 .monospacedDigit()
                 .multilineTextAlignment(.trailing)
-                .foregroundStyle(warn ? AnyShapeStyle(Khayt.attention)
-                                 : dim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                .foregroundStyle(tint.map(AnyShapeStyle.init)
+                                 ?? (warn ? AnyShapeStyle(Khayt.attention)
+                                     : dim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary)))
         }
     }
 }

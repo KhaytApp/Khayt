@@ -131,7 +131,7 @@ struct Expenses: View {
                             .padding(.horizontal, 4)
                     }
                 }
-                .padding(14)
+                .padding(Metric.pane)
             }
             // Recomputed when the period changes as well as the book: the
             // budget rows are about what has been spent, and that is a figure
@@ -245,7 +245,7 @@ struct Waste: View {
                         }
                     }
                 }
-                .padding(14)
+                .padding(Metric.pane)
             }
         }
     }

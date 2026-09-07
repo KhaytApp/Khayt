@@ -57,7 +57,7 @@ struct Dashboard: View {
                     }
                 }
             }
-            .padding(20)
+            .padding(Metric.screen)
             // ── A COLUMN, NOT THE WHOLE WINDOW ────────────────────────────
             //
             // These sections are lists with a name at one end and a figure at

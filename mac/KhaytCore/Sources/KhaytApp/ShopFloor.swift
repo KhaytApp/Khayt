@@ -18,7 +18,7 @@ struct Machines: View {
                     Card(machine: machine, wear: shop.wear[machine.id], shop: shop)
                 }
             }
-            .padding(16)
+            .padding(Metric.screen)
         }
         .background(Khayt.ground)
         .overlay {
@@ -245,7 +245,7 @@ struct Inventory: View {
                                 }
                         }
                     }
-                    .padding(16)
+                    .padding(Metric.screen)
                 }
                 .background(Khayt.ground)
             }
