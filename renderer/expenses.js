@@ -427,32 +427,23 @@ function buildProfitabilityHtml(order) {
 /* ============================================================
    Monthly Tax Summary Export
    ============================================================ */
-/** Map orders → the accounting-export invoice row shape (VAT-inclusive price). */
+/** Map orders → the accounting-export invoice row shape (VAT-inclusive price).
+ *
+ * The decisions — a quote is not an invoice, an order with no price is not
+ * one, the shop's rate and pricing mode, which customer a clientId belongs to —
+ * moved to lib/accounting-rows.js so that the Mac app produces the same file.
+ * Two apps disagreeing about a VAT figure is a disagreement an auditor finds.
+ * This is now only the renderer's globals, handed over. */
 function ordersToInvoiceRows() {
-  // The rate AND how the shop prices. vatSplit() needs both: under exclusive
-  // pricing the total is larger than o.price, and exporting it the old way
-  // understated every total in the bookkeeping file.
-  const _tp = KhaytTax.profileFromSettings(settings);
-  const rate = _tp.rates.reduce((sum, r) => sum + r.percent, 0);
-  const baseCurrency = settings.currency || 'SAR';
-  return printLog
-    .filter(o => o && o.status !== 'quote' && (+o.price > 0))
-    .map(o => {
-      const cur = (typeof clientCurrency === 'function') ? orderCurrency(o) : baseCurrency;
-      const client = clients.find(c => c.id === o.clientId);
-      return {
-        id: o.id,
-        date: o.date || '',
-        clientName: (client && client.name) || o.clientName || '',
-        price: +o.price || 0,
-        currency: cur,
-        vatRate: rate,
-        taxMode: _tp.mode,
-        baseCurrency,
-        baseAmount: (typeof convertToBase === 'function') ? convertToBase(+o.price || 0, cur) : (+o.price || 0),
-        status: o.status,
-      };
-    });
+  return KhaytAccountingRows.ordersToInvoiceRows(printLog, {
+    settings,
+    clients,
+    KhaytTax,
+    currencyOf: (o) => ((typeof clientCurrency === 'function')
+      ? orderCurrency(o) : (settings.currency || 'SAR')),
+    toBase: (typeof convertToBase === 'function')
+      ? ((amt, cur) => convertToBase(amt, cur)) : ((amt) => amt),
+  });
 }
 
 /** Map ONE order to the invoice row shape (same rules as ordersToInvoiceRows). */

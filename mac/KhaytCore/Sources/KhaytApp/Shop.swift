@@ -1663,6 +1663,69 @@ final class Shop {
         }
     }
 
+    /// The accounting packages `lib/accounting-export.js` lays out columns for.
+    ///
+    /// The names are the products' own and are deliberately NOT translated —
+    /// "QuickBooks" is what the software is called in every language, and a
+    /// localised guess at it is a menu item nobody recognises.
+    static let accountingFormats: [(String, String)] = [
+        ("generic", "CSV"), ("quickbooks", "QuickBooks"),
+        ("xero", "Xero"), ("zoho", "Zoho Books"),
+    ]
+
+    /// The two files an accountant actually wants.
+    ///
+    /// ── WHY NOT THE EXPORT ABOVE ──────────────────────────────────────────
+    ///
+    /// `exportForSharing` writes the whole book as redacted JSON, which is the
+    /// right thing to hand a support thread and the wrong thing to hand a
+    /// bookkeeper: nobody opens a thirty-three-collection JSON in the software
+    /// that files a VAT return. This writes what that software reads — one CSV
+    /// of invoices, one of expenses — and the columns are laid out the way the
+    /// chosen package wants them.
+    ///
+    /// The arithmetic is `lib/accounting-export.js`: the VAT split, the
+    /// category-to-account mapping, the four column layouts. None of it is
+    /// worked out here. A quarter exported from this Mac is the same set of
+    /// rows, to the halalah, as the same quarter exported from the other app —
+    /// which matters more here than anywhere else in this program, because two
+    /// apps disagreeing about a VAT figure is a disagreement an auditor finds.
+    ///
+    /// A FOLDER, not a file, because there are two of them. Asking twice for
+    /// somewhere to put a pair of files is a dialogue nobody finishes.
+    func exportForAccounting(format: String) async {
+        spendProblem = nil
+        spendNote = nil
+        guard let engine else {
+            spendProblem = words.callIt("mac.move_sample"); return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = words.callIt("common.save")
+        panel.message = words.callIt("mac.export_accounting_where")
+        guard panel.runModal() == .OK, let dir = panel.url else { return }
+        do {
+            let day = Shop.today(Date())
+            // The rule already puts a BOM on each file. It is asked for rather
+            // than assumed, because the reason for it — Excel on Windows reads
+            // a UTF-8 CSV without one as the system code page, and turns a
+            // shop's Arabic customer names into mojibake — is the rule's
+            // decision to make and to change.
+            let invoices = try await engine.invoiceCsv(
+                orderRows, settings: settingsDict, clients: clientRows, format: format)
+            let expenses = try await engine.expenseCsv(expenseRows, format: format)
+            let a = dir.appending(path: "khayt-invoices-\(day).csv")
+            let b = dir.appending(path: "khayt-expenses-\(day).csv")
+            try Data(invoices.utf8).write(to: a, options: .atomic)
+            try Data(expenses.utf8).write(to: b, options: .atomic)
+            spendNote = words.callIt("mac.exported_to") + " " + dir.lastPathComponent
+        } catch {
+            spendProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+        }
+    }
+
     /// Is this book connected to Khayt Cloud, and therefore expecting to be in
     /// step with another device?
     ///
