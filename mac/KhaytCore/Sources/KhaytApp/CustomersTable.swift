@@ -81,6 +81,11 @@ struct CustomersTable: View {
 
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
+        // The app's ground shows through rather than the system's white — the
+        // pane beside this one sits on it, and an opaque table drew a seam
+        // down the middle of the window. The alternating row stripes are the
+        // system's and still draw.
+        .scrollContentBackground(.hidden)
         // Right-click. The two things there are to do to a customer: write them
         // down properly, and take a job for them.
         .contextMenu(forSelectionType: Customer.ID.self) { ids in
@@ -110,6 +115,7 @@ struct CustomersTable: View {
                 }
             }
         }
+        .background(Khayt.ground)
     }
 }
 

@@ -108,9 +108,13 @@ struct OrdersTable: View {
 
             TableColumn(shop.words.callIt("mac.stage"), value: \.status) { job in
                 if let s = Stage.of(job) {
+                    // Colour only where the stage means something the palette
+                    // has a word for — see `Stage.tint`. On a book whose jobs
+                    // are all delivered this column is still one colour, and
+                    // that is the honest answer rather than a decorated one.
                     Label(shop.words.callIt(s.key), systemImage: s.symbol)
                         .labelStyle(.titleAndIcon)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(s.tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
                 } else {
                     Text(job.status).foregroundStyle(.tertiary)
                 }
@@ -136,6 +140,11 @@ struct OrdersTable: View {
             .alignment(.trailing)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
+        // The app's ground shows through rather than the system's white — the
+        // pane beside this one sits on it, and an opaque table drew a seam
+        // down the middle of the window. The alternating row stripes are the
+        // system's and still draw.
+        .scrollContentBackground(.hidden)
         // After the book is loaded, not while it is empty: asked of a shop with
         // no orders yet, every column looks unused and all of them would go.
         .onChange(of: shop.orders.isEmpty) { _, empty in
@@ -157,6 +166,7 @@ struct OrdersTable: View {
         .overlay {
             if rows.isEmpty { EmptyBook(shop: shop) }
         }
+        .background(Khayt.ground)
         .toolbar { NewJobButton(shop: shop) }
     }
 }

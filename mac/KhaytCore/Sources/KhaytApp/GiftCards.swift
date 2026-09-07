@@ -88,8 +88,11 @@ struct GiftCards: View {
                     }
                     .width(min: 80, ideal: 100)
                 }
+                // As every other table in the app: the ground shows through.
+                .scrollContentBackground(.hidden)
             }
         }
+        .background(Khayt.ground)
         .toolbar {
             ToolbarItem {
                 Button {

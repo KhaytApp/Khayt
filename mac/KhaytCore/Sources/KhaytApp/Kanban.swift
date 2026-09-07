@@ -37,7 +37,7 @@ struct Kanban: View {
                         Column(stage: stage, jobs: shop.board[stage] ?? [], shop: shop)
                     }
                 }
-                .padding(16)
+                .padding(Metric.screen)
             }
             // Said out loud rather than filtered away. A job whose status has no
             // column is not on this board, and the board saying so is the
@@ -48,7 +48,7 @@ struct Kanban: View {
                        symbol: "questionmark.circle", tint: .secondary)
             }
         }
-        .background(.background)
+        .background(Khayt.ground)
         .overlay {
             if shop.orders.isEmpty {
                 ContentUnavailableView(shop.words.callIt("mac.no_jobs"), systemImage: "rectangle.split.3x1")
@@ -151,21 +151,25 @@ private struct Column: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // The PRINTING column is the one with machines running in it, and
-            // amber is the app's word for that — the same colour the dashboard
-            // tile and the live progress bar wear. Only when it has something
+            // The stage's own colour, and only when the column has something
             // in it: a warm heading over an empty column says a machine is
-            // working when none is.
-            let working = stage == .printing && !jobs.isEmpty
+            // working when none is, and a green one over no delivered jobs
+            // says work went out that did not.
+            //
+            // This asked `stage == .printing` before, so the board knew about
+            // exactly one of the nine states it draws. `Stage.tint` answers for
+            // all of them and returns nil for the five that are simply the
+            // ordinary course of a job.
+            let tint: Color? = jobs.isEmpty ? nil : stage.tint
+            let style = tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary)
             HStack(spacing: 6) {
-                Image(systemName: stage.symbol)
-                    .foregroundStyle(working ? AnyShapeStyle(Khayt.hot) : AnyShapeStyle(.secondary))
+                Image(systemName: stage.symbol).foregroundStyle(style)
                 Text(shop.words.callIt(stage.key)).font(.headline)
                 Spacer(minLength: 6)
                 Text("\(jobs.count)")
                     .font(.caption)
                     .monospacedDigit()
-                    .foregroundStyle(working ? AnyShapeStyle(Khayt.hot) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(style)
             }
             .padding(.horizontal, 4)
 
@@ -186,12 +190,11 @@ private struct Column: View {
         // Narrow enough that seven columns are a short scroll rather than a
         // long one, wide enough for a two-line job name.
         .frame(width: 196, alignment: .leading)
-        .padding(10)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+        .lane()
         .overlay {
             // Only while something is over it: a permanently outlined column
             // reads as selected, and four selected columns read as none.
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(.tint, lineWidth: 2)
                 .opacity(isTarget && shop.canMoveJobs ? 1 : 0)
         }
@@ -275,10 +278,12 @@ private struct JobCard: View {
                 }
             }
         }
-        .padding(9)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 7))
-        .contentShape(RoundedRectangle(cornerRadius: 7))
+        // Late first, then flagged — a job can be both, and "late" is the one
+        // that decides what happens next. Neither is said by colour alone: the
+        // date already wears a warning triangle and the flag is a flag.
+        .card(rail: job.isOverdue() ? Khayt.late : (job.priority ? Khayt.attention : nil),
+              padding: 9)
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onTapGesture {
             // The board is for seeing; the table is for reading one job. A tap
             // takes you there rather than opening a panel the board has no room

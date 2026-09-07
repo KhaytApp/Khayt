@@ -74,6 +74,9 @@ struct Catalogue: View {
             .width(min: 90, ideal: 130)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
+        // As every other table in the app: the ground shows through.
+        .scrollContentBackground(.hidden)
+        .background(Khayt.ground)
         .overlay {
             if shop.catalogueRows.isEmpty {
                 ContentUnavailableView(shop.words.callIt("mac.no_products"),

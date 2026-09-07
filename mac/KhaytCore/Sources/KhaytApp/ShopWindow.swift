@@ -18,7 +18,16 @@ struct ShopWindow: View {
     var body: some View {
         NavigationSplitView {
             Sidebar(shop: shop)
-                .navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 280)
+                // 190 was under every published minimum for a Mac source list
+                // (225-275), and the app was paying for it: `SidebarLayoutTests`
+                // caps every sidebar label at 22 characters because they
+                // truncate, which is a test managing the symptom of a column
+                // too narrow to hold its own words. Arabic is the tighter of
+                // the two languages and set the cap.
+                //
+                // The extra 25 points come out of a detail pane that is
+                // hundreds wide and, on the dashboard, capped anyway.
+                .navigationSplitViewColumnWidth(min: 225, ideal: 240, max: 340)
         } detail: {
             VStack(spacing: 0) {
                 // What the last move said, above whatever screen you are on.

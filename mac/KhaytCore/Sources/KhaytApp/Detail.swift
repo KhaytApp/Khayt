@@ -7,19 +7,34 @@ import SwiftUI
 /// harmless while one file used it, a trap waiting for the second.
 struct DetailSection<Content: View>: View {
     let title: String
+    /// The colour of what this section is about, or nil for the ordinary case.
+    ///
+    /// A tinted header and a rail on the card below it are one signal said
+    /// twice, which is the point — see the note in `Surface.swift` on why most
+    /// sections should leave this nil. A section that is merely a heading over
+    /// some facts is not news, and colouring it costs the colour its meaning.
+    var accent: Color?
+    var symbol: String?
     @ViewBuilder let content: Content
 
-    init(_ title: String, @ViewBuilder content: () -> Content) {
-        self.title = title; self.content = content()
+    init(_ title: String, accent: Color? = nil, symbol: String? = nil,
+         @ViewBuilder content: () -> Content) {
+        self.title = title; self.accent = accent; self.symbol = symbol
+        self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 10, weight: .semibold))
-                .textCase(.uppercase)
-                .tracking(0.6)
-                .foregroundStyle(.tertiary)
+            HStack(spacing: 5) {
+                if let symbol {
+                    Image(systemName: symbol).font(.system(size: 9, weight: .bold))
+                }
+                Text(title)
+                    .textCase(.uppercase)
+                    .tracking(0.6)
+            }
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(accent.map(AnyShapeStyle.init) ?? AnyShapeStyle(.tertiary))
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -34,10 +49,17 @@ struct DetailLine: View {
     var dim = false
     var strong = false
     var warn = false
+    /// An explicit colour for the value, where neither "ordinary" nor `warn`
+    /// is the right thing to say. `warn` means amber, which is the palette's
+    /// "wants a person" — a quarter that lost money is not that, and passing
+    /// `warn` for it would put a third meaning on the one colour this app
+    /// already had to rescue from meaning everything.
+    var tint: Color?
 
-    init(_ label: String, _ value: String, dim: Bool = false, strong: Bool = false, warn: Bool = false) {
+    init(_ label: String, _ value: String, dim: Bool = false, strong: Bool = false,
+         warn: Bool = false, tint: Color? = nil) {
         self.label = label; self.value = value
-        self.dim = dim; self.strong = strong; self.warn = warn
+        self.dim = dim; self.strong = strong; self.warn = warn; self.tint = tint
     }
 
     var body: some View {
@@ -50,8 +72,9 @@ struct DetailLine: View {
                 .font(.callout.weight(strong ? .semibold : .regular))
                 .monospacedDigit()
                 .multilineTextAlignment(.trailing)
-                .foregroundStyle(warn ? AnyShapeStyle(Khayt.attention)
-                                 : dim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                .foregroundStyle(tint.map(AnyShapeStyle.init)
+                                 ?? (warn ? AnyShapeStyle(Khayt.attention)
+                                     : dim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary)))
         }
     }
 }

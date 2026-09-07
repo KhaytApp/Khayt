@@ -33,7 +33,7 @@ struct LibraryGrid: View {
                             cell(for: file).id(file.id)
                         }
                     }
-                    .padding(16)
+                    .padding(Metric.screen)
                 }
                 .onChange(of: shop.focusedFile) { _, id in
                     guard let id else { return }
@@ -84,7 +84,7 @@ struct LibraryGrid: View {
             }
             .onAppear { focused = true }
         }
-        .background(.background)
+        .background(Khayt.ground)
         .overlay { if shop.shownFiles.isEmpty { EmptyShelf(shop: shop) } }
     }
 

@@ -59,10 +59,10 @@ struct ColourStudio: View {
                     blender
                 }
             }
-            .padding(20)
+            .padding(Metric.screen)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(.background)
+        .background(Khayt.ground)
         // NO `.navigationTitle` and no `.toolbar`: the window owns both, and a
         // detail screen that sets either rebuilds the window's toolbar. See
         // the note in `Portfolio.shown` for what that costs.
@@ -106,7 +106,7 @@ struct ColourStudio: View {
                         }
                     }
                     .padding(.horizontal, 12)
-                    .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
+                    .card(padding: 0)
                 }
             }
         }

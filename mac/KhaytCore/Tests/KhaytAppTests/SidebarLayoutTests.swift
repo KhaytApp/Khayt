@@ -96,8 +96,16 @@ struct SidebarLayoutTests {
     ///
     /// Khayt calls three of these "Expense Tracker", "Failed Prints & Waste
     /// Log" and "Profit & Loss by Quarter" — good names for a screen, and too
-    /// long for a column that holds at 190pt. Two of the three were truncated
-    /// mid-word on every launch, in both languages, and nothing said so.
+    /// long for the column. Two of the three were truncated mid-word on every
+    /// launch, in both languages, and nothing said so.
+    ///
+    /// The cap below was derived when the column could be dragged to 190pt.
+    /// Its minimum is 225 now, so 22 characters is stricter than the column
+    /// requires — deliberately left alone rather than raised to a number
+    /// nobody has measured. What must not change is that it is checked against
+    /// the MINIMUM width, not the ideal: the column is resizable, and a label
+    /// that fits only when the user has not touched it is a label that
+    /// truncates.
     ///
     /// Both languages, because Arabic is not the shorter one: "سجل المطبوعات
     /// الفاشلة والهدر" is twenty-eight characters where the English is

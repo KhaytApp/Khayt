@@ -93,6 +93,63 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The Mac app looks like Khayt now, rather than like a SwiftUI app.** The
+  palette was already chosen and contrast-checked, and almost none of it reached
+  the screen: every panel in the app was the same grey rounded rectangle, so
+  nine sections down the dashboard and eight figures across it were all drawn
+  identically and the screen had no way of saying which of them mattered. Three
+  things changed. Screens sit on a warm off-white ground with the cards raised
+  on it — in light appearance a macOS window is pure **white**, so a card could
+  not be lifted at all and every panel was necessarily a grey box laid on top;
+  the ground had to move instead. Cards carry a short coloured **rail** down the
+  leading edge saying what they are about — amber on a machine that is printing
+  right now, red on a late job, the app's cyan on the shop's own figures — and
+  a card with nothing to say has no rail, which is what keeps the ones that do
+  worth looking at. And the takings for the chosen period are drawn as one large
+  figure with profit and margin beneath them, instead of as the first of eight
+  identical tiles that gave a month's revenue the same weight as the number of
+  files in the library.
+
+- **Every screen on the Mac sits on the same background.** The jobs, customers,
+  expenses and waste screens painted the system's white while the dashboard, the
+  board and the library sat on the app's own ground, so moving between them
+  jumped. In Reports and Expenses, where a table sits beside a summary pane, it
+  drew a hard seam down the middle of the window — two halves of one screen
+  looking like two documents. The tables let the ground through now; their
+  alternating row stripes are still the system's.
+
+- **Every screen on the Mac is laid out on the same margin.** It was 14 on
+  Reports, 16 on the library, the machines, the board and the portfolio, and 20
+  on the dashboard — four values for one decision, none of them chosen. They are
+  all 20 now, which is Apple's published margin for macOS content, and the
+  numbers have names and a source rather than being typed at each call site.
+  Nobody notices a 20-point margin; everybody notices that two screens in the
+  same app do not agree.
+
+- **The Mac's sidebar is wide enough for its own words.** It was 190 points at
+  its narrowest, under every published minimum for a Mac source list, and the
+  app had been paying for it in a test that caps every sidebar label at 22
+  characters because longer ones truncate — Arabic set the cap. The column
+  starts at 225 now and the twenty-five points come out of a detail pane that is
+  hundreds wide.
+
+- **The Mac's reports say their answer first.** Net income was the fourth line
+  of a four-line list, set at the same size as the VAT it is not — and it is the
+  figure the screen exists to give. It is now the large one at the top of the
+  pane, red when the shop lost money and uncoloured when it did not, with the
+  revenue, expenses and VAT it is made of beneath. The aged-receivables buckets
+  and the two Best lists are cards rather than shapes floating on the window.
+
+- **A job's stage has a colour on the Mac, and only where it means something.**
+  The jobs table drew every row's stage in the same grey, and the board knew
+  about exactly one of the nine states it draws. Four of them now carry the
+  colour the palette already defines in words — printing is the amber that means
+  something is being made right now, on hold the amber that means it wants a
+  person, completed and delivered the green that means finished, cancelled the
+  red. The other five are the ordinary course of a job and stay the colour of
+  ordinary text: nine stages in nine colours is a rainbow, and a rainbow is what
+  a colour scheme looks like once it has stopped meaning anything.
+
 - **The Mac's profit-and-loss report stops drawing rows it does not have.** One
   row per quarter, two of them on a young book — and the striping was drawn down
   the whole window regardless, so a shop read two figures above a dozen empty
@@ -723,6 +780,42 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+
+- **The Mac's colours respond to Increase Contrast.** Apple asks for an
+  increased-contrast variant of every custom colour alongside its light and dark
+  ones, and Khayt's palette supplied only two of the three — so a shop that had
+  turned the setting on got no more contrast from any status colour in the app.
+  Each one is now strengthened toward the far end of the surface it sits on,
+  taking the palette from roughly 5:1 to roughly 8:1 without moving a hue.
+
+- **Two status colours had quietly fallen below the contrast the palette
+  promises.** Giving cards a colour of their own changed the background half of
+  every measurement in dark appearance, and nobody would have seen it: "late"
+  landed at 4.25:1 and "worth reading" at 4.52 where text needs 4.5, against the
+  4.68 and 4.98 documented. The dark surfaces moved down together to put them
+  back at 4.63 and 4.92, and the palette now records which figure to re-check
+  when either changes.
+
+- **An aged-receivables figure was all but invisible on the Mac.** The 31-60 day
+  bucket was drawn in SwiftUI's `.yellow` — `#FFCC00`, which measures **1.51:1
+  against white** where text needs 4.5 — so on a light screen the money in that
+  bucket was a pale smear. It was also a colour chosen at the call site rather
+  than from the palette, which is the habit that made the palette necessary. It
+  is the palette's amber now, at 5.29:1, shared with the 61-90 bucket: both mean
+  "wants a person", and a fourth hue invented to keep two ages apart would be a
+  colour standing for nothing.
+
+- **The Mac's sidebar stops saying "Dashboard 0".** Every other count there is
+  how many things a screen lists; that one is how much is wrong, and no news is
+  not a quantity worth printing. It shows nothing when nothing needs a person —
+  the same fault as the two below, found by looking at the running app rather
+  than at a screenshot.
+
+- **Colour Studio and Reports no longer show a "0" in the Mac's sidebar.**
+  Neither is a list of anything — a quarter is not a thing a shop has a number
+  of — and all three call sites said so in a comment while passing zero to a row
+  that drew whatever it was given. A zero beside a screen's name reads as an
+  empty screen, so both looked like features nobody had set up yet.
 
 - **A dependency that could only ever have been undefined.** Developer tooling:
   modules that work in both Node and a browser fall back to a global when there

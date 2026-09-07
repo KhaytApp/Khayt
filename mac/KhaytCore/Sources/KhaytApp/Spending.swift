@@ -20,6 +20,7 @@ struct Expenses: View {
             table
             Summary(shop: shop).frame(minWidth: 260, idealWidth: 300, maxWidth: 380)
         }
+        .background(Khayt.ground)
         .toolbar { SpendToolbar(shop: shop, add: { adding = true },
                                 addLabel: shop.words.callIt("exp.add_title")) }
         .sheet(isPresented: $adding) { ExpenseSheet(shop: shop) }
@@ -63,6 +64,11 @@ struct Expenses: View {
             }
             .width(min: 90, ideal: 120)
         }
+        // The app's ground shows through rather than the system's white — the
+        // pane beside this one sits on it, and an opaque table drew a seam
+        // down the middle of the window. The alternating row stripes are the
+        // system's and still draw.
+        .scrollContentBackground(.hidden)
         .overlay {
             if rows.isEmpty {
                 ContentUnavailableView(shop.words.callIt(shop.expenses.isEmpty ? "exp.empty" : "exp.empty_filter"),
@@ -131,7 +137,7 @@ struct Expenses: View {
                             .padding(.horizontal, 4)
                     }
                 }
-                .padding(14)
+                .padding(Metric.pane)
             }
             // Recomputed when the period changes as well as the book: the
             // budget rows are about what has been spent, and that is a figure
@@ -164,6 +170,7 @@ struct Waste: View {
             table
             Summary(shop: shop).frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
         }
+        .background(Khayt.ground)
         .toolbar { SpendToolbar(shop: shop, add: { logging = true },
                                 addLabel: shop.words.callIt("waste.add")) }
         .sheet(isPresented: $logging) { WasteSheet(shop: shop) }
@@ -205,6 +212,8 @@ struct Waste: View {
             }
             .width(min: 90, ideal: 110)
         }
+        // As the expenses table above.
+        .scrollContentBackground(.hidden)
         .contextMenu(forSelectionType: WasteEntry.ID.self) { ids in
             if let id = ids.first, shop.canMoveJobs {
                 Button(shop.words.callIt("common.delete"), role: .destructive) {
@@ -245,7 +254,7 @@ struct Waste: View {
                         }
                     }
                 }
-                .padding(14)
+                .padding(Metric.pane)
             }
         }
     }
