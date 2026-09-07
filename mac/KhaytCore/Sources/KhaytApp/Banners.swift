@@ -55,6 +55,20 @@ struct MoveBanners: View {
                        tint: Khayt.cyan)
             }
         }
+        // A conversion: what it saved, or why it would not. Beside the slicer
+        // banner because it is the same gesture — a model, a menu, an answer
+        // with nowhere else to appear.
+        if let problem = shop.convertProblem {
+            Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention)
+        }
+        if let note = shop.convertNote {
+            Banner(text: note, symbol: "checkmark.circle", tint: Khayt.done)
+        }
+        if shop.converting {
+            Banner(text: shop.words.callIt("mac.converting"),
+                   symbol: "gearshape.arrow.trianglehead.2.clockwise.rotate.90",
+                   tint: Khayt.cyan)
+        }
         // A slicer that would not open. It belongs here for the same reason a
         // refused move does: the gesture was a menu item on a model, and there
         // is nowhere on that menu for an answer to appear.

@@ -318,6 +318,20 @@ final class Shop {
             giftCards = Self.decode(root, "giftCards", as: GiftCard.self)
             fits = await Self.measureFit(files, machines: machineRows, engine: engine)
             lowSpools = (try? await engine?.lowStock(inventoryRows, settings: settingsDict)) ?? [:]
+            // Once per book rather than per right-click: the list is twenty-two
+            // fixed entries and a context menu is built while a grid draws.
+            printerProfiles = (try? await engine?.printerProfiles()) ?? []
+            // What each model's licence permits, asked once for the library:
+            // the inspector shows it for the selected model and the grid does
+            // not, so a hop per row would be a hop for nothing.
+            var standings: [String: KhaytEngine.Standing] = [:]
+            for file in files where !(file.licence ?? "").isEmpty || !(file.source ?? "").isEmpty {
+                if let standing = try? await engine?.licenceStanding(source: file.source,
+                                                                     licence: file.licence) {
+                    standings[file.id] = standing
+                }
+            }
+            licences = standings
             // The status of each, from the shared rule rather than a Swift
             // comparison of two date strings — asked once for all of them,
             // because the table redraws on every keystroke in the search box.
@@ -2284,6 +2298,60 @@ final class Shop {
         return out
     }
 
+    // MARK: - Converting a model
+
+    /// Convert a model for another printer, and put the result where the shop
+    /// says. `nil` target means normalise: strip the vendor's settings and
+    /// leave a clean standard 3MF that any slicer opens.
+    ///
+    /// The save panel first, deliberately. A conversion that runs and then asks
+    /// where to put it has already spent the time before the shop can change
+    /// its mind, and a shop that cancels should have cost nothing.
+    func convertModel(_ file: LibraryFile, targetId: String?) async {
+        convertNote = nil
+        convertProblem = nil
+        guard let source = modelFile(for: file) else {
+            convertProblem = words.callIt("mac.not_found"); return
+        }
+        guard let engine else { convertProblem = "the engine is not loaded"; return }
+
+        let target = printerProfiles.first { $0.id == targetId }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = suggestedConvertName(file, target: target)
+        panel.allowedContentTypes = [UTType(filenameExtension: "3mf")].compactMap { $0 }
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+
+        converting = true
+        defer { converting = false }
+        var options: [String: JSONValue] = [:]
+        if let targetId { options["targetId"] = .string(targetId) }
+        else { options["mode"] = .string("normalize") }
+
+        do {
+            _ = try await Converter.convert(source, into: destination,
+                                            options: options, engine: engine)
+            convertNote = words.callIt("mac.converted", [
+                "name": .string(destination.lastPathComponent),
+                "target": .string(target?.name ?? words.callIt("mac.standard_3mf")),
+            ])
+        } catch let refusal as Converter.Failure {
+            convertProblem = refusal.description
+        } catch {
+            convertProblem = String(describing: error)
+        }
+    }
+
+    /// `Falcon hood — Snapmaker U1.3mf`. The target in the name, because a
+    /// folder of conversions of one model is otherwise a folder of the same
+    /// filename with numbers after it.
+    func suggestedConvertName(_ file: LibraryFile,
+                              target: KhaytEngine.PrinterProfile?) -> String {
+        let base = file.title.isEmpty ? "model" : file.title
+        let suffix = target?.name ?? words.callIt("mac.standard_3mf")
+        return "\(base) — \(suffix).3mf"
+    }
+
     // MARK: - Gift cards
 
     /// A code somebody can read down a telephone: no I/O/0/1, nothing to
@@ -3823,6 +3891,18 @@ final class Shop {
     /// Resolved once when the book loads — thirty-one rows asking the engine
     /// one at a time would be thirty-one bridge crossings for one screen.
     private(set) var clientNames: [String: KhaytEngine.Named] = [:]
+    /// What each model's licence permits, by model id. Absent for a model
+    /// nobody has recorded one for, which is NOT the same as one that may not
+    /// be sold — the screen says nothing rather than something wrong.
+    private(set) var licences: [String: KhaytEngine.Standing] = [:]
+
+    /// The printers a model can be converted for, from the shared rule.
+    private(set) var printerProfiles: [KhaytEngine.PrinterProfile] = []
+    /// What the last conversion had to say, and whether one is running.
+    var convertNote: String?
+    var convertProblem: String?
+    private(set) var converting = false
+
     /// Which spools are running low, by id — the shared rule's answer, asked
     /// once for the whole shelf.
     private(set) var lowSpools: [String: Bool] = [:]

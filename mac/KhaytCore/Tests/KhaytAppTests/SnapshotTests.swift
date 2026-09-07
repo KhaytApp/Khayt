@@ -204,4 +204,24 @@ import AppKit
         _ = shop
     }
 
+    /// Where a model came from, both ways round.
+    ///
+    /// The line a shop is looking for is "may not be sold", and it has to read
+    /// as a fact rather than an alarm — and the model beside it, the shop's own
+    /// work, must not look like it is missing something. Drawn together because
+    /// that is how they are judged.
+    @Test("provenance: a downloaded model and the shop's own")
+    func provenanceRows() throws {
+        try render(VStack(alignment: .leading, spacing: 18) {
+            DetailSection("Where it came from") {
+                DetailLine("Source", "https://www.printables.com/model/remb-forest-dragon")
+                DetailLine("Licence", "CC BY-NC — not for sale", warn: true)
+            }
+            DetailSection("Where it came from") {
+                DetailLine("Source", "Commissioned — Athar Tuwaiq")
+                DetailLine("Licence", "My own design")
+            }
+        }.frame(width: 380), "31-provenance", size: CGSize(width: 380, height: 300))
+    }
+
 }

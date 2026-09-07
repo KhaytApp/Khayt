@@ -241,3 +241,53 @@ struct CurrencyMarkTests {
         }
     }
 }
+
+/// Where a model came from, and whether a print of it may be sold.
+@MainActor
+struct LicenceStandingTests {
+
+    static func shop() async throws -> Shop {
+        let shop = Shop()
+        await shop.load(.sample)
+        try #require(shop.engine != nil)
+        return shop
+    }
+
+    /// The question a print shop is actually asking, and the answer it must
+    /// never guess at.
+    @Test("a NonCommercial model says so; an unrecorded one says nothing")
+    func sellable() async throws {
+        let engine = try #require(try await Self.shop().engine)
+
+        let nc = try await engine.licenceStanding(source: "printables.com/x", licence: "cc-by-nc")
+        #expect(nc.known)
+        #expect(nc.sellable == false)
+        #expect(nc.attribution)
+
+        let mine = try await engine.licenceStanding(source: "", licence: "own")
+        #expect(mine.sellable == true)
+        #expect(!mine.attribution)
+
+        // NOT `false`. A library that has just been imported has recorded
+        // nothing, and telling a shop it may not sell its own work would be
+        // worse than saying nothing at all.
+        let blank = try await engine.licenceStanding(source: "", licence: "")
+        #expect(!blank.known)
+        #expect(blank.sellable == nil, "an unrecorded licence was decided")
+    }
+
+    /// Every licence the menu offers has words in both languages, or the
+    /// inspector shows a raw key like `plib.licence_cc_by_nc_sa`.
+    @Test("every licence the rule offers can be said in the shop's language")
+    func everyLicenceHasWords() async throws {
+        let shop = try await Self.shop()
+        for id in ["own", "cc0", "cc-by", "cc-by-sa", "cc-by-nd",
+                   "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "commercial"] {
+            let key = "plib.licence_" + id.replacingOccurrences(of: "-", with: "_")
+            #expect(shop.words.callIt(key) != key, "\(id) has no words")
+        }
+        for key in ["plib.source", "plib.licence", "plib.provenance"] {
+            #expect(shop.words.callIt(key) != key, "\(key) has no words")
+        }
+    }
+}

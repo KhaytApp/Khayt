@@ -50,6 +50,9 @@ public actor KhaytEngine {
         // out of `mf-convert` it could only be asked during a conversion — by
         // the one app that can run one.
         "print-fit",
+        // Where a model came from and what may be done with it. Pure, and the
+        // one place that decides whether a print may be sold.
+        "model-licence",
         // ── THE CONVERTER ────────────────────────────────────────────────
         //
         // In dependency order, because each reads the one above it off the
@@ -457,7 +460,50 @@ public actor KhaytEngine {
                           as: [String].self)
     }
 
+    // MARK: - Where a model came from
+
+    /// What a model's licence lets a shop do.
+    ///
+    /// `lib/model-licence.js`. `known` false means nobody has recorded one, and
+    /// every field below it is then meaningless — a shop that has filled
+    /// nothing in must not be told it may not sell its own work, so `sellable`
+    /// is an OPTIONAL Bool and nil is a different sentence from false.
+    public struct Standing: Decodable, Sendable {
+        public let known: Bool
+        public let licence: String
+        public let source: String
+        public let sellable: Bool?
+        public let attribution: Bool
+        public let derivatives: Bool?
+    }
+
+    public func licenceStanding(source: String?, licence: String?) throws -> Standing {
+        try runtime.call2("KhaytModelLicence.standing({ source: ARG0, licence: ARG1 })",
+                          [.string(source ?? ""), .string(licence ?? "")], as: Standing.self)
+    }
+
     // MARK: - Converting a 3MF
+
+    /// The printers a 3MF can be converted for.
+    ///
+    /// `lib/printer-profiles.js`'s own list, not a Swift copy of it: the ids
+    /// are what `convertMembers` is given, and a second list here would be a
+    /// menu offering a printer the converter cannot name.
+    public struct PrinterProfile: Decodable, Sendable, Identifiable, Hashable {
+        public let id: String
+        public let name: String
+        /// How many filaments it can hold. Nil for a single-material machine
+        /// that does not say.
+        public let maxColors: Int?
+    }
+
+    public func printerProfiles() throws -> [PrinterProfile] {
+        try runtime.call2("""
+            KhaytPrinterProfiles.listProfiles().map((p) => (
+              { id: p.id, name: p.name, maxColors: p.maxColors == null ? null : p.maxColors }
+            ))
+            """, [], as: [PrinterProfile].self)
+    }
 
     /// What a converted 3MF should contain.
     ///

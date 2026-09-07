@@ -42,6 +42,11 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let contentHash: String?
     /// `triangles:volumeMm3:XxYxZ`, composed by `lib/model-identity.js`.
     let geometryKey: String?
+    /// Where the model came from — a URL, a designer, or "my own design".
+    let source: String?
+    /// What its licence lets a shop do. `lib/model-licence.js` reads it; this
+    /// only carries it.
+    let licence: String?
     let timesPrinted: Int?
     let lastPrinted: String?
 
