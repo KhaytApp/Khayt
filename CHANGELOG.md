@@ -6,6 +6,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac writes the file a shop gives its accountant.** File → Export for the
+  Accountant, in the layout QuickBooks, Xero or Zoho Books wants — or plain CSV
+  — and two files land in the folder you pick: one of invoices, one of expenses.
+  Until now the Mac could export the whole book as JSON, which is the right
+  thing to hand a support thread and the wrong thing to hand a bookkeeper:
+  nobody opens a thirty-three-collection JSON in the software that files a VAT
+  return.
+
+  What a row SAYS — that a quote is not an invoice, that an order with no price
+  is not one either, what the shop's VAT rate and pricing mode are, which
+  customer a job belongs to — was decided in the Electron window and nowhere
+  else. It is a shared rule now, so the same quarter exported from either app is
+  the same rows to the halalah. That matters more here than anywhere else in
+  Khayt: two apps disagreeing about a VAT figure is a disagreement an auditor
+  finds.
+
 - **A model can say where it came from and what its licence allows.** A shop's
   library holds work it made and models it downloaded, and they look identical
   in a grid — while most of what is on the model sites is Creative Commons and a

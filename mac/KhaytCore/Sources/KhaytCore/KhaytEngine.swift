@@ -16,6 +16,20 @@ public actor KhaytEngine {
     /// The modules this engine exposes, in dependency order.
     static let modules = [
         "tax",
+        // The file a shop gives its accountant. Two modules, and BOTH are
+        // needed: `accounting-export` lays out the columns, and
+        // `accounting-rows` decides what the rows say — that a quote is not an
+        // invoice, what the shop's VAT rate and pricing mode are, which
+        // customer a clientId belongs to. Calling the formatter without the
+        // rows module produces a file that looks right and states 0.00 VAT on
+        // every line.
+        //
+        // ROWS FIRST: it reads the tax profile through `KhaytTax`, and under
+        // JavaScriptCore there is no require — it falls back to the global,
+        // which only exists once `tax` has run. `tax` is the first module in
+        // this list, so both are satisfied.
+        "accounting-rows",
+        "accounting-export",
         "pricing",
         "payment-plan",
         "split-order",
@@ -549,6 +563,45 @@ public actor KhaytEngine {
               };
             })(ARG0, ARG1)
             """, [.array(members), .object(options)], as: Conversion.self)
+    }
+
+    // MARK: - The accountant's file
+
+    /// The shop's invoices as a CSV, in the layout the accountant's software
+    /// wants.
+    ///
+    /// `format` is one of `generic`, `quickbooks`, `xero`, `zoho`; anything
+    /// else is treated as generic by the rule rather than refused, which is the
+    /// right way round for a file somebody is trying to produce at the end of a
+    /// quarter.
+    ///
+    /// `from`/`to` are `YYYY-MM-DD` or empty for the whole book. The rule does
+    /// the range check, so an exported quarter is the same set of rows in both
+    /// apps.
+    /// The whole print log in, the accountant's CSV out.
+    ///
+    /// `orders` is the book's own rows, unmapped — the rule decides which of
+    /// them are invoices at all. Passing pre-filtered rows would be this app
+    /// deciding that, and deciding it differently from the other one.
+    public func invoiceCsv(_ orders: [JSONValue], settings: [String: JSONValue],
+                           clients: [JSONValue], format: String,
+                           from: String = "", to: String = "") throws -> String {
+        try runtime.call2(
+            "KhaytAccountingExport.buildInvoiceCsv("
+            + "KhaytAccountingRows.ordersToInvoiceRows(ARG0, {settings: ARG1, clients: ARG2}),"
+            + " {format: ARG3, from: ARG4 || undefined, to: ARG5 || undefined})",
+            [.array(orders), .object(settings), .array(clients),
+             .string(format), .string(from), .string(to)],
+            as: String.self)
+    }
+
+    /// The shop's expenses as a CSV, in the same layouts.
+    public func expenseCsv(_ expenses: [JSONValue], format: String,
+                           from: String = "", to: String = "") throws -> String {
+        try runtime.call2(
+            "KhaytAccountingExport.buildExpenseCsv(ARG0, {format: ARG1, from: ARG2 || undefined, to: ARG3 || undefined})",
+            [.array(expenses), .string(format), .string(from), .string(to)],
+            as: String.self)
     }
 
     // MARK: - The shelf

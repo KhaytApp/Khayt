@@ -159,6 +159,16 @@ private struct BookMenu: View {
             Task { await shop.exportForSharing() }
         }
         .disabled(shop.source.build == nil)
+        // One item per accounting package, rather than a format picker in a
+        // sheet. A shop uses one of these and uses it every quarter; the
+        // choice is a property of the shop, not a question to be asked each
+        // time, and a submenu remembers nothing but costs nothing either.
+        Menu(Words.upfront("mac.export_accounting")) {
+            ForEach(Shop.accountingFormats, id: \.0) { key, name in
+                Button(name) { Task { await shop.exportForAccounting(format: key) } }
+            }
+        }
+        .disabled(shop.orders.isEmpty && shop.expenses.isEmpty)
 
         Divider()
         Picker(Words.upfront("mac.open_book"), selection: Binding(get: { shop.source }, set: { shop.open($0) })) {
