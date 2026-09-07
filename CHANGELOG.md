@@ -6,6 +6,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The 3MF converter's decisions can now be asked for on their own.** Groundwork
+  for running it outside Electron: the reading and writing of the container are
+  Node's zlib and nothing else in that module is, so the part that decides what
+  a converted file should contain now has a door of its own. Nothing about a
+  conversion has changed — the same members come out, byte for byte.
+
 - **The Mac draws a preview for a model that has none.** A 3MF carries a picture
   its slicer made; an STL carries nothing but triangles, so a shop that imports
   a folder of them gets a library of identical grey cubes. The geometry is right
