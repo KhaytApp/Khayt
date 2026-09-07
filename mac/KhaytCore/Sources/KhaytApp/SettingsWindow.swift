@@ -516,8 +516,15 @@ struct OperationsPane: View {
                         ForEach(Draft.days, id: \.self) { day in
                             VStack(spacing: 2) {
                                 Text(shop.words.callIt("day." + day)).font(.caption).foregroundStyle(.secondary)
+                                // `.labelsHidden()`, or the empty label still
+                                // claims a Form's label column and shoves the
+                                // field to the right of it — which is why every
+                                // number sat 44 points right of the day it
+                                // belongs to, in a row whose whole job is to
+                                // put a figure under a weekday.
                                 TextField("", value: Binding(get: { draft.hours[day] ?? 0 }, set: { draft.hours[day] = $0 }),
                                           format: .number.precision(.fractionLength(0...1)))
+                                    .labelsHidden()
                                     .multilineTextAlignment(.center).frame(width: 52)
                             }
                         }
