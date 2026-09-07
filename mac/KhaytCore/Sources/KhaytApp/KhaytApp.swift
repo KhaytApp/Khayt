@@ -139,6 +139,38 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// launch; nil in a normal run because nothing else asks for it.
     static weak var subject: Shop?
 
+    /// `KHAYT_SNAPSHOT_SIZE=WxH` — photograph the app at somebody else's Mac.
+    ///
+    /// Every screen in this app had only ever been reviewed at one size, the
+    /// 1320x760 the window opens at, which is roughly a small laptop. That is
+    /// the size a layout is least likely to be wrong at, because it is the one
+    /// it was built against. A shop runs this full screen: a 13-inch Air is
+    /// 1470 points wide, a 16-inch 1710, a Studio Display 2560, an XDR 3008 —
+    /// and a column with a fixed maximum width looks composed at one of those
+    /// and abandoned at another.
+    ///
+    /// The size is set in POINTS on the content view, so it is independent of
+    /// how the display is scaled, and it may exceed the physical screen: an
+    /// off-screen window still lays out and still draws into a bitmap, which
+    /// is the whole reason a 6K layout can be checked on a laptop.
+    private static func resizeIfAsked() {
+        guard let spec = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SIZE"] else { return }
+        let parts = spec.lowercased().split(separator: "x")
+        guard parts.count == 2, let w = Double(parts[0]), let h = Double(parts[1]),
+              w >= 480, h >= 360 else {
+            FileHandle.standardError.write(Data("bad KHAYT_SNAPSHOT_SIZE \(spec)\n".utf8))
+            return
+        }
+        for window in NSApp.windows where window.isVisible && window.contentView != nil {
+            // `setContentSize` rather than `setFrame`, so the number asked for
+            // is the number the app gets to lay out in — a frame includes the
+            // title bar and would quietly give back a shorter window than the
+            // one being tested.
+            window.setContentSize(NSSize(width: w, height: h))
+        }
+        FileHandle.standardError.write(Data("window set to \(Int(w))x\(Int(h)) pt\n".utf8))
+    }
+
     static func run(into dir: URL) {
         // Every write below is `try?`, so a directory that is not there costs a
         // whole run and says nothing at all — 31 "wrote …" lines and no files.
@@ -196,6 +228,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             let want: NSAppearance.Name = dark ? .darkAqua : .aqua
             NSApp.appearance = NSAppearance(named: want)
             for window in NSApp.windows { window.appearance = NSAppearance(named: want) }
+            resizeIfAsked()
             // The window has to have laid out and drawn once. Two seconds is
             // generous; capturing an unlaid-out window yields a blank sheet.
             try? await Task.sleep(for: .seconds(2))
