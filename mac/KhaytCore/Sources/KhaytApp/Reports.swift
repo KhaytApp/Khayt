@@ -108,6 +108,17 @@ struct Reports: View {
             }
             .width(min: 110, ideal: 140)
         }
+        // NO ZEBRA. This table has one row per quarter — two of them on the
+        // shop's own book — and the stripes are drawn down the whole window
+        // whether there are rows in them or not, so a shop with a young book
+        // read two figures above a dozen empty grey bands and reasonably
+        // wondered what had failed to load. The same thing made the filament
+        // shelf look broken.
+        //
+        // Striping earns its keep across forty rows of similar numbers. It
+        // cannot here, because there will never be forty quarters, and the
+        // separators already carry the eye across a row this short.
+        .tableStyle(.inset(alternatesRowBackgrounds: false))
     }
 
     private func recompute() async {
