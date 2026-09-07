@@ -165,3 +165,51 @@ struct AddManyTests {
         #expect(totals == [3], "the total moved during the run")
     }
 }
+
+/// Catching up a library that came in before the app could do everything.
+@MainActor
+struct CatchUpTests {
+
+    static func file(ext: String, thumb: String?, key: String?) throws -> LibraryFile {
+        var o: [String: JSONValue] = [
+            "id": .string("PF-1"), "name": .string("m"),
+            "sourceFile": .object(["filename": .string("m.\(ext)"), "ext": .string(ext)]),
+        ]
+        if let thumb { o["thumbFile"] = .string(thumb) }
+        if let key { o["geometryKey"] = .string(key) }
+        return try JSONDecoder().decode(LibraryFile.self,
+                                        from: try JSONEncoder().encode(JSONValue.object(o)))
+    }
+
+    /// EITHER is enough. Fifteen of the shop's models were missing both,
+    /// because a text STL written on Windows read as no triangles at all — it
+    /// drew nothing and measured as nothing, from the same cause.
+    @Test("a model missing a picture, a measurement, or both is caught up")
+    func eitherIsEnough() throws {
+        #expect(ImportCommand.needsCatchingUp(try Self.file(ext: "stl", thumb: nil, key: nil)))
+        #expect(ImportCommand.needsCatchingUp(try Self.file(ext: "stl", thumb: nil, key: "12:1:1x1x1")))
+        #expect(ImportCommand.needsCatchingUp(try Self.file(ext: "stl", thumb: "thumb.png", key: nil)))
+        // An empty string is as missing as an absent one.
+        #expect(ImportCommand.needsCatchingUp(try Self.file(ext: "stl", thumb: "", key: "")))
+    }
+
+    /// So it is safe to run twice, and the second run does nothing.
+    @Test("a model that has both is left alone")
+    func idempotent() throws {
+        #expect(!ImportCommand.needsCatchingUp(
+            try Self.file(ext: "stl", thumb: "thumb.png", key: "12:1:1x1x1")))
+    }
+
+    /// A 3MF brings its own picture and is measured on the way in, and nothing
+    /// reads an OBJ's triangles yet — offering to catch those up would be a
+    /// promise this cannot keep.
+    @Test("only STLs are offered, whatever they are missing")
+    func onlyStl() throws {
+        for ext in ["3mf", "obj", "gcode", "stp"] {
+            #expect(!ImportCommand.needsCatchingUp(try Self.file(ext: ext, thumb: nil, key: nil)),
+                    "\(ext) was offered and cannot be caught up")
+        }
+        // Case does not decide it: a file named .STL is an STL.
+        #expect(ImportCommand.needsCatchingUp(try Self.file(ext: "STL", thumb: nil, key: nil)))
+    }
+}

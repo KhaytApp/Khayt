@@ -6,6 +6,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac draws a preview for a model that has none.** A 3MF carries a picture
+  its slicer made; an STL carries nothing but triangles, so a shop that imports
+  a folder of them gets a library of identical grey cubes. The geometry is right
+  there — the app already reads every triangle to measure the model — so it is
+  drawn: a three-quarter view, shaded, from the mesh itself. New models get one
+  as they are imported, and `Khayt --import --previews` catches up a library
+  that already exists, drawing a picture for a model that has none and recording
+  a measurement for one that was never measured. A model that has both is left
+  alone, so running it twice costs nothing.
+
 - **The Mac can write a 3MF, not only read one.** Groundwork for the converter,
   which is the last thing the Mac app cannot do that the Electron one can: it
   could already open a 3MF — it measures meshes and pulls thumbnails out of them
