@@ -140,6 +140,7 @@ final class Shop {
         case reports
         case catalogue
         case colour
+        case calculator
         case portfolio
         case giftCards
     }
@@ -156,6 +157,7 @@ final class Shop {
     var showingWaste: Bool { shelf == .waste }
     var showingReports: Bool { shelf == .reports }
     var showingColour: Bool { shelf == .colour }
+    var showingCalculator: Bool { shelf == .calculator }
     var showingPortfolio: Bool { shelf == .portfolio }
     var showingGiftCards: Bool { shelf == .giftCards }
 

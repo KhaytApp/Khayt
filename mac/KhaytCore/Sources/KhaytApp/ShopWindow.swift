@@ -59,6 +59,8 @@ struct ShopWindow: View {
                     Reports(shop: shop)
                 } else if shop.showingCatalogue {
                     Catalogue(shop: shop)
+                } else if shop.showingCalculator {
+                    Calculator(shop: shop)
                 } else if shop.showingColour {
                     ColourStudio(shop: shop)
                 } else if shop.showingPortfolio {
@@ -86,6 +88,7 @@ struct ShopWindow: View {
                    && !shop.showingMachines && !shop.showingInventory
                    && !shop.showingExpenses && !shop.showingWaste && !shop.showingReports
                    && !shop.showingCatalogue && !shop.showingColour && !shop.showingPortfolio
+                   && !shop.showingCalculator
                    && !shop.showingGiftCards },
             set: { showInspector = $0 }
         )) {
@@ -93,6 +96,7 @@ struct ShopWindow: View {
                 if shop.showingMachines || shop.showingInventory || shop.showingBoard
                     || shop.showingExpenses || shop.showingWaste || shop.showingReports
                     || shop.showingCatalogue || shop.showingColour || shop.showingPortfolio
+                    || shop.showingCalculator
                     || shop.showingGiftCards {
                     // Both screens carry their own detail — a card and a table
                     // wide enough to read. A panel beside them would repeat.
@@ -301,6 +305,7 @@ private struct OwedSummary: View {
         case .reports: "reports"
         case .catalogue: "catalogue"
         case .colour: "colour"
+        case .calculator: "calculator"
         case .portfolio: "portfolio"
         case .giftCards: "gift-cards"
         case .library(nil): "library"
@@ -338,6 +343,11 @@ private struct OwedSummary: View {
             return shop.catalogueRows.isEmpty ? nil : .catalogue
         case "colour":
             return .colour
+        case "calculator":
+            // Unconditional, unlike the catalogue above: this screen holds
+            // nothing, so there is no state it could restore into that has
+            // since gone away.
+            return .calculator
         case "gift-cards":
             // Unlike the catalogue and the portfolio, this restores even when
             // empty: a shop with no cards issued still has an Issue button to

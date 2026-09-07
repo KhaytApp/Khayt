@@ -585,6 +585,28 @@ final class Words {
         "mac.export_redacted": ["en": "API keys, passwords and access codes are removed from this copy.",
                                 "ar": "تُحذف مفاتيح الواجهات وكلمات المرور ورموز الوصول من هذه النسخة."],
         "mac.exported_to":   ["en": "Exported as", "ar": "صُدّرت باسم"],
+        // The calculator. The shared `calc.*` strings are the Electron form's
+        // and carry its step numbers — "1. Part & Material", "4. Build Cart &
+        // Quote" — which are a lie on a screen with two sections. Its field
+        // labels are reused where they read short; these are the rest.
+        "mac.calc_title":    ["en": "Calculator", "ar": "الحاسبة"],
+        "mac.calc_part":     ["en": "The part", "ar": "القطعة"],
+        "mac.calc_price":    ["en": "What to charge", "ar": "كم تطلب"],
+        "mac.calc_breakdown": ["en": "Where it goes", "ar": "أين يذهب"],
+        "mac.calc_cost":     ["en": "cost", "ar": "التكلفة"],
+        "mac.calc_weight":   ["en": "Weight", "ar": "الوزن"],
+        "mac.calc_time":     ["en": "Print time", "ar": "زمن الطباعة"],
+        "mac.calc_printer":  ["en": "Printer", "ar": "الطابعة"],
+        "mac.calc_nothing":  ["en": "Nothing to price yet",
+                              "ar": "لا شيء لتسعيره بعد"],
+        "mac.calc_nothing_hint": [
+            "en": "Put in a weight or a print time and this works out what the job costs you and what to charge for it.",
+            "ar": "أدخل وزناً أو زمن طباعة ليحسب تكلفة العمل والسعر المناسب له."],
+        "mac.any_filament":  ["en": "Any filament", "ar": "أي خيط"],
+        "mac.any_machine":   ["en": "Any machine", "ar": "أي طابعة"],
+        "mac.calc_no_filament": [
+            "en": "No filament chosen, so the plastic is not counted in this price.",
+            "ar": "لم يُختر خيط، لذا لا تشمل هذه التسعيرة تكلفة المادة."],
         "mac.export_accounting": ["en": "Export for the Accountant",
                                   "ar": "تصدير للمحاسب"],
         "mac.export_accounting_where": [

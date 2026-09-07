@@ -199,6 +199,13 @@ private struct GoMenu: View {
             .keyboardShortcut("8", modifiers: .command)
         Button(Words.upfront("cat.title")) { shop.shelf = .catalogue }
             .keyboardShortcut("6", modifiers: .command)
+        // ⇧⌘K, not a digit: ⌘0 through ⌘9 are all taken, and SwiftUI does not
+        // warn about a clash — it drops the shortcut on the second claimant, so
+        // adding a second ⌘9 here would have quietly cost Expenses its key and
+        // given this nothing. Checked the whole app's shortcuts rather than
+        // guessing at a free one.
+        Button(Words.upfront("mac.calc_title")) { shop.shelf = .calculator }
+            .keyboardShortcut("k", modifiers: [.command, .shift])
 
         Divider()
         // Three screens the sidebar has always had and this menu never listed,
