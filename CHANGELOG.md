@@ -795,6 +795,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **The Mac's profit-and-loss table stops spreading across a wide display.** A
+  table hands its spare width to its columns, which on a desktop screen put a
+  quarter's name and its net income fifteen hundred points apart — the two ends
+  of a row somebody has to read as one line. The app's other three tables can
+  afford that because they stripe their rows, and zebra is what carries an eye
+  across a wide row; this is the only one with striping switched off, on purpose,
+  because it holds one row per quarter and stripes down an empty window looked
+  like a screen that had failed to load. So it had nothing to carry the eye and
+  now simply does not spread: every column has a ceiling and the table ends where
+  the figures do. A figure is no more readable at four hundred points than at a
+  hundred and forty.
+
 - **The Mac's dashboard uses a big display instead of sitting in the corner of
   one.** Its content is held to a readable column so that a job's name and how
   late it is are not a hand's width apart — and on a desktop display that left

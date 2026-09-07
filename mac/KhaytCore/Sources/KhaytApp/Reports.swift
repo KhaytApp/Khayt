@@ -66,15 +66,15 @@ struct Reports: View {
             TableColumn(shop.words.callIt("an.pnl_period"), value: \.period) { r in
                 Text(r.period).font(.body.weight(.semibold)).monospacedDigit()
             }
-            .width(min: 80, ideal: 100)
+            .width(min: 80, ideal: 100, max: 160)
             TableColumn(shop.words.callIt("an.pnl_orders"), value: \.orders) { r in
                 Text("\(r.orders)").monospacedDigit()
             }
-            .width(min: 60, ideal: 80)
+            .width(min: 60, ideal: 80, max: 120)
             TableColumn(shop.words.callIt("an.revenue"), value: \.revenue) { r in
                 Text(Money.text(r.revenue, shop.currency)).monospacedDigit()
             }
-            .width(min: 110, ideal: 140)
+            .width(min: 110, ideal: 140, max: 220)
             TableColumn(shop.words.callIt("an.pnl_expenses"), value: \.expenses) { r in
                 // What was spent AND the overhead charged to the period, which
                 // is the figure the net is worked out from. Two numbers in one
@@ -96,18 +96,18 @@ struct Reports: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .width(min: 120, ideal: 160)
+            .width(min: 120, ideal: 160, max: 240)
             TableColumn(shop.words.callIt("an.pnl_vat"), value: \.vatCollected) { r in
                 Text(Money.text(r.vatCollected, shop.currency))
                     .monospacedDigit().foregroundStyle(.secondary)
             }
-            .width(min: 100, ideal: 130)
+            .width(min: 100, ideal: 130, max: 200)
             TableColumn(shop.words.callIt("an.pnl_net"), value: \.net) { r in
                 Text(Money.text(r.net, shop.currency))
                     .font(.body.weight(.semibold)).monospacedDigit()
                     .foregroundStyle(r.net >= 0 ? AnyShapeStyle(.primary) : AnyShapeStyle(Khayt.late))
             }
-            .width(min: 110, ideal: 140)
+            .width(min: 110, ideal: 140, max: 220)
         }
         // NO ZEBRA. This table has one row per quarter — two of them on the
         // shop's own book — and the stripes are drawn down the whole window
@@ -119,6 +119,22 @@ struct Reports: View {
         // Striping earns its keep across forty rows of similar numbers. It
         // cannot here, because there will never be forty quarters, and the
         // separators already carry the eye across a row this short.
+        // EVERY COLUMN HAS A CEILING, and this is the one table that needs
+        // one.
+        //
+        // A `Table` spreads its spare width across its columns, which on a
+        // 2560-point display put a quarter's name and its net income fifteen
+        // hundred points apart — the two ends of a row somebody has to read as
+        // one line. The other three tables in this app can afford that: they
+        // stripe their rows, and zebra is what carries an eye across a wide
+        // row. This is the only one with striping switched OFF — deliberately,
+        // because it holds one row per quarter and stripes down an empty
+        // window looked like a screen that had failed to load — so it has
+        // nothing to carry the eye and must not spread in the first place.
+        //
+        // The slack goes nowhere and the table simply ends. That is the right
+        // answer for six columns of money: a figure is as readable at 140
+        // points as at 400, and the space is better spent as nothing.
         .tableStyle(.inset(alternatesRowBackgrounds: false))
         // The app's ground shows through rather than the system's white.
         //
