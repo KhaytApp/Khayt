@@ -93,6 +93,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **An invoice draws the Saudi Riyal mark instead of trusting the reader's
+  fonts.** Every price in the app already carried the official mark; the
+  document a customer is actually handed still said "SAR", because the invoice
+  formats against a currency table that predates it. The app can afford the
+  character — it asks the system whether the font it is drawing in has the glyph
+  and says SAR when it does not. **A PDF cannot ask.** It is opened on a machine
+  the app will never see, in a reader whose fonts it cannot inspect, and the
+  codepoint only arrived with the mark in 2025 — so on anything older a price
+  renders as an empty box on a customer's invoice, which is worse than the
+  letters. So the mark is geometry now, the official symbol drawn as a path,
+  which needs no font at all. Every other currency keeps its own symbol, and
+  nothing about the ZATCA QR changes: it carries the total and the tax as
+  numbers and never saw the symbol.
+
 - **The Mac app looks like Khayt now, rather than like a SwiftUI app.** The
   palette was already chosen and contrast-checked, and almost none of it reached
   the screen: every panel in the app was the same grey rounded rectangle, so

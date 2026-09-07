@@ -80,6 +80,55 @@ function contactLine(client, escape) {
   return `<div class="name-sub">${bits}</div>`;
 }
 
+/**
+ * The Saudi Riyal mark, drawn.
+ *
+ * ── WHY A PATH AND NOT THE CHARACTER ──────────────────────────────────────
+ *
+ * The app itself prints U+20C1 — it can ask CoreText at runtime whether the
+ * face it is drawing in has the glyph and fall back to "SAR" when it does not.
+ * **A document cannot ask.** An invoice is exported to PDF and opened on a
+ * machine this app will never see, in a reader with fonts it cannot inspect,
+ * and a price that renders as an empty box on a customer's invoice is worse
+ * than one that says SAR. The codepoint arrived with the mark in 2025, so any
+ * font older than that has nothing at that position.
+ *
+ * So the mark is geometry: `Saudi_Riyal_Symbol.svg` from Wikimedia Commons,
+ * the same source and the same two paths the storefront uses. Geometry needs
+ * no font.
+ *
+ * `currentColor` so it takes the colour of the text it sits in — the line
+ * amounts wrap it in a muted span and the total does not. Sized from the
+ * viewBox's own ratio in `invoice.css` so it cannot squash.
+ *
+ * The `<title>` is what a screen reader says. Note the trade-off taken here:
+ * a drawn mark is not text, so a machine reading the PDF back gets the figure
+ * without a currency beside it. That is the price of the glyph being certain,
+ * and the ZATCA QR — which is the thing software actually parses — carries the
+ * total and the tax as numbers regardless.
+ */
+const RIYAL_SVG =
+  '<svg class="riyal" viewBox="0 0 1124.14 1256.39" role="img" aria-label="SAR" ' +
+  'xmlns="http://www.w3.org/2000/svg" fill="currentColor" focusable="false">' +
+  '<title>SAR</title>' +
+  '<path d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"/>' +
+  '<path d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"/>' +
+  '</svg>';
+
+/**
+ * How a currency is SHOWN on the document — the drawn mark for the riyal, the
+ * escaped symbol or code for everything else.
+ *
+ * Display only. Nothing that is stored, totalled, or packed into the ZATCA QR
+ * goes through here: `zatca-qr.js` builds its TLV from `String(total)` and the
+ * VAT amount, so the mark cannot reach a scanner.
+ */
+function currencyMarkHtml(code, symbol, escapeHtml) {
+  return String(code).toUpperCase() === 'SAR'
+    ? RIYAL_SVG
+    : escapeHtml(String(symbol == null ? '' : symbol));
+}
+
 function invoiceHtml(order, ctx) {
   const {
     qrSvg, qrProblem = null, payQrSvg = '', total, vatAmount, subtotal,
@@ -109,7 +158,11 @@ function invoiceHtml(order, ctx) {
   // Feature 1: use the order's currency (per-order override, else client, else base)
   const invCurrencyCode = (typeof orderCurrency === 'function') ? orderCurrency(order) : clientCurrency(order.clientId);
   const invCurObj = CURRENCIES[invCurrencyCode] || CURRENCIES[settings.currency] || CURRENCIES.SAR;
-  const invCurrSym = invCurObj.symbol;
+  // The drawn mark for SAR; the plain symbol for everything else. Named
+  // `…Html` because it is markup now and must never be escaped again at a call
+  // site, nor used anywhere a plain string is wanted.
+  const invCurrSym = currencyMarkHtml(invCurrencyCode || settings.currency || 'SAR',
+                                      invCurObj.symbol, escapeHtml);
 
   // Direction follows the current app language, and the primary label (larger,
   // bolder) matches it.
@@ -495,7 +548,8 @@ function invoiceHtml(order, ctx) {
             const xrate = (settings.exchangeRates || {})[orderCur];
             if (orderCur && orderCur !== baseCur && xrate && xrate > 0) {
               const convertedAmt = fmtMoney((+order.price || 0) * xrate);
-              const baseSym = (CURRENCIES[baseCur] || CURRENCIES.SAR).symbol;
+              const baseSym = currencyMarkHtml(baseCur,
+                                (CURRENCIES[baseCur] || CURRENCIES.SAR).symbol, escapeHtml);
               return `<div class="row" style="opacity:0.65;font-size:11px;border-top:1px dashed rgba(0,0,0,0.1);padding-top:4px;margin-top:4px;">
                 <span class="label-en">${escapeHtml(isAr ? `المبلغ بـ ${baseCur}` : `Amount in ${baseCur}`)}</span>
                 <span class="v">${convertedAmt}<span class="unit">${escapeHtml(baseSym)}</span></span>
