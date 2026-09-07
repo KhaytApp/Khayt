@@ -35,7 +35,7 @@ struct ExpenseSheet: View {
                             .textFieldStyle(.roundedBorder).monospacedDigit()
                             .focused($focused)
                             .onSubmit(commit)
-                        Text(shop.currency).foregroundStyle(.secondary)
+                        Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                     }
                 }
                 GridRow {
@@ -170,7 +170,7 @@ struct WasteSheet: View {
                     HStack(spacing: 4) {
                         TextField("", value: $cost, format: .number.precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit()
-                        Text(shop.currency).foregroundStyle(.secondary)
+                        Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                     }
                 }
                 GridRow {

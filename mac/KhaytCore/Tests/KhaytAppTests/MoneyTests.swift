@@ -17,7 +17,12 @@ struct MoneyTests {
     func moneyKeepsTwoPlaces() {
         #expect(Money.figure(50) == "50.00")
         #expect(Money.figure(46.694) == "46.69")
-        #expect(Money.text(575, "SAR") == "575.00 SAR")
+        // The MARK is whatever this Mac can draw — U+20C1 where the font has
+        // it, "SAR" where it does not — and that is `CurrencyMarkTests`'
+        // business. What this line is about is the two decimal places, so it
+        // asks for the token rather than pinning one and failing on half the
+        // Macs in the world.
+        #expect(Money.text(575, "SAR") == "575.00 \(Money.mark("SAR"))")
     }
 
     /// The distinction this file exists for.
@@ -40,9 +45,10 @@ struct MoneyTests {
     /// trailing zero beside one that kept it.
     @Test("a dashboard tile rubs off the small change above ten thousand")
     func tilesRound() {
-        #expect(Money.short(52_691.57, "SAR") == "52,692 SAR")
-        #expect(Money.short(1_243.08, "SAR") == "1,243.08 SAR")
-        #expect(Money.short(839.3, "SAR") == "839.30 SAR", "and keeps its zero")
+        let sar = Money.mark("SAR")
+        #expect(Money.short(52_691.57, "SAR") == "52,692 \(sar)")
+        #expect(Money.short(1_243.08, "SAR") == "1,243.08 \(sar)")
+        #expect(Money.short(839.3, "SAR") == "839.30 \(sar)", "and keeps its zero")
     }
 
     /// Not a preference: this is why the columns line up.

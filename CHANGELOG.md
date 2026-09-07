@@ -52,6 +52,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **Prices on the Mac carry the Saudi Riyal mark, not the letters SAR.** Every
+  figure, every unit label beside a money field, and the OWED badge in the
+  toolbar. On a Mac whose system font does not have the mark — it arrived with
+  the font after the symbol was adopted in 2025 — the letters stay, because a
+  price that is an empty box is worse than one that is merely older. Other
+  currencies keep their codes.
+
 - **The Mac's jobs table stops showing columns this book never fills.** A shop
   whose work is auto-logged from its printers names no customer and promises no
   date on any job, so two of the six columns said so on every row — four of the

@@ -190,3 +190,54 @@ struct PrintFitTests {
         }
     }
 }
+
+/// The mark a shop's money is written with.
+@MainActor
+struct CurrencyMarkTests {
+    /// U+20C0 is the codepoint everyone reaches for and it draws an empty box:
+    /// it falls through to `LastResort`, Apple's tofu font, on this Mac and on
+    /// an iPhone before it. The mark the system font actually carries is
+    /// U+20C1, and this test exists so nobody "corrects" it back.
+    @Test("the riyal is U+20C1, never U+20C0")
+    func theRightCodepoint() {
+        let source = BannerTests.source("Money.swift")
+        #expect(source.contains("\\u{20C1}"), "the riyal mark moved off U+20C1")
+        #expect(!source.contains("\\u{20C0}") || source.contains("NOT U+20C0"),
+                "U+20C0 is being drawn, which is a box")
+    }
+
+    /// Only SAR, and only where the glyph exists. Every other currency keeps
+    /// its code — one symbol for one shop must not become an assumption that
+    /// every currency has one.
+    @Test("other currencies keep their codes")
+    func othersUnchanged() {
+        for code in ["USD", "EUR", "AED", "GBP"] {
+            #expect(Money.mark(code) == code)
+            #expect(Money.text(1234.5, code).hasSuffix(" \(code)"))
+        }
+    }
+
+    /// The fallback is the behaviour of yesterday, not a blank.
+    @Test("SAR is either the mark or the letters, never nothing")
+    func neverEmpty() {
+        let mark = Money.mark("SAR")
+        #expect(!mark.isEmpty)
+        #expect(mark == "\u{20C1}" || mark == "SAR",
+                "SAR rendered as something that is neither the mark nor the code: \(mark)")
+        // And whichever it is, a figure carries it.
+        #expect(Money.text(1243.08, "SAR").contains(mark))
+        #expect(Money.short(52691.57, "SAR").contains(mark))
+    }
+
+    /// On a Mac whose font has the glyph, it is used. This asserts the machine
+    /// the tests run on rather than the app — if it ever fails on a modern Mac,
+    /// the detection has broken rather than the font.
+    @Test("where the font has the glyph, the mark is what is shown")
+    func usesItWhenAvailable() {
+        if Money.drawsTheRiyal {
+            #expect(Money.mark("SAR") == "\u{20C1}")
+        } else {
+            #expect(Money.mark("SAR") == "SAR")
+        }
+    }
+}

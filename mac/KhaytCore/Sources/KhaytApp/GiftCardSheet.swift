@@ -45,7 +45,7 @@ struct GiftCardSheet: View {
                         TextField("", value: $balance,
                                   format: .number.precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
-                        Text(shop.currency).foregroundStyle(.secondary)
+                        Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                     }
                 }
                 LabeledContent(shop.words.callIt("giftCardIssuedTo")) {

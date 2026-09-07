@@ -8,13 +8,52 @@ import SwiftUI
 /// Electron app sets money in the proportional UI face inside a flex row, and
 /// the columns wander by a character or two down the page.
 enum Money {
+
+    // MARK: - The mark a currency is written with
+
+    /// The official Saudi Riyal sign, U+20C1.
+    ///
+    /// NOT U+20C0, which is the codepoint everyone reaches for and which draws
+    /// an empty box: measured on this Mac, it falls through to `LastResort` —
+    /// Apple's tofu font — and it did the same on an iPhone. U+20C1 is what the
+    /// system font actually carries the mark at.
+    private static let riyal = "\u{20C1}"
+
+    /// Does the font this Mac draws with actually have it?
+    ///
+    /// ── ASKED, NOT ASSUMED ────────────────────────────────────────────────
+    ///
+    /// The mark was adopted in 2025 and the glyph arrived with a system font
+    /// after it. This package runs on macOS 14, where it is not there — and a
+    /// shop whose prices are empty boxes is worse served than one reading
+    /// "SAR", which is what it read yesterday and is not wrong, only older.
+    ///
+    /// So the question is put to CoreText once, on the face the app draws in,
+    /// and the answer decides. There is no version check here on purpose: what
+    /// matters is whether the glyph exists, and a font can arrive in a point
+    /// release that no `if #available` knows about.
+    static let drawsTheRiyal: Bool = {
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        var chars = Array(riyal.utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: chars.count)
+        let ok = CTFontGetGlyphsForCharacters(font, &chars, &glyphs, chars.count)
+        return ok && glyphs.allSatisfy { $0 != 0 }
+    }()
+
+    /// How to write this currency: its own mark where there is one, its code
+    /// otherwise. Every other currency keeps its code, which is what stops the
+    /// one symbol this shop uses becoming an assumption about the rest.
+    static func mark(_ currency: String) -> String {
+        currency.uppercased() == "SAR" && drawsTheRiyal ? riyal : currency
+    }
+
     static func text(_ amount: Double, _ currency: String) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
         f.minimumFractionDigits = 2
         f.maximumFractionDigits = 2
         let n = f.string(from: amount as NSNumber) ?? "\(amount)"
-        return "\(n) \(currency)"
+        return "\(n) \(mark(currency))"
     }
 
     /// Just the figure, for columns where the currency is stated once at the top
@@ -53,7 +92,7 @@ enum Money {
         f.maximumFractionDigits = places
         f.minimumFractionDigits = places
         let n = f.string(from: amount as NSNumber) ?? "\(amount)"
-        return "\(n) \(currency)"
+        return "\(n) \(mark(currency))"
     }
 }
 
