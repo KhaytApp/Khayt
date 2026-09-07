@@ -585,6 +585,11 @@ final class Words {
         "mac.export_redacted": ["en": "API keys, passwords and access codes are removed from this copy.",
                                 "ar": "تُحذف مفاتيح الواجهات وكلمات المرور ورموز الوصول من هذه النسخة."],
         "mac.exported_to":   ["en": "Exported as", "ar": "صُدّرت باسم"],
+        "mac.export_accounting": ["en": "Export for the Accountant",
+                                  "ar": "تصدير للمحاسب"],
+        "mac.export_accounting_where": [
+            "en": "Two files are written here: one of invoices and one of expenses.",
+            "ar": "يُكتب هنا ملفان: ملف للفواتير وآخر للمصروفات."],
         "mac.export_failed": ["en": "Nothing was exported:", "ar": "لم يُصدَّر شيء:"],
         // Who the shop's money came from, and what it is asked for. Khayt has
         // its own words for the two lists; this is the name of the page that

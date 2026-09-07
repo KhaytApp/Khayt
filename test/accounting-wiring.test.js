@@ -9,6 +9,7 @@ test('ordersToInvoiceRows maps non-quote orders; buildInvoiceCsv applies VAT spl
   require('../renderer/format.js');
   require('../renderer/currency.js');
   require('../lib/tax.js');          // sets globalThis.KhaytTax — money paths need it
+  require('../lib/accounting-rows.js'); // sets globalThis.KhaytAccountingRows — the row shape
   const acct = require('../lib/accounting-export.js');
   const exp = require('../renderer/expenses.js');
 
@@ -37,6 +38,7 @@ test('ordersToInvoiceRows maps non-quote orders; buildInvoiceCsv applies VAT spl
 test('VAT disabled → vatRate 0 on rows', () => {
   require('../renderer/currency.js');
   require('../lib/tax.js');          // sets globalThis.KhaytTax — money paths need it
+  require('../lib/accounting-rows.js'); // sets globalThis.KhaytAccountingRows — the row shape
   const exp = require('../renderer/expenses.js');
   global.settings = { currency: 'SAR', enableVat: false };
   global.clients = [];
