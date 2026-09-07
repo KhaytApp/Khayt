@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac app converts a 3MF.** Retarget a model to another printer, or
+  normalise it to a clean standard 3MF, without Electron running. The container
+  is opened and rebuilt by the Mac itself and the decisions come from the same
+  shared rule the other app uses, so a file converted on either opens the same.
+  The geometry never enters the app at all — it is copied across still
+  compressed — which is how a conversion cannot corrupt it. The two colour
+  strategies that rewrite the model itself, Full Spectrum and band-swap, say so
+  plainly and stay in Khayt for now.
+
 - **The 3MF converter's decisions can now be asked for on their own.** Groundwork
   for running it outside Electron: the reading and writing of the container are
   Node's zlib and nothing else in that module is, so the part that decides what

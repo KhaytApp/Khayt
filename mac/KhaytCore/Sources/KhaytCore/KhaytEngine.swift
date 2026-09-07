@@ -50,6 +50,23 @@ public actor KhaytEngine {
         // out of `mf-convert` it could only be asked during a conversion — by
         // the one app that can run one.
         "print-fit",
+        // ── THE CONVERTER ────────────────────────────────────────────────
+        //
+        // In dependency order, because each reads the one above it off the
+        // global: the profiles and the two colour strategies first, then the
+        // mixer, the mesh codec that needs it, and the converter last.
+        //
+        // `mf-convert` also reaches for `zip-read` and `zip-write`, and it does
+        // NOT get them: both are built on Node's zlib and neither can exist
+        // here. That is the whole design — `convertMembers` never touches a
+        // zip, and Swift does the reading and writing at the two ends.
+        "printer-profiles",
+        "color-bands",
+        "swap-pauses",
+        "filament-mixer",
+        "mf-mesh",
+        "full-spectrum",
+        "mf-convert",
         "kpi-rows",
         "kpi",
         // What needs a shop's attention, and the figures on the dashboard.
@@ -438,6 +455,54 @@ public actor KhaytEngine {
         try runtime.call2("KhaytColor.gradient(ARG0, ARG1, ARG2)",
                           [.string(a), .string(b), .number(Double(steps))],
                           as: [String].self)
+    }
+
+    // MARK: - Converting a 3MF
+
+    /// What a converted 3MF should contain.
+    ///
+    /// `lib/mf-convert.js`'s `convertMembers`: members in, members out. The
+    /// zip at either end is Swift's, because `zip-read` and `zip-write` are
+    /// built on Node's zlib and cannot exist here — which is the reason this
+    /// module could not be loaded at all until its decisions were given a door.
+    ///
+    /// A member the conversion did not touch comes back with NO data, only its
+    /// name. That is not an omission: it means "copy the bytes that were
+    /// already there", and it is what keeps a 400 MB mesh out of this process
+    /// entirely. The caller must copy it from the file it read.
+    public struct ConvertedMember: Decodable, Sendable {
+        public let name: String
+        /// The new contents, when this member was rewritten. Nil means the
+        /// original bytes, unchanged.
+        public let text: String?
+    }
+
+    public struct Conversion: Decodable, Sendable {
+        public let ok: Bool
+        public let error: String?
+        public let members: [ConvertedMember]?
+        public let report: JSONValue?
+    }
+
+    public func convertMembers(_ members: [JSONValue],
+                               options: [String: JSONValue]) throws -> Conversion {
+        try runtime.call2("""
+            (function (members, opts) {
+              const planned = KhaytMfConvert.convertMembers(members, opts);
+              if (!planned.ok) return { ok: false, error: planned.error };
+              return {
+                ok: true,
+                report: planned.report,
+                // `data` is a Buffer in Node and a string here, so what comes
+                // back is the TEXT of a rewritten member and nothing at all for
+                // one that was left alone. A config is XML or JSON; the members
+                // this rewrites are never binary.
+                members: planned.members.map((m) => (
+                  m.data == null ? { name: m.name } : { name: m.name, text: String(m.data) }
+                )),
+              };
+            })(ARG0, ARG1)
+            """, [.array(members), .object(options)], as: Conversion.self)
     }
 
     // MARK: - The shelf
