@@ -111,7 +111,14 @@ public final class JSRuntime {
                           "quote-followup": "KhaytQuoteFollowUp",
                           // `color-mix.js` publishes `KhaytColor` — the file is
                           // named for the mixing, the global for the subject.
-                          "color-mix": "KhaytColor"]
+                          "color-mix": "KhaytColor",
+                          // The converter's chain. Three of these are named for
+                          // what they produce rather than for their global, and
+                          // one of them — `mf-mesh` — is read under a THIRD name
+                          // by two of its own callers, which had never mattered
+                          // because both reached it through `require`.
+                          "filament-mixer": "filamentMixer",
+                          "full-spectrum": "fullSpectrum"]
         if let known = exceptions[module] { return known }
         let camel = module.split(separator: "-").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()
         return "Khayt\(camel)"

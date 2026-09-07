@@ -48,9 +48,16 @@ struct BundledLogicIsNotAForkTests {
         // here and then throw at its first call — from inside a screen.
         for module in KhaytEngine.modules {
             let source = try String(contentsOf: Self.repoRoot.appending(path: "lib/\(module).js"), encoding: .utf8)
+            // ANCHORED PER LINE, or the `//` stripper does nothing at all:
+            // without it `$` is the end of the whole file, so a line comment is
+            // never matched and only block comments were being removed. Two
+            // modules joined the list carrying the word "process." in ordinary
+            // prose — "hang the main process." — and the guard read them as
+            // Node dependencies. It has been blind to line comments since it
+            // was written; nothing had tripped it before.
             let stripped = source
                 .replacing(#/\/\*[\s\S]*?\*\//#, with: "")
-                .replacing(#/(^|[^:])\/\/.*$/#.ignoresCase(), with: "")
+                .replacing(#/(^|[^:])\/\/[^\n]*/#, with: "$1")
             #expect(!stripped.contains("require('fs')"), "\(module).js now requires fs")
             #expect(!stripped.contains("require('path')"), "\(module).js now requires path")
             #expect(!stripped.contains("require('crypto')"), "\(module).js now requires crypto")
