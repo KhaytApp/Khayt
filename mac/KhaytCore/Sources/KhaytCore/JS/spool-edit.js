@@ -45,6 +45,17 @@
         // A kilo is the default, and the floor is one gram: a spool weighing
         // nothing divides into every cost-per-gram in the app.
         weight: Math.max(1, num(i.weight, 1000)),
+        // WHAT IT WEIGHED WHEN IT ARRIVED, written once and never touched
+        // again. `weight` is what is LEFT and falls as the shop prints, so
+        // anything that divides the spool's price by it drifts: a 1 kg roll
+        // bought at 75 reads 150 once half gone, and 2,000 on one nearly
+        // empty. That is the figure a shop compares two suppliers with, and it
+        // was wrong on exactly the spools it most wanted to reorder.
+        //
+        // Only for spools bought from now on. Neither book records this for
+        // one already on the shelf, and it cannot be recovered — a shop that
+        // has used half a roll no longer has any record of the other half.
+        spoolWeight: Math.max(1, num(i.weight, 1000)),
         color: i.color || '#888888',
         purchasedAt: c.today,
         materialType: i.materialType || 'fdm',

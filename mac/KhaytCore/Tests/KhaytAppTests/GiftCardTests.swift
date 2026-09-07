@@ -291,3 +291,47 @@ struct LicenceStandingTests {
         }
     }
 }
+
+/// What a kilo of filament cost.
+@MainActor
+struct CostPerKiloTests {
+
+    static func spool(cost: Double?, weight: Double?, original: Double?) throws -> Spool {
+        var o: [String: JSONValue] = ["id": .string("INV-1"), "material": .string("PLA")]
+        if let cost { o["cost"] = .number(cost) }
+        if let weight { o["weight"] = .number(weight) }
+        if let original { o["spoolWeight"] = .number(original) }
+        return try JSONDecoder().decode(Spool.self,
+                                        from: try JSONEncoder().encode(JSONValue.object(o)))
+    }
+
+    /// THE BUG THIS REPLACES. A 1 kg roll bought at 75 is 75 a kilo when it is
+    /// full and 75 a kilo when it is nearly gone — the price it was bought at
+    /// does not change because the shop printed with it. Dividing by what is
+    /// left said 375 once 800 g had been used, on exactly the spool a shop is
+    /// about to reorder.
+    @Test("the rate does not climb as the spool empties")
+    func steady() throws {
+        let full = try Self.spool(cost: 75, weight: 1000, original: 1000)
+        let nearlyGone = try Self.spool(cost: 75, weight: 200, original: 1000)
+        #expect(full.costPerKilo == 75)
+        #expect(nearlyGone.costPerKilo == 75, "the rate moved as the roll was used")
+    }
+
+    /// Nil, not a guess. A spool bought before the original weight was recorded
+    /// cannot have one worked out — half the roll is gone and nothing wrote
+    /// down how much there was. The shelf shows what it cost instead.
+    @Test("a spool that never recorded its original weight has no rate")
+    func unknowable() throws {
+        #expect(try Self.spool(cost: 75, weight: 400, original: nil).costPerKilo == nil)
+        #expect(try Self.spool(cost: nil, weight: 1000, original: 1000).costPerKilo == nil)
+        #expect(try Self.spool(cost: 75, weight: 1000, original: 0).costPerKilo == nil)
+    }
+
+    /// A part-roll bought as a part-roll: 500 g for 40 is 80 a kilo, and the
+    /// arithmetic must not assume every spool is a kilo.
+    @Test("a half-kilo spool is priced per kilo, not per spool")
+    func notAlwaysAKilo() throws {
+        #expect(try Self.spool(cost: 40, weight: 500, original: 500).costPerKilo == 80)
+    }
+}

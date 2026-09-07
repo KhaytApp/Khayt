@@ -160,7 +160,20 @@ test('the module and the original agree over 3000 generated new spools', () => {
       locationId: pick(r, [undefined, '', 'LOC-1']),
     };
     const ctx = { id: 'INV-' + i, today: '2026-09-04', activeLocation: pick(r, [null, '', 'LOC-2']) };
-    assert.deepEqual(newSpool(form, ctx), runOriginalAdd(form, ctx), JSON.stringify(form));
+    const made = newSpool(form, ctx);
+    const original = runOriginalAdd(form, ctx);
+
+    // `spoolWeight` is NEW and the original renderer never wrote it, so it is
+    // checked against the module's own `weight` and then set aside. Comparing
+    // it to the original would be asking a 2026 function about a field added
+    // after it — the equivalence this test exists for is about the fields both
+    // sides have opinions on.
+    if (made.spool) {
+      assert.equal(made.spool.spoolWeight, made.spool.weight,
+        'a new spool arrives at the weight it is bought with: ' + JSON.stringify(form));
+      delete made.spool.spoolWeight;
+    }
+    assert.deepEqual(made, original, JSON.stringify(form));
   }
 });
 
@@ -252,4 +265,37 @@ test('the renderer writes no spool of its own any more', () => {
     'a new spool must come from the shared rule');
   assert.doesNotMatch(body, /inventory\.push\(\{/,
     'and the renderer must not build the record itself, or the two apps drift');
+});
+
+// ── what it weighed when it arrived ───────────────────────────────────────
+
+test('a new spool records the weight it came with, not just what is left', () => {
+  const made = newSpool({ material: 'PLA', cost: 75, weight: 1000 },
+                           { id: 'INV-1', today: '2026-09-07' });
+  assert.equal(made.spool.weight, 1000, 'what is left, today');
+  assert.equal(made.spool.spoolWeight, 1000, 'and what it arrived as');
+});
+
+// THE REASON IT EXISTS. `weight` falls as the shop prints, so any figure that
+// divides the spool's price by it drifts: a 1 kg roll bought at 75 reads 150
+// half way down and 375 with 200 g left — the supplier-comparison number,
+// wrong on exactly the spool a shop is about to reorder.
+test('the original weight is what a cost-per-kilo can be trusted to', () => {
+  const made = newSpool({ material: 'PLA', cost: 75, weight: 1000 }, { id: 'INV-1' });
+  const spool = made.spool;
+  spool.weight = 200;                              // 800 g printed
+  assert.equal(spool.cost / (spool.spoolWeight / 1000), 75, 'the rate moved');
+  assert.notEqual(spool.cost / (spool.weight / 1000), 75, 'the old sum was already right');
+});
+
+test('a part-roll records the part-roll', () => {
+  const made = newSpool({ material: 'PETG', cost: 40, weight: 500 }, { id: 'INV-2' });
+  assert.equal(made.spool.spoolWeight, 500);
+});
+
+// The same floor as `weight`: a spool weighing nothing divides into every
+// cost-per-gram in the app.
+test('the original weight has the same one-gram floor', () => {
+  assert.equal(newSpool({ material: 'PLA', weight: 0 }, {}).spool.spoolWeight, 1);
+  assert.equal(newSpool({ material: 'PLA' }, {}).spool.spoolWeight, 1000, 'a kilo by default');
 });
