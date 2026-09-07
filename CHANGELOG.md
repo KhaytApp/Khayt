@@ -15,8 +15,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   says so in words as well as colour. A model nobody has recorded a licence for
   says **nothing** — not knowing is not the same as not being allowed.
 
-- **The Mac app converts a 3MF.** Retarget a model to another printer, or
-  normalise it to a clean standard 3MF, without Electron running. The container
+- **The Mac app converts a 3MF.** Right-click a model in the library and pick
+  **Convert for** — twenty-two printers, or a clean standard 3MF — and choose
+  where to save it. Retarget a model to another printer, or normalise it,
+  without Electron running. The container
   is opened and rebuilt by the Mac itself and the decisions come from the same
   shared rule the other app uses, so a file converted on either opens the same.
   The geometry never enters the app at all — it is copied across still
