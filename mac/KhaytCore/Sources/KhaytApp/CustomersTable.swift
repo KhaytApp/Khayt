@@ -109,9 +109,7 @@ struct CustomersTable: View {
                 if !shop.search.isEmpty {
                     ContentUnavailableView.search(text: shop.search)
                 } else {
-                    ContentUnavailableView(shop.words.callIt("mac.no_customers"),
-                        systemImage: "person.2",
-                        description: Text(shop.words.callIt("mac.no_customers_hint")))
+                    EmptyHere(title: shop.words.callIt("mac.no_customers"), message: shop.words.callIt("mac.no_customers_hint"))
                 }
             }
         }
@@ -233,8 +231,7 @@ struct CustomerInspector: View {
                 .padding(16)
             }
         } else {
-            ContentUnavailableView(shop.words.callIt("mac.no_customer"), systemImage: "person",
-                                   description: Text(shop.words.callIt("mac.no_customer_hint")))
+            EmptyHere(title: shop.words.callIt("mac.no_customer"), message: shop.words.callIt("mac.no_customer_hint"))
         }
     }
 }

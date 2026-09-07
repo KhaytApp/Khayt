@@ -139,6 +139,59 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// launch; nil in a normal run because nothing else asks for it.
     static weak var subject: Shop?
 
+    /// Photograph a view no book can reach.
+    ///
+    /// The empty states are the problem this solves. There are twenty of them
+    /// and the sample book fills every screen it has, so not one of the
+    /// fifty-one pictures this harness takes contains a single one — which
+    /// means they could be redrawn, or broken, and every screenshot would look
+    /// fine. That is the same trap as a screen that ships showing its empty
+    /// state, running the other way.
+    ///
+    /// `ImageRenderer` rather than a window: these are plain shapes and text,
+    /// which it draws correctly, and no book state has to be faked to see them.
+    @MainActor
+    private static func captureDetached(into dir: URL) {
+        let cases: [(String, AnyView)] = [
+            ("98-empty-drawn", AnyView(
+                EmptyHere(title: "Nothing here yet",
+                          message: "A machine you add shows up here, with what it is printing.")
+                    .frame(width: 460, height: 300)
+                    .background(Khayt.ground))),
+            ("98-empty-drawn-dark", AnyView(
+                EmptyHere(title: "Nothing here yet",
+                          message: "A machine you add shows up here, with what it is printing.")
+                    .frame(width: 460, height: 300)
+                    .background(Khayt.ground)
+                    .environment(\.colorScheme, .dark))),
+            ("98-layer-progress", AnyView(
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Falcon hood \u{00B7} 62%").font(.caption)
+                    ZStack(alignment: .leading) {
+                        LayerLinesShape().fill(Khayt.hot.opacity(0.16))
+                        LayerLinesShape(progress: 0.62).fill(Khayt.hot)
+                    }
+                    .frame(height: 26)
+                }
+                .padding(18)
+                .frame(width: 320)
+                .background(Khayt.surface))),
+        ]
+        for (name, view) in cases {
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 2
+            guard let image = renderer.nsImage,
+                  let tiff = image.tiffRepresentation,
+                  let rep = NSBitmapImageRep(data: tiff),
+                  let png = rep.representation(using: .png, properties: [:]) else {
+                FileHandle.standardError.write(Data("could not render \(name)\n".utf8))
+                continue
+            }
+            try? png.write(to: dir.appending(path: name + ".png"))
+            FileHandle.standardError.write(Data("wrote \(name).png\n".utf8))
+        }
+    }
+
     /// `KHAYT_SNAPSHOT_SIZE=WxH` — photograph the app at somebody else's Mac.
     ///
     /// Every screen in this app had only ever been reviewed at one size, the
@@ -229,6 +282,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             NSApp.appearance = NSAppearance(named: want)
             for window in NSApp.windows { window.appearance = NSAppearance(named: want) }
             resizeIfAsked()
+            captureDetached(into: dir)
             // The window has to have laid out and drawn once. Two seconds is
             // generous; capturing an unlaid-out window yields a blank sheet.
             try? await Task.sleep(for: .seconds(2))

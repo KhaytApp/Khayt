@@ -51,7 +51,7 @@ struct Kanban: View {
         .background(Khayt.ground)
         .overlay {
             if shop.orders.isEmpty {
-                ContentUnavailableView(shop.words.callIt("mac.no_jobs"), systemImage: "rectangle.split.3x1")
+                EmptyHere(title: shop.words.callIt("mac.no_jobs"))
             } else if shop.matching(shop.orders).isEmpty {
                 // Seven columns all saying "nothing here" is a board that looks
                 // broken. It is a search that matched nothing, and it should say

@@ -71,8 +71,7 @@ struct Expenses: View {
         .scrollContentBackground(.hidden)
         .overlay {
             if rows.isEmpty {
-                ContentUnavailableView(shop.words.callIt(shop.expenses.isEmpty ? "exp.empty" : "exp.empty_filter"),
-                                       systemImage: "creditcard")
+                EmptyHere(title: shop.words.callIt(shop.expenses.isEmpty ? "exp.empty" : "exp.empty_filter"))
             }
         }
     }
@@ -223,7 +222,7 @@ struct Waste: View {
         }
         .overlay {
             if rows.isEmpty {
-                ContentUnavailableView(shop.words.callIt("waste.empty"), systemImage: "trash")
+                EmptyHere(title: shop.words.callIt("waste.empty"))
             }
         }
     }

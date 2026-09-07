@@ -109,6 +109,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The Mac app draws its own subject.** Counted before any of this: forty-three
+  distinct system symbols, twenty-nine stock empty states, and zero drawn shapes
+  — not one. Every mark on every screen was Apple's, arranged by us, which is
+  what "it looks generic" turned out to mean and why three rounds of better
+  arrangement did not touch it. Khayt is about a craft with a visual language of
+  its own — a nozzle, a bead of plastic, layers cooling — and none of it appeared
+  anywhere except in the words. Twenty screens that have nothing on them yet now
+  show a nozzle laying a first layer, drawn by the app, instead of the same grey
+  glyph every Mac app shows. A printer's progress is drawn as the stack itself,
+  filling from the bed upward, because that is what the number means.
+
+  The Arabic letter in Khayt's mark is deliberately **not** redrawn. A letterform
+  approximated by somebody who cannot read it is wrong in a way its readers see
+  at once and its author never does; where the mark is wanted the app uses its
+  own icon, which is already correct. And a book that will not open keeps the
+  system's warning glyph — that is a failure, not an empty screen, and the drawn
+  nozzle would say the wrong thing cheerfully.
+
 - **An invoice draws the Saudi Riyal mark instead of trusting the reader's
   fonts.** Every price in the app already carried the official mark; the
   document a customer is actually handed still said "SAR", because the invoice

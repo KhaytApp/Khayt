@@ -23,9 +23,7 @@ struct Machines: View {
         .background(Khayt.ground)
         .overlay {
             if shop.machines.isEmpty {
-                ContentUnavailableView(shop.words.callIt("mac.no_machines"),
-                                       systemImage: "printer",
-                                       description: Text(shop.words.callIt("mac.no_machines_hint")))
+                EmptyHere(title: shop.words.callIt("mac.no_machines"), message: shop.words.callIt("mac.no_machines_hint"))
             }
         }
         .toolbar {
@@ -219,7 +217,7 @@ struct Inventory: View {
     var body: some View {
         Group {
             if shop.spools.isEmpty {
-                ContentUnavailableView(shop.words.callIt("mac.no_filament"), systemImage: "circle.dashed")
+                EmptyHere(title: shop.words.callIt("mac.no_filament"))
             } else if shown.isEmpty {
                 ContentUnavailableView.search(text: shop.search)
             } else {
@@ -397,7 +395,7 @@ private struct Live: View {
                 }
             }
             if isRunning(status.state) {
-                ProgressView(value: Double(status.progress) / 100) {
+                VStack(alignment: .leading, spacing: 5) {
                     HStack {
                         if !status.filename.isEmpty {
                             Text(status.filename).lineLimit(1).truncationMode(.middle)
@@ -406,6 +404,29 @@ private struct Live: View {
                         Text("\(status.progress)%").monospacedDigit()
                     }
                     .font(.caption)
+                    // A BAR, BUT THE RIGHT ONE.
+                    //
+                    // What a printer is doing is laying layers, and how far
+                    // through it is, is how many of them are down. So the
+                    // progress is drawn as the stack itself, filling from the
+                    // bed upward — the app's own subject, in the one place on
+                    // any screen where the subject is literally what is being
+                    // measured.
+                    //
+                    // The first attempt put this motif behind a dashboard
+                    // tile's label and number, where at that size it read as
+                    // skeleton-loading bars — a screen that had not finished
+                    // drawing. Only the screenshot said so. Here it has room,
+                    // it sits under its own caption, and it means something.
+                    ZStack(alignment: .leading) {
+                        LayerLinesShape()
+                            .fill(Khayt.hot.opacity(0.16))
+                        LayerLinesShape(progress: Double(status.progress) / 100)
+                            .fill(Khayt.hot)
+                    }
+                    .frame(height: 26)
+                    .accessibilityElement()
+                    .accessibilityLabel("\(status.progress)%")
                 }
                 // WHICH SIGNAL the percentage came from, because bytes are not
                 // work: on a relief whose detail is all in its upper layers,

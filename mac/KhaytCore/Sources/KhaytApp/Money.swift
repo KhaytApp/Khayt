@@ -47,9 +47,32 @@ enum Money {
         currency.uppercased() == "SAR" && drawsTheRiyal ? riyal : currency
     }
 
+    // MARK: - The digits a figure is written in
+
+    /// The locale every figure below is formatted in, PINNED.
+    ///
+    /// ── WESTERN DIGITS, ON AN ARABIC MAC TOO ──────────────────────────────
+    ///
+    /// A `NumberFormatter` left alone takes the system locale. On a Mac set to
+    /// العربية (السعودية) that is `ar_SA`, and every price in this app came out
+    /// ١٬٢٣٤٫٥٠ — with the app's own language in English too, because the
+    /// digits never came from the app's language.
+    ///
+    /// Saudi products ship Western figures. Codepoint scans of live Arabic
+    /// pages — Al Rajhi, SNB, Absher, Tawakkalna, Salla, STC, SAMA — find them
+    /// on essentially every financial figure, and the Electron app already
+    /// carries the rule and a guard for it (`test/arabic-numerals.test.js`).
+    /// The one place Khayt does write Arabic-Indic digits is an invoice whose
+    /// shop asked for them, where it is a deliberate pass over the document.
+    ///
+    /// `en_US` and not the reflexive `en_US_POSIX`: POSIX suppresses grouping
+    /// altogether and hands back "1234567.89".
+    private static let digits = Locale(identifier: "en_US")
+
     static func text(_ amount: Double, _ currency: String) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
+        f.locale = digits
         f.minimumFractionDigits = 2
         f.maximumFractionDigits = 2
         let n = f.string(from: amount as NSNumber) ?? "\(amount)"
@@ -61,6 +84,7 @@ enum Money {
     static func figure(_ amount: Double) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
+        f.locale = digits
         f.minimumFractionDigits = 2
         f.maximumFractionDigits = 2
         return f.string(from: amount as NSNumber) ?? "\(amount)"
@@ -72,6 +96,7 @@ enum Money {
     static func grams(_ n: Double) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
+        f.locale = digits
         f.minimumFractionDigits = 0
         f.maximumFractionDigits = 1
         return f.string(from: n as NSNumber) ?? "\(n)"
@@ -86,6 +111,7 @@ enum Money {
     static func short(_ amount: Double, _ currency: String) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
+        f.locale = digits
         // Both bounds, or a tidy figure loses its trailing zero and sits next
         // to one that kept it: "839.3 SAR" beside "1,243.08 SAR".
         let places = amount >= 10_000 ? 0 : 2
