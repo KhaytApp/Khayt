@@ -517,6 +517,18 @@ enum Mesh {
         return true
     }
 
+    /// An OBJ's triangle count and the box it sits in.
+    static func measureOBJ(_ url: URL) throws -> Measurement? {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            throw Failure.notAMesh("it is not UTF-8 text")
+        }
+        var m = Measurement()
+        eachOBJTriangle(text) { ax, ay, az, bx, by, bz, cx, cy, cz in
+            m.add(ax, ay, az, bx, by, bz, cx, cy, cz)
+        }
+        return m.finished()
+    }
+
     /// The text form. Rare from a slicer, common out of a CAD package.
     static func measureAsciiSTL(_ url: URL) throws -> Measurement? {
         let text: String
@@ -531,6 +543,60 @@ enum Mesh {
             m.add(ax, ay, az, bx, by, bz, cx, cy, cz)
         }
         return m.finished()
+    }
+
+    /// Every triangle of an OBJ, from text already read.
+    ///
+    /// ── WHY OBJ AT ALL ────────────────────────────────────────────────────
+    ///
+    /// It is the third format a shop's library holds, and the one the mesh
+    /// reader knew nothing about — so an OBJ was never measured and, once the
+    /// renderer arrived, never drawn. Twenty-seven of one shop's models were
+    /// OBJ and every one of them stayed a grey cube while four hundred others
+    /// gained a picture.
+    ///
+    /// ── WHAT IT READS, AND WHAT IT IGNORES ────────────────────────────────
+    ///
+    /// `v` and `f`, and nothing else. An OBJ can carry normals, texture
+    /// coordinates, materials, smoothing groups and named objects; none of them
+    /// change where a triangle is, which is the only question here.
+    ///
+    /// A face index is 1-BASED and may be NEGATIVE, meaning "counting back from
+    /// the vertices seen so far" — a relative form that several exporters use
+    /// and that reads as a wild index if taken literally. A face may also be a
+    /// quad or larger, and is fanned into triangles from its first corner,
+    /// which is correct for the convex faces an exporter writes.
+    ///
+    /// `f 1/2/3` carries the vertex index before the first slash; the rest is
+    /// texture and normal and is dropped.
+    static func eachOBJTriangle(_ text: String,
+                                _ body: (Double, Double, Double, Double, Double,
+                                         Double, Double, Double, Double) -> Void) {
+        var xs: [Double] = [], ys: [Double] = [], zs: [Double] = []
+        for line in text.split(whereSeparator: \.isNewline) {
+            let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if t.hasPrefix("v ") {
+                let parts = t.dropFirst(2).split(separator: " ", omittingEmptySubsequences: true)
+                guard parts.count >= 3,
+                      let x = Double(parts[0]), let y = Double(parts[1]), let z = Double(parts[2])
+                else { continue }
+                xs.append(x); ys.append(y); zs.append(z)
+            } else if t.hasPrefix("f ") {
+                let corners = t.dropFirst(2).split(separator: " ", omittingEmptySubsequences: true)
+                    .compactMap { field -> Int? in
+                        guard let first = field.split(separator: "/", omittingEmptySubsequences: false).first,
+                              let n = Int(first), n != 0 else { return nil }
+                        // Negative is relative to the end, and 1-based either way.
+                        let at = n > 0 ? n - 1 : xs.count + n
+                        return (at >= 0 && at < xs.count) ? at : nil
+                    }
+                guard corners.count >= 3 else { continue }
+                for i in 1..<(corners.count - 1) {
+                    let a = corners[0], b = corners[i], c = corners[i + 1]
+                    body(xs[a], ys[a], zs[a], xs[b], ys[b], zs[b], xs[c], ys[c], zs[c])
+                }
+            }
+        }
     }
 
     /// Every facet of a text STL, from text already read.

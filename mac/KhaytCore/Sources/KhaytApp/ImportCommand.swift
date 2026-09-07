@@ -203,7 +203,8 @@ enum ImportCommand {
     /// and nothing here reads an OBJ's triangles yet — offering to catch those
     /// up would be a promise this cannot keep.
     static func needsCatchingUp(_ file: LibraryFile) -> Bool {
-        guard (file.sourceFile?.ext ?? "").lowercased() == "stl" else { return false }
+        let ext = (file.sourceFile?.ext ?? "").lowercased()
+        guard ext == "stl" || ext == "obj" else { return false }
         return (file.thumbFile ?? "").isEmpty || (file.geometryKey ?? "").isEmpty
     }
 
@@ -252,8 +253,10 @@ enum ImportCommand {
                              .appending(path: name)
             say("[\(i + 1)/\(wanted.count)] \(file.title)")
 
+            let isOBJ = (file.sourceFile?.ext ?? "").lowercased() == "obj"
             if (file.geometryKey ?? "").isEmpty,
-               let box = try? Mesh.measureSTL(model), box.triangleCount > 0,
+               let box = try? (isOBJ ? Mesh.measureOBJ(model) : Mesh.measureSTL(model)),
+               box.triangleCount > 0,
                let key = try? await engine.geometryKey(triangleCount: box.triangleCount,
                                                        volumeMm3: box.volumeMm3,
                                                        x: box.x, y: box.y, z: box.z) {

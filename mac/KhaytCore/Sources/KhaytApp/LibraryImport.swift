@@ -220,7 +220,8 @@ enum LibraryImport {
         switch ext {
         case "3mf": geometry = try? Mesh.measure3MF(destination)
         case "stl": geometry = try? Mesh.measureSTL(destination)
-        default: geometry = nil          // obj and gcode carry no mesh this reads
+        case "obj": geometry = try? Mesh.measureOBJ(destination)
+        default: geometry = nil          // gcode carries no mesh this reads
         }
 
         var key: String?
@@ -249,7 +250,7 @@ enum LibraryImport {
         //
         // Best effort: a model that will not draw is still a model, and an
         // import must not fail over a picture.
-        if thumbFile == nil, ext == "stl",
+        if thumbFile == nil, ext == "stl" || ext == "obj",
            let drawn = try? MeshPreview.png(of: destination),
            (try? drawn.write(to: dir.appending(path: "thumb.png"))) != nil {
             thumbFile = "thumb.png"

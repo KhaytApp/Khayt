@@ -200,16 +200,23 @@ struct CatchUpTests {
             try Self.file(ext: "stl", thumb: "thumb.png", key: "12:1:1x1x1")))
     }
 
-    /// A 3MF brings its own picture and is measured on the way in, and nothing
-    /// reads an OBJ's triangles yet — offering to catch those up would be a
-    /// promise this cannot keep.
-    @Test("only STLs are offered, whatever they are missing")
-    func onlyStl() throws {
-        for ext in ["3mf", "obj", "gcode", "stp"] {
+    /// Only the formats whose triangles this app can actually read.
+    ///
+    /// This said "only STLs" until the mesh reader learned OBJ. That was not a
+    /// preference — it was the honest limit at the time, and offering to catch
+    /// up a format nothing could read would have been a promise this could not
+    /// keep. A 3MF is still excluded for the opposite reason: it arrives with a
+    /// picture its slicer made and is measured on the way in, so there is
+    /// nothing to catch up.
+    @Test("only the formats whose triangles can be read are offered")
+    func onlyMeshesItCanRead() throws {
+        for ext in ["stl", "STL", "obj", "OBJ"] {
+            #expect(ImportCommand.needsCatchingUp(try Self.file(ext: ext, thumb: nil, key: nil)),
+                    "\(ext) can be read and was not offered")
+        }
+        for ext in ["3mf", "gcode", "stp", "step"] {
             #expect(!ImportCommand.needsCatchingUp(try Self.file(ext: ext, thumb: nil, key: nil)),
                     "\(ext) was offered and cannot be caught up")
         }
-        // Case does not decide it: a file named .STL is an STL.
-        #expect(ImportCommand.needsCatchingUp(try Self.file(ext: "STL", thumb: nil, key: nil)))
     }
 }

@@ -322,6 +322,14 @@ private struct ModelMenu: View {
     /// …and its file is on this Mac.
     private var canReach: Bool { shop.showingLibrary && shop.selectionIsOnThisMac }
 
+    /// A 3MF is the only thing there is anything to convert IN: an STL carries
+    /// no printer settings to rewrite, so offering it would be offering to do
+    /// nothing.
+    private var canConvert: Bool {
+        canReach && !shop.printerProfiles.isEmpty
+            && (shop.selectedFile?.sourceFile?.ext ?? "").lowercased() == "3mf"
+    }
+
     var body: some View {
         // "Favourite", not "Add to Favourites" / "Remove from Favourites".
         //
@@ -350,6 +358,31 @@ private struct ModelMenu: View {
         Button(Words.upfront("mac.open")) { shop.openSelection() }
             .keyboardShortcut("o")
             .disabled(!canReach)
+        // CONVERT, in the menu bar as well as the right-click menu.
+        //
+        // It reached the library as a context menu only, which is a feature a
+        // shop finds by accident or not at all — and a context menu cannot be
+        // photographed by the snapshot runner, so it was also the one screen
+        // nobody could check. The menu bar is printed on every run.
+        // ALWAYS THERE, greyed when it cannot be used — a menu whose items come
+        // and go is one a shop cannot learn, and Apple's own menus keep an item
+        // and disable it. It is also the only way this can be checked: the
+        // snapshot runner prints the menu bar, and an item that vanishes when
+        // nothing is selected is an item no run ever sees.
+        Menu(Words.upfront("mac.convert_for")) {
+            ForEach(shop.printerProfiles) { profile in
+                Button(profile.name) {
+                    guard let file = shop.selectedFile else { return }
+                    Task { await shop.convertModel(file, targetId: profile.id) }
+                }
+            }
+            Divider()
+            Button(Words.upfront("mac.standard_3mf")) {
+                guard let file = shop.selectedFile else { return }
+                Task { await shop.convertModel(file, targetId: nil) }
+            }
+        }
+        .disabled(shop.converting || !canConvert)
     }
 }
 

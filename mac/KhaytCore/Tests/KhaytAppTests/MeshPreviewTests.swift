@@ -173,3 +173,99 @@ struct WindowsLineEndingTests {
         #expect(b.x == 20)
     }
 }
+
+/// OBJ — the third format a library holds, and the one the mesh reader knew
+/// nothing about. Twenty-seven of one shop's models were OBJ and every one
+/// stayed a grey cube while four hundred others gained a picture.
+@MainActor
+struct OBJTests {
+
+    /// A cube as an exporter writes one: quads, and a `v` block before `f`.
+    static func cubeOBJ(_ side: Double) -> String {
+        let s = side
+        var out = "# a cube\n"
+        for v in [(0.0,0.0,0.0),(s,0.0,0.0),(s,s,0.0),(0.0,s,0.0),
+                  (0.0,0.0,s),(s,0.0,s),(s,s,s),(0.0,s,s)] {
+            out += "v \(v.0) \(v.1) \(v.2)\n"
+        }
+        // Quads, which have to be fanned into triangles.
+        for f in ["1 2 3 4", "5 6 7 8", "1 2 6 5", "2 3 7 6", "3 4 8 7", "4 1 5 8"] {
+            out += "f \(f)\n"
+        }
+        return out
+    }
+
+    @Test("a quad face is fanned into triangles")
+    func quadsBecomeTriangles() {
+        var n = 0
+        Mesh.eachOBJTriangle(Self.cubeOBJ(10)) { _, _, _, _, _, _, _, _, _ in n += 1 }
+        #expect(n == 12, "six quads should be twelve triangles, got \(n)")
+    }
+
+    @Test("an OBJ measures to its own box")
+    func measures() throws {
+        let dir = MeshPreviewTests.temp()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appending(path: "cube.obj")
+        try Self.cubeOBJ(20).write(to: url, atomically: true, encoding: .utf8)
+        let m = try #require(try Mesh.measureOBJ(url))
+        #expect(m.triangleCount == 12)
+        #expect(m.x == 20 && m.y == 20 && m.z == 20)
+    }
+
+    /// A NEGATIVE index counts back from the vertices seen so far — a relative
+    /// form several exporters use, and one that reads as a wild index if taken
+    /// literally. Getting it wrong drops every face rather than failing loudly.
+    @Test("a negative face index counts back from the end")
+    func negativeIndices() {
+        let obj = """
+            v 0 0 0
+            v 1 0 0
+            v 0 1 0
+            f -3 -2 -1
+            """
+        var seen: [Double] = []
+        Mesh.eachOBJTriangle(obj) { ax, _, _, bx, _, _, cx, _, _ in seen = [ax, bx, cx] }
+        #expect(seen == [0, 1, 0], "the relative face was dropped or misread")
+    }
+
+    /// `f 1/2/3` is vertex/texture/normal. Only the first number places a point.
+    @Test("texture and normal indices are ignored")
+    func slashedFaces() {
+        var n = 0
+        Mesh.eachOBJTriangle("""
+            v 0 0 0
+            v 1 0 0
+            v 0 1 0
+            f 1/1/1 2/2/2 3/3/3
+            """) { _, _, _, _, _, _, _, _, _ in n += 1 }
+        #expect(n == 1)
+    }
+
+    @Test("an OBJ draws, and an empty one draws nothing")
+    func draws() throws {
+        let dir = MeshPreviewTests.temp()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let cube = dir.appending(path: "cube.obj")
+        try Self.cubeOBJ(20).write(to: cube, atomically: true, encoding: .utf8)
+        #expect(try MeshPreview.png(of: cube, size: 64) != nil)
+
+        let empty = dir.appending(path: "empty.obj")
+        try "# nothing here\n".write(to: empty, atomically: true, encoding: .utf8)
+        #expect(try MeshPreview.png(of: empty, size: 64) == nil)
+    }
+
+    /// A face naming a vertex that does not exist is skipped, not a crash: an
+    /// index out of range would be a hard trap on a shop's own file.
+    @Test("a face pointing at nothing is skipped")
+    func wildIndices() {
+        var n = 0
+        Mesh.eachOBJTriangle("""
+            v 0 0 0
+            v 1 0 0
+            f 1 2 99
+            f 1 2 0
+            """) { _, _, _, _, _, _, _, _, _ in n += 1 }
+        #expect(n == 0, "a face with a bad index was drawn anyway")
+    }
+}

@@ -15,8 +15,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   says so in words as well as colour. A model nobody has recorded a licence for
   says **nothing** — not knowing is not the same as not being allowed.
 
-- **The Mac app converts a 3MF.** Right-click a model in the library and pick
-  **Convert for** — twenty-two printers, or a clean standard 3MF — and choose
+- **The Mac app converts a 3MF.** In the Model menu, or right-click a model in
+  the library, and pick **Convert for** — twenty-two printers, or a clean standard 3MF — and choose
   where to save it. Retarget a model to another printer, or normalise it,
   without Electron running. The container
   is opened and rebuilt by the Mac itself and the decisions come from the same
@@ -31,6 +31,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Node's zlib and nothing else in that module is, so the part that decides what
   a converted file should contain now has a door of its own. Nothing about a
   conversion has changed — the same members come out, byte for byte.
+
+- **OBJ models are measured and drawn like the rest.** The third format a
+  library holds, and the one the mesh reader knew nothing about — so an OBJ was
+  never measured, never had a size to check against a printer's bed, and stayed
+  a grey square while every STL beside it gained a picture.
 
 - **The Mac draws a preview for a model that has none.** A 3MF carries a picture
   its slicer made; an STL carries nothing but triangles, so a shop that imports
