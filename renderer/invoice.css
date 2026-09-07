@@ -279,6 +279,29 @@ html.printing-labels #label-print-area {
   vertical-align: top;
   font-size: 12px;
 }
+/* The drawn Saudi Riyal mark — see RIYAL_SVG in lib/invoice-document.js for
+   why this is geometry rather than U+20C1.
+
+   Sized in `em` so it tracks whatever text it lands in: it appears at three
+   different sizes on one document (line amounts, the totals block, the
+   instalment table) and a fixed pixel height would be wrong in two of them.
+   The width is the viewBox's own ratio, 1124.14 / 1256.39 = 0.895, so the
+   mark cannot squash however the box around it is sized. `-0.075em` drops it
+   off the text baseline to sit with the digits: the glyph has no descender
+   and would otherwise float above them.
+
+   `print-color-adjust` because it inherits `currentColor` from a muted span
+   in the line rows, and a print pipeline that decides to "help" by forcing
+   graphics to black would make the mark darker than the figure beside it. */
+.inv .riyal {
+  height: .72em;
+  width: .645em;          /* .72em x 0.895 — the viewBox ratio */
+  vertical-align: -0.075em;
+  display: inline-block;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
 .inv table.lines td.num { text-align: end; font-variant-numeric: tabular-nums; }
 .inv table.lines td.center { text-align: center; font-variant-numeric: tabular-nums; }
 .inv table.lines td.amount {
