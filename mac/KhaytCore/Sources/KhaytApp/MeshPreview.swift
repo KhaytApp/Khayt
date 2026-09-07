@@ -34,7 +34,9 @@ enum MeshPreview {
 
     /// A PNG of the model, or nil when the file holds no triangles to draw.
     static func png(of url: URL, size: Int = 256) throws -> Data? {
-        guard let box = try Mesh.measureSTL(url), box.triangleCount > 0 else { return nil }
+        let isOBJ = url.pathExtension.lowercased() == "obj"
+        guard let box = try (isOBJ ? Mesh.measureOBJ(url) : Mesh.measureSTL(url)),
+              box.triangleCount > 0 else { return nil }
         let side = size * scale
 
         // The model, centred and turned to a three-quarter view. Straight on it
@@ -141,8 +143,12 @@ enum MeshPreview {
             }
         }
 
-        if try !Mesh.eachSTLTriangle(url, draw),
-           let text = try? String(contentsOf: url, encoding: .utf8) {
+        if isOBJ {
+            if let text = try? String(contentsOf: url, encoding: .utf8) {
+                Mesh.eachOBJTriangle(text, draw)
+            }
+        } else if try !Mesh.eachSTLTriangle(url, draw),
+                  let text = try? String(contentsOf: url, encoding: .utf8) {
             Mesh.eachAsciiSTLTriangle(text, draw)
         }
 
