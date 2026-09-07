@@ -110,6 +110,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   identical tiles that gave a month's revenue the same weight as the number of
   files in the library.
 
+- **Every screen on the Mac sits on the same background.** The jobs, customers,
+  expenses and waste screens painted the system's white while the dashboard, the
+  board and the library sat on the app's own ground, so moving between them
+  jumped. In Reports and Expenses, where a table sits beside a summary pane, it
+  drew a hard seam down the middle of the window — two halves of one screen
+  looking like two documents. The tables let the ground through now; their
+  alternating row stripes are still the system's.
+
 - **Every screen on the Mac is laid out on the same margin.** It was 14 on
   Reports, 16 on the library, the machines, the board and the portfolio, and 20
   on the dashboard — four values for one decision, none of them chosen. They are
@@ -796,6 +804,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   is the palette's amber now, at 5.29:1, shared with the 61-90 bucket: both mean
   "wants a person", and a fourth hue invented to keep two ages apart would be a
   colour standing for nothing.
+
+- **The Mac's sidebar stops saying "Dashboard 0".** Every other count there is
+  how many things a screen lists; that one is how much is wrong, and no news is
+  not a quantity worth printing. It shows nothing when nothing needs a person —
+  the same fault as the two below, found by looking at the running app rather
+  than at a screenshot.
 
 - **Colour Studio and Reports no longer show a "0" in the Mac's sidebar.**
   Neither is a list of anything — a quarter is not a thing a shop has a number

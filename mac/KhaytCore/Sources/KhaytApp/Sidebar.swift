@@ -13,8 +13,15 @@ struct Sidebar: View {
             Section {
                 // First, and above the pipeline: it is the screen a shop opens
                 // the app to look at.
+                // Nothing at all when nothing needs a person, rather than a
+                // "0". Every other count here is how many things a screen
+                // lists; this one is how much is WRONG, and no news is not a
+                // quantity worth printing. Seen in the running app — the row
+                // read "Dashboard 0" on a book with nothing late, which is the
+                // same thing that made Colour Studio look unfinished.
                 Row(title: shop.words.callIt("mac.dashboard"), symbol: "square.grid.2x2.fill",
-                    count: shop.attention?.count ?? 0, selected: shop.shelf == .dashboard,
+                    count: shop.attention.map(\.count).flatMap { $0 == 0 ? nil : $0 },
+                    selected: shop.shelf == .dashboard,
                     tint: Khayt.attention)
                     .tag(Shop.Shelf.dashboard)
                 Row(title: shop.words.callIt("mac.all_jobs"), symbol: "tray.full", count: shop.orders.count,
