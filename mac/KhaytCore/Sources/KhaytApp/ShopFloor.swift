@@ -280,16 +280,19 @@ struct SpoolCard: View {
                         .foregroundStyle(Khayt.attention)
                 }
             }
-            // WHAT IT COST, not what it costs per kilo.
+            // Per kilo where it is KNOWN, the purchase price where it is not.
             //
-            // `costPerKilo` is `cost / weight`, and `weight` is what is LEFT —
-            // so the figure a shop uses to compare two suppliers climbs as the
-            // spool is used. A 1 kg roll bought at 75 reads 150 once it is half
-            // gone, and 2,000 on the nearly-empty spool this shelf most wants to
-            // draw attention to. Neither book records the original weight, so
-            // the true rate cannot be worked out here; the purchase price can,
-            // and is a fact rather than a drifting derivation.
-            if let cost = spool.cost {
+            // A rate needs what the spool weighed when it arrived, and only
+            // spools bought since `spool-edit.js` started recording that have
+            // it. Dividing by what is left instead made the figure climb as the
+            // roll emptied, which is why the old one was deleted rather than
+            // fixed. An older spool shows what it cost — a fact — rather than a
+            // rate worked out from the wrong number.
+            if let perKilo = spool.costPerKilo {
+                Text(Money.text(perKilo, shop.currency) + " / "
+                     + shop.words.callIt("common.kg"))
+                    .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+            } else if let cost = spool.cost {
                 Text(Money.text(cost, shop.currency))
                     .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
             }

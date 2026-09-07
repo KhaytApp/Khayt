@@ -85,6 +85,9 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
     let cost: Double?
     /// Grams remaining. The seed rows are whole kilos.
     let weight: Double?
+    /// What it weighed when it arrived, written once by `spool-edit.js`.
+    /// Absent on every spool bought before that, and unrecoverable.
+    let spoolWeight: Double?
     let openedAt: String?
     let storage: String?
     /// What the shop calls this particular colour — "Matte Black" — as opposed
@@ -120,15 +123,22 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
         return material + grams + where_
     }
 
-    // NO `costPerKilo` HERE, and it is worth saying why rather than leaving
-    // the next person to add it back.
-    //
-    // It was `cost / (weight / 1000)`, and `weight` is what is LEFT on the
-    // spool — so the figure that supposedly compares two suppliers climbed as
-    // the spool was used: a 1 kg roll bought at 75 read 150 once half gone, and
-    // 2,000 on one nearly empty. Electron does not derive this at all; the shop
-    // types a `costPerKg` on the item, and `calculator-cost.js` divides by
-    // `spoolWeight`, the ORIGINAL weight. Neither field is on an inventory row
-    // in either book, so the true rate cannot be worked out here from what is
-    // recorded — and a wrong number about money is worse than no number.
+    /// What a kilo of it cost, from what it weighed WHEN IT ARRIVED.
+    ///
+    /// Never from `weight`, which is what is left and falls as the shop prints:
+    /// dividing the price by that made the supplier-comparison figure climb as
+    /// the roll emptied — 75 became 150 half way down and 2,000 near the end,
+    /// worst on exactly the spool a shop is about to reorder. That version was
+    /// deleted rather than fixed, because nothing recorded the original weight
+    /// to divide by.
+    ///
+    /// `spool-edit.js` records it now, so this answers for every spool bought
+    /// from that point on and NIL for one already on the shelf. Nil is the
+    /// honest answer there: a shop that has used half a roll has no record of
+    /// the other half, and a rate worked out from what is left would be the
+    /// same wrong number wearing a new comment.
+    var costPerKilo: Double? {
+        guard let cost, let original = spoolWeight, original > 0 else { return nil }
+        return cost / (original / 1000)
+    }
 }

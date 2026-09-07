@@ -724,6 +724,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **Cost per kilo climbed as a spool emptied.** It divided the spool's price by
+  the grams REMAINING, so a 1 kg roll bought at 75 read 150 half way down and
+  375 with 200 g left — the figure that compares two suppliers, wrong on exactly
+  the spool a shop is about to reorder. Khayt now records what a spool weighed
+  when it arrived, and the rate is worked out from that. A spool bought before
+  this shows what it cost instead: half the roll is gone and nothing wrote down
+  how much there was, so the rate cannot be recovered and is not guessed at.
+
 - **Four HueForge studio tests waited eighty milliseconds and then looked.**
   Developer tooling: they failed together on a machine that had a build running
   beside them and passed on every quiet run, which is a suite that teaches
