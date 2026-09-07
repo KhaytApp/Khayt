@@ -450,6 +450,25 @@ enum Mesh {
         }
 
         var m = Measurement()
+        try streamBinarySTL(handle, size: size) { ax, ay, az, bx, by, bz, cx, cy, cz in
+            m.add(ax, ay, az, bx, by, bz, cx, cy, cz)
+        }
+        return m.finished()
+    }
+
+    /// Every facet of a binary STL, one at a time, in file order.
+    ///
+    /// SHARED, because there are two readers now — the measurement above, and
+    /// the preview renderer, which needs the same triangles to draw. Two copies
+    /// of a parser that reads a shop's geometry is two ways to read it wrong.
+    ///
+    /// Generic over the body and non-escaping, so the optimiser can specialise
+    /// and inline it: this runs six million times for one of this shop's files
+    /// and the cost of the call IS the cost of the read.
+    @inline(__always)
+    static func streamBinarySTL(_ handle: FileHandle, size: Int,
+                                _ body: (Double, Double, Double, Double, Double,
+                                         Double, Double, Double, Double) -> Void) throws {
         // A multiple of 50 so a facet is never split across two reads.
         let chunkFacets = 20_000
         var offset = 84
@@ -469,14 +488,33 @@ enum Mesh {
                     }
                     // Bytes 0–11 are the normal, which is ignored: it is
                     // derivable, frequently zero, and frequently wrong.
-                    m.add(f(12), f(16), f(20), f(24), f(28), f(32), f(36), f(40), f(44))
+                    body(f(12), f(16), f(20), f(24), f(28), f(32), f(36), f(40), f(44))
                     at += 50
                 }
             }
             offset += (chunk.count / 50) * 50
             if chunk.count < 50 { break }
         }
-        return m.finished()
+    }
+
+    /// The same file, opened and streamed for a caller that has no handle.
+    /// Returns false when it is not a binary STL, so a caller can fall back.
+    static func eachSTLTriangle(_ url: URL,
+                                _ body: (Double, Double, Double, Double, Double,
+                                         Double, Double, Double, Double) -> Void) throws -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        let size = Int(try handle.seekToEnd())
+        guard size >= 84 else { return false }
+        try handle.seek(toOffset: 80)
+        guard let header = try handle.read(upToCount: 4), header.count == 4 else { return false }
+        let claimed = Int(UInt32(header[header.startIndex])
+                        | UInt32(header[header.startIndex + 1]) << 8
+                        | UInt32(header[header.startIndex + 2]) << 16
+                        | UInt32(header[header.startIndex + 3]) << 24)
+        guard claimed > 0, claimed <= mostTriangles, size == 84 + claimed * 50 else { return false }
+        try streamBinarySTL(handle, size: size, body)
+        return true
     }
 
     /// The text form. Rare from a slicer, common out of a CAD package.
@@ -489,21 +527,54 @@ enum Mesh {
         }
 
         var m = Measurement()
+        eachAsciiSTLTriangle(text) { ax, ay, az, bx, by, bz, cx, cy, cz in
+            m.add(ax, ay, az, bx, by, bz, cx, cy, cz)
+        }
+        return m.finished()
+    }
+
+    /// Every facet of a text STL, from text already read.
+    ///
+    /// Shared with the preview renderer for the same reason the binary one is:
+    /// one parser, so a model cannot be measured one way and drawn another.
+    /// Sixteen of this shop's models are this format — a CAD package's default
+    /// — and they were the ones that came back as grey cubes after the
+    /// renderer only learned to read the binary form.
+    @inline(__always)
+    static func eachAsciiSTLTriangle(_ text: String,
+                                     _ body: (Double, Double, Double, Double, Double,
+                                              Double, Double, Double, Double) -> Void) {
         var corner: [Double] = []
-        for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
-            let t = line.trimmingCharacters(in: .whitespaces)
+        // SPLIT ON NEWLINES, not on "\n" — and the difference is not pedantry.
+        //
+        // In Swift a String is a sequence of grapheme clusters, and CR-LF is
+        // ONE of them. So `split(separator: "\n")` finds no separator at all in
+        // a file written on Windows: the whole mesh comes back as a single
+        // line, no line starts with "vertex", and the reader returns nothing at
+        // all. Not a truncated model — nothing.
+        //
+        // Fifteen of this shop's models were exactly that, measured as nothing
+        // and drawn as nothing, and every one of them opens perfectly in any
+        // editor. CATIA and several CAD exporters write CR-LF as a matter of
+        // course. `isNewline` is true for the cluster, so this splits where a
+        // person would say the lines are.
+        for line in text.split(whereSeparator: \.isNewline) {
+            // A lone CR, which is neither of the above and still ends a line on
+            // some very old exports.
+            let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
             guard t.hasPrefix("vertex") else { continue }
             let parts = t.dropFirst(6).split(separator: " ", omittingEmptySubsequences: true)
             guard parts.count >= 3,
-                  let x = Double(parts[0]), let y = Double(parts[1]), let z = Double(parts[2])
+                  let x = Double(parts[0].trimmingCharacters(in: .whitespacesAndNewlines)),
+                  let y = Double(parts[1].trimmingCharacters(in: .whitespacesAndNewlines)),
+                  let z = Double(parts[2].trimmingCharacters(in: .whitespacesAndNewlines))
             else { continue }
             corner.append(contentsOf: [x, y, z])
             if corner.count == 9 {
-                m.add(corner[0], corner[1], corner[2], corner[3], corner[4],
-                      corner[5], corner[6], corner[7], corner[8])
+                body(corner[0], corner[1], corner[2], corner[3], corner[4],
+                     corner[5], corner[6], corner[7], corner[8])
                 corner.removeAll(keepingCapacity: true)
             }
         }
-        return m.finished()
     }
 }

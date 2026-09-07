@@ -683,6 +683,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **A text STL written on Windows was read as nothing at all.** Not a truncated
+  model — nothing. In Swift a CR-LF is a single character, so splitting the file
+  on "\n" found no line breaks in it, the whole mesh came back as one line, and
+  no line began with "vertex". Fifteen of one shop's models measured as empty
+  and drew as blank, and every one of them opens perfectly in an editor. CATIA
+  and several CAD exporters write CR-LF as a matter of course.
+
 - **"1 days late."** The Mac's dashboard said it to every shop with a job one
   day over. The count sits inside the sentence rather than in front of it —
   Arabic puts متأخر before the number — so the sentence itself now has a

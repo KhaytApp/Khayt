@@ -31,6 +31,10 @@ enum ImportCommand {
         var paths: [String] = []
         var keepOriginals = false
         var dryRun = false
+        /// Draw the missing previews in a library that already exists, rather
+        /// than import anything. For the models that came in before the app
+        /// could draw them.
+        var previewsOnly = false
     }
 
     enum Parsed: Equatable {
@@ -46,6 +50,8 @@ enum ImportCommand {
           <path>             a model, or a folder to walk for models
           --keep-originals   copy them in; the default is to MOVE
           --dry-run          say what would happen and change nothing
+          --previews         draw the missing previews in the library, and
+                             import nothing (needs no path)
         """
 
     static func parse(_ arguments: [String]) -> Parsed {
@@ -58,6 +64,7 @@ enum ImportCommand {
             switch argument {
             case "--keep-originals": options.keepOriginals = true
             case "--dry-run": options.dryRun = true
+            case "--previews": options.previewsOnly = true
             // AppKit puts its own arguments on a launched bundle — `-NSDocument…`,
             // and `-psn_…` when Finder opens it. Passing those to the walker
             // would report each as a path that is not there.
@@ -67,7 +74,9 @@ enum ImportCommand {
             case let path: options.paths.append(path)
             }
         }
-        guard !options.paths.isEmpty else {
+        // `--previews` works on the library that is already there, so it is
+        // the one form that needs no path.
+        guard !options.paths.isEmpty || options.previewsOnly else {
             return .usage("--import needs at least one file or folder.\n\n\(usage)")
         }
         return .run(options)
@@ -102,6 +111,11 @@ enum ImportCommand {
         guard let roots = shop.libraryRoots else {
             complain(LibraryImport.Failure.noLibrary.description)
             return 2
+        }
+
+        if options.previewsOnly {
+            return await drawMissingPreviews(shop: shop, build: build,
+                                             root: roots.primary, dryRun: options.dryRun)
         }
 
         let chosen = options.paths.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
@@ -172,6 +186,86 @@ enum ImportCommand {
         for failure in report.failures { complain("  \(failure)") }
         say(String(format: "took %.0f s", Date().timeIntervalSince(started)))
         return report.failures.isEmpty ? 0 : 1
+    }
+
+    /// Draw a preview for every model in the library that has none.
+    ///
+    /// For the library that was imported before the app could draw one — 445
+    /// models on the book this was written against, every one of them a grey
+    /// cube on the library screen. A model that already has a picture is left
+    /// alone, so this is safe to run twice and costs nothing the second time.
+    private static func drawMissingPreviews(shop: Shop, build: StoreReader.Build,
+                                            root: String, dryRun: Bool) async -> Int32 {
+        let vault = URL(fileURLWithPath: root)
+        let wanted = shop.files.filter { file in
+            guard file.thumbFile == nil || file.thumbFile?.isEmpty == true else { return false }
+            return (file.sourceFile?.ext ?? "").lowercased() == "stl"
+        }
+        say("library: \(root)")
+        say("models with no picture: \(wanted.count) of \(shop.files.count)")
+        guard !wanted.isEmpty else { return 0 }
+        if dryRun {
+            say("")
+            for file in wanted { say("  would draw  \(file.title)") }
+            say("")
+            say("dry run: nothing was drawn or written.")
+            return 0
+        }
+
+        guard let claim = StoreLock.take(for: build) else {
+            let who = StoreLock.held(StoreLock.verdict(for: build))
+            complain("\(who?.app ?? "Another app") has this book open. Close it and try again.")
+            return 3
+        }
+        defer { StoreLock.release(claim, for: build) }
+
+        var drawn: [String: String] = [:]
+        var failures: [String] = []
+        let started = Date()
+        for (i, file) in wanted.enumerated() {
+            guard let name = file.sourceFile?.filename else { continue }
+            let model = vault.appending(path: LibraryLocation.itemDirName(file.id))
+                             .appending(path: name)
+            say("[\(i + 1)/\(wanted.count)] \(file.title)")
+            do {
+                guard let png = try MeshPreview.png(of: model) else {
+                    failures.append("\(file.title): nothing to draw"); continue
+                }
+                try png.write(to: model.deletingLastPathComponent().appending(path: "thumb.png"))
+                drawn[file.id] = "thumb.png"
+            } catch {
+                failures.append("\(file.title): \(error)")
+            }
+        }
+
+        // ONE WRITE, at the end. Four hundred and forty-five separate updates
+        // of a one-megabyte book is four hundred and forty-five rewrites of it.
+        if !drawn.isEmpty {
+            do {
+                try StoreWriter.update(storeURL: build.storeURL,
+                                       owns: { StoreLock.weOwnIt(build) },
+                                       whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) { root in
+                    guard case .array(let rows)? = root["printFiles"] else { return }
+                    root["printFiles"] = .array(rows.map { row in
+                        guard case .object(var o) = row, case .string(let id)? = o["id"],
+                              let name = drawn[id] else { return row }
+                        o["thumbFile"] = .string(name)
+                        o["thumbSource"] = .string("mesh")
+                        return .object(o)
+                    })
+                }
+            } catch {
+                complain("The book refused the write: \(error)")
+                return 2
+            }
+        }
+
+        say("")
+        say("drawn:   \(drawn.count)")
+        say("skipped: \(failures.count)")
+        for failure in failures.prefix(10) { complain("  \(failure)") }
+        say(String(format: "took %.0f s", Date().timeIntervalSince(started)))
+        return failures.isEmpty ? 0 : 1
     }
 
     private static func size(_ bytes: Int) -> String {
