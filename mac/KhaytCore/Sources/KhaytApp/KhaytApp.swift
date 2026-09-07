@@ -166,7 +166,10 @@ final class Activator: NSObject, NSApplicationDelegate {
                     .environment(\.colorScheme, .dark))),
             ("98-layer-progress", AnyView(
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Falcon hood \u{00B7} 62%").font(.caption)
+                    // A figure, not a job name: an English sample string here
+                    // is still an English string on a screen, and the guard
+                    // that says so is right even about a picture nobody ships.
+                    Text("62%").font(.caption).monospacedDigit()
                     ZStack(alignment: .leading) {
                         LayerLinesShape().fill(Khayt.hot.opacity(0.16))
                         LayerLinesShape(progress: 0.62).fill(Khayt.hot)

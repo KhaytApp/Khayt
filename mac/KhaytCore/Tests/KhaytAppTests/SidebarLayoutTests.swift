@@ -180,18 +180,59 @@ struct LastWordsTests {
         #expect(path.contains("Application Support/khayt/"))
     }
 
-    @Test("a note is written, read back and forgotten")
-    func roundTrip() throws {
-        let dir = FileManager.default.temporaryDirectory
-            .appending(path: "khayt-lastwords-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let file = dir.appending(path: "last-crash.txt")
+    /// THE ONE THAT ACTUALLY CRASHES THE APP.
+    ///
+    /// What stood here before wrote a file itself, read it back, and passed —
+    /// a test of `FileManager`, with `LastWords` never called. It was green on
+    /// 2026-09-07 while the app aborted and left no note at all, which is the
+    /// whole failure it was supposed to be watching for.
+    ///
+    /// So this launches the built app, tells it to raise with
+    /// `KHAYT_TEST_ABORT`, and reads back the note. That runs before AppKit
+    /// starts, so nothing opens a window, and `KHAYT_CRASH_NOTE` puts the note
+    /// in a temporary file rather than over the note from a real crash on the
+    /// machine running the test.
+    ///
+    /// Proved able to fail: with the `NSSetUncaughtExceptionHandler` call
+    /// removed, the app still aborts and no note appears.
+    @Test("the app, told to crash, says what killed it")
+    func leavesANote() throws {
+        // Not `Bundle.main`: under `swift test` that is the test RUNNER, which
+        // lives in the toolchain rather than in this package's build directory.
+        // The package root is known from this file, and SwiftPM has built the
+        // executable already — it is what these tests link against.
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let app = try #require(["debug", "release"]
+            .map { root.appending(path: ".build/\($0)/Khayt") }
+            .first { FileManager.default.isExecutableFile(atPath: $0.path) },
+            "the app has not been built — nothing to ask for its last words")
 
-        try "why: something went wrong".write(to: file, atomically: true, encoding: .utf8)
-        #expect(try String(contentsOf: file, encoding: .utf8).contains("something went wrong"))
-        try FileManager.default.removeItem(at: file)
-        #expect(!FileManager.default.fileExists(atPath: file.path))
+        let note = FileManager.default.temporaryDirectory
+            .appending(path: "khayt-last-words-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: note) }
+
+        let reason = "the reason a crash report would not have carried"
+        let task = Process()
+        task.executableURL = app
+        task.environment = ProcessInfo.processInfo.environment
+            .merging(["KHAYT_CRASH_NOTE": note.path, "KHAYT_TEST_ABORT": reason]) { _, new in new }
+        task.standardError = FileHandle.nullDevice
+        task.standardOutput = FileHandle.nullDevice
+        try task.run()
+        task.waitUntilExit()
+
+        // It is meant to die. The note is the point, not survival.
+        #expect(task.terminationReason == .uncaughtSignal)
+
+        let written = try #require(try? String(contentsOf: note, encoding: .utf8), """
+            the app aborted and left no note — which is exactly the state that \
+            made three crashes in this family cost a morning each.
+            """)
+        #expect(written.contains(reason), "the note does not say why")
+        #expect(written.contains("KhaytDeliberateException"), "the note does not say what")
+        #expect(written.contains("Khayt"), "the note carries no backtrace")
     }
 
     @Test("no note is not a crash")

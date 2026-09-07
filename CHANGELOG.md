@@ -849,6 +849,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **When the Mac app crashes, it now reliably says why — and that is checked by
+  crashing it.** macOS reports an uncaught Objective-C exception with a backtrace
+  and no reason, so Khayt writes its own note beside the book. The app aborted on
+  7 September and left no note, and the tests covering that note were green:
+  every one of them wrote a file itself and read it back, so `LastWords` was
+  never called by any of them. The test that replaces them launches the app,
+  tells it to raise, and reads back what it left — and it was proved able to fail
+  by removing the handler and watching it go red.
+
+- **Two more Mac tests were reporting on something other than the app.** The
+  scan that checks every counted word has a singular looked for `counting(`,
+  which also matches the tail of `exportForAccounting(` — so it picked up
+  whatever string literal happened to follow that call and demanded a plural
+  for `Open` and for a sentence about the sample shop, neither of which is
+  counted. And the check that no screen spells anything out in English was
+  right about the one thing it caught: a snapshot fixture with an English job
+  name in it, now a figure instead.
+
 - **The Mac's profit-and-loss table stops spreading across a wide display.** A
   table hands its spare width to its columns, which on a desktop screen put a
   quarter's name and its net income fifteen hundred points apart — the two ends

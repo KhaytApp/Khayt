@@ -14,6 +14,13 @@ import Foundation
 /// One file, overwritten each time, because the interesting crash is the one
 /// that just happened.
 ///
+/// **PROVEN, NOT ASSUMED.** `KHAYT_TEST_ABORT` makes the app raise on purpose
+/// and `KHAYT_CRASH_NOTE` sends the note somewhere a test can read it, so
+/// "the app can say why it died" is a thing this repository checks rather than
+/// a thing it believes. It is checked because the belief was tested and had
+/// been wrong before: after the abort of 2026-09-07 there was no note, and
+/// three separate explanations for that were plausible and unmeasurable.
+///
 /// **This does not catch Swift runtime traps** — a force-unwrap of nil, an
 /// array out of bounds, a `precondition`. Those are not exceptions and nothing
 /// can catch them; they still produce an ordinary crash report, which for a
@@ -42,25 +49,55 @@ enum LastWords {
     static func listen() {
         // Both books, because which one is open is not known this early and a
         // crash before the book opens is exactly the kind worth reading.
-        targets = StoreReader.Build.allCases.map(file(for:))
-        NSSetUncaughtExceptionHandler { exception in
-            let note = """
-                Khayt for Mac stopped unexpectedly.
-
-                when:   \(ISO8601DateFormatter().string(from: Date()))
-                what:   \(exception.name.rawValue)
-                why:    \(exception.reason ?? "(no reason given)")
-
-                where:
-                \(exception.callStackSymbols.prefix(40).joined(separator: "\n"))
-                """
-            for url in LastWords.targets {
-                // Best effort by design: a handler that throws while reporting
-                // a crash has turned one problem into two.
-                try? note.write(to: url, atomically: true, encoding: .utf8)
-            }
-            FileHandle.standardError.write(Data((note + "\n").utf8))
+        //
+        // `KHAYT_CRASH_NOTE` sends it somewhere else instead. That is how the
+        // test proves this works without writing over the note from a real
+        // crash on the machine running the test — and it is the answer for a
+        // shop asked to put one somewhere it can be collected from.
+        if let elsewhere = ProcessInfo.processInfo.environment["KHAYT_CRASH_NOTE"],
+           !elsewhere.isEmpty {
+            targets = [URL(fileURLWithPath: elsewhere)]
+        } else {
+            targets = StoreReader.Build.allCases.map(file(for:))
         }
+        NSSetUncaughtExceptionHandler { exception in
+            LastWords.leave(what: exception.name.rawValue,
+                            why: exception.reason,
+                            where: exception.callStackSymbols)
+        }
+    }
+
+    /// Write the note.
+    nonisolated static func leave(what: String, why: String?, where stack: [String]) {
+        let note = """
+            Khayt for Mac stopped unexpectedly.
+
+            when:   \(ISO8601DateFormatter().string(from: Date()))
+            what:   \(what)
+            why:    \(why ?? "(no reason given)")
+
+            where:
+            \(stack.prefix(40).joined(separator: "\n"))
+            """
+        for url in LastWords.targets {
+            // Best effort by design: a handler that throws while reporting a
+            // crash has turned one problem into two.
+            try? note.write(to: url, atomically: true, encoding: .utf8)
+        }
+        FileHandle.standardError.write(Data((note + "\n").utf8))
+    }
+
+    /// Die on purpose, the way AppKit does, when asked to.
+    ///
+    /// Only reachable by setting `KHAYT_TEST_ABORT`, and it runs before AppKit
+    /// starts, so it costs a shop nothing and never opens a window. It exists
+    /// because the wiring here is only worth having if it is PROVEN — and the
+    /// way to prove a crash handler is to crash.
+    static func abortIfAsked() {
+        let env = ProcessInfo.processInfo.environment
+        guard let reason = env["KHAYT_TEST_ABORT"], !reason.isEmpty else { return }
+        NSException(name: .init("KhaytDeliberateException"),
+                    reason: reason, userInfo: nil).raise()
     }
 
     /// The note from the last crash, if there is one.

@@ -65,7 +65,13 @@ struct WordsTests {
             where file.pathExtension == "swift" && file.lastPathComponent != "Words.swift" {
             let text = try String(contentsOf: file, encoding: .utf8)
             var rest = text[...]
-            while let at = rest.range(of: "counting(") {
+            // `.counting(`, WITH THE DOT. Bare `counting(` also matches the
+            // tail of `exportForAccounting(` — exportAc·counting( — and the
+            // scan then took the next string literal it could find, which was
+            // whatever happened to come after that call. It reported
+            // `mac.open_book` and `mac.move_sample` as counted words needing a
+            // singular, and neither is counted at all.
+            while let at = rest.range(of: ".counting(") {
                 let after = rest[at.upperBound...]
                 rest = after
                 guard let quote = after.firstIndex(of: "\"") else { continue }
