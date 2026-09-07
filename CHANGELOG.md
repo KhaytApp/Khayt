@@ -52,6 +52,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The Mac's profit-and-loss report stops drawing rows it does not have.** One
+  row per quarter, two of them on a young book — and the striping was drawn down
+  the whole window regardless, so a shop read two figures above a dozen empty
+  grey bands and reasonably wondered what had failed to load.
+
 - **Prices on the Mac carry the Saudi Riyal mark, not the letters SAR.** Every
   figure, every unit label beside a money field, and the OWED badge in the
   toolbar. On a Mac whose system font does not have the mark — it arrived with
