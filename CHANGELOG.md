@@ -699,6 +699,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **Four HueForge studio tests waited eighty milliseconds and then looked.**
+  Developer tooling: they failed together on a machine that had a build running
+  beside them and passed on every quiet run, which is a suite that teaches
+  people to run it again rather than to read it. They wait for the thing now.
+
 - **A text STL written on Windows was read as nothing at all.** Not a truncated
   model — nothing. In Swift a CR-LF is a single character, so splitting the file
   on "\n" found no line breaks in it, the whole mesh came back as one line, and

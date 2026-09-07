@@ -79,11 +79,32 @@ async function boot() {
   const ev = new window.Event('drop');
   ev.dataTransfer = { files: [{ type: 'image/png', name: 'poster.png' }] };
   doc.getElementById('hfDrop').dispatchEvent(ev);
-  await settle(window);
+  await settle(window, () => doc.getElementById('hfMode'));
   return { window, doc, relief, flat };
 }
 
-const settle = (window) => new Promise((r) => window.setTimeout(r, 80));
+/**
+ * Wait for the thing, not for eighty milliseconds.
+ *
+ * This was a fixed 80 ms sleep followed by an assertion, which is a race the
+ * machine loses when it is busy: four of these failed together during a run
+ * that had a Swift build going beside it, and passed on every quiet run before
+ * and since. A suite that goes green when the machine is idle teaches people to
+ * run it again rather than to read it.
+ *
+ * Resolves rather than throws when the deadline passes, so the test's own
+ * assertion reports what was actually missing instead of a timeout.
+ */
+const settle = (window, until, ms = 4000) => new Promise((resolve) => {
+  const deadline = Date.now() + ms;
+  const tick = () => {
+    let done = false;
+    try { done = until ? !!until() : true; } catch (_) { done = false; }
+    if (done || Date.now() >= deadline) return resolve();
+    window.setTimeout(tick, 10);
+  };
+  window.setTimeout(tick, 0);
+});
 const click = (window, el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 
 async function toFlat(window, doc) {
@@ -91,7 +112,7 @@ async function toFlat(window, doc) {
   assert.ok(sel, 'the studio should offer a mode selector');
   sel.value = 'flat';
   sel.dispatchEvent(new window.Event('change', { bubbles: true }));
-  await settle(window);
+  await settle(window, () => doc.getElementById('hfVerdict')?.textContent.length);
 }
 
 const partHeads = (doc) => Array.from(doc.querySelectorAll('.hf-band-slot')).map((e) => +e.textContent.replace(/[^0-9]/g, ''));
@@ -117,7 +138,7 @@ test('switching modes does not leave the other mode\'s plan on screen', async ()
   const sel = doc.getElementById('hfMode');
   sel.value = 'relief';
   sel.dispatchEvent(new window.Event('change', { bubbles: true }));
-  await settle(window);
+  await settle(window, () => doc.getElementById('hfVerdict')?.textContent.length);
   assert.ok(doc.getElementById('hfVerdict').textContent.length, 'relief mode should come back');
   assert.doesNotMatch(doc.getElementById('hfVerdict').textContent, /free tool change/i,
     'the flat verdict is still on screen after leaving flat mode');
@@ -128,7 +149,7 @@ test('exporting in flat mode calls the flat bridge, not the relief one', async (
   await toFlat(window, doc);
 
   click(window, doc.getElementById('hf3mf'));
-  await settle(window);
+  await settle(window, () => flat.length || relief.length);
 
   assert.equal(flat.length, 1, 'the flat export should have been invoked');
   assert.equal(relief.length, 0, 'the relief export must not fire for a flat plate');
@@ -143,7 +164,7 @@ test('what the panel sends is what the main process can build', async () => {
   const { window, doc, flat } = await boot();
   await toFlat(window, doc);
   click(window, doc.getElementById('hf3mf'));
-  await settle(window);
+  await settle(window, () => flat.length);
   const sent = flat[0];
 
   // Exactly what main.js's hub:hf-export-flat-3mf does with the payload.
