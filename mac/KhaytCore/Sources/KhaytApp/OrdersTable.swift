@@ -318,6 +318,10 @@ private struct EmptyBook: View {
 
     var body: some View {
         if let problem = shop.problem {
+            // DELIBERATELY the system's component and its warning octagon. A
+            // book that would not open is a FAILURE, not an empty screen, and
+            // the drawn nozzle that says "nothing here yet" would say the
+            // wrong thing about it cheerfully.
             ContentUnavailableView {
                 Label(shop.words.callIt("mac.book_wont_open"), systemImage: "exclamationmark.octagon")
             } description: {
@@ -326,10 +330,9 @@ private struct EmptyBook: View {
         } else if !shop.search.isEmpty {
             ContentUnavailableView.search(text: shop.search)
         } else if shop.stage != nil {
-            ContentUnavailableView(shop.words.callIt("mac.nothing_at_stage"), systemImage: "tray",
-                                   description: Text(shop.words.callIt("mac.stage_hint")))
+            EmptyHere(title: shop.words.callIt("mac.nothing_at_stage"), message: shop.words.callIt("mac.stage_hint"))
         } else {
-            ContentUnavailableView(shop.words.callIt("mac.no_jobs"), systemImage: "tray")
+            EmptyHere(title: shop.words.callIt("mac.no_jobs"))
         }
     }
 }

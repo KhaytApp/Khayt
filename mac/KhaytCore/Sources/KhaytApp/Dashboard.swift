@@ -125,9 +125,7 @@ struct Dashboard: View {
             .background(Khayt.ground)
             .overlay {
                 if shop.facts == nil {
-                    ContentUnavailableView(shop.words.callIt("mac.no_figures"),
-                                           systemImage: "chart.bar",
-                                           description: Text(shop.words.callIt("mac.no_figures_hint")))
+                    EmptyHere(title: shop.words.callIt("mac.no_figures"), message: shop.words.callIt("mac.no_figures_hint"))
                 }
             }
         }

@@ -18,8 +18,7 @@ struct OrderInspector: View {
                 Detail(job: job, shop: shop, split: split)
                     .task(id: job.id) { split = await shop.taxSplit(job.price) }
             } else {
-                ContentUnavailableView(shop.words.callIt("mac.no_job"), systemImage: "sidebar.trailing",
-                                       description: Text(shop.words.callIt("mac.no_job_hint")))
+                EmptyHere(title: shop.words.callIt("mac.no_job"), message: shop.words.callIt("mac.no_job_hint"))
             }
         }
     }

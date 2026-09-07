@@ -35,7 +35,7 @@ struct Reports: View {
             } else if shop.reportPage == .best {
                 Best(shop: shop, best: best)
             } else if rows.isEmpty {
-                ContentUnavailableView(shop.words.callIt("an.pnl_empty"), systemImage: "chart.bar.doc.horizontal")
+                EmptyHere(title: shop.words.callIt("an.pnl_empty"))
                     .frame(maxHeight: .infinity)
             } else {
                 HSplitView {
@@ -344,8 +344,7 @@ struct Reports: View {
                     .scrollContentBackground(.hidden)
                 }
             } else {
-                ContentUnavailableView(shop.words.callIt("an.aged_none"),
-                                       systemImage: "checkmark.circle")
+                EmptyHere(title: shop.words.callIt("an.aged_none"))
                     .frame(maxHeight: .infinity)
             }
         }

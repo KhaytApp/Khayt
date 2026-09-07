@@ -47,7 +47,7 @@ struct InvoiceSheet: View {
                 if let paper {
                     InvoicePaperView(paper: paper)
                 } else if let problem {
-                    ContentUnavailableView(problem, systemImage: "doc.questionmark")
+                    EmptyHere(title: problem)
                 } else {
                     ProgressView().controlSize(.small)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)

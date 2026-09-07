@@ -239,14 +239,17 @@ private struct EmptyShelf: View {
 
     var body: some View {
         if let problem = shop.problem {
+            // DELIBERATELY the system's component and its warning octagon. A
+            // book that would not open is a FAILURE, not an empty screen, and
+            // the drawn nozzle that says "nothing here yet" would say the
+            // wrong thing about it cheerfully.
             ContentUnavailableView {
                 Label(shop.words.callIt("mac.library_wont_open"), systemImage: "exclamationmark.octagon")
             } description: { Text(problem) }
         } else if !shop.search.isEmpty {
             ContentUnavailableView.search(text: shop.search)
         } else {
-            ContentUnavailableView(shop.words.callIt("mac.no_models"), systemImage: "cube",
-                                   description: Text(shop.words.callIt("mac.no_models_hint")))
+            EmptyHere(title: shop.words.callIt("mac.no_models"), message: shop.words.callIt("mac.no_models_hint"))
         }
     }
 }

@@ -35,8 +35,7 @@ struct LibraryInspector: View {
                 .padding(16)
             }
         } else {
-            ContentUnavailableView(shop.words.callIt("mac.no_model"), systemImage: "cube",
-                                   description: Text(shop.words.callIt("mac.no_model_hint")))
+            EmptyHere(title: shop.words.callIt("mac.no_model"), message: shop.words.callIt("mac.no_model_hint"))
         }
     }
 
