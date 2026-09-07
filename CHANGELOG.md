@@ -93,6 +93,33 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The Mac app looks like Khayt now, rather than like a SwiftUI app.** The
+  palette was already chosen and contrast-checked, and almost none of it reached
+  the screen: every panel in the app was the same grey rounded rectangle, so
+  nine sections down the dashboard and eight figures across it were all drawn
+  identically and the screen had no way of saying which of them mattered. Three
+  things changed. Screens sit on a warm off-white ground with the cards raised
+  on it — in light appearance a macOS window is pure **white**, so a card could
+  not be lifted at all and every panel was necessarily a grey box laid on top;
+  the ground had to move instead. Cards carry a short coloured **rail** down the
+  leading edge saying what they are about — amber on a machine that is printing
+  right now, red on a late job, the app's cyan on the shop's own figures — and
+  a card with nothing to say has no rail, which is what keeps the ones that do
+  worth looking at. And the takings for the chosen period are drawn as one large
+  figure with profit and margin beneath them, instead of as the first of eight
+  identical tiles that gave a month's revenue the same weight as the number of
+  files in the library.
+
+- **A job's stage has a colour on the Mac, and only where it means something.**
+  The jobs table drew every row's stage in the same grey, and the board knew
+  about exactly one of the nine states it draws. Four of them now carry the
+  colour the palette already defines in words — printing is the amber that means
+  something is being made right now, on hold the amber that means it wants a
+  person, completed and delivered the green that means finished, cancelled the
+  red. The other five are the ordinary course of a job and stay the colour of
+  ordinary text: nine stages in nine colours is a rainbow, and a rainbow is what
+  a colour scheme looks like once it has stopped meaning anything.
+
 - **The Mac's profit-and-loss report stops drawing rows it does not have.** One
   row per quarter, two of them on a young book — and the striping was drawn down
   the whole window regardless, so a shop read two figures above a dozen empty
@@ -723,6 +750,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+
+- **Colour Studio and Reports no longer show a "0" in the Mac's sidebar.**
+  Neither is a list of anything — a quarter is not a thing a shop has a number
+  of — and all three call sites said so in a comment while passing zero to a row
+  that drew whatever it was given. A zero beside a screen's name reads as an
+  empty screen, so both looked like features nobody had set up yet.
 
 - **A dependency that could only ever have been undefined.** Developer tooling:
   modules that work in both Node and a browser fall back to a global when there

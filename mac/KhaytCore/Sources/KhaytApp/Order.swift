@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// One job in the shop's book.
 ///
@@ -228,6 +229,37 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
         case .completed: "checkmark.circle"
         case .delivered: "shippingbox"
         case .cancelled: "xmark.circle"
+        }
+    }
+
+    /// The colour of this stage, where the palette already has a word for it.
+    ///
+    /// ── WHY MOST STAGES RETURN NIL ────────────────────────────────────────
+    ///
+    /// Nine stages given nine colours is a rainbow, and a rainbow is what a
+    /// colour scheme looks like when it has stopped meaning anything — the
+    /// same mistake, from the opposite direction, as the amber that was on
+    /// forty-eight unrelated things before `Palette.swift` was written.
+    ///
+    /// So only the four that `Palette.swift` already defines in words get one,
+    /// and they get exactly the colour that definition names. Quote, pending,
+    /// post-processing and QC are the ordinary course of a job — nothing about
+    /// them is news, and they stay the colour of ordinary text. If a stage
+    /// here ever needs a fifth colour, the question to answer first is which
+    /// sentence in the palette it is an instance of.
+    var tint: Color? {
+        switch self {
+        // "Something is being made right now" — the drop of filament in the
+        // app's own icon, and the one state worth looking up at.
+        case .printing: Khayt.hot
+        // "Wants a person, and will keep working if it does not get one" — a
+        // held job is precisely that, and nothing else on this list is.
+        case .on_hold: Khayt.attention
+        // "Finished, paid, sent, agreed."
+        case .completed, .delivered: Khayt.done
+        // "Late, failed, refused."
+        case .cancelled: Khayt.late
+        case .quote, .pending, .post, .qc: nil
         }
     }
 

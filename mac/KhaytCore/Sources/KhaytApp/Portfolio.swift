@@ -57,7 +57,7 @@ struct Portfolio: View {
                     }
                     .padding(16)
                 }
-                .background(.background)
+                .background(Khayt.ground)
             }
         }
     }
@@ -80,7 +80,7 @@ struct Portfolio: View {
             .padding(.horizontal, 8).padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
+        .card(padding: 0)
         .contentShape(RoundedRectangle(cornerRadius: 8))
         .help(snap.project)
         .onTapGesture(count: 2) { shop.openPhoto(snap) }

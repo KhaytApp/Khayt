@@ -7,19 +7,34 @@ import SwiftUI
 /// harmless while one file used it, a trap waiting for the second.
 struct DetailSection<Content: View>: View {
     let title: String
+    /// The colour of what this section is about, or nil for the ordinary case.
+    ///
+    /// A tinted header and a rail on the card below it are one signal said
+    /// twice, which is the point — see the note in `Surface.swift` on why most
+    /// sections should leave this nil. A section that is merely a heading over
+    /// some facts is not news, and colouring it costs the colour its meaning.
+    var accent: Color?
+    var symbol: String?
     @ViewBuilder let content: Content
 
-    init(_ title: String, @ViewBuilder content: () -> Content) {
-        self.title = title; self.content = content()
+    init(_ title: String, accent: Color? = nil, symbol: String? = nil,
+         @ViewBuilder content: () -> Content) {
+        self.title = title; self.accent = accent; self.symbol = symbol
+        self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 10, weight: .semibold))
-                .textCase(.uppercase)
-                .tracking(0.6)
-                .foregroundStyle(.tertiary)
+            HStack(spacing: 5) {
+                if let symbol {
+                    Image(systemName: symbol).font(.system(size: 9, weight: .bold))
+                }
+                Text(title)
+                    .textCase(.uppercase)
+                    .tracking(0.6)
+            }
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(accent.map(AnyShapeStyle.init) ?? AnyShapeStyle(.tertiary))
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)

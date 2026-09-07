@@ -58,9 +58,22 @@ struct Dashboard: View {
                 }
             }
             .padding(20)
+            // ── A COLUMN, NOT THE WHOLE WINDOW ────────────────────────────
+            //
+            // These sections are lists with a name at one end and a figure at
+            // the other, and on a wide display that put "Souq stall sign" and
+            // "13 days late" fifteen hundred pixels apart — the two halves of
+            // one fact, too far apart to read as one. The revenue card had the
+            // matching problem from the other side: a figure at the left edge
+            // of an otherwise empty panel a metre wide.
+            //
+            // So the content is a column and the window is what it sits in.
+            // The cap is generous enough for five tiles across at a readable
+            // size and short enough that a row reads as a row.
+            .frame(maxWidth: 1040, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(.background)
+        .background(Khayt.ground)
         .overlay {
             if shop.facts == nil {
                 ContentUnavailableView(shop.words.callIt("mac.no_figures"),
@@ -121,7 +134,7 @@ private struct ToChase: View {
                 }
             }
             .padding(.horizontal, 12)
-            .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
+            .card(padding: 0)
         }
     }
 
@@ -166,8 +179,7 @@ private struct Goal: View {
                     ProgressView(value: min(1, done / goal))
                         .tint(done >= goal ? Khayt.done : Khayt.cyan)
                 }
-                .padding(12)
-                .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
+                .card(padding: 12)
             }
         }
     }
@@ -178,8 +190,17 @@ private struct NeedsAttention: View {
     let items: [DashboardFacts.Item]
     let shop: Shop
 
+    /// Red when something has actually failed, amber when something merely
+    /// wants a person. The severity is the module's own — `dashboard-facts`
+    /// marks an item "bad" — so the rail is not a second opinion about how
+    /// worried to be.
+    private var worst: Color {
+        items.contains { $0.severity == "bad" } ? Khayt.late : Khayt.attention
+    }
+
     var body: some View {
-        DetailSection(shop.words.callIt("mac.needs_attention")) {
+        DetailSection(shop.words.callIt("mac.needs_attention"),
+                      accent: worst, symbol: "exclamationmark.triangle.fill") {
             VStack(spacing: 0) {
                 ForEach(items) { item in
                     HStack(spacing: 10) {
@@ -215,7 +236,7 @@ private struct NeedsAttention: View {
                 }
             }
             .padding(.horizontal, 12)
-            .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
+            .card(rail: worst, padding: 0)
         }
     }
 
@@ -375,7 +396,7 @@ private struct MoneyTiles: View {
     @Bindable var shop: Shop
 
     var body: some View {
-        DetailSection(shop.words.callIt("mac.money")) {
+        DetailSection(shop.words.callIt("mac.money"), accent: Khayt.cyan, symbol: "banknote.fill") {
             // Which period, said next to the figures rather than assumed. An
             // owner reading "revenue" needs to know whether that is this month
             // or all time before the number means anything.
@@ -390,18 +411,45 @@ private struct MoneyTiles: View {
             .padding(.bottom, 2)
 
             if let k = shop.kpis {
+                // ── THE ONE FIGURE ────────────────────────────────────────
+                //
+                // Revenue was the first of eight identical tiles, which said
+                // that the shop's takings and the number of files in its
+                // library are equally worth looking at. They are not. This is
+                // the figure somebody opens this screen for, so it is drawn
+                // like it — and the two numbers that qualify it, profit and
+                // margin, sit under it rather than beside it as rivals.
+                //
+                // No trend arrow here, deliberately. The only trend this app
+                // has is `outlook.trendPct`, which is month-over-month; the
+                // picker above can say "year", and an arrow that means
+                // something other than the figure it is attached to is the
+                // exact trap the comment further down was written about.
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(shop.words.callIt("mac.revenue"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .textCase(.uppercase).tracking(0.6)
+                        .foregroundStyle(Khayt.cyan)
+                    BigFigure(value: Money.figure(k.revenue), unit: Money.mark(shop.currency))
+                    HStack(spacing: 5) {
+                        Text(Money.short(k.grossProfit, shop.currency))
+                            .monospacedDigit()
+                        Text(shop.words.callIt("mac.gross").lowercased())
+                            .foregroundStyle(.secondary)
+                        Text("·").foregroundStyle(.tertiary)
+                        Text("\(Money.figure(k.grossMargin))%")
+                            .monospacedDigit()
+                        Text(shop.words.callIt("mac.margin").lowercased())
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.callout)
+                    .lineLimit(1)
+                }
+                .card(rail: Khayt.cyan, padding: 14)
+
                 HStack(spacing: 14) {
-                    Tile(value: Money.short(k.revenue, shop.currency),
-                         label: shop.words.callIt("mac.revenue"), symbol: "banknote", tint: .secondary)
-                    Tile(value: Money.short(k.grossProfit, shop.currency),
-                         label: shop.words.callIt("mac.gross"), symbol: "chart.line.uptrend.xyaxis",
-                         tint: .secondary)
-                    Tile(value: "\(Money.figure(k.grossMargin))%",
-                         label: shop.words.callIt("mac.margin"), symbol: "percent", tint: .secondary)
                     Tile(value: Money.short(k.avgOrderValue, shop.currency),
                          label: shop.words.callIt("mac.avg_order"), symbol: "chart.bar", tint: .secondary)
-                }
-                HStack(spacing: 14) {
                     // NOT "Owed" here. `kpi` scopes outstanding to the rows in
                     // the period, and the toolbar shows what the whole book is
                     // owed, unscoped and always visible. Two figures under one
@@ -458,15 +506,17 @@ private struct Tile: View {
                 .symbolEffect(.variableColor.iterative.dimInactiveLayers,
                               isActive: alive && !reduceMotion)
             Text(value)
-                .font(.system(size: 24, weight: .medium))
+                // Rounded to match `BigFigure`, and stepped down from it: the
+                // hero above is 34pt, so a supporting tile at the old 24 was
+                // close enough to argue with it. 19 reads as "also a number,
+                // and not the one".
+                .font(.system(size: 19, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(tint == .secondary ? AnyShapeStyle(.primary) : AnyShapeStyle(tint))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
+        .card(rail: alive ? Khayt.hot : nil)
     }
 }
 

@@ -108,9 +108,13 @@ struct OrdersTable: View {
 
             TableColumn(shop.words.callIt("mac.stage"), value: \.status) { job in
                 if let s = Stage.of(job) {
+                    // Colour only where the stage means something the palette
+                    // has a word for — see `Stage.tint`. On a book whose jobs
+                    // are all delivered this column is still one colour, and
+                    // that is the honest answer rather than a decorated one.
                     Label(shop.words.callIt(s.key), systemImage: s.symbol)
                         .labelStyle(.titleAndIcon)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(s.tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
                 } else {
                     Text(job.status).foregroundStyle(.tertiary)
                 }

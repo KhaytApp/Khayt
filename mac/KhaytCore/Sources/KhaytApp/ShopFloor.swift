@@ -20,7 +20,7 @@ struct Machines: View {
             }
             .padding(16)
         }
-        .background(.background)
+        .background(Khayt.ground)
         .overlay {
             if shop.machines.isEmpty {
                 ContentUnavailableView(shop.words.callIt("mac.no_machines"),
@@ -59,6 +59,19 @@ private struct Card: View {
                     }
                 }
             }
+    }
+
+    /// Amber down the leading edge while this machine is laying down plastic.
+    ///
+    /// `Palette.swift` reserves that colour for exactly this — "the one thing
+    /// on any of these screens worth looking up at" — and the screen that
+    /// shows the printers was the one screen not using it.
+    ///
+    /// Only `printing`, not `paused`. A paused machine is not being made on,
+    /// and lighting it the same amber would make the colour mean "a job is
+    /// attached" rather than "it is running now".
+    private var running: Bool {
+        Live.isPrinting(shop.printers.readings[machine.id]?.status?.state ?? "")
     }
 
     private var card: some View {
@@ -151,9 +164,7 @@ private struct Card: View {
                 }
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+        .card(rail: running ? Khayt.hot : nil, padding: 14)
     }
 
     private var hasSpecs: Bool {
@@ -236,7 +247,7 @@ struct Inventory: View {
                     }
                     .padding(16)
                 }
-                .background(.background)
+                .background(Khayt.ground)
             }
         }
     }
@@ -273,11 +284,7 @@ struct SpoolCard: View {
                     // The word, not only a colour: a shop reading this at a
                     // glance in a bright workshop should not have to know that
                     // amber means anything.
-                    Text(shop.words.callIt("cons.low"))
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Khayt.attention.opacity(0.16), in: Capsule())
-                        .foregroundStyle(Khayt.attention)
+                    Chip(text: shop.words.callIt("cons.low"), tint: Khayt.attention)
                 }
             }
             // Per kilo where it is KNOWN, the purchase price where it is not.
@@ -299,10 +306,16 @@ struct SpoolCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(selected ? AnyShapeStyle(.selection) : AnyShapeStyle(.quinary),
-                    in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .strokeBorder(low ? Khayt.attention.opacity(0.5) : .clear, lineWidth: 1))
+        // The app's card rather than `.quinary`, which is a translucent grey:
+        // over the new ground it read as a recess punched into the screen, so
+        // six spools looked like six holes. A low one keeps its amber ring
+        // instead of taking a rail — the content of this card is centred and a
+        // bar down one edge of centred content reads as a stray mark.
+        .background(selected ? AnyShapeStyle(.selection) : AnyShapeStyle(Khayt.surface),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(low ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(Khayt.hairline),
+                          lineWidth: low ? 1.5 : 1))
         .help(spool.material)
     }
 
@@ -434,9 +447,18 @@ private struct Live: View {
         }
     }
 
+    /// Is there a job on this machine — running or held part-way through?
+    /// This is the question the progress bar asks, and a paused print still
+    /// has a percentage worth showing.
     private func isRunning(_ raw: String) -> Bool {
-        let s = raw.lowercased()
-        return s == "printing" || s == "paused"
+        Self.isPrinting(raw) || raw.lowercased() == "paused"
     }
+
+    /// Is it laying down plastic RIGHT NOW? A narrower question than the one
+    /// above and a different answer for a paused machine, which is why they
+    /// are two functions. Static because the card around this view asks it
+    /// too, and one spelling of the state means one place to change when a
+    /// protocol calls it something else.
+    static func isPrinting(_ raw: String) -> Bool { raw.lowercased() == "printing" }
 
 }

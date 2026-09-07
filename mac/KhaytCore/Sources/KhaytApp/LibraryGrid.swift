@@ -84,7 +84,7 @@ struct LibraryGrid: View {
             }
             .onAppear { focused = true }
         }
-        .background(.background)
+        .background(Khayt.ground)
         .overlay { if shop.shownFiles.isEmpty { EmptyShelf(shop: shop) } }
     }
 

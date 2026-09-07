@@ -209,8 +209,7 @@ struct NewJobSheet: View {
                     .disabled(!draft.isComplete)
             }
         }
-        .padding(10)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
+        .card(padding: 10)
     }
 
     private var money: some View {

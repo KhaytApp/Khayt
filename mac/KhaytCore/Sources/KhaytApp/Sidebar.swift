@@ -14,7 +14,8 @@ struct Sidebar: View {
                 // First, and above the pipeline: it is the screen a shop opens
                 // the app to look at.
                 Row(title: shop.words.callIt("mac.dashboard"), symbol: "square.grid.2x2.fill",
-                    count: shop.attention?.count ?? 0, selected: shop.shelf == .dashboard)
+                    count: shop.attention?.count ?? 0, selected: shop.shelf == .dashboard,
+                    tint: Khayt.attention)
                     .tag(Shop.Shelf.dashboard)
                 Row(title: shop.words.callIt("mac.all_jobs"), symbol: "tray.full", count: shop.orders.count,
                     selected: shop.shelf == .jobs(nil))
@@ -55,7 +56,7 @@ struct Sidebar: View {
                 // No count: "how many colours" is not a thing a shop has a
                 // number of, and the row is about the spools listed above it.
                 Row(title: shop.words.callIt("cmix.title"), symbol: "paintpalette",
-                    count: 0, selected: shop.shelf == .colour)
+                    count: nil, selected: shop.shelf == .colour)
                     .tag(Shop.Shelf.colour)
                 // Cards a shop has issued. Unlike the portfolio below, the row
                 // shows even at zero: this screen has an Issue button on it, so
@@ -85,7 +86,7 @@ struct Sidebar: View {
                     .tag(Shop.Shelf.waste)
                 // No count: a quarter is not a thing a shop has a number of.
                 Row(title: shop.words.callIt("mac.nav_reports"), symbol: "chart.bar.doc.horizontal",
-                    count: 0, selected: shop.shelf == .reports)
+                    count: nil, selected: shop.shelf == .reports)
                     .tag(Shop.Shelf.reports)
             }
             Section(shop.words.callIt("mac.people")) {
@@ -115,17 +116,45 @@ struct Sidebar: View {
     private struct Row: View {
         let title: String
         let symbol: String
-        let count: Int
+        /// How many, or nil where the row is not a count of anything.
+        ///
+        /// This was an `Int` and three call sites passed 0 to mean "no count",
+        /// each with a comment saying so — and the row drew "0" anyway. Colour
+        /// Studio and Reports have shown a literal zero next to them ever
+        /// since, which reads as an empty screen rather than as a screen that
+        /// is not a list.
+        let count: Int?
         let selected: Bool
+        /// The colour of the count, where the count is news. Only the
+        /// dashboard's is: it is how many things want a person today.
+        var tint: Color?
 
         var body: some View {
             HStack {
+                // Deliberately NOT tinted when selected. A macOS sidebar draws
+                // its own selection as a filled accent rounded rect with white
+                // content on it; a colour set here would be that colour on top
+                // of the accent fill, which is the one place in the app where
+                // the palette cannot be checked — the snapshot runner captures
+                // this pane as a vibrancy alpha mask, so every pixel comes back
+                // black and no screenshot could show the mistake.
                 Label(title, systemImage: symbol)
                 Spacer(minLength: 8)
-                Text("\(count)")
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(selected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                if let count {
+                    // The coloured badge stands down on the selected row, for
+                    // the same reason the label above is not tinted: that row
+                    // is a filled accent rectangle and amber on it is a guess
+                    // nobody can check. Nothing is lost — the badge says "there
+                    // is something over there", and you are already there.
+                    if let tint, count > 0, !selected {
+                        Chip(text: "\(count)", tint: tint)
+                    } else {
+                        Text("\(count)")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(selected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                    }
+                }
             }
         }
     }
