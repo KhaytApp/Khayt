@@ -77,11 +77,23 @@ struct ConverterTests {
                                         options: ["targetId": .string("snapmaker-u1")],
                                         engine: try Self.engine())
 
-        let before = try Zip.entries(of: source).first { $0.name == "3D/3dmodel.model" }
-        let after = try Zip.entries(of: out).first { $0.name == "3D/3dmodel.model" }
-        let a = try Zip.data(of: try #require(before), in: source, limit: .max)
-        let b = try Zip.data(of: try #require(after), in: out, limit: .max)
-        #expect(a == b, "the mesh changed: \(a.count) bytes in, \(b.count) out")
+        // EVERY member that is not a config, not just the one named
+        // `3D/3dmodel.model`. On a real file that one is the CONTAINER — 1,544
+        // bytes of a six-megabyte model — and it references the actual meshes
+        // beside it, so checking it alone checks almost nothing. Run against
+        // the shop's own Forest Dragon this walks twelve members and 44 MB.
+        let written = try Zip.entries(of: out)
+        var checked = 0
+        for entry in try Zip.entries(of: source)
+        where !entry.name.lowercased().hasSuffix(".config") {
+            let after = try #require(written.first { $0.name == entry.name },
+                                     "\(entry.name) is missing from the converted file")
+            let a = try Zip.data(of: entry, in: source, limit: .max)
+            let b = try Zip.data(of: after, in: out, limit: .max)
+            #expect(a == b, "\(entry.name) changed: \(a.count) bytes in, \(b.count) out")
+            checked += 1
+        }
+        #expect(checked >= 3, "only \(checked) member(s) were compared")
     }
 
     /// The config IS rewritten, or nothing was converted and the test above
