@@ -17,12 +17,13 @@
 
   var mixer = (typeof require === 'function') ? require('./filament-mixer') : global.filamentMixer;
   var mfMesh = (typeof require === 'function') ? require('./mf-mesh')
-    // `KhaytMfMesh` is what `mf-mesh.js` actually publishes. The old
-    // name here was never wrong in practice because both readers are
-    // main-process and take the `require` branch — it was wrong and
-    // waiting for the first host without one. `mfMesh` is kept after
-    // it in case something out there does define it.
-    : (global.KhaytMfMesh || global.mfMesh);
+    // `KhaytMfMesh` is what `mf-mesh.js` actually publishes. The old name
+    // here was `mfMesh`, which nothing has ever defined: never wrong in
+    // practice because both readers are main-process and take the
+    // `require` branch, and wrong the moment the Mac app loaded this
+    // into JavaScriptCore. The old name is NOT kept as a second chance —
+    // a fallback that can only ever be undefined reads like an option.
+    : global.KhaytMfMesh;
   var mixRgb = mixer.mixRgb;
   var hexToBits = mfMesh.hexToBits;
   var bitsToHex = mfMesh.bitsToHex;

@@ -724,6 +724,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **A dependency that could only ever have been undefined.** Developer tooling:
+  modules that work in both Node and a browser fall back to a global when there
+  is no `require`, and in Node that branch never runs — so a wrong name in it is
+  invisible until something loads the file the other way. One had been waiting
+  since it was written. A check now reads every such fallback and fails if the
+  name is one nothing publishes.
+
 - **Cost per kilo climbed as a spool emptied.** It divided the spool's price by
   the grams REMAINING, so a 1 kg roll bought at 75 read 150 half way down and
   375 with 200 g left — the figure that compares two suppliers, wrong on exactly
