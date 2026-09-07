@@ -795,15 +795,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
-- **The Mac's dashboard no longer sits in the corner of a big display.** Its
-  content is held to a readable column so that a job's name and how late it is
-  are not a hand's width apart — but the column was pinned to the leading edge,
-  which looks composed on the laptop it was written on and abandoned on anything
-  wider. On a 2560-point desktop display the whole dashboard sat in the left
-  third with an empty field beside it, reading as a screen that had failed to
-  draw its other half. The column is centred now and a little wider, so the
-  space falls either side and looks like a margin. Checked at four window sizes
-  rather than reasoned about.
+- **The Mac's dashboard uses a big display instead of sitting in the corner of
+  one.** Its content is held to a readable column so that a job's name and how
+  late it is are not a hand's width apart — and on a desktop display that left
+  the whole dashboard in the left third with an empty field beside it, reading
+  as a screen that had failed to draw its other half. Past 1800 points the
+  screen becomes two columns: what the shop is doing and what wants a person on
+  one side, how it is doing on the other. The width a desk display has is spent
+  on showing more of the shop at once rather than on stretching the same rows
+  wider, and on the sample book the whole dashboard now fits without scrolling.
+  A laptop is unchanged — it is not a big display, it is a full one. Checked at
+  1280, 1470, 1710, 2560 and 3008 points rather than reasoned about.
 
 - **The Mac's working-hours row put every number beside the wrong day.** Seven
   weekday names with a figure under each — except each figure sat forty-four

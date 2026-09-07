@@ -19,80 +19,116 @@ struct Dashboard: View {
 
     private let columns = [GridItem(.adaptive(minimum: 210, maximum: 320), spacing: 14)]
 
+
+    /// What the shop is doing and what wants a person. The left column when
+    /// there are two, and the top of the screen when there is one.
+    @ViewBuilder private var theWork: some View {
+        if let attention = shop.attention, !attention.items.isEmpty {
+            // First, and above the figures. A shop that opens this app is
+            // asking "is anything wrong" before it asks "how are we doing", and
+            // a late job under a revenue tile is a late job nobody sees.
+            NeedsAttention(items: attention.items, shop: shop)
+        }
+        if let facts = shop.facts {
+            Work(facts: facts, shop: shop)
+        }
+        // What the machines are ACTUALLY doing, under the count of how many the
+        // book thinks are busy. The tile above is the book's answer; this is
+        // the printers'. A shop opening this app to ask "is it still going"
+        // should not have to change screens.
+        RunningNow(shop: shop)
+        // And what went wrong while nobody was looking. A notification
+        // dismissed while the shop was making coffee is a notification it never
+        // had, so the alerts are on the screen as well.
+        WentWrong(shop: shop)
+        // Money to go after, which is a different question from "is anything
+        // wrong" and belongs under it. Both lists are opt-in — the two switches
+        // are in Settings → Operations — and the section is absent when neither
+        // has anything.
+        ToChase(shop: shop)
+    }
+
+    /// How the shop is doing. The right column when there are two.
+    ///
+    /// The split falls exactly where the code already had a seam: these three
+    /// were the only sections inside `showsMoney`, so a shop that has turned
+    /// the money off loses the whole column rather than half of each screen.
+    @ViewBuilder private var theMoney: some View {
+        MoneyTiles(shop: shop)
+        Goal(shop: shop)
+        // After the tiles, because the tiles answer "what is it now" and this
+        // answers "is that good" — which is the second question, not the first.
+        if let outlook = shop.outlook, outlook.method != "none" {
+            Takings(outlook: outlook, shop: shop)
+        }
+    }
+
+    /// The width at which the screen stops being a column and becomes two.
+    ///
+    /// Chosen so that each column is still wide enough to be worth having:
+    /// below this a split would give the money side about 700 points, and five
+    /// tiles across 700 is five tiles nobody can read. A 16-inch laptop
+    /// (roughly 1470 points of pane) stays one column deliberately — it is not
+    /// a big display, it is a full one.
+    private static let twoColumnFrom: CGFloat = 1800
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                if let attention = shop.attention, !attention.items.isEmpty {
-                    // First, and above the figures. A shop that opens this app
-                    // is asking "is anything wrong" before it asks "how are we
-                    // doing", and a late job under a revenue tile is a late job
-                    // nobody sees.
-                    NeedsAttention(items: attention.items, shop: shop)
-                }
-                if let facts = shop.facts {
-                    Work(facts: facts, shop: shop)
-                }
-                // What the machines are ACTUALLY doing, under the count of how
-                // many the book thinks are busy. The tile above is the book's
-                // answer; this is the printers'. A shop opening this app to ask
-                // "is it still going" should not have to change screens.
-                RunningNow(shop: shop)
-                // And what went wrong while nobody was looking. A notification
-                // dismissed while the shop was making coffee is a notification
-                // it never had, so the alerts are on the screen as well.
-                WentWrong(shop: shop)
-                // Money to go after, which is a different question from "is
-                // anything wrong" and belongs under it. Both lists are opt-in
-                // — the two switches are in Settings → Operations — and the
-                // section is absent when neither has anything.
-                ToChase(shop: shop)
-                if shop.facts?.showsMoney != false {
-                    MoneyTiles(shop: shop)
-                    Goal(shop: shop)
-                    // Under the tiles, because the tiles answer "what is it
-                    // now" and this answers "is that good" — which is the
-                    // second question, not the first.
-                    if let outlook = shop.outlook, outlook.method != "none" {
-                        Takings(outlook: outlook, shop: shop)
+        GeometryReader { geo in
+            // Money hidden means the right-hand column is empty, and two
+            // columns with nothing in one of them is worse than one.
+            let showsMoney = shop.facts?.showsMoney != false
+            let twoUp = geo.size.width >= Self.twoColumnFrom && showsMoney
+            let content = geo.size.width - Metric.screen * 2
+            // 58/42. The work side carries the lists — a name at one end and
+            // how late it is at the other — and needs the room; the money side
+            // is tiles and one big figure, which do not.
+            let leftW = (content - 24) * 0.58
+
+            ScrollView {
+                Group {
+                    if twoUp {
+                        HStack(alignment: .top, spacing: 24) {
+                            VStack(alignment: .leading, spacing: 22) { theWork }
+                                .frame(width: leftW, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 22) { theMoney }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 22) {
+                            theWork
+                            if showsMoney { theMoney }
+                        }
                     }
                 }
+                .padding(Metric.screen)
+                // ── ONE COLUMN, OR TWO ────────────────────────────────────
+                //
+                // These sections are lists with a name at one end and a figure
+                // at the other, and across a whole wide window that put "Souq
+                // stall sign" and "13 days late" fifteen hundred points apart —
+                // two halves of one fact, too far apart to read as one. The
+                // revenue card had the matching problem from the other side: a
+                // figure at the left edge of an otherwise empty panel.
+                //
+                // A capped column fixes both and then wastes the display, which
+                // is its own fault: at 2560 points the dashboard sat in a
+                // column with an empty field beside it. So past a point the
+                // screen stops being a column and becomes two, and the width a
+                // desk display has is spent on showing MORE of the shop at once
+                // rather than on stretching the same rows wider.
+                //
+                // Below that point the cap and the centring still apply, so a
+                // laptop is unchanged.
+                .frame(maxWidth: twoUp ? .infinity : 1280, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
-            .padding(Metric.screen)
-            // ── A COLUMN, NOT THE WHOLE WINDOW ────────────────────────────
-            //
-            // These sections are lists with a name at one end and a figure at
-            // the other, and on a wide display that put "Souq stall sign" and
-            // "13 days late" fifteen hundred pixels apart — the two halves of
-            // one fact, too far apart to read as one. The revenue card had the
-            // matching problem from the other side: a figure at the left edge
-            // of an otherwise empty panel a metre wide.
-            //
-            // So the content is a column and the window is what it sits in.
-            // The cap is generous enough for five tiles across at a readable
-            // size and short enough that a row reads as a row — 1280 fills a
-            // 16-inch laptop almost exactly and leaves a real margin on a
-            // desktop display.
-            .frame(maxWidth: 1280, alignment: .leading)
-            // CENTRED, and that is the half this got wrong first.
-            //
-            // A capped column pinned to the leading edge looks composed on the
-            // laptop it was written on and abandoned on anything wider: at
-            // 2560 points — a Studio Display, which is what a shop with a desk
-            // actually runs this on — the whole dashboard sat in the left
-            // third with an empty field beside it, reading as a screen that
-            // had failed to draw its other half. Centred, the space falls
-            // either side and looks like a margin.
-            //
-            // Checked at 1470, 1710, 2560 and 3008 points with
-            // `KHAYT_SNAPSHOT_SIZE`, not reasoned about.
-            .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .background(Khayt.ground)
-        .overlay {
-            if shop.facts == nil {
-                ContentUnavailableView(shop.words.callIt("mac.no_figures"),
-                                       systemImage: "chart.bar",
-                                       description: Text(shop.words.callIt("mac.no_figures_hint")))
+            .background(Khayt.ground)
+            .overlay {
+                if shop.facts == nil {
+                    ContentUnavailableView(shop.words.callIt("mac.no_figures"),
+                                           systemImage: "chart.bar",
+                                           description: Text(shop.words.callIt("mac.no_figures_hint")))
+                }
             }
         }
     }
