@@ -239,6 +239,21 @@ enum LibraryImport {
             swapCount = found?.swapCount ?? 0
             thumbFile = found?.thumbFile
         }
+        // AN STL HAS NO PREVIEW, so one is drawn from its own triangles.
+        //
+        // Only a 3MF carries a picture its slicer made. Importing a downloads
+        // folder therefore filled this shop's library with 445 identical grey
+        // cubes — on the one screen whose whole job is showing what it has. The
+        // geometry was read a moment ago to measure it; drawing it costs one
+        // more pass over the same bytes.
+        //
+        // Best effort: a model that will not draw is still a model, and an
+        // import must not fail over a picture.
+        if thumbFile == nil, ext == "stl",
+           let drawn = try? MeshPreview.png(of: destination),
+           (try? drawn.write(to: dir.appending(path: "thumb.png"))) != nil {
+            thumbFile = "thumb.png"
+        }
 
         let name = originalName.replacingOccurrences(
             of: "\\.[^.]+$", with: "", options: .regularExpression)
