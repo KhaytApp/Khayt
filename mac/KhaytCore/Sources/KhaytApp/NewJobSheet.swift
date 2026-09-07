@@ -325,7 +325,7 @@ struct NewJobSheet: View {
     private func percent(_ value: Binding<Double>) -> some View { unit(value, 70, "%") }
 
     private func amount(_ value: Binding<Double>) -> some View {
-        unit(value, 90, shop.currency)
+        unit(value, 90, Money.mark(shop.currency))
     }
 
     // MARK: - What it costs, and what it comes to

@@ -506,10 +506,10 @@ struct OperationsPane: View {
                 Section(shop.words.callIt("set.ops_section")) {
                     numberRow("set.min_margin", $draft.minMarginPct)
                     numberRow("set.quote_validity", $draft.quoteValidityDays)
-                    numberRow("set.min_order_amount", $draft.minOrderAmount, unit: shop.currency)
+                    numberRow("set.min_order_amount", $draft.minOrderAmount, unit: Money.mark(shop.currency))
                     Toggle(shop.words.callIt("set.rush_fee_enabled"), isOn: $draft.rushFeeEnabled)
                     numberRow("set.rush_fee_pct", $draft.rushFeePct).disabled(!draft.rushFeeEnabled)
-                    numberRow("set.default_packaging_cost", $draft.defaultPackagingCost, unit: shop.currency)
+                    numberRow("set.default_packaging_cost", $draft.defaultPackagingCost, unit: Money.mark(shop.currency))
                 }
                 Section {
                     HStack(spacing: 8) {
@@ -557,7 +557,7 @@ struct OperationsPane: View {
                                                              set: { draft.budgets[category] = $0 }),
                                           format: .number.precision(.fractionLength(0...2)))
                                     .multilineTextAlignment(.trailing).frame(width: 90)
-                                Text(shop.currency).foregroundStyle(.secondary)
+                                Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -565,7 +565,7 @@ struct OperationsPane: View {
                     Text(shop.words.callIt("set.exp_budgets"))
                 }
                 Section {
-                    numberRow("dash.goal_setting", $draft.monthlyGoal, unit: shop.currency)
+                    numberRow("dash.goal_setting", $draft.monthlyGoal, unit: Money.mark(shop.currency))
                 } footer: {
                     Text(shop.words.callIt("dash.goal_hint"))
                 }

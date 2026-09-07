@@ -95,7 +95,7 @@ struct SpoolSheet: View {
                     HStack(spacing: 4) {
                         TextField("", value: $cost, format: .number.precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
-                        Text(shop.currency).foregroundStyle(.secondary)
+                        Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                         // What a kilo costs is the figure that compares two
                         // suppliers; a price per roll says nothing until you
                         // know what is on the roll.
