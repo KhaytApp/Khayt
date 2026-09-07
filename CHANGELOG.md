@@ -6,6 +6,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac can price a job without taking it.** A calculator, in the sidebar and
+  at ⇧⌘K: a weight, a print time, how many, which spool and which printer, and it
+  says what the work costs the shop and what to charge for it — with the four
+  buckets the cost is made of. Until now the only way to get that answer here was
+  to create a job, read the number and delete it, which is not something anybody
+  does with a customer waiting.
+
+  Not one line of the arithmetic is written for this screen. It goes through the
+  same two calls the New Job sheet uses, so a quote worked out here and the same
+  job taken through the sheet agree to the halalah. Choosing a printer matters
+  for the same reason: the wear, power and electricity rates come from that
+  machine and this shop's settings, so the answer is what you would charge rather
+  than a general one.
+
+  It opens on a real spool rather than on none, because without one there is no
+  cost per gram and the material bucket — the largest part of most prints — comes
+  out at zero. On a 180-gram part that is thirteen and a half riyals missing from
+  a price that otherwise looks finished. If a spool is deliberately not chosen,
+  the screen says in words that the plastic is not counted.
+
 - **The Mac writes the file a shop gives its accountant.** File → Export for the
   Accountant, in the layout QuickBooks, Xero or Zoho Books wants — or plain CSV
   — and two files land in the folder you pick: one of invoices, one of expenses.

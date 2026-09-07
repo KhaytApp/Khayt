@@ -62,6 +62,11 @@ struct Sidebar: View {
                 }
                 // No count: "how many colours" is not a thing a shop has a
                 // number of, and the row is about the spools listed above it.
+                // No count: "how many quotes" is not a thing a shop has a
+                // number of, and this screen keeps nothing.
+                Row(title: shop.words.callIt("mac.calc_title"), symbol: "function",
+                    count: nil, selected: shop.shelf == .calculator)
+                    .tag(Shop.Shelf.calculator)
                 Row(title: shop.words.callIt("cmix.title"), symbol: "paintpalette",
                     count: nil, selected: shop.shelf == .colour)
                     .tag(Shop.Shelf.colour)

@@ -1,0 +1,241 @@
+import SwiftUI
+import KhaytCore
+
+/// What should I charge for this?
+///
+/// ── WHY A SCREEN, WHEN THE JOB SHEET ALREADY QUOTES ───────────────────────
+///
+/// Because the job sheet answers a different question. It quotes a job it is
+/// about to take, and every figure in it is on its way into the book. A shop
+/// asked "what would a hundred of these cost?" over the counter does not want
+/// to create a job, price it, read the number and delete it — and that was the
+/// only way to get an answer on this Mac. The Electron app has had a
+/// calculator tab since the beginning; this is the one screen in it that a
+/// shop reaches for daily and the Mac had no answer to at all.
+///
+/// ── AND WHY IT IS SHORT ───────────────────────────────────────────────────
+///
+/// Every figure here comes from `lib/calculator-cost.js` and `lib/pricing.js`,
+/// through the same two calls the job sheet uses — `Shop.costedPart` and
+/// `Shop.previewQuote`. Not one line of arithmetic is written in Swift. A
+/// quote worked out here and the same job taken through the sheet come to the
+/// same halalah, because they are the same code answering twice.
+///
+/// The rates a part is costed at — wear, power, electricity, prep, post,
+/// labour, failure — come from the machine and the shop's settings, exactly as
+/// they do for a real job. That is the point of picking a machine here rather
+/// than typing seven numbers: the answer is what this shop on this printer
+/// would actually charge, not a general one.
+struct Calculator: View {
+    @Bindable var shop: Shop
+
+    @State private var grams = ""
+    @State private var hours = ""
+    @State private var qty = 1
+    /// Which spool, and it starts on a real one.
+    ///
+    /// NOT nil. Without a spool there is no cost per gram, so the material
+    /// bucket comes out at zero — and material is the largest part of most
+    /// prints. A calculator that opens quoting a job with no plastic in it
+    /// gives a confidently wrong answer to the one question it exists for.
+    @State private var spoolId: String?
+    @State private var machineId: String?
+    @State private var margin = 30.0
+    @State private var discount = 0.0
+    @State private var rush = false
+
+    @State private var costed: KhaytEngine.CostedPart?
+    @State private var quoted: QuoteTotal?
+
+    private var gramsValue: Double { Double(grams.replacingOccurrences(of: ",", with: ".")) ?? 0 }
+    private var hoursValue: Double { Double(hours.replacingOccurrences(of: ",", with: ".")) ?? 0 }
+    /// Nothing to price until there is something to print.
+    private var hasInput: Bool { gramsValue > 0 || hoursValue > 0 }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                DetailSection(shop.words.callIt("mac.calc_part"),
+                              accent: Khayt.cyan, symbol: "wrench.and.screwdriver.fill") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 10) {
+                            field(shop.words.callIt("mac.calc_weight"), $grams,
+                                  unit: shop.words.callIt("common.grams"))
+                            field(shop.words.callIt("mac.calc_time"), $hours,
+                                  unit: shop.words.callIt("common.hours"))
+                            Stepper(value: $qty, in: 1...9999) {
+                                HStack(spacing: 6) {
+                                    Text(shop.words.callIt("calc.part.qty"))
+                                        .foregroundStyle(.secondary)
+                                    Text("\(qty)").monospacedDigit()
+                                }
+                                .font(.callout)
+                            }
+                            .fixedSize()
+                            Spacer(minLength: 0)
+                        }
+                        Divider()
+                        HStack(spacing: 10) {
+                            // The spool decides the material cost per gram, and
+                            // the machine decides the wear and the electricity.
+                            // Both are the book's own rows, so the answer is
+                            // this shop's, not a worked example.
+                            Picker(shop.words.callIt("calc.part.filament"),
+                                   selection: $spoolId) {
+                                Text(shop.words.callIt("mac.any_filament")).tag(String?.none)
+                                ForEach(shop.spools) { spool in
+                                    Text(spool.material).tag(String?.some(spool.id))
+                                }
+                            }
+                            Picker(shop.words.callIt("mac.calc_printer"), selection: $machineId) {
+                                Text(shop.words.callIt("mac.any_machine")).tag(String?.none)
+                                ForEach(shop.machines) { machine in
+                                    Text(machine.name).tag(String?.some(machine.id))
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .card()
+                }
+
+                DetailSection(shop.words.callIt("mac.calc_price")) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 14) {
+                            slider(shop.words.callIt("calc.quote.margin"), $margin, 0...300)
+                            slider(shop.words.callIt("calc.quote.discount"), $discount, 0...90)
+                            Toggle(shop.words.callIt("calc.rush_fee"), isOn: $rush).fixedSize()
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .card()
+                }
+
+                if hasInput { answer } else { nothingYet }
+            }
+            .padding(Metric.screen)
+            .frame(maxWidth: 900, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .background(Khayt.ground)
+        .task(id: recomputeKey) { await recompute() }
+        // The book may not have loaded when this screen first appears, so the
+        // default is chosen when the spools arrive rather than at init.
+        .onChange(of: shop.spools.map(\.id)) { _, ids in
+            if spoolId == nil, let first = ids.first { spoolId = first }
+        }
+        .onAppear { if spoolId == nil { spoolId = shop.spools.first?.id } }
+    }
+
+    /// What the price is, and where it went.
+    @ViewBuilder private var answer: some View {
+        DetailSection(shop.words.callIt("mac.calc_price"),
+                      accent: Khayt.cyan, symbol: "banknote.fill") {
+            VStack(alignment: .leading, spacing: 10) {
+                BigFigure(value: Money.figure(quoted?.total ?? 0),
+                          unit: Money.mark(shop.currency))
+                // The cost underneath the price, because the difference between
+                // them is the only reason to look at this screen twice.
+                HStack(spacing: 5) {
+                    Text(Money.short((costed?.cost ?? 0) * Double(qty), shop.currency))
+                        .monospacedDigit()
+                    Text(shop.words.callIt("mac.calc_cost").lowercased())
+                        .foregroundStyle(.secondary)
+                    if let q = quoted, q.discountAmount > 0 {
+                        Text("·").foregroundStyle(.tertiary)
+                        Text("−" + Money.short(q.discountAmount, shop.currency))
+                            .monospacedDigit().foregroundStyle(Khayt.attention)
+                    }
+                    if let q = quoted, q.rushFee > 0 {
+                        Text("·").foregroundStyle(.tertiary)
+                        Text("+" + Money.short(q.rushFee, shop.currency))
+                            .monospacedDigit().foregroundStyle(Khayt.hot)
+                    }
+                }
+                .font(.callout).lineLimit(1)
+                // The one thing this screen can be silently wrong about. With
+                // no spool there is no cost per gram, the material bucket is
+                // zero, and the price looks like a price. Said in words rather
+                // than left for somebody to notice in the breakdown.
+                if spoolId == nil && gramsValue > 0 {
+                    Label(shop.words.callIt("mac.calc_no_filament"),
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .card(rail: Khayt.cyan, padding: 14)
+        }
+
+        // The four buckets, which is the thing a shop argues with. Same figures
+        // the job sheet shows, from the same call.
+        if let p = costed?.parts, p.material + p.machine + p.labor + p.buffer > 0 {
+            DetailSection(shop.words.callIt("mac.calc_breakdown")) {
+                HStack(spacing: 10) {
+                    bucket("calc.bd.material", p.material)
+                    bucket("calc.bd.machine", p.machine)
+                    bucket("calc.bd.labor", p.labor)
+                    bucket("calc.bd.buffer", p.buffer)
+                }
+            }
+        }
+    }
+
+    private var nothingYet: some View {
+        EmptyHere(title: shop.words.callIt("mac.calc_nothing"),
+                  message: shop.words.callIt("mac.calc_nothing_hint"))
+            .frame(height: 260)
+    }
+
+    private func bucket(_ key: String, _ value: Double) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(shop.words.callIt(key))
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text(Money.figure(value * Double(qty)))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+        }
+        .card()
+    }
+
+    private func field(_ label: String, _ text: Binding<String>, unit: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                TextField("", text: text)
+                    .labelsHidden()
+                    .monospacedDigit()
+                    .frame(width: 74)
+                Text(unit).font(.caption).foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func slider(_ label: String, _ value: Binding<Double>, _ range: ClosedRange<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 5) {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+                Text("\(Int(value.wrappedValue))%").font(.caption).monospacedDigit()
+            }
+            Slider(value: value, in: range, step: 1).frame(width: 190)
+        }
+    }
+
+    /// Everything the answer depends on, in one value, so the recompute runs
+    /// when any of it moves and not once per keystroke per field.
+    private var recomputeKey: String {
+        "\(grams)|\(hours)|\(qty)|\(spoolId ?? "")|\(machineId ?? "")|\(margin)|\(discount)|\(rush)"
+    }
+
+    private func recompute() async {
+        guard hasInput else { costed = nil; quoted = nil; return }
+        let part = await shop.costedPart(spoolId: spoolId, grams: gramsValue,
+                                         hours: hoursValue, qty: qty, machineId: machineId)
+        costed = part
+        quoted = await shop.previewQuote(baseCost: (part?.cost ?? 0) * Double(qty),
+                                         margin: margin, discountPct: discount,
+                                         shippingCost: 0, rush: rush)
+    }
+}
