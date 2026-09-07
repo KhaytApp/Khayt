@@ -69,9 +69,23 @@ struct Dashboard: View {
             //
             // So the content is a column and the window is what it sits in.
             // The cap is generous enough for five tiles across at a readable
-            // size and short enough that a row reads as a row.
-            .frame(maxWidth: 1040, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // size and short enough that a row reads as a row — 1280 fills a
+            // 16-inch laptop almost exactly and leaves a real margin on a
+            // desktop display.
+            .frame(maxWidth: 1280, alignment: .leading)
+            // CENTRED, and that is the half this got wrong first.
+            //
+            // A capped column pinned to the leading edge looks composed on the
+            // laptop it was written on and abandoned on anything wider: at
+            // 2560 points — a Studio Display, which is what a shop with a desk
+            // actually runs this on — the whole dashboard sat in the left
+            // third with an empty field beside it, reading as a screen that
+            // had failed to draw its other half. Centred, the space falls
+            // either side and looks like a margin.
+            //
+            // Checked at 1470, 1710, 2560 and 3008 points with
+            // `KHAYT_SNAPSHOT_SIZE`, not reasoned about.
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .background(Khayt.ground)
         .overlay {

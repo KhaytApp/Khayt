@@ -795,6 +795,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **The Mac's dashboard no longer sits in the corner of a big display.** Its
+  content is held to a readable column so that a job's name and how late it is
+  are not a hand's width apart — but the column was pinned to the leading edge,
+  which looks composed on the laptop it was written on and abandoned on anything
+  wider. On a 2560-point desktop display the whole dashboard sat in the left
+  third with an empty field beside it, reading as a screen that had failed to
+  draw its other half. The column is centred now and a little wider, so the
+  space falls either side and looks like a margin. Checked at four window sizes
+  rather than reasoned about.
+
 - **The Mac's working-hours row put every number beside the wrong day.** Seven
   weekday names with a figure under each — except each figure sat forty-four
   points to the right of the day it belonged to, so the row whose whole job is
