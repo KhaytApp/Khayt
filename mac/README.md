@@ -468,6 +468,20 @@ loop itself is `LibraryImport.addMany`, shared with the menu, so the two cannot
 drift on what counts as a model, what counts as a duplicate, or when an original
 is removed.
 
+`--previews` catches up a library that already exists instead of importing
+anything, and needs no path:
+
+```bash
+Khayt.app/Contents/MacOS/Khayt --import --previews --dry-run
+Khayt.app/Contents/MacOS/Khayt --import --previews
+```
+
+It draws a picture for an STL that has none — only a 3MF carries one its slicer
+made — and records a measurement for one that was never measured. Either is
+enough to bring a model in; a model that has both is left alone, so running it
+twice costs nothing. Only STLs: a 3MF arrives with both, and nothing here reads
+an OBJ's triangles yet.
+
 Exit codes: `0` everything asked for arrived, `1` something failed (named on
 stderr) or there was nothing to read, `2` no book / no library, `3` another app
 holds the book, `64` the arguments did not parse.

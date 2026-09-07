@@ -50,8 +50,9 @@ enum ImportCommand {
           <path>             a model, or a folder to walk for models
           --keep-originals   copy them in; the default is to MOVE
           --dry-run          say what would happen and change nothing
-          --previews         draw the missing previews in the library, and
-                             import nothing (needs no path)
+          --previews         draw the missing previews and record the missing
+                             measurements in the library that is already there;
+                             imports nothing, and needs no path
         """
 
     static func parse(_ arguments: [String]) -> Parsed {
@@ -115,7 +116,8 @@ enum ImportCommand {
 
         if options.previewsOnly {
             return await drawMissingPreviews(shop: shop, build: build,
-                                             root: roots.primary, dryRun: options.dryRun)
+                                             root: roots.primary, dryRun: options.dryRun,
+                                             engine: engine)
         }
 
         let chosen = options.paths.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
@@ -188,6 +190,23 @@ enum ImportCommand {
         return report.failures.isEmpty ? 0 : 1
     }
 
+    /// A model that came in before the app could do everything to it.
+    ///
+    /// EITHER, not both: until the CR-LF fix, fifteen of this shop's models
+    /// were missing both — a text STL written on Windows read as no triangles,
+    /// so it drew nothing AND measured as nothing. The picture is what a person
+    /// notices; the measurement is what "will it fit on my printer" needs, and
+    /// a model without one is quietly left out of that answer rather than
+    /// reported as too big.
+    ///
+    /// Only STL. A 3MF brings its own picture and is measured on the way in,
+    /// and nothing here reads an OBJ's triangles yet — offering to catch those
+    /// up would be a promise this cannot keep.
+    static func needsCatchingUp(_ file: LibraryFile) -> Bool {
+        guard (file.sourceFile?.ext ?? "").lowercased() == "stl" else { return false }
+        return (file.thumbFile ?? "").isEmpty || (file.geometryKey ?? "").isEmpty
+    }
+
     /// Draw a preview for every model in the library that has none.
     ///
     /// For the library that was imported before the app could draw one — 445
@@ -195,14 +214,18 @@ enum ImportCommand {
     /// cube on the library screen. A model that already has a picture is left
     /// alone, so this is safe to run twice and costs nothing the second time.
     private static func drawMissingPreviews(shop: Shop, build: StoreReader.Build,
-                                            root: String, dryRun: Bool) async -> Int32 {
+                                            root: String, dryRun: Bool,
+                                            engine: KhaytEngine) async -> Int32 {
         let vault = URL(fileURLWithPath: root)
-        let wanted = shop.files.filter { file in
-            guard file.thumbFile == nil || file.thumbFile?.isEmpty == true else { return false }
-            return (file.sourceFile?.ext ?? "").lowercased() == "stl"
-        }
+        // A MODEL CAN BE MISSING EITHER, and until the CR-LF fix fifteen of
+        // this shop's were missing both: a text STL written on Windows read as
+        // no triangles, so it drew nothing AND measured as nothing. The picture
+        // is what a person notices; the measurement is what "will it fit on my
+        // printer" needs, and a model with no key is silently left out of that
+        // answer rather than reported as too big.
+        let wanted = shop.files.filter(needsCatchingUp)
         say("library: \(root)")
-        say("models with no picture: \(wanted.count) of \(shop.files.count)")
+        say("models missing a picture or a measurement: \(wanted.count) of \(shop.files.count)")
         guard !wanted.isEmpty else { return 0 }
         if dryRun {
             say("")
@@ -220,6 +243,7 @@ enum ImportCommand {
         defer { StoreLock.release(claim, for: build) }
 
         var drawn: [String: String] = [:]
+        var measured: [String: String] = [:]
         var failures: [String] = []
         let started = Date()
         for (i, file) in wanted.enumerated() {
@@ -227,6 +251,16 @@ enum ImportCommand {
             let model = vault.appending(path: LibraryLocation.itemDirName(file.id))
                              .appending(path: name)
             say("[\(i + 1)/\(wanted.count)] \(file.title)")
+
+            if (file.geometryKey ?? "").isEmpty,
+               let box = try? Mesh.measureSTL(model), box.triangleCount > 0,
+               let key = try? await engine.geometryKey(triangleCount: box.triangleCount,
+                                                       volumeMm3: box.volumeMm3,
+                                                       x: box.x, y: box.y, z: box.z) {
+                measured[file.id] = key
+            }
+
+            guard (file.thumbFile ?? "").isEmpty else { continue }
             do {
                 guard let png = try MeshPreview.png(of: model) else {
                     failures.append("\(file.title): nothing to draw"); continue
@@ -240,17 +274,22 @@ enum ImportCommand {
 
         // ONE WRITE, at the end. Four hundred and forty-five separate updates
         // of a one-megabyte book is four hundred and forty-five rewrites of it.
-        if !drawn.isEmpty {
+        if !drawn.isEmpty || !measured.isEmpty {
             do {
                 try StoreWriter.update(storeURL: build.storeURL,
                                        owns: { StoreLock.weOwnIt(build) },
                                        whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) { root in
                     guard case .array(let rows)? = root["printFiles"] else { return }
                     root["printFiles"] = .array(rows.map { row in
-                        guard case .object(var o) = row, case .string(let id)? = o["id"],
-                              let name = drawn[id] else { return row }
-                        o["thumbFile"] = .string(name)
-                        o["thumbSource"] = .string("mesh")
+                        guard case .object(var o) = row, case .string(let id)? = o["id"] else {
+                            return row
+                        }
+                        guard drawn[id] != nil || measured[id] != nil else { return row }
+                        if let name = drawn[id] {
+                            o["thumbFile"] = .string(name)
+                            o["thumbSource"] = .string("mesh")
+                        }
+                        if let key = measured[id] { o["geometryKey"] = .string(key) }
                         return .object(o)
                     })
                 }
@@ -261,8 +300,9 @@ enum ImportCommand {
         }
 
         say("")
-        say("drawn:   \(drawn.count)")
-        say("skipped: \(failures.count)")
+        say("drawn:    \(drawn.count)")
+        say("measured: \(measured.count)")
+        say("skipped:  \(failures.count)")
         for failure in failures.prefix(10) { complain("  \(failure)") }
         say(String(format: "took %.0f s", Date().timeIntervalSince(started)))
         return failures.isEmpty ? 0 : 1
