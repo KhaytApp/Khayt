@@ -52,7 +52,12 @@ struct WordsAreTranslatedTests {
     /// translates it — `cmix.plot_title` is "خريطة ΔE · مستوى اللون a*b*" in
     /// Arabic, which keeps the symbol inside its own sentence. Looked up, like
     /// the rest of this list.
-    static let noWordForIt: Set<String> = ["mm", "W", "h m", "m", "kB", "MB", "GB", "ΔE"]
+    /// Things that are not words in any language: units, and the tail of a
+    /// filename. `— .3mf` is what is left of a suggested save name once its
+    /// interpolations are removed, and a file extension is not translated —
+    /// a converted model is `.3mf` on an Arabic Mac too.
+    static let noWordForIt: Set<String> = ["mm", "W", "h m", "m", "kB", "MB", "GB", "ΔE",
+                                           "— .3mf", ".3mf"]
 
     /// A literal with its `\(…)` taken out, brackets BALANCED.
     ///

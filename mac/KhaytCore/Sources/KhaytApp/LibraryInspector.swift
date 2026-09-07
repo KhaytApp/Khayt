@@ -25,6 +25,7 @@ struct LibraryInspector: View {
                         Divider()
                         geometry(mesh, file.id)
                     }
+                    provenance(file)
                     actions(file)
             if let notes = file.testedNotes, !notes.isEmpty {
                         Divider()
@@ -149,6 +150,36 @@ struct LibraryInspector: View {
             }
             if file.swaps > 0 {
                 DetailLine(shop.words.callIt("mac.swaps"), "\(file.swaps)", dim: true)
+            }
+        }
+    }
+
+    /// Where it came from, and what may be done with it.
+    ///
+    /// Absent entirely for a model nobody has recorded a licence for. That is
+    /// deliberate: a library that has just been imported has recorded none, and
+    /// a panel that said "not recorded" on four hundred models would teach
+    /// people to stop reading it. What it must never do is imply a refusal —
+    /// unknown is not "you may not sell this".
+    @ViewBuilder
+    private func provenance(_ file: LibraryFile) -> some View {
+        if let standing = shop.licences[file.id], standing.known || !standing.source.isEmpty {
+            DetailSection(shop.words.callIt("plib.provenance")) {
+                if !standing.source.isEmpty {
+                    DetailLine(shop.words.callIt("plib.source"), standing.source)
+                }
+                if standing.known {
+                    // ONE ROW, and the words are in the licence's own name:
+                    // every language spells the NonCommercial ones "… — not for
+                    // sale". A separate warning line said the same thing twice
+                    // and had to borrow "Status" as a label, so the panel showed
+                    // two rows both called Status. Amber for the eye, the
+                    // sentence for the reader, one line for both.
+                    DetailLine(shop.words.callIt("plib.licence"),
+                               shop.words.callIt("plib.licence_"
+                                                 + standing.licence.replacingOccurrences(of: "-", with: "_")),
+                               warn: standing.sellable == false)
+                }
             }
         }
     }

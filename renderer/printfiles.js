@@ -2221,6 +2221,33 @@
             })()}
           </div>
         </div>
+        <!-- WHERE IT CAME FROM, AND WHAT MAY BE DONE WITH IT.
+             A library holds work the shop made and models it downloaded, and
+             they look identical in a grid. Most of what is on the model sites
+             is Creative Commons and a good share of that is NonCommercial —
+             the licence that makes selling a print of it a breach rather than
+             a favour — and Khayt recorded neither fact. -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+          <div>
+            <label>${escapeHtml(t('plib.source') || 'Source')}</label>
+            <input type="text" id="pfSource" maxlength="300"
+              value="${escapeHtml(rec.source || '')}"
+              placeholder="${escapeHtml(t('plib.source_ph') || 'e.g. printables.com/model/… or your own design')}">
+          </div>
+          <div>
+            <label>${escapeHtml(t('plib.licence') || 'Licence')}</label>
+            <select id="pfLicence">
+              <!-- "Not recorded" is the default and is NOT the same as "may not
+                   be sold". A shop that has filled nothing in must not be told
+                   it cannot sell its own work. -->
+              <option value="">— ${escapeHtml(t('plib.licence_unknown') || 'Not recorded')} —</option>
+              ${(window.KhaytModelLicence ? window.KhaytModelLicence.list() : []).map((l) =>
+                `<option value="${escapeHtml(l.id)}"${rec.licence === l.id ? ' selected' : ''}>`
+                + escapeHtml(t('plib.licence_' + l.id.replace(/-/g, '_')) || l.id)
+                + `</option>`).join('')}
+            </select>
+          </div>
+        </div>
         <label style="margin-top:10px;">${escapeHtml(t('plib.tested_notes') || 'Tested settings / notes')}</label>
         <textarea id="pfNotes" rows="3">${escapeHtml(rec.testedNotes || '')}</textarea>
         <label style="margin-top:10px;">${escapeHtml(t('plib.photo') || 'Photo (optional)')}</label>
@@ -2288,6 +2315,8 @@
           ? _org.assign(rec, _patch, { group: knownNames('group'), category: knownNames('category') })
           : { group: _patch.group.trim(), folder: _patch.group.trim(), category: _patch.category.trim() });
         rec.testedNotes = modal.querySelector('#pfNotes').value.trim();
+        rec.source = modal.querySelector('#pfSource').value.trim();
+        rec.licence = modal.querySelector('#pfLicence').value;
         const ph = modal._getPhoto ? modal._getPhoto() : null;
         if (ph) { if (ph.cleared) rec.userPhoto = null; else if (ph.stagedPhoto) rec.userPhoto = ph.stagedPhoto; }
         rec.updatedAt = Date.now();

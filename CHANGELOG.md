@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **A model can say where it came from and what its licence allows.** A shop's
+  library holds work it made and models it downloaded, and they look identical
+  in a grid — while most of what is on the model sites is Creative Commons and a
+  good share of that is NonCommercial, which is the licence that makes selling a
+  print of it a breach rather than a favour. Both are fields on a model now, set
+  in Khayt's model editor and shown on the Mac, and a model that may not be sold
+  says so in words as well as colour. A model nobody has recorded a licence for
+  says **nothing** — not knowing is not the same as not being allowed.
+
 - **The Mac app converts a 3MF.** Retarget a model to another printer, or
   normalise it to a clean standard 3MF, without Electron running. The container
   is opened and rebuilt by the Mac itself and the decisions come from the same

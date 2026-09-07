@@ -101,6 +101,29 @@ struct ModelActions: View {
             // opens in a viewer as readily as in the thing the shop prints
             // from, and this shop has four slicers installed and has already
             // said which it means.
+            // CONVERT, beside the slicers rather than under Edit: a maker
+            // converts a file in order to open it in one of them, and this is
+            // where they already are.
+            //
+            // Only for a 3MF. An STL carries no printer settings to rewrite, so
+            // offering it would be offering to do nothing.
+            if (file.sourceFile?.ext ?? "").lowercased() == "3mf", !shop.printerProfiles.isEmpty {
+                Menu(shop.words.callIt("mac.convert_for")) {
+                    ForEach(shop.printerProfiles) { profile in
+                        Button(profile.name) {
+                            Task { await shop.convertModel(file, targetId: profile.id) }
+                        }
+                    }
+                    Divider()
+                    // The vendor's settings stripped rather than replaced — a
+                    // clean 3MF any slicer opens, which is the answer when the
+                    // printer is not on the list.
+                    Button(shop.words.callIt("mac.standard_3mf")) {
+                        Task { await shop.convertModel(file, targetId: nil) }
+                    }
+                }
+                .disabled(shop.converting)
+            }
             if let first = shop.defaultSlicer {
                 Button(shop.words.callIt("mac.open_in", ["name": .string(first.name)])) {
                     Task { await shop.openInSlicer(url, slicer: first) }
