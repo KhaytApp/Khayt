@@ -781,6 +781,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **The Mac's working-hours row put every number beside the wrong day.** Seven
+  weekday names with a figure under each — except each figure sat forty-four
+  points to the right of the day it belonged to, so the row whose whole job is
+  to say "eight hours on Monday" said it about a gap. The field's label was
+  empty but still claimed the form's label column and pushed the field off its
+  own centre.
+
+- **Two section headers in Settings were the odd ones out.** Fifteen of them are
+  Title Case and three were not; the two the Mac shows — Delivery Estimates and
+  WIP Limits per Column — now match. The Electron page's own fallback text
+  disagreed with the translation it falls back from, in both cases, which is how
+  the same heading managed to be spelled two ways in one app.
+
 - **The Mac's colours respond to Increase Contrast.** Apple asks for an
   increased-contrast variant of every custom colour alongside its light and dark
   ones, and Khayt's palette supplied only two of the three — so a shop that had
