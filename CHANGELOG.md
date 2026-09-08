@@ -326,6 +326,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The sample catalogue reads in Arabic now.** Ten of its twenty products had
+  no Arabic name at all, so a shop looking around Khayt in Arabic — which is the
+  market this app is for — got ten rows of English in a right-to-left table.
+  Nothing was broken; the language fallback did exactly its job, ten times in a
+  row. Three keep their English names on purpose, because a Riyadh shop does
+  leave some technical parts as they came.
+
 - **A spool on the shelf is drawn wound to what is actually left in it.** The
   picture was full on every card: a roll down to its last 120 g looked exactly
   like an untouched kilo, with a number underneath saying otherwise — so the
