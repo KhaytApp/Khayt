@@ -25,6 +25,10 @@ struct LibraryInspector: View {
                         Divider()
                         geometry(mesh, file.id)
                     }
+                    if let how = howItPrints(file) {
+                        Divider()
+                        how
+                    }
                     provenance(file)
                     actions(file)
             if let notes = file.testedNotes, !notes.isEmpty {
@@ -151,6 +155,93 @@ struct LibraryInspector: View {
                 DetailLine(shop.words.callIt("mac.swaps"), "\(file.swaps)", dim: true)
             }
         }
+    }
+
+    /// A measurement with no trailing zero pretending to be precision: 0.12 and
+    /// 0.4, never 0.120 and 0.40. The unit belongs to the label.
+    static func number(_ v: Double) -> String {
+        var s = String(format: "%.3f", v)
+        while s.contains("."), s.hasSuffix("0") { s.removeLast() }
+        if s.hasSuffix(".") { s.removeLast() }
+        return s
+    }
+
+    /// What the slicer was told to do with this model.
+    ///
+    /// The question a shop asks second, after "which model is this": a folder
+    /// holds the same shape sliced for a U1 and for an X1 Carbon, at three layer
+    /// heights, one with support and one without, and the pictures are
+    /// identical.
+    ///
+    /// NO PRINT TIME AND NO FILAMENT WEIGHT. Those exist only in a SLICED 3MF
+    /// and not one of the 43 files in this shop's library carries them; a row
+    /// that is empty on every real file teaches people the panel is broken.
+    ///
+    /// Absent entirely for a model whose file says nothing — an STL, a 3MF a CAD
+    /// program wrote — for the same reason `provenance` is absent when nobody
+    /// recorded a licence.
+    @ViewBuilder
+    private func howItPrints(_ file: LibraryFile) -> (some View)? {
+        let lines = Self.lines(from: shop.printFacts(for: file), words: shop.words)
+        if !lines.isEmpty {
+            DetailSection(shop.words.callIt("mac.how_it_prints")) {
+                ForEach(lines, id: \.label) { line in
+                    DetailLine(line.label, line.value, dim: line.dim)
+                }
+            }
+        }
+    }
+
+    /// One line per thing the file actually said.
+    ///
+    /// Separated from the view because this is the part that can be wrong: it
+    /// decides that a support STYLE is only shown when support is on, that a
+    /// plate whose parts disagree says so rather than picking one, and that a
+    /// fact the file did not state gets no row at all. `HowItPrintsTests` holds
+    /// each of those.
+    @MainActor
+    static func lines(from facts: KhaytEngine.PrintFacts?,
+                      words: Words) -> [(label: String, value: String, dim: Bool)] {
+        guard let f = facts, !f.isEmpty else { return [] }
+        var out: [(label: String, value: String, dim: Bool)] = []
+        if let printer = f.printer, !printer.isEmpty {
+            out.append((words.callIt("conv.src_printer"), printer, false))
+        }
+        // THE UNIT IS IN THE LABEL — "Layer height (mm)", "الفوهة (مم)" — because
+        // a bare " mm" appended in Swift is an English word sitting in a
+        // right-to-left panel, which is the mistake this app's guards exist for.
+        if let layer = f.layerHeight {
+            out.append((words.callIt("calc.layer_height"), number(layer), false))
+        }
+        if let nozzle = f.nozzle {
+            out.append((words.callIt("conv.cp_nozzle"),
+                        f.nozzleVaries ? words.callIt("mac.mixed_nozzles") : number(nozzle),
+                        f.nozzleVaries))
+        }
+        if !f.materials.isEmpty {
+            out.append((words.callIt("plib.material"),
+                        f.materials.joined(separator: " · "), false))
+        }
+        if f.infillVaries {
+            out.append((words.callIt("mac.infill"), words.callIt("mac.varies_by_part"), true))
+        } else if let infill = f.infill {
+            out.append((words.callIt("mac.infill"), infill, false))
+        }
+        if let support = f.support {
+            // The style shows only when support is ON. Every one of these files
+            // carries a `support_type` whether or not it is used, and "tree
+            // (auto)" beside a model that prints without support is the most
+            // misleading thing this panel could say — `lib/print-facts.js` is
+            // what stops it, and this is what would put it back.
+            out.append((words.callIt("doc.supports"),
+                        support ? (f.supportStyle ?? "✓") : words.callIt("common.none"),
+                        !support))
+        }
+        if let objects = f.objects, objects > 1 {
+            out.append((words.callIt("mac.on_the_plate"),
+                        words.counting(objects, "mac.objects_n"), true))
+        }
+        return out
     }
 
     /// Where it came from, and what may be done with it.

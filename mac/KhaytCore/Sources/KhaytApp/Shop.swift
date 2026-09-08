@@ -4193,6 +4193,72 @@ final class Shop {
         return models.count == 1 ? models[0] : nil
     }
 
+    // MARK: - What a model is set up to print like
+
+    /// The slicer's own settings for a model, once they have been read.
+    ///
+    /// Keyed by record id. `nil` means not read yet; a present entry holding
+    /// `nil` facts means read and the file had nothing to say, which is a real
+    /// answer and must not send the reader back to the disk on every redraw.
+    private var factsByFile: [String: KhaytEngine.PrintFacts?] = [:]
+    private var factsInFlight: Set<String> = []
+
+    /// What the file says about how it prints, or nil until it has been read.
+    ///
+    /// READ FROM THE FILE, NOT FROM THE RECORD. These could have been captured
+    /// at import and stored, and then every model imported before today would
+    /// have none — and a model re-sliced for a different machine would keep
+    /// saying what it used to be. The configs are two small members of the zip;
+    /// finding them costs the central directory, not the 436 MB in front of it.
+    func printFacts(for file: LibraryFile) -> KhaytEngine.PrintFacts? {
+        if let known = factsByFile[file.id] { return known }
+        loadPrintFacts(for: file)
+        return nil
+    }
+
+    /// True once the answer is in, whatever the answer was. The inspector uses
+    /// it to tell "still reading" from "this file says nothing".
+    func printFactsAreIn(for file: LibraryFile) -> Bool { factsByFile[file.id] != nil }
+
+    private func loadPrintFacts(for file: LibraryFile) {
+        guard !factsInFlight.contains(file.id), let engine else { return }
+        guard let url = modelFile(for: file),
+              url.pathExtension.lowercased() == "3mf" else {
+            factsByFile[file.id] = .some(nil)
+            return
+        }
+        factsInFlight.insert(file.id)
+        let id = file.id
+        Task { [weak self] in
+            // The zip is read off the main thread; the RULE runs on the engine's
+            // own actor, which is where the one JavaScriptCore context lives.
+            // What goes to a background thread is the file, not the interpreter.
+            let configs = await Task.detached(priority: .userInitiated) {
+                () -> (project: String, model: String, prusa: String)? in
+                guard let entries = try? Zip.entries(of: url) else { return nil }
+                func text(_ name: String) -> String {
+                    guard let e = entries.first(where: { $0.name.lowercased() == name.lowercased() }),
+                          let d = try? Zip.data(of: e, in: url) else { return "" }
+                    return String(decoding: d, as: UTF8.self)
+                }
+                let project = text("Metadata/project_settings.config")
+                let model = text("Metadata/model_settings.config")
+                // Either spelling, depending on how old the PrusaSlicer was.
+                var prusa = text("Metadata/Slic3r_PE.config")
+                if prusa.isEmpty { prusa = text("Metadata/Prusa_Slicer.config") }
+                if project.isEmpty && model.isEmpty && prusa.isEmpty { return nil }
+                return (project, model, prusa)
+            }.value
+            guard let self else { return }
+            self.factsInFlight.remove(id)
+            guard let configs else { self.factsByFile[id] = .some(nil); return }
+            self.factsByFile[id] = .some(try? await engine.printFacts(
+                projectSettings: configs.project,
+                modelSettings: configs.model,
+                prusa: configs.prusa))
+        }
+    }
+
     /// A photograph the shop took beats a generated thumbnail: it is the print
     /// as it came off the bed, which is what someone is trying to recognise.
     func thumbnail(for file: LibraryFile) -> ThumbnailSource? {
