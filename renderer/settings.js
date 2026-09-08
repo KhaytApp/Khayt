@@ -1392,6 +1392,12 @@ async function openStorefrontModal() {
   if (!sf.categories) sf.categories = {};
   if (!sf.soldOut) sf.soldOut = {};
   if (!sf.options) sf.options = {};
+  /* How many of each product are printed, boxed and ready to post, and when
+   * the shop last counted them. Two maps rather than one so an older build,
+   * which merges whole records, cannot half-write a count with someone else's
+   * timestamp attached to it. */
+  if (!sf.stockQty) sf.stockQty = {};
+  if (!sf.stockCountedAt) sf.stockCountedAt = {};
   // Parse "Color: Black, White; Size: S, M" → [{name, values}]; ≤5 groups, ≤12 vals.
   const parseOptionGroups = (raw) => String(raw || '').split(';').map((seg) => {
     const ci = seg.indexOf(':');
@@ -1411,6 +1417,7 @@ async function openStorefrontModal() {
       <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:3px;cursor:pointer;" title="${escapeHtml(t('store.sold_out') || 'Sold out')}">
         <input class="sfSold" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(t('store.sold_out') || 'Sold out')}" type="checkbox" style="width:auto;margin:0;" ${sf.soldOut[p.id] ? 'checked' : ''}>${escapeHtml(t('store.sold_out') || 'Sold out')}
       </label>
+      <input class="sfStock" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(t('store.stock_qty'))}" type="number" min="0" step="1" inputmode="numeric" placeholder="${escapeHtml(t('store.stock_qty'))}" value="${escapeHtml(sf.stockQty[p.id] != null ? String(sf.stockQty[p.id]) : '')}" title="${escapeHtml(t('store.stock_hint'))}" style="width:64px;font-size:12.5px;text-align:right;">
       <input class="sfOpts" data-pid="${escapeHtml(p.id)}" type="text" maxlength="240" placeholder="${escapeHtml(t('store.options_ph') || 'Options — Color: Black, White; Size: S, M')}" value="${escapeHtml(sf.options[p.id] || '')}" title="${escapeHtml(t('store.options_hint') || 'Optional product choices. Format: Group: value, value; Group: value')}" style="flex-basis:100%;font-size:12px;">
     </div>`;
   }).join('') || `<p style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('store.no_products') || 'Add products to your catalog first')}</p>`;
@@ -1485,6 +1492,24 @@ async function openStorefrontModal() {
       <div style="margin-top:6px;font-size:11.5px;color:var(--text-muted);word-break:break-all;">${escapeHtml(reviewLink)}</div>
       <div id="storeReviewList" style="margin-top:10px;font-size:12px;"></div>`,
     onMount(modal) {
+      /* Remember that a human TOUCHED a stock box, not merely that the number
+       * ended up different.
+       *
+       * The published stockCountedAt is what tells a storefront to re-apply a
+       * count over what it has sold since. Stamping it whenever the number
+       * changes sounds equivalent and is not: a shop that sells three, prints
+       * three and counts twenty again types the same figure, and a
+       * change-comparison reads that as nothing having happened — leaving the
+       * storefront on its own decremented total and under-selling the shelf
+       * from then on. That case is the entire reason the timestamp exists, so
+       * it has to survive it.
+       *
+       * Typing fires `input` even when the result is identical, so touching the
+       * box is the signal. Merely opening this dialog to edit a price is not,
+       * which is the other half of it: that must NOT re-assert a count. */
+      modal.querySelectorAll('.sfStock').forEach((inp) => {
+        inp.addEventListener('input', () => { inp.dataset.counted = '1'; });
+      });
       const res = modal.querySelector('#storeResult');
       const setRes = (m, ok) => { res.textContent = m; res.style.color = ok ? 'var(--success)' : 'var(--danger)'; };
       // Promo-code editor (rows of code / type / value / expiry / max uses).
@@ -1540,7 +1565,34 @@ async function openStorefrontModal() {
         modal.querySelectorAll('.sfCat').forEach((inp) => { const v = inp.value.trim(); if (v) categories[inp.dataset.pid] = v; });
         modal.querySelectorAll('.sfSold').forEach((inp) => { if (inp.checked) soldOut[inp.dataset.pid] = true; });
         modal.querySelectorAll('.sfOpts').forEach((inp) => { const v = inp.value.trim(); if (v) options[inp.dataset.pid] = v; });
+
+        /* The batch count, and when it was taken.
+         *
+         * EMPTY IS NOT ZERO. Empty means the shop does not stock this piece —
+         * it is made to order, and a storefront must leave its inventory alone
+         * entirely. Zero means the shop stocks it and the batch has sold out,
+         * which is a state it reverses next week. Reading one as the other
+         * moves a customer's quoted date by weeks in whichever direction is
+         * wrong, so the empty string is checked before the number is. */
+        const stockQty = {}, stockCountedAt = {};
+        modal.querySelectorAll('.sfStock').forEach((inp) => {
+          const raw = inp.value.trim();
+          if (raw === '') return;
+          const n = Number(raw);
+          if (!Number.isInteger(n) || n < 0) return;
+          const pid = inp.dataset.pid;
+          stockQty[pid] = n;
+          // Touched in this dialog, or never dated before. Otherwise the shop
+          // opened the dialog for some other reason and the previous count
+          // stands — re-dating it would re-apply the number downstream and
+          // undo the sales since.
+          stockCountedAt[pid] = (inp.dataset.counted === '1' || !sf.stockCountedAt[pid])
+            ? new Date().toISOString()
+            : sf.stockCountedAt[pid];
+        });
+
         sf.prices = prices; sf.categories = categories; sf.soldOut = soldOut; sf.options = options;
+        sf.stockQty = stockQty; sf.stockCountedAt = stockCountedAt;
         sf.depositPct = Math.max(0, Math.min(100, num(modal.querySelector('#storeDeposit').value, 0)));
         sf.minOrder = Math.max(0, num(modal.querySelector('#storeMinOrder').value, 0));
         sf.taxRate = Math.max(0, Math.min(100, num(modal.querySelector('#storeTax').value, 0)));
@@ -1637,6 +1689,15 @@ async function openStorefrontModal() {
             const grp = (typeof productGroupOf === 'function' ? productGroupOf(p) : (p.group || p.folder || ''));
             if (grp) it.group = grp;
             if (sf.soldOut[p.id]) it.soldOut = true;
+            /* The batch on the shelf, for a storefront that can ship it today.
+             *
+             * != null rather than a truthiness check: 0 is a sold-out batch and
+             * has to be published as 0, or the piece reads as made to order and
+             * is quoted a print lead time it does not need once restocked. */
+            if (sf.stockQty[p.id] != null) {
+              it.stockQty = sf.stockQty[p.id];
+              if (sf.stockCountedAt[p.id]) it.stockCountedAt = sf.stockCountedAt[p.id];
+            }
             /* What the thing is, for a storefront that has to reason about it.
              *
              * Khayt already knows all three and had never published them, so a

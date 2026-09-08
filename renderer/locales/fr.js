@@ -3816,6 +3816,8 @@
   "scan.order_missing": "Commande introuvable.",
   "store.category_ph": "catégorie",
   "store.sold_out": "Épuisé",
+  "store.stock_qty": "En stock",
+  "store.stock_hint": "Combien sont imprimées, emballées et prêtes à expédier aujourd’hui. Laissez vide si la pièce est fabriquée à la commande.",
   "store.lead_time": "Délai (facultatif)",
   "store.lead_ph": "ex. 3–5 jours",
   "store.min_order": "Commande minimum",

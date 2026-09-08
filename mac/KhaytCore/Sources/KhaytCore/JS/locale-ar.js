@@ -3816,6 +3816,8 @@
   "scan.order_missing": "لم يُعثر على هذا الطلب.",
   "store.category_ph": "الفئة",
   "store.sold_out": "نفد",
+  "store.stock_qty": "في المخزون",
+  "store.stock_hint": "كم قطعة مطبوعة ومعبّأة وجاهزة للشحن اليوم. اتركه فارغاً إن كانت تُصنع عند الطلب.",
   "store.lead_time": "مدة التنفيذ (اختياري)",
   "store.lead_ph": "مثال: ٣–٥ أيام",
   "store.min_order": "الحد الأدنى للطلب",

@@ -3816,6 +3816,8 @@
   "scan.order_missing": "No se encontró ese pedido.",
   "store.category_ph": "categoría",
   "store.sold_out": "Agotado",
+  "store.stock_qty": "En stock",
+  "store.stock_hint": "Cuántas están impresas, embaladas y listas para enviar hoy. Déjalo vacío si se fabrica por encargo.",
   "store.lead_time": "Plazo de entrega (opcional)",
   "store.lead_ph": "p. ej. 3–5 días",
   "store.min_order": "Pedido mínimo",
