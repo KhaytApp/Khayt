@@ -200,6 +200,9 @@ struct DayInTheShopTests {
                 clients: Shop.rows(after, "clients"),
                 currencies: ["SAR": .object(["symbol": .string("SAR"), "label": .string("SAR"), "pos": .string("after")])],
                 language: "en", sellerName: "Tuwaiq Additive", sellerAddress: "Riyadh",
+                sellerFields: ["biz": .string("Tuwaiq Additive"), "addr": .string("Riyadh"),
+                               "tagline": .string("Precision 3D printing in Riyadh"),
+                               "footer": .string("")],
                 price: price, subtotal: money.subtotal, taxTotal: money.taxTotal,
                 vatRate: 15, timestamp: Self.string(paid["date"]) ?? ""),
             engine: engine, words: words))

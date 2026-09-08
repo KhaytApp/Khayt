@@ -67,6 +67,9 @@ struct InvoiceTests {
             language: "en",
             sellerName: "Tuwaiq Additive",
             sellerAddress: "Riyadh",
+            sellerFields: ["biz": .string("Tuwaiq Additive"), "addr": .string("Riyadh"),
+                           "tagline": .string("Precision 3D printing in Riyadh"),
+                           "footer": .string("")],
             price: 575,
             // 15% inclusive of 575: the shop keeps 500 and owes 75.
             subtotal: 500, taxTotal: 75, vatRate: 15,

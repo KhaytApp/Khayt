@@ -40,6 +40,7 @@ enum Invoice {
             language: shop.words.language,
             sellerName: shop.shopName,
             sellerAddress: shop.shopAddress,
+            sellerFields: shop.shopDocumentFields,
             price: job.price,
             subtotal: money?.subtotal ?? job.price,
             taxTotal: money?.taxTotal ?? 0,
@@ -61,6 +62,11 @@ enum Invoice {
         var language: String
         var sellerName: String
         var sellerAddress: String
+        /// Every field the document asks the shop for — see
+        /// `Shop.shopDocumentFields`. `sellerName` and `sellerAddress` stay
+        /// because the ZATCA payload and the readiness check want them on their
+        /// own, spelled as those rules spell them.
+        var sellerFields: [String: JSONValue]
         /// What the job is priced at, before tax is split out of it.
         var price: Double
         var subtotal: Double
@@ -115,7 +121,7 @@ enum Invoice {
         return try? await engine.invoiceHtml(
             order: paper.row, settings: paper.settings, clients: paper.clients,
             currencies: paper.currencies, language: paper.language,
-            money: money, sellerName: paper.sellerName, sellerAddress: paper.sellerAddress)
+            money: money, sellerFields: paper.sellerFields)
     }
 
     /// The currency table the document formats against.
