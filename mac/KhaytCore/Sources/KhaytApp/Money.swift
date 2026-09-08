@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytCore
 
 /// Money on screen.
 ///
@@ -93,6 +94,11 @@ enum Money {
     }
 
     /// Grams, as a shop says them: whole numbers, and a half when there is one.
+    ///
+    /// For anything on a shelf prefer `Quantity.say`, which asks the item what
+    /// it is counted in. This stays for the figures that genuinely ARE grams
+    /// whatever the shop stocks: a nozzle's wear, and the filament weight a
+    /// slicer wrote into a 3MF.
     /// `figure` is for money and always shows two decimals, which turned a
     /// 180g failure into "180.00 grams".
     static func grams(_ n: Double) -> String {
@@ -129,5 +135,33 @@ extension View {
     func moneyStyle() -> some View {
         self.monospacedDigit()
             .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+}
+
+/// A quantity on a shelf, said in the unit the item is actually counted in.
+///
+/// ── ONE UNIT WAS THE ONLY UNIT ────────────────────────────────────────────
+///
+/// Every quantity in this app was written `"\(Int(x)) \(callIt("common.grams"))"`,
+/// because grams were the only thing anything could be recorded in. A bottle of
+/// resin then said "500 g" and a stack of plywood said "6 g".
+///
+/// The number of decimals is the unit's, not this file's: half a sheet is a
+/// real thing to have left and half a gram is not.
+enum Quantity {
+    @MainActor
+    static func say(_ amount: Double, _ unit: KhaytEngine.InventoryUnit?, _ words: Words) -> String {
+        let places = unit?.decimals ?? 0
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.locale = Locale(identifier: "en_US")
+        f.minimumFractionDigits = 0
+        f.maximumFractionDigits = places
+        let n = f.string(from: amount as NSNumber) ?? "\(amount)"
+        // `common.grams` is where Khayt already keeps the gram, and it is `جم`
+        // in Arabic — a `g` written here would be an English letter in an
+        // Arabic list. The other units are this app's own.
+        let word = words.callIt(unit?.unitKey ?? "common.grams")
+        return "\(n) \(word)"
     }
 }

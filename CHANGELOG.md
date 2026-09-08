@@ -34,6 +34,50 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The shelf counts in the unit the thing is actually sold in.** An inventory
+  item now says whether it is measured in grams, millilitres or sheets, and
+  every screen that writes a quantity asks it. A bottle of resin used to read
+  "500 g" and a stack of plywood "6 g", because grams were the only thing
+  anything could be recorded in.
+
+  The part that was genuinely wrong rather than just badly worded is the price:
+  Khayt worked out what a KILO of an item cost, so a 500 ml bottle at 180 came
+  out as "360.00 / kg" — a real figure about a different quantity, wearing the
+  wrong name. Filament is priced per kilo, resin per litre and sheet goods per
+  sheet now.
+
+  So is "low". 200 is a sensible last spool of filament and absurd for sheet
+  goods, where two left is the moment to order — under the old single threshold
+  a rack with two sheets on it looked fully stocked. **Nothing changes for
+  filament:** the gram threshold is still 200, your own setting still applies to
+  it, and every item already in your book is in grams and is read as one.
+
+- **Khayt knows there are other machines than filament printers.** A machine now
+  says what kind it is — filament printer, resin printer, UV flatbed, laser
+  cutter or CNC router — and the app stops describing all five as the first one.
+  A laser cutter was being shown a nozzle diameter, an extruder type and a
+  colour count, and asked when its nozzle was installed, because those fields
+  were on the record so they were drawn. It sees its bed and its power draw now,
+  which is what it has.
+
+  Every machine already in your book is a filament printer, and is read as one —
+  not as a guess, but because until now nothing else could be recorded. Nothing
+  changes for a shop that only runs filament printers.
+
+  Each kind also names what it consumes and what wears out on it: resin in
+  millilitres with a FEP film counted in prints and an LCD counted in hours,
+  ink in millilitres with a printhead, sheet material with a tube and a lens.
+  Recording those is the next piece of work — Khayt's stock, waste and reorder
+  rules are written in grams and teaching them a second unit changes how a
+  shop's costs are counted, which is not a change to make quietly alongside
+  this one.
+
+- **A machine Khayt cannot ask no longer looks like one that has stopped
+  answering.** Every printer protocol in Khayt talks to a filament printer, so a
+  laser cutter is not unreachable — it is working, and there is simply nothing to
+  ask it with. The two looked identical on the machines band and mean opposite
+  things. It says which it is now, and only the fault is amber.
+
 - **Filament about to run out now reaches the dashboard.** A spool at or below
   its reorder point was the last thing on the shop floor with a rule, a screen
   and no place on the one screen you leave open — the shelf knew, the badge

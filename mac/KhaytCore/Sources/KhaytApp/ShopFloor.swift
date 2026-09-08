@@ -108,6 +108,12 @@ private struct Card: View {
         Live.isPrinting(shop.printers.readings[machine.id]?.status?.state ?? "")
     }
 
+    /// What kind of machine this is. Nil only for the instant before the book
+    /// has loaded, and `shows` treats that as a filament printer — which every
+    /// machine in every book written before this existed genuinely is.
+    private var kind: KhaytEngine.MachineKind? { shop.kind(of: machine) }
+    private func shows(_ field: String) -> Bool { kind?.shows(field) ?? true }
+
     private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
@@ -140,11 +146,21 @@ private struct Card: View {
             if hasSpecs {
             DetailSection(shop.words.callIt("mac.the_machine")) {
                 if let bed = machine.bedSize { DetailLine(shop.words.callIt("mac.bed"), bed) }
-                if let d = machine.nozzleDiameter {
+                // ── ONLY WHAT THIS KIND OF MACHINE HAS ───────────────────
+                //
+                // A laser cutter has no nozzle, no extruder and no colour
+                // count, and this screen gave it all three: the field was on
+                // the record, so it was drawn. `lib/machine-kinds.js` says
+                // which specs belong to which kind, and this asks it.
+                if let d = machine.nozzleDiameter, shows("nozzleDiameter") {
                     DetailLine(shop.words.callIt("mac.nozzle"), "\(Money.figure(d)) mm")
                 }
-                if let n = machine.maxColors { DetailLine(shop.words.callIt("mac.colours"), "\(n)") }
-                if let e = machine.extruderType { DetailLine(shop.words.callIt("mac.extruder"), e) }
+                if let n = machine.maxColors, shows("maxColors") {
+                    DetailLine(shop.words.callIt("mac.colours"), "\(n)")
+                }
+                if let e = machine.extruderType, shows("extruderType") {
+                    DetailLine(shop.words.callIt("mac.extruder"), e)
+                }
                 if let w = machine.powerDraw { DetailLine(shop.words.callIt("mac.power"), "\(Int(w)) W") }
                 if let address = machine.address {
                     // The address, never the key. The store keeps that encrypted
@@ -304,6 +320,11 @@ struct SpoolCard: View {
         Swatch.rgb(fromHex: spool.color).map { Color(red: $0.r, green: $0.g, blue: $0.b) }
     }
 
+    /// What this item is counted in. Nil for the instant before the book has
+    /// loaded, and `Quantity.say` reads that as grams — which every item
+    /// written before this existed genuinely is.
+    private var unit: KhaytEngine.InventoryUnit? { shop.unit(of: spool) }
+
     var body: some View {
         VStack(spacing: 8) {
             face
@@ -317,7 +338,10 @@ struct SpoolCard: View {
                 }
             }
             HStack(spacing: 6) {
-                Text(spool.weight.map { "\(Int($0)) \(shop.words.callIt("common.grams"))" } ?? "—")
+                // In the item's OWN unit. A bottle of resin said "500 g" and a
+                // stack of ply said "6 g", because the only unit this screen
+                // knew was the only unit anything could be recorded in.
+                Text(spool.weight.map { Quantity.say($0, unit, shop.words) } ?? "—")
                     .font(.callout).monospacedDigit()
                     .foregroundStyle(low ? Khayt.attention : .primary)
                 if low {
@@ -335,9 +359,14 @@ struct SpoolCard: View {
             // roll emptied, which is why the old one was deleted rather than
             // fixed. An older spool shows what it cost — a fact — rather than a
             // rate worked out from the wrong number.
-            if let perKilo = spool.costPerKilo {
-                Text(Money.text(perKilo, shop.currency) + " / "
-                     + shop.words.callIt("common.kg"))
+            // Per KILO for filament, per LITRE for resin, per SHEET for ply.
+            // This was the one place the gram assumption was load bearing
+            // rather than cosmetic: a 500 ml bottle at 180 came out as "360.00
+            // / kg", which is a figure about a different quantity wearing the
+            // wrong name.
+            if let rate = unit?.rate {
+                Text(Money.text(rate, shop.currency) + " / "
+                     + shop.words.callIt(unit?.rateKey ?? "unit.per_kg"))
                     .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
             } else if let cost = spool.cost {
                 Text(Money.text(cost, shop.currency))

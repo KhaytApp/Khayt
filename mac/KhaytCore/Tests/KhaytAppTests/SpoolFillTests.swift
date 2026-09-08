@@ -18,7 +18,7 @@ struct SpoolFillTests {
         Spool(id: "S1", material: "PLA", cost: 75, vatAmount: nil,
               weight: left, spoolWeight: new, openedAt: nil, storage: nil,
               colourVariant: nil, color: nil, materialType: nil, lot: nil,
-              purchasedAt: nil, reorderPoint: nil, reorderQty: nil,
+              purchasedAt: nil, unit: nil, reorderPoint: nil, reorderQty: nil,
               printTemp: nil, bedTemp: nil, maxSpeed: nil, priceHistory: nil)
     }
 

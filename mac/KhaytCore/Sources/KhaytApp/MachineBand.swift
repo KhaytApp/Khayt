@@ -253,8 +253,15 @@ struct MachineBandView: View {
                         // The honest answer, and the reason the totals below are
                         // over fewer machines than the shop owns.
                         Text("—").font(.title3.weight(.semibold)).foregroundStyle(.tertiary)
-                        Text(shop.words.callIt("mac.band_unknown"))
-                            .font(.caption2).foregroundStyle(Khayt.attention)
+                        Text(shop.words.callIt(
+                            shop.machineKinds[row.machineId]?.polled == false
+                                ? "mac.band_not_asked" : "mac.band_unknown"))
+                            .font(.caption2)
+                            // Amber says "go and look". A machine Khayt simply
+                            // cannot ask is not a problem, so it is not amber.
+                            .foregroundStyle(shop.machineKinds[row.machineId]?.polled == false
+                                             ? AnyShapeStyle(.tertiary)
+                                             : AnyShapeStyle(Khayt.attention))
                             .multilineTextAlignment(.trailing)
                     }
                 }
@@ -300,7 +307,16 @@ struct MachineBandView: View {
                                 .offset(x: w * (gap.startMinute / band.minutes))
                         }
                     } else {
-                        Text(shop.words.callIt("mac.band_cannot_ask"))
+                        // TWO DIFFERENT SENTENCES, and telling them apart is
+                        // the whole point of knowing a machine's kind. A
+                        // printer that is not answering is a fault. A laser
+                        // cutter is not answering because nothing in this app
+                        // can ask one — it is working perfectly and Khayt has
+                        // no protocol for it. They look identical to a status
+                        // panel and mean opposite things.
+                        Text(shop.words.callIt(
+                            shop.machineKinds[row.machineId]?.polled == false
+                                ? "mac.band_no_protocol" : "mac.band_cannot_ask"))
                             .font(.caption).foregroundStyle(.tertiary)
                             .frame(height: height, alignment: .leading)
                     }

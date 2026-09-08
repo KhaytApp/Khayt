@@ -23,6 +23,10 @@ struct SpoolSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var material = ""
+    /// What this item is counted in. `g` because every item recorded before
+    /// Khayt could ask is filament — see `lib/inventory-units.js`.
+    @State private var unit = "g"
+    @State private var units: [KhaytEngine.InventoryUnit] = []
     @State private var colourVariant = ""
     @State private var swatch = Color(nsColor: NSColor(hex: "#888888") ?? .gray)
     @State private var cost: Double = 0
@@ -83,12 +87,24 @@ struct SpoolSheet: View {
                     Text(shop.words.callIt("mac.swatch")).foregroundStyle(.secondary)
                     ColorPicker("", selection: $swatch, supportsOpacity: false).labelsHidden()
                 }
+                // BEFORE the quantity, because it says what the quantity is.
+                // A field labelled "g" that a shop types 500 into meaning
+                // millilitres is a field that records the wrong fact silently.
+                GridRow {
+                    Text(shop.words.callIt("inv.unit")).foregroundStyle(.secondary)
+                    Picker("", selection: $unit) {
+                        ForEach(units) { choice in
+                            Text(shop.words.callIt("inv.unit_\(choice.unit)")).tag(choice.unit)
+                        }
+                    }
+                    .labelsHidden().fixedSize()
+                }
                 GridRow {
                     Text(shop.words.callIt("mac.weight")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
                         TextField("", value: $weight, format: .number.precision(.fractionLength(0...1)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
-                        Text(shop.words.callIt("mac.grams")).foregroundStyle(.secondary)
+                        Text(shop.words.callIt(unitKey)).foregroundStyle(.secondary)
                     }
                 }
                 GridRow {
@@ -191,7 +207,15 @@ struct SpoolSheet: View {
         .padding(18)
         .frame(width: Self.width)
         .onAppear(perform: fill)
+        .task { units = await shop.inventoryUnitChoices() }
         .task(id: material) { await loadColours() }
+    }
+
+    /// The word after the quantity field, in the unit being chosen. Falls back
+    /// to the gram Khayt already keeps, because `common.grams` is `جم` in Arabic
+    /// and a `g` written here would be an English letter in an Arabic form.
+    private var unitKey: String {
+        units.first { $0.unit == unit }?.unitKey ?? "common.grams"
     }
 
     private func fill() {
@@ -202,6 +226,7 @@ struct SpoolSheet: View {
         cost = spool.cost ?? 0
         vatAmount = spool.vatAmount ?? 0
         weight = spool.weight ?? 0
+        unit = shop.unit(of: spool)?.unit ?? "g"
         lot = spool.lot ?? ""
         reorderPoint = spool.reorderPoint ?? 200
         openedAt = Order.day(spool.openedAt)
@@ -220,6 +245,7 @@ struct SpoolSheet: View {
             "cost": .number(cost),
             "vatAmount": .number(shop.reclaimsTax ? min(max(0, vatAmount), cost) : 0),
             "weight": .number(weight),
+            "unit": .string(unit),
             "lot": .string(lot),
             "colourVariant": .string(colourVariant),
             "reorderPoint": .number(reorderPoint),

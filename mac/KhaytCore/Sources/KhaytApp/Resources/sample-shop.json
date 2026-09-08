@@ -2171,7 +2171,8 @@
         "installedAt": "2026-08-01",
         "gramsThreshold": 50000,
         "gramsAtInstall": 0
-      }
+      },
+      "kind": "fdm"
     },
     {
       "id": "MACH-core-one",
@@ -2198,7 +2199,8 @@
         "installedAt": "2026-06-14",
         "gramsThreshold": 8000,
         "gramsAtInstall": 0
-      }
+      },
+      "kind": "fdm"
     },
     {
       "id": "MACH-x1c",
@@ -2226,7 +2228,38 @@
         "installedAt": "2026-03-02",
         "gramsThreshold": 30000,
         "gramsAtInstall": 0
-      }
+      },
+      "kind": "fdm"
+    },
+    {
+      "id": "MACH-UVFLAT",
+      "name": "Roland VersaUV",
+      "kind": "uv",
+      "color": "#3E5A70",
+      "vendor": "Roland DG",
+      "printerModelName": "LEF2-200",
+      "bed": {
+        "x": 508,
+        "y": 330,
+        "z": 100
+      },
+      "powerDraw": 210,
+      "createdAt": "2026-03-14"
+    },
+    {
+      "id": "MACH-LASER",
+      "name": "Ruida 1390",
+      "kind": "laser",
+      "color": "#8A5A0B",
+      "vendor": "Ruida",
+      "printerModelName": "RD-1390",
+      "bed": {
+        "x": 1300,
+        "y": 900,
+        "z": 200
+      },
+      "powerDraw": 1400,
+      "createdAt": "2026-05-02"
     }
   ],
   "printFiles": [
@@ -2990,7 +3023,8 @@
       "color": "#1B1B1F",
       "colourVariant": "Galaxy Black",
       "spoolWeight": 1000,
-      "vatAmount": 9.78
+      "vatAmount": 9.78,
+      "unit": "g"
     },
     {
       "id": "sp-2",
@@ -3004,7 +3038,8 @@
       "color": "#2E7FD4",
       "colourVariant": "Sky Blue",
       "spoolWeight": 1000,
-      "vatAmount": 11.09
+      "vatAmount": 11.09,
+      "unit": "g"
     },
     {
       "id": "sp-3",
@@ -3018,7 +3053,8 @@
       "color": "#C0392B",
       "colourVariant": "Signal Red",
       "spoolWeight": 750,
-      "vatAmount": 14.35
+      "vatAmount": 14.35,
+      "unit": "g"
     },
     {
       "id": "sp-4",
@@ -3031,7 +3067,8 @@
       "updatedAt": "2026-05-11T09:00:00.000Z",
       "color": "#3A3D42",
       "colourVariant": "Carbon Grey",
-      "spoolWeight": 1000
+      "spoolWeight": 1000,
+      "unit": "g"
     },
     {
       "id": "sp-5",
@@ -3043,7 +3080,8 @@
       "color": "#F2F3F5",
       "colourVariant": "Traffic White",
       "spoolWeight": 1000,
-      "vatAmount": 12.39
+      "vatAmount": 12.39,
+      "unit": "g"
     },
     {
       "id": "sp-6",
@@ -3057,7 +3095,53 @@
       "color": "#D4A62A",
       "colourVariant": "Silk Gold",
       "spoolWeight": 1000,
-      "vatAmount": 8.87
+      "vatAmount": 8.87,
+      "unit": "g"
+    },
+    {
+      "id": "INV-RESIN01",
+      "material": "Resin Standard Grey",
+      "unit": "ml",
+      "colourVariant": "Slate Grey",
+      "color": "#6E6A66",
+      "cost": 180,
+      "vatAmount": 23.48,
+      "weight": 340,
+      "spoolWeight": 500,
+      "storage": "Shelf C1",
+      "openedAt": "2026-08-20",
+      "rev": 1,
+      "updatedAt": "2026-09-01"
+    },
+    {
+      "id": "INV-PLY3MM",
+      "material": "Birch ply 3 mm",
+      "unit": "sheet",
+      "colourVariant": "600 × 400 mm",
+      "color": "#C8A06A",
+      "cost": 240,
+      "vatAmount": 31.3,
+      "weight": 6,
+      "spoolWeight": 10,
+      "storage": "Rack by the laser",
+      "openedAt": "2026-08-02",
+      "rev": 1,
+      "updatedAt": "2026-09-01"
+    },
+    {
+      "id": "INV-ACRYL3",
+      "material": "Acrylic 3 mm clear",
+      "unit": "sheet",
+      "colourVariant": "600 × 400 mm",
+      "color": "#DCE8EC",
+      "cost": 420,
+      "vatAmount": 54.78,
+      "weight": 2,
+      "spoolWeight": 10,
+      "storage": "Rack by the laser",
+      "openedAt": "2026-07-11",
+      "rev": 1,
+      "updatedAt": "2026-09-01"
     }
   ],
   "expenses": [

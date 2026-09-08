@@ -143,6 +143,16 @@ public actor KhaytEngine {
         // a completion that silently failed to deduct would leave a shop
         // ordering filament it does not have.
         "order-deduction",
+        // What an inventory item is COUNTED IN — grams of filament,
+        // millilitres of resin, sheets of ply. Loaded before anything that
+        // asks whether an item is low, because the threshold is in the item's
+        // own unit.
+        "inventory-units",
+        // What KIND of machine this is — filament, resin, UV flatbed, laser,
+        // CNC — and what follows: what it consumes, what wears out on it, and
+        // whether any protocol in this repo can ask it anything. Loaded early
+        // because screens and rules both read it.
+        "machine-kinds",
         // The next 48 hours on the machines. Reads `scheduling` for the queue
         // order and `order-deduction` for what a job needs off the shelf, so
         // the band cannot disagree with the board about which job runs next or
@@ -1944,6 +1954,153 @@ public actor KhaytEngine {
         public let final: Double
         /// `override`, `rounded` or `base`.
         public let source: String
+    }
+
+    // MARK: - What an item is counted in
+
+    /// Every inventory item's unit and what follows from it, keyed by item id.
+    ///
+    /// One call per book, like `machineKinds`. The module decides — including
+    /// that an item with no unit is genuinely grams rather than an unknown, and
+    /// that a unit this build has not learned reads as grams rather than
+    /// dropping the row off the shelf.
+    public func inventoryUnits(_ items: [JSONValue],
+                               settings: [String: JSONValue]) throws -> [String: InventoryUnit] {
+        try runtime.call2("""
+            (function (rows, settings) {
+              var out = {};
+              rows.forEach(function (item) {
+                var unit = KhaytInventoryUnits.unitOf(item);
+                var spec = KhaytInventoryUnits.spec(unit);
+                var keys = KhaytInventoryUnits.keysFor(unit);
+                var rate = KhaytInventoryUnits.costPerRateUnit(
+                  item && item.cost, item && item.spoolWeight, unit);
+                out[String((item && item.id) || '')] = {
+                  unit: unit, unitKey: keys.unit, rateKey: keys.rate,
+                  measure: spec.measure, decimals: spec.decimals,
+                  low: KhaytInventoryUnits.lowThreshold(item, settings),
+                  rate: rate ? rate.value : null
+                };
+              });
+              return out;
+            })(ARG0, ARG1)
+            """, [.array(items), .object(settings)], as: [String: InventoryUnit].self)
+    }
+
+    /// The units a shop can choose from, for the picker.
+    public func inventoryUnitChoices() throws -> [InventoryUnit] {
+        try runtime.call2("""
+            KhaytInventoryUnits.UNITS.map(function (unit) {
+              var spec = KhaytInventoryUnits.spec(unit), keys = KhaytInventoryUnits.keysFor(unit);
+              return {unit: unit, unitKey: keys.unit, rateKey: keys.rate,
+                      measure: spec.measure, decimals: spec.decimals,
+                      low: spec.low, rate: null};
+            })
+            """, [], as: [InventoryUnit].self)
+    }
+
+    public struct InventoryUnit: Decodable, Sendable, Hashable, Identifiable {
+        /// `g` | `ml` | `sheet`
+        public let unit: String
+        public let unitKey: String
+        /// What a price is quoted PER — `kg`, `L`, `sheet`. This is the one
+        /// place the gram assumption was load bearing rather than cosmetic:
+        /// `costPerKilo` on a bottle of resin answered in the wrong
+        /// denominator and called it a kilo.
+        public let rateKey: String
+        /// `mass` | `volume` | `count`
+        public let measure: String
+        /// How many decimals a quantity is worth writing. Half a sheet is real;
+        /// half a gram is not.
+        public let decimals: Int
+        /// What counts as low, in this item's own unit.
+        public let low: Double
+        /// What one `rate` unit of it cost, or nil where that is not knowable —
+        /// it needs what the item held when it ARRIVED, never what is left.
+        public let rate: Double?
+        public var id: String { unit }
+    }
+
+    // MARK: - What kind of machine this is
+
+    /// Every machine's kind, resolved in ONE crossing.
+    ///
+    /// The module decides — including the two decisions it would be easy to
+    /// re-make in Swift and get subtly wrong: that a machine with no `kind` is
+    /// genuinely a filament printer rather than an unknown, and that a kind
+    /// this build has not learned is drawn as one rather than not drawn at all.
+    /// A newer Khayt writing `kind: "waterjet"` into a synced book must not
+    /// make a machine vanish from an older one.
+    ///
+    /// One call per book, like `printerProfiles`: this is read in view bodies,
+    /// and a hop into JavaScript per machine per redraw is a hop for a constant.
+    public func machineKinds(_ machines: [JSONValue]) throws -> [String: MachineKind] {
+        try runtime.call2("""
+            (function (rows) {
+              var out = {};
+              rows.forEach(function (m) {
+                var kind = KhaytMachineKinds.kindOf(m);
+                var spec = KhaytMachineKinds.spec(kind);
+                var keys = KhaytMachineKinds.keysFor(kind);
+                out[String((m && m.id) || '')] = {
+                  kind: kind, nameKey: keys.name,
+                  consumable: spec.consumable, unit: spec.unit,
+                  consumableKey: keys.consumable, unitKey: keys.unit,
+                  layered: spec.layered, polled: spec.polled,
+                  specs: spec.specs,
+                  wear: keys.wear
+                };
+              });
+              return out;
+            })(ARG0)
+            """, [.array(machines)], as: [String: MachineKind].self)
+    }
+
+    /// The kinds a shop can choose from, for the picker.
+    public func machineKindChoices() throws -> [MachineKind] {
+        try runtime.call2("""
+            KhaytMachineKinds.KINDS.map(function (kind) {
+              var spec = KhaytMachineKinds.spec(kind), keys = KhaytMachineKinds.keysFor(kind);
+              return {kind: kind, nameKey: keys.name, consumable: spec.consumable,
+                      unit: spec.unit, consumableKey: keys.consumable, unitKey: keys.unit,
+                      layered: spec.layered, polled: spec.polled, specs: spec.specs,
+                      wear: keys.wear};
+            })
+            """, [], as: [MachineKind].self)
+    }
+
+    public struct MachineKind: Decodable, Sendable, Hashable, Identifiable {
+        /// `fdm` | `resin` | `uv` | `laser` | `cnc`
+        public let kind: String
+        public let nameKey: String
+        /// `filament` | `resin` | `ink` | `sheet` | `stock`
+        public let consumable: String
+        /// `g` | `ml` | `sheet` — RECORDED, not yet acted on. Khayt's stock,
+        /// deduction, waste and reorder rules are written in grams, and
+        /// teaching them a second unit changes how a shop's costs are counted.
+        /// This is here so that work has something to read.
+        public let unit: String
+        public let consumableKey: String
+        public let unitKey: String
+        public let layered: Bool
+        /// Whether any protocol in this repo can ask a machine of this kind
+        /// what it is doing. False is not an apology — it is what stops a laser
+        /// cutter being drawn as a printer that is failing to answer.
+        public let polled: Bool
+        public let specs: [String]
+        public let wear: [Wear]
+        public var id: String { kind }
+
+        public struct Wear: Decodable, Sendable, Hashable, Identifiable {
+            public let part: String
+            public let label: String
+            public let unit: String
+            public var id: String { part }
+        }
+
+        /// Whether a spec row is worth showing for this kind. A laser has no
+        /// extruder, and Khayt used to tell it its nozzle was 0.4 mm.
+        public func shows(_ field: String) -> Bool { specs.contains(field) }
     }
 
     // MARK: - The next 48 hours on the machines

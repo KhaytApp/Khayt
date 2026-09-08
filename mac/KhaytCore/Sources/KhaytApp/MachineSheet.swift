@@ -25,6 +25,10 @@ struct MachineSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
+    /// What kind of machine this is. `fdm` because every machine recorded
+    /// before Khayt could ask genuinely is one — see `lib/machine-kinds.js`.
+    @State private var kind = "fdm"
+    @State private var kinds: [KhaytEngine.MachineKind] = []
     // The colour a new machine starts with, before the shop picks one. The
     // app's own, so a printer added and left alone still looks like it belongs
     // to Khayt rather than to whatever SwiftUI's `.blue` happens to be.
@@ -60,6 +64,20 @@ struct MachineSheet: View {
                     TextField(shop.words.callIt("mach.name_ph"), text: $name)
                         .textFieldStyle(.roundedBorder).focused($focused)
                 }
+                // FIRST, because it decides what the rest of this sheet is
+                // asking about. A nozzle diameter is a question for a filament
+                // printer and nonsense for a laser cutter, and a form that asks
+                // it anyway is a form that records nonsense.
+                GridRow {
+                    Text(shop.words.callIt("mach.kind")).foregroundStyle(.secondary)
+                    Picker("", selection: $kind) {
+                        ForEach(kinds) { choice in
+                            Text(shop.words.callIt(choice.nameKey)).tag(choice.kind)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
                 GridRow {
                     Text(shop.words.callIt("mach.printer_model")).foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 4) {
@@ -89,12 +107,18 @@ struct MachineSheet: View {
                     Text(shop.words.callIt("mach.color")).foregroundStyle(.secondary)
                     ColorPicker("", selection: $swatch, supportsOpacity: false).labelsHidden()
                 }
-                GridRow {
-                    Text(shop.words.callIt("mac.nozzle")).foregroundStyle(.secondary)
-                    HStack(spacing: 4) {
-                        TextField("", value: $nozzleDiameter, format: .number.precision(.fractionLength(0...2)))
-                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 70)
-                        Text("mm").foregroundStyle(.secondary)
+                // A nozzle diameter is a question for a filament printer and
+                // nonsense for a laser cutter. A form that asks it anyway is a
+                // form that records nonsense.
+                if shows("nozzleDiameter") {
+                    GridRow {
+                        Text(shop.words.callIt("mac.nozzle")).foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            TextField("", value: $nozzleDiameter,
+                                      format: .number.precision(.fractionLength(0...2)))
+                                .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 70)
+                            Text("mm").foregroundStyle(.secondary)
+                        }
                     }
                 }
                 GridRow {
@@ -112,6 +136,13 @@ struct MachineSheet: View {
                 }
             }
 
+            // The whole wear block belongs to the nozzle, and only a filament
+            // printer has one. What wears on a resin printer is its FEP film
+            // and its screen, on two different clocks; on a laser it is the
+            // tube and the lens. `lib/machine-kinds.js` names all of them —
+            // recording them is the next piece of work, and asking a laser
+            // when its nozzle went in until then is worse than asking nothing.
+            if shows("nozzleDiameter") {
             Divider()
 
             // The nozzle, as a block: what it is made of, when it went in, and
@@ -162,6 +193,7 @@ struct MachineSheet: View {
                     }
                 }
             }
+            }
 
             HStack {
                 Spacer()
@@ -174,7 +206,10 @@ struct MachineSheet: View {
         }
         .padding(18)
         .frame(width: Self.width)
-        .task { await shop.readCatalog() }
+        .task {
+            await shop.readCatalog()
+            kinds = await shop.machineKindChoices()
+        }
         .onAppear(perform: fill)
     }
 
@@ -184,6 +219,9 @@ struct MachineSheet: View {
     private func fill() {
         guard let machine = existing else { focused = true; return }
         name = machine.name
+        // What the module says this machine is, which for every machine
+        // recorded before Khayt could ask is a filament printer.
+        kind = shop.kind(of: machine)?.kind ?? "fdm"
         swatch = Color(nsColor: NSColor(hex: machine.color ?? "#5b9cf0") ?? .systemBlue)
         model = machine.printerModelName ?? ""
         nozzleDiameter = machine.nozzleDiameter ?? 0.4
@@ -204,6 +242,12 @@ struct MachineSheet: View {
         if name.trimmingCharacters(in: .whitespaces).isEmpty { name = printer.name }
     }
 
+    /// Whether a field belongs to the kind being edited. The module decides;
+    /// nil is the instant before the choices have loaded, and everything shows.
+    private func shows(_ field: String) -> Bool {
+        kinds.first { $0.kind == kind }?.shows(field) ?? true
+    }
+
     private func commit() {
         var nozzle: [String: JSONValue] = [
             "material": .string(nozzleMaterial),
@@ -217,6 +261,7 @@ struct MachineSheet: View {
         let input: [String: JSONValue] = [
             "name": .string(name),
             "color": .string(NSColor(swatch).hexString ?? "#5b9cf0"),
+            "kind": .string(kind),
             "nozzleDiameter": .number(nozzleDiameter),
             "powerDraw": .number(powerDraw),
             "targetHoursPerDay": .number(targetHours),
