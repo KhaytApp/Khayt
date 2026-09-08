@@ -11,14 +11,39 @@ struct Machines: View {
 
     private let columns = [GridItem(.adaptive(minimum: 280, maximum: 420), spacing: 16)]
 
+    /// Recomputed when the printers say something new, and once a minute
+    /// regardless — the now-line and every gap move with the clock, and a band
+    /// five minutes stale is wrong in the one place it must not be.
+    @State private var band: KhaytEngine.MachineBand?
+    @State private var minute = 0
+
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(shop.machines) { machine in
-                    Card(machine: machine, wear: shop.wear[machine.id], shop: shop)
+            VStack(spacing: 16) {
+                // Above the cards, because it answers the question the shop
+                // came to this screen with. The cards answer "what is this
+                // machine", which is the second question and the rarer one.
+                if let band, !shop.machines.isEmpty {
+                    MachineBandView(shop: shop, band: band)
+                }
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(shop.machines) { machine in
+                        Card(machine: machine, wear: shop.wear[machine.id], shop: shop)
+                    }
                 }
             }
             .padding(Metric.screen)
+        }
+        .task(id: "\(shop.bandSignature)#\(minute)") {
+            band = await shop.machineBand()
+        }
+        .task {
+            // Not a display timer: this drives an engine call, so it ticks at
+            // the resolution the band is drawn to and no faster.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                minute &+= 1
+            }
         }
         .background(Khayt.ground)
         .overlay {
@@ -526,6 +551,6 @@ private struct Live: View {
     /// are two functions. Static because the card around this view asks it
     /// too, and one spelling of the state means one place to change when a
     /// protocol calls it something else.
-    static func isPrinting(_ raw: String) -> Bool { raw.lowercased() == "printing" }
+    static func isPrinting(_ raw: String) -> Bool { PrinterWatch.isPrinting(raw) }
 
 }

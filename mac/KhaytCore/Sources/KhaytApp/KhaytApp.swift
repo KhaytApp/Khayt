@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import WebKit
+import KhaytCore
 
 /// Not `@main`: `main.swift` is the entry point, because the writing direction
 /// has to be settled before AppKit starts. See `Direction.swift`.
@@ -637,7 +638,48 @@ final class Activator: NSObject, NSApplicationDelegate {
 
             shop.shelf = .machines
             await settle()
+            // THE SAMPLE SHOP'S PRINTERS ARE SOMEBODY ELSE'S ADDRESSES, so this
+            // Mac never knocks on them and the band has nothing it can time. It
+            // draws its "cannot time any of these yet" line, which is the right
+            // answer and IS worth a picture — it is what a shop sees on day one.
+            try? await Task.sleep(for: .milliseconds(900))
             capture(named: "07-machines", into: dir)
+
+            // And then with the printers answering, because the band is the
+            // point of this screen and the shot above shows none of it. The
+            // readings are put in place rather than polled: a snapshot runner
+            // cannot wait on three machines that are not on this network.
+            for (i, machine) in shop.machines.enumerated() {
+                shop.printers.setReadingForTesting(machine.id, PrinterWatch.Reading(
+                    status: KhaytEngine.PrinterStatus(
+                        state: "printing", progress: [56, 22, 8][i % 3], progressSource: "layers",
+                        filename: "", timeRemaining: [3.8, 5.1, 41.6][i % 3] * 3600,
+                        tempNozzle: 245, tempBed: 60, type: "moonraker"),
+                    problem: nil, at: Date()))
+            }
+            await settle()
+            try? await Task.sleep(for: .milliseconds(900))
+            capture(named: "07c-machines-band", into: dir)
+
+            // AND A FARM. The band has a second density that only appears above
+            // four machines, and nothing in this repo has more than three — so
+            // without this the layout a ten-printer shop actually sees would
+            // ship having been looked at by nobody. Same concession as the
+            // readings above: the runner cannot put nine printers on this wifi.
+            shop.standUpFarmForSnapshot(10)
+            for (i, machine) in shop.machines.enumerated() {
+                shop.printers.setReadingForTesting(machine.id, PrinterWatch.Reading(
+                    status: KhaytEngine.PrinterStatus(
+                        state: i == 7 ? "idle" : "printing",
+                        progress: [56, 22, 8, 71, 94, 33, 12, 0, 48, 66][i % 10],
+                        progressSource: "layers", filename: "",
+                        timeRemaining: [3.8, 5.1, 41.6, 2.2, 0.7, 18.4, 27.0, 0, 9.5, 6.1][i % 10] * 3600,
+                        tempNozzle: 245, tempBed: 60, type: "moonraker"),
+                    problem: nil, at: Date()))
+            }
+            await settle()
+            try? await Task.sleep(for: .milliseconds(1200))
+            capture(named: "07d-machines-farm", into: dir)
             // And the real book, because the live card only exists there: the
             // sample's printers are somebody else's addresses on somebody
             // else's network, so this app never knocks on them. The poll needs

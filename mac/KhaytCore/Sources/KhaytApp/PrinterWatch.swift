@@ -43,6 +43,17 @@ final class PrinterWatch {
         var consecutiveFailures: Int = 0
     }
 
+    /// Is this printer laying plastic right now?
+    ///
+    /// The one place that decides. It lived on a private view in `ShopFloor`,
+    /// which is fine while the only thing asking is a card on that screen — and
+    /// the band asks too, from `Shop`, because an IDLE printer answers a poll
+    /// perfectly well with `progress: 0`. A job still marked printing in the
+    /// book against an idle machine would then be drawn as starting now and
+    /// running its whole estimate: a confident picture of something that is not
+    /// happening.
+    static func isPrinting(_ raw: String) -> Bool { raw.lowercased() == "printing" }
+
     /// Why a machine is not being polled at all, which is different from a poll
     /// that failed.
     enum NotWatched: Equatable {

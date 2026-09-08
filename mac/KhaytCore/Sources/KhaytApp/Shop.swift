@@ -4277,6 +4277,83 @@ final class Shop {
     /// have none — and a model re-sliced for a different machine would keep
     /// saying what it used to be. The configs are two small members of the zip;
     /// finding them costs the central directory, not the 436 MB in front of it.
+    /// Stand up a farm, for a snapshot that has no farm to photograph.
+    ///
+    /// A ten-printer shop is the case the band's compact density exists for, and
+    /// nothing in this repo has ten printers — so without this the layout that
+    /// only appears above four machines would ship having been reviewed by
+    /// nobody. It is the same concession as `setReadingForTesting`: the runner
+    /// cannot put nine more printers on this Mac's network.
+    ///
+    /// Copies the shop's own machines and the jobs on them, so the picture is of
+    /// this app drawing real rows rather than of a fixture.
+    func standUpFarmForSnapshot(_ n: Int) {
+        guard !machines.isEmpty, machines.count < n else { return }
+        var grown = machines
+        var rows = machineRows
+        var i = machines.count
+        while grown.count < n, i < n {
+            guard case .object(var row) = machineRows[i % machineRows.count] else { break }
+            row["id"] = .string(String(format: "FARM-%02d", i + 1))
+            row["name"] = .string(String(format: "Printer %02d", i + 1))
+            let copy = JSONValue.object(row)
+            // Decoded rather than copied field by field: a `Machine` built here
+            // by hand would drift from the one the store produces the moment
+            // anybody adds a field, and this is the only place that would not
+            // notice.
+            if let data = try? JSONEncoder().encode(copy),
+               let machine = try? JSONDecoder().decode(Machine.self, from: data) {
+                grown.append(machine)
+                rows.append(copy)
+            }
+            i += 1
+        }
+        machines = grown
+        machineRows = rows
+    }
+
+    /// The next `hours` on the machines.
+    ///
+    /// Recomputed rather than cached: it depends on the printers' answers and on
+    /// the time, and a band that is five minutes stale draws its now-line in the
+    /// wrong place — which is the one mark on it that has to be right.
+    ///
+    /// ── WHICH MACHINES GET A READING ───────────────────────────────────────
+    ///
+    /// Only the ones whose printer says it is PRINTING. A failed poll carries a
+    /// `problem` and no status, so it is already absent — but an idle printer
+    /// answers perfectly well with `progress: 0`, and a job still marked
+    /// printing in the book against an idle machine would then be drawn as
+    /// starting now and running its whole estimate. That is a confident picture
+    /// of something that is not happening. Left out, the row says the end is
+    /// unknown, which is true and is what a shop should go and look at.
+    func machineBand(hours: Double = 48) async -> KhaytEngine.MachineBand? {
+        guard let engine else { return nil }
+        var live: [String: JSONValue] = [:]
+        for (id, reading) in printers.readings {
+            guard let status = reading.status, PrinterWatch.isPrinting(status.state) else { continue }
+            var seen: [String: JSONValue] = ["progress": .number(Double(status.progress))]
+            if let left = status.timeRemaining { seen["timeRemaining"] = .number(left) }
+            live[id] = .object(seen)
+        }
+        return try? await engine.machineBand(machines: machineRows, orders: orderRows,
+                                             inventory: inventoryRows, live: live,
+                                             now: Date(), hours: hours)
+    }
+
+    /// What the band was computed FROM, as one string.
+    ///
+    /// A `.task(id:)` needs something cheap that changes exactly when the answer
+    /// would. The readings change on every sweep and most sweeps change nothing,
+    /// so this is the progress and the time left, which are the only two things
+    /// the band reads out of a printer.
+    var bandSignature: String {
+        printers.readings.keys.sorted().map { id in
+            guard let s = printers.readings[id]?.status, PrinterWatch.isPrinting(s.state) else { return "\(id):-" }
+            return "\(id):\(s.progress):\(s.timeRemaining.map { String(Int($0 / 60)) } ?? "-")"
+        }.joined(separator: "|")
+    }
+
     func printFacts(for file: LibraryFile) -> KhaytEngine.PrintFacts? {
         if let known = factsByFile[file.id] { return known }
         loadPrintFacts(for: file)

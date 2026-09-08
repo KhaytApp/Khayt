@@ -262,6 +262,40 @@ final class Words {
         "mac.board":         ["en": "Board",         "ar": "اللوح"],
         "mac.nothing_here":  ["en": "nothing here",  "ar": "لا شيء هنا"],
         "mac.no_jobs":       ["en": "No jobs yet",   "ar": "لا أعمال بعد"],
+        // The band: the next two days on the machines
+        "mac.band_title":    ["en": "The next 48 hours",  "ar": "الـ 48 ساعة القادمة"],
+        "mac.band_sub":      ["en": "now → {hours} hours ahead · one mark = 6 h",
+                              "ar": "من الآن إلى {hours} ساعة · كل علامة 6 ساعات"],
+        // Said ONLY when a machine cannot be asked, so it reads as news rather
+        // than as a permanent disclaimer nobody sees any more.
+        "mac.band_over":     ["en": "over {counted} of your machines — {silent} not answering",
+                              "ar": "على {counted} من طابعاتك — {silent} لا تجيب"],
+        // When NONE of them can be timed the band has nothing to draw, so it is
+        // not drawn: one line saying what is missing beats three empty lanes and
+        // a legend for marks that do not appear.
+        "mac.band_free_across": ["en": "{hours} free across {n} machines",
+                                 "ar": "{hours} متفرغة على {n} طابعات"],
+        "mac.band_none":     ["en": "Khayt cannot time any of these printers yet",
+                              "ar": "لا يستطيع خيط تقدير أي من هذه الطابعات بعد"],
+        "mac.band_none_why": ["en": "Connect a printer and the next 48 hours fill themselves in — what is running, when each machine comes free, and what is waiting on filament.",
+                              "ar": "اربط طابعة وتمتلئ الـ 48 ساعة القادمة من تلقاء نفسها — ما يعمل، ومتى تتفرغ كل طابعة، وما ينتظر خيطاً."],
+        "mac.band_unknown":  ["en": "no estimate",   "ar": "لا تقدير"],
+        "mac.band_cannot_ask": ["en": "printing something Khayt cannot time — nothing here is a guess",
+                                "ar": "تطبع شيئاً لا يستطيع خيط تقديره — ولا شيء هنا تخمين"],
+        "mac.band_free_in":  ["en": "free in {hours} h",  "ar": "متفرغة خلال {hours} ساعة"],
+        "mac.band_printing": ["en": "Printing now",   "ar": "تطبع الآن"],
+        "mac.band_queued":   ["en": "Queued — projected", "ar": "في الانتظار — متوقع"],
+        "mac.band_blocked":  ["en": "Blocked on stock",  "ar": "متوقف على المخزون"],
+        "mac.band_free":     ["en": "free",           "ar": "متفرغة"],
+        "mac.band_state_printing": ["en": "Printing", "ar": "تطبع"],
+        "mac.band_state_queued":   ["en": "Queued",   "ar": "في الانتظار"],
+        "mac.band_state_free":     ["en": "Free",     "ar": "متفرغة"],
+        "mac.band_short":    ["en": "{grams} g short of {material}",
+                              "ar": "ناقص {grams} غ من {material}"],
+        "mac.band_past":     ["en": "runs {hours} past the end of this window",
+                              "ar": "يمتد {hours} بعد نهاية هذه النافذة"],
+        "mac.band_before":   ["en": "started {hours} before now",
+                              "ar": "بدأ قبل {hours} من الآن"],
         // Moving a job
         "mac.move_action":   ["en": "Move Job",       "ar": "نقل العمل"],
         "mac.move_refused":  ["en": "That move was refused.", "ar": "رُفض هذا النقل."],

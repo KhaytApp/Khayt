@@ -34,6 +34,38 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The next 48 hours on your machines, drawn.** The Machines screen opens with
+  a band: what is printing on each printer, what is queued behind it, and where
+  the gaps are — with each gap dimensioned, so "when is that machine free" is
+  answered by looking at a space rather than reading a time and holding it
+  against two others. Forty-eight hours and not a day, because a day cannot hold
+  a 42-hour print; anything longer still says in words how far past the edge it
+  runs, and a job that started before the window says that too.
+
+  It separates three things most schedule views blur. What is **known** — a
+  running job's end, from what the printer itself reports. What is
+  **projected** — everything queued behind it, laid end to end in the order the
+  board would run them, drawn dashed and labelled as a projection, because a
+  shop that reads one as a promise will plan a delivery around it. And what is
+  **neither**: a printer Khayt cannot reach is printing something that ends at a
+  time nobody knows, so that machine draws nothing, says "no estimate", and **is
+  left out of the capacity figures entirely** — counting it as forty-eight free
+  hours would overstate your shop by a whole printer on the morning its printer
+  went offline. The heading says how many machines the totals are actually over.
+
+  A queued job that needs more filament than the shelf holds is drawn as blocked
+  and names the shortfall, so a spool holding forty-two machine hours looks like
+  what it is.
+
+- **It works at ten printers as well as three.** Above four machines the band
+  changes density — rows halve, blocks keep their name and drop their second
+  line, and the two fixed columns give their width to the track — and past eight
+  it scrolls rather than pushing the machines off the screen. The free-hours
+  summary is spelled out as a sum you can check by eye up to four machines
+  (`29:12 + 0:00 + 41:50 = 71:02`) and becomes a total over a count beyond that,
+  because ten terms is not an arithmetic anybody verifies.
+
+
 - **The tax you pay on a purchase is money you get back, and Khayt can hold it
   now.** A box on an expense for the VAT on the supplier's invoice. It comes off
   the VAT you charged, so the quarterly report shows what you actually owe
