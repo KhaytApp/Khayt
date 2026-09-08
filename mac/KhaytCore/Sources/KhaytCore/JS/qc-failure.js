@@ -55,13 +55,30 @@
    * Nothing when no weight was recorded and nothing when the material is not on
    * the shelf: a cost invented from a spool that does not exist is worse than
    * an honest zero, which at least reads as "not measured".
+   *
+   * ── ONE RULE, NOT TWO ─────────────────────────────────────────────────────
+   *
+   * This used to divide the roll's price by `spool.weight` — what is LEFT, not
+   * what was bought — so the plastic grew dearer every time somebody used some.
+   * `lib/waste-entry.js` had exactly the same line and exactly the same defect,
+   * and fixing one would have left the other: a QC failure and a waste entry
+   * for the same 180 g off the same roll would then have cost different
+   * amounts. It delegates now, so there is one answer.
    */
-  function wasteCost(materialName, grams, inventory) {
+  function wasteCost(materialName, grams, inventory, reclaims) {
+    const W = (typeof global !== 'undefined' && global.KhaytWasteEntry) || null;
+    if (W && typeof W.costOf === 'function') {
+      return W.costOf(materialName, grams, inventory, reclaims);
+    }
+    // Standalone fallback, kept correct rather than kept as it was.
     const g = Math.max(0, numberOf(grams));
-    if (g <= 0) return 0;
+    if (!materialName || g <= 0) return 0;
     const spool = arrayOf(inventory).find(i => i && i.material === materialName);
-    if (!spool || numberOf(spool.weight) <= 0) return 0;
-    return (numberOf(spool.cost) / numberOf(spool.weight)) * g;
+    if (!spool || numberOf(spool.cost) <= 0) return 0;
+    const bought = numberOf(spool.spoolWeight) > 0
+      ? numberOf(spool.spoolWeight) : numberOf(spool.weight);
+    if (bought <= 0) return 0;
+    return (numberOf(spool.cost) / bought) * g;
   }
 
   /**
@@ -105,7 +122,7 @@
       material: order.material || '',
       machineId: order.machineId || null,
       weight: weight || 0,
-      cost: wasteCost(order.material, weight, c.inventory),
+      cost: wasteCost(order.material, weight, c.inventory, c.reclaimsTax),
       reason: reason || c.defaultReason || '',
       orderId: order.id,
       failureType,

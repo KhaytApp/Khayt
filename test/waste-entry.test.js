@@ -139,3 +139,37 @@ test('totals', () => {
   const t = W.totals([{ weight: 10, cost: 1, failureType: 'warping' }, { weight: '5', cost: '2.5' }]);
   assert.deepEqual(t, { count: 2, grams: 15, cost: 3.5, byFailureType: { warping: 1, other: 1 } });
 });
+
+const round2 = (n) => Math.round(n * 100) / 100;
+const costOf = W.costOf;
+
+test('wasted plastic costs what the roll cost, not what is left of it', () => {
+  require('../lib/spool-edit.js');
+  // A 500 g roll of PA-CF bought at 240 is 0.48 a gram, all its life. `weight`
+  // is what is LEFT and falls as the shop prints, so dividing the price by it
+  // made the plastic dearer every time somebody used some: with 120 g left this
+  // read 2.00 a gram and costed 180 g at 360.00 instead of 86.40 — four times
+  // over, and without bound as the roll empties.
+  const nearlyEmpty = [{ id: 'sp', material: 'PA-CF', cost: 240, weight: 120, spoolWeight: 500 }];
+  const full = [{ id: 'sp', material: 'PA-CF', cost: 240, weight: 500, spoolWeight: 500 }];
+  assert.equal(round2(costOf('PA-CF', 180, nearlyEmpty)), 86.40);
+  assert.equal(round2(costOf('PA-CF', 180, full)), 86.40,
+    'the same 180 g costs the same whether the roll is full or nearly gone');
+
+  // A roll bought before `spoolWeight` existed is the one case with no better
+  // answer — what it originally weighed is unrecoverable — so it still divides
+  // by what is left. Stated so nobody "fixes" it into inventing a figure.
+  const legacy = [{ id: 'sp', material: 'PA-CF', cost: 240, weight: 120 }];
+  assert.equal(round2(costOf('PA-CF', 180, legacy)), 360,
+    'unrecoverable, and it must not guess');
+});
+
+test('a registered shop did not pay the tax on the plastic it threw away', () => {
+  require('../lib/spool-edit.js');
+  const roll = [{ id: 'sp', material: 'PA-CF', cost: 240, weight: 500, spoolWeight: 500, vatAmount: 31.30 }];
+  assert.equal(round2(costOf('PA-CF', 180, roll, false)), 86.40, 'not registered: it paid all of it');
+  assert.equal(round2(costOf('PA-CF', 180, roll, true)), 75.13, 'registered: the tax comes back');
+  // A roll with no tax recorded costs what it cost, whatever the shop is.
+  const plain = [{ id: 'sp', material: 'PA-CF', cost: 240, weight: 500, spoolWeight: 500 }];
+  assert.equal(round2(costOf('PA-CF', 180, plain, true)), 86.40);
+});

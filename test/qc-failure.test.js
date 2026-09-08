@@ -187,3 +187,23 @@ test('a caller with no waste log still gets the row back', () => {
   assert.equal(out.waste.weight, 100);
   assert.deepEqual(out.effects.map(e => e.type), ['save', 'render_waste', 'render_inventory']);
 });
+
+test('a QC failure and a waste entry cost the same plastic the same', () => {
+  // Two screens, one roll. They each had their own copy of "price divided by
+  // weight", so they shared the defect — the plastic growing dearer as the roll
+  // emptied — and fixing one would have left them disagreeing about the same
+  // 180 g. `qc-failure` delegates to `waste-entry` now; this is what stops it
+  // growing a second opinion again.
+  require('../lib/spool-edit.js');
+  const WasteEntry = require('../lib/waste-entry.js');
+  const roll = [{ id: 'sp', material: 'PA-CF', cost: 240, weight: 120, spoolWeight: 500 }];
+  for (const grams of [1, 42, 180, 500]) {
+    for (const reclaims of [false, true]) {
+      assert.equal(Q.wasteCost('PA-CF', grams, roll, reclaims),
+                   WasteEntry.costOf('PA-CF', grams, roll, reclaims),
+                   `${grams} g, reclaims=${reclaims}`);
+    }
+  }
+  // And the shared answer is the roll's real price per gram, not what is left.
+  assert.equal(Math.round(Q.wasteCost('PA-CF', 180, roll, false) * 100) / 100, 86.40);
+});

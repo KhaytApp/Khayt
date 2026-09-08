@@ -1379,9 +1379,11 @@ public actor KhaytEngine {
     }
 
     /// What wasted grams of a material cost, from the spool they came off.
-    public func wasteCost(material: String, grams: Double, inventory: [JSONValue]) throws -> Double {
-        try runtime.call2("KhaytWasteEntry.costOf(ARG0, ARG1, ARG2)",
-                          [.string(material), .number(grams), .array(inventory)], as: Double.self)
+    public func wasteCost(material: String, grams: Double, inventory: [JSONValue],
+                          reclaimsTax: Bool) throws -> Double {
+        try runtime.call2("KhaytWasteEntry.costOf(ARG0, ARG1, ARG2, ARG3)",
+                          [.string(material), .number(grams), .array(inventory),
+                           .bool(reclaimsTax)], as: Double.self)
     }
 
     /// Take an entry out of the log and put its grams back on its spool.
