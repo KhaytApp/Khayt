@@ -162,3 +162,29 @@ struct SampleShopTests {
         }
     }
 }
+
+extension SampleShopTests {
+
+    /// The Arabic catalogue read half in English.
+    ///
+    /// Ten of twenty sample products carried no `nameAr` at all, so a shop
+    /// looking at Khayt in Arabic — the market this app is for — saw ten rows
+    /// of English in a right-to-left table. Nothing was broken: the language
+    /// fallback did exactly what it should, ten times in a row.
+    ///
+    /// A few stay in English on purpose, because a Riyadh shop does keep some
+    /// technical names as they came ("HVAC duct adapter"), and because that
+    /// fallback is itself a thing worth having seen once.
+    @Test("the sample catalogue is mostly Arabic, and not entirely")
+    func mostProductsHaveAnArabicName() throws {
+        let products = try Self.rows("products")
+        let named = products.filter {
+            if case .string(let s)? = $0["nameAr"] { return !s.trimmingCharacters(in: .whitespaces).isEmpty }
+            return false
+        }
+        #expect(named.count * 4 >= products.count * 3,
+                "only \(named.count) of \(products.count) sample products have an Arabic name")
+        #expect(named.count < products.count,
+                "every product is translated, so the language fallback never renders")
+    }
+}
