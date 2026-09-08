@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 /// Which member of a `.3mf` is the picture of the print.
 ///
@@ -64,5 +65,27 @@ public enum ThreeMF {
         let middle = lower.dropFirst(prefix.count).dropLast(suffix.count)
         guard !middle.isEmpty, middle.allSatisfy(\.isNumber) else { return nil }
         return Int(middle)
+    }
+
+    /// How big a thumbnail of `picture` should be, in POINTS.
+    ///
+    /// Three things at once, and the first two were both got wrong on the way
+    /// here. It keeps the render's shape, because returning the maximum itself
+    /// stretches a 512×384 plate render into a square and that reads as a fault
+    /// in the file. It works in pixels, because `maximum` is in points and a
+    /// Retina request asks for twice as many of them — mixing the two put a
+    /// 256×256 render in the bottom-left corner of a 1024×1024 thumbnail. And
+    /// it never enlarges: the render inside a 3MF is often only 256 across, and
+    /// blowing that up makes a soft picture out of a sharp one for no gain,
+    /// since Finder can scale it later and will do no worse.
+    public static func thumbnailSize(for picture: CGSize,
+                                     maximum: CGSize,
+                                     scale: CGFloat) -> CGSize {
+        guard picture.width > 0, picture.height > 0,
+              maximum.width > 0, maximum.height > 0, scale > 0 else { return maximum }
+        let room = CGSize(width: maximum.width * scale, height: maximum.height * scale)
+        let k = min(room.width / picture.width, room.height / picture.height, 1)
+        return CGSize(width: max(1, (picture.width * k / scale).rounded()),
+                      height: max(1, (picture.height * k / scale).rounded()))
     }
 }
