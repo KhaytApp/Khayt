@@ -9,11 +9,11 @@ import KhaytCore
 ///
 /// ── WHY THIS IS WORTH A WHOLE EXTENSION ───────────────────────────────────
 ///
-/// A shop's library is 3MF files and macOS has never heard of them: no icon, no
-/// preview, no type — `mdls` on one of this shop's models reports
-/// `dyn.ah62d4rv4ge8xg5pg`, which is macOS's way of saying it has no idea. Ten
-/// identical blank document icons in a Finder window, each 46 MB, each a
-/// different king.
+/// A shop's library is 3MF files, and until Khayt declared the type macOS had
+/// never heard of them — `mdls` on one of this shop's models reported
+/// `dyn.ah62d4rv4ge8xg5pg`, which is how macOS says it has no idea. The type
+/// bought a kind and an icon. It did not buy a PICTURE, so a Finder window was
+/// still ten identical pages, each 46 MB, each a different king.
 ///
 /// The picture is already inside the file. A 3MF is a zip and every one of them
 /// carries a plate render the slicer wrote; `ThreeMF.preview` decides which
