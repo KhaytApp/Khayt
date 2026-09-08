@@ -2982,37 +2982,43 @@
       "id": "sp-1",
       "material": "PLA+ 2.0",
       "cost": 75,
-      "weight": 1000,
+      "weight": 860,
       "rev": 1,
       "openedAt": "2026-08-20",
       "storage": "drybox",
       "updatedAt": "2026-08-20T09:00:00.000Z",
       "color": "#1B1B1F",
-      "colourVariant": "Galaxy Black"
+      "colourVariant": "Galaxy Black",
+      "spoolWeight": 1000,
+      "vatAmount": 9.78
     },
     {
       "id": "sp-2",
       "material": "Sunlu PETG",
       "cost": 85,
-      "weight": 1000,
+      "weight": 720,
       "rev": 1,
       "openedAt": "2026-07-02",
       "storage": "shelf",
       "updatedAt": "2026-07-02T09:00:00.000Z",
       "color": "#2E7FD4",
-      "colourVariant": "Sky Blue"
+      "colourVariant": "Sky Blue",
+      "spoolWeight": 1000,
+      "vatAmount": 11.09
     },
     {
       "id": "sp-3",
       "material": "Sunlu TPU",
       "cost": 110,
-      "weight": 750,
+      "weight": 480,
       "rev": 1,
       "openedAt": "2026-08-30",
       "storage": "drybox",
       "updatedAt": "2026-08-30T09:00:00.000Z",
       "color": "#C0392B",
-      "colourVariant": "Signal Red"
+      "colourVariant": "Signal Red",
+      "spoolWeight": 750,
+      "vatAmount": 14.35
     },
     {
       "id": "sp-4",
@@ -3024,29 +3030,34 @@
       "storage": "shelf",
       "updatedAt": "2026-05-11T09:00:00.000Z",
       "color": "#3A3D42",
-      "colourVariant": "Carbon Grey"
+      "colourVariant": "Carbon Grey",
+      "spoolWeight": 1000
     },
     {
       "id": "sp-5",
       "material": "ASA",
       "cost": 95,
-      "weight": 1000,
+      "weight": 640,
       "rev": 1,
       "updatedAt": "2026-08-01T09:00:00.000Z",
       "color": "#F2F3F5",
-      "colourVariant": "Traffic White"
+      "colourVariant": "Traffic White",
+      "spoolWeight": 1000,
+      "vatAmount": 12.39
     },
     {
       "id": "sp-6",
       "material": "PLA Silk",
       "cost": 68,
-      "weight": 1000,
+      "weight": 940,
       "rev": 1,
       "openedAt": "2026-09-01",
       "storage": "drybox",
       "updatedAt": "2026-09-01T09:00:00.000Z",
       "color": "#D4A62A",
-      "colourVariant": "Silk Gold"
+      "colourVariant": "Silk Gold",
+      "spoolWeight": 1000,
+      "vatAmount": 8.87
     }
   ],
   "expenses": [
@@ -3616,14 +3627,14 @@
         {
           "name": "Turbine bracket",
           "material": "PETG-CF",
-          "printWeight": 559.1,
+          "printWeight": 180,
           "supportWeight": 0,
-          "printTime": 8.745,
+          "printTime": 4.5,
           "qty": 1,
           "colour": "black"
         }
       ],
-      "basePrice": 231.31,
+      "basePrice": 104.98,
       "defaultMargin": 35,
       "priceRound": {
         "step": 5,
@@ -3642,15 +3653,15 @@
         {
           "name": "Dental model set",
           "material": "Resin-like",
-          "printWeight": 182.55,
+          "printWeight": 18,
           "supportWeight": 0,
-          "printTime": 23.7389,
+          "printTime": 1.2,
           "qty": 12,
           "colour": "bone"
         }
       ],
-      "basePrice": 632.52,
-      "defaultMargin": 35,
+      "basePrice": 338.15,
+      "defaultMargin": 55,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -3668,15 +3679,15 @@
         {
           "name": "Kaaba desk piece",
           "material": "PLA+",
-          "printWeight": 752.84,
+          "printWeight": 753,
           "supportWeight": 0,
-          "printTime": 19.9026,
-          "qty": 2,
+          "printTime": 19.9,
+          "qty": 1,
           "colour": "matte black"
         }
       ],
-      "basePrice": 537.36,
-      "defaultMargin": 35,
+      "basePrice": 472.44,
+      "defaultMargin": 60,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -3694,17 +3705,17 @@
         {
           "name": "Cable chain, 40 links",
           "material": "PA12",
-          "printWeight": 340.94,
+          "printWeight": 9,
           "supportWeight": 0,
-          "printTime": 10.4705,
-          "qty": 24,
+          "printTime": 0.35,
+          "qty": 40,
           "colour": "natural"
         }
       ],
-      "basePrice": 1805.04,
-      "defaultMargin": 35,
+      "basePrice": 285.6,
+      "defaultMargin": 25,
       "priceRound": {
-        "step": 5,
+        "step": 10,
         "mode": "up"
       },
       "createdAt": "2026-01-05"
@@ -3720,15 +3731,15 @@
         {
           "name": "Museum replica — Kings",
           "material": "PLA+",
-          "printWeight": 771.91,
+          "printWeight": 772,
           "supportWeight": 0,
-          "printTime": 6.1737,
-          "qty": 4,
+          "printTime": 24.0,
+          "qty": 7,
           "colour": "sand"
         }
       ],
-      "basePrice": 1357.28,
-      "defaultMargin": 35,
+      "basePrice": 3510.89,
+      "defaultMargin": 45,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -3747,15 +3758,15 @@
         {
           "name": "Drone arm v4",
           "material": "PA-CF",
-          "printWeight": 302.72,
+          "printWeight": 76,
           "supportWeight": 0,
-          "printTime": 16.4782,
-          "qty": 1,
+          "printTime": 2.6,
+          "qty": 4,
           "colour": "black"
         }
       ],
-      "basePrice": 41.92,
-      "defaultMargin": 35,
+      "basePrice": 276.86,
+      "defaultMargin": 40,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -3773,15 +3784,15 @@
         {
           "name": "Signage letters, 12",
           "material": "ASA",
-          "printWeight": 583.0,
+          "printWeight": 48,
           "supportWeight": 0,
-          "printTime": 24.4982,
-          "qty": 1,
+          "printTime": 2.0,
+          "qty": 12,
           "colour": "white"
         }
       ],
-      "basePrice": 118.08,
-      "defaultMargin": 35,
+      "basePrice": 445.54,
+      "defaultMargin": 30,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -3799,19 +3810,15 @@
         {
           "name": "Gearbox housing",
           "material": "ABS",
-          "printWeight": 218.28,
+          "printWeight": 218,
           "supportWeight": 0,
-          "printTime": 21.5577,
+          "printTime": 7.5,
           "qty": 1,
           "colour": "grey"
         }
       ],
-      "basePrice": 53.11,
+      "basePrice": 144.46,
       "defaultMargin": 35,
-      "priceRound": {
-        "step": 5,
-        "mode": "up"
-      },
       "createdAt": "2026-01-05"
     },
     {
@@ -3825,15 +3832,15 @@
         {
           "name": "Falcon hood",
           "material": "TPU 95A",
-          "printWeight": 184.57,
+          "printWeight": 185,
           "supportWeight": 0,
-          "printTime": 23.8567,
+          "printTime": 9.5,
           "qty": 1,
           "colour": "brown"
         }
       ],
-      "basePrice": 91.54,
-      "defaultMargin": 35,
+      "basePrice": 211.79,
+      "defaultMargin": 50,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -3851,19 +3858,15 @@
         {
           "name": "Camera rig plate",
           "material": "PETG",
-          "printWeight": 297.78,
+          "printWeight": 298,
           "supportWeight": 0,
-          "printTime": 23.2517,
+          "printTime": 8.0,
           "qty": 1,
           "colour": "black"
         }
       ],
-      "basePrice": 33.0,
+      "basePrice": 163.8,
       "defaultMargin": 35,
-      "priceRound": {
-        "step": 5,
-        "mode": "up"
-      },
       "createdAt": "2026-01-05"
     },
     {
@@ -3877,15 +3880,15 @@
         {
           "name": "Palm frond mould",
           "material": "PLA",
-          "printWeight": 40.07,
+          "printWeight": 40,
           "supportWeight": 0,
-          "printTime": 16.8318,
+          "printTime": 1.8,
           "qty": 1,
           "colour": "green"
         }
       ],
-      "basePrice": 315.4,
-      "defaultMargin": 35,
+      "basePrice": 33.21,
+      "defaultMargin": null,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -3903,15 +3906,15 @@
         {
           "name": "Coffee dallah stand",
           "material": "Wood PLA",
-          "printWeight": 289.99,
+          "printWeight": 290,
           "supportWeight": 0,
-          "printTime": 18.0657,
-          "qty": 24,
+          "printTime": 11.0,
+          "qty": 1,
           "colour": "walnut"
         }
       ],
-      "basePrice": 4652.16,
-      "defaultMargin": 35,
+      "basePrice": 261.82,
+      "defaultMargin": 65,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -3929,19 +3932,15 @@
         {
           "name": "Prosthetic socket trial",
           "material": "PETG",
-          "printWeight": 78.62,
+          "printWeight": 79,
           "supportWeight": 0,
-          "printTime": 3.0843,
-          "qty": 24,
+          "printTime": 3.1,
+          "qty": 1,
           "colour": "clear"
         }
       ],
-      "basePrice": 4858.56,
-      "defaultMargin": 35,
-      "priceRound": {
-        "step": 5,
-        "mode": "up"
-      },
+      "basePrice": 52.7,
+      "defaultMargin": 20,
       "createdAt": "2026-01-05"
     },
     {
@@ -3955,15 +3954,15 @@
         {
           "name": "HVAC duct adapter",
           "material": "ASA",
-          "printWeight": 478.57,
+          "printWeight": 479,
           "supportWeight": 0,
-          "printTime": 12.9201,
-          "qty": 24,
+          "printTime": 12.9,
+          "qty": 2,
           "colour": "grey"
         }
       ],
-      "basePrice": 3836.4,
-      "defaultMargin": 35,
+      "basePrice": 520.79,
+      "defaultMargin": 30,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -3981,15 +3980,15 @@
         {
           "name": "Shelf brackets, 24",
           "material": "PLA+",
-          "printWeight": 152.22,
+          "printWeight": 38,
           "supportWeight": 0,
-          "printTime": 23.6242,
-          "qty": 4,
+          "printTime": 1.1,
+          "qty": 24,
           "colour": "white"
         }
       ],
-      "basePrice": 1226.6,
-      "defaultMargin": 35,
+      "basePrice": 481.5,
+      "defaultMargin": 25,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -4007,15 +4006,15 @@
         {
           "name": "Oud bridge jig",
           "material": "PA12",
-          "printWeight": 464.83,
+          "printWeight": 465,
           "supportWeight": 0,
-          "printTime": 8.7755,
-          "qty": 4,
+          "printTime": 8.8,
+          "qty": 1,
           "colour": "natural"
         }
       ],
-      "basePrice": 327.68,
-      "defaultMargin": 35,
+      "basePrice": 266.39,
+      "defaultMargin": 45,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -4033,15 +4032,15 @@
         {
           "name": "Ramadan lantern",
           "material": "PLA silk",
-          "printWeight": 232.02,
+          "printWeight": 232,
           "supportWeight": 0,
-          "printTime": 6.1948,
-          "qty": 1,
+          "printTime": 6.2,
+          "qty": 24,
           "colour": "gold"
         }
       ],
-      "basePrice": 323.9,
-      "defaultMargin": 35,
+      "basePrice": 3246.34,
+      "defaultMargin": 50,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -4059,15 +4058,15 @@
         {
           "name": "Robot gripper fingers",
           "material": "TPU 95A",
-          "printWeight": 536.76,
+          "printWeight": 89,
           "supportWeight": 0,
-          "printTime": 7.883,
-          "qty": 24,
+          "printTime": 1.3,
+          "qty": 6,
           "colour": "black"
         }
       ],
-      "basePrice": 2907.6,
-      "defaultMargin": 35,
+      "basePrice": 240.94,
+      "defaultMargin": 40,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -4085,15 +4084,15 @@
         {
           "name": "Wind tunnel model",
           "material": "Resin-like",
-          "printWeight": 613.12,
+          "printWeight": 613,
           "supportWeight": 0,
-          "printTime": 20.8806,
+          "printTime": 20.9,
           "qty": 1,
           "colour": "grey"
         }
       ],
-      "basePrice": 148.47,
-      "defaultMargin": 35,
+      "basePrice": 512.37,
+      "defaultMargin": null,
       "priceRound": {
         "step": 5,
         "mode": "up"
@@ -4111,14 +4110,14 @@
         {
           "name": "Souq stall sign",
           "material": "ASA",
-          "printWeight": 217.57,
+          "printWeight": 218,
           "supportWeight": 0,
-          "printTime": 18.7984,
-          "qty": 6,
+          "printTime": 8.0,
+          "qty": 1,
           "colour": "teal"
         }
       ],
-      "basePrice": 1959.72,
+      "basePrice": 157.56,
       "defaultMargin": 35,
       "priceRound": {
         "step": 5,
