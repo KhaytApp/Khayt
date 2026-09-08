@@ -356,6 +356,23 @@ final class Activator: NSObject, NSApplicationDelegate {
                 subject?.shelf = .jobs(nil)
                 try? await Task.sleep(for: .milliseconds(700))
                 capture(named: "01-dark-jobs", into: dir)
+                // The shelf, because it is the one screen in the app whose
+                // content is COLOUR. Everything else here is text on a ground
+                // and survives a theme by construction; a spool is a drawn
+                // shape whose ring, hub and bare flange are three tones that
+                // have to stay apart on both — a white spool against a light
+                // card and a black one against a dark card are different
+                // problems, and only one of them had ever been photographed.
+                // On the SAMPLE book, which the dark run had no reason to load
+                // until now: this Mac's own book has three spools with no colour
+                // and no record of what they weighed new, so every ring it can
+                // draw is the same dashed full circle. The three tones this
+                // screen has to keep apart only exist on a shelf that has a
+                // white spool, a black one and a nearly-empty one.
+                if let subject { await subject.load(.sample) }
+                subject?.shelf = .inventory
+                try? await Task.sleep(for: .milliseconds(700))
+                capturePanes(named: "08-dark-inventory", into: dir)
                 // Stop here. Everything below is photographed by the light run.
                 NSApp.terminate(nil)
                 return

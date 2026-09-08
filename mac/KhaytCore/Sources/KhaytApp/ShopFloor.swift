@@ -339,26 +339,55 @@ struct SpoolCard: View {
     /// Drawn rather than photographed, and drawn as a RING because that is the
     /// shape being looked for on a rack. A flat square of colour is a swatch; a
     /// ring is a spool, and the difference is what makes the shelf scannable.
+    ///
+    /// ── AND IT IS WOUND TO WHAT IS LEFT ───────────────────────────────────
+    ///
+    /// The picture used to be full on every card. A spool down to its last
+    /// 120 g was drawn exactly like an untouched kilo, and a number underneath
+    /// said otherwise — so the biggest, first thing the eye landed on was the
+    /// one part of the card that was not true.
+    ///
+    /// Filament sits between the hub and the flange, and the wound diameter
+    /// shrinks toward the hub as it goes. So that is what shrinks here: the
+    /// flange stays, the colour winds down to the hub, and a nearly-empty spool
+    /// LOOKS nearly empty from across the room. It is the same information the
+    /// grams give, in the shape a shop already reads it in.
+    ///
+    /// A spool with no record of what it weighed new keeps the old full ring —
+    /// see `Spool.fill`. Drawing a guess would put a wrong picture at the top of
+    /// the card, which is worse than the honest one that only says what colour.
     private var face: some View {
-        ZStack {
+        // Hub 22pt across on a 72pt face, so the filament winds between r=11 and
+        // r=36. An empty spool is bare flange with the hub's ring on it.
+        let outer = 36.0, hub = 11.0
+        let wound = spool.fill.map { hub + (outer - hub) * $0 } ?? outer
+        return ZStack {
+            // The bare flange, showing wherever the filament no longer reaches.
+            Circle().fill(Khayt.bareSpool)
+            Circle().strokeBorder(Khayt.drawnEdge, lineWidth: 1)
+
             Circle()
                 .fill(colour ?? Color(nsColor: .quaternaryLabelColor))
                 .overlay(
                     // A hint of depth, so a black spool is not a black hole and
-                    // a white one is not a gap in the page.
-                    Circle().strokeBorder(.black.opacity(0.14), lineWidth: 1)
+                    // a white one is not a gap in the page. Theme-aware, or it
+                    // is only true of one of the two themes — see `drawnEdge`.
+                    Circle().strokeBorder(Khayt.drawnEdge, lineWidth: 1)
                 )
-            Circle().fill(.background).frame(width: 22, height: 22)
-            Circle().strokeBorder(.black.opacity(0.10), lineWidth: 1)
-                .frame(width: 22, height: 22)
+                .frame(width: wound * 2, height: wound * 2)
+
+            Circle().fill(.background).frame(width: hub * 2, height: hub * 2)
+            Circle().strokeBorder(Khayt.drawnEdge, lineWidth: 1)
+                .frame(width: hub * 2, height: hub * 2)
             // A colour nobody recorded is a dashed outline, never a grey that
             // could be mistaken for grey filament.
             if colour == nil {
                 Circle().strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                     .foregroundStyle(.tertiary)
+                    .frame(width: wound * 2, height: wound * 2)
             }
         }
-        .frame(width: 72, height: 72)
+        .frame(width: outer * 2, height: outer * 2)
     }
 }
 

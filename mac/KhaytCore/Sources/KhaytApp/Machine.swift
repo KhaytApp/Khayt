@@ -147,6 +147,21 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
         guard let cost, let original = spoolWeight, original > 0 else { return nil }
         return cost / (original / 1000)
     }
+
+    /// How much of it is left, 0…1 — and NIL where that is not knowable.
+    ///
+    /// Same rule as `costPerKilo` and for the same reason: it needs what the
+    /// spool weighed when it arrived. A spool bought before Khayt asked has no
+    /// record of the other half, and guessing a kilo would draw a half-empty
+    /// roll as two-thirds full — a picture that is confidently wrong is worse
+    /// than one that does not claim.
+    ///
+    /// Clamped, because a shop that tops a roll up or mistypes a figure should
+    /// get a full spool rather than a ring wider than the flange.
+    var fill: Double? {
+        guard let left = weight, let original = spoolWeight, original > 0 else { return nil }
+        return min(1, max(0, left / original))
+    }
 }
 
 extension String {
