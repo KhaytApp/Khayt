@@ -34,6 +34,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Khayt draws its own marks.** Counted before this: forty-one Apple symbols
+  and one file in the whole app that drew anything. `shippingbox` for the
+  filament shelf. `tray.full` for the jobs. `function` for the calculator,
+  `creditcard` for expenses. Every mark on every screen was somebody else's,
+  arranged by us — which is what "it looks generic" actually meant, and why
+  three rounds of better arrangement had not touched it.
+
+  Fifteen marks now, drawn on one 24-unit grid at one weight, and every one of
+  them a thing on this shop floor seen straight on or from above: a nozzle
+  laying a bead, layers stacking, a spool face on, a printer with a part on its
+  bed, a purge tower for the waste log, a caliper for the calculator. The one
+  exception is Clients, because a customer is a person.
+
 - **The shelf counts in the unit the thing is actually sold in.** An inventory
   item now says whether it is measured in grams, millilitres or sheets, and
   every screen that writes a quantity asks it. A bottle of resin used to read
@@ -1174,6 +1187,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: a crash on quitting, when the menu bar item was on.** Nothing stopped
+  its clock, so it went on ticking on the main run loop while the app was being
+  taken apart around it — and each tick asked the Swift runtime a question about
+  machinery that was already going away. It stops when the app does now, and it
+  no longer needs to ask.
 - **Fixed: on an OctoPrint shop the menu bar said nothing was printing.** It
   asked whether a printer's state was exactly `printing`, and OctoPrint hands
   over the printer's own wording, which it capitalises — so the count was zero
