@@ -49,6 +49,7 @@ cat > "$AI_PROTOCOLS" <<'AIP'
 AIP
 
 swift build -c release --product KhaytThumbnail --package-path "$PKG"
+swift build -c release --product KhaytPreview --package-path "$PKG"
 echo "Building Khayt $VERSION (release)…"
 swift build -c release --product Khayt --package-path "$PKG" \
   -Xswiftc -emit-const-values \
@@ -123,6 +124,58 @@ EXTPLIST
 # refuses the whole appex with "unsealed contents present in the bundle root",
 # because anything inside a bundle has to be part of what is sealed.
 EXT_ENTS="$PKG/.build/thumbnail.entitlements"
+# ── THE QUICK LOOK PREVIEW ────────────────────────────────────────────────
+#
+# What the SPACE BAR shows, as opposed to what the icon shows. Assembled exactly
+# like the thumbnail extension above and subject to both of the same rules: no
+# Swift entry point in the binary, and sandboxed. One extension point per .appex
+# is why this is a second bundle rather than a second class in the first.
+PRV="$APP/Contents/PlugIns/KhaytPreview.appex"
+mkdir -p "$PRV/Contents/MacOS" "$PRV/Contents/Resources"
+cp "$PKG/.build/release/KhaytPreview" "$PRV/Contents/MacOS/KhaytPreview"
+
+# IT NEEDS ITS OWN COPY OF THE RULES. This extension reads the print settings
+# through the shared engine, and `Bundle.module` resolves against the bundle it
+# is running in — which for an extension is the .appex, not the app around it.
+# Without this it launches, finds its extension point, and dies on
+# `Fatal error: could not load resource bundle` the moment a preview is asked
+# for; Quick Look then falls back to scaling the thumbnail, so what a person
+# sees is a preview that looks almost right and has no facts under it.
+#
+# The thumbnail extension does NOT need this and does not get it: it reads the
+# zip and picks a member, and never builds an engine. 1.4 MB is worth carrying
+# once, not twice.
+for b in "$PKG"/.build/release/*.bundle; do
+  [ -e "$b" ] && cp -R "$b" "$PRV/Contents/Resources/"
+done
+cat > "$PRV/Contents/Info.plist" <<PRVPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>KhaytPreview</string>
+  <key>CFBundleDisplayName</key><string>Khayt 3MF preview</string>
+  <key>CFBundleExecutable</key><string>KhaytPreview</string>
+  <key>CFBundleIdentifier</key><string>app.khayt.mac.preview</string>
+  <key>CFBundlePackageType</key><string>XPC!</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$BUILD_VERSION</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key><string>com.apple.quicklook.preview</string>
+    <key>NSExtensionPrincipalClass</key><string>KhaytPreviewController</string>
+    <key>NSExtensionAttributes</key>
+    <dict>
+      <key>QLSupportedContentTypes</key>
+      <array><string>app.khayt.mac.three-mf</string></array>
+      <key>QLSupportsSearchableItems</key><false/>
+    </dict>
+  </dict>
+</dict>
+</plist>
+PRVPLIST
+
 cat > "$EXT_ENTS" <<'EXTENTS'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -267,12 +320,14 @@ IDENTITY="$(pick_identity)"
 # are specific and the reason is the whole message: an entitlements file written
 # INSIDE the bundle gets "unsealed contents present in the bundle root", which
 # says exactly what is wrong and says nothing at all down /dev/null.
-if ! EXT_SIGN_ERR="$(codesign --force --sign "$IDENTITY" --timestamp=none \
-      --entitlements "$EXT_ENTS" "$EXT" 2>&1)"; then
-  echo "codesign failed for the extension:"
-  echo "$EXT_SIGN_ERR" | sed 's/^/  /'
-  exit 1
-fi
+for BUNDLE in "$EXT" "$PRV"; do
+  if ! EXT_SIGN_ERR="$(codesign --force --sign "$IDENTITY" --timestamp=none \
+        --entitlements "$EXT_ENTS" "$BUNDLE" 2>&1)"; then
+    echo "codesign failed for $(basename "$BUNDLE"):"
+    echo "$EXT_SIGN_ERR" | sed 's/^/  /'
+    exit 1
+  fi
+done
 
 codesign --force --sign "$IDENTITY" --timestamp=none "$APP" >/dev/null 2>&1 \
   || { echo "codesign failed (identity: $IDENTITY)"; exit 1; }

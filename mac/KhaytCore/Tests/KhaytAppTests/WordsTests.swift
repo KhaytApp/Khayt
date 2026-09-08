@@ -82,6 +82,11 @@ struct WordsTests {
         }
         #expect(asked.count >= 5, "found \(asked.count) counted words — the scan is wrong, not the app")
 
+        // The scan reads this app's sources. A panel whose rule lives in
+        // KhaytCore — the print facts, shown here and in the Quick Look preview
+        // — counts where the scan cannot look, so it declares its keys instead.
+        asked.formUnion(PrintFactLines.countedKeys)
+
         let words = Words()
         for base in asked.sorted() {
             for key in [base, base + "_one"] {
