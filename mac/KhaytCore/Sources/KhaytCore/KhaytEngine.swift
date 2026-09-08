@@ -143,6 +143,12 @@ public actor KhaytEngine {
         // a completion that silently failed to deduct would leave a shop
         // ordering filament it does not have.
         "order-deduction",
+        // The next 48 hours on the machines. Reads `scheduling` for the queue
+        // order and `order-deduction` for what a job needs off the shelf, so
+        // the band cannot disagree with the board about which job runs next or
+        // with the shelf about whether it can. Loaded AFTER both, because it
+        // reaches for them through the global.
+        "machine-band",
         // What a shop has been paid, and what that makes an order. One answer
         // to "is this paid" instead of the three that had drifted apart — the
         // smallest of which was the one that WROTE the field the others read.
@@ -1738,6 +1744,16 @@ public actor KhaytEngine {
         public let tempNozzle: Double?
         public let tempBed: Double?
         public let type: String
+
+        /// Public so a caller with no printer on the network can stand one up —
+        /// the snapshot runner and the tests both need a machine that answers,
+        /// and neither can put one on this Mac's wifi.
+        public init(state: String, progress: Int, progressSource: String?, filename: String,
+                    timeRemaining: Double?, tempNozzle: Double?, tempBed: Double?, type: String) {
+            self.state = state; self.progress = progress; self.progressSource = progressSource
+            self.filename = filename; self.timeRemaining = timeRemaining
+            self.tempNozzle = tempNozzle; self.tempBed = tempBed; self.type = type
+        }
     }
 
     /// What has just gone wrong with a printer, and what to remember for next
@@ -1919,6 +1935,101 @@ public actor KhaytEngine {
         public let final: Double
         /// `override`, `rounded` or `base`.
         public let source: String
+    }
+
+    // MARK: - The next 48 hours on the machines
+
+    /// The band: what each machine is doing, what is queued behind it, and
+    /// where the gaps are.
+    ///
+    /// `now` crosses as a number rather than being read inside the module, the
+    /// same as `scheduling` — a band computed from a clock cannot be tested and
+    /// cannot be reproduced from a screenshot.
+    public func machineBand(machines: [JSONValue], orders: [JSONValue],
+                            inventory: [JSONValue], live: [String: JSONValue],
+                            now: Date, hours: Double) throws -> MachineBand {
+        try runtime.call2("""
+            (function (a) { return KhaytMachineBand.band(a); })(ARG0)
+            """,
+            [.object([
+                "machines": .array(machines), "orders": .array(orders),
+                "inventory": .array(inventory), "live": .object(live),
+                "now": .number(now.timeIntervalSince1970 * 1000),
+                "hours": .number(hours),
+            ])],
+            as: MachineBand.self)
+    }
+
+    public struct MachineBand: Decodable, Sendable, Hashable {
+        /// When the window opens, epoch milliseconds. The screen reads its
+        /// clock marks off THIS rather than off `Date()` at draw time — the
+        /// band is recomputed once a minute and a ruler drawn from a different
+        /// instant than the blocks would drift against them between ticks.
+        public let from: Double
+        public let minutes: Double
+        public let hours: Double
+        public let rows: [Row]
+        /// How many machines the totals below are actually over. A shop looking
+        /// at "46% utilised" with a printer offline is reading a figure about
+        /// two machines that looks like one about three, so the screen says so.
+        public let countedMachines: Int
+        public let unknownMachines: Int
+        public let capacityMinutes: Double
+        public let bookedMinutes: Double
+        public let freeMinutes: Double
+        public let utilised: Double
+
+        public struct Row: Decodable, Sendable, Hashable, Identifiable {
+            public let machineId: String
+            public let name: String
+            /// `printing` | `queued` | `free`
+            public let state: String
+            /// False for a machine Khayt cannot ask. Such a row draws no blocks
+            /// and is left out of the totals — see `lib/machine-band.js`.
+            public let known: Bool
+            public let blocks: [Block]
+            public let gaps: [Gap]
+            public let bookedMinutes: Double
+            public let freeMinutes: Double
+            public let overrunMinutes: Double
+            public let runningOrderId: String?
+            public var id: String { machineId }
+        }
+
+        public struct Block: Decodable, Sendable, Hashable, Identifiable {
+            public let orderId: String
+            /// `printing` | `queued` | `blocked`
+            public let kind: String
+            /// True for everything behind the running job. Nothing schedules
+            /// those; they are laid end to end, and a shop that reads a
+            /// projection as a promise will plan a delivery around it.
+            public let projected: Bool
+            public let title: String
+            public let startMinute: Double
+            public let endMinute: Double
+            public let minutes: Double
+            public let clippedStart: Bool
+            public let clippedEnd: Bool
+            public let beforeMinutes: Double
+            public let afterMinutes: Double
+            /// Past the window entirely: named so a shop can see what it just
+            /// missed, drawn nowhere, counted in nothing.
+            public let beyond: Bool
+            public let shortfall: Shortfall?
+            public var id: String { orderId }
+        }
+
+        public struct Shortfall: Decodable, Sendable, Hashable {
+            public let material: String
+            public let needs: Double
+            public let has: Double
+            public let short: Double
+        }
+
+        public struct Gap: Decodable, Sendable, Hashable {
+            public let startMinute: Double
+            public let minutes: Double
+        }
     }
 
     /// What a product's parts add up to: hours, grams and the materials.

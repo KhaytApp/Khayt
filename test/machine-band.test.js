@@ -1,0 +1,281 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert');
+
+require('../lib/scheduling.js');
+require('../lib/order-deduction.js');
+const MB = require('../lib/machine-band.js');
+
+const HOUR = 3600000;
+const NOW = Date.UTC(2026, 8, 8, 7, 0, 0); // Tue 8 Sep 2026, 07:00
+
+const machine = (id, name) => ({ id, name });
+const job = (o) => Object.assign({
+  id: 'J', status: 'pending', machineId: 'M1', printTime: 4, project: 'A job', parts: [],
+}, o);
+
+// ── What is known ──────────────────────────────────────────────────────────
+
+test('a running job ends when the printer says it does', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [job({ id: 'run', status: 'printing', printTime: 8 })],
+    live: { M1: { progress: 50, timeRemaining: 4 * 3600 } },
+    now: NOW, hours: 48,
+  });
+  const block = b.rows[0].blocks[0];
+  assert.equal(block.kind, 'printing');
+  assert.equal(block.endsAt, NOW + 4 * HOUR, 'timeRemaining is the printer\'s own answer');
+  // Its start is its end less its own estimate, which puts it before the window.
+  assert.equal(block.startsAt, NOW - 4 * HOUR);
+  assert.equal(block.clippedStart, true);
+  assert.equal(block.beforeMinutes, 240);
+  assert.equal(block.startMinute, 0, 'clipped to the window, not drawn off the left edge');
+  assert.equal(block.minutes, 240);
+});
+
+test('with no timeRemaining, progress against the job estimate answers', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [job({ id: 'run', status: 'printing', printTime: 10 })],
+    live: { M1: { progress: 40 } },
+    now: NOW, hours: 48,
+  });
+  // 60% of ten hours left.
+  assert.equal(b.rows[0].blocks[0].endsAt, NOW + 6 * HOUR);
+});
+
+test('timeRemaining WINS over progress, because it is the printer\'s own answer', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [job({ id: 'run', status: 'printing', printTime: 10 })],
+    live: { M1: { progress: 40, timeRemaining: 3600 } },
+    now: NOW, hours: 48,
+  });
+  assert.equal(b.rows[0].blocks[0].endsAt, NOW + 1 * HOUR);
+});
+
+// ── What is NEITHER known nor projectable ──────────────────────────────────
+
+test('a machine printing something Khayt cannot time is left out of the totals', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1'), machine('M2', 'X1C')],
+    orders: [
+      job({ id: 'dark', status: 'printing', machineId: 'M1', printTime: 8 }),
+      job({ id: 'lit', status: 'printing', machineId: 'M2', printTime: 8 }),
+    ],
+    live: { M2: { timeRemaining: 2 * 3600 } },   // M1 is not being polled
+    now: NOW, hours: 48,
+  });
+  const dark = b.rows.find(r => r.machineId === 'M1');
+  assert.equal(dark.known, false, 'no estimate is not the same as free');
+  assert.deepEqual(dark.blocks, []);
+  assert.equal(dark.freeMinutes, 0, 'an unaskable machine has no free hours, it has unknown ones');
+
+  // THE POINT: capacity is over two machines, not three.
+  assert.equal(b.countedMachines, 1);
+  assert.equal(b.unknownMachines, 1);
+  assert.equal(b.capacityMinutes, 48 * 60,
+    'counting the offline machine would overstate the shop by a whole printer');
+  assert.equal(b.bookedMinutes, 120);
+  assert.equal(b.freeMinutes, 48 * 60 - 120);
+});
+
+test('a machine with nothing on it is free, and that IS known', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')], orders: [], live: {}, now: NOW, hours: 48,
+  });
+  assert.equal(b.rows[0].known, true);
+  assert.equal(b.rows[0].state, 'free');
+  assert.equal(b.rows[0].freeMinutes, 48 * 60);
+  assert.equal(b.utilised, 0);
+});
+
+// ── What is projected ──────────────────────────────────────────────────────
+
+test('queued work is laid end to end behind the running job, and says it is a projection', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [
+      job({ id: 'run', status: 'printing', printTime: 8 }),
+      job({ id: 'q1', printTime: 3, dueDate: '2026-09-09' }),
+      job({ id: 'q2', printTime: 5, dueDate: '2026-09-20' }),
+    ],
+    live: { M1: { timeRemaining: 2 * 3600 } },
+    now: NOW, hours: 48,
+  });
+  const [running, first, second] = b.rows[0].blocks;
+  assert.equal(running.projected, false);
+  assert.equal(first.orderId, 'q1', 'the sooner due job runs first, as the board would run it');
+  assert.equal(first.projected, true);
+  assert.equal(first.startsAt, running.endsAt, 'no gap invented between them');
+  assert.equal(second.startsAt, first.endsAt);
+  assert.equal(b.rows[0].bookedMinutes, (2 + 3 + 5) * 60);
+});
+
+test('a job that runs past the window is clipped and SAYS how far past', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'X1C')],
+    orders: [job({ id: 'big', status: 'printing', printTime: 42 })],
+    live: { M1: { timeRemaining: 42 * 3600 } },
+    now: NOW, hours: 24,
+  });
+  const block = b.rows[0].blocks[0];
+  assert.equal(block.clippedEnd, true);
+  assert.equal(block.afterMinutes, 18 * 60, 'eighteen hours past the edge of a one-day window');
+  assert.equal(block.minutes, 24 * 60);
+  assert.equal(b.rows[0].overrunMinutes, 18 * 60);
+  assert.equal(b.rows[0].freeMinutes, 0);
+});
+
+test('a 42-hour job FITS a 48-hour window, which is the whole point of it', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'X1C')],
+    orders: [job({ id: 'big', status: 'printing', printTime: 42 })],
+    live: { M1: { timeRemaining: 42 * 3600 } },
+    now: NOW, hours: 48,
+  });
+  const block = b.rows[0].blocks[0];
+  assert.equal(block.clippedEnd, false);
+  assert.equal(block.minutes, 42 * 60, 'drawn at its real length, not squashed to the day');
+  assert.equal(b.rows[0].freeMinutes, 6 * 60);
+});
+
+test('the first job beyond the window is named but occupies nothing', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [
+      job({ id: 'fills', status: 'printing', printTime: 48 }),
+      job({ id: 'next', printTime: 5 }),
+      job({ id: 'later', printTime: 5 }),
+    ],
+    live: { M1: { timeRemaining: 48 * 3600 } },
+    now: NOW, hours: 48,
+  });
+  const beyond = b.rows[0].blocks.filter(x => x.beyond);
+  assert.equal(beyond.length, 1, 'one, so a shop can see what it just missed — not the whole queue');
+  assert.equal(beyond[0].orderId, 'next');
+  assert.equal(b.rows[0].bookedMinutes, 48 * 60, 'and it adds nothing to the booked hours');
+});
+
+// ── Blocked on stock ───────────────────────────────────────────────────────
+
+const spool = (id, material, weight) => ({ id, material, weight });
+const partOf = (filamentId, grams) => ({ filamentId, printWeight: grams, supportWeight: 0, qty: 1 });
+
+test('a queued job needing more filament than the shelf holds is blocked', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'X1C')],
+    orders: [job({ id: 'museum', printTime: 42, parts: [partOf('s1', 480)] })],
+    inventory: [spool('s1', 'PA-CF', 120)],
+    live: {}, now: NOW, hours: 48,
+  });
+  const block = b.rows[0].blocks[0];
+  assert.equal(block.kind, 'blocked');
+  assert.equal(block.shortfall.material, 'PA-CF');
+  assert.equal(block.shortfall.needs, 480);
+  assert.equal(block.shortfall.has, 120);
+  assert.equal(block.shortfall.short, 360);
+  // It still occupies the band: the machine is committed to it and stuck, which
+  // is what makes "one spool is holding 42 machine hours" a true sentence.
+  assert.equal(b.rows[0].bookedMinutes, 42 * 60);
+});
+
+test('another spool of the same material unblocks it, because completing it would use one', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'X1C')],
+    orders: [job({ id: 'museum', printTime: 42, parts: [partOf('s1', 480)] })],
+    inventory: [spool('s1', 'PA-CF', 120), spool('s2', 'PA-CF', 900)],
+    live: {}, now: NOW, hours: 48,
+  });
+  assert.equal(b.rows[0].blocks[0].kind, 'queued');
+  assert.equal(b.rows[0].blocks[0].shortfall, null);
+});
+
+test('a job nobody assigned filament to is not blocked, it is unknown — and unknown is not a warning', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'X1C')],
+    orders: [job({ id: 'vague', printTime: 4, parts: [{ printWeight: 500, qty: 1 }] })],
+    inventory: [spool('s1', 'PA-CF', 10)],
+    live: {}, now: NOW, hours: 48,
+  });
+  assert.equal(b.rows[0].blocks[0].kind, 'queued',
+    'inventing a shortage from a part with no spool would cry wolf on every old job');
+});
+
+// ── The gaps, which are the reason the band exists ─────────────────────────
+
+test('the free stretches are the gaps between what is booked', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [job({ id: 'run', status: 'printing', printTime: 4 })],
+    live: { M1: { timeRemaining: 4 * 3600 } },
+    now: NOW, hours: 48,
+  });
+  assert.deepEqual(b.rows[0].gaps, [{ startMinute: 240, minutes: 44 * 60 }]);
+});
+
+test('booked and free add up to the window, on every machine', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1'), machine('M2', 'Prusa'), machine('M3', 'X1C')],
+    orders: [
+      job({ id: 'a', status: 'printing', machineId: 'M1', printTime: 4 }),
+      job({ id: 'b', machineId: 'M1', printTime: 16 }),
+      job({ id: 'c', status: 'printing', machineId: 'M2', printTime: 5.3 }),
+      job({ id: 'd', machineId: 'M3', printTime: 42, parts: [partOf('s1', 480)] }),
+    ],
+    inventory: [spool('s1', 'PA-CF', 120)],
+    live: { M1: { timeRemaining: 4 * 3600 }, M2: { timeRemaining: 5.3 * 3600 }, M3: {} },
+    now: NOW, hours: 48,
+  });
+  for (const r of b.rows) {
+    assert.ok(Math.abs(r.bookedMinutes + r.freeMinutes - 48 * 60) < 1e-6,
+      `${r.name}: ${r.bookedMinutes} + ${r.freeMinutes} != 2880`);
+  }
+  assert.equal(b.capacityMinutes, 3 * 48 * 60);
+  assert.ok(Math.abs(b.bookedMinutes + b.freeMinutes - b.capacityMinutes) < 1e-6);
+  assert.ok(Math.abs(b.utilised - b.bookedMinutes / b.capacityMinutes) < 1e-9);
+});
+
+// ── Determinism ────────────────────────────────────────────────────────────
+
+test('no clock inside: the same inputs give the same band', () => {
+  const inputs = {
+    machines: [machine('M1', 'U1')],
+    orders: [job({ id: 'run', status: 'printing', printTime: 8 }), job({ id: 'q', printTime: 3 })],
+    live: { M1: { timeRemaining: 2 * 3600 } },
+    now: NOW, hours: 48,
+  };
+  assert.deepEqual(JSON.parse(JSON.stringify(MB.band(inputs))),
+                   JSON.parse(JSON.stringify(MB.band(inputs))));
+});
+
+test('a job with no estimate takes no time rather than defaulting to something', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [job({ id: 'q', printTime: 0 })],
+    live: {}, now: NOW, hours: 48,
+  });
+  assert.equal(b.rows[0].blocks[0].minutes, 0);
+  assert.equal(b.rows[0].freeMinutes, 48 * 60);
+});
+
+test('every block carries the same fields, whatever kind it is', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [
+      job({ id: 'run', status: 'printing', printTime: 4 }),
+      job({ id: 'q', printTime: 3, parts: [partOf('s1', 900)] }),
+    ],
+    inventory: [spool('s1', 'PA-CF', 100)],
+    live: { M1: { timeRemaining: 4 * 3600 } },
+    now: NOW, hours: 48,
+  });
+  const shape = k => Object.keys(k).sort().join(',');
+  const [running, queued] = b.rows[0].blocks;
+  assert.equal(shape(running), shape(queued),
+    'a shape that varies by kind makes a typed caller decode "absent" and "false" as one thing');
+  assert.equal(running.beyond, false);
+  assert.equal(running.shortfall, null);
+});
