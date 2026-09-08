@@ -34,6 +34,34 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The app's own colours, and a contrast guard that was asking the wrong
+  question.** The palette is warmer and deeper — a paper ground rather than a
+  near-white one, a warm line round every card instead of black at 9%, and a
+  real burnt orange for the one thing on the screen that is happening now.
+
+  The guard that is supposed to keep all of it legible was measuring every
+  colour against plain white and a system dark grey, neither of which this app
+  draws on. Made to ask about the three surfaces it actually uses, it failed
+  **ten** pairs on the palette as it then shipped — one of them at 2.56:1 where
+  3 is the floor for a graphical mark. Every colour is now solved against the
+  darkest thing it can sit on in light and the lightest in dark, and the two
+  that must never be confused — printing and overdue — are checked for being
+  tellable apart rather than assumed to be.
+
+- **Lists are ruled like layers instead of striped.** A stack of layers is
+  separated by lines, which is also the denser of the two: a ruled row can be
+  28pt where a striped one needs padding above and below the fill. Screens are
+  tighter throughout — a 900pt window shows four more jobs than it did.
+
+- **A print's progress is drawn as the layers it has laid.** The shape had been
+  in the app for months and reached exactly one surface: a picture in the
+  snapshot runner that nothing ships. The screen a shop actually leaves open was
+  using the same stock bar as every other app on the machine.
+
+- **Derived figures show their arithmetic.** "Average job 540.46" is a number
+  you either trust or you do not; `1,080.93 ÷ 2` underneath it is one you can
+  check while you read it.
+
 - **Khayt draws its own marks.** Counted before this: forty-one Apple symbols
   and one file in the whole app that drew anything. `shippingbox` for the
   filament shelf. `tray.full` for the jobs. `function` for the calculator,
@@ -1187,6 +1215,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: a rack with two sheets of acrylic on it reported "2 g".** The shelf
+  had learned to count in sheets and millilitres and the dashboard had not, so
+  it wrote the gram after every figure it showed.
 - **Fixed: a crash on quitting, when the menu bar item was on.** Nothing stopped
   its clock, so it went on ticking on the main run loop while the app was being
   taken apart around it — and each tick asked the Swift runtime a question about

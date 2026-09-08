@@ -139,7 +139,7 @@ struct OrdersTable: View {
             .width(min: 96, ideal: 120)
             .alignment(.trailing)
         }
-        .tableStyle(.inset(alternatesRowBackgrounds: true))
+        .tableStyle(.inset(alternatesRowBackgrounds: false))
         // The app's ground shows through rather than the system's white — the
         // pane beside this one sits on it, and an opaque table drew a seam
         // down the middle of the window. The alternating row stripes are the

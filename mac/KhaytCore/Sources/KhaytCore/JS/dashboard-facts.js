@@ -159,9 +159,16 @@ function dashboardFacts(input) {
   const lowStock = (deduction && typeof deduction.isLowStock === 'function')
     ? (item) => deduction.isLowStock(item, settings)
     : undefined;
+  /* And what each item is COUNTED IN, so the panel can write the right word
+   * after the figure. Injected like the rest; a caller that passes no units
+   * module gets grams, which is what every item was before there were any. */
+  const unitsMod = inp.units;
+  const unitOf = (unitsMod && typeof unitsMod.unitOf === 'function')
+    ? (item) => unitsMod.unitOf(item)
+    : undefined;
   const attn = selectAttentionSafely(inp.attention, {
     machines, orders, statusCache: cache, now, nozzleWear,
-    inventory: asArray(inp.inventory), lowStock,
+    inventory: asArray(inp.inventory), lowStock, unitOf,
   });
   const late = lateOrderIds(attn);
 

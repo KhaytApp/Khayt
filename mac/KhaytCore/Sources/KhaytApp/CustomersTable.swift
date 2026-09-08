@@ -80,7 +80,7 @@ struct CustomersTable: View {
             .width(min: 90, ideal: 108, max: 130)
 
         }
-        .tableStyle(.inset(alternatesRowBackgrounds: true))
+        .tableStyle(.inset(alternatesRowBackgrounds: false))
         // The app's ground shows through rather than the system's white — the
         // pane beside this one sits on it, and an opaque table drew a seam
         // down the middle of the window. The alternating row stripes are the

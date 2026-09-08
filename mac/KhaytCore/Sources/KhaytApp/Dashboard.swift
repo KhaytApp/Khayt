@@ -311,7 +311,7 @@ private struct NeedsAttention: View {
                     Row(item: item, shop: shop,
                         ink: item.severity == NeedsAttentionSeverity.critical
                              ? Khayt.late : Khayt.attention)
-                    if item.id != shown.last?.id || hidden > 0 { Divider() }
+                    if item.id != shown.last?.id || hidden > 0 { LayerRule() }
                 }
                 if hidden > 0 {
                     // Counted, not hidden. A list that silently stops at six is
@@ -359,7 +359,10 @@ private struct NeedsAttention: View {
                                            ["n": .number(Double(late))]))
                         .font(.callout).monospacedDigit().foregroundStyle(ink)
                 } else if let grams = item.grams {
-                    Text("\(Int(grams)) \(shop.words.callIt("common.grams"))")
+                    // In the item's OWN unit. The shelf learned to count in
+                    // sheets and millilitres; this screen was still writing the
+                    // gram after everything.
+                    Text(Quantity.say(grams, shop.inventoryUnits[item.id], shop.words))
                         .font(.callout).monospacedDigit().foregroundStyle(ink)
                 }
                 // ── AND THE THING THAT FIXES IT ───────────────────────────
@@ -377,7 +380,10 @@ private struct NeedsAttention: View {
                     .buttonStyle(.borderless)
                     .font(.callout)
             }
-            .padding(.vertical, 5)
+            // 28pt rows. A ruled list can be this tight; a striped one cannot,
+            // which is half the reason the rules are lines.
+            .padding(.vertical, 3)
+            .frame(minHeight: Metric.row)
             .contentShape(Rectangle())
             .onTapGesture { go() }
         }
@@ -498,9 +504,14 @@ private struct RunningNow: View {
                 // for having a warm colour at all: the icon's drop of filament
                 // is exactly this moment. Everything else on the dashboard is a
                 // number about the past; this is the machine, now.
-                ProgressView(value: Double(status.progress) / 100)
-                    .progressViewStyle(.linear)
-                    .tint(Khayt.hot)
+                //
+                // Drawn as the LAYERS it has laid, not as a capsule filling up.
+                // The shape has been in `Craft.swift` for months and appeared on
+                // exactly one surface — a picture in the snapshot runner that
+                // nothing shipped — while the screen a shop actually leaves open
+                // used the stock bar, which is the same bar as every other app
+                // on the machine.
+                LayerProgress(progress: Double(status.progress) / 100)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -648,8 +659,14 @@ private struct MoneyTiles: View {
                 .card(rail: Khayt.cyan, padding: 14)
 
                 HStack(spacing: 14) {
+                    // WITH ITS DIVISOR. "Average job 540.46" is a figure you
+                    // either trust or do not; "1,080.93 ÷ 2" underneath is one
+                    // you can check while you read it.
                     Tile(value: Money.short(k.avgOrderValue, shop.currency),
-                         label: shop.words.callIt("mac.avg_order"), symbol: "chart.bar", tint: .secondary)
+                         label: shop.words.callIt("mac.avg_order"),
+                         working: k.completedCount > 0
+                             ? "\(Money.figure(k.revenue)) ÷ \(k.completedCount)" : nil,
+                         symbol: "chart.bar", tint: .secondary)
                     // NOT "Owed" here. `kpi` scopes outstanding to the rows in
                     // the period, and the toolbar shows what the whole book is
                     // owed, unscoped and always visible. Two figures under one
@@ -679,6 +696,9 @@ private struct MoneyTiles: View {
 private struct Tile: View {
     let value: String
     let label: String
+    /// The arithmetic that produced the value, on the tiles where there is
+    /// one. A shop that can check one derived figure trusts the other forty.
+    var working: String?
     let symbol: String
     let tint: Color
     /// Set on the one tile that is describing something happening RIGHT NOW.
@@ -692,7 +712,7 @@ private struct Tile: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 5) {
             Label(label, systemImage: symbol)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -716,8 +736,17 @@ private struct Tile: View {
                 .foregroundStyle(tint == .secondary ? AnyShapeStyle(.primary) : AnyShapeStyle(tint))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
+            // The arithmetic, tied to the figure by a tick the way a dimension
+            // on a drawing is tied to what it measures.
+            if let working {
+                HStack(spacing: 5) {
+                    Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
+                    Text(working).font(.caption2).monospacedDigit()
+                        .foregroundStyle(.tertiary).lineLimit(1)
+                }
+            }
         }
-        .card(rail: alive ? Khayt.hot : nil)
+        .card(rail: alive ? Khayt.hot : nil, padding: 10)
     }
 }
 
