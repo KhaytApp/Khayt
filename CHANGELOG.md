@@ -6,6 +6,33 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The library says how a model is set up to print.** Printer, layer height,
+  nozzle, material, infill and supports, read out of the slicer's own settings
+  inside the file. It is the question a shop asks second: a folder holds the same
+  shape sliced for a U1 and for an X1 Carbon, at three layer heights, one with
+  support and one without, and the pictures are identical.
+
+  Read from the FILE rather than captured at import, so a model re-sliced for a
+  different machine stops claiming to be what it used to be, and so every model
+  imported before today has it too. Nothing is estimated: there is no print time
+  and no filament weight here, because those exist only in a sliced 3MF and not
+  one of the 43 files in this shop's library carries them — a row that is empty
+  on every real file teaches people the panel is broken.
+
+  TWO THINGS IT REFUSES TO GET WRONG. An object's own settings beat the
+  project's, and 14 of those 43 files set one: the king plates say 100% infill on
+  the object where the project says 15%, and reporting 15% would be a straight
+  lie about what the file prints. And a support STYLE is shown only when support
+  is actually on — every one of these files carries a `support_type` whether or
+  not it is used, so "tree (auto)" beside a model that prints without support was
+  the easiest wrong answer available.
+
+  The rule is `lib/print-facts.js`, shared, so Khayt and the Mac cannot hold two
+  opinions about what a model prints in. PrusaSlicer spells the same ideas
+  differently — `fill_density`, not `sparse_infill_density`; `support_material`,
+  not `enable_support` — and those names were read off this Mac's own PrusaSlicer
+  profiles rather than remembered.
+
 - **A 3MF looks like the thing it prints.** Finder, Spotlight and Quick Look show
   the plate render that is already inside the file, so a folder of models is ten
   different pictures instead of ten identical blank pages. Nothing is rendered

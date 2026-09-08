@@ -304,6 +304,15 @@ public actor KhaytEngine {
         // be shared at all: `lib/zip-read.js` needs Buffer and zlib, and the
         // Mac opens a 3MF with its own reader.
         "thumbnail-extract",
+        // What a slicer's configs say about the PRINT — the machine, the layer
+        // height, the material, whether it has support. Takes the config text
+        // for the same reason `thumbnail-extract` does, and lives beside it
+        // because both are one question about a slicer's output asked twice.
+        //
+        // The Quick Look preview reads these and so does the library inspector,
+        // which is the whole point: what Finder says about a model and what the
+        // app says about it cannot be two different opinions.
+        "print-facts",
         // What makes two library records the same MESH. Bundled so the key this
         // app writes is the key Khayt reads — three numbers joined by
         // punctuation is exactly what two implementations agree on until they
@@ -871,6 +880,43 @@ public actor KhaytEngine {
         """,
         [.string(sliceInfo), .string(projectSettings), .string(modelSettings), .string(prusa)],
         as: Colours.self)
+    }
+
+    /// What a slicer's configs say about the print itself.
+    ///
+    /// An OPTIONAL everywhere, because a 3MF a CAD program wrote answers none of
+    /// it and inventing a default would put a printer's name on a file that has
+    /// never met a slicer.
+    public struct PrintFacts: Decodable, Sendable, Equatable {
+        public let printer: String?
+        public let layerHeight: Double?
+        public let nozzle: Double?
+        public let nozzleVaries: Bool
+        public let materials: [String]
+        public let infill: String?
+        public let infillVaries: Bool
+        public let support: Bool?
+        public let supportStyle: String?
+        public let objects: Int?
+        public let source: String?
+
+        /// True when the file said nothing at all — the CAD case.
+        public var isEmpty: Bool { source == nil && objects == nil }
+    }
+
+    /// Reads the CONFIG TEXT, like `coloursFromConfigs` and for the same reason.
+    /// Two slicer dialects disagree on the key names and an object's own
+    /// settings beat the project's; all of that is in `lib/print-facts.js`,
+    /// under test, once.
+    public func printFacts(projectSettings: String, modelSettings: String,
+                           prusa: String) throws -> PrintFacts {
+        try runtime.call2("""
+        globalThis.KhaytPrintFacts.printFacts({
+          projectSettings: ARG0, modelSettings: ARG1, prusa: ARG2
+        })
+        """,
+        [.string(projectSettings), .string(modelSettings), .string(prusa)],
+        as: PrintFacts.self)
     }
 
     // MARK: - Is this the same model
