@@ -326,6 +326,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The sample shop is a shop now, not twenty rows of the same row.** If you open
+  Khayt without your own book you get a made-up Riyadh shop to look around, and
+  it was answering more or less every question the same way. All twenty of its
+  products carried a 35% margin and the same rounding rule, so the catalogue drew
+  twenty identical cells; every spool was a full 1 kg with no record of what it
+  weighed new, so no spool could show a price per kilo and every fill bar read
+  full; and the batch quantities had been assigned at random, which is how "Shelf
+  brackets, 24" came to be a batch of four while a prosthetic socket trial — a
+  one-off — was a batch of twenty-four, and a robot gripper came to weigh 12.9 kg.
+  Margins now run from 20% to 65%, two products have none set, three are priced
+  without any rounding rule and one is priced by hand, the spools sit at six
+  different fill levels and carry the tax that was inside their price, and one is
+  an import that reclaims none. Nothing here changes your own book.
+
 - **The Mac app draws its own subject.** Counted before any of this: forty-three
   distinct system symbols, twenty-nine stock empty states, and zero drawn shapes
   — not one. Every mark on every screen was Apple's, arranged by us, which is
