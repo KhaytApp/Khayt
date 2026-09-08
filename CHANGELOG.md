@@ -6,6 +6,28 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The floor is in the menu bar.** A print runs for eleven hours; nobody keeps a
+  shop-management window open for eleven hours to answer *is it still going, and
+  when is the printer free?* The nozzle in the menu bar carries the number of
+  machines running, and clicking it shows each one, what is on it, how far in and
+  how long is left — with the way in to the app and, when there is unassigned
+  work, straight to the scheduler.
+
+  It can be turned off in Preferences. That switch is Mac-local and deliberately
+  not a shop setting: whether this Mac shows an icon is nothing to do with the
+  book and has no business following it to another machine.
+
+  WRITTEN TWICE, AND THE SECOND ONE IS APPKIT. SwiftUI's `MenuBarExtra` is three
+  lines and made the app unusable: the snapshot runner went from a full pass in
+  ninety seconds to seven pictures in as long, and a sample of the stuck process
+  put 706 of 846 samples inside `makeMainMenu`. A `MenuBarExtra` is a scene, and
+  every change to the scene graph rebuilds the whole main menu — so a menu bar
+  item watching a live shop rebuilt the File menu every time a printer reported a
+  temperature. An `NSStatusItem` is not in that graph: its title comes from a
+  five-second timer and the panel is built when somebody opens it and dropped
+  when they close it, so nothing is evaluated while nobody is looking. The full
+  pass is 64 seconds with it installed.
+
 - **Khayt answers the Mac without being opened.** "What is printing" and "What is
   waiting to print" are now actions the system owns: they appear in Spotlight and
   Shortcuts, Siri can be asked them, and an automation can run one at seven in the

@@ -317,6 +317,11 @@ final class Words {
                                    "ar": "{n} بلا طابعة بعد"],
         "mac.job_on_machine":     ["en": "{job} on the {machine}",
                                    "ar": "{job} على {machine}"],
+        // The menu bar, which is Mac-only in a way nothing else here is.
+        "mac.next_free":          ["en": "next free in", "ar": "أول جهاز يفرغ خلال"],
+        "mac.not_connected":      ["en": "No connection set up", "ar": "لا يوجد اتصال"],
+        "mac.menu_bar":           ["en": "Show the floor in the menu bar",
+                                   "ar": "إظهار الورشة في شريط القوائم"],
         // Customers
         "mac.new_customer":  ["en": "New Customer",   "ar": "عميل جديد"],
         "mac.edit_customer": ["en": "Edit Customer",  "ar": "تعديل العميل"],

@@ -126,6 +126,7 @@ struct BusinessPane: View {
 
     @State private var draft = Draft()
     @State private var original = Draft()
+    @AppStorage("mac.menuBar") private var menuBar = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -211,6 +212,7 @@ struct InvoicePane: View {
 
     @State private var draft = Draft()
     @State private var original = Draft()
+    @AppStorage("mac.menuBar") private var menuBar = true
     @State private var example = ""
 
     private var countries: [(code: String, name: String)] {
@@ -382,6 +384,7 @@ struct PaymentsPane: View {
 
     @State private var draft = Draft()
     @State private var original = Draft()
+    @AppStorage("mac.menuBar") private var menuBar = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -499,6 +502,7 @@ struct OperationsPane: View {
 
     @State private var draft = Draft()
     @State private var original = Draft()
+    @AppStorage("mac.menuBar") private var menuBar = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -648,6 +652,7 @@ struct PreferencesPane: View {
 
     @State private var draft = Draft()
     @State private var original = Draft()
+    @AppStorage("mac.menuBar") private var menuBar = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -660,6 +665,18 @@ struct PreferencesPane: View {
                             }
                         }.labelsHidden()
                     }
+                }
+                // MAC-LOCAL, and deliberately not in `Draft`. Everything else
+                // on this pane is written into the shop's settings and reaches
+                // every device; whether this Mac shows a menu bar icon is not
+                // the shop's business and must not follow the book around.
+                Section(shop.words.callIt("set.prefs_section")) {
+                    Toggle(shop.words.callIt("mac.menu_bar"), isOn: $menuBar)
+                        .onChange(of: menuBar) { _, on in
+                            // AppKit, so nothing redraws itself: say so plainly.
+                            if on { FloorStatus.shared.install(shop: shop) }
+                            else { FloorStatus.shared.remove() }
+                        }
                 }
                 Section(shop.words.callIt("set.locale_section")) {
                     Toggle(shop.words.callIt("set.use_hijri"), isOn: $draft.useHijri)
