@@ -6,6 +6,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The space bar answers the question too.** Pressing space on a `.3mf` in
+  Finder shows the plate render large, with the printer, layer height, nozzle,
+  material, infill and supports underneath — the same facts the library
+  inspector shows, laid out by the same code, so Finder and Khayt cannot start
+  telling a shop different things about the same model. In Arabic it is in
+  Arabic and mirrored, and the unit lives in the label rather than being an
+  English word appended to a number.
+
+  It reads the shared rules, which means it carries them: an extension's
+  `Bundle.module` resolves against the `.appex`, not the app around it, so
+  without its own copy it launched, found its extension point, and died on
+  `could not load resource bundle` the instant a preview was asked for — with
+  Quick Look quietly falling back to scaling the thumbnail, which looks almost
+  right and has no facts under it. Two tests now hold that: one that the bundle
+  is there, one that nothing loose sits in an `.appex`'s root, where it would
+  break the code signature.
+
 - **The library says how a model is set up to print.** Printer, layer height,
   nozzle, material, infill and supports, read out of the slicer's own settings
   inside the file. It is the question a shop asks second: a folder holds the same

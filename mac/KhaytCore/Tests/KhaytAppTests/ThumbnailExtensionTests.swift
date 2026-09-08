@@ -12,16 +12,30 @@ import KhaytCore
 /// they live.
 struct ThumbnailExtensionTests {
 
-    /// The built extension binary, or nil when only the app was built.
-    static var binary: URL? {
+    /// The package root. COUNTED, not guessed: four of these lands on `mac/`
+    /// and the check below then found no binary and passed without looking at
+    /// anything, which is how it sat green while proving nothing.
+    static var package: URL {
         var root = URL(fileURLWithPath: #filePath)
-        for _ in 0..<4 { root.deleteLastPathComponent() }   // → KhaytCore
+        for _ in 0..<3 { root.deleteLastPathComponent() }   // …/Tests/KhaytAppTests/<file>
+        return root                                        // → mac/KhaytCore
+    }
+
+    /// A built extension binary, or nil when this product has not been built.
+    static func binary(_ name: String) -> URL? {
+        #expect(FileManager.default.fileExists(atPath: package.appending(path: "Package.swift").path),
+                "the package root is wrong, so every check against a build is vacuous")
         for build in ["release", "debug"] {
-            let url = root.appending(path: ".build/\(build)/KhaytThumbnail")
+            let url = package.appending(path: ".build/\(build)/\(name)")
             if FileManager.default.fileExists(atPath: url.path) { return url }
         }
         return nil
     }
+
+    /// EVERY extension bundle, not just the first one written. The rule below
+    /// is a property of app extensions, not of thumbnails, and the second
+    /// extension is exactly where it would be forgotten.
+    static let extensions = ["KhaytThumbnail", "KhaytPreview"]
 
     /// THE ONE THAT COST A DAY.
     ///
@@ -34,8 +48,9 @@ struct ThumbnailExtensionTests {
     ///
     /// `Package.swift` keeps it out with `-parse-as-library` and an `@_cdecl`
     /// entry. Anyone who adds a `main.swift` or an `@main` back gets this.
-    @Test func hasNoSwiftEntryPoint() throws {
-        guard let binary = Self.binary else { return }
+    @Test(arguments: ThumbnailExtensionTests.extensions)
+    func hasNoSwiftEntryPoint(_ name: String) throws {
+        guard let binary = Self.binary(name) else { return }
         let otool = Process()
         otool.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
         otool.arguments = ["otool", "-l", binary.path]
@@ -46,12 +61,15 @@ struct ThumbnailExtensionTests {
         let out = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(),
                          as: UTF8.self)
         otool.waitUntilExit()
-        #expect(out.contains("sectname __TEXT"),
-                "otool told us nothing; the check would pass vacuously")
+        // `segname __TEXT`, capitals — `sectname` is lowercase (`__text`) and
+        // looking for the wrong one made this sanity check itself vacuous.
+        #expect(out.contains("segname __TEXT"),
+                "otool told us nothing; the check below would pass vacuously")
         #expect(!out.contains("__swift5_entry"), """
-            KhaytThumbnail has a Swift entry point again. ExtensionKit will run \
-            it instead of KhaytThumbnailProvider and every .3mf will show the \
-            blank document icon. See the note in Package.swift.
+            \(name) has a Swift entry point again. ExtensionKit will run it \
+            instead of the extension's principal class, the process will be gone \
+            in 38 ms, and every .3mf will fall back to the blank document icon \
+            with no error anywhere. See the note in Package.swift.
             """)
     }
 
@@ -88,5 +106,70 @@ struct ThumbnailExtensionTests {
         #expect(ThreeMF.thumbnailSize(for: .zero, maximum: max, scale: 2) == max)
         #expect(ThreeMF.thumbnailSize(
             for: CGSize(width: 10, height: 10), maximum: max, scale: 0) == max)
+    }
+}
+
+/// What the built .app carries inside its extensions.
+///
+/// Checked against `dist/Khayt.app` when one has been built, because these are
+/// properties of the BUNDLE and nothing in the Swift can express them. Skipped
+/// when there is no build to look at, so `swift test` alone stays green.
+struct ExtensionBundleTests {
+
+    /// The built app, when there is one. `mac/` is FOUR levels up — five is the
+    /// repository root and `dist/Khayt.app` is not there, so every check in this
+    /// suite would skip and report success.
+    static var app: URL? {
+        var root = URL(fileURLWithPath: #filePath)
+        for _ in 0..<4 { root.deleteLastPathComponent() }      // → mac/
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "make-app.sh").path),
+                "\(root.path) is not mac/, so these checks are looking at nothing")
+        let url = root.appending(path: "dist/Khayt.app")
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    /// THE PREVIEW NEEDS ITS OWN COPY OF THE RULES.
+    ///
+    /// It reads print settings through the shared engine, and `Bundle.module`
+    /// resolves against the bundle it runs in — for an extension, the .appex and
+    /// not the app around it. Without this the extension launched, found its
+    /// extension point, and died on `could not load resource bundle` the instant
+    /// a preview was asked for. Quick Look then fell back to scaling the
+    /// thumbnail, so what a person saw was a preview that looked nearly right
+    /// and simply had no facts under it — which is why this is a test and not a
+    /// comment.
+    @Test func thePreviewCarriesTheRules() throws {
+        guard let app = Self.app else { return }
+        let rules = app.appending(
+            path: "Contents/PlugIns/KhaytPreview.appex/Contents/Resources/KhaytCore_KhaytCore.bundle")
+        #expect(FileManager.default.fileExists(atPath: rules.path),
+                "KhaytPreview has no copy of the JavaScript; every preview will be blank")
+        let one = rules.appending(path: "JS/print-facts.js")
+        #expect(FileManager.default.fileExists(atPath: one.path),
+                "the resource bundle is there and the rule is not")
+    }
+
+    /// The thumbnail extension does NOT get one, and that is deliberate: it
+    /// reads the zip and picks a member and never builds an engine. 1.4 MB is
+    /// worth carrying once, not twice.
+    @Test func theThumbnailDoesNotCarryWhatItDoesNotUse() throws {
+        guard let app = Self.app else { return }
+        let rules = app.appending(
+            path: "Contents/PlugIns/KhaytThumbnail.appex/Contents/Resources/KhaytCore_KhaytCore.bundle")
+        #expect(!FileManager.default.fileExists(atPath: rules.path))
+    }
+
+    /// Nothing may sit in an .appex's root: it is outside `Contents/` and so
+    /// outside what is sealed, and codesign refuses the whole bundle with
+    /// "unsealed contents present in the bundle root". An entitlements file put
+    /// there once already cost a build.
+    @Test(arguments: ["KhaytThumbnail", "KhaytPreview"])
+    func nothingLooseInTheBundleRoot(_ name: String) throws {
+        guard let app = Self.app else { return }
+        let appex = app.appending(path: "Contents/PlugIns/\(name).appex")
+        let inRoot = try FileManager.default.contentsOfDirectory(
+            at: appex, includingPropertiesForKeys: nil)
+        #expect(inRoot.map(\.lastPathComponent) == ["Contents"],
+                "\(name).appex has \(inRoot.map(\.lastPathComponent)) in its root")
     }
 }

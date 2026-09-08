@@ -247,7 +247,15 @@ final class Words {
     /// Every entry carries both languages. A key with only English is worse than
     /// no key at all: it reads as a translation that happens to look English, and
     /// nothing tells anyone it is missing.
-    nonisolated static let own: [String: [String: String]] = [
+    /// The Mac's own words.
+    ///
+    /// `PrintFactLines.ownWords` is MERGED IN rather than copied: the Quick Look
+    /// preview shows the same facts from a separate bundle and needs the same
+    /// words, and two literals would agree today and drift by the third change.
+    nonisolated static let own: [String: [String: String]] =
+        base.merging(PrintFactLines.ownWords) { mine, _ in mine }
+
+    private nonisolated static let base: [String: [String: String]] = [
         // Shelves
         "mac.all_jobs":      ["en": "All jobs",      "ar": "كل الأعمال"],
         "mac.pipeline":      ["en": "Pipeline",      "ar": "المسار"],
@@ -402,20 +410,6 @@ final class Words {
         "mac.jobs_word":     ["en": "jobs",           "ar": "أعمال"],
         "mac.jobs_word_one": ["en": "job",            "ar": "عمل"],
 
-        // ── How a model is set up to print ────────────────────────────────
-        // The printer, the layer, the material and the supports are Khayt's own
-        // words, borrowed below. These five are the ones it has never needed:
-        // `calc.infill` is "Infill (%)" and this column already carries the %,
-        // and nothing in the shared catalogue says a plate disagrees with
-        // itself.
-        "mac.how_it_prints":  ["en": "How it prints",  "ar": "كيف تُطبع"],
-        "mac.infill":         ["en": "Infill",         "ar": "نسبة الملء"],
-        "mac.varies_by_part": ["en": "varies by part", "ar": "تختلف حسب القطعة"],
-        "mac.mixed_nozzles":  ["en": "mixed nozzles",  "ar": "فوهات مختلفة"],
-        "mac.on_the_plate":   ["en": "On the plate",   "ar": "على الصينية"],
-        // `counting` puts the number in front, so these are bare nouns.
-        "mac.objects_n":      ["en": "objects",        "ar": "قطع"],
-        "mac.objects_n_one":  ["en": "object",         "ar": "قطعة"],
         "mac.reading_file":   ["en": "Reading the file…", "ar": "جارٍ قراءة الملف…"],
         // The library's grouping menu.
         "mac.pick_a_model":  ["en": "Select a model first", "ar": "اختر نموذجًا أولًا"],
@@ -930,7 +924,9 @@ final class Words {
     /// them still exists in every bundled language — a key that disappears from
     /// the shared catalogue would otherwise surface as a raw `queue.printing`
     /// sitting in the sidebar.
-    static let borrowed = [
+    /// The shared keys this app uses. `PrintFactLines` declares its own, so a
+    /// key added to that panel cannot be forgotten here.
+    static let borrowed = PrintFactLines.borrowedKeys + [
         "queue.quote", "queue.pending", "queue.printing", "queue.completed",
         "queue.delivered", "doc.client", "doc.due", "doc.notes", "common.total",
         "an.range.month", "an.range.last_month", "an.range.quarter", "an.range.year",
@@ -938,8 +934,7 @@ final class Words {
         "flow.owed", "flow.paid", "plib.group", "plib.unfiled", "plib.favorite",
         "plib.material", "plib.tags_short", "plib.group_ph", "set.store_size",
         // What a slicer's config says about a model — see `LibraryInspector`.
-        "conv.src_printer", "calc.layer_height", "conv.cp_nozzle", "doc.supports",
-        "common.none",
+
         "tab.clients", "doc.invoice", "doc.quotation", "common.close",
         "inv.qr_failed",
         "qc.weight_typed",

@@ -25,6 +25,10 @@ let package = Package(
         // own binary inside its own bundle — see `make-app.sh`, which assembles
         // the .appex the way it already assembles the .app.
         .executable(name: "KhaytThumbnail", targets: ["KhaytThumbnail"]),
+        // What the SPACE BAR shows for a .3mf: the plate render, and what the
+        // slicer was told to do with it. Its own bundle for the same reason the
+        // thumbnail is — one extension point per .appex.
+        .executable(name: "KhaytPreview", targets: ["KhaytPreview"]),
     ],
     targets: [
         .target(name: "KhaytCore", resources: [.copy("JS")]),
@@ -60,6 +64,16 @@ let package = Package(
                           swiftSettings: [
                               .unsafeFlags(["-parse-as-library"]),
                           ]),
+        // The Quick Look PREVIEW. Same shape as the thumbnail extension and for
+        // the same reasons — no Swift entry point, `NSExtensionMain` supplied by
+        // `Entry.swift` — and it shows the facts through `PrintFactLines`, which
+        // is the code the app's own inspector lays out with.
+        .executableTarget(name: "KhaytPreview", dependencies: ["KhaytCore"],
+                          swiftSettings: [
+                              .unsafeFlags(["-parse-as-library"]),
+                          ]),
+        .testTarget(name: "KhaytPreviewTests",
+                    dependencies: ["KhaytPreview", "KhaytCore"]),
         .testTarget(name: "KhaytCoreTests", dependencies: ["KhaytCore"]),
         .testTarget(name: "KhaytAppTests", dependencies: ["KhaytApp", "KhaytCore"]),
     ]
