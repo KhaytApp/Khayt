@@ -178,6 +178,44 @@ function selectAttention(input) {
     }
   }
 
+  /* ── Filament about to run out ───────────────────────────────────────
+   *
+   * `warn`, like the nozzle and for the same reason: a low spool does not stop
+   * a printer that is already running, it stops the NEXT job — which is worse
+   * to discover at the moment you want to start one, and still not a reason to
+   * outrank a machine that has actually gone down.
+   *
+   * This was the last thing on the shop floor with a rule, a screen and no
+   * place on the dashboard. `isLowStock` has decided what "low" means since the
+   * banner, the row badge and the reorder list stopped disagreeing about it;
+   * the one screen a shop leaves open was still not asking.
+   *
+   * Gated on `inventory` being passed in, and on `lowStock` being handed over,
+   * exactly as `nozzleWear` is: this module is pure and must not reach for a
+   * global, and a caller that supplies neither gets today's behaviour rather
+   * than an error.
+   */
+  if (Array.isArray(inp.inventory) && typeof inp.lowStock === 'function') {
+    const low = [];
+    for (const item of inp.inventory) {
+      if (!item) continue;
+      let isLow = false;
+      try { isLow = !!inp.lowStock(item); } catch (e) { isLow = false; }
+      if (!isLow) continue;
+      low.push({
+        severity: 'warn',
+        kind: 'stock',
+        id: String(item.id || ''),
+        name: item.material || '',
+        variant: item.colourVariant || '',
+        grams: Math.max(0, +item.weight || 0),
+      });
+    }
+    // Emptiest first: the spool closest to stopping a job leads.
+    low.sort((a, b) => (a.grams - b.grams) || String(a.id).localeCompare(String(b.id)));
+    items.push(...low);
+  }
+
   // ── Work that has missed its promised date ──────────────────────────
   const overdue = [];
   for (const o of orders) {

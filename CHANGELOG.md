@@ -34,6 +34,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Filament about to run out now reaches the dashboard.** A spool at or below
+  its reorder point was the last thing on the shop floor with a rule, a screen
+  and no place on the one screen you leave open — the shelf knew, the badge
+  knew, the reorder list knew, and the dashboard did not. It appears in "Needs
+  attention" now with how many grams are left, emptiest first, because the
+  spool closest to stopping the next job is the one to order.
+
+- **Every row of "Needs attention" has the button that fixes it.** A list of
+  problems with nothing to press is a list you read and then go looking for the
+  screen it is about. A stopped printer offers "Open printer", a worn nozzle
+  "Replace", a low spool "Order more", a late job "Open job" — each going to the
+  right screen, and to the right row on it.
+
 - **The next 48 hours on your machines, drawn.** The Machines screen opens with
   a band: what is printing on each printer, what is queued behind it, and where
   the gaps are — with each gap dimensioned, so "when is that machine free" is
@@ -1117,6 +1130,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: a printer that had stopped looked exactly like a nozzle reminder.**
+  The dashboard's attention panel colours a row red when something has actually
+  failed and amber when something merely wants a person — and it decided which
+  by comparing against a word the rule that produces those rows has never once
+  emitted. So the comparison was false on every row ever drawn: the panel stayed
+  amber with a machine down, and the distinction it exists to make was thrown
+  away one line before the screen. Nothing failed and nothing was logged, which
+  is what a string compared against a value nobody produces does.
+- **Fixed: the attention panel could fill the whole dashboard.** It listed
+  everything, and on a shop with twenty late jobs that is a dashboard which is
+  nothing but that list. It shows six now — the six the rule already sorted to
+  the top, so a stopped machine and a low spool are never the ones cut — and
+  counts the rest, because a list that silently stops at six says a shop has six
+  problems.
 - **Fixed: the product catalogue said "Rounded from" and never said from what.**
   Nineteen of twenty rows carried a caption that names a figure and then stopped
   before printing it, which is the one number that lets you tell a rounded price

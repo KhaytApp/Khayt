@@ -445,7 +445,8 @@ public actor KhaytEngine {
     /// it was demonstrably printing.
     public func dashboardFacts(orders: [JSONValue], machines: [JSONValue],
                                settings: [String: JSONValue],
-                               statusCache: [String: JSONValue] = [:]) throws -> DashboardFacts {
+                               statusCache: [String: JSONValue] = [:],
+                               inventory: [JSONValue] = []) throws -> DashboardFacts {
         // `nozzleWear` IS PASSED IN, and the whole nozzle category depends on
         // it: `attention` is pure and refuses to reach for a global, so a
         // caller that does not supply it gets no nozzle warnings at all — not
@@ -463,8 +464,16 @@ public actor KhaytEngine {
                         // wrong one produces no error — just no nozzle
                         // warnings, for ever.
                         + " nozzleWear: globalThis.KhaytNozzleWear,"
+                        // THE SHELF, and the same trap as `nozzleWear` above:
+                        // pass the MODULE, because `dashboard-facts` reads
+                        // `deduction.isLowStock` and wraps it with the shop's
+                        // settings itself. Hand it a bare function and there is
+                        // no error — just no spool warnings, for ever.
+                        + " inventory: ARG4,"
+                        + " deduction: globalThis.KhaytOrderDeduction,"
                         + " attention: globalThis.KhaytAttention})",
-                          [.array(orders), .array(machines), .object(settings), .object(statusCache)],
+                          [.array(orders), .array(machines), .object(settings),
+                           .object(statusCache), .array(inventory)],
                           as: DashboardFacts.self)
     }
 

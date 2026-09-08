@@ -155,3 +155,56 @@ test('selectAttention: tolerates missing input entirely', () => {
   // A null in the list must not throw.
   assert.equal(selectAttention({ machines: [null], orders: [null], now: NOW }).count, 0);
 });
+
+// ── Filament about to run out ───────────────────────────────────────────────
+
+const DEDUCTION = require('../lib/order-deduction.js');
+const lowStock = (item) => DEDUCTION.isLowStock(item, {});
+
+test('a spool at or below its reorder point needs the operator', () => {
+  const { items } = selectAttention({
+    inventory: [
+      { id: 's1', material: 'PA-CF', colourVariant: 'Carbon Grey', weight: 120 },
+      { id: 's2', material: 'PLA+', colourVariant: 'Galaxy Black', weight: 860 },
+    ],
+    lowStock, now: Date.UTC(2026, 8, 8),
+  });
+  const stock = items.filter(i => i.kind === 'stock');
+  assert.equal(stock.length, 1);
+  assert.equal(stock[0].id, 's1');
+  assert.equal(stock[0].severity, 'warn');
+  assert.equal(stock[0].grams, 120);
+  assert.equal(stock[0].variant, 'Carbon Grey');
+});
+
+test('the emptiest spool leads, because it stops the next job first', () => {
+  const { items } = selectAttention({
+    inventory: [
+      { id: 'b', material: 'PETG', weight: 180 },
+      { id: 'a', material: 'PA-CF', weight: 40 },
+      { id: 'c', material: 'ASA', weight: 90 },
+    ],
+    lowStock, now: Date.UTC(2026, 8, 8),
+  });
+  assert.deepEqual(items.filter(i => i.kind === 'stock').map(i => i.id), ['a', 'c', 'b']);
+});
+
+test('no inventory means no stock warnings, not an error', () => {
+  // The same contract `nozzleWear` has: a caller that supplies nothing gets
+  // today's behaviour rather than a thrown module.
+  assert.equal(selectAttention({ lowStock }).items.filter(i => i.kind === 'stock').length, 0);
+  assert.equal(selectAttention({ inventory: [{ id: 's', weight: 0 }] })
+    .items.filter(i => i.kind === 'stock').length, 0,
+    'inventory with no lowStock function decides nothing');
+});
+
+test('a spool warning never outranks a machine that has stopped', () => {
+  const { items } = selectAttention({
+    machines: [{ id: 'M1', name: 'X1C', isOffline: true }],
+    inventory: [{ id: 's1', material: 'PA-CF', weight: 40 }],
+    lowStock, now: Date.UTC(2026, 8, 8),
+  });
+  assert.equal(items[0].kind, 'machine');
+  assert.equal(items[0].severity, 'crit');
+  assert.ok(items.some(i => i.kind === 'stock' && i.severity === 'warn'));
+});

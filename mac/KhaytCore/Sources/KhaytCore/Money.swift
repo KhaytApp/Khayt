@@ -96,8 +96,14 @@ public struct DashboardFacts: Decodable, Sendable {
         public let items: [Item]
     }
 
-    /// One thing that needs looking at. `kind` is `order`, `machine` or
-    /// `nozzle`; `severity` is the module's word, not a colour chosen here.
+    /// One thing that needs looking at. `kind` is `order`, `machine`, `nozzle`
+    /// or `stock`; `severity` is the module's word, not a colour chosen here.
+    ///
+    /// Every field past `name` belongs to one kind and is nil on the rest —
+    /// `daysLate` on an order, `grams` on a nozzle or a spool, `state` on a
+    /// machine. Decoding them all here rather than per kind is what lets the
+    /// panel say WHAT IS WRONG rather than only that something is: "120 g left"
+    /// beats "PA-CF Carbon Grey" with no number after it.
     public struct Item: Decodable, Sendable, Identifiable, Hashable {
         public let severity: String
         public let kind: String
@@ -105,6 +111,14 @@ public struct DashboardFacts: Decodable, Sendable {
         public let name: String?
         public let dueDate: String?
         public let daysLate: Int?
+        /// `offline` or `error`, for a machine.
+        public let state: String?
+        /// Grams worn, for a nozzle; grams LEFT, for a spool.
+        public let grams: Double?
+        /// The gram figure the nozzle was measured against.
+        public let threshold: Double?
+        /// The shop's own name for a spool's colour.
+        public let variant: String?
     }
 }
 
