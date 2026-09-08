@@ -48,6 +48,7 @@ cat > "$AI_PROTOCOLS" <<'AIP'
  "PersistentlyIdentifiable","SetValueIntent","AppIntentsPackage"]
 AIP
 
+swift build -c release --product KhaytThumbnail --package-path "$PKG"
 echo "Building Khayt $VERSION (release)…"
 swift build -c release --product Khayt --package-path "$PKG" \
   -Xswiftc -emit-const-values \
@@ -69,6 +70,65 @@ for b in "$PKG"/.build/release/*.bundle; do
 done
 
 cp "$REPO/assets/icon.icns" "$APP/Contents/Resources/Khayt.icns"
+
+# ── THE QUICK LOOK EXTENSION ──────────────────────────────────────────────
+#
+# What Finder shows for a .3mf. A .appex is a bundle like the .app is a bundle,
+# so it is assembled the same way: a binary, an Info.plist and a signature of
+# its own, signed before the app so the app's signature seals it in.
+#
+# TWO THINGS ARE LOAD-BEARING AND NEITHER IS OBVIOUS.
+#
+# The binary must have no Swift entry point. macOS 14+ launches a thumbnail
+# extension through ExtensionKit, which looks for one in the binary FIRST and
+# only falls back to NSExtensionPrincipalClass when it finds none. See
+# `Package.swift`, which is where that is arranged, and `EntryPointTests`.
+#
+# The extension must be sandboxed. The extension point declares
+# `EXSandboxProfileName = quicklook-thumbnail` (visible in `lsregister -dump`),
+# and an .appex signed without `com.apple.security.app-sandbox` is registered,
+# is matched, and then fails every request with QLThumbnailErrorDomain 102.
+# The read entitlement is what lets it open the file it was handed.
+EXT="$APP/Contents/PlugIns/KhaytThumbnail.appex"
+mkdir -p "$EXT/Contents/MacOS"
+cp "$PKG/.build/release/KhaytThumbnail" "$EXT/Contents/MacOS/KhaytThumbnail"
+cat > "$EXT/Contents/Info.plist" <<EXTPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>KhaytThumbnail</string>
+  <key>CFBundleDisplayName</key><string>Khayt 3MF previews</string>
+  <key>CFBundleExecutable</key><string>KhaytThumbnail</string>
+  <key>CFBundleIdentifier</key><string>app.khayt.mac.thumbnail</string>
+  <key>CFBundlePackageType</key><string>XPC!</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$BUILD_VERSION</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key><string>com.apple.quicklook.thumbnail</string>
+    <key>NSExtensionPrincipalClass</key><string>KhaytThumbnailProvider</string>
+    <key>NSExtensionAttributes</key>
+    <dict>
+      <key>QLSupportedContentTypes</key>
+      <array><string>app.khayt.mac.three-mf</string></array>
+      <key>QLThumbnailMinimumDimension</key><integer>32</integer>
+    </dict>
+  </dict>
+</dict>
+</plist>
+EXTPLIST
+cat > "$EXT/entitlements.plist" <<'EXTENTS'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+  <key>com.apple.security.files.user-selected.read-only</key><true/>
+</dict>
+</plist>
+EXTENTS
 
 # The App Intents metadata, into Resources BEFORE signing — it is part of what
 # is signed, and a bundle whose metadata arrives afterwards fails verification.
@@ -196,6 +256,15 @@ pick_identity() {
   echo "-"
 }
 IDENTITY="$(pick_identity)"
+
+# INSIDE OUT: a bundle's signature covers what is within it, so the extension is
+# signed first and the app's signature seals that in. The entitlements file is
+# consumed here and then removed — it is an input to the signature, not part of
+# what ships.
+codesign --force --sign "$IDENTITY" --timestamp=none \
+  --entitlements "$EXT/entitlements.plist" "$EXT" >/dev/null 2>&1 \
+  || { echo "codesign failed for the extension"; exit 1; }
+rm -f "$EXT/entitlements.plist"
 
 codesign --force --sign "$IDENTITY" --timestamp=none "$APP" >/dev/null 2>&1 \
   || { echo "codesign failed (identity: $IDENTITY)"; exit 1; }

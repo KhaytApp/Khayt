@@ -6,6 +6,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **A 3MF looks like the thing it prints.** Finder, Spotlight and Quick Look show
+  the plate render that is already inside the file, so a folder of models is ten
+  different pictures instead of ten identical blank pages. Nothing is rendered
+  and no mesh is read: a 3MF is a zip, the slicer wrote a PNG into it, and that
+  PNG is 160 KB sitting beside 436 MB of triangles. A file a CAD program wrote
+  with no render in it shows the ordinary icon, which is what it showed before.
+
+  TWO THINGS MADE THIS TAKE A DAY, AND NEITHER IS IN ANY DOCUMENTATION. macOS 14
+  and later launch a thumbnail extension through ExtensionKit, which looks for a
+  Swift entry point in the binary FIRST and only falls back to the declared
+  provider class when it finds none — so `main.swift`, whose entire body was a
+  message saying it should never run, was what ran. The extension launched and
+  was gone in 38 ms, every request came back `QLThumbnailErrorDomain 102`, and
+  the provider was never built. Apple's own thumbnail extensions have no Swift
+  entry point either; ours has none now, and a test fails the build if one comes
+  back. The second: the extension must be sandboxed. Its extension point
+  declares `EXSandboxProfileName = quicklook-thumbnail`, and one signed without
+  the sandbox entitlement registers, matches, and then fails every request in
+  exactly the same way, which is a good way to spend an afternoon on the wrong
+  theory.
+
 - **macOS knows what a .3mf is.** It did not: `mdls` on one of this shop's models
   reported a `dyn.*` placeholder, which is what a type nobody has declared looks
   like — no kind, no icon, ten identical blank pages in a Finder window, each one
