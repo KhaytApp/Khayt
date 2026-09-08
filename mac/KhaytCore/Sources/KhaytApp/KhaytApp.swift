@@ -92,7 +92,15 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// Give the book back on the way out, so the next app to open does not have
     /// to reason about a dead pid to know it is free.
     func applicationWillTerminate(_ note: Notification) {
-        MainActor.assumeIsolated { Snapshot.subject?.relinquish() }
+        MainActor.assumeIsolated {
+            // THE MENU BAR TIMER FIRST, and this is the point of it: nothing
+            // was stopping it, so it went on firing on the main run loop while
+            // AppKit took the app apart around it. A repeating timer that
+            // outlives its application is a timer running against a runtime
+            // that is being dismantled.
+            FloorStatus.shared.remove()
+            Snapshot.subject?.relinquish()
+        }
     }
 
     func applicationDidFinishLaunching(_ note: Notification) {
@@ -166,6 +174,32 @@ final class Activator: NSObject, NSApplicationDelegate {
     @MainActor
     private static func captureDetached(into dir: URL) {
         let cases: [(String, AnyView)] = [
+            // THE WHOLE MARK SET, at the size it is read at and at four times
+            // it. A set is only a set if it holds together, and that cannot be
+            // judged from a table of coordinates — it needs looking at, all of
+            // it at once, which is what nobody had ever been able to do.
+            ("98-marks", AnyView(
+                VStack(alignment: .leading, spacing: 18) {
+                    ForEach([Array(Mark.allCases.prefix(6)),
+                             Array(Mark.allCases.dropFirst(6).prefix(6)),
+                             Array(Mark.allCases.dropFirst(12))], id: \.first) { row in
+                        HStack(spacing: 26) {
+                            ForEach(row, id: \.self) { mark in
+                                VStack(spacing: 9) {
+                                    Drawn(mark: mark, size: 64)
+                                    Drawn(mark: mark, size: 16)
+                                    Text(mark.rawValue).font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(width: 76)
+                            }
+                        }
+                    }
+                }
+                .foregroundStyle(.primary)
+                .padding(30)
+                .frame(width: 660, height: 430)
+                .background(Khayt.ground))),
             ("98-empty-drawn", AnyView(
                 EmptyHere(title: "Nothing here yet",
                           message: "A machine you add shows up here, with what it is printing.")

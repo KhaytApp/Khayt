@@ -3816,6 +3816,8 @@
   "scan.order_missing": "未找到该订单。",
   "store.category_ph": "分类",
   "store.sold_out": "已售罄",
+  "store.stock_qty": "现货",
+  "store.stock_hint": "已打印、装箱并可于今日发货的数量。按需制作请留空。",
   "store.lead_time": "交货周期（可选）",
   "store.lead_ph": "例如 3–5 天",
   "store.min_order": "最低起订",

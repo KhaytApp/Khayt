@@ -15,29 +15,70 @@ struct DetailSection<Content: View>: View {
     /// some facts is not news, and colouring it costs the colour its meaning.
     var accent: Color?
     var symbol: String?
+    /// The one section on a screen that is the reason somebody opened it.
+    ///
+    /// ── FOUR HEADINGS AT ONE VOLUME IS NO HEADING AT ALL ──────────────────
+    ///
+    /// Every section in this app said its name in the same 10pt uppercase
+    /// grey. On the dashboard that is "NEEDS ATTENTION", "THE FLOOR",
+    /// "INVOICES TO CHASE" and "MONEY" — four labels of identical weight, so a
+    /// screen whose whole job is to answer "what should I look at" answered by
+    /// listing four things and standing back.
+    ///
+    /// A lead section says its name at reading size, in the colour of what is
+    /// wrong, with the count in the heading. At most one per screen, and NOT
+    /// always the same one: nothing is wrong on most mornings, and on those the
+    /// floor leads instead.
+    var lead = false
+    /// How many, shown in a lead heading — half the news is the number. "Three
+    /// things need you" is a different morning from "one thing does".
+    var count: Int?
     @ViewBuilder let content: Content
 
     init(_ title: String, accent: Color? = nil, symbol: String? = nil,
+         lead: Bool = false, count: Int? = nil,
          @ViewBuilder content: () -> Content) {
         self.title = title; self.accent = accent; self.symbol = symbol
+        self.lead = lead; self.count = count
         self.content = content()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
-                if let symbol {
-                    Image(systemName: symbol).font(.system(size: 9, weight: .bold))
-                }
-                Text(title)
-                    .textCase(.uppercase)
-                    .tracking(0.6)
-            }
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(accent.map(AnyShapeStyle.init) ?? AnyShapeStyle(.tertiary))
+        VStack(alignment: .leading, spacing: lead ? 9 : 8) {
+            if lead { leadHeading } else { quietHeading }
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The ordinary heading: a label over some facts, deliberately quiet.
+    private var quietHeading: some View {
+        HStack(spacing: 5) {
+            if let symbol {
+                Image(systemName: symbol).font(.system(size: 9, weight: .bold))
+            }
+            Text(title).textCase(.uppercase).tracking(0.6)
+        }
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(accent.map(AnyShapeStyle.init) ?? AnyShapeStyle(.tertiary))
+    }
+
+    /// The lead heading: reading size, in the colour of what is wrong, with the
+    /// count beside it.
+    private var leadHeading: some View {
+        HStack(spacing: 8) {
+            if let symbol {
+                Image(systemName: symbol).font(.system(size: 13, weight: .semibold))
+            }
+            Text(title).font(.system(size: 15, weight: .semibold))
+            if let count, count > 0 {
+                Text("\(count)")
+                    .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                    .padding(.horizontal, 6).padding(.vertical, 1)
+                    .background((accent ?? Khayt.attention).opacity(0.15), in: Capsule())
+            }
+        }
+        .foregroundStyle(accent.map(AnyShapeStyle.init) ?? AnyShapeStyle(.primary))
     }
 }
 

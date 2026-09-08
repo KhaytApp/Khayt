@@ -70,10 +70,37 @@ final class FloorStatus {
         // Five seconds. A menu bar is glanced at, not watched: polling the
         // shop's own printer readings any harder would put this back in the
         // business of costing something.
-        tick = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
-        }
+        //
+        // ── TARGET AND SELECTOR, NOT A BLOCK ──────────────────────────────
+        //
+        // The block form has to get from a C function pointer back into Swift
+        // isolation, and the only way to do that is `MainActor.assumeIsolated`,
+        // which asks the concurrency runtime whether this is the main executor.
+        // During application teardown that runtime is being dismantled while
+        // the run loop is still firing timers, and the question is asked of
+        // metadata that is going away underneath it:
+        //
+        //     objc_opt_class + 48
+        //     swift_getObjectType + 204
+        //     swift_task_isMainExecutorImpl + 36
+        //     swift_task_isCurrentExecutorWithFlags + 72
+        //     MainActor.assumeIsolated<A>
+        //     closure #1 in FloorStatus.install(shop:)   ← here
+        //
+        // — a byte read at address 0x1e, which is not a nil of ours.
+        //
+        // A target/selector timer is dispatched by the Objective-C runtime
+        // straight to a method on a `@MainActor` class, exactly as this file's
+        // button action already is. The executor check is not in the path at
+        // all, so there is nothing there to be torn down mid-question.
+        tick = Timer.scheduledTimer(timeInterval: 5, target: self,
+                                    selector: #selector(tickFired),
+                                    userInfo: nil, repeats: true)
     }
+
+    /// Is the clock running? For the tests, which cannot see an `NSTimer`
+    /// otherwise and need to prove that stopping it actually stops it.
+    var isTicking: Bool { tick?.isValid == true }
 
     func remove() {
         tick?.invalidate(); tick = nil
@@ -81,6 +108,8 @@ final class FloorStatus {
         if let item { NSStatusBar.system.removeStatusItem(item) }
         item = nil
     }
+
+    @objc private func tickFired() { refresh() }
 
     /// The count beside the glyph, or nothing when nothing is running.
     private func refresh() {

@@ -3816,6 +3816,8 @@
   "scan.order_missing": "その注文は見つかりませんでした。",
   "store.category_ph": "カテゴリ",
   "store.sold_out": "売り切れ",
+  "store.stock_qty": "在庫",
+  "store.stock_hint": "印刷・梱包が済み、本日発送できる数。受注生産の場合は空欄にしてください。",
   "store.lead_time": "納期（任意）",
   "store.lead_ph": "例：3〜5日",
   "store.min_order": "最低注文額",

@@ -3817,6 +3817,8 @@
   "scan.order_missing": "That order was not found.",
   "store.category_ph": "category",
   "store.sold_out": "Sold out",
+  "store.stock_qty": "In stock",
+  "store.stock_hint": "How many are printed, boxed and ready to post today. Leave empty if this is made to order.",
   "store.lead_time": "Lead time (optional)",
   "store.lead_ph": "e.g. 3–5 days",
   "store.min_order": "Minimum order",

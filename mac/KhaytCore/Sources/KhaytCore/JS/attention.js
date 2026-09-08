@@ -208,7 +208,12 @@ function selectAttention(input) {
         id: String(item.id || ''),
         name: item.material || '',
         variant: item.colourVariant || '',
+        /* The quantity and THE UNIT IT IS IN. Without the unit the dashboard
+         * wrote the gram after every figure, so a rack with two sheets of
+         * acrylic on it reported "2 g" — the shelf had learned to count in
+         * sheets and the one screen a shop leaves open had not. */
         grams: Math.max(0, +item.weight || 0),
+        unit: (typeof inp.unitOf === 'function') ? inp.unitOf(item) : 'g',
       });
     }
     // Emptiest first: the spool closest to stopping a job leads.

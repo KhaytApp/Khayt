@@ -3816,6 +3816,8 @@
   "scan.order_missing": "Bu sipariş bulunamadı.",
   "store.category_ph": "kategori",
   "store.sold_out": "Tükendi",
+  "store.stock_qty": "Stokta",
+  "store.stock_hint": "Kaç adedi basılmış, kutulanmış ve bugün gönderilmeye hazır. Sipariş üzerine üretiliyorsa boş bırakın.",
   "store.lead_time": "Teslim süresi (isteğe bağlı)",
   "store.lead_ph": "ör. 3–5 gün",
   "store.min_order": "Minimum sipariş",

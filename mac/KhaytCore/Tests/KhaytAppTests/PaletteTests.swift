@@ -37,34 +37,99 @@ struct PaletteTests {
         return out
     }
 
-    /// EVERY colour, in BOTH appearances, against the surface it sits on.
+    /// EVERY colour, in BOTH appearances, against EVERY SURFACE IT SITS ON.
     ///
     /// 4.5:1 is the AA threshold for body text, and these are used on text —
     /// "3 late", "Not sent — trying again", a nozzle warning. SwiftUI's own
-    /// `.green` is 2.4:1 on white, which is why they were not left as they
-    /// were.
-    @Test("every palette colour is legible in both appearances")
+    /// `.green` is 2.4:1 on white, which is why they were not left as they were.
+    ///
+    /// ── IT USED TO MEASURE AGAINST WHITE ──────────────────────────────────
+    ///
+    /// White, and `#1E1E1E` for dark. Neither is a surface this app draws on:
+    /// the ground is a warm off-white and cards are lifted above it, so every
+    /// figure here flattered itself by a fraction of a point — and the first
+    /// time the card surface moved, `late` fell to 4.25:1 against it and this
+    /// test said nothing, because it was still asking about white.
+    ///
+    /// A palette is only legible against the things it is actually drawn on.
+    @Test("every palette colour is legible on every surface, in both appearances")
     func contrastHolds() {
-        let onLight = NSColor(hex: 0xFFFFFF)
-        // The window background in dark appearance, not black: a colour checked
-        // against #000 flatters itself by about a point.
-        let onDark = NSColor(hex: 0x1E1E1E)
+        // The three grounds a coloured label is ever drawn on, plus white and
+        // the system window colour, which are what a sheet and an alert use.
+        let surfaces: [(String, Color)] = [
+            ("the card surface", Khayt.surface),
+            ("the screen ground", Khayt.ground),
+            ("a recessed strip", Khayt.recessed),
+        ]
+        let text: [(String, Color)] = [
+            ("cyan", Khayt.cyan), ("hot", Khayt.hot), ("done", Khayt.done),
+            ("attention", Khayt.attention), ("late", Khayt.late), ("note", Khayt.note),
+        ]
 
-        for (name, color) in [("cyan", Khayt.cyan), ("hot", Khayt.hot), ("done", Khayt.done),
-                              ("attention", Khayt.attention), ("late", Khayt.late),
-                              ("note", Khayt.note)] {
-            let light = Self.contrast(Self.resolved(color, dark: false), onLight)
-            let dark = Self.contrast(Self.resolved(color, dark: true), onDark)
-            #expect(light >= 4.5, "\(name) is \(String(format: "%.2f", light)):1 on white")
-            #expect(dark >= 4.5, "\(name) is \(String(format: "%.2f", dark)):1 on the dark window")
+        for dark in [false, true] {
+            let appearance = dark ? "dark" : "light"
+            for (surfaceName, surface) in surfaces {
+                let ground = Self.resolved(surface, dark: dark)
+                for (name, colour) in text {
+                    let ratio = Self.contrast(Self.resolved(colour, dark: dark), ground)
+                    #expect(ratio >= 4.5,
+                            "\(name) is \(String(format: "%.2f", ratio)):1 on \(surfaceName), \(appearance)")
+                }
+                // `marked` is held to 3:1, the threshold for a graphical
+                // element. It is only ever `star.fill` and never text.
+                let marked = Self.contrast(Self.resolved(Khayt.marked, dark: dark), ground)
+                #expect(marked >= 3,
+                        "marked is \(String(format: "%.2f", marked)):1 on \(surfaceName), \(appearance)")
+            }
         }
+    }
 
-        // `marked` is held to 3:1, the threshold for a graphical element. It is
-        // only ever `star.fill` and never text — see its note in the palette.
-        let markedLight = Self.contrast(Self.resolved(Khayt.marked, dark: false), onLight)
-        let markedDark = Self.contrast(Self.resolved(Khayt.marked, dark: true), onDark)
-        #expect(markedLight >= 3, "marked is \(String(format: "%.2f", markedLight)):1 on white")
-        #expect(markedDark >= 3, "marked is \(String(format: "%.2f", markedDark)):1 on the dark window")
+    /// A card has to be visible AGAINST the screen it sits on, and the line
+    /// round it visible against both. These are not text, so the bar is the
+    /// eye's rather than AA's — but "no difference at all" is a card that is
+    /// not a card.
+    @Test("the surfaces are told apart from each other")
+    func surfacesSeparate() {
+        for dark in [false, true] {
+            let appearance = dark ? "dark" : "light"
+            let surface = Self.resolved(Khayt.surface, dark: dark)
+            let ground = Self.resolved(Khayt.ground, dark: dark)
+            let recessed = Self.resolved(Khayt.recessed, dark: dark)
+            #expect(Self.contrast(surface, ground) >= 1.06,
+                    "a card is invisible against the screen in \(appearance)")
+            #expect(Self.contrast(ground, recessed) >= 1.04,
+                    "a recessed strip is invisible against the ground in \(appearance)")
+        }
+    }
+
+    /// Two colours that mean opposite things have to be tellable apart.
+    ///
+    /// `hot` is printing — the thing going well — and `late` is an invoice
+    /// nobody has paid. They appear on the same dashboard. Warming `hot` to a
+    /// burnt orange moved it toward the red, and "distinguishable" is not a
+    /// thing to decide by looking once.
+    @Test("the heat colour and the alarm colour are not the same colour")
+    func heatIsNotAlarm() {
+        for dark in [false, true] {
+            let hot = Self.resolved(Khayt.hot, dark: dark)
+            let late = Self.resolved(Khayt.late, dark: dark)
+            let apart = Self.distance(hot, late)
+            let where_ = dark ? "dark" : "light"
+            #expect(apart >= 25,
+                    "hot and late are \(String(format: "%.0f", apart)) apart in \(where_) — a shop cannot tell a printing job from an overdue invoice")
+        }
+    }
+
+    /// Rough perceptual distance, enough to catch two colours that have drifted
+    /// into each other. Not CIEDE2000 — `lib/color-mix.js` is where that lives,
+    /// and this is a guard rail rather than a colour science claim.
+    static func distance(_ a: NSColor, _ b: NSColor) -> Double {
+        let x = a.usingColorSpace(.sRGB) ?? a, y = b.usingColorSpace(.sRGB) ?? b
+        let dr = (x.redComponent - y.redComponent) * 255
+        let dg = (x.greenComponent - y.greenComponent) * 255
+        let db = (x.blueComponent - y.blueComponent) * 255
+        // Weighted toward green, which the eye is most sensitive to.
+        return (2 * dr * dr + 4 * dg * dg + 3 * db * db).squareRoot()
     }
 
     /// Light and dark are actually different values, in the right direction.

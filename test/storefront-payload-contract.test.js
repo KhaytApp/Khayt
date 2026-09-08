@@ -33,6 +33,7 @@ const CONTRACT = {
   'item.photos': /it\.photos = photos/,
   'item.alt': /it\.alt = \{ lang:/,
   'item.nameAr': /nameAr: \(p\.nameAr \|\| ''\)/,   // kept for older pages
+  'item.stockQty': /it\.stockQty = sf\.stockQty\[p\.id\]/,
 };
 
 test('the publish payload still carries every field the storefront needs', () => {
@@ -79,6 +80,84 @@ test('a published item is priced from the catalogue, not from a second form', ()
   // at nothing is a decision, and a truthy check silently replaces it.
   assert.doesNotMatch(build, /if \(sf\.prices\[p\.id\]\) it\.price/,
     'a truthy check would treat a deliberate zero as unpriced');
+});
+
+test('the stock box the dialog draws is the one the save reads', () => {
+  /* The cheapest way for this feature to do nothing at all.
+   *
+   * The row markup and the capture are ~130 lines apart and joined only by a
+   * class name. Rename one and the input still renders, the shop still types a
+   * number, Save still succeeds — and querySelectorAll finds nothing, so the
+   * count is silently never published. No error, no test failure, and the shop
+   * discovers it when a customer is quoted a print lead time on something in a
+   * box.
+   *
+   * No Electron here, so this cannot click the field; it can at least insist
+   * the two halves still name the same thing.
+   */
+  assert.match(SETTINGS, /<input class="sfStock"/, 'the dialog must draw the box');
+  assert.match(SETTINGS, /querySelectorAll\('\.sfStock'\)/, 'and the save must read it');
+
+  // The dirty flag is likewise a name shared across the two, and it decides
+  // whether a count is re-dated at all.
+  assert.match(SETTINGS, /inp\.dataset\.counted = '1'/, 'touching the box must mark it');
+  assert.match(SETTINGS, /inp\.dataset\.counted === '1'/, 'and the save must read that mark');
+});
+
+test('a batch count of zero survives every hop, because zero is a state', () => {
+  /* The one number in this payload where 0 is meaningful and every neighbour's
+   * 0 is not.
+   *
+   * printHours and weightGrams are dropped when zero — nothing prints instantly
+   * or weighs nothing, so a zero there is a parse failure wearing a number. A
+   * stock count of zero is a shop saying the batch sold out, which it reverses
+   * next week. Read as "absent" it becomes "we do not stock this", and the
+   * storefront quotes a print lead time on a piece about to be restocked.
+   *
+   * Three places can each swallow it independently, which is why all three are
+   * pinned here rather than trusted to review: the app's publish, the server's
+   * whitelist, and the feed the storefront actually reads.
+   */
+  const build = SETTINGS.slice(SETTINGS.indexOf('const buildCatalog = '), SETTINGS.indexOf('#storeCopy'));
+  assert.match(build, /sf\.stockQty\[p\.id\] != null/,
+    'a truthy check would publish a sold-out batch as made to order');
+
+  const php = path.join(ROOT, 'khayt-cloud', 'index.php');
+  if (!fs.existsSync(php)) return;   // separate repo, absent in CI
+  const src = fs.readFileSync(php, 'utf8');
+
+  // The whitelist must admit 0 — `>= 0`, not the `> 0` its neighbours use.
+  assert.match(src, /\$o\['stockQty'\] = \(int\) min/,
+    'the server whitelist must know the field, or it is dropped in silence');
+  assert.match(src, /\(float\) \$sq >= 0/,
+    'the whitelist must admit zero — a sold-out batch is a state, not a gap');
+
+  // And the feed must emit it. isset() is false for null and TRUE for 0.
+  assert.match(src, /isset\(\$it\['stockQty'\]\)\) \$products\[\$last\]\['stock_quantity'\]/,
+    'the feed must carry the count, and !empty() would drop a zero');
+});
+
+test('the count and the moment it was taken travel together', () => {
+  /* stockCountedAt is what lets a storefront re-apply a count over what it has
+   * sold since — it applies the number when the shop COUNTED, not when it
+   * happened to read. So the app must date a count the shop touched, and must
+   * NOT re-date one it did not: opening this dialog to edit a price would
+   * otherwise re-assert every count and undo the sales in between.
+   */
+  const build = SETTINGS.slice(SETTINGS.indexOf('const buildCatalog = '), SETTINGS.indexOf('#storeCopy'));
+  assert.match(build, /it\.stockCountedAt = sf\.stockCountedAt\[p\.id\]/,
+    'a count with no date cannot be told from one the shop never re-took');
+
+  // Touched, not merely changed: a shop that sells three, prints three and
+  // counts twenty again types the same figure, and that IS a re-count.
+  assert.match(SETTINGS, /inp\.dataset\.counted = '1'/,
+    'touching the box is the signal — a value comparison misses a re-count onto the same number');
+
+  const php = path.join(ROOT, 'khayt-cloud', 'index.php');
+  if (!fs.existsSync(php)) return;
+  const src = fs.readFileSync(php, 'utf8');
+  assert.match(src, /\$o\['stockCountedAt'\] = \$sc/,
+    'the server must keep the date, or the consumer can never tell a re-count from a re-read');
 });
 
 test('the storefront page reads them, where the cloud repo is checked out', {

@@ -15,24 +15,24 @@ struct LibraryInspector: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header(file)
-                    Divider()
+                    LayerRule()
                     theFile(file)
                     if !file.palette.isEmpty {
-                        Divider()
+                        LayerRule()
                         filament(file)
                     }
                     if let mesh = file.mesh {
-                        Divider()
+                        LayerRule()
                         geometry(mesh, file.id)
                     }
                     if let how = howItPrints(file) {
-                        Divider()
+                        LayerRule()
                         how
                     }
                     provenance(file)
                     actions(file)
             if let notes = file.testedNotes, !notes.isEmpty {
-                        Divider()
+                        LayerRule()
                         DetailSection(shop.words.callIt("doc.notes")) { Text(notes).textSelection(.enabled) }
                     }
                 }

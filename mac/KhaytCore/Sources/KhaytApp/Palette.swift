@@ -96,7 +96,7 @@ enum Khayt {
     ///
     /// Darkened for light appearance — `#2BCDE4` is 1.9:1 on white, which is
     /// fine for a large filled shape and unreadable as a label.
-    static let cyan = adaptive(light: 0x0B7C91, dark: 0x2BCDE4, name: "khaytCyan")
+    static let cyan = adaptive(light: 0x0A6E81, dark: 0x2BCDE4, name: "khaytCyan")
 
     /// The drop of filament, and the ONE thing it is allowed to mean: something
     /// is being made right now.
@@ -104,20 +104,20 @@ enum Khayt {
     /// Not "warning" — that is `attention` below and it is a different idea. A
     /// printer mid-job is not a problem, it is the good state, and it is the
     /// one thing on any of these screens worth looking up at.
-    static let hot = adaptive(light: 0x9A6200, dark: 0xFFD27A, name: "khaytHot")
+    static let hot = adaptive(light: 0xAF3E18, dark: 0xF0763D, name: "khaytHot")
 
     /// Finished, paid, sent, agreed. `--cmd-ok` / `--success`.
-    static let done = adaptive(light: 0x157A4F, dark: 0x2BB673, name: "khaytDone")
+    static let done = adaptive(light: 0x1B5E4F, dark: 0x4FBFA0, name: "khaytDone")
 
     /// Wants a person, and will keep working if it does not get one: low stock,
     /// a nozzle near its life, a sync that will retry. `--warning`.
-    static let attention = adaptive(light: 0x906300, dark: 0xF5A623, name: "khaytAttention")
+    static let attention = adaptive(light: 0x8A5A0B, dark: 0xE0A73C, name: "khaytAttention")
 
     /// Late, failed, refused. `--danger`.
-    static let late = adaptive(light: 0xC32F47, dark: 0xEF4D5E, name: "khaytLate")
+    static let late = adaptive(light: 0xBB2D44, dark: 0xF2564A, name: "khaytLate")
 
     /// Worth reading, not worth acting on. `--info`.
-    static let note = adaptive(light: 0x1F66C8, dark: 0x8A7DF0, name: "khaytNote")
+    static let note = adaptive(light: 0x3E5A70, dark: 0x7FA6C4, name: "khaytNote")
 
     /// A model the shop has starred.
     ///
@@ -130,7 +130,7 @@ enum Khayt {
     /// thumbnail, with a shadow under it — and never text. The graphical
     /// threshold is the one that applies. A gold dark enough for 4.5:1 on white
     /// is brown, and a brown star is not a star.
-    static let marked = adaptive(light: 0xB8860B, dark: 0xF0C040, name: "khaytMarked")
+    static let marked = adaptive(light: 0xA6790A, dark: 0xF0C040, name: "khaytMarked")
 
     /// Has this Mac's owner chosen an accent colour of their own?
     ///

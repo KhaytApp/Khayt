@@ -74,7 +74,7 @@ struct Calculator: View {
                             .fixedSize()
                             Spacer(minLength: 0)
                         }
-                        Divider()
+                        LayerRule()
                         HStack(spacing: 10) {
                             // The spool decides the material cost per gram, and
                             // the machine decides the wear and the electricity.

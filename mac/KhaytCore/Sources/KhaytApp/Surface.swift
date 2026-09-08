@@ -90,18 +90,24 @@ extension Khayt {
     /// over it: `.quinary` on white is a grey box, and a column of grey boxes
     /// is what this file exists to stop. Dark lifts, because in dark appearance
     /// a raised surface is lighter than its ground.
-    /// The dark value is not a taste decision: it is the LIGHTEST background a
-    /// palette colour is ever drawn on in dark appearance, so it is the one
-    /// that sets their contrast. The first attempt at this file used `#24262B`
-    /// and quietly broke two of them — `late` fell to **4.25:1** and `note` to
-    /// 4.52 where AA text needs 4.5, against the 4.68 and 4.98 the palette
-    /// documents. Measured, not noticed by eye. `#1D1F24` puts them back at
-    /// 4.63 and 4.92, and the whole dark ramp moved down with it to keep the
-    /// steps between the three tones visible.
+    /// The dark value is the LIGHTEST background a palette colour is ever drawn
+    /// on in dark appearance, so it is the one that sets their contrast. An
+    /// early version used `#24262B` and quietly broke two — `late` fell to
+    /// 4.25:1 where AA text needs 4.5. Measured, not noticed by eye.
     ///
-    /// Anything that darkens `late` further, or lightens this, has to be
-    /// measured against it again.
-    static let surface = adaptive(light: 0xFDFCFA, dark: 0x1D1F24, name: "khaytSurface")
+    /// ── AND THE TEST THAT SAID IT WAS FINE WAS ASKING ABOUT WHITE ─────────
+    ///
+    /// `PaletteTests` measured every colour against `#FFFFFF` and `#1E1E1E`,
+    /// neither of which this app draws on. Made to ask about the three real
+    /// surfaces instead, it failed **ten** pairs on the palette as it then
+    /// shipped: `cyan` at 3.84:1 on a recessed strip, `hot` at 4.02, `marked`
+    /// at 2.56. Every one of them had been on screen for months.
+    ///
+    /// The whole light ramp is solved against `recessed` now — the darkest
+    /// thing a coloured label sits on — and the dark ramp against this, the
+    /// lightest. Anything that moves either has to be measured again, and the
+    /// test will say so.
+    static let surface = adaptive(light: 0xFBF9F5, dark: 0x201C17, name: "khaytSurface")
 
     /// The ground a screen is drawn on, and the reason the two above work.
     ///
@@ -121,14 +127,34 @@ extension Khayt {
     ///
     /// Dark barely moves — `#1E1E1E` is already a ground and only needs to be
     /// a shade below `surface`.
-    static let ground = adaptive(light: 0xF2F0EC, dark: 0x141518, name: "khaytGround")
+    static let ground = adaptive(light: 0xEFEBE3, dark: 0x16130F, name: "khaytGround")
 
-    /// The line around a card. Low contrast on purpose — it is there to say
-    /// where the card ends, not to be seen.
-    static let hairline = Color(nsColor: NSColor(name: NSColor.Name("khaytHairline")) { appearance in
-        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        return isDark ? NSColor(white: 1, alpha: 0.10) : NSColor(white: 0, alpha: 0.09)
-    })
+    /// The line around a card: low contrast on purpose, there to say where the
+    /// card ends rather than to be seen.
+    ///
+    /// A WARM LINE, not black at 9%.
+    ///
+    /// An alpha-black hairline over a warm ground is a grey line, and a grey
+    /// line on every card edge in the app is most of what "it looks washed out"
+    /// was. This is a colour of its own, from the same family as the surfaces
+    /// it separates.
+    static let hairline = adaptive(light: 0xDCD5C8, dark: 0x3A342C, name: "khaytHairline")
+
+    /// The rule between two rows of a list.
+    ///
+    /// ── A LAYER LINE, NOT A ZEBRA STRIPE ─────────────────────────────────
+    ///
+    /// The usual way to separate rows is to tint every other one, and it works
+    /// — at the cost of putting a grey band across half the screen. This app is
+    /// about a thing built out of stacked layers, and a stack of layers is
+    /// separated by LINES. So rows are ruled rather than striped: one hairline
+    /// between them, lighter than the line round the card, so the card's own
+    /// edge still reads as the edge.
+    ///
+    /// It is also the denser of the two. A ruled row can be 28pt; a striped one
+    /// needs padding above and below the fill or the stripe looks like a
+    /// selection.
+    static let layerLine = adaptive(light: 0xEAE4D9, dark: 0x2E2822, name: "khaytLayerLine")
 
     /// The bare part of a spool, where the filament no longer reaches.
     ///
@@ -145,7 +171,7 @@ extension Khayt {
     /// So this one goes the OTHER way in dark: an empty spool is a lighter
     /// object than the card it sits on, because that is the only direction
     /// with room in it.
-    static let bareSpool = adaptive(light: 0xE7E3DC, dark: 0x33373F, name: "khaytBareSpool")
+    static let bareSpool = adaptive(light: 0xE3DCCD, dark: 0x35302A, name: "khaytBareSpool")
 
     /// The edge of a drawn object, as opposed to the edge of a card.
     ///
@@ -243,7 +269,7 @@ extension Khayt {
     /// rather than assumed: in dark appearance "further away" is DARKER, so
     /// this goes down from the window while `surface` goes up from it. A lane
     /// lightened in dark would come forward and swap the two depths over.
-    static let recessed = adaptive(light: 0xE7E4DE, dark: 0x090A0C, name: "khaytRecessed")
+    static let recessed = adaptive(light: 0xE7E1D7, dark: 0x0E0C09, name: "khaytRecessed")
 }
 
 extension View {
@@ -269,11 +295,151 @@ extension View {
 /// with white space of 12 to 24 points.
 enum Metric {
     /// The margin between a screen's content and the edges of its pane.
-    static let screen: CGFloat = 20
+    ///
+    /// 14, not 20. This app replaces a spreadsheet, and the thing a shop wants
+    /// from it is to see the work — a 900pt window at 20 showed eighteen jobs
+    /// where it now shows twenty-two, and the four it was spending on air are
+    /// four a shop would otherwise scroll for.
+    static let screen: CGFloat = 14
     /// The margin inside an inspector or summary pane. Tighter on purpose:
     /// these are narrow, dense and read at arm's length beside the thing they
     /// describe, and 20 on a 280pt pane spends a seventh of it on air.
     static let pane: CGFloat = 14
     /// Between one group of things and the next.
-    static let gap: CGFloat = 14
+    static let gap: CGFloat = 12
+    /// A row in a ruled list. The mockup's figure, and the reason the rules
+    /// above are lines rather than fills: a striped row cannot be this tight.
+    static let row: CGFloat = 28
+}
+
+/// The rule between two rows.
+///
+/// `Divider()` draws the system separator, which is a grey that belongs to
+/// nobody. This is the app's own — see `Khayt.layerLine`.
+struct LayerRule: View {
+    var body: some View {
+        Rectangle().fill(Khayt.layerLine).frame(height: 1)
+    }
+}
+
+/// A figure with the arithmetic that produced it written underneath.
+///
+/// ── A SHOP CHECKS BY EYE ──────────────────────────────────────────────────
+///
+/// "Average job 540.46" is a number you either trust or do not. `1,080.93 ÷ 2`
+/// underneath it is a number you can check while you read it, and a shop that
+/// can check one derived figure trusts the other forty on the screen.
+///
+/// It also catches a whole class of mistake before anyone reports it: a total
+/// printed beside the terms that make it cannot silently stop matching them.
+/// The mockup this came from printed a free-hours total that did not match the
+/// rows above it, and nothing on that artboard would ever have said so.
+struct Derived: View {
+    let value: String
+    /// `1,080.93 ÷ 2`, `662 of 750 h`, `480 − 120`. The working, not a caption.
+    let working: String
+    var unit: String?
+    var tint: Color?
+    var size: CGFloat = 26
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            BigFigure(value: value, unit: unit, tint: tint, size: size)
+            HStack(spacing: 5) {
+                // A tick, the way a dimension on a drawing is tied to what it
+                // measures rather than floating near it.
+                Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
+                Text(working)
+                    .font(.caption2).monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// One figure in a strip of them.
+struct Stat: Identifiable {
+    let label: String
+    let value: String
+    /// The arithmetic, where there is any.
+    var working: String?
+    /// The app's own mark, preferred. `symbol` is the fallback for the handful
+    /// of labels this app has no drawing for yet.
+    var mark: Mark?
+    var symbol: String?
+    var tint: Color = .secondary
+    /// Set on the one figure describing something happening right now.
+    var alive = false
+    var id: String { label }
+}
+
+/// Several figures in ONE card, ruled apart.
+///
+/// ── FOUR CARDS FOR FOUR NUMBERS ───────────────────────────────────────────
+///
+/// The dashboard drew "Printing 5", "Open 11", "Late 6" and "Online 0/5" as
+/// four separate cards, each with its own border, corner radius, padding and
+/// shadowless lift — four rectangles across seventeen hundred points to carry
+/// four numbers and four words. The ink went almost entirely on the boxes.
+///
+/// They are one thing: the state of the floor, right now. So they are one card,
+/// with a layer line between each figure and the next — which is also what the
+/// rest of the app now uses to separate a row from the row below it.
+struct StatStrip: View {
+    let stats: [Stat]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(stats.enumerated()), id: \.element.id) { index, stat in
+                if index > 0 {
+                    Rectangle().fill(Khayt.layerLine).frame(width: 1)
+                        .padding(.vertical, 8)
+                }
+                Cell(stat: stat)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .card(padding: 0)
+    }
+
+    private struct Cell: View {
+        let stat: Stat
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 5) {
+                    if let mark = stat.mark {
+                        Drawn(mark: mark, size: 13)
+                    } else if let symbol = stat.symbol {
+                        Image(systemName: symbol)
+                            // The one piece of motion in the app, on the one
+                            // thing that is actually moving.
+                            .symbolEffect(.variableColor.iterative.dimInactiveLayers,
+                                          isActive: stat.alive && !reduceMotion)
+                    }
+                    Text(stat.label).lineLimit(1)
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(stat.alive ? AnyShapeStyle(Khayt.hot) : AnyShapeStyle(.secondary))
+
+                Text(stat.value)
+                    .font(.system(size: 21, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(stat.tint == .secondary
+                                     ? AnyShapeStyle(.primary) : AnyShapeStyle(stat.tint))
+                    .lineLimit(1).minimumScaleFactor(0.6)
+
+                if let working = stat.working {
+                    HStack(spacing: 5) {
+                        Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
+                        Text(working).font(.caption2).monospacedDigit()
+                            .foregroundStyle(.tertiary).lineLimit(1)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 13).padding(.vertical, 11)
+        }
+    }
 }

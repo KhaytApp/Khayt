@@ -30,7 +30,9 @@ struct Dashboard: View {
             NeedsAttention(items: attention.items, shop: shop)
         }
         if let facts = shop.facts {
-            Work(facts: facts, shop: shop)
+            // The floor leads when nothing is wrong — which is most mornings.
+            Work(facts: facts, shop: shop,
+                 leads: (shop.attention?.items.isEmpty ?? true))
         }
         // What the machines are ACTUALLY doing, under the count of how many the
         // book thinks are busy. The tile above is the book's answer; this is
@@ -142,16 +144,33 @@ struct Dashboard: View {
 private struct ToChase: View {
     let shop: Shop
 
+    /// ── NOT WHAT THE PANEL ABOVE ALREADY SAYS ─────────────────────────────
+    ///
+    /// A job that is late is in the attention panel, and its invoice is
+    /// overdue, so it was in this list too — four of the eight rows here were
+    /// four of the six rows eight inches above them. One problem printed twice
+    /// is not twice the warning; it is a screen a shop learns to skim.
+    ///
+    /// So this list is what the panel does NOT already carry. A quote about to
+    /// expire and an invoice on a job that was delivered on time are money
+    /// questions with nobody late attached, and those are exactly the rows this
+    /// section exists for.
+    private var alreadyShown: Set<String> {
+        Set((shop.attention?.items ?? []).map(\.id))
+    }
+    private var invoices: [Chase] { shop.invoicesToChase.filter { !alreadyShown.contains($0.id) } }
+    private var quotes: [Chase] { shop.quotesToChase.filter { !alreadyShown.contains($0.id) } }
+
     var body: some View {
-        if !shop.invoicesToChase.isEmpty || !shop.quotesToChase.isEmpty {
-            VStack(alignment: .leading, spacing: 14) {
-                if !shop.invoicesToChase.isEmpty {
+        if !invoices.isEmpty || !quotes.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                if !invoices.isEmpty {
                     list(shop.words.callIt("mac.chase_invoices"),
-                         "exclamationmark.circle", shop.invoicesToChase, overdue: true)
+                         "exclamationmark.circle", invoices, overdue: true)
                 }
-                if !shop.quotesToChase.isEmpty {
+                if !quotes.isEmpty {
                     list(shop.words.callIt("dash.expiring_quotes"),
-                         "clock.badge.questionmark", shop.quotesToChase, overdue: false)
+                         "clock.badge.questionmark", quotes, overdue: false)
                 }
             }
         }
@@ -177,8 +196,9 @@ private struct ToChase: View {
                             .font(.callout).monospacedDigit()
                             .foregroundStyle(Khayt.attention)
                     }
-                    .padding(.vertical, 5)
-                    if row.id != rows.last?.id { Divider() }
+                    .padding(.vertical, 3)
+                    .frame(minHeight: Metric.row)
+                    if row.id != rows.last?.id { LayerRule() }
                 }
             }
             .padding(.horizontal, 12)
@@ -304,14 +324,18 @@ private struct NeedsAttention: View {
     }
 
     var body: some View {
+        // THE LEAD, whenever there is anything in it. This is the reason
+        // somebody opened the screen, and it used to say so in the same 10pt
+        // grey as "MONEY".
         DetailSection(shop.words.callIt("mac.needs_attention"),
-                      accent: worst, symbol: "exclamationmark.triangle.fill") {
+                      accent: worst, symbol: "exclamationmark.triangle.fill",
+                      lead: true, count: items.count) {
             VStack(spacing: 0) {
                 ForEach(shown) { item in
                     Row(item: item, shop: shop,
                         ink: item.severity == NeedsAttentionSeverity.critical
                              ? Khayt.late : Khayt.attention)
-                    if item.id != shown.last?.id || hidden > 0 { Divider() }
+                    if item.id != shown.last?.id || hidden > 0 { LayerRule() }
                 }
                 if hidden > 0 {
                     // Counted, not hidden. A list that silently stops at six is
@@ -359,7 +383,10 @@ private struct NeedsAttention: View {
                                            ["n": .number(Double(late))]))
                         .font(.callout).monospacedDigit().foregroundStyle(ink)
                 } else if let grams = item.grams {
-                    Text("\(Int(grams)) \(shop.words.callIt("common.grams"))")
+                    // In the item's OWN unit. The shelf learned to count in
+                    // sheets and millilitres; this screen was still writing the
+                    // gram after everything.
+                    Text(Quantity.say(grams, shop.inventoryUnits[item.id], shop.words))
                         .font(.callout).monospacedDigit().foregroundStyle(ink)
                 }
                 // ── AND THE THING THAT FIXES IT ───────────────────────────
@@ -377,7 +404,10 @@ private struct NeedsAttention: View {
                     .buttonStyle(.borderless)
                     .font(.callout)
             }
-            .padding(.vertical, 5)
+            // 28pt rows. A ruled list can be this tight; a striped one cannot,
+            // which is half the reason the rules are lines.
+            .padding(.vertical, 3)
+            .frame(minHeight: Metric.row)
             .contentShape(Rectangle())
             .onTapGesture { go() }
         }
@@ -414,26 +444,45 @@ private struct Work: View {
     let facts: DashboardFacts
     let shop: Shop
 
+    /// The floor leads on a morning when nothing is wrong.
+    ///
+    /// A screen answers "what should I look at" by saying one thing louder than
+    /// the rest, and which thing that is depends on the day. With something in
+    /// the attention panel, this is supporting; with nothing there, this is the
+    /// answer and it says so.
+    let leads: Bool
+
     var body: some View {
-        DetailSection(shop.words.callIt("mac.the_floor")) {
-            HStack(spacing: 14) {
+        DetailSection(shop.words.callIt("mac.the_floor"),
+                      accent: leads ? Khayt.cyan : nil,
+                      symbol: leads ? "printer.fill" : nil,
+                      lead: leads) {
+            // ONE CARD, RULED — not four. These four figures are one thing: the
+            // state of the floor right now. Drawn as four separate cards they
+            // spent almost all their ink on borders.
+            StatStrip(stats: [
                 // Amber only when something IS printing. A colour that means
                 // "being made right now" sitting on a zero says the opposite of
                 // what it means, and a dashboard where the warm colour is
                 // always on is a dashboard where it stops being noticed.
-                Tile(value: "\(facts.printingCount)", label: shop.words.callIt("queue.printing"),
+                Stat(label: shop.words.callIt("queue.printing"),
+                     value: "\(facts.printingCount)",
                      symbol: "printer",
                      tint: facts.printingCount > 0 ? Khayt.hot : Color.secondary,
-                     alive: facts.printingCount > 0)
-                Tile(value: "\(facts.activeCount)", label: shop.words.callIt("mac.open_count"),
-                     symbol: "tray.full", tint: .secondary)
-                Tile(value: "\(facts.lateCount)", label: shop.words.callIt("mac.late_tile"),
-                     symbol: "exclamationmark.triangle",
-                     tint: facts.lateCount > 0 ? Khayt.attention : Color.secondary)
-                Tile(value: "\(facts.fleet.live)/\(facts.fleet.total)",
-                     label: shop.words.callIt("mac.machines_online"),
-                     symbol: "server.rack", tint: .secondary)
-            }
+                     alive: facts.printingCount > 0),
+                Stat(label: shop.words.callIt("mac.open_count"),
+                     value: "\(facts.activeCount)", mark: .jobs),
+                Stat(label: shop.words.callIt("mac.late_tile"),
+                     value: "\(facts.lateCount)",
+                     mark: .clock,
+                     tint: facts.lateCount > 0 ? Khayt.attention : Color.secondary),
+                Stat(label: shop.words.callIt("mac.machines_online"),
+                     value: "\(facts.fleet.live)/\(facts.fleet.total)",
+                     working: facts.fleet.offline > 0
+                         ? shop.words.callIt("mac.fleet_offline",
+                                             ["n": .number(Double(facts.fleet.offline))]) : nil,
+                     mark: .machines),
+            ])
         }
     }
 }
@@ -498,9 +547,14 @@ private struct RunningNow: View {
                 // for having a warm colour at all: the icon's drop of filament
                 // is exactly this moment. Everything else on the dashboard is a
                 // number about the past; this is the machine, now.
-                ProgressView(value: Double(status.progress) / 100)
-                    .progressViewStyle(.linear)
-                    .tint(Khayt.hot)
+                //
+                // Drawn as the LAYERS it has laid, not as a capsule filling up.
+                // The shape has been in `Craft.swift` for months and appeared on
+                // exactly one surface — a picture in the snapshot runner that
+                // nothing shipped — while the screen a shop actually leaves open
+                // used the stock bar, which is the same bar as every other app
+                // on the machine.
+                LayerProgress(progress: Double(status.progress) / 100)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -647,28 +701,37 @@ private struct MoneyTiles: View {
                 }
                 .card(rail: Khayt.cyan, padding: 14)
 
-                HStack(spacing: 14) {
-                    Tile(value: Money.short(k.avgOrderValue, shop.currency),
-                         label: shop.words.callIt("mac.avg_order"), symbol: "chart.bar", tint: .secondary)
+                // ONE CARD, RULED. Five separate cards for five figures is
+                // five borders, five corner radii and five paddings carrying
+                // five numbers — and they are one thing: how the period went.
+                StatStrip(stats: [
+                    // WITH ITS DIVISOR. "Average job 540.46" is a figure you
+                    // either trust or do not; "1,080.93 ÷ 2" underneath is one
+                    // you can check while you read it.
+                    Stat(label: shop.words.callIt("mac.avg_order"),
+                         value: Money.short(k.avgOrderValue, shop.currency),
+                         working: k.completedCount > 0
+                             ? "\(Money.figure(k.revenue)) ÷ \(k.completedCount)" : nil,
+                         mark: .reports),
                     // NOT "Owed" here. `kpi` scopes outstanding to the rows in
                     // the period, and the toolbar shows what the whole book is
                     // owed, unscoped and always visible. Two figures under one
                     // word, inches apart, differing by an order of magnitude —
                     // the same trap this section was rewritten to remove once
                     // already.
-                    Tile(value: "\(k.orderCount)", label: shop.words.callIt("mac.jobs_count"),
-                         symbol: "tray.full", tint: .secondary)
+                    Stat(label: shop.words.callIt("mac.jobs_count"),
+                         value: "\(k.orderCount)", mark: .jobs),
                     // Nothing to judge against is "—", not 100%. A shop with no
                     // due dates has not delivered everything on time; it has
                     // promised nothing.
-                    Tile(value: k.onTimePct.map { "\(Money.figure($0))%" } ?? "—",
-                         label: shop.words.callIt("mac.on_time"), symbol: "checkmark.circle",
-                         tint: .secondary)
-                    Tile(value: "\(k.completedCount)", label: shop.words.callIt("queue.completed"),
-                         symbol: "shippingbox", tint: .secondary)
-                    Tile(value: "\(shop.files.count)", label: shop.words.callIt("mac.library"),
-                         symbol: "square.grid.2x2", tint: .secondary)
-                }
+                    Stat(label: shop.words.callIt("mac.on_time"),
+                         value: k.onTimePct.map { "\(Money.figure($0))%" } ?? "—",
+                         symbol: "checkmark.circle"),
+                    Stat(label: shop.words.callIt("queue.completed"),
+                         value: "\(k.completedCount)", symbol: "checkmark.seal"),
+                    Stat(label: shop.words.callIt("mac.library"),
+                         value: "\(shop.files.count)", mark: .library),
+                ])
             }
             }   // hasNotTradedYet
         }
@@ -679,6 +742,9 @@ private struct MoneyTiles: View {
 private struct Tile: View {
     let value: String
     let label: String
+    /// The arithmetic that produced the value, on the tiles where there is
+    /// one. A shop that can check one derived figure trusts the other forty.
+    var working: String?
     let symbol: String
     let tint: Color
     /// Set on the one tile that is describing something happening RIGHT NOW.
@@ -692,7 +758,7 @@ private struct Tile: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 5) {
             Label(label, systemImage: symbol)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -716,8 +782,17 @@ private struct Tile: View {
                 .foregroundStyle(tint == .secondary ? AnyShapeStyle(.primary) : AnyShapeStyle(tint))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
+            // The arithmetic, tied to the figure by a tick the way a dimension
+            // on a drawing is tied to what it measures.
+            if let working {
+                HStack(spacing: 5) {
+                    Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
+                    Text(working).font(.caption2).monospacedDigit()
+                        .foregroundStyle(.tertiary).lineLimit(1)
+                }
+            }
         }
-        .card(rail: alive ? Khayt.hot : nil)
+        .card(rail: alive ? Khayt.hot : nil, padding: 10)
     }
 }
 

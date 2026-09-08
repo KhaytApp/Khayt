@@ -481,6 +481,7 @@ public actor KhaytEngine {
                         // no error — just no spool warnings, for ever.
                         + " inventory: ARG4,"
                         + " deduction: globalThis.KhaytOrderDeduction,"
+                        + " units: globalThis.KhaytInventoryUnits,"
                         + " attention: globalThis.KhaytAttention})",
                           [.array(orders), .array(machines), .object(settings),
                            .object(statusCache), .array(inventory)],

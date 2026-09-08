@@ -226,3 +226,35 @@ struct KhaytWatermark: View {
         .allowsHitTesting(false)
     }
 }
+
+
+/// How far through a print is, drawn as the layers it has laid.
+///
+/// ── THE APP DREW THIS AND PUT IT NOWHERE ──────────────────────────────────
+///
+/// `LayerLinesShape` has been in this file for months and appeared on exactly
+/// one surface: a picture in the snapshot runner that nothing shipped. Every
+/// progress figure a shop actually sees was a percentage or a `ProgressView` —
+/// the stock capsule, which is the same capsule in every app on the machine.
+///
+/// A print is not a bar filling up. It is layers going down, from the bed
+/// upward, and the shape already knew that. This is the two lines it takes to
+/// put it on a screen.
+struct LayerProgress: View {
+    /// 0…1.
+    let progress: Double
+    var tint: Color = Khayt.hot
+    var height: CGFloat = 18
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // The layers still to come, ghosted — so the bar has a length
+            // before it has a value, and a print at 4% is not a screen with
+            // almost nothing on it.
+            LayerLinesShape().fill(tint.opacity(0.15))
+            LayerLinesShape(progress: max(0, min(1, progress))).fill(tint)
+        }
+        .frame(height: height)
+        .accessibilityHidden(true)
+    }
+}

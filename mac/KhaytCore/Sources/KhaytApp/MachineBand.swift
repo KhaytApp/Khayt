@@ -86,7 +86,7 @@ struct MachineBandView: View {
     private var full: some View {
         VStack(spacing: 0) {
             header
-            Divider()
+            LayerRule()
             ticks
             if band.rows.count > Self.rowsBeforeScrolling {
                 ScrollView {
@@ -98,7 +98,7 @@ struct MachineBandView: View {
             } else {
                 rows
             }
-            Divider()
+            LayerRule()
             legend
         }
         .background(Khayt.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -108,7 +108,7 @@ struct MachineBandView: View {
 
     @ViewBuilder private var rows: some View {
         ForEach(band.rows) { row in
-            Divider()
+            LayerRule()
             Row(row: row, band: band, shop: shop, compact: compact, height: rowHeight,
                 nameWidth: nameWidth, freeWidth: freeWidth)
         }

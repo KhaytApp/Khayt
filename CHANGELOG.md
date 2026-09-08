@@ -34,6 +34,68 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The dashboard answers "what should I look at" instead of listing four
+  things.** Every section said its name in the same small grey capitals, so
+  "Needs attention" and "Money" carried identical weight. One section now leads
+  — at reading size, in the colour of what is wrong, with the count beside it —
+  and which one it is depends on the morning: with nothing wrong, the floor
+  leads instead.
+
+  The four figures about the floor were four separate cards, each with its own
+  border and padding, spending almost all their ink on the boxes. They are one
+  thing, so they are one card with a rule between each figure. The same for the
+  five about the period.
+
+  And "Invoices to chase" no longer repeats what the panel above already shows.
+  A late job is in both lists, and four of eight rows were four of the six rows
+  eight inches above them — one problem printed twice is not twice the warning.
+
+- **The jobs table shows twenty jobs where it showed twelve.** The name sat over
+  the order number on two lines, making every row 55 points tall on the screen a
+  shop lives in. One line now, and the stage is a coloured dot beside its word
+  rather than the same borrowed icon repeated down forty-two rows.
+
+- **The app's own colours, and a contrast guard that was asking the wrong
+  question.** The palette is warmer and deeper — a paper ground rather than a
+  near-white one, a warm line round every card instead of black at 9%, and a
+  real burnt orange for the one thing on the screen that is happening now.
+
+  The guard that is supposed to keep all of it legible was measuring every
+  colour against plain white and a system dark grey, neither of which this app
+  draws on. Made to ask about the three surfaces it actually uses, it failed
+  **ten** pairs on the palette as it then shipped — one of them at 2.56:1 where
+  3 is the floor for a graphical mark. Every colour is now solved against the
+  darkest thing it can sit on in light and the lightest in dark, and the two
+  that must never be confused — printing and overdue — are checked for being
+  tellable apart rather than assumed to be.
+
+- **Lists are ruled like layers instead of striped.** A stack of layers is
+  separated by lines, which is also the denser of the two: a ruled row can be
+  28pt where a striped one needs padding above and below the fill. Screens are
+  tighter throughout — a 900pt window shows four more jobs than it did.
+
+- **A print's progress is drawn as the layers it has laid.** The shape had been
+  in the app for months and reached exactly one surface: a picture in the
+  snapshot runner that nothing ships. The screen a shop actually leaves open was
+  using the same stock bar as every other app on the machine.
+
+- **Derived figures show their arithmetic.** "Average job 540.46" is a number
+  you either trust or you do not; `1,080.93 ÷ 2` underneath it is one you can
+  check while you read it.
+
+- **Khayt draws its own marks.** Counted before this: forty-one Apple symbols
+  and one file in the whole app that drew anything. `shippingbox` for the
+  filament shelf. `tray.full` for the jobs. `function` for the calculator,
+  `creditcard` for expenses. Every mark on every screen was somebody else's,
+  arranged by us — which is what "it looks generic" actually meant, and why
+  three rounds of better arrangement had not touched it.
+
+  Fifteen marks now, drawn on one 24-unit grid at one weight, and every one of
+  them a thing on this shop floor seen straight on or from above: a nozzle
+  laying a bead, layers stacking, a spool face on, a printer with a part on its
+  bed, a purge tower for the waste log, a caliper for the calculator. The one
+  exception is Clients, because a customer is a person.
+
 - **The shelf counts in the unit the thing is actually sold in.** An inventory
   item now says whether it is measured in grams, millilitres or sheets, and
   every screen that writes a quantity asks it. A bottle of resin used to read
@@ -1174,6 +1236,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: a rack with two sheets of acrylic on it reported "2 g".** The shelf
+  had learned to count in sheets and millilitres and the dashboard had not, so
+  it wrote the gram after every figure it showed.
+- **Fixed: a crash on quitting, when the menu bar item was on.** Nothing stopped
+  its clock, so it went on ticking on the main run loop while the app was being
+  taken apart around it — and each tick asked the Swift runtime a question about
+  machinery that was already going away. It stops when the app does now, and it
+  no longer needs to ask.
 - **Fixed: on an OctoPrint shop the menu bar said nothing was printing.** It
   asked whether a printer's state was exactly `printing`, and OctoPrint hands
   over the printer's own wording, which it capitalises — so the count was zero

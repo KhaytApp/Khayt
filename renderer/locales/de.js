@@ -3816,6 +3816,8 @@
   "scan.order_missing": "Dieser Auftrag wurde nicht gefunden.",
   "store.category_ph": "Kategorie",
   "store.sold_out": "Ausverkauft",
+  "store.stock_qty": "Auf Lager",
+  "store.stock_hint": "Wie viele fertig gedruckt und verpackt sind und heute versandt werden können. Leer lassen, wenn auf Bestellung gefertigt wird.",
   "store.lead_time": "Lieferzeit (optional)",
   "store.lead_ph": "z. B. 3–5 Tage",
   "store.min_order": "Mindestbestellung",

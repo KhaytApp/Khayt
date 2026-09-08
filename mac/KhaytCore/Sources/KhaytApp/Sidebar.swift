@@ -19,17 +19,17 @@ struct Sidebar: View {
                 // quantity worth printing. Seen in the running app — the row
                 // read "Dashboard 0" on a book with nothing late, which is the
                 // same thing that made Colour Studio look unfinished.
-                Row(title: shop.words.callIt("mac.dashboard"), symbol: "square.grid.2x2.fill",
+                Row(title: shop.words.callIt("mac.dashboard"), mark: .dashboard,
                     count: shop.attention.map(\.count).flatMap { $0 == 0 ? nil : $0 },
                     selected: shop.shelf == .dashboard,
                     tint: Khayt.attention)
                     .tag(Shop.Shelf.dashboard)
-                Row(title: shop.words.callIt("mac.all_jobs"), symbol: "tray.full", count: shop.orders.count,
+                Row(title: shop.words.callIt("mac.all_jobs"), mark: .jobs, count: shop.orders.count,
                     selected: shop.shelf == .jobs(nil))
                     .tag(Shop.Shelf.jobs(nil))
             }
             Section(shop.words.callIt("mac.pipeline")) {
-                Row(title: shop.words.callIt("mac.board"), symbol: "rectangle.split.3x1",
+                Row(title: shop.words.callIt("mac.board"), mark: .board,
                     count: shop.orders.count { Stage.of($0).map { $0 != .delivered && $0 != .cancelled } ?? false },
                     selected: shop.shelf == .board)
                     .tag(Shop.Shelf.board)
@@ -46,17 +46,17 @@ struct Sidebar: View {
             }
             // The floor: what the shop prints with and prints on.
             Section(shop.words.callIt("mac.the_floor")) {
-                Row(title: shop.words.callIt("mac.machines"), symbol: "printer",
+                Row(title: shop.words.callIt("mac.machines"), mark: .machines,
                     count: shop.machines.count, selected: shop.shelf == .machines)
                     .tag(Shop.Shelf.machines)
-                Row(title: shop.words.callIt("mac.inventory"), symbol: "shippingbox",
+                Row(title: shop.words.callIt("mac.inventory"), mark: .filament,
                     count: shop.spools.count, selected: shop.shelf == .inventory)
                     .tag(Shop.Shelf.inventory)
                 // Only for a shop that has one. A catalogue is a decision a
                 // shop makes, not a screen everybody needs, and an empty row
                 // on every launch is a row people stop seeing.
                 if !shop.catalogueRows.isEmpty {
-                    Row(title: shop.words.callIt("cat.title"), symbol: "tag",
+                    Row(title: shop.words.callIt("cat.title"), mark: .catalogue,
                         count: shop.catalogueRows.count, selected: shop.shelf == .catalogue)
                         .tag(Shop.Shelf.catalogue)
                 }
@@ -64,24 +64,24 @@ struct Sidebar: View {
                 // number of, and the row is about the spools listed above it.
                 // No count: "how many quotes" is not a thing a shop has a
                 // number of, and this screen keeps nothing.
-                Row(title: shop.words.callIt("mac.calc_title"), symbol: "function",
+                Row(title: shop.words.callIt("mac.calc_title"), mark: .calculator,
                     count: nil, selected: shop.shelf == .calculator)
                     .tag(Shop.Shelf.calculator)
-                Row(title: shop.words.callIt("cmix.title"), symbol: "paintpalette",
+                Row(title: shop.words.callIt("cmix.title"), mark: .colour,
                     count: nil, selected: shop.shelf == .colour)
                     .tag(Shop.Shelf.colour)
                 // Cards a shop has issued. Unlike the portfolio below, the row
                 // shows even at zero: this screen has an Issue button on it, so
                 // an empty one is where you go to make the first card rather
                 // than a dead end.
-                Row(title: shop.words.callIt("giftCards"), symbol: "giftcard",
+                Row(title: shop.words.callIt("giftCards"), mark: .giftCards,
                     count: shop.giftCards.count, selected: shop.shelf == .giftCards)
                     .tag(Shop.Shelf.giftCards)
                 // Only for a shop that has photographed something. A portfolio
                 // with nothing in it is a row that teaches people the app has
                 // an empty screen.
                 if !shop.snapshots.isEmpty {
-                    Row(title: shop.words.callIt("pf.title"), symbol: "photo.on.rectangle",
+                    Row(title: shop.words.callIt("pf.title"), mark: .portfolio,
                         count: shop.snapshots.count, selected: shop.shelf == .portfolio)
                         .tag(Shop.Shelf.portfolio)
                 }
@@ -90,19 +90,19 @@ struct Sidebar: View {
             // because both are read at the end of a month rather than during a
             // day's work.
             Section(shop.words.callIt("mac.money")) {
-                Row(title: shop.words.callIt("mac.nav_expenses"), symbol: "creditcard",
+                Row(title: shop.words.callIt("mac.nav_expenses"), mark: .expenses,
                     count: shop.expenses.count, selected: shop.shelf == .expenses)
                     .tag(Shop.Shelf.expenses)
-                Row(title: shop.words.callIt("mac.nav_waste"), symbol: "trash",
+                Row(title: shop.words.callIt("mac.nav_waste"), mark: .waste,
                     count: shop.wasteLog.count, selected: shop.shelf == .waste)
                     .tag(Shop.Shelf.waste)
                 // No count: a quarter is not a thing a shop has a number of.
-                Row(title: shop.words.callIt("mac.nav_reports"), symbol: "chart.bar.doc.horizontal",
+                Row(title: shop.words.callIt("mac.nav_reports"), mark: .reports,
                     count: nil, selected: shop.shelf == .reports)
                     .tag(Shop.Shelf.reports)
             }
             Section(shop.words.callIt("mac.people")) {
-                Row(title: shop.words.callIt("tab.clients"), symbol: "person.2", count: shop.customers.count,
+                Row(title: shop.words.callIt("tab.clients"), mark: .clients, count: shop.customers.count,
                     selected: shop.shelf == .customers)
                     .tag(Shop.Shelf.customers)
             }
@@ -111,7 +111,7 @@ struct Sidebar: View {
             // so the groups a shop has actually made are named here rather
             // than hidden behind a filter menu.
             Section(shop.words.callIt("mac.library")) {
-                Row(title: shop.words.callIt("mac.all_models"), symbol: "square.grid.2x2", count: shop.files.count,
+                Row(title: shop.words.callIt("mac.all_models"), mark: .library, count: shop.files.count,
                     selected: shop.shelf == .library(nil))
                     .tag(Shop.Shelf.library(nil))
                 ForEach(shop.groups, id: \.self) { group in
@@ -127,7 +127,12 @@ struct Sidebar: View {
 
     private struct Row: View {
         let title: String
-        let symbol: String
+        /// A mark this app draws. Nil on the pipeline stages, which still wear
+        /// Apple's — a stage is a state of work, not an object on the floor,
+        /// and drawing eight of those is a different piece of work from
+        /// drawing the shelves.
+        var mark: Mark?
+        var symbol: String = ""
         /// How many, or nil where the row is not a count of anything.
         ///
         /// This was an `Int` and three call sites passed 0 to mean "no count",
@@ -150,7 +155,17 @@ struct Sidebar: View {
                 // the palette cannot be checked — the snapshot runner captures
                 // this pane as a vibrancy alpha mask, so every pixel comes back
                 // black and no screenshot could show the mistake.
-                Label(title, systemImage: symbol)
+                // The app's own mark where it has one. `Label` is kept for the
+                // stages, so the two kinds of row still line up: a drawn mark
+                // is given the same 16pt box a symbol takes.
+                if let mark {
+                    HStack(spacing: 6) {
+                        Drawn(mark: mark, size: 16).frame(width: 18, alignment: .center)
+                        Text(title)
+                    }
+                } else {
+                    Label(title, systemImage: symbol)
+                }
                 Spacer(minLength: 8)
                 if let count {
                     // The coloured badge stands down on the selected row, for
