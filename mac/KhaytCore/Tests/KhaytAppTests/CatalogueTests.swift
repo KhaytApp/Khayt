@@ -100,6 +100,44 @@ struct CatalogueTests {
         }
     }
 
+    /// The reason a price is what it is has to READ, not just resolve.
+    ///
+    /// "Rounded from" is a prefix in all nine languages, and this screen showed
+    /// it with nothing after it — nineteen catalogue rows naming a figure they
+    /// never printed. `everyReasonIsTranslated` above passed throughout: the key
+    /// resolved to a word, and the word was half a sentence.
+    ///
+    /// So the test is not "is it translated" but "does it name the number".
+    @Test("a rounded price says which figure it was rounded from")
+    func roundedNamesTheBasePrice() async throws {
+        let engine = try KhaytEngine()
+        let words = Words()
+        await words.load("en", engine: engine)
+        let round = JSONValue.object(["step": .number(5), "mode": .string("up")])
+        let rows = try await engine.catalogue([
+            Self.product(["id": .string("moved"), "basePrice": .number(46.69),
+                          "priceRound": round]),
+            Self.product(["id": .string("unmoved"), "basePrice": .number(50),
+                          "priceRound": round]),
+            Self.product(["id": .string("typed"), "basePrice": .number(46.69),
+                          "priceOverride": .number(41), "priceRound": round]),
+        ], language: "en", settings: [:])
+        let line = Dictionary(uniqueKeysWithValues: rows.map {
+            ($0.id, Catalogue.reasonLine($0, words, currency: "SAR"))
+        })
+
+        // 46.69 rounded up to a step of 5 is 50, and the row must say where the
+        // 50 came from.
+        #expect(line["moved"]?.contains("46.69") == true,
+                "a rounded price does not name the calculated figure: \(line["moved"] ?? "")")
+        #expect(line["moved"]?.hasPrefix(words.callIt("pe.price_is_rounded")) == true)
+
+        // The other two are whole sentences already. Appending a figure to
+        // "Your own price" would print the price twice.
+        #expect(line["unmoved"] == words.callIt("pe.price_is_base"))
+        #expect(line["typed"] == words.callIt("pe.price_is_override"))
+    }
+
     // MARK: - What its parts add up to
 
     @Test("hours, grams and the materials come from the parts")

@@ -666,6 +666,19 @@ final class Activator: NSObject, NSApplicationDelegate {
                 await settle()
                 capture(named: "24-portfolio", into: dir)
             }
+            // THE TWO NOBODY HAD EVER SEEN. This harness wrote 56 pictures and
+            // neither of these was among them, so the calculator — the screen a
+            // shop prices a job on, which is the highest-stakes screen in the
+            // app — and the product catalogue had never been looked at once.
+            // A screen with no picture is a screen no review can reach.
+            shop.shelf = .calculator
+            await settle()
+            capture(named: "28-calculator", into: dir)
+
+            shop.shelf = .catalogue
+            await settle()
+            capture(named: "29-catalogue", into: dir)
+
             shop.shelf = .giftCards
             await settle()
             capture(named: "25-gift-cards", into: dir)
