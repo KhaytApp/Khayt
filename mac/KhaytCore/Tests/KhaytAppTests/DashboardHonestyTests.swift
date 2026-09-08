@@ -39,11 +39,20 @@ struct DashboardHonestyTests {
     /// answer to nothing. The label has to say what the number is.
     @Test func theFleetTileIsLabelledForWhatItCounts() {
         let words = Words()
-        let label = words.callIt("mac.machines")
-        #expect(label != "Machines",
+        #expect(words.callIt("mac.machines_online") != "Machines",
                 "the tile counts printers reporting, not machines the shop owns")
         for language in Words.supported {
-            #expect(Words.own["mac.machines"]?[language]?.isEmpty == false)
+            #expect(Words.own["mac.machines_online"]?[language]?.isEmpty == false)
         }
+    }
+
+    /// AND THE SHELF KEEPS ITS NAME. Renaming `mac.machines` for the tile's
+    /// sake renamed the sidebar row and the Go menu item with it, and the menu
+    /// came back reading "Online ⌘5" — which is not a place anyone navigates
+    /// to. The tile has its own key precisely so this cannot happen again.
+    @Test func theMachinesShelfIsStillCalledMachines() {
+        let words = Words()
+        #expect(words.callIt("mac.machines") == "Machines")
+        #expect(words.callIt("mac.machines") != words.callIt("mac.machines_online"))
     }
 }

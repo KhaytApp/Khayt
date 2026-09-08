@@ -992,6 +992,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: the dashboard tile renamed the sidebar with it.** Giving the fleet
+  tile an honest label changed `mac.machines`, which the Machines shelf and its
+  Go menu item also use — so the menu came back reading "Online ⌘5", which is
+  not a place anyone navigates to. The tile has its own key now, and a test
+  holds both.
+
 - **Fixed: every invoice printed the shop's name where its tagline and footer
   belong.** The document asks its host for four fields — the business name, the
   address, the tagline and the footer. This app answered two of them and

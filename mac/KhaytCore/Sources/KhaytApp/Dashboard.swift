@@ -319,7 +319,7 @@ private struct Work: View {
                      symbol: "exclamationmark.triangle",
                      tint: facts.lateCount > 0 ? Khayt.attention : Color.secondary)
                 Tile(value: "\(facts.fleet.live)/\(facts.fleet.total)",
-                     label: shop.words.callIt("mac.machines"),
+                     label: shop.words.callIt("mac.machines_online"),
                      symbol: "server.rack", tint: .secondary)
             }
         }
