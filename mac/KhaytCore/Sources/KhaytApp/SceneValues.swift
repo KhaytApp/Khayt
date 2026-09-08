@@ -27,7 +27,7 @@ extension FocusedValues {
     /// A request rather than a state: it goes true, the field takes focus, and
     /// the window sets it back. `searchFocused` is macOS 15, so on 14 this is
     /// simply never honoured and ⌘F does nothing — which is why the item is
-    /// disabled there rather than present and inert.
+    /// present and working, on every version this app runs on.
     var searchWanted: Binding<Bool>? {
         get { self[SearchWantedKey.self] }
         set { self[SearchWantedKey.self] = newValue }
@@ -36,26 +36,23 @@ extension FocusedValues {
 
 /// Puts the caret in the search field when `wanted` goes true.
 ///
-/// Wrapped in a modifier because `searchFocused` arrived in macOS 15 and this
-/// package still builds for 14: an `if #available` inside a view body changes
-/// the view's type, and a modifier is where that is allowed to happen.
+/// Still a modifier rather than being folded into the view: `@FocusState` has
+/// to live beside the `.searchFocused` that reads it, and a modifier is where
+/// that pairing stays together. It used to ALSO carry an `if #available` for
+/// macOS 15, which is what made the wrapper necessary rather than merely tidy.
 struct FocusSearchWhenAsked: ViewModifier {
     @Binding var wanted: Bool
     @FocusState private var focused: Bool
 
     func body(content: Content) -> some View {
-        if #available(macOS 15, *) {
-            content
-                .searchFocused($focused)
-                .onChange(of: wanted) {
-                    guard wanted else { return }
-                    focused = true
-                    // Put it back down, so asking twice in a row works.
-                    wanted = false
-                }
-        } else {
-            content
-        }
+        content
+            .searchFocused($focused)
+            .onChange(of: wanted) {
+                guard wanted else { return }
+                focused = true
+                // Put it back down, so asking twice in a row works.
+                wanted = false
+            }
     }
 }
 

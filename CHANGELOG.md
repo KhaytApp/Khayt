@@ -4,7 +4,58 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+### Before you update
+
+- **Your Profit & Loss will show a lower profit, and the old figure was wrong.**
+  Revenue no longer counts the VAT you collect on a sale, because that money is
+  not yours: ZATCA and IFRS 15 both treat tax collected from a customer as a
+  liability you hold until you remit it, never as income. The report was
+  subtracting only expenses from the full amount charged, so it counted the VAT
+  as profit.
+
+  On the sample shop that is 20,664.08 shown against 17,337.45 actually kept —
+  19% high, in exactly the figure you would look at to decide whether the
+  quarter made money. Your own numbers will move by the VAT you collected in
+  each quarter.
+
+  Nothing about what you charged or what you are owed changes, and neither does
+  a single invoice. **If your prices EXCLUDE VAT, nothing changes at all** —
+  your price is already the net figure. Khayt's export for your accountant has
+  always split it correctly, so this makes the app agree with the file your
+  accountant already had.
+
+  **And you can now record the VAT you PAY**, which Khayt has never asked for.
+  An expense has a box for the tax on the supplier's invoice — an amount, not a
+  rate, because rates differ line by line and an imported or exempt purchase
+  carries none. Enter it and that tax stops being a cost: it comes off the tax
+  you charged, and the P&L shows what you actually owe for the quarter, which is
+  the figure a return is filed on. It can be negative in a quarter you buy a
+  printer, and that is a real position.
+
+  **And the same for a spool.** What a roll cost you stays what it cost — that
+  is what left the bank — but what a JOB is costed at is the price without the
+  tax, because you get that tax back and charging it to a print understates
+  every margin you quote. So your material costs, and the margins built on them,
+  are measured against the same money your revenue is.
+
+  Every expense and every spool already in your book carries no tax figure and
+  reclaims nothing, so none of them changes until you enter one.
+
 ### Added
+
+- **The tax you pay on a purchase is money you get back, and Khayt can hold it
+  now.** A box on an expense for the VAT on the supplier's invoice. It comes off
+  the VAT you charged, so the quarterly report shows what you actually owe
+  rather than what you collected — and a quarter that bought a printer can show
+  the authority owing you. Only for a shop that is registered: one that cannot
+  reclaim is not asked.
+
+- **The Mac app needs macOS 26.** It asked for 14, which bought nothing: the Mac
+  build has always been Apple Silicon only, and every Apple Silicon Mac is
+  supported by 26. It was excluding no machine and charging for it in
+  workarounds — the VAT column below was written as a squeezed second line
+  because a conditional table column needs 14.4.
+
 
 - **The Mac app's tests run on a pull request.** Everything in CI ran on Linux,
   so for as long as the native app has existed none of its 705 tests had run on

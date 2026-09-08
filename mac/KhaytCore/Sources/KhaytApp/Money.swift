@@ -24,14 +24,16 @@ enum Money {
     /// ── ASKED, NOT ASSUMED ────────────────────────────────────────────────
     ///
     /// The mark was adopted in 2025 and the glyph arrived with a system font
-    /// after it. This package runs on macOS 14, where it is not there — and a
-    /// shop whose prices are empty boxes is worse served than one reading
-    /// "SAR", which is what it read yesterday and is not wrong, only older.
+    /// after it. macOS 26 draws it — measured, not assumed — but a shop whose
+    /// prices are empty boxes is worse served than one reading "SAR", which is
+    /// what it read yesterday and is not wrong, only older.
     ///
     /// So the question is put to CoreText once, on the face the app draws in,
     /// and the answer decides. There is no version check here on purpose: what
     /// matters is whether the glyph exists, and a font can arrive in a point
-    /// release that no `if #available` knows about.
+    /// release that no `if #available` knows about. That is why raising the
+    /// app's floor to macOS 26 changed nothing here: the question was never
+    /// which version this is.
     static let drawsTheRiyal: Bool = {
         let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         var chars = Array(riyal.utf16)
