@@ -1287,6 +1287,15 @@ final class Shop {
         return ""
     }
 
+    /// Whether this shop can reclaim the tax it pays on a purchase.
+    ///
+    /// A shop with no registration reclaims nothing, so asking it for the tax
+    /// on a receipt would be asking for a number it cannot use — and recording
+    /// one would understate its costs.
+    /// Read from the profile the settings load already resolved, so this asks
+    /// the same rule the invoice asks and gets the same answer.
+    var reclaimsTax: Bool { taxProfile?.isRegistered == true }
+
     /// The combined tax percentage, or zero for a shop that is not registered.
     func taxPercent() async -> Double {
         guard let engine, case .object(let dict) = settingsValue,

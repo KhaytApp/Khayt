@@ -314,7 +314,12 @@ test('every VAT figure is derived from the netted revenue', () => {
                                   creditNotes: [{ amount: 400 }] }],
                                [], { settings, now: new Date(2026, 8, 4) })[0];
   assert.equal(gross.vatCollected, 130.43);
-  assert.equal(credited.revenue, 600, 'the credit note reduces the sale');
+  // 521.74, not 600: revenue is also net of the TAX now (see the test below).
+  // What this one is about is the CREDIT NOTE, and the property it pins is that
+  // the credit reduces the tax as well as the sale — 78.26 rather than 130.43.
+  assert.equal(credited.revenue, 521.74, 'the credit note reduces the sale');
+  assert.equal(Math.round((credited.revenue + credited.vatCollected) * 100) / 100, 600,
+    'and the two together are what the customer was charged after the credit');
   assert.equal(credited.vatCollected, 78.26,
     'and the tax collected with it — VAT must follow the netted revenue, never the gross price');
 
@@ -375,4 +380,95 @@ test('a refund moves the margin it should', () => {
   const o = { price: 1000, costBasis: 600, creditNotes: [{ amount: 400 }] };
   assert.equal((o.price - o.costBasis) / o.price * 100, 40, 'the figure the chart used to show');
   assert.equal((netRev(o) - o.costBasis) / netRev(o) * 100, 0, 'the true margin');
+});
+
+test('the income statement books revenue NET OF TAX, in either pricing mode', () => {
+  // THE THIRD AXIS. This file already guards two questions about which figure
+  // "revenue" means — the gross price versus the credit-netted one. This is the
+  // one it did not ask: whether the tax is in it.
+  //
+  // ZATCA and IFRS 15 both treat tax collected on a sale as money held for the
+  // government. It is a liability until it is remitted and it is never income,
+  // so an income statement that counts it overstates profit by exactly the tax.
+  // Khayt's own accountant export has always split it (`vatSplit` in
+  // lib/accounting-export.js); the quarterly P&L did not, so the same book
+  // answered one way to the shop and another to its accountant.
+  //
+  // AND THE MODE DECIDES, which is the easy way to break it in the other
+  // direction: under `exclusive` the price a shop enters is ALREADY net and the
+  // tax is added on top, so subtracting again would understate every such
+  // shop's revenue.
+  require('../lib/business-scope.js');
+  require('../lib/order-money.js');
+  require('../lib/tax.js');
+  const { pnlByPeriod } = require('../lib/pnl-report.js');
+  const when = { now: new Date(2026, 8, 4) };
+  const order = [{ id: 'A', status: 'completed', date: '2026-08-10', price: 1150 }];
+  const rated = (mode) => ({
+    currency: 'SAR',
+    tax: { name: 'VAT', mode, registration: 'VAT No.', rates: [{ id: 'vat', label: 'VAT', percent: 15 }] },
+  });
+
+  const inclusive = pnlByPeriod(order, [], { settings: rated('inclusive'), ...when })[0];
+  assert.equal(inclusive.revenue, 1000, 'the tax comes out of an inclusive price');
+  assert.equal(inclusive.vatCollected, 150);
+  assert.equal(inclusive.net, 1000, 'and the net is the revenue, not the takings');
+
+  const exclusive = pnlByPeriod(order, [], { settings: rated('exclusive'), ...when })[0];
+  assert.equal(exclusive.revenue, 1150, 'an exclusive price IS the revenue — nothing to remove');
+  assert.equal(exclusive.vatCollected, 172.5, 'the tax is charged on top of it');
+  assert.equal(exclusive.net, 1150);
+
+  // A shop that is not registered has no tax to take out of anything.
+  const none = pnlByPeriod(order, [], { settings: { currency: 'SAR' }, ...when })[0];
+  assert.equal(none.revenue, 1150);
+  assert.equal(none.vatCollected, 0);
+
+  // And the figure the shop actually banked is still recoverable: revenue plus
+  // the tax it collected is what the customer was charged.
+  assert.equal(Math.round((inclusive.revenue + inclusive.vatCollected) * 100) / 100, 1150);
+});
+
+test('the P&L, the dashboard and the best lists report the SAME revenue', () => {
+  // Three surfaces answer "what did the shop earn", and until now two of them
+  // answered with the tax included. The figures a shop compares across screens
+  // have to be the same figure, so this asserts they agree rather than
+  // asserting each one separately against a number typed here.
+  require('../lib/business-scope.js');
+  require('../lib/order-money.js');
+  require('../lib/tax.js');
+  const { pnlByPeriod } = require('../lib/pnl-report.js');
+  const KpiRows = require('../lib/kpi-rows.js');
+  const Kpi = require('../lib/kpi.js');
+  const TopLists = require('../lib/top-lists.js');
+
+  const settings = {
+    currency: 'SAR',
+    tax: { name: 'VAT', mode: 'inclusive', registration: 'VAT No.', rates: [{ id: 'vat', label: 'VAT', percent: 15 }] },
+  };
+  const orders = [
+    { id: 'A', status: 'completed', date: '2026-08-10', price: 1150, clientId: 'C1' },
+    { id: 'B', status: 'completed', date: '2026-08-20', price: 2300, clientId: 'C1' },
+  ];
+  const clients = [{ id: 'C1', name: 'One Customer' }];
+  const CHARGED = 3450;
+  const NET = 3000;          // 3,450 inclusive of 15% is 3,000 plus 450 tax
+
+  const pnl = pnlByPeriod(orders, [], { settings, clients, now: new Date(2026, 8, 4) })[0];
+  assert.equal(pnl.revenue, NET, 'the P&L');
+  assert.equal(pnl.vatCollected, 450);
+
+  const rows = KpiRows.kpiRows({
+    orders, from: '2026-08-01', to: '2026-08-31', settings,
+    money: (o) => ({ revenue: +o.price || 0, cost: 0, outstanding: 0 }),
+  });
+  assert.equal(Kpi.computeKpis(rows).revenue, NET, 'the dashboard');
+
+  const top = TopLists.topClients(orders, { settings, clients });
+  assert.equal(Math.round(top[0].revenue * 100) / 100, NET, 'the best-customers list');
+
+  // And none of them is quietly reporting what the customer was charged.
+  assert.notEqual(pnl.revenue, CHARGED);
+  assert.equal(Math.round((pnl.revenue + pnl.vatCollected) * 100) / 100, CHARGED,
+    'which is still recoverable, as revenue plus the tax collected');
 });

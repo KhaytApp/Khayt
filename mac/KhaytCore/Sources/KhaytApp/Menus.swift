@@ -91,13 +91,13 @@ private struct FindCommand: View {
     var body: some View {
         Button(Words.upfront("mac.find")) { wanted?.wrappedValue = true }
             .keyboardShortcut("f")
-            // macOS 15 brought `searchFocused`; on 14 there is no way to move
-            // focus into a `.searchable` field, so the item says so by being
-            // unavailable rather than by doing nothing when chosen.
-            .disabled(wanted == nil || !supported)
+            // Enabled wherever a screen offers a search field. It used to be
+            // switched off on macOS 14 as well, because `searchFocused` arrived
+            // in 15 and there was no way to move focus into a `.searchable`
+            // field before it — so ⌘F was a menu item that could not work. The
+            // app's floor is 26 now and it always can.
+            .disabled(wanted == nil)
     }
-
-    private var supported: Bool { if #available(macOS 15, *) { true } else { false } }
 }
 
 /// Each menu's items, as a View so the focused value arrives and the enabled

@@ -2644,6 +2644,10 @@ private let KPI_SCRIPT = """
   var b = globalThis.KhaytKpiRows.bounds(ARG3);
   return globalThis.KhaytKpi.computeKpis(globalThis.KhaytKpiRows.kpiRows({
     orders: ARG0, from: b[0], to: b[1],
+    // So the rows come back with revenue NET OF TAX — the module resolves the
+    // profile from these settings and decides, rather than this host netting it
+    // its own way and drifting from the renderer.
+    settings: ARG2,
     money: function (o) {
       return {
         revenue: M.orderNetRevenueBase(o, ctx),

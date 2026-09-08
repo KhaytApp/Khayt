@@ -91,8 +91,37 @@ test('the module and the original agree over 4000 generated expense forms', () =
       locationId: pick(r, [undefined, '', 'L1']),
     };
     const ctx = { id: 'EXP-' + i, today: '2026-09-04' };
-    assert.deepEqual(E.newExpense(form, ctx), runOriginal(form, ctx), JSON.stringify(form));
+    const mine = E.newExpense(form, ctx);
+    const theirs = runOriginal(form, ctx);
+
+    // `vatAmount` IS NEW AND THE ORIGINAL HAS NO OPINION ABOUT IT. None of
+    // these forms carries one, so every record must come out with zero — an
+    // expense that says nothing about tax reclaims nothing, which is what every
+    // expense written before the field existed does. Removing it and comparing
+    // the rest keeps the parity proof for all seven fields that were there
+    // before; editing the ORIGINAL to add the field would prove nothing.
+    if (mine.expense) {
+      assert.equal(mine.expense.vatAmount, 0,
+                   `a form with no tax on it: ${JSON.stringify(form)}`);
+      const { vatAmount, ...rest } = mine.expense;
+      assert.deepEqual({ ...mine, expense: rest }, theirs, JSON.stringify(form));
+    } else {
+      assert.deepEqual(mine, theirs, JSON.stringify(form));
+    }
   }
+});
+
+test('the tax on a receipt is kept, clamped, and never invented', () => {
+  const ctx = { id: 'EXP-1', today: '2026-09-04' };
+  const of = (form) => E.newExpense({ amount: 100, ...form }, ctx).expense.vatAmount;
+  assert.equal(of({}), 0, 'absent is nothing, not a guess');
+  assert.equal(of({ vatAmount: 13.04 }), 13.04, 'what the supplier invoice says');
+  assert.equal(of({ vatAmount: '13.04' }), 13.04, 'typed into a form, so a string');
+  assert.equal(of({ vatAmount: 500 }), 100, 'never more tax than the receipt cost');
+  assert.equal(of({ vatAmount: -5 }), 0);
+  assert.equal(of({ vatAmount: 'abc' }), 0);
+  // And a bad tax figure must not stop somebody recording what they spent.
+  assert.equal(E.newExpense({ amount: 100, vatAmount: 'abc' }, ctx).refused, undefined);
 });
 
 test('nextDueDate agrees with the original across every month of four years', () => {

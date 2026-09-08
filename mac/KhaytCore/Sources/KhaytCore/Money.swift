@@ -379,7 +379,16 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// The fixed overhead charged to this period — pro-rated for the quarter
     /// in progress, so it is not billed a full quarter's rent on day three.
     public let fixed: Double
+    /// Tax charged on this quarter's sales — money held for the authority, and
+    /// the reason `revenue` above is net of it.
     public let vatCollected: Double
+    /// Tax the shop paid on its purchases and can reclaim. Only the expenses
+    /// that recorded one contribute; an expense entered before Khayt asked
+    /// carries none and reclaims nothing.
+    public let vatReclaimable: Double
+    /// What is actually owed for the quarter: charged less paid. NEGATIVE is a
+    /// real position — the quarter a shop buys a printer, the authority owes it.
+    public let vatDue: Double
     public let net: Double
     public var id: String { period }
 }

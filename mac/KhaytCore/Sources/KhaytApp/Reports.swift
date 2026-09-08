@@ -102,6 +102,29 @@ struct Reports: View {
                     .monospacedDigit().foregroundStyle(.secondary)
             }
             .width(min: 100, ideal: 130, max: 200)
+            // WHAT IS ACTUALLY OWED, in its own column beside what was charged.
+            // The tax a shop paid on its purchases comes off the tax it
+            // charged, and the difference is the figure a return is filed on.
+            //
+            // Shown only to a shop that reclaims anything: a column of zeros
+            // teaches people to stop reading the ones next to it. A conditional
+            // TableColumn needs macOS 14.4, which is why this was a second line
+            // squeezed into the column before — the app's floor is 26 now.
+            if shop.reclaimsTax {
+                TableColumn(shop.words.callIt("exp.vat_due"), value: \.vatDue) { r in
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text(Money.text(r.vatDue, shop.currency))
+                            .monospacedDigit()
+                        if r.vatReclaimable > 0 {
+                            Text("−\(Money.text(r.vatReclaimable, shop.currency))")
+                                .font(.caption).foregroundStyle(.tertiary)
+                                .help(shop.words.callIt("exp.vat_reclaimed"))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                .width(min: 100, ideal: 140, max: 220)
+            }
             TableColumn(shop.words.callIt("an.pnl_net"), value: \.net) { r in
                 Text(Money.text(r.net, shop.currency))
                     .font(.body.weight(.semibold)).monospacedDigit()

@@ -2719,6 +2719,9 @@ function openExecutiveSummary() {
     return KhaytKpiRows.kpiRows({
       orders: printLog || [],
       from, to,
+      // So the rows come back with revenue NET OF TAX — the module resolves the
+      // profile and decides, rather than each host netting it its own way.
+      settings: (typeof settings !== 'undefined' ? settings : null),
       locationId: locId,
       locationOf: (typeof orderLocationId === 'function') ? orderLocationId : null,
       money: (o) => ({

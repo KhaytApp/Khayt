@@ -18,6 +18,7 @@ struct ExpenseSheet: View {
     @State private var amount: Double = 0
     @State private var category = "filament"
     @State private var date = Date()
+    @State private var vatAmount: Double = 0
     @State private var note = ""
     @State private var orderId = ""
     @State private var recurring = ""
@@ -36,6 +37,33 @@ struct ExpenseSheet: View {
                             .focused($focused)
                             .onSubmit(commit)
                         Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
+                    }
+                }
+                // THE TAX ON THE RECEIPT, not a rate. A supplier's invoice
+                // states an amount, rates differ line by line, and an import or
+                // an exempt purchase carries none — so the shop copies the
+                // figure in front of it rather than answering a question about
+                // percentages. Left at zero it changes nothing, which is what
+                // every expense recorded before this one does.
+                //
+                // Only for a registered shop: one that cannot reclaim the tax
+                // has no use for the field, and every riyal on the receipt is
+                // its cost.
+                if shop.reclaimsTax {
+                    GridRow {
+                        Text(shop.words.callIt("exp.vat_paid")).foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            TextField("", value: $vatAmount,
+                                      format: .number.precision(.fractionLength(0...2)))
+                                .textFieldStyle(.roundedBorder).monospacedDigit()
+                            Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
+                        }
+                    }
+                    GridRow {
+                        Color.clear.frame(height: 0)
+                        Text(shop.words.callIt("exp.vat_paid_hint"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 GridRow {
@@ -97,6 +125,10 @@ struct ExpenseSheet: View {
         guard amount > 0 else { return }
         let input: [String: JSONValue] = [
             "amount": .number(amount),
+            // Never more than what was paid, and never negative: the rule
+            // clamps it too, but a figure typed here goes into the book and the
+            // book is read by two apps.
+            "vatAmount": .number(shop.reclaimsTax ? min(max(0, vatAmount), amount) : 0),
             "category": .string(category),
             "date": .string(Shop.today(date)),
             "note": .string(note),

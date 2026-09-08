@@ -10,7 +10,7 @@
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { newSpool, applyEdit, coloursFor } = require('../lib/spool-edit.js');
+const { newSpool, applyEdit, coloursFor, netCost } = require('../lib/spool-edit.js');
 
 const ORIGINAL_ADD = `
 function addInventoryItem() {
@@ -172,6 +172,13 @@ test('the module and the original agree over 3000 generated new spools', () => {
       assert.equal(made.spool.spoolWeight, made.spool.weight,
         'a new spool arrives at the weight it is bought with: ' + JSON.stringify(form));
       delete made.spool.spoolWeight;
+      // `vatAmount` is new for the same reason and set aside the same way. None
+      // of these forms carries one, so every spool must come out with zero — a
+      // roll that says nothing about tax reclaims nothing, which is what every
+      // spool bought before Khayt asked does.
+      assert.equal(made.spool.vatAmount, 0,
+        'a form with no tax on it: ' + JSON.stringify(form));
+      delete made.spool.vatAmount;
     }
     assert.deepEqual(made, original, JSON.stringify(form));
   }
@@ -298,4 +305,42 @@ test('a part-roll records the part-roll', () => {
 test('the original weight has the same one-gram floor', () => {
   assert.equal(newSpool({ material: 'PLA', weight: 0 }, {}).spool.spoolWeight, 1);
   assert.equal(newSpool({ material: 'PLA' }, {}).spool.spoolWeight, 1000, 'a kilo by default');
+});
+
+test('the tax on a roll is kept, clamped, and never added to a roll that has none', () => {
+  const ctx = { id: 'S1', today: '2026-09-08' };
+  const made = (form) => newSpool({ material: 'PLA', cost: 75, weight: 1000, ...form }, ctx).spool;
+
+  assert.equal(made({}).vatAmount, 0, 'absent is nothing, not a guess');
+  assert.equal(made({ vatAmount: 9.78 }).vatAmount, 9.78, 'what the supplier invoice says');
+  assert.equal(made({ vatAmount: 500 }).vatAmount, 75, 'never more tax than the roll cost');
+  assert.equal(made({ vatAmount: -1 }).vatAmount, 0);
+
+  // Lowering the price lowers the tax inside it — the invariant is that one can
+  // never exceed the other.
+  const rolled = { id: 'S1', material: 'PLA', cost: 75, weight: 1000, vatAmount: 9.78 };
+  applyEdit(rolled, { cost: 5 }, { today: '2026-09-08' });
+  assert.equal(rolled.cost, 5);
+  assert.equal(rolled.vatAmount, 5, 'the tax cannot survive larger than the price it sits in');
+
+  // But a roll bought before Khayt asked does not GAIN the field just because
+  // somebody retyped its price: that is a row changed for no reason.
+  const legacy = { id: 'S2', material: 'PLA', cost: 75, weight: 1000 };
+  applyEdit(legacy, { cost: 60 }, { today: '2026-09-08' });
+  assert.equal(legacy.cost, 60);
+  assert.equal('vatAmount' in legacy, false, 'no field appeared on a record that never had one');
+});
+
+test('what a roll costs a JOB is not what it cost the shop', () => {
+  // A registered shop reclaims the tax it paid, so the tax is not part of what
+  // a print consumes — charging it to the job would understate every margin the
+  // shop quotes. One that cannot reclaim spent every riyal of it.
+  const roll = { id: 'S1', cost: 75, vatAmount: 9.78 };
+  assert.equal(netCost(roll, true), 65.22, 'registered: the price without the tax');
+  assert.equal(netCost(roll, false), 75, 'not registered: the whole price is the cost');
+  assert.equal(netCost({ cost: 75 }, true), 75, 'a roll with no tax recorded reclaims none');
+  assert.equal(netCost({}, true), 0);
+  // And a nonsense figure can never make a roll look free or negative.
+  assert.equal(netCost({ cost: 75, vatAmount: 500 }, true), 0);
+  assert.equal(netCost({ cost: 75, vatAmount: -5 }, true), 75);
 });

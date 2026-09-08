@@ -218,9 +218,36 @@ function profileFromSettings(settings = {}) {
   };
 }
 
+/**
+ * What a price is worth as REVENUE, with the tax taken out of it.
+ *
+ * ZATCA and IFRS 15 agree and are not optional about it: tax collected on a sale
+ * is money held for the government, not income. It belongs on the balance sheet
+ * as a liability until it is remitted, and it must never appear in the profit
+ * and loss.
+ *
+ * MODE-AWARE, AND THAT IS THE WHOLE POINT. Under `inclusive` the price already
+ * contains the tax and this returns less than it was given; under `exclusive`
+ * the price IS the net figure and this returns it unchanged. A report that
+ * subtracts the tax unconditionally is wrong for half the world's shops in the
+ * opposite direction to the one it is trying to fix.
+ *
+ * A shop with no rates — not registered — has no tax to take out, and gets its
+ * own number back.
+ *
+ * @param {number} amount the price as the shop enters it
+ * @param {object} profile from `profileFromSettings`
+ */
+function netOfTax(amount, profile) {
+  const n = +amount || 0;
+  if (!profile || !Array.isArray(profile.rates) || !profile.rates.length) return n;
+  return computeTax(n, profile).subtotal;
+}
+
 const api = {
   MODES, DEFAULT_MODE, PRESETS, GENERIC,
   computeTax, grossFactor, normalizeRates, presetFor, profileFromSettings,
+  netOfTax,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

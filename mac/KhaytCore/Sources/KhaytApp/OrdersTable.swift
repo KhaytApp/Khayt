@@ -30,9 +30,9 @@ struct OrdersTable: View {
     /// columns to saying so on every row — on the book this app was written
     /// against, four of the six carried nothing at all.
     ///
-    /// HIDDEN, not removed. A conditional column would need macOS 14.4 and this
-    /// package targets 14.0, and hiding turns out to be the better answer
-    /// anyway: the column is in the header's own menu, so a shop that wants it
+    /// HIDDEN, not removed — and it stays that way now the app's floor is 26
+    /// and a conditional column is available. Hiding is the better answer on
+    /// its own merits: the column is in the header's own menu, so a shop that wants it
     /// back can have it and the choice sticks. Only ever done ONCE, the first
     /// time a book is opened — after that the customization is the shop's, and
     /// a screen that keeps re-hiding a column somebody deliberately showed is

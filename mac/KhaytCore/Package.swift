@@ -17,7 +17,22 @@ import PackageDescription
 /// What IS written in Swift: the store, the platform layer, and the interface.
 let package = Package(
     name: "KhaytCore",
-    platforms: [.macOS(.v14)],
+    // macOS 26, and NOT for the sake of the machine this is built on.
+    //
+    // Khayt's Mac build has always been arm64 only, so every Mac that can run
+    // it is Apple Silicon and every Apple Silicon Mac is supported by macOS 26.
+    // The floor therefore excludes no hardware at all — only somebody who has
+    // not updated. And the native app is unreleased, so there is nobody on an
+    // older one to strand: this is free today and expensive after the first
+    // shop installs it.
+    //
+    // It was .v14, inherited rather than chosen, and it was charging for that
+    // reach in availability workarounds — a conditional `TableColumn` needs
+    // 14.4, so a column that should have been three lines was written around.
+    // A STRING, because `.v26` does not exist in swift-tools-version 6.0 —
+    // the enum only knows the versions its own toolchain shipped with. The
+    // string initializer takes any version and means the same thing.
+    platforms: [.macOS("26.0")],
     products: [
         .library(name: "KhaytCore", targets: ["KhaytCore"]),
         .executable(name: "Khayt", targets: ["KhaytApp"]),

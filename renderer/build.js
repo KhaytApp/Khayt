@@ -1261,6 +1261,23 @@ async function deleteQuoteTemplate() {
   renderQuoteTemplates();
   toast(t('calc.tpl.deleted'), 'success');
 }
+/**
+ * What a spool costs a JOB, which is not what it cost the shop.
+ *
+ * A registered shop reclaims the tax it paid on the roll, so the tax is not
+ * part of what a print consumes and charging it to the job would understate
+ * every margin quoted from this form. A spool with no tax recorded — which is
+ * every spool bought before Khayt asked — costs what it cost.
+ */
+function spoolCostBasis(item) {
+  const profile = (typeof KhaytTax !== 'undefined' && typeof settings !== 'undefined')
+    ? KhaytTax.profileFromSettings(settings) : null;
+  const reclaims = !!(profile && profile.rates && profile.rates.length);
+  return (typeof KhaytSpoolEdit !== 'undefined' && KhaytSpoolEdit.netCost)
+    ? KhaytSpoolEdit.netCost(item, reclaims)
+    : (+item.cost || 0);
+}
+
 function populateFilamentDropdown() {
   const select = $('#filamentSelect');
   const previous = select.value;
@@ -1284,7 +1301,7 @@ function populateFilamentDropdown() {
    * valued every partly-used spool at full purchase cost") and
    * lib/po-audit.js:64. This dropdown was the one feeding it the wrong number. */
   select.innerHTML = inventory.map(item => `
-    <option value="${item.id}" data-cost="${item.cost}" data-weight="${Math.max(1, +item.spoolWeight || 1000)}" data-color="${escapeHtml(item.color || '#888888')}">
+    <option value="${item.id}" data-cost="${spoolCostBasis(item)}" data-weight="${Math.max(1, +item.spoolWeight || 1000)}" data-color="${escapeHtml(item.color || '#888888')}">
       ${escapeHtml(item.material)}${item.weight <= (item.reorderPoint ?? settings.lowStockThreshold) ? '  ⚠' : ''}
     </option>`).join('');
   if (inventory.find(i => i.id === previous)) {
