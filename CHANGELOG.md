@@ -1045,6 +1045,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: the product catalogue said "Rounded from" and never said from what.**
+  Nineteen of twenty rows carried a caption that names a figure and then stopped
+  before printing it, which is the one number that lets you tell a rounded price
+  from a calculated one. "Rounded from" is a prefix in all nine languages — the
+  desktop app has always completed it with the calculated price, and the Mac app
+  printed only the prefix. It reads "Rounded from 4,858.56 ﷼" now. A price you
+  typed yourself still says just "Your own price", because that is already a
+  whole sentence and appending a figure to it would state the price twice.
 - **Fixed: the first screen a new shop ever sees was eight zeros.** Revenue
   0.00, gross profit 0.00, margin 0.00%, average job 0.00, jobs 0, completed 0,
   on time "—", and then two thirds of an empty window. Every figure in that

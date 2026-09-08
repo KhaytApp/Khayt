@@ -45,8 +45,9 @@ struct Catalogue: View {
                     // WHY that number. A rounded price that matches the
                     // calculated one says "calculated", because saying
                     // "rounded" of a figure that did not move is noise.
-                    Text(shop.words.callIt(Self.reason(row)))
+                    Text(Self.reasonLine(row, shop.words, currency: shop.currency))
                         .font(.caption2).foregroundStyle(.tertiary)
+                        .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -92,6 +93,31 @@ struct Catalogue: View {
     /// disagree with itself later, and the copy that drifts is the one nobody
     /// is looking at.
     static func reason(_ row: KhaytEngine.CatalogueRow) -> String { row.reason }
+
+    /// That reason as a FINISHED line.
+    ///
+    /// ── A PREFIX IS NOT A SENTENCE ─────────────────────────────────────────
+    ///
+    /// `pe.price_is_rounded` is "Rounded from" — and it is "Gerundet von",
+    /// "Arrondi depuis", "مُقرَّب من" in the other eight. Every one of them is a
+    /// PREFIX that names a figure, and the Electron app supplies the figure:
+    /// `(${why} · ${fmtPrice(r.basePrice)})` in `renderer/inventory.js`.
+    ///
+    /// This app printed the prefix alone. The first time the catalogue was ever
+    /// photographed, nineteen of its twenty rows read "Rounded from" and
+    /// stopped — pointing at a number the screen never showed, and the one
+    /// figure a shop needs to tell a rounded price from a calculated one.
+    ///
+    /// `base` was already on the row. Only the sentence was missing.
+    static func reasonLine(_ row: KhaytEngine.CatalogueRow,
+                           _ words: Words, currency: String) -> String {
+        let said = words.callIt(row.reason)
+        // Only the rounding reason names another number. "Calculated" and
+        // "Your own price" are whole sentences, and appending a figure to
+        // either would state the price twice.
+        guard row.reason == "pe.price_is_rounded" else { return said }
+        return "\(said) \(Money.text(row.base, currency))"
+    }
 }
 
 extension KhaytEngine.CatalogueRow {
