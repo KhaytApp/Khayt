@@ -35,6 +35,15 @@ public actor KhaytEngine {
         "split-order",
         "business-scope",
         "order-progress",
+        // Which printer should take which job, and in what order.
+        //
+        // The Electron kanban has had this since 3.0 — `renderer/kanban.js`
+        // calls `proposeSchedule` for its "Suggest assignments" panel — and the
+        // Mac could not schedule at all, because this module was never in the
+        // list. The rule is 300 lines of tested, deterministic JavaScript with
+        // no `Date.now()` in it; the Mac gets the same answers by running the
+        // same file, not by growing a second scheduler.
+        "scheduling",
         "loyalty",
         // How long a nozzle lasts, and what wears it out.
         //
@@ -1527,6 +1536,48 @@ public actor KhaytEngine {
              .object(currencies), .string(language), .string(period),
              .number(now.timeIntervalSince1970 * 1000), .number(Double(limit))],
             as: TopLists.self)
+    }
+
+    /// Which machine should take which job — a PROPOSAL, never a move.
+    ///
+    /// `lib/scheduling.js` is assistive by design: it returns an assignment per
+    /// order and a reason for it, and writes nothing. Nothing here writes
+    /// either. The caller shows the proposal and applies it only when somebody
+    /// presses the button, which is the same contract the kanban has kept since
+    /// the feature shipped.
+    ///
+    /// `now` is injected rather than read inside the module, so a proposal is
+    /// reproducible and testable to the minute.
+    public func proposeSchedule(machines: [JSONValue], orders: [JSONValue],
+                                now: Date = Date()) throws -> SchedulePlan {
+        try runtime.call2(
+            "globalThis.KhaytScheduling.proposeSchedule(ARG0, ARG1, { now: ARG2 })",
+            [.array(machines), .array(orders), .number(now.timeIntervalSince1970 * 1000)],
+            as: SchedulePlan.self)
+    }
+
+    /// What the scheduler proposes, and what it could not place.
+    public struct SchedulePlan: Decodable, Sendable {
+        public let assignments: [Assignment]
+        public let unassignable: [Unplaceable]
+
+        public struct Assignment: Decodable, Sendable {
+            public let orderId: String
+            public let machineId: String
+            /// Where in that machine's queue, counting from zero.
+            public let position: Int
+            /// Minutes from now until this job would come off, given everything
+            /// already on that machine plus what is proposed ahead of it.
+            public let projectedFinishMins: Double
+            /// Why this machine — in the module's own words, so the reason a
+            /// shop reads is the reason the code used.
+            public let reason: String?
+        }
+
+        public struct Unplaceable: Decodable, Sendable {
+            public let orderId: String
+            public let reason: String?
+        }
     }
 
     /// The two lists, and one row of either.

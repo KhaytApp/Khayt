@@ -6,6 +6,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac can say which printer should take which job.** Khayt has had a
+  print-farm scheduler since 3.0 — it places waiting work by due date, material,
+  nozzle and how loaded each machine already is — and the Electron kanban has
+  used it all along. The Mac could not schedule at all, because the module was
+  never in its engine's list. Printers → Suggest assignments now proposes a
+  printer for every waiting job, with the reason beside it, and the jobs it
+  cannot place with the reason for that: "no compatible printer" against a resin
+  job is the app telling a shop what its fleet cannot do.
+
+  It proposes and stops there. Nothing moves until somebody presses Apply, which
+  is the contract the scheduler was written to and the one the kanban has kept.
+
+  Not a line of the scheduling is written in Swift: the Mac runs
+  `lib/scheduling.js`, and a differential test compares the whole proposal —
+  printer, queue position, projected finish and reason — against Node on the
+  same JSON.
+
+  One thing the Mac does that the Electron panel does not: it hands the
+  scheduler the work still to happen rather than only the unassigned jobs, so
+  each machine's queue is seeded with what is already on it. Given only the
+  unassigned rows the module sees every printer as empty and reports each job
+  finishing within minutes of now.
+
 - **The Mac can price a job without taking it.** A calculator, in the sidebar and
   at ⇧⌘K: a weight, a print time, how many, which spool and which printer, and it
   says what the work costs the shop and what to charge for it — with the four

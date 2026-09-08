@@ -124,6 +124,7 @@ struct ShopWindow: View {
         .sheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }
         .sheet(item: $shop.pendingQcFail) { QcFailSheet(shop: shop, subject: $0) }
         .sheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }
+        .sheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }
         .sheet(item: $shop.editingCustomer) { CustomerSheet(shop: shop, existing: $0) }
         .sheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
         .sheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }

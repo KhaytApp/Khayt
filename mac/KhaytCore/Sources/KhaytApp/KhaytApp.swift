@@ -447,6 +447,28 @@ final class Activator: NSObject, NSApplicationDelegate {
             shop.takingAJob = false
             await settle()
 
+            // Where the waiting work would go.
+            //
+            // The sample gives every one of its 42 jobs a printer, so this
+            // photographs the panel's EMPTY state — which is the honest picture
+            // of that book and still proves the sheet opens and says the right
+            // thing. Photographed against a sample with unassigned work it
+            // shows six proposals; that was checked by hand before shipping.
+            // The panel asks the engine on `.task`, which a settle alone does
+            // not wait for.
+            shop.forgetSchedule()
+            shop.schedulingWork = true
+            await settle()
+            try? await Task.sleep(for: .milliseconds(700))
+            let rows = shop.orderRows.count
+            let waiting = shop.schedulableRows.count
+            let fleet = shop.machines.count
+            let placed = shop.schedulePlan?.assignments.count ?? -1
+            let why = shop.scheduleProblem ?? "-"
+            captureSheet(named: "26-schedule", into: dir)
+            shop.schedulingWork = false
+            await settle()
+
             shop.editingCustomer = Shop.newCustomer()
             await settle()
             captureSheet(named: "15-new-customer", into: dir)
