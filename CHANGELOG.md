@@ -6,6 +6,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+
 - **The space bar answers the question too.** Pressing space on a `.3mf` in
   Finder shows the plate render large, with the printer, layer height, nozzle,
   material, infill and supports underneath — the same facts the library
@@ -991,6 +992,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: the settings screenshots were photographs of the menu bar icon.** The
+  snapshot harness found the Settings window by taking the first visible window
+  that was not the shop's — and since the menu bar arrived, the status item has
+  a window that is visible and is not the shop's. Six pictures of a 30×34 nozzle
+  glyph, written without complaint, for as long as the menu bar has existed.
+  It now requires a window big enough to be one somebody reads, and when it
+  finds none it says which windows were open instead of failing quietly.
+
 
 - **Two of ten models in one real library were filed under a picture of
   themselves from above.** Importing a 3MF took the largest `Metadata/*.png` in
