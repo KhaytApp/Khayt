@@ -1130,6 +1130,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: on an OctoPrint shop the menu bar said nothing was printing.** It
+  asked whether a printer's state was exactly `printing`, and OctoPrint hands
+  over the printer's own wording, which it capitalises — so the count was zero
+  and there was no "free in" time, while the machine beside it was demonstrably
+  printing. That is the precise disagreement between the book and the printers
+  that this part of the menu bar exists to settle. Four places in the app were
+  asking "is it printing" and two of them had forgotten to allow for the
+  printer's own capitalisation; all four now ask the same one.
 - **Fixed: a printer that had stopped looked exactly like a nozzle reminder.**
   The dashboard's attention panel colours a row red when something has actually
   failed and amber when something merely wants a person — and it decided which

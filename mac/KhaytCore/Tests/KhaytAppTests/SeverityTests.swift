@@ -200,3 +200,42 @@ struct AttentionCapTests {
                 "and the longest-late job leads the orders")
     }
 }
+
+/// "Is this printer printing" had four answers in this app.
+///
+/// `PrinterWatch.isPrinting` lowercases. So did the dashboard's live strip. The
+/// menu bar's two properties — how many machines are printing, and when the
+/// first one is free — compared `state == "printing"` exactly.
+///
+/// That is not pedantry: `lib/octoprint.js` passes the printer's OWN state text
+/// through untouched (`printer.state.text`), and OctoPrint capitalises it. So on
+/// an OctoPrint shop the menu bar counted zero machines printing and offered no
+/// finish time, while the machine beside it was demonstrably printing — the
+/// exact failure the property's own comment says it exists to prevent.
+@MainActor
+struct IsPrintingTests {
+
+    /// Every spelling a protocol in this repo can hand over.
+    @Test("the predicate accepts what the printers actually say")
+    func spellings() {
+        for said in ["printing", "Printing", "PRINTING", " printing"] {
+            #expect(PrinterWatch.isPrinting(said.trimmingCharacters(in: .whitespaces)),
+                    "'\(said)' is a printer saying it is printing")
+        }
+    }
+
+    @Test("and nothing else")
+    func notEverythingElse() {
+        for said in ["idle", "Operational", "paused", "Paused", "error", "", "Unknown"] {
+            #expect(!PrinterWatch.isPrinting(said), "'\(said)' is not printing")
+        }
+    }
+
+    /// `Paused` matters on its own: a paused machine is not being made on, and
+    /// counting it would put a number in the menu bar that nothing is behind.
+    @Test("a paused machine is not a printing one")
+    func pausedIsNotPrinting() {
+        #expect(!PrinterWatch.isPrinting("Paused"))
+        #expect(!PrinterWatch.isPrinting("paused"))
+    }
+}

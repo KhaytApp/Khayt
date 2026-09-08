@@ -449,8 +449,11 @@ private struct RunningNow: View {
 
     private var running: [(Machine, KhaytEngine.PrinterStatus)] {
         shop.machines.compactMap { machine in
+            // The one predicate, not a fourth spelling of it. This file, the
+            // machine card and two properties on `Shop` each had their own,
+            // and two of the four forgot to lowercase.
             guard let status = shop.printers.readings[machine.id]?.status,
-                  status.state.lowercased() == "printing" else { return nil }
+                  PrinterWatch.isPrinting(status.state) else { return nil }
             return (machine, status)
         }
     }

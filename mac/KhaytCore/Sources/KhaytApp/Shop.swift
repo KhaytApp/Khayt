@@ -1680,7 +1680,13 @@ final class Shop {
     /// is still "printing" in a book nobody has touched since.
     var printingNow: Int {
         machines.reduce(into: 0) { count, machine in
-            if printers.readings[machine.id]?.status?.state == "printing" { count += 1 }
+            // `PrinterWatch.isPrinting`, not `== "printing"`. OctoPrint passes
+            // the printer's own `state.text` through untouched and OctoPrint
+            // capitalises it — so an exact comparison counted zero on every
+            // OctoPrint shop, and the menu bar this property exists for said
+            // "nothing is printing" while the machine was printing.
+            if let state = printers.readings[machine.id]?.status?.state,
+               PrinterWatch.isPrinting(state) { count += 1 }
         }
     }
 
@@ -1688,7 +1694,7 @@ final class Shop {
     var soonestFinish: Double? {
         machines.compactMap { machine -> Double? in
             guard let status = printers.readings[machine.id]?.status,
-                  status.state == "printing",
+                  PrinterWatch.isPrinting(status.state),
                   let left = status.timeRemaining, left > 0 else { return nil }
             return left
         }.min()
