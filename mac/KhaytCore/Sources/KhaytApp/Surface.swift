@@ -129,6 +129,36 @@ extension Khayt {
         let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         return isDark ? NSColor(white: 1, alpha: 0.10) : NSColor(white: 0, alpha: 0.09)
     })
+
+    /// The bare part of a spool, where the filament no longer reaches.
+    ///
+    /// ── WHY NOT `ground` ──────────────────────────────────────────────────
+    ///
+    /// It was `ground`, which is a shade BELOW `surface` in both appearances —
+    /// correct for a screen background, wrong for a shape drawn on a card. In
+    /// dark appearance the empty flange came out at `#141518` against a
+    /// `#1D1F24` card: two near-blacks, so an 86%-full black spool read as
+    /// emptier than a 12%-full grey one. Exactly backwards, and invisible in
+    /// light appearance where the same two tones are far enough apart to look
+    /// deliberate.
+    ///
+    /// So this one goes the OTHER way in dark: an empty spool is a lighter
+    /// object than the card it sits on, because that is the only direction
+    /// with room in it.
+    static let bareSpool = adaptive(light: 0xE7E3DC, dark: 0x33373F, name: "khaytBareSpool")
+
+    /// The edge of a drawn object, as opposed to the edge of a card.
+    ///
+    /// `hairline` is deliberately almost invisible; a shape needs more than
+    /// that or a black spool on a dark card has no outline at all. Roughly
+    /// double, and it goes white in dark appearance rather than staying black —
+    /// which is the whole bug: `.black.opacity(0.14)` was doing nothing in dark
+    /// appearance, so the one comment promising a black spool would not be "a
+    /// black hole" was describing light mode only.
+    static let drawnEdge = Color(nsColor: NSColor(name: NSColor.Name("khaytDrawnEdge")) { appearance in
+        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        return isDark ? NSColor(white: 1, alpha: 0.30) : NSColor(white: 0, alpha: 0.16)
+    })
 }
 
 /// A figure the shop reads before it reads anything else.

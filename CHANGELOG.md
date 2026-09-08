@@ -326,6 +326,25 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **A spool on the shelf is drawn wound to what is actually left in it.** The
+  picture was full on every card: a roll down to its last 120 g looked exactly
+  like an untouched kilo, with a number underneath saying otherwise — so the
+  biggest thing on the card, the one your eye lands on from across the workshop,
+  was the one part of it that was not true. Filament sits between the hub and the
+  flange and the wound diameter shrinks as it goes, so that is what happens here:
+  the flange stays, the colour winds down toward the hub, and a nearly-empty
+  spool looks nearly empty. A spool bought before Khayt recorded what it weighed
+  new keeps the ring it always had, because a guess drawn confidently is worse
+  than a picture that only tells you the colour.
+
+- **Fixed: in dark mode a black spool had no edge at all.** The outline meant to
+  stop "a black spool being a black hole" was a black line at 14% — which does
+  nothing on a dark card, so the whole thing had only ever been true in light
+  mode. With the winding above it got worse: an 86%-full black spool read as
+  emptier than a 12%-full grey one, exactly backwards. Drawn shapes have their
+  own edge tone now that goes white in dark appearance, and the bare part of a
+  spool is a tone that stays clear of the card in both.
+
 - **The sample shop is a shop now, not twenty rows of the same row.** If you open
   Khayt without your own book you get a made-up Riyadh shop to look around, and
   it was answering more or less every question the same way. All twenty of its
