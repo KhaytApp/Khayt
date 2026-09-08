@@ -119,7 +119,11 @@ cat > "$EXT/Contents/Info.plist" <<EXTPLIST
 </dict>
 </plist>
 EXTPLIST
-cat > "$EXT/entitlements.plist" <<'EXTENTS'
+# OUTSIDE the bundle. Written into it — even into the bundle root — codesign
+# refuses the whole appex with "unsealed contents present in the bundle root",
+# because anything inside a bundle has to be part of what is sealed.
+EXT_ENTS="$PKG/.build/thumbnail.entitlements"
+cat > "$EXT_ENTS" <<'EXTENTS'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -258,13 +262,17 @@ pick_identity() {
 IDENTITY="$(pick_identity)"
 
 # INSIDE OUT: a bundle's signature covers what is within it, so the extension is
-# signed first and the app's signature seals that in. The entitlements file is
-# consumed here and then removed — it is an input to the signature, not part of
-# what ships.
-codesign --force --sign "$IDENTITY" --timestamp=none \
-  --entitlements "$EXT/entitlements.plist" "$EXT" >/dev/null 2>&1 \
-  || { echo "codesign failed for the extension"; exit 1; }
-rm -f "$EXT/entitlements.plist"
+# signed first and the app's signature seals that in.
+# The output is captured rather than thrown away, because codesign's refusals
+# are specific and the reason is the whole message: an entitlements file written
+# INSIDE the bundle gets "unsealed contents present in the bundle root", which
+# says exactly what is wrong and says nothing at all down /dev/null.
+if ! EXT_SIGN_ERR="$(codesign --force --sign "$IDENTITY" --timestamp=none \
+      --entitlements "$EXT_ENTS" "$EXT" 2>&1)"; then
+  echo "codesign failed for the extension:"
+  echo "$EXT_SIGN_ERR" | sed 's/^/  /'
+  exit 1
+fi
 
 codesign --force --sign "$IDENTITY" --timestamp=none "$APP" >/dev/null 2>&1 \
   || { echo "codesign failed (identity: $IDENTITY)"; exit 1; }
