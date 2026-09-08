@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **macOS knows what a .3mf is.** It did not: `mdls` on one of this shop's models
+  reported a `dyn.*` placeholder, which is what a type nobody has declared looks
+  like — no kind, no icon, ten identical blank pages in a Finder window, each one
+  a different model. Khayt declares the type now, so a 3MF has a name and an icon
+  in Finder, in Open dialogs and in Spotlight. It does not claim to OPEN them:
+  the slicers keep that, and double-clicking one still opens the slicer it always
+  did.
+
 - **The floor is in the menu bar.** A print runs for eleven hours; nobody keeps a
   shop-management window open for eleven hours to answer *is it still going, and
   when is the printer free?* The nozzle in the menu bar carries the number of
@@ -918,6 +926,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+
+- **Two of ten models in one real library were filed under a picture of
+  themselves from above.** Importing a 3MF took the largest `Metadata/*.png` in
+  the archive, and a slicer writes several: the plate render, a small copy of it,
+  an unlit version, a top-down plan view and a colour-coded mask it uses for
+  hit-testing. On flat models the plan view compresses badly enough to be the
+  biggest file — 111 KB against the plate's 56 KB — so the plan view won. The
+  rule picks by name now, with the reason for every exclusion written next to it,
+  and it is pinned by the real member lists out of those files.
 
 - **When the Mac app crashes, it now reliably says why — and that is checked by
   crashing it.** macOS reports an uncaught Objective-C exception with a backtrace

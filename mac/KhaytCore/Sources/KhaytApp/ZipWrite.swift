@@ -1,5 +1,6 @@
 import Foundation
 import Compression
+import KhaytCore
 
 /// Writing a zip, which is what a 3MF is.
 ///

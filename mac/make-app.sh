@@ -126,6 +126,34 @@ cat > "$APP/Contents/Info.plist" <<PLIST
       <key>UTTypeDescription</key><string>Khayt job</string>
       <key>UTTypeConformsTo</key><array><string>public.data</string></array>
     </dict>
+    <!-- WHAT A .3mf IS. macOS does not know: mdls on one of this shop's
+         models reports a dyn.* placeholder, which is what a type nobody has
+         declared looks like. No icon, no preview, no kind.
+
+         NO BACKTICKS IN THIS HEREDOC. It is unquoted so that $VERSION expands,
+         which means the shell also runs anything in backticks — a prose comment
+         mentioning a command substituted that command's help text into the
+         plist, silently, and it took a lint to notice.
+
+         EXPORTED rather than imported, which is the uncomfortable half. An
+         imported declaration says "somebody else owns this type and here is
+         what I know about it", and that would be the honest shape — except
+         nobody has declared one. The 3MF Consortium publishes the format and
+         not a UTI, and neither OrcaSlicer nor Bambu Studio declares one, which
+         is why a Mac with both installed still shows a blank page. So this
+         declares its own, in this app's namespace rather than in Microsoft's
+         or the consortium's, and it will sit quietly beside a real one if a
+         real one ever arrives. -->
+    <dict>
+      <key>UTTypeIdentifier</key><string>app.khayt.mac.three-mf</string>
+      <key>UTTypeDescription</key><string>3D Manufacturing Format</string>
+      <key>UTTypeConformsTo</key><array><string>public.data</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>3mf</string></array>
+        <key>public.mime-type</key><array><string>model/3mf</string></array>
+      </dict>
+    </dict>
   </array>
 </dict>
 </plist>
