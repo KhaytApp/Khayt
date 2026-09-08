@@ -82,6 +82,28 @@ test('a published item is priced from the catalogue, not from a second form', ()
     'a truthy check would treat a deliberate zero as unpriced');
 });
 
+test('the stock box the dialog draws is the one the save reads', () => {
+  /* The cheapest way for this feature to do nothing at all.
+   *
+   * The row markup and the capture are ~130 lines apart and joined only by a
+   * class name. Rename one and the input still renders, the shop still types a
+   * number, Save still succeeds — and querySelectorAll finds nothing, so the
+   * count is silently never published. No error, no test failure, and the shop
+   * discovers it when a customer is quoted a print lead time on something in a
+   * box.
+   *
+   * No Electron here, so this cannot click the field; it can at least insist
+   * the two halves still name the same thing.
+   */
+  assert.match(SETTINGS, /<input class="sfStock"/, 'the dialog must draw the box');
+  assert.match(SETTINGS, /querySelectorAll\('\.sfStock'\)/, 'and the save must read it');
+
+  // The dirty flag is likewise a name shared across the two, and it decides
+  // whether a count is re-dated at all.
+  assert.match(SETTINGS, /inp\.dataset\.counted = '1'/, 'touching the box must mark it');
+  assert.match(SETTINGS, /inp\.dataset\.counted === '1'/, 'and the save must read that mark');
+});
+
 test('a batch count of zero survives every hop, because zero is a state', () => {
   /* The one number in this payload where 0 is meaningful and every neighbour's
    * 0 is not.
