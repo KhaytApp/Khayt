@@ -28,6 +28,17 @@ struct Machines: View {
         }
         .toolbar {
             ToolbarItem {
+                // Only where there is something to place. A button that always
+                // opens a panel saying "nothing to assign" is a button that
+                // teaches a shop to stop pressing it.
+                Button(shop.words.callIt("sched.suggest_btn"),
+                       systemImage: "wand.and.stars") {
+                    shop.forgetSchedule()
+                    shop.schedulingWork = true
+                }
+                .disabled(shop.schedulableRows.isEmpty || shop.machines.isEmpty)
+            }
+            ToolbarItem {
                 Button(shop.words.callIt("mach.add"), systemImage: "plus") { shop.addingMachine = true }
                     .disabled(!shop.canMoveJobs)
             }

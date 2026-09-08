@@ -1594,6 +1594,154 @@ final class Shop {
     /// carry the reason.
     private(set) var lastCrash: String?
 
+    // MARK: - Which printer takes which job
+
+    /// Whether the proposal panel is up.
+    var schedulingWork = false
+
+    /// The scheduler's proposal, or nil when nobody has asked for one.
+    ///
+    /// Held rather than recomputed on every redraw, because it is a PROPOSAL: a
+    /// panel whose rows changed underneath the person reading them would be a
+    /// panel nobody could approve.
+    private(set) var schedulePlan: KhaytEngine.SchedulePlan?
+    /// Why there is no proposal, in the shop's own words.
+    private(set) var scheduleProblem: String?
+    /// How many jobs the last apply moved.
+    private(set) var scheduleApplied: Int?
+
+    /// The jobs a scheduler is allowed to place: waiting, and on no machine yet.
+    ///
+    /// The same filter the Electron kanban uses. A job already on a printer is
+    /// left alone — the scheduler seeds each machine's load with it, but never
+    /// proposes moving work somebody has already committed.
+    var schedulableRows: [JSONValue] { Self.schedulable(orderRows) }
+
+    /// Static and separate so it can be tested without opening a book — the
+    /// version that lived inline returned nothing against a sample where six
+    /// jobs plainly qualified, and there was no way to ask it why.
+    /// What the scheduler should be HANDED: every job still to happen.
+    ///
+    /// Three sets were candidates and only this one is right.
+    ///
+    /// * Just the unassigned jobs — what the Electron kanban passes — makes
+    ///   `machineLoadMins` see every printer as empty, so each proposal comes
+    ///   back finishing in minutes. That is where "0.1 hrs" came from.
+    /// * The whole book seeds the load correctly for in-flight work and then
+    ///   adds thirteen delivered and nine completed jobs to it, because
+    ///   `machineLoadMins` sums by `machineId` without looking at status. A
+    ///   printer that has done a hundred jobs would look booked for a month.
+    /// * The work still to happen — waiting, queued, printing — seeds each
+    ///   machine with what is actually on it and nothing else. `isSchedulable`
+    ///   then refuses anything already on a printer, so the proposal covers the
+    ///   same jobs either way; only the finishing times change, and they become
+    ///   true.
+    static func stillToHappen(_ rows: [JSONValue]) -> [JSONValue] {
+        rows.filter { row in
+            guard case .object(let o) = row else { return false }
+            let status = plainString(o["status"]) ?? ""
+            return status == "pending" || status == "queued" || status == "printing"
+        }
+    }
+
+    static func schedulable(_ rows: [JSONValue]) -> [JSONValue] {
+        rows.filter { row in
+            guard case .object(let o) = row else { return false }
+            let status = plainString(o["status"]) ?? ""
+            guard status == "pending" || status == "queued" else { return false }
+            return (plainString(o["machineId"]) ?? "").isEmpty
+        }
+    }
+
+    /// Ask the shared scheduler where the unassigned work should go.
+    ///
+    /// Reads only. `lib/scheduling.js` writes nothing and neither does this;
+    /// `applySchedule` is the one that touches the book.
+    func proposeSchedule() async {
+        scheduleProblem = nil
+        scheduleApplied = nil
+        schedulePlan = nil
+        guard let engine else {
+            scheduleProblem = words.callIt("mac.move_no_engine"); return
+        }
+        let waiting = schedulableRows
+        guard !waiting.isEmpty else {
+            scheduleProblem = words.callIt("sched.none_to_assign"); return
+        }
+        do {
+            // Everything still to happen — see `stillToHappen`. Not just the
+            // waiting jobs, or every printer looks empty and every proposal
+            // comes back finishing in minutes.
+            schedulePlan = try await engine.proposeSchedule(
+                machines: machineRows, orders: Self.stillToHappen(orderRows), now: Date())
+        } catch {
+            scheduleProblem = String(describing: error)
+        }
+    }
+
+    /// Put the proposal into the book. The only part of this that writes.
+    ///
+    /// Each assignment sets one job's `machineId` and nothing else — not its
+    /// status, not its queue position. The scheduler proposes a printer; moving
+    /// the card is still the operator's.
+    func applySchedule() async {
+        guard let plan = schedulePlan, !plan.assignments.isEmpty else { return }
+        guard let build = source.build else {
+            scheduleProblem = words.callIt("mac.move_sample"); return
+        }
+        let wanted = Dictionary(plan.assignments.map { ($0.orderId, $0.machineId) },
+                                uniquingKeysWith: { first, _ in first })
+        var moved = 0
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                // Read INSIDE the write: the book on disk may have moved since
+                // the proposal was drawn, and a job somebody assigned by hand in
+                // the meantime must not be overwritten by a stale suggestion.
+                let orders = Self.rows(root, "printLog")
+                var out: [JSONValue] = []
+                out.reserveCapacity(orders.count)
+                for row in orders {
+                    guard case .object(var o) = row,
+                          let id = Self.plainString(o["id"]),
+                          let machine = wanted[id],
+                          (Self.plainString(o["machineId"]) ?? "").isEmpty else {
+                        out.append(row); continue
+                    }
+                    o["machineId"] = .string(machine)
+                    out.append(.object(o))
+                    moved += 1
+                }
+                root["printLog"] = .array(out)
+            }
+            scheduleApplied = moved
+            schedulePlan = nil
+            await load(source)
+        } catch let refusal as StoreWriter.Refusal {
+            scheduleProblem = refusal.description
+        } catch {
+            scheduleProblem = String(describing: error)
+        }
+    }
+
+    /// Put the proposal out of mind.
+    func forgetSchedule() {
+        schedulePlan = nil
+        scheduleProblem = nil
+        scheduleApplied = nil
+    }
+
+    /// What a proposal row says, ready for a screen: the job, the printer, and
+    /// the module's own reason.
+    func scheduleRow(_ a: KhaytEngine.SchedulePlan.Assignment) -> (job: String, machine: String, why: String) {
+        let job = orders.first { $0.id == a.orderId }?.project ?? a.orderId
+        let machine = machines.first { $0.id == a.machineId }?.name ?? a.machineId
+        return (job, machine, a.reason ?? "")
+    }
+
     /// Take a backup now, for the shop that is about to do something it might
     /// want to undo.
     ///
