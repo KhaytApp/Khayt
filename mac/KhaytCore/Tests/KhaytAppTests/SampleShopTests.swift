@@ -210,6 +210,37 @@ extension SampleShopTests {
         #expect(kinds.values.contains { $0.polled })
     }
 
+    /// The shelf was six spools of filament, so no screen had ever drawn a
+    /// quantity in anything but grams — and every one of them wrote the gram
+    /// after the number by hand.
+    @Test("the sample shelf holds more than filament")
+    func moreThanGrams() async throws {
+        let rows = try Self.rows("inventory").map { JSONValue.object($0) }
+        let units = try await KhaytEngine().inventoryUnits(rows, settings: [:])
+        let seen = Set(units.values.map(\.unit))
+        #expect(seen.contains("g"))
+        #expect(seen.count >= 3,
+                "one unit on the shelf draws one version of every stock screen: \(seen.sorted())")
+        // Each measure prices in its own denominator, which is the one place
+        // the gram assumption was load bearing rather than cosmetic.
+        let rates = Set(units.values.map(\.rateKey))
+        #expect(rates.count >= 3, "every item priced per kilo: \(rates.sorted())")
+    }
+
+    /// Low means something different per unit, and the shelf has to be able to
+    /// show that: two sheets left is low, and 180 g of the same number is not.
+    @Test("something on the sample shelf is low in a unit that is not grams")
+    func lowInAnotherUnit() async throws {
+        let rows = try Self.rows("inventory").map { JSONValue.object($0) }
+        let units = try await KhaytEngine().inventoryUnits(rows, settings: [:])
+        let lowNonGram = try Self.rows("inventory").contains { item in
+            guard case .string(let id)? = item["id"], let u = units[id], u.unit != "g",
+                  case .number(let left)? = item["weight"] else { return false }
+            return left <= u.low
+        }
+        #expect(lowNonGram, "nothing exercises a threshold that is not the gram one")
+    }
+
     @Test("every machine in the sample shop says which kind it is")
     func everyMachineSaysSo() throws {
         for m in try Self.rows("machines") {

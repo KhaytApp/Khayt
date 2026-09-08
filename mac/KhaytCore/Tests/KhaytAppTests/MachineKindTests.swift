@@ -132,3 +132,122 @@ struct MachineKindTests {
         #expect(en.callIt("mac.band_not_asked") != en.callIt("mac.band_unknown"))
     }
 }
+
+/// What an inventory item is counted in.
+///
+/// Every quantity on every screen was written `"\(Int(x)) g"` because grams
+/// were the only thing anything could be recorded in. A bottle of resin said
+/// "500 g" and a stack of plywood said "6 g".
+@MainActor
+struct InventoryUnitTests {
+
+    static func item(_ id: String, unit: String? = nil,
+                     cost: Double? = nil, held: Double? = nil,
+                     left: Double? = nil) -> JSONValue {
+        var row: [String: JSONValue] = ["id": .string(id), "material": .string(id)]
+        if let unit { row["unit"] = .string(unit) }
+        if let cost { row["cost"] = .number(cost) }
+        if let held { row["spoolWeight"] = .number(held) }
+        if let left { row["weight"] = .number(left) }
+        return .object(row)
+    }
+
+    static func units(_ items: [JSONValue],
+                      settings: [String: JSONValue] = [:]) async throws -> [String: KhaytEngine.InventoryUnit] {
+        try await KhaytEngine().inventoryUnits(items, settings: settings)
+    }
+
+    @Test("an item with no unit crosses back as grams")
+    func absentIsGrams() async throws {
+        let u = try await Self.units([Self.item("A")])
+        #expect(u["A"]?.unit == "g")
+        #expect(u["A"]?.measure == "mass")
+        #expect(u["A"]?.low == 200, "and at exactly the threshold it always had")
+    }
+
+    /// The one place the gram assumption was load bearing rather than cosmetic.
+    @Test("a price is quoted per kilo, per litre or per sheet — never all three")
+    func theDenominator() async throws {
+        let u = try await Self.units([
+            Self.item("spool", unit: "g", cost: 75, held: 1000),
+            Self.item("bottle", unit: "ml", cost: 180, held: 500),
+            Self.item("ply", unit: "sheet", cost: 240, held: 10),
+        ])
+        #expect(u["spool"]?.rate == 75)
+        #expect(u["spool"]?.rateKey == "unit.per_kg")
+        // 180 for half a litre is 360 a litre. The old `costPerKilo` answered
+        // 360 too, and called it a kilo.
+        #expect(u["bottle"]?.rate == 360)
+        #expect(u["bottle"]?.rateKey == "unit.per_L")
+        #expect(u["ply"]?.rate == 24)
+        #expect(u["ply"]?.rateKey == "unit.per_sheet")
+    }
+
+    @Test("an item with no record of what it held has no rate, rather than a climbing one")
+    func noRateWithoutTheOriginal() async throws {
+        let u = try await Self.units([Self.item("old", unit: "g", cost: 75, left: 300)])
+        #expect(u["old"]?.rate == nil,
+                "a rate from what is LEFT climbs as the item empties, worst just before reorder")
+    }
+
+    @Test("low means something different per unit")
+    func lowPerUnit() async throws {
+        let u = try await Self.units([
+            Self.item("spool", unit: "g"), Self.item("bottle", unit: "ml"),
+            Self.item("ply", unit: "sheet"),
+        ])
+        #expect(u["spool"]?.low == 200)
+        #expect(u["bottle"]?.low == 150)
+        #expect(u["ply"]?.low == 2, "200 sheets is not low stock, it is a warehouse")
+    }
+
+    @Test("the shop's own threshold is a gram figure and reaches only grams")
+    func shopThresholdIsGrams() async throws {
+        let u = try await Self.units([
+            Self.item("spool", unit: "g"), Self.item("ply", unit: "sheet"),
+        ], settings: ["lowStockThreshold": .number(500)])
+        #expect(u["spool"]?.low == 500)
+        #expect(u["ply"]?.low == 2, "a shop that types 500 means grams, not sheets")
+    }
+
+    @Test("half a sheet is a real thing to have left; half a gram is not")
+    func decimals() async throws {
+        let u = try await Self.units([Self.item("g", unit: "g"), Self.item("s", unit: "sheet")])
+        #expect(u["g"]?.decimals == 0)
+        #expect(u["s"]?.decimals == 1)
+    }
+
+    @Test("every unit has both its words, in both languages")
+    func everyWord() async throws {
+        let engine = try KhaytEngine()
+        let choices = try await engine.inventoryUnitChoices()
+        #expect(choices.map(\.unit) == ["g", "ml", "sheet"])
+        let en = Words(); await en.load("en", engine: engine)
+        let ar = Words(); await ar.load("ar", engine: engine)
+        for choice in choices {
+            for key in [choice.unitKey, choice.rateKey, "inv.unit_\(choice.unit)"] {
+                #expect(en.callIt(key) != key, "\(choice.unit): \(key) has no English")
+                #expect(ar.callIt(key) != key, "\(choice.unit): \(key) has no Arabic")
+            }
+        }
+        // The word after a quantity and the word after a slash are not the
+        // same word: "6 sheets", but "24.00 / sheet".
+        let sheet = try #require(choices.first { $0.unit == "sheet" })
+        #expect(en.callIt(sheet.unitKey) != en.callIt(sheet.rateKey))
+    }
+
+    @Test("a quantity is written in the unit the item is counted in")
+    func quantitiesAreSaidRight() async throws {
+        let engine = try KhaytEngine()
+        let words = Words(); await words.load("en", engine: engine)
+        let u = try await Self.units([
+            Self.item("g", unit: "g"), Self.item("ml", unit: "ml"), Self.item("s", unit: "sheet"),
+        ])
+        #expect(Quantity.say(940, u["g"], words) == "940 g")
+        #expect(Quantity.say(340, u["ml"], words) == "340 ml")
+        #expect(Quantity.say(6, u["s"], words) == "6 sheets")
+        #expect(Quantity.say(2.5, u["s"], words) == "2.5 sheets", "half a sheet survives")
+        #expect(Quantity.say(940, nil, words).hasSuffix(words.callIt("common.grams")),
+                "before the book loads, a quantity is grams — which every old one is")
+    }
+}

@@ -103,7 +103,12 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
     let materialType: String?
     let lot: String?
     let purchasedAt: String?
-    /// Warn below this many grams; reorder this many.
+    /// What this item is counted in — `g`, `ml`, `sheet`. Absent is grams;
+    /// `lib/inventory-units.js` decides that and this is the raw field. Prefer
+    /// `Shop.unit(of:)`, which knows about a unit a newer Khayt may have
+    /// written and this does not.
+    let unit: String?
+    /// Warn below this many — IN THE UNIT ABOVE. Reorder this many.
     let reorderPoint: Double?
     let reorderQty: Double?
     let printTemp: Double?

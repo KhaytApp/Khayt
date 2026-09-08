@@ -317,7 +317,17 @@ final class Words {
         "mach.wear_tube":      ["en": "Laser tube", "ar": "أنبوب الليزر"],
         "mach.wear_lens":      ["en": "Lens",       "ar": "العدسة"],
         "mach.wear_bit":       ["en": "Cutting bit", "ar": "لقمة القطع"],
+        // Units an item is counted in, and what a price is quoted per.
         "unit.g":      ["en": "g",      "ar": "غ"],
+        // What a price is quoted PER. Singular, and a separate key from the
+        // word after a quantity — "6 sheets" but "24.00 / sheet".
+        "unit.per_kg":    ["en": "kg",    "ar": "كغ"],
+        "unit.per_L":     ["en": "L",     "ar": "لتر"],
+        "unit.per_sheet": ["en": "sheet", "ar": "لوح"],
+        "inv.unit":    ["en": "Counted in", "ar": "الوحدة"],
+        "inv.unit_g":     ["en": "Grams — filament", "ar": "غرامات — خيط"],
+        "inv.unit_ml":    ["en": "Millilitres — resin or ink", "ar": "مليلترات — راتنج أو حبر"],
+        "inv.unit_sheet": ["en": "Sheets — board or acrylic", "ar": "ألواح — خشب أو أكريليك"],
         "unit.ml":     ["en": "ml",     "ar": "مل"],
         "unit.sheet":  ["en": "sheets", "ar": "لوح"],
         "unit.prints": ["en": "prints", "ar": "طبعة"],

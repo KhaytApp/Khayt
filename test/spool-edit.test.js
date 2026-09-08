@@ -344,3 +344,31 @@ test('what a roll costs a JOB is not what it cost the shop', () => {
   assert.equal(netCost({ cost: 75, vatAmount: 500 }, true), 0);
   assert.equal(netCost({ cost: 75, vatAmount: -5 }, true), 75);
 });
+
+// ── What an item is counted in ─────────────────────────────────────────────
+
+require('../lib/inventory-units.js');
+
+test('a shelf row can be told it is millilitres', () => {
+  const spool = { id: 'S1', material: 'Resin' };
+  KhaytSpoolEdit.applyEdit(spool, { unit: 'ml' }, {});
+  assert.equal(spool.unit, 'ml');
+});
+
+test('a unit the vocabulary does not know is refused where it is WRITTEN', () => {
+  const spool = { id: 'S1', material: 'Ply' };
+  KhaytSpoolEdit.applyEdit(spool, { unit: 'board-feet' }, {});
+  assert.equal(spool.unit, 'g', 'stored once, an unknown unit reads back as grams for ever');
+});
+
+test('editing a price does not turn a bottle of resin into a spool of filament', () => {
+  const spool = { id: 'S1', material: 'Resin', unit: 'ml' };
+  KhaytSpoolEdit.applyEdit(spool, { cost: 180 }, {});
+  assert.equal(spool.unit, 'ml');
+});
+
+test('an item written before this field existed is left without one', () => {
+  const spool = { id: 'S1', material: 'PLA' };
+  KhaytSpoolEdit.applyEdit(spool, { cost: 75 }, {});
+  assert.equal('unit' in spool, false, 'and the module reads that as grams, which it is');
+});

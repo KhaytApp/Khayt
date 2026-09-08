@@ -67,7 +67,21 @@
   function isLowStock(item, settings) {
     if (!item) return false;
     const s = ctxOf(settings);
-    const threshold = item.reorderPoint ?? s.lowStockThreshold ?? DEFAULT_LOW_STOCK;
+    /* The threshold is in the item's OWN unit.
+     *
+     * 200 is a sensible last spool of filament and absurd for sheet goods,
+     * where two left is the moment to order. `KhaytInventoryUnits` knows which,
+     * and — this is the part that must not change — it answers 200 for grams
+     * and honours the shop's own `lowStockThreshold` there, so no item in any
+     * existing book moves. Every item that exists is in grams.
+     *
+     * Asked through the global rather than required, like every other
+     * cross-module reach in this file. Without it loaded the old line stands,
+     * which is correct for the only unit that existed when it was written. */
+    const U = (typeof global !== 'undefined') && global.KhaytInventoryUnits;
+    const threshold = U
+      ? U.lowThreshold(item, s)
+      : (item.reorderPoint ?? s.lowStockThreshold ?? DEFAULT_LOW_STOCK);
     return (+item.weight || 0) <= threshold;
   }
 

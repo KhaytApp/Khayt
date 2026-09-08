@@ -143,6 +143,11 @@ public actor KhaytEngine {
         // a completion that silently failed to deduct would leave a shop
         // ordering filament it does not have.
         "order-deduction",
+        // What an inventory item is COUNTED IN — grams of filament,
+        // millilitres of resin, sheets of ply. Loaded before anything that
+        // asks whether an item is low, because the threshold is in the item's
+        // own unit.
+        "inventory-units",
         // What KIND of machine this is — filament, resin, UV flatbed, laser,
         // CNC — and what follows: what it consumes, what wears out on it, and
         // whether any protocol in this repo can ask it anything. Loaded early
@@ -1949,6 +1954,71 @@ public actor KhaytEngine {
         public let final: Double
         /// `override`, `rounded` or `base`.
         public let source: String
+    }
+
+    // MARK: - What an item is counted in
+
+    /// Every inventory item's unit and what follows from it, keyed by item id.
+    ///
+    /// One call per book, like `machineKinds`. The module decides — including
+    /// that an item with no unit is genuinely grams rather than an unknown, and
+    /// that a unit this build has not learned reads as grams rather than
+    /// dropping the row off the shelf.
+    public func inventoryUnits(_ items: [JSONValue],
+                               settings: [String: JSONValue]) throws -> [String: InventoryUnit] {
+        try runtime.call2("""
+            (function (rows, settings) {
+              var out = {};
+              rows.forEach(function (item) {
+                var unit = KhaytInventoryUnits.unitOf(item);
+                var spec = KhaytInventoryUnits.spec(unit);
+                var keys = KhaytInventoryUnits.keysFor(unit);
+                var rate = KhaytInventoryUnits.costPerRateUnit(
+                  item && item.cost, item && item.spoolWeight, unit);
+                out[String((item && item.id) || '')] = {
+                  unit: unit, unitKey: keys.unit, rateKey: keys.rate,
+                  measure: spec.measure, decimals: spec.decimals,
+                  low: KhaytInventoryUnits.lowThreshold(item, settings),
+                  rate: rate ? rate.value : null
+                };
+              });
+              return out;
+            })(ARG0, ARG1)
+            """, [.array(items), .object(settings)], as: [String: InventoryUnit].self)
+    }
+
+    /// The units a shop can choose from, for the picker.
+    public func inventoryUnitChoices() throws -> [InventoryUnit] {
+        try runtime.call2("""
+            KhaytInventoryUnits.UNITS.map(function (unit) {
+              var spec = KhaytInventoryUnits.spec(unit), keys = KhaytInventoryUnits.keysFor(unit);
+              return {unit: unit, unitKey: keys.unit, rateKey: keys.rate,
+                      measure: spec.measure, decimals: spec.decimals,
+                      low: spec.low, rate: null};
+            })
+            """, [], as: [InventoryUnit].self)
+    }
+
+    public struct InventoryUnit: Decodable, Sendable, Hashable, Identifiable {
+        /// `g` | `ml` | `sheet`
+        public let unit: String
+        public let unitKey: String
+        /// What a price is quoted PER — `kg`, `L`, `sheet`. This is the one
+        /// place the gram assumption was load bearing rather than cosmetic:
+        /// `costPerKilo` on a bottle of resin answered in the wrong
+        /// denominator and called it a kilo.
+        public let rateKey: String
+        /// `mass` | `volume` | `count`
+        public let measure: String
+        /// How many decimals a quantity is worth writing. Half a sheet is real;
+        /// half a gram is not.
+        public let decimals: Int
+        /// What counts as low, in this item's own unit.
+        public let low: Double
+        /// What one `rate` unit of it cost, or nil where that is not knowable —
+        /// it needs what the item held when it ARRIVED, never what is left.
+        public let rate: Double?
+        public var id: String { unit }
     }
 
     // MARK: - What kind of machine this is

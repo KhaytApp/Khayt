@@ -34,6 +34,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The shelf counts in the unit the thing is actually sold in.** An inventory
+  item now says whether it is measured in grams, millilitres or sheets, and
+  every screen that writes a quantity asks it. A bottle of resin used to read
+  "500 g" and a stack of plywood "6 g", because grams were the only thing
+  anything could be recorded in.
+
+  The part that was genuinely wrong rather than just badly worded is the price:
+  Khayt worked out what a KILO of an item cost, so a 500 ml bottle at 180 came
+  out as "360.00 / kg" — a real figure about a different quantity, wearing the
+  wrong name. Filament is priced per kilo, resin per litre and sheet goods per
+  sheet now.
+
+  So is "low". 200 is a sensible last spool of filament and absurd for sheet
+  goods, where two left is the moment to order — under the old single threshold
+  a rack with two sheets on it looked fully stocked. **Nothing changes for
+  filament:** the gram threshold is still 200, your own setting still applies to
+  it, and every item already in your book is in grams and is read as one.
+
 - **Khayt knows there are other machines than filament printers.** A machine now
   says what kind it is — filament printer, resin printer, UV flatbed, laser
   cutter or CNC router — and the app stops describing all five as the first one.

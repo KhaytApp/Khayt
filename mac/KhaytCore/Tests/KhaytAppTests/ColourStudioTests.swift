@@ -226,8 +226,12 @@ struct SampleBookShowsTheAppTests {
                 """)
         #expect(coloured.count >= 4, "too few to make a ranked list worth looking at")
 
+        // The limit is the SHELF, not the eight this shop happened to have when
+        // this was written: the assertion is that every coloured row can be
+        // ranked, and a cap smaller than the shelf makes it a test of the cap.
         let ranked = try await #require(shop.engine)
-            .nearestFilaments(to: "#2E6F9E", among: shop.inventoryRows, limit: 8)
+            .nearestFilaments(to: "#2E6F9E", among: shop.inventoryRows,
+                              limit: shop.inventoryRows.count)
         #expect(ranked.count == coloured.count, "the raw rows the screen reads carry no colour")
         // Spread out, or every answer is a tie and the ranking teaches nothing.
         #expect((ranked.last?.deltaE ?? 0) - (ranked.first?.deltaE ?? 0) > 20,
@@ -259,11 +263,31 @@ struct SampleBookShowsTheAppTests {
     func shelfShowsLow() async throws {
         let shop = try await Self.shop()
         let low = shop.spools.filter { shop.lowSpools[$0.id] == true }
-        #expect(low.count == 1, "\(low.count) low spools — the shelf cannot show its warning")
-        // Under the shared rule's default threshold, and visibly so.
-        #expect((low.first?.weight ?? 999) < 200)
-        // And the rest are not, or every card would wear the warning.
-        #expect(shop.lowSpools.values.filter { $0 }.count == 1)
+        #expect(!low.isEmpty, "no low item — the shelf cannot show its warning")
+        // Under the shared rule's default threshold, and visibly so. The
+        // FILAMENT one, which is what this test was written about and the only
+        // kind of item the shelf held when it was.
+        let lowFilament = low.filter { shop.unit(of: $0)?.unit ?? "g" == "g" }
+        #expect(lowFilament.count == 1)
+        #expect((lowFilament.first?.weight ?? 999) < 200)
+        // And most are not, or every card would wear the warning.
+        #expect(shop.lowSpools.values.filter { $0 }.count < shop.spools.count / 2)
+    }
+
+    /// The delta, pinned separately: "low" now means something different per
+    /// unit, and the shelf has to be able to draw that. Two sheets left is low
+    /// and 180 g of the same number is not — under the old single gram
+    /// threshold the acrylic would have looked fully stocked at two sheets.
+    @Test("low means something different on the sheet rack than on the spool shelf")
+    func lowIsPerUnit() async throws {
+        let shop = try await Self.shop()
+        let sheets = shop.spools.filter { shop.unit(of: $0)?.unit == "sheet" }
+        #expect(!sheets.isEmpty, "nothing on the shelf is counted in sheets")
+        let lowSheets = sheets.filter { shop.lowSpools[$0.id] == true }
+        #expect(!lowSheets.isEmpty,
+                "no sheet stock is low, so the per-unit threshold is never drawn")
+        // And it is low at a figure the gram rule would have called plenty.
+        #expect((lowSheets.first?.weight ?? 999) < 200)
     }
 
     @Test("the sample shop has photographs, so the portfolio is a portfolio")

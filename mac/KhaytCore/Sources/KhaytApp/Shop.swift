@@ -327,6 +327,10 @@ final class Shop {
             // bodies, so a hop into JavaScript per machine per redraw would be
             // a hop for a constant.
             machineKinds = (try? await engine?.machineKinds(machineRows)) ?? [:]
+            // And what each shelf row is counted in. Same reason: read in view
+            // bodies, and a constant per item per redraw is a hop for nothing.
+            inventoryUnits = (try? await engine?.inventoryUnits(
+                inventoryRows, settings: settingsDict)) ?? [:]
             // What each model's licence permits, asked once for the library:
             // the inspector shows it for the selected model and the grid does
             // not, so a hop per row would be a hop for nothing.
@@ -1275,6 +1279,20 @@ final class Shop {
     /// that as FDM — correctly, because until now nothing else could be
     /// recorded. The fallback here is for the moment before the book loads.
     func kind(of machine: Machine) -> KhaytEngine.MachineKind? { machineKinds[machine.id] }
+
+    /// What each shelf row is counted in, keyed by item id.
+    /// `lib/inventory-units.js` decides; this holds the answer.
+    private(set) var inventoryUnits: [String: KhaytEngine.InventoryUnit] = [:]
+
+    /// What this spool, bottle or stack of sheets is measured in. Nil only for
+    /// the instant before the book has loaded; every caller reads that as grams,
+    /// which every item written before this existed genuinely is.
+    func unit(of spool: Spool) -> KhaytEngine.InventoryUnit? { inventoryUnits[spool.id] }
+
+    /// The units the editor can offer.
+    func inventoryUnitChoices() async -> [KhaytEngine.InventoryUnit] {
+        (try? await engine?.inventoryUnitChoices()) ?? []
+    }
 
     /// The kinds the editor can offer. Asked when the sheet opens rather than
     /// held on the shop: it is five records and the sheet is not a hot path.
