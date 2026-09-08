@@ -532,8 +532,23 @@ final class Activator: NSObject, NSApplicationDelegate {
             }
 
             // The Settings window: opened the way ⌘, opens it, one picture per
-            // pane. It is its own window, so it is found by not being the shop's.
+            // pane.
+            //
+            // "NOT THE SHOP'S WINDOW" IS NOT ENOUGH TO FIND IT. The menu bar's
+            // NSStatusItem has a window too, and it is visible and it is not the
+            // main one — so `first(where:)` found it and six settings pictures
+            // were 30×34 photographs of the nozzle glyph for as long as the menu
+            // bar has existed. Nothing failed: the harness wrote six PNGs and
+            // said so.
             let main = NSApp.windows.first { $0.isVisible && $0.contentView != nil }
+            /// A window big enough to be a window somebody reads, which the
+            /// status item's 30×34 is not.
+            func settingsWindow() -> NSWindow? {
+                NSApp.windows.first {
+                    $0.isVisible && $0 !== main && $0.contentView != nil
+                        && $0.frame.width >= 300 && $0.frame.height >= 300
+                }
+            }
             // Through the menu item ⌘, is bound to, whatever selector SwiftUI
             // gave it this release — sending `showSettingsWindow:` by name
             // opened nothing.
@@ -542,7 +557,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             }
             await settle()
             try? await Task.sleep(for: .seconds(1))
-            if let settings = NSApp.windows.first(where: { $0.isVisible && $0 !== main && $0.contentView != nil }) {
+            if let settings = settingsWindow() {
                 for pane in SettingsPane.allCases {
                     shop.settingsPane = pane
                     await settle()
@@ -551,7 +566,12 @@ final class Activator: NSObject, NSApplicationDelegate {
                 settings.close()
                 await settle()
             } else {
-                FileHandle.standardError.write(Data("no settings window to capture\n".utf8))
+                // Loudly, and with what WAS open: a silent miss here is how the
+                // nozzle glyph got photographed six times.
+                let open = NSApp.windows.filter(\.isVisible)
+                    .map { "\(type(of: $0)) \(Int($0.frame.width))x\(Int($0.frame.height))" }
+                FileHandle.standardError.write(Data(
+                    "no settings window to capture — open: \(open.joined(separator: ", "))\n".utf8))
             }
 
             // What the shop spent and what it wasted. The sample, because this
