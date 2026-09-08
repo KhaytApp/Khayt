@@ -489,6 +489,20 @@ private struct MoneyTiles: View {
                             .monospacedDigit()
                         Text(shop.words.callIt("mac.margin").lowercased())
                             .foregroundStyle(.secondary)
+                        // THE DIVISOR, BESIDE THE FIGURE IT DIVIDES.
+                        //
+                        // Every number in this section is over COMPLETED rows —
+                        // revenue, cost, margin, the average, on-time — and the
+                        // "Jobs" tile below is over every row in the period. So
+                        // the screen showed 1,243.08 revenue, 4 jobs and a
+                        // 621.54 average, and the obvious arithmetic gives
+                        // 310.77. Both figures were right and together they
+                        // were not: `avgOrderValue` divides by the count that
+                        // is now printed here.
+                        Text("·").foregroundStyle(.tertiary)
+                        Text(shop.words.counting(k.completedCount, "mac.jobs_word"))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
                     }
                     .font(.callout)
                     .lineLimit(1)

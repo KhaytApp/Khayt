@@ -539,7 +539,12 @@ final class Words {
                               "ar": "تظهر هنا البكرات المضافة في خيط."],
         "mac.needs_attention": ["en": "Needs attention", "ar": "يحتاج انتباهك"],
         "mac.the_floor":     ["en": "The floor",       "ar": "الورشة"],
-        "mac.machines":      ["en": "Machines",        "ar": "الطابعات"],
+        // "Machines 0/3" beside "Printing 5" reads as a contradiction, because
+        // it is one: the number counts printers ANSWERING ON THE NETWORK
+        // (`fleet.live`), not machines with work on them. A shop with three
+        // printers all busy and none of them networked saw "Printing 5" and
+        // "Machines 0/3" side by side under one heading.
+        "mac.machines":      ["en": "Online",          "ar": "متصلة"],
         "mac.revenue":       ["en": "Revenue",         "ar": "الإيراد"],
         "mac.margin":        ["en": "Margin",          "ar": "هامش الربح"],
         "mac.avg_order":     ["en": "Average job",     "ar": "متوسط العمل"],
