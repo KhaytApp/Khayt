@@ -75,11 +75,21 @@
   function revenueOf(order, ctx) {
     const M = money();
     if (!M || typeof M.orderNetRevenueBase !== 'function') return 0;
+    const settings = (ctx && ctx.settings) || {};
     const value = M.orderNetRevenueBase(order, {
-      settings: (ctx && ctx.settings) || {},
+      settings,
       clients: (ctx && ctx.clients) || [],
     }, (ctx && ctx.currencies) || null);
-    return Number.isFinite(+value) ? +value : 0;
+    const charged = Number.isFinite(+value) ? +value : 0;
+    // NET OF TAX, like every other place that says "revenue". Tax collected on
+    // a sale belongs to the government, so a list of best customers ranked and
+    // TOTALLED by revenue must not count it. The order of the list barely moves
+    // — one rate divides everything alike — but the figures beside the names
+    // are money, and they have to be the same money the P&L and the dashboard
+    // report. `netOfTax` leaves an exclusive-VAT shop's prices alone.
+    const T = (typeof global !== 'undefined' && global.KhaytTax) || null;
+    if (!T || typeof T.netOfTax !== 'function') return charged;
+    return T.netOfTax(charged, T.profileFromSettings(settings));
   }
 
   /** Does this order count as trade? Everything counts when the module is absent. */

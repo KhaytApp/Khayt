@@ -178,11 +178,45 @@ test('the module and the original agree, every figure, over 2000 generated books
       for (const field of ['period', 'orders']) {
         assert.equal(ours[j][field], theirs[j][field], `case ${i} row ${j} ${field}`);
       }
-      for (const field of ['revenue', 'shipping', 'expenses', 'fixed', 'vatCollected', 'net']) {
+      for (const field of ['shipping', 'expenses', 'fixed', 'vatCollected']) {
         // The module rounds to the cent where the original handed raw floats
         // to fmtMoney; comparing at that precision is comparing what is printed.
         assert.equal(ours[j][field], round2(theirs[j][field]), `case ${i} row ${j} ${field}`);
       }
+
+      // REVENUE AND NET DIFFER ON PURPOSE, AND BY EXACTLY THE TAX.
+      //
+      // The original booked what the customer was charged as revenue and took
+      // only expenses off it, so a shop whose prices include VAT read its own
+      // VAT as profit. ZATCA and IFRS 15 both treat tax collected on a sale as
+      // a liability, never income.
+      //
+      // The parity proof is kept rather than dropped: every other figure must
+      // still match the implementation this was lifted from, and the two that
+      // changed must differ by the VAT and by nothing else. Editing the
+      // ORIGINAL above to agree would prove nothing at all.
+      // AND THE DELTA DEPENDS ON THE MODE, which is the half of this that is
+      // easy to get wrong in the other direction: under `exclusive` the price
+      // the shop enters is ALREADY the net figure and the tax is added on top,
+      // so revenue must not move even though VAT collected is not zero. Stated
+      // here from the mode rather than by calling `netOfTax`, which would be
+      // asking the code under test whether it agrees with itself.
+      const mode = KhaytTax.profileFromSettings(settings).mode;
+      const expectedRevenue = mode === 'exclusive'
+        ? round2(theirs[j].revenue)
+        : round2(theirs[j].revenue - theirs[j].vatCollected);
+      assert.equal(ours[j].revenue, expectedRevenue,
+                   `case ${i} row ${j} revenue (${mode})`);
+      // A CENT, and only because of where the rounding happens. The module
+      // sums unrounded revenue and rounds once at the end; this expectation is
+      // rebuilt from figures already rounded, so a sum landing exactly on a
+      // half-cent (3,259.235) goes one way there and the other way here.
+      // Revenue itself is asserted EXACTLY above — this is the derived figure,
+      // and a cent of tolerance on it cannot hide a missing or doubled tax,
+      // which would be off by hundreds.
+      const expectedNet = round2(theirs[j].net - (round2(theirs[j].revenue) - expectedRevenue));
+      assert.ok(Math.abs(ours[j].net - expectedNet) <= 0.01,
+                `case ${i} row ${j} net (${mode}): ${ours[j].net} vs ${expectedNet}`);
     }
   }
 });
@@ -195,8 +229,13 @@ test('a voided invoice is not revenue, and not VAT collected either', () => {
   ], [], { settings, now: new Date(2026, 8, 4) });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].orders, 1, 'the voided one is not counted at all');
-  assert.equal(rows[0].revenue, 1000);
+  // 869.57, not 1000: the price includes 15% VAT and revenue is net of it.
+  // The 5,000 order contributes nothing to either figure, which is what this
+  // test is about.
+  assert.equal(rows[0].revenue, 869.57);
   assert.equal(rows[0].vatCollected, 130.43, 'nor is its VAT');
+  assert.equal(round2(rows[0].revenue + rows[0].vatCollected), 1000,
+               'and the two together are what the customer was charged');
 });
 
 test('the overhead is charged to every quarter, and pro-rated for the one in progress', () => {
@@ -227,4 +266,52 @@ test('the renderer builds no P&L of its own any more', () => {
   assert.match(body, /\.pnlByPeriod\(/, 'the table must come from the shared rule');
   assert.doesNotMatch(body, /nowQuarterFraction|fixedCostPerQ|qMap/,
     'and the renderer must not keep its own aggregation, or the two apps drift');
+});
+
+test('the tax a shop paid on a purchase is reclaimed, not spent', () => {
+  const settings = { currency: 'SAR', enableVat: true, vatRate: 15 };
+  const now = new Date(2026, 8, 4);
+  const orders = [{ id: 'A', status: 'completed', date: '2026-08-10', price: 1150 }];
+
+  // An expense recorded before this existed carries no `vatAmount`, and nothing
+  // about it changes: no tax is invented on a receipt nobody described.
+  const before = pnlByPeriod(orders, [{ date: '2026-08-11', amount: 230 }], { settings, now })[0];
+  assert.equal(before.expenses, 230, 'an expense with no tax recorded is a cost in full');
+  assert.equal(before.vatReclaimable, 0);
+  assert.equal(before.vatDue, 150, 'so the whole of the tax charged is owed');
+  assert.equal(before.net, 770);
+
+  // The same receipt, with the supplier's tax line entered.
+  const after = pnlByPeriod(orders, [{ date: '2026-08-11', amount: 230, vatAmount: 30 }],
+                            { settings, now })[0];
+  assert.equal(after.expenses, 200, 'the cost is what the goods cost');
+  assert.equal(after.vatReclaimable, 30);
+  assert.equal(after.vatDue, 120, 'and only the difference is owed');
+  assert.equal(after.net, 800, 'profit rises by the tax that was never a cost');
+});
+
+test('a shop that is not registered reclaims nothing, whatever it typed', () => {
+  // No registration means no input tax to recover: every riyal on the receipt
+  // is a cost. Treating it otherwise would understate the costs of the shops
+  // least able to absorb it.
+  const now = new Date(2026, 8, 4);
+  const rows = pnlByPeriod(
+    [{ id: 'A', status: 'completed', date: '2026-08-10', price: 1150 }],
+    [{ date: '2026-08-11', amount: 230, vatAmount: 30 }],
+    { settings: { currency: 'SAR' }, now })[0];
+  assert.equal(rows.expenses, 230);
+  assert.equal(rows.vatReclaimable, 0);
+  assert.equal(rows.vatDue, 0);
+});
+
+test('a receipt cannot reclaim more tax than it cost', () => {
+  const settings = { currency: 'SAR', enableVat: true, vatRate: 15 };
+  const now = new Date(2026, 8, 4);
+  for (const bad of [{ amount: 100, vatAmount: 500 }, { amount: 100, vatAmount: -50 },
+                     { amount: 100, vatAmount: 'lots' }]) {
+    const row = pnlByPeriod([], [{ date: '2026-08-11', ...bad }], { settings, now })[0];
+    assert.ok(row.expenses >= 0, `expenses went negative for ${JSON.stringify(bad)}`);
+    assert.ok(row.vatReclaimable >= 0 && row.vatReclaimable <= 100,
+              `reclaimed ${row.vatReclaimable} from a 100 receipt`);
+  }
 });
