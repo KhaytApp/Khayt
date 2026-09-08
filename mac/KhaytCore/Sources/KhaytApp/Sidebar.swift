@@ -35,8 +35,16 @@ struct Sidebar: View {
                     .tag(Shop.Shelf.board)
                 ForEach(Stage.allCases) { stage in
                     let n = shop.count(stage)
-                    Row(title: shop.words.callIt(stage.key), symbol: stage.symbol, count: n,
-                        selected: shop.shelf == .jobs(stage))
+                    // A DOT, NOT A SYMBOL — twice over.
+                    //
+                    // These nine are sub-rows under "Pipeline", and giving them
+                    // the same 16pt mark as the shelves above made them read as
+                    // nine more shelves. A dot in the stage's own colour is
+                    // both the right weight for a sub-item and the same device
+                    // the jobs table uses in its Stage column, so the two
+                    // screens agree about what a stage looks like.
+                    Row(title: shop.words.callIt(stage.key), dot: stage.tint ?? .secondary,
+                        count: n, selected: shop.shelf == .jobs(stage))
                         .tag(Shop.Shelf.jobs(stage))
                         // An empty stage stays visible and dimmed rather than
                         // disappearing: a sidebar that changes shape as work
@@ -132,6 +140,9 @@ struct Sidebar: View {
         /// and drawing eight of those is a different piece of work from
         /// drawing the shelves.
         var mark: Mark?
+        /// A stage, said with a dot in its own colour. Sub-rows do not carry
+        /// the same weight of mark as the shelves they sit under.
+        var dot: Color?
         var symbol: String = ""
         /// How many, or nil where the row is not a count of anything.
         ///
@@ -161,6 +172,12 @@ struct Sidebar: View {
                 if let mark {
                     HStack(spacing: 6) {
                         Drawn(mark: mark, size: 16).frame(width: 18, alignment: .center)
+                        Text(title)
+                    }
+                } else if let dot {
+                    HStack(spacing: 6) {
+                        Circle().fill(dot).frame(width: 6, height: 6)
+                            .frame(width: 18, alignment: .center)
                         Text(title)
                     }
                 } else {
