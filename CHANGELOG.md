@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac app's tests run on a pull request.** Everything in CI ran on Linux,
+  so for as long as the native app has existed none of its 705 tests had run on
+  a PR — not the guard that the Quick Look extension carries no Swift entry
+  point, not the word catalogue, not the check that no unit is spelled out in
+  Swift. A release merged green with one of them failing and nobody could have
+  known, because the four required checks cannot see a line of Swift.
+
+  It builds the extensions before testing, because the entry-point guard READS
+  THE BUILT BINARY and skips when there is nothing to read.
+
+
 
 - **The space bar answers the question too.** Pressing space on a `.3mf` in
   Finder shows the plate render large, with the printer, layer height, nozzle,

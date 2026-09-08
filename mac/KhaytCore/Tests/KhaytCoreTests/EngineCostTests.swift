@@ -21,9 +21,10 @@ struct EngineCostTests {
         let called = Date().timeIntervalSince(t1)
         print(String(format: "engine start %.0f ms, first call %.0f ms",
                      started * 1000, called * 1000))
-        // Generous, because a loaded CI box is not this Mac. The number that
-        // matters is the one printed above; this only catches it becoming a
+        // VERY generous, because a cold CI runner is not this Mac and a flaky
+        // required check is worse than no check. The number that matters is the
+        // one printed above — 78 ms here — and this only catches it becoming a
         // different order of magnitude.
-        #expect(started < 2.0, "an engine took \(started)s to start")
+        #expect(started < 5.0, "an engine took \(started)s to start")
     }
 }
