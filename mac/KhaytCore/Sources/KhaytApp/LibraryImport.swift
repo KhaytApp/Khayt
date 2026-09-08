@@ -416,10 +416,6 @@ enum LibraryImport {
     }
 
     /// The embedded preview and the filament colours, from a 3MF.
-    ///
-    /// Both decisions are the shared module's: which preview wins — the biggest
-    /// `Metadata/*.png` — and what the colours are. This reads the members and
-    /// hands over the bytes.
     private static func readPreviewAndColours(_ file: URL, dir: URL, engine: KhaytEngine)
         async throws -> (thumbFile: String?, colours: [JSONValue], swapCount: Int) {
         let entries = try Zip.entries(of: file)
@@ -429,12 +425,18 @@ enum LibraryImport {
             return String(decoding: data, as: UTF8.self)
         }
 
+        // THE BIGGEST PNG IS NOT THE PICTURE. What stood here took the largest
+        // `Metadata/*.png`, and on two of the ten files in one real library that
+        // is `top_1.png` or `top_3.png` — the slicer's top-down plan view, which
+        // is 111 KB against the plate render's 56 KB because a plan view of a
+        // flat object compresses badly. Those two models have been sitting in
+        // the library under a picture of themselves from directly above.
+        //
+        // `ThreeMF.preview` picks by name instead of by weight, and says why.
         var thumbFile: String?
-        let previews = entries.filter {
-            $0.name.lowercased().hasPrefix("metadata/") && $0.name.lowercased().hasSuffix(".png")
-        }
-        if let biggest = previews.max(by: { $0.size < $1.size }),
-           let png = try? Zip.data(of: biggest, in: file) {
+        if let name = ThreeMF.preview(among: entries.map(\.name)),
+           let entry = entries.first(where: { $0.name == name }),
+           let png = try? Zip.data(of: entry, in: file) {
             // `thumb.png`, not `thumb.jpg`. The record names the file, both apps
             // read the name, and re-encoding a PNG the slicer already made into
             // a JPEG would cost quality for a filename.

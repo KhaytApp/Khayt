@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import KhaytApp
+@testable import KhaytCore
 
 /// Reading members out of a zip.
 ///

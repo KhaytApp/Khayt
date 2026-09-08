@@ -29,19 +29,19 @@ import Compression
 /// 28 KB), and an entry claiming more than `limit` is refused rather than
 /// inflated. That is the whole defence against a zip built to exhaust memory,
 /// and it is a cap rather than a heuristic because the honest bound is known.
-enum Zip {
+public enum Zip {
 
     /// English, and technical. A shop never reads "the archive is damaged: a
     /// member's name runs past the directory" — whoever is working out why a
     /// file would not open does. See the note on `Mesh.Failure`.
-    enum Failure: Error, CustomStringConvertible, Equatable {
+    public enum Failure: Error, CustomStringConvertible, Equatable {
         case notAZip
         case unreadable(String)
         case tooBig(name: String, size: Int, limit: Int)
         case unsupported(name: String, method: UInt16)
         case corrupt(String)
 
-        var description: String {
+        public var description: String {
             switch self {
             case .notAZip: return "That file is not a zip archive."
             case .unreadable(let why): return "Could not read the archive: \(why)"
@@ -55,27 +55,27 @@ enum Zip {
     }
 
     /// One member, as the central directory describes it.
-    struct Entry: Equatable, Sendable {
-        let name: String
-        let compressedSize: Int
-        let size: Int
+    public struct Entry: Equatable, Sendable {
+        public let name: String
+        public let compressedSize: Int
+        public let size: Int
         /// 0 stored, 8 deflate. A 3MF's previews are usually stored — already
         /// PNG, so there is nothing left to squeeze — and its XML is deflated.
-        let method: UInt16
+        public let method: UInt16
         /// Where the LOCAL header sits. The central directory's copy of the
         /// name and sizes is authoritative; the local header is read only for
         /// its two length fields, because they say where the data starts.
-        let offset: Int
+        public let offset: Int
     }
 
     /// The most a single member may weigh. Generous for a preview or a config
     /// and far under any mesh, which is the point.
-    static let defaultLimit = 8 * 1024 * 1024
+    public static let defaultLimit = 8 * 1024 * 1024
 
     // MARK: - Reading
 
     /// Every member, without decompressing any of them.
-    static func entries(of url: URL) throws -> [Entry] {
+    public static func entries(of url: URL) throws -> [Entry] {
         let handle = try open(url)
         defer { try? handle.close() }
         let fileSize = Int(try handle.seekToEnd())
@@ -131,7 +131,7 @@ enum Zip {
     /// `limit` is checked BEFORE anything is read or decompressed, against the
     /// size the directory claims — so a member that says it is 436 MB costs a
     /// comparison rather than 436 MB.
-    static func data(of entry: Entry, in url: URL, limit: Int = defaultLimit) throws -> Data {
+    public static func data(of entry: Entry, in url: URL, limit: Int = defaultLimit) throws -> Data {
         guard entry.size <= limit, entry.compressedSize <= limit else {
             throw Failure.tooBig(name: entry.name, size: max(entry.size, entry.compressedSize),
                                  limit: limit)
@@ -168,7 +168,7 @@ enum Zip {
     /// `COMPRESSION_ZLIB` in Apple's framework IS the raw stream despite the
     /// name; the header-and-checksum form is what a `.zz` file has and what a
     /// zip member does not.
-    static func inflate(_ raw: Data, to size: Int, name: String) throws -> Data {
+    public static func inflate(_ raw: Data, to size: Int, name: String) throws -> Data {
         // A stated size of zero is a real answer for an empty member, and would
         // otherwise become a zero-length destination buffer and a crash.
         guard size > 0 else { return Data() }
@@ -197,7 +197,7 @@ enum Zip {
     /// The cap here is on the TOTAL, not on what is held, and it exists to stop
     /// a stream that never ends rather than to bound memory. Returning false
     /// from `onChunk` stops the read.
-    static func stream(_ entry: Entry, in url: URL, totalLimit: Int = 4 << 30,
+    public static func stream(_ entry: Entry, in url: URL, totalLimit: Int = 4 << 30,
                        onChunk: (UnsafeRawBufferPointer) -> Bool) throws {
         guard entry.method == 0 || entry.method == 8 else {
             throw Failure.unsupported(name: entry.name, method: entry.method)

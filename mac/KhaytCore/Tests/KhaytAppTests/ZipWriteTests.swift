@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import KhaytApp
+@testable import KhaytCore
 
 /// Writing a zip.
 ///
