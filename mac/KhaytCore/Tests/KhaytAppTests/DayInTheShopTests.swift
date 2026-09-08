@@ -243,12 +243,23 @@ struct DayInTheShopTests {
             currencies: [:], now: Date())
         let quarter = try #require(pnl.first)
         #expect(quarter.orders == 1)
-        #expect(quarter.revenue == price)
         #expect(quarter.expenses == 90)
-        // 15% inclusive: the shop is holding this for the tax authority, and it
-        // is stated rather than left inside the revenue figure.
-        #expect(abs(quarter.vatCollected - (price - price / 1.15)) < 0.01)
-        #expect(abs(quarter.net - (price - 90)) < 0.01)
+        // 15% INCLUSIVE, AND HELD FOR THE TAX AUTHORITY — which this test said
+        // in words before its numbers agreed. The price is what the customer
+        // paid; the shop keeps what is left after the tax inside it, and that
+        // is what revenue and profit are. ZATCA and IFRS 15 both refuse to call
+        // tax collected on a sale income.
+        let held = price - price / 1.15
+        #expect(abs(quarter.vatCollected - held) < 0.01)
+        #expect(abs(quarter.revenue - (price - held)) < 0.01,
+                "revenue is the price without the tax the shop is holding")
+        #expect(abs(quarter.revenue + quarter.vatCollected - price) < 0.01,
+                "and the two together are still what the customer paid")
+        #expect(abs(quarter.net - (price - held - 90)) < 0.01)
+        // The day recorded no tax on its own purchases, so there is none to
+        // reclaim and the whole of what was charged is owed.
+        #expect(quarter.vatReclaimable == 0)
+        #expect(abs(quarter.vatDue - quarter.vatCollected) < 0.01)
 
         // Nothing was lost on the way through: every collection the day touched
         // is still a list, and the ones it did not are still there.

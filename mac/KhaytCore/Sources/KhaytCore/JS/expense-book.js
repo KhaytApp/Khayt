@@ -59,6 +59,17 @@
     const c = ctx || {};
     const amount = Math.max(0, num(i.amount));
     if (amount <= 0) return { refused: 'amount_required' };
+    // THE TAX ON THE RECEIPT, as the supplier's invoice states it.
+    //
+    // An amount and not a rate: rates differ line by line, an import or an
+    // exempt purchase carries none, and a receipt with two rates on it has no
+    // single percentage to type. A shop copies the figure in front of it.
+    //
+    // Never more than was paid and never negative — a clamp rather than a
+    // refusal, because a mistyped tax must not stop somebody recording what
+    // they spent. Absent is zero, which is what every expense written before
+    // this field existed carries, and it reclaims nothing.
+    const vatAmount = Math.min(amount, Math.max(0, num(i.vatAmount)));
     const date = i.date || c.today;
     const recurring = RECURRING.includes(i.recurring) ? i.recurring : null;
     const category = CATEGORIES.includes(i.category) ? i.category : 'other';
@@ -68,6 +79,7 @@
         date,
         category,
         amount,
+        vatAmount,
         note: trim(i.note),
         orderId: trim(i.orderId) || null,
         receiptPath: i.receiptPath || null,

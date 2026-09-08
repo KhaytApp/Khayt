@@ -73,6 +73,7 @@ function addExpense() {
   // was built here from seven controls, which is why only this window could.
   const made = ExpenseBook.newExpense({
     amount:      $('#expAmount').value,
+    vatAmount:   $('#expVatAmount')?.value,
     date:        $('#expDate').value,
     category:    $('#expCategory').value,
     note:        $('#expNote').value,
@@ -92,6 +93,7 @@ function addExpense() {
     toast(t('exp.budget_exceeded', { cat: expCatLabel(expCat), spent: fmtMoney(over.spent), budget: fmtMoney(over.budget) }), 'warning', 5000);
   }
   $('#expAmount').value = '';
+  if ($('#expVatAmount')) $('#expVatAmount').value = '';
   $('#expNote').value   = '';
   if ($('#expOrderRef')) $('#expOrderRef').value = '';
   if ($('#expRecurring')) $('#expRecurring').value = '';
@@ -224,6 +226,16 @@ async function deleteExpense(id) {
 function renderExpenses() {
   const filtered = expenses.filter(e => inRange(e.date, expRangeFilter, 'expenses'));
   const tbody = $('#expenseTable tbody');
+
+  // A shop that is not registered reclaims nothing, so it is not asked. Read
+  // through the tax rule rather than from `enableVat`, so a shop configured
+  // through the country presets is answered the same way its invoices are.
+  const vatRow = $('#expVatRow');
+  if (vatRow) {
+    const profile = (typeof KhaytTax !== 'undefined' && settings)
+      ? KhaytTax.profileFromSettings(settings) : null;
+    vatRow.hidden = !(profile && profile.rates && profile.rates.length);
+  }
 
   if (expenses.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${escapeHtml(t('exp.empty'))}</td></tr>`;

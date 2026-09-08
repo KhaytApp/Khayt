@@ -26,6 +26,7 @@ struct SpoolSheet: View {
     @State private var colourVariant = ""
     @State private var swatch = Color(nsColor: NSColor(hex: "#888888") ?? .gray)
     @State private var cost: Double = 0
+    @State private var vatAmount: Double = 0
     @State private var weight: Double = 1000
     @State private var lot = ""
     @State private var reorderPoint: Double = 200
@@ -107,6 +108,28 @@ struct SpoolSheet: View {
                         }
                     }
                 }
+                // THE TAX INSIDE THAT PRICE. What the roll cost the shop is the
+                // figure above and stays there — it is what left the bank. What
+                // a JOB is costed at is the price without the tax, because a
+                // registered shop gets the tax back and charging it to a print
+                // understates every margin it quotes.
+                if shop.reclaimsTax {
+                    GridRow {
+                        Text(shop.words.callIt("exp.vat_paid")).foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            TextField("", value: $vatAmount,
+                                      format: .number.precision(.fractionLength(0...2)))
+                                .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                            Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
+                            if vatAmount > 0, cost > vatAmount {
+                                Text(shop.words.callIt("inv.costs_a_job") + " "
+                                     + Money.text(cost - vatAmount, shop.currency))
+                                    .font(.callout).foregroundStyle(.tertiary).monospacedDigit()
+                                    .fixedSize()
+                            }
+                        }
+                    }
+                }
                 GridRow {
                     Text(shop.words.callIt("inv.reorder_point")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
@@ -177,6 +200,7 @@ struct SpoolSheet: View {
         colourVariant = spool.colourVariant ?? ""
         swatch = Color(nsColor: NSColor(hex: spool.color ?? "#888888") ?? .gray)
         cost = spool.cost ?? 0
+        vatAmount = spool.vatAmount ?? 0
         weight = spool.weight ?? 0
         lot = spool.lot ?? ""
         reorderPoint = spool.reorderPoint ?? 200
@@ -194,6 +218,7 @@ struct SpoolSheet: View {
             "material": .string(material),
             "color": .string(NSColor(swatch).hexString ?? "#888888"),
             "cost": .number(cost),
+            "vatAmount": .number(shop.reclaimsTax ? min(max(0, vatAmount), cost) : 0),
             "weight": .number(weight),
             "lot": .string(lot),
             "colourVariant": .string(colourVariant),

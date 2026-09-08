@@ -940,6 +940,13 @@ final class Words {
     /// The shared keys this app uses. `PrintFactLines` declares its own, so a
     /// key added to that panel cannot be forgotten here.
     static let borrowed = PrintFactLines.borrowedKeys + [
+        // The tax on a purchase. BORROWED, not supplied: Electron's expense
+        // form needs the same words, so they went into the shared catalogue in
+        // all nine languages — and a key this app also supplied would shadow
+        // Khayt's, which is what `a borrowed key never shadows one this app
+        // supplies` refuses. One vocabulary, both apps.
+        "exp.vat_paid", "exp.vat_paid_hint", "exp.vat_reclaimed", "exp.vat_due",
+        "inv.costs_a_job",
         "queue.quote", "queue.pending", "queue.printing", "queue.completed",
         "queue.delivered", "doc.client", "doc.due", "doc.notes", "common.total",
         "an.range.month", "an.range.last_month", "an.range.quarter", "an.range.year",

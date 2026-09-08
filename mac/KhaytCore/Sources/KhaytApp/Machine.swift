@@ -81,8 +81,14 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
 struct Spool: Identifiable, Decodable, Hashable, Sendable {
     let id: String
     let material: String
-    /// What the spool cost, in the shop's currency.
+    /// What the spool cost, in the shop's currency. This is what left the bank
+    /// and it never changes: `vatAmount` below is what a JOB is costed at.
     let cost: Double?
+    /// The tax inside that price, when the shop recorded it and can reclaim it.
+    /// Absent on every spool bought before Khayt asked, and reclaims nothing —
+    /// no tax is invented on a receipt nobody described. See
+    /// `KhaytSpoolEdit.netCost`, which is the one place that decides.
+    let vatAmount: Double?
     /// Grams remaining. The seed rows are whole kilos.
     let weight: Double?
     /// What it weighed when it arrived, written once by `spool-edit.js`.
