@@ -568,8 +568,12 @@ final class Activator: NSObject, NSApplicationDelegate {
             } else {
                 // Loudly, and with what WAS open: a silent miss here is how the
                 // nozzle glyph got photographed six times.
+                // `×`, not an `x`: the units guard reads a letter between two
+                // numbers as a unit written in Swift, and it is right to — it
+                // cannot tell this line from one a shop would read. The proper
+                // multiplication sign is what the rest of the app uses anyway.
                 let open = NSApp.windows.filter(\.isVisible)
-                    .map { "\(type(of: $0)) \(Int($0.frame.width))x\(Int($0.frame.height))" }
+                    .map { "\(type(of: $0)) \(Int($0.frame.width))×\(Int($0.frame.height))" }
                 FileHandle.standardError.write(Data(
                     "no settings window to capture — open: \(open.joined(separator: ", "))\n".utf8))
             }
