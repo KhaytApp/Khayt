@@ -1594,6 +1594,31 @@ final class Shop {
     /// carry the reason.
     private(set) var lastCrash: String?
 
+    // MARK: - What the menu bar asks
+
+    /// How many machines are printing RIGHT NOW, from the poller rather than
+    /// from the book.
+    ///
+    /// The book's `status` is what somebody last told Khayt; this is what the
+    /// printers last said themselves. On the one question the menu bar exists
+    /// to answer they can disagree for hours — a print that finished at 03:00
+    /// is still "printing" in a book nobody has touched since.
+    var printingNow: Int {
+        machines.reduce(into: 0) { count, machine in
+            if printers.readings[machine.id]?.status?.state == "printing" { count += 1 }
+        }
+    }
+
+    /// Seconds until the first machine is free, or nil when none is running.
+    var soonestFinish: Double? {
+        machines.compactMap { machine -> Double? in
+            guard let status = printers.readings[machine.id]?.status,
+                  status.state == "printing",
+                  let left = status.timeRemaining, left > 0 else { return nil }
+            return left
+        }.min()
+    }
+
     // MARK: - Which printer takes which job
 
     /// Whether the proposal panel is up.

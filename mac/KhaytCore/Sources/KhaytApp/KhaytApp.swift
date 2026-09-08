@@ -8,6 +8,12 @@ struct KhaytApp: App {
     @NSApplicationDelegateAdaptor(Activator.self) private var activator
 
     var body: some Scene {
+        // THE WINDOW FIRST. SwiftUI treats the first scene in this builder as
+        // the app's primary one, and with `FloorMenuBar` ahead of it the app
+        // launched with no window at all — the menu bar icon appeared, the
+        // window's `.task` never ran, and the snapshot runner terminated
+        // because `Snapshot.subject` was never set. A menu bar extra is an
+        // addition to this app, not the front of it.
         Window("Khayt", id: "shop") {
             ShopWindow(shop: shop)
                 // A FLOOR, so the window cannot be dragged into nonsense.
@@ -35,6 +41,9 @@ struct KhaytApp: App {
                 .tint(Khayt.appTint)
                 .task {
                     Snapshot.subject = shop
+                    // The menu bar item, which is AppKit rather than a scene —
+                    // see `FloorStatus` for the profile that decided that.
+                    FloorStatus.shared.install(shop: shop)
                     // Before the book is opened, so the very first write is
                     // heard. Every path that changes the store lands in one
                     // place and this listens there — see `StoreWriter.didWrite`.
@@ -61,6 +70,8 @@ struct KhaytApp: App {
         // ⌘, — the shop's own settings, written through the same rule the
         // Electron page saves through. The scene puts "Settings…" in the app
         // menu by itself.
+        // AFTER the window, deliberately — see the note on scene order above.
+
         Settings {
             SettingsWindow(shop: shop)
         }
@@ -193,6 +204,26 @@ final class Activator: NSObject, NSApplicationDelegate {
             try? png.write(to: dir.appending(path: name + ".png"))
             FileHandle.standardError.write(Data("wrote \(name).png\n".utf8))
         }
+    }
+
+    /// Photograph a view that is not in a window.
+    ///
+    /// A `MenuBarExtra`'s panel is the case this exists for: it is not a window,
+    /// so `capture(named:window:)` cannot see it, and without this it would be
+    /// the one surface in the app that ships unlooked at.
+    @MainActor
+    static func captureView(named name: String, _ view: some View, into dir: URL) {
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        guard let image = renderer.nsImage,
+              let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else {
+            FileHandle.standardError.write(Data("could not render \(name)\n".utf8))
+            return
+        }
+        try? png.write(to: dir.appending(path: name + ".png"))
+        FileHandle.standardError.write(Data("wrote \(name).png\n".utf8))
     }
 
     /// `KHAYT_SNAPSHOT_SIZE=WxH` — photograph the app at somebody else's Mac.
@@ -446,6 +477,10 @@ final class Activator: NSObject, NSApplicationDelegate {
             captureSheet(named: "14-new-job", into: dir)
             shop.takingAJob = false
             await settle()
+
+            // The menu bar's panel, which no window shot can reach.
+            captureView(named: "27-menu-bar",
+                        FloorPanel(shop: shop).background(Khayt.ground), into: dir)
 
             // Where the waiting work would go.
             //
