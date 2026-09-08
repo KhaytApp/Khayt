@@ -1409,6 +1409,35 @@ final class Shop {
         return (total, byCategory)
     }
 
+    /// What THIS CALENDAR MONTH's expenses came to, per category — whatever the
+    /// period picker is showing.
+    ///
+    /// A BUDGET IS A MONTHLY THING. `lib/expense-book.js`'s `overBudget` filters
+    /// on `date.startsWith(month)` and the toast after an overspend says "this
+    /// month", so a budget compared against anything else is comparing two
+    /// different periods. The panel used the SHOWN totals, which the period
+    /// picker moves: on "All time" a shop with 1,240 of filament against a 1,500
+    /// budget was told it was over by 2,130, and every category eventually goes
+    /// over a monthly budget if you total enough months into it. Two of the
+    /// sample book's three "Over budget" warnings were false.
+    ///
+    /// The shop's own calendar day, like `today()` — not UTC's. See
+    /// `overBudget`'s note about a month boundary being local.
+    var expenseTotalsThisMonth: [String: Double] {
+        Self.totals(of: expenses, inMonth: String(Self.today().prefix(7)))   // "2026-09"
+    }
+
+    /// The filtering on its own, so it can be asked about a month that is not
+    /// today's — `BudgetIsMonthlyTests`.
+    static func totals(of expenses: [Expense], inMonth month: String) -> [String: Double] {
+        var byCategory: [String: Double] = [:]
+        for category in expenseCategories { byCategory[category] = 0 }
+        for e in expenses where e.date.hasPrefix(month) {
+            byCategory[e.category, default: 0] += e.amount
+        }
+        return byCategory
+    }
+
     /// Khayt's own categories, in its own order.
     static let expenseCategories = ["filament", "electricity", "maintenance", "tools", "shipping", "other"]
 

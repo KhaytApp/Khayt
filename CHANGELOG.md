@@ -1045,6 +1045,30 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: wasted plastic got more expensive as a spool emptied.** The cost of
+  a failed print divided the roll's price by what was LEFT on it rather than by
+  what it weighed when it arrived, so the same plastic grew dearer every time
+  somebody used some. A 500 g roll of PA-CF bought at 240 is 0.48 a gram all its
+  life; with 120 g left this read 2.00 a gram, and 180 g of waste would have
+  been logged at 360.00 instead of 86.40 — four times over, and without bound as
+  the roll runs out. A roll bought before Khayt recorded what it arrived at is
+  the one case with no better answer, so it still divides by what is left.
+
+  The QC failure screen had its own copy of the same line and the same fault.
+  Both go through one rule now, so a QC failure and a waste entry can no longer
+  put different prices on the same 180 grams.
+
+- **Fixed: "Over budget" on categories that were not over budget.** The panel
+  is headed *Budget vs. Actual (This Month)* and a budget in Khayt has always
+  been a monthly thing — but the figures it compared were whatever the period
+  picker was showing. Left on **All time**, it added up every month a shop had
+  ever recorded and held the total against one month's budget, so it warned
+  about categories that were comfortably under. On the sample book two of the
+  three warnings were false: filament read 2,130 over a 1,500 budget when 1,240
+  had been spent this month, and Tools & Supplies read 430 over 250 having spent
+  nothing at all. It gets worse the longer a book runs, because eventually every
+  category exceeds a monthly budget if you total enough months into it.
+
 - **Fixed: the dashboard tile renamed the sidebar with it.** Giving the fleet
   tile an honest label changed `mac.machines`, which the Machines shelf and its
   Go menu item also use — so the menu came back reading "Online ⌘5", which is

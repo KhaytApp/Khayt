@@ -208,7 +208,12 @@ function openWasteForm() {
         const mat = modal.querySelector('#wf_material')?.value;
         const wt  = Math.max(0, +modal.querySelector('#wf_weight')?.value || 0);
         if (!mat || wt <= 0) return;
-        const cost = WasteEntry.costOf(mat, wt, inventory);
+        // Net of reclaimable tax, like every other cost: a registered shop
+        // gets the tax on the roll back, so that is not what the plastic cost.
+        const profile = (typeof KhaytTax !== 'undefined' && typeof settings !== 'undefined')
+          ? KhaytTax.profileFromSettings(settings) : null;
+        const reclaims = !!(profile && profile.rates && profile.rates.length);
+        const cost = WasteEntry.costOf(mat, wt, inventory, reclaims);
         const costEl = modal.querySelector('#wf_cost');
         if (cost > 0 && costEl) costEl.value = cost.toFixed(2);
       };

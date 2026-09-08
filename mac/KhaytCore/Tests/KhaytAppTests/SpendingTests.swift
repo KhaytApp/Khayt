@@ -104,8 +104,13 @@ struct SpendingTests {
     func waste() async throws {
         let engine = try Self.engine()
         var root = Self.book()
+        // `reclaimsTax: false` — this book has no tax profile, so there is
+        // nothing to reclaim and the plastic cost what it cost. S1 records no
+        // `spoolWeight` either, so the 800 is all there is to divide by: the
+        // legacy case, and the answer is the same as it always was.
         let cost = try await engine.wasteCost(material: "PLA", grams: 200,
-                                              inventory: Shop.rows(root, "inventory"))
+                                              inventory: Shop.rows(root, "inventory"),
+                                              reclaimsTax: false)
         #expect(cost == 22.5, "200g of a 90-riyal 800g spool")
 
         let made = try await engine.newWasteEntry([

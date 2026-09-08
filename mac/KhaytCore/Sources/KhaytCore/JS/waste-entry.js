@@ -30,13 +30,37 @@
    * shelf. Nothing when the material is not on the shelf or the spool has no
    * cost or no weight recorded — a cost invented from a spool that does not
    * exist is worse than none.
+   *
+   * ── DIVIDE BY WHAT THE ROLL WEIGHED, NOT BY WHAT IS LEFT ──────────────────
+   *
+   * `weight` FALLS as the shop prints. Dividing a roll's price by it makes the
+   * plastic more expensive every time somebody uses some: a 500 g roll of PA-CF
+   * bought at 240 costs 0.48 a gram, and this read 2.00 with 120 g left on it —
+   * so 180 g of it was costed at 360.00 instead of 86.40, four times over, and
+   * without bound as the roll empties. `spoolWeight` is what it weighed when it
+   * arrived and is written once, which is exactly why it exists.
+   *
+   * A roll bought before that field did is the one case with no better answer:
+   * what it originally weighed is unrecoverable, so `weight` is all there is.
+   *
+   * ── AND NET OF RECLAIMABLE TAX ────────────────────────────────────────────
+   *
+   * A registered shop gets the tax on a purchase back, so the plastic it threw
+   * away cost it the price without the tax — the same basis a job is costed at.
+   * `reclaims` comes from the caller because only it knows the shop's profile.
    */
-  function costOf(material, grams, inventory) {
+  function costOf(material, grams, inventory, reclaims) {
     const g = Math.max(0, num(grams));
     if (!material || g <= 0) return 0;
     const spool = (inventory || []).find((i) => i && i.material === material);
-    if (!spool || !(num(spool.cost) > 0) || !(num(spool.weight) > 0)) return 0;
-    return g * (num(spool.cost) / num(spool.weight));
+    if (!spool || !(num(spool.cost) > 0)) return 0;
+    const bought = num(spool.spoolWeight) > 0 ? num(spool.spoolWeight) : num(spool.weight);
+    if (!(bought > 0)) return 0;
+    const SE = (typeof global !== 'undefined' && global.KhaytSpoolEdit) || null;
+    const price = (SE && typeof SE.netCost === 'function')
+      ? SE.netCost(spool, !!reclaims)
+      : num(spool.cost);
+    return g * (price / bought);
   }
 
   /**
@@ -101,7 +125,7 @@
       weight,
       failureType: FAILURE_TYPES.includes(i.failureType) ? i.failureType : 'other',
       notes: trim(i.notes),
-      cost: Math.round(costOf(material, weight, c.inventory) * 100) / 100,
+      cost: Math.round(costOf(material, weight, c.inventory, c.reclaimsTax) * 100) / 100,
     };
     const D = deduction();
     const taken = (D && weight > 0 && order)

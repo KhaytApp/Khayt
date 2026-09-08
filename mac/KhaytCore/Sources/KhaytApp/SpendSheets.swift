@@ -251,7 +251,8 @@ struct WasteSheet: View {
     private func priceIt() async {
         guard let engine = shop.engine, !material.isEmpty, weight > 0 else { return }
         if let worked = try? await engine.wasteCost(material: material, grams: weight,
-                                                    inventory: shop.inventoryRows), worked > 0 {
+                                                    inventory: shop.inventoryRows,
+                                                    reclaimsTax: shop.reclaimsTax), worked > 0 {
             cost = (worked * 100).rounded() / 100
         }
     }
