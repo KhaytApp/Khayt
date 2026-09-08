@@ -28,8 +28,31 @@ VERSION="$(node -p "require('$REPO/package.json').version" 2>/dev/null || echo "
 BUILD_VERSION="$(printf '%s' "$VERSION" | sed 's/[^0-9.].*$//' | sed 's/\.$//')"
 [ -n "$BUILD_VERSION" ] || BUILD_VERSION="0.0.0"
 
+# ── APP INTENTS ───────────────────────────────────────────────────────────
+#
+# Xcode discovers `AppIntent` types by running two steps SwiftPM does not: the
+# compiler emits per-file CONST VALUES describing which types conform to which
+# protocols, and `appintentsmetadataprocessor` turns those into the
+# `Metadata.appintents` bundle the system reads. Without that bundle the intents
+# compile, link, and are never seen by Shortcuts, Spotlight or Siri — the app
+# would ship a verb nothing can call.
+#
+# So the const values are asked for here, and the processor is run below. The
+# protocol list is ours because the SDK does not ship one; anything App Intents
+# looks for has to be named in it or the type is not gathered.
+AI_PROTOCOLS="$PKG/.build/appintents-protocols.json"
+mkdir -p "$PKG/.build"
+cat > "$AI_PROTOCOLS" <<'AIP'
+["AppIntent","AppShortcutsProvider","AppEntity","AppEnum","EntityQuery",
+ "EntityStringQuery","DynamicOptionsProvider","TransientAppEntity",
+ "PersistentlyIdentifiable","SetValueIntent","AppIntentsPackage"]
+AIP
+
 echo "Building Khayt $VERSION (release)…"
-swift build -c release --product Khayt --package-path "$PKG"
+swift build -c release --product Khayt --package-path "$PKG" \
+  -Xswiftc -emit-const-values \
+  -Xswiftc -Xfrontend -Xswiftc -const-gather-protocols-file \
+  -Xswiftc -Xfrontend -Xswiftc "$AI_PROTOCOLS"
 BIN="$PKG/.build/release/Khayt"
 [ -x "$BIN" ] || { echo "no binary at $BIN"; exit 1; }
 
@@ -46,6 +69,32 @@ for b in "$PKG"/.build/release/*.bundle; do
 done
 
 cp "$REPO/assets/icon.icns" "$APP/Contents/Resources/Khayt.icns"
+
+# The App Intents metadata, into Resources BEFORE signing — it is part of what
+# is signed, and a bundle whose metadata arrives afterwards fails verification.
+AI_TOOL="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor"
+if [ -x "$AI_TOOL" ]; then
+  find "$PKG/Sources/KhaytApp" -name '*.swift' > "$PKG/.build/ai-sources.txt"
+  find "$PKG/.build/release/KhaytApp.build" -name '*.swiftconstvalues' \
+    > "$PKG/.build/ai-const.txt" 2>/dev/null || true
+  if [ -s "$PKG/.build/ai-const.txt" ]; then
+    "$AI_TOOL" \
+      --output "$APP/Contents/Resources" \
+      --toolchain-dir "$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain" \
+      --module-name KhaytApp \
+      --sdk-root "$(xcrun --show-sdk-path)" \
+      --xcode-version "$(xcodebuild -version | tail -1 | awk '{print $3}')" \
+      --platform-family macOS --deployment-target 14.0 \
+      --target-triple arm64-apple-macosx14.0 \
+      --source-file-list "$PKG/.build/ai-sources.txt" \
+      --swift-const-vals-list "$PKG/.build/ai-const.txt" >/dev/null 2>&1 \
+      && echo "  app intents: $(python3 -c "import json,sys;d=json.load(open('$APP/Contents/Resources/Metadata.appintents/extract.actionsdata'));print(len(d.get('actions',{})))" 2>/dev/null || echo '?') actions"
+  else
+    echo "  app intents: no const values — Shortcuts and Siri will not see them"
+  fi
+else
+  echo "  app intents: no Xcode toolchain — skipped"
+fi
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

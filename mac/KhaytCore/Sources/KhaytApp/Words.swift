@@ -301,6 +301,22 @@ final class Words {
         "mac.save_quote":    ["en": "Save as quote",  "ar": "حفظ كعرض سعر"],
         "mac.grams":         ["en": "grams",          "ar": "غرام"],
         "mac.hours":         ["en": "hours",          "ar": "ساعة"],
+        // The answers Khayt gives the system when it is asked a question —
+        // Siri, Spotlight, Shortcuts. See `Ask.swift`. Khayt's own catalogue
+        // rather than the shared one, which knows nothing about intents.
+        "mac.no_book":            ["en": "No book on this Mac yet",
+                                   "ar": "لا يوجد دفتر على هذا الجهاز بعد"],
+        "mac.nothing_printing":   ["en": "Nothing on the beds",
+                                   "ar": "لا شيء قيد الطباعة"],
+        "mac.printing_count":     ["en": "printing", "ar": "تطبع"],
+        "mac.printing_count_one": ["en": "printing", "ar": "تطبع"],
+        "mac.nothing_waiting":    ["en": "Nothing waiting", "ar": "لا شيء بانتظار الطباعة"],
+        "mac.waiting_count":      ["en": "waiting", "ar": "بانتظار"],
+        "mac.waiting_count_one":  ["en": "waiting", "ar": "بانتظار"],
+        "mac.without_printer":    ["en": "{n} with no printer yet",
+                                   "ar": "{n} بلا طابعة بعد"],
+        "mac.job_on_machine":     ["en": "{job} on the {machine}",
+                                   "ar": "{job} على {machine}"],
         // Customers
         "mac.new_customer":  ["en": "New Customer",   "ar": "عميل جديد"],
         "mac.edit_customer": ["en": "Edit Customer",  "ar": "تعديل العميل"],
