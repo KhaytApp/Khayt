@@ -387,7 +387,8 @@ final class Shop {
         guard let engine, !machineRows.isEmpty else { return }
         facts = try? await engine.dashboardFacts(orders: orderRows, machines: machineRows,
                                                  settings: kpiSettings.isEmpty ? settingsDict : kpiSettings,
-                                                 statusCache: printers.statusCache)
+                                                 statusCache: printers.statusCache,
+                                                 inventory: inventoryRows)
     }
 
     /// Ask the shared rule what every job still owes, and put it on the rows.
@@ -441,8 +442,15 @@ final class Shop {
         if case .array(let rows)? = root["clients"] { clients = rows } else { clients = [] }
         var settings: [String: JSONValue] = [:]
         if case .object(let dict)? = root["settings"] { settings = dict }
+        // The shelf goes in with everything else: a spool about to stop the
+        // next job is a thing the operator must act on, and until now it was
+        // the only one of those with a rule, a screen, and no place on the one
+        // screen a shop leaves open.
+        var shelf: [JSONValue] = []
+        if case .array(let rows)? = root["inventory"] { shelf = rows }
         facts = try? await engine.dashboardFacts(orders: orders, machines: machines, settings: settings,
-                                                 statusCache: printers.statusCache)
+                                                 statusCache: printers.statusCache,
+                                                 inventory: shelf)
         var perMachine: [String: NozzleWear] = [:]
         for machine in machines {
             guard case .object(let record) = machine,
@@ -1672,7 +1680,13 @@ final class Shop {
     /// is still "printing" in a book nobody has touched since.
     var printingNow: Int {
         machines.reduce(into: 0) { count, machine in
-            if printers.readings[machine.id]?.status?.state == "printing" { count += 1 }
+            // `PrinterWatch.isPrinting`, not `== "printing"`. OctoPrint passes
+            // the printer's own `state.text` through untouched and OctoPrint
+            // capitalises it — so an exact comparison counted zero on every
+            // OctoPrint shop, and the menu bar this property exists for said
+            // "nothing is printing" while the machine was printing.
+            if let state = printers.readings[machine.id]?.status?.state,
+               PrinterWatch.isPrinting(state) { count += 1 }
         }
     }
 
@@ -1680,7 +1694,7 @@ final class Shop {
     var soonestFinish: Double? {
         machines.compactMap { machine -> Double? in
             guard let status = printers.readings[machine.id]?.status,
-                  status.state == "printing",
+                  PrinterWatch.isPrinting(status.state),
                   let left = status.timeRemaining, left > 0 else { return nil }
             return left
         }.min()

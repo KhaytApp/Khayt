@@ -234,53 +234,98 @@ private struct Goal: View {
 }
 
 /// What is late, wrong, or about to be.
+/// The words `lib/attention.js` emits, named once.
+///
+/// ── THEY WERE COMPARED AGAINST A WORD NOTHING PRODUCES ────────────────────
+///
+/// The panel below asked `severity == "bad"`, and the module emits `crit` and
+/// `warn` — never "bad". The comparison was false on every row that has ever
+/// been drawn: the rail stayed amber with a printer down, and a machine that
+/// had stopped looked exactly like a nozzle reminder. Nothing threw, no test
+/// failed, and the module's distinction between "something has broken" and
+/// "something merely wants a person" was thrown away one line before the
+/// screen.
+///
+/// A string compared against a value its producer never emits is silent by
+/// construction, so `SeverityTests` asks the producer.
+enum NeedsAttentionSeverity {
+    static let critical = "crit"
+    static let warning = "warn"
+}
+
+/// What a row of the attention panel offers to do about itself.
+enum NeedsAttentionAction {
+    /// Each kind gets its own mark, so the list is scannable before it is read.
+    static func symbol(_ kind: String) -> String {
+        switch kind {
+        case "machine": "printer.dotmatrix"
+        case "nozzle": "wrench.adjustable"
+        case "stock": "circle.dashed"
+        default: "clock.badge.exclamationmark"
+        }
+    }
+
+    /// The word on the button, per kind. A single "Open" on all four would be
+    /// honest and useless: the value is in saying what pressing it does before
+    /// it is pressed.
+    static func forKind(_ kind: String) -> String {
+        switch kind {
+        case "machine": "mac.attn_go_machine"
+        case "nozzle": "mac.attn_go_nozzle"
+        case "stock": "mac.attn_go_stock"
+        default: "mac.attn_go_job"
+        }
+    }
+}
+
 private struct NeedsAttention: View {
     let items: [DashboardFacts.Item]
     let shop: Shop
 
+    /// How many rows before the panel stops being a list and becomes a wall.
+    ///
+    /// The module returns everything, correctly — it is a selector, not a
+    /// display. On the sample shop that is eight rows, and a shop with twenty
+    /// late jobs would get a dashboard that is nothing but this panel, which is
+    /// the same failure as a band with twenty machines on it. Six fit above the
+    /// fold on the smallest window this app opens at; the rest are counted and
+    /// one press away.
+    private static let atMost = 6
+
+    private var shown: ArraySlice<DashboardFacts.Item> { items.prefix(Self.atMost) }
+    private var hidden: Int { max(0, items.count - Self.atMost) }
+
     /// Red when something has actually failed, amber when something merely
-    /// wants a person. The severity is the module's own — `dashboard-facts`
-    /// marks an item "bad" — so the rail is not a second opinion about how
-    /// worried to be.
+    /// wants a person. The severity is the module's own — this is not a second
+    /// opinion about how worried to be.
     private var worst: Color {
-        items.contains { $0.severity == "bad" } ? Khayt.late : Khayt.attention
+        items.contains { $0.severity == NeedsAttentionSeverity.critical }
+            ? Khayt.late : Khayt.attention
     }
 
     var body: some View {
         DetailSection(shop.words.callIt("mac.needs_attention"),
                       accent: worst, symbol: "exclamationmark.triangle.fill") {
             VStack(spacing: 0) {
-                ForEach(items) { item in
-                    HStack(spacing: 10) {
-                        Image(systemName: symbol(item.kind))
-                            .foregroundStyle(item.severity == "bad" ? Khayt.late : Khayt.attention)
-                            .frame(width: 18)
-                        // ONE LINE, not two. This list is read at a glance and
-                        // its job is to be complete on the screen: stacking the
-                        // order number under the name doubled the height of
-                        // every row, so six late jobs filled the window and a
-                        // seventh was below the fold — which is the one thing a
-                        // list of what is wrong must not do.
-                        Text(item.name ?? item.id).lineLimit(1)
-                        Text(item.id)
-                            .font(.caption2)
-                            .monospacedDigit()
-                            .foregroundStyle(.tertiary)
-                        Spacer(minLength: 8)
-                        if let late = item.daysLate, late > 0 {
-                            // Said in words, not by colour alone. This is the
-                            // line that decides whether someone gets a phone
-                            // call today.
-                            Text(shop.words.callIt(
-                                late == 1 ? "mac.days_late_one" : "mac.days_late",
-                                ["n": .number(Double(late))]))
-                                .font(.callout)
-                                .monospacedDigit()
-                                .foregroundStyle(Khayt.attention)
+                ForEach(shown) { item in
+                    Row(item: item, shop: shop,
+                        ink: item.severity == NeedsAttentionSeverity.critical
+                             ? Khayt.late : Khayt.attention)
+                    if item.id != shown.last?.id || hidden > 0 { Divider() }
+                }
+                if hidden > 0 {
+                    // Counted, not hidden. A list that silently stops at six is
+                    // a list that says the shop has six problems.
+                    HStack {
+                        Text(shop.words.callIt("mac.attn_more", ["n": .number(Double(hidden))]))
+                            .font(.callout).foregroundStyle(.secondary)
+                        Spacer()
+                        Button(shop.words.callIt("mac.attn_see_all")) {
+                            shop.shelf = .jobs(nil)
                         }
+                        .buttonStyle(.borderless).font(.callout)
                     }
                     .padding(.vertical, 5)
-                    if item.id != items.last?.id { Divider() }
                 }
             }
             .padding(.horizontal, 12)
@@ -288,11 +333,78 @@ private struct NeedsAttention: View {
         }
     }
 
-    private func symbol(_ kind: String) -> String {
-        switch kind {
-        case "machine": "printer.dotmatrix"
-        case "nozzle": "wrench.adjustable"
-        default: "clock.badge.exclamationmark"
+    private struct Row: View {
+        let item: DashboardFacts.Item
+        let shop: Shop
+        let ink: Color
+
+        var body: some View {
+            HStack(spacing: 10) {
+                Image(systemName: NeedsAttentionAction.symbol(item.kind))
+                    .foregroundStyle(ink)
+                    .frame(width: 18)
+                // ONE LINE, not two. This list is read at a glance and its job
+                // is to be complete on the screen: stacking the order number
+                // under the name doubled the height of every row, so six late
+                // jobs filled the window and a seventh was below the fold —
+                // which is the one thing a list of what is wrong must not do.
+                Text(item.name ?? item.id).lineLimit(1)
+                Text(subtitle).font(.caption2).monospacedDigit()
+                    .foregroundStyle(.tertiary).lineLimit(1)
+                Spacer(minLength: 8)
+                if let late = item.daysLate, late > 0 {
+                    // Said in words, not by colour alone. This is the line that
+                    // decides whether someone gets a phone call today.
+                    Text(shop.words.callIt(late == 1 ? "mac.days_late_one" : "mac.days_late",
+                                           ["n": .number(Double(late))]))
+                        .font(.callout).monospacedDigit().foregroundStyle(ink)
+                } else if let grams = item.grams {
+                    Text("\(Int(grams)) \(shop.words.callIt("common.grams"))")
+                        .font(.callout).monospacedDigit().foregroundStyle(ink)
+                }
+                // ── AND THE THING THAT FIXES IT ───────────────────────────
+                //
+                // A list of problems with nothing to press is a list you read
+                // and then go looking for the screen it is about. Every row
+                // knows which screen that is, so it takes you there.
+                // `.borderless`, not `.link`: a link button paints itself
+                // `NSColor.linkColor` and ignores the environment tint, so
+                // every one of these came out system blue in an app whose own
+                // colour is cyan — and would have stayed blue for someone who
+                // had chosen a different accent in System Settings, which is
+                // the one case the tint exists to honour.
+                Button(shop.words.callIt(NeedsAttentionAction.forKind(item.kind))) { go() }
+                    .buttonStyle(.borderless)
+                    .font(.callout)
+            }
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+            .onTapGesture { go() }
+        }
+
+        /// What is wrong, in the fewest characters that say it: the order
+        /// number for a job, the shop's own colour for a spool, the state for a
+        /// machine, the figure it went past for a nozzle.
+        private var subtitle: String {
+            switch item.kind {
+            case "stock": return item.variant ?? ""
+            case "machine":
+                return item.state.map { shop.words.callIt("mac.attn_state_\($0)") } ?? ""
+            case "nozzle":
+                guard let threshold = item.threshold else { return "" }
+                return shop.words.callIt("mac.attn_nozzle_of", ["n": .number(threshold)])
+            default: return item.id
+            }
+        }
+
+        private func go() {
+            switch item.kind {
+            case "stock": shop.shelf = .inventory
+            case "machine", "nozzle": shop.shelf = .machines
+            default:
+                shop.shelf = .jobs(nil)
+                shop.selection = item.id
+            }
         }
     }
 }
@@ -337,8 +449,11 @@ private struct RunningNow: View {
 
     private var running: [(Machine, KhaytEngine.PrinterStatus)] {
         shop.machines.compactMap { machine in
+            // The one predicate, not a fourth spelling of it. This file, the
+            // machine card and two properties on `Shop` each had their own,
+            // and two of the four forgot to lowercase.
             guard let status = shop.printers.readings[machine.id]?.status,
-                  status.state.lowercased() == "printing" else { return nil }
+                  PrinterWatch.isPrinting(status.state) else { return nil }
             return (machine, status)
         }
     }

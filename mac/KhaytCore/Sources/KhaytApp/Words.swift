@@ -262,6 +262,16 @@ final class Words {
         "mac.board":         ["en": "Board",         "ar": "اللوح"],
         "mac.nothing_here":  ["en": "nothing here",  "ar": "لا شيء هنا"],
         "mac.no_jobs":       ["en": "No jobs yet",   "ar": "لا أعمال بعد"],
+        // Needs attention — what is wrong, and the button that goes to it
+        "mac.attn_go_machine": ["en": "Open printer",  "ar": "افتح الطابعة"],
+        "mac.attn_go_nozzle":  ["en": "Replace",       "ar": "استبدل"],
+        "mac.attn_go_stock":   ["en": "Order more",    "ar": "اطلب المزيد"],
+        "mac.attn_go_job":     ["en": "Open job",      "ar": "افتح العمل"],
+        "mac.attn_state_offline": ["en": "not answering", "ar": "لا تجيب"],
+        "mac.attn_state_error":   ["en": "reporting a fault", "ar": "تبلّغ عن عطل"],
+        "mac.attn_nozzle_of":  ["en": "past {n} g",    "ar": "تجاوزت {n} غ"],
+        "mac.attn_more":       ["en": "and {n} more",  "ar": "و{n} أخرى"],
+        "mac.attn_see_all":    ["en": "See all",       "ar": "اعرض الكل"],
         // The band: the next two days on the machines
         "mac.band_title":    ["en": "The next 48 hours",  "ar": "الـ 48 ساعة القادمة"],
         "mac.band_sub":      ["en": "now → {hours} hours ahead · one mark = 6 h",
