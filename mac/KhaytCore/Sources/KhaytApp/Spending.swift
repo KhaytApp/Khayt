@@ -138,10 +138,10 @@ struct Expenses: View {
                 }
                 .padding(Metric.pane)
             }
-            // Recomputed when the period changes as well as the book: the
-            // budget rows are about what has been spent, and that is a figure
-            // the period picker moves.
-            .task(id: shop.expenses.count + shop.period.hashValue) { await recompute() }
+            // The BOOK moves these rows; the period picker does not. A budget
+            // is a monthly thing — see `expenseTotalsThisMonth` — and this
+            // panel says so in its own heading.
+            .task(id: shop.expenses.count) { await recompute() }
         }
 
         private func recompute() async {
@@ -149,7 +149,8 @@ struct Expenses: View {
             var settings = shop.settingsDict
             let table: [String: JSONValue]
             if case .object(let b)? = settings["expBudgets"] { table = b } else { table = [:] }
-            budgets = (try? await engine.budgetProgress(shop.expenseTotals.byCategory, budgets: table)) ?? []
+            budgets = (try? await engine.budgetProgress(shop.expenseTotalsThisMonth,
+                                                        budgets: table)) ?? []
         }
     }
 }
