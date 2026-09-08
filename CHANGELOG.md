@@ -6,6 +6,31 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Khayt answers the Mac without being opened.** "What is printing" and "What is
+  waiting to print" are now actions the system owns: they appear in Spotlight and
+  Shortcuts, Siri can be asked them, and an automation can run one at seven in the
+  morning with nobody present. They read the book on disk and nothing else — no
+  window, no engine, no printer poll — so the answer arrives faster than the app
+  could open.
+
+  That constrains them on purpose to facts the book STATES rather than facts a
+  rule derives. "Printing" is a status somebody wrote down; "late" is a judgement
+  `lib/attention.js` makes about due dates and voided orders, and it is not
+  re-implemented in Swift to save a launch.
+
+  The build had to grow a step for this. Xcode discovers `AppIntent` types by
+  emitting per-file const values and running `appintentsmetadataprocessor` over
+  them; SwiftPM does neither, so the intents compiled, linked, and would have
+  been invisible to every part of macOS — a verb nothing could call. `make-app.sh`
+  now asks the compiler for the const values, builds `Metadata.appintents` and
+  signs it into the bundle, and says how many actions it found. It says so loudly
+  when it finds none.
+
+  The verbs themselves are English. Khayt translates at runtime from its own
+  catalogue and App Intents titles are read by the system at registration, which
+  wants a string catalog this hand-assembled bundle has not got. The ANSWERS are
+  in the shop's language.
+
 - **The Mac can say which printer should take which job.** Khayt has had a
   print-farm scheduler since 3.0 — it places waiting work by due date, material,
   nozzle and how loaded each machine already is — and the Electron kanban has
