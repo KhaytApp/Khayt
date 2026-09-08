@@ -239,3 +239,31 @@ struct IsPrintingTests {
         #expect(!PrinterWatch.isPrinting("paused"))
     }
 }
+
+/// One problem, printed once.
+///
+/// A late job is in the attention panel, and its invoice is overdue, so it was
+/// in "Invoices to chase" as well — four of the eight rows in that list were
+/// four of the six rows eight inches above them. Twice is not twice the
+/// warning; it is a screen a shop learns to skim.
+@MainActor
+struct ChaseDoesNotRepeatTests {
+
+    @Test("the chase list is what the attention panel does not already carry")
+    func noDuplicates() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let attention = Set((shop.attention?.items ?? []).map(\.id))
+        #expect(!attention.isEmpty, "the sample shop has nothing to be attentive about")
+
+        let shown = shop.invoicesToChase.filter { !attention.contains($0.id) }
+        for row in shown {
+            #expect(!attention.contains(row.id),
+                    "\(row.id) is in both lists on the same screen")
+        }
+        // And the filter is doing something on this book, or the test proves
+        // nothing about a screen nobody has looked at.
+        #expect(shown.count < shop.invoicesToChase.count,
+                "nothing overlapped, so this guard would not notice if it did")
+    }
+}

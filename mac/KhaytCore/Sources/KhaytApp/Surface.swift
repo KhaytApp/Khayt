@@ -356,3 +356,90 @@ struct Derived: View {
         }
     }
 }
+
+/// One figure in a strip of them.
+struct Stat: Identifiable {
+    let label: String
+    let value: String
+    /// The arithmetic, where there is any.
+    var working: String?
+    /// The app's own mark, preferred. `symbol` is the fallback for the handful
+    /// of labels this app has no drawing for yet.
+    var mark: Mark?
+    var symbol: String?
+    var tint: Color = .secondary
+    /// Set on the one figure describing something happening right now.
+    var alive = false
+    var id: String { label }
+}
+
+/// Several figures in ONE card, ruled apart.
+///
+/// ── FOUR CARDS FOR FOUR NUMBERS ───────────────────────────────────────────
+///
+/// The dashboard drew "Printing 5", "Open 11", "Late 6" and "Online 0/5" as
+/// four separate cards, each with its own border, corner radius, padding and
+/// shadowless lift — four rectangles across seventeen hundred points to carry
+/// four numbers and four words. The ink went almost entirely on the boxes.
+///
+/// They are one thing: the state of the floor, right now. So they are one card,
+/// with a layer line between each figure and the next — which is also what the
+/// rest of the app now uses to separate a row from the row below it.
+struct StatStrip: View {
+    let stats: [Stat]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(stats.enumerated()), id: \.element.id) { index, stat in
+                if index > 0 {
+                    Rectangle().fill(Khayt.layerLine).frame(width: 1)
+                        .padding(.vertical, 8)
+                }
+                Cell(stat: stat)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .card(padding: 0)
+    }
+
+    private struct Cell: View {
+        let stat: Stat
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 5) {
+                    if let mark = stat.mark {
+                        Drawn(mark: mark, size: 13)
+                    } else if let symbol = stat.symbol {
+                        Image(systemName: symbol)
+                            // The one piece of motion in the app, on the one
+                            // thing that is actually moving.
+                            .symbolEffect(.variableColor.iterative.dimInactiveLayers,
+                                          isActive: stat.alive && !reduceMotion)
+                    }
+                    Text(stat.label).lineLimit(1)
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(stat.alive ? AnyShapeStyle(Khayt.hot) : AnyShapeStyle(.secondary))
+
+                Text(stat.value)
+                    .font(.system(size: 21, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(stat.tint == .secondary
+                                     ? AnyShapeStyle(.primary) : AnyShapeStyle(stat.tint))
+                    .lineLimit(1).minimumScaleFactor(0.6)
+
+                if let working = stat.working {
+                    HStack(spacing: 5) {
+                        Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
+                        Text(working).font(.caption2).monospacedDigit()
+                            .foregroundStyle(.tertiary).lineLimit(1)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 13).padding(.vertical, 11)
+        }
+    }
+}

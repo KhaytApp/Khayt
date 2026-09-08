@@ -34,6 +34,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The dashboard answers "what should I look at" instead of listing four
+  things.** Every section said its name in the same small grey capitals, so
+  "Needs attention" and "Money" carried identical weight. One section now leads
+  — at reading size, in the colour of what is wrong, with the count beside it —
+  and which one it is depends on the morning: with nothing wrong, the floor
+  leads instead.
+
+  The four figures about the floor were four separate cards, each with its own
+  border and padding, spending almost all their ink on the boxes. They are one
+  thing, so they are one card with a rule between each figure. The same for the
+  five about the period.
+
+  And "Invoices to chase" no longer repeats what the panel above already shows.
+  A late job is in both lists, and four of eight rows were four of the six rows
+  eight inches above them — one problem printed twice is not twice the warning.
+
+- **The jobs table shows twenty jobs where it showed twelve.** The name sat over
+  the order number on two lines, making every row 55 points tall on the screen a
+  shop lives in. One line now, and the stage is a coloured dot beside its word
+  rather than the same borrowed icon repeated down forty-two rows.
+
 - **The app's own colours, and a contrast guard that was asking the wrong
   question.** The palette is warmer and deeper — a paper ground rather than a
   near-white one, a warm line round every card instead of black at 9%, and a

@@ -63,28 +63,32 @@ struct OrdersTable: View {
                     // grey squares.
                     if let thumb = shop.modelThumbnail(for: job) {
                         Thumbnail(source: thumb)
-                            .frame(width: 30, height: 30)
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .frame(width: 20, height: 20)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(job.project).lineLimit(1)
-                        HStack(spacing: 5) {
-                            Text(job.id)
-                                .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
-                            // The colours it was printed in, as WORDS — the
-                            // shop's own, which is how it would be asked for
-                            // over the counter. Not swatches: nothing here maps
-                            // "sand" to a colour, and a guess would be this
-                            // app's opinion of a physical thing.
-                            ForEach(shop.partColours(of: job).prefix(2), id: \.self) { colour in
-                                Text(colour)
-                                    .font(.caption2)
-                                    .padding(.horizontal, 5).padding(.vertical, 1)
-                                    .background(.quaternary, in: Capsule())
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
+                    // ONE LINE, NOT TWO.
+                    //
+                    // The name over the order number made every row 55pt tall,
+                    // so a 900pt window showed twelve jobs where the same table
+                    // ruled at 28 shows twenty-two. This is the screen a shop
+                    // lives in, and the thing it wants from it is to see the
+                    // work — the number is a reference you read once you have
+                    // found the row, not something you scan down.
+                    Text(job.project).lineLimit(1)
+                    Text(job.id)
+                        .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                        .layoutPriority(-1).lineLimit(1)
+                    // The colours it was printed in, as WORDS — the shop's own,
+                    // which is how it would be asked for over the counter. Not
+                    // swatches: nothing here maps "sand" to a colour, and a
+                    // guess would be this app's opinion of a physical thing.
+                    ForEach(shop.partColours(of: job).prefix(2), id: \.self) { colour in
+                        Text(colour)
+                            .font(.caption2)
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Khayt.recessed, in: Capsule())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1).layoutPriority(-1)
                     }
                 }
             }
@@ -112,9 +116,21 @@ struct OrdersTable: View {
                     // has a word for — see `Stage.tint`. On a book whose jobs
                     // are all delivered this column is still one colour, and
                     // that is the honest answer rather than a decorated one.
-                    Label(shop.words.callIt(s.key), systemImage: s.symbol)
-                        .labelStyle(.titleAndIcon)
-                        .foregroundStyle(s.tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
+                    // A DOT AND THE WORD, not an icon and the word.
+                    //
+                    // The same borrowed symbol repeated down forty-two rows
+                    // carries one bit the word beside it already carries, and
+                    // costs the height that made this table 55pt a row. A dot
+                    // in the stage's own colour scans as well and takes 6pt.
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(s.tint ?? Color.secondary)
+                            .frame(width: 6, height: 6)
+                        Text(shop.words.callIt(s.key))
+                            .foregroundStyle(s.tint.map(AnyShapeStyle.init)
+                                             ?? AnyShapeStyle(.secondary))
+                            .lineLimit(1)
+                    }
                 } else {
                     Text(job.status).foregroundStyle(.tertiary)
                 }

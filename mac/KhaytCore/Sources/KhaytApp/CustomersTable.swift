@@ -154,7 +154,7 @@ struct CustomerInspector: View {
                             .font(.callout)
                         }
                     }
-                    Divider()
+                    LayerRule()
                     // What the shop actually wrote down. Absent entirely before
                     // this app read the `clients` collection, so a customer's
                     // phone number lived only in the Electron window.
@@ -186,11 +186,11 @@ struct CustomerInspector: View {
                                 Text(record.notes).font(.callout).textSelection(.enabled)
                             }
                         }
-                        Divider()
+                        LayerRule()
                     } else if person.record == nil {
                         Label(shop.words.callIt("mac.no_record"), systemImage: "person.crop.circle.badge.questionmark")
                             .font(.caption).foregroundStyle(.secondary)
-                        Divider()
+                        LayerRule()
                     }
                     DetailSection(shop.words.callIt("mac.money")) {
                         DetailLine(shop.words.callIt("mac.billed"), Money.text(person.billed, shop.currency))
@@ -201,7 +201,7 @@ struct CustomerInspector: View {
                             DetailLine(shop.words.callIt("mac.past_due"), "\(person.overdueCount)", warn: true)
                         }
                     }
-                    Divider()
+                    LayerRule()
                     DetailSection(shop.words.callIt("mac.jobs_count")) {
                         ForEach(person.orders.sorted { ($0.day ?? .distantPast) > ($1.day ?? .distantPast) }) { job in
                             HStack(alignment: .firstTextBaseline) {
