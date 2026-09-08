@@ -323,6 +323,10 @@ final class Shop {
             // Once per book rather than per right-click: the list is twenty-two
             // fixed entries and a context menu is built while a grid draws.
             printerProfiles = (try? await engine?.printerProfiles()) ?? []
+            // What kind each machine is, resolved once per book. Read in view
+            // bodies, so a hop into JavaScript per machine per redraw would be
+            // a hop for a constant.
+            machineKinds = (try? await engine?.machineKinds(machineRows)) ?? [:]
             // What each model's licence permits, asked once for the library:
             // the inspector shows it for the selected model and the grid does
             // not, so a hop per row would be a hop for nothing.
@@ -1261,6 +1265,22 @@ final class Shop {
     /// The machines, as the book holds them. Kept so the fleet tile can be
     /// recomputed when the printers answer, without redoing the whole dashboard.
     private(set) var machineRows: [JSONValue] = []
+
+    /// Every machine's kind and what follows from it, keyed by machine id.
+    /// `lib/machine-kinds.js` decides; this holds the answer.
+    private(set) var machineKinds: [String: KhaytEngine.MachineKind] = [:]
+
+    /// What this machine is. A book written before Khayt knew about anything
+    /// but filament printers has no `kind` on any machine, and the module reads
+    /// that as FDM — correctly, because until now nothing else could be
+    /// recorded. The fallback here is for the moment before the book loads.
+    func kind(of machine: Machine) -> KhaytEngine.MachineKind? { machineKinds[machine.id] }
+
+    /// The kinds the editor can offer. Asked when the sheet opens rather than
+    /// held on the shop: it is five records and the sheet is not a hot path.
+    func machineKindChoices() async -> [KhaytEngine.MachineKind] {
+        (try? await engine?.machineKindChoices()) ?? []
+    }
 
     /// The catalogue, as the book holds it.
     ///

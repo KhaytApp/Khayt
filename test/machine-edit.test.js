@@ -219,3 +219,33 @@ test('a nozzle is written as a block, and an empty threshold falls back to the m
   assert.equal(machine.nozzle.gramsThreshold, 7000, 'a figure the shop typed is kept');
   assert.equal(machine.nozzle.installedAt, '', 'and the block is whole — a half-written nozzle lies about wear');
 });
+
+// ── What kind of machine this is ───────────────────────────────────────────
+
+require('../lib/machine-kinds.js');
+
+test('a machine can be told it is a laser cutter', () => {
+  const m = { id: 'M1', name: 'Ruida' };
+  KhaytMachineEdit.applyEdit(m, { kind: 'laser' }, {});
+  assert.equal(m.kind, 'laser');
+});
+
+test('a kind the vocabulary does not know is refused where it is WRITTEN', () => {
+  // Not at every screen that reads it: a word nobody knows, once in the book,
+  // reads back as FDM for ever and the shop's answer is silently lost.
+  const m = { id: 'M1', name: 'Thing' };
+  KhaytMachineEdit.applyEdit(m, { kind: 'waterjet' }, {});
+  assert.equal(m.kind, 'fdm');
+});
+
+test('editing something else does not blank the kind', () => {
+  const m = { id: 'M1', name: 'Ruida', kind: 'laser' };
+  KhaytMachineEdit.applyEdit(m, { powerDraw: 80 }, {});
+  assert.equal(m.kind, 'laser', 'a nozzle edit must not turn a laser into a printer');
+});
+
+test('a machine written before this field existed is left without one', () => {
+  const m = { id: 'M1', name: 'Old' };
+  KhaytMachineEdit.applyEdit(m, { name: 'Older' }, {});
+  assert.equal('kind' in m, false, 'and the module reads that as FDM, which it is');
+});

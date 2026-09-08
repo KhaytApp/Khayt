@@ -188,3 +188,36 @@ extension SampleShopTests {
                 "every product is translated, so the language fallback never renders")
     }
 }
+
+extension SampleShopTests {
+
+    /// The sample shop was three filament printers and nothing else, so no
+    /// screen had ever drawn any other kind of machine — the nozzle row, the
+    /// wear block and the band's "cannot ask" line were all only ever seen in
+    /// the one case they were written for.
+    @Test("the sample shop runs more than filament printers")
+    func moreThanFilament() async throws {
+        let machines = try Self.rows("machines").map { JSONValue.object($0) }
+        let kinds = try await KhaytEngine().machineKinds(machines)
+        let seen = Set(kinds.values.map(\.kind))
+        #expect(seen.contains("fdm"))
+        #expect(seen.count >= 3,
+                "one kind of machine draws one version of every machine screen: \(seen.sorted())")
+        // And at least one Khayt cannot poll, which is the case that must not
+        // look like a printer that has stopped answering.
+        #expect(kinds.values.contains { !$0.polled },
+                "nothing here exercises 'Khayt has no protocol for this'")
+        #expect(kinds.values.contains { $0.polled })
+    }
+
+    @Test("every machine in the sample shop says which kind it is")
+    func everyMachineSaysSo() throws {
+        for m in try Self.rows("machines") {
+            guard case .string(let kind)? = m["kind"] else {
+                Issue.record("a sample machine has no kind, so it is read as FDM by default rather than by choice")
+                continue
+            }
+            #expect(!kind.isEmpty)
+        }
+    }
+}

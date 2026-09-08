@@ -34,6 +34,32 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Khayt knows there are other machines than filament printers.** A machine now
+  says what kind it is — filament printer, resin printer, UV flatbed, laser
+  cutter or CNC router — and the app stops describing all five as the first one.
+  A laser cutter was being shown a nozzle diameter, an extruder type and a
+  colour count, and asked when its nozzle was installed, because those fields
+  were on the record so they were drawn. It sees its bed and its power draw now,
+  which is what it has.
+
+  Every machine already in your book is a filament printer, and is read as one —
+  not as a guess, but because until now nothing else could be recorded. Nothing
+  changes for a shop that only runs filament printers.
+
+  Each kind also names what it consumes and what wears out on it: resin in
+  millilitres with a FEP film counted in prints and an LCD counted in hours,
+  ink in millilitres with a printhead, sheet material with a tube and a lens.
+  Recording those is the next piece of work — Khayt's stock, waste and reorder
+  rules are written in grams and teaching them a second unit changes how a
+  shop's costs are counted, which is not a change to make quietly alongside
+  this one.
+
+- **A machine Khayt cannot ask no longer looks like one that has stopped
+  answering.** Every printer protocol in Khayt talks to a filament printer, so a
+  laser cutter is not unreachable — it is working, and there is simply nothing to
+  ask it with. The two looked identical on the machines band and mean opposite
+  things. It says which it is now, and only the fault is amber.
+
 - **Filament about to run out now reaches the dashboard.** A spool at or below
   its reorder point was the last thing on the shop floor with a rule, a screen
   and no place on the one screen you leave open — the shelf knew, the badge

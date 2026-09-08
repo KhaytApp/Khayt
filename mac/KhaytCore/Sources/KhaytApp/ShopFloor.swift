@@ -108,6 +108,12 @@ private struct Card: View {
         Live.isPrinting(shop.printers.readings[machine.id]?.status?.state ?? "")
     }
 
+    /// What kind of machine this is. Nil only for the instant before the book
+    /// has loaded, and `shows` treats that as a filament printer — which every
+    /// machine in every book written before this existed genuinely is.
+    private var kind: KhaytEngine.MachineKind? { shop.kind(of: machine) }
+    private func shows(_ field: String) -> Bool { kind?.shows(field) ?? true }
+
     private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
@@ -140,11 +146,21 @@ private struct Card: View {
             if hasSpecs {
             DetailSection(shop.words.callIt("mac.the_machine")) {
                 if let bed = machine.bedSize { DetailLine(shop.words.callIt("mac.bed"), bed) }
-                if let d = machine.nozzleDiameter {
+                // ── ONLY WHAT THIS KIND OF MACHINE HAS ───────────────────
+                //
+                // A laser cutter has no nozzle, no extruder and no colour
+                // count, and this screen gave it all three: the field was on
+                // the record, so it was drawn. `lib/machine-kinds.js` says
+                // which specs belong to which kind, and this asks it.
+                if let d = machine.nozzleDiameter, shows("nozzleDiameter") {
                     DetailLine(shop.words.callIt("mac.nozzle"), "\(Money.figure(d)) mm")
                 }
-                if let n = machine.maxColors { DetailLine(shop.words.callIt("mac.colours"), "\(n)") }
-                if let e = machine.extruderType { DetailLine(shop.words.callIt("mac.extruder"), e) }
+                if let n = machine.maxColors, shows("maxColors") {
+                    DetailLine(shop.words.callIt("mac.colours"), "\(n)")
+                }
+                if let e = machine.extruderType, shows("extruderType") {
+                    DetailLine(shop.words.callIt("mac.extruder"), e)
+                }
                 if let w = machine.powerDraw { DetailLine(shop.words.callIt("mac.power"), "\(Int(w)) W") }
                 if let address = machine.address {
                     // The address, never the key. The store keeps that encrypted
