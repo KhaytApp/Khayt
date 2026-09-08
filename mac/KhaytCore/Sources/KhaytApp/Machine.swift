@@ -142,3 +142,13 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
         return cost / (original / 1000)
     }
 }
+
+extension String {
+    /// Equal ignoring case and the spaces around it — "Snapmaker U1" and
+    /// "snapmaker u1 " are the same printer typed twice.
+    func caseInsensitiveEquals(_ other: String) -> Bool {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .compare(other.trimmingCharacters(in: .whitespacesAndNewlines),
+                     options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+    }
+}

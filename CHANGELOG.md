@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac app's tests run on a pull request.** Everything in CI ran on Linux,
+  so for as long as the native app has existed none of its 705 tests had run on
+  a PR — not the guard that the Quick Look extension carries no Swift entry
+  point, not the word catalogue, not the check that no unit is spelled out in
+  Swift. A release merged green with one of them failing and nobody could have
+  known, because the four required checks cannot see a line of Swift.
+
+  It builds the extensions before testing, because the entry-point guard READS
+  THE BUILT BINARY and skips when there is nothing to read.
+
+
 
 - **The space bar answers the question too.** Pressing space on a `.3mf` in
   Finder shows the plate render large, with the printer, layer height, nozzle,
@@ -992,6 +1003,42 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: the dashboard tile renamed the sidebar with it.** Giving the fleet
+  tile an honest label changed `mac.machines`, which the Machines shelf and its
+  Go menu item also use — so the menu came back reading "Online ⌘5", which is
+  not a place anyone navigates to. The tile has its own key now, and a test
+  holds both.
+
+- **Fixed: every invoice printed the shop's name where its tagline and footer
+  belong.** The document asks its host for four fields — the business name, the
+  address, the tagline and the footer. This app answered two of them and
+  returned the NAME for the other two, so the name appeared twice at the top of
+  every invoice and again at the bottom, and the tagline typed into Settings had
+  never once reached a customer. Nothing was blank and nothing failed; it looked
+  like a design. A field the shop has not filled in now prints nothing, which is
+  what an empty field should do.
+
+- **Fixed: a printer named after its model said so twice.** "Snapmaker U1" sat
+  under "Snapmaker U1" on two machine cards out of three, because most shops
+  call a printer what it is. The model line still earns its place when it says
+  something the name does not — "Bambu X1C" is a Bambu Lab X1 Carbon.
+
+- **Fixed: three numbers on the dashboard that could not all be right.** None
+  of them was calculated wrongly. Each was correct over a different population,
+  printed inches from the others, and the arithmetic a person does between them
+  gave a fourth number the app never showed.
+
+  "Printing 5" beside "Machines 0/3" — the second counts printers ANSWERING ON
+  THE NETWORK, not machines with work on them, so a shop whose three printers
+  are all busy and none of them networked read a flat contradiction under one
+  heading. The tile says "Online" now, which is what the number is.
+
+  Revenue 1,243.08, Jobs 4, Average job 621.54 — revenue, cost, margin, the
+  average and on-time are all over COMPLETED jobs; the "Jobs" tile is over every
+  job in the period. Dividing the first by the second gives 310.77. The revenue
+  card now prints the count it actually divides by, so the average can be
+  checked against the money it came from.
+
 - **Fixed: the settings screenshots were photographs of the menu bar icon.** The
   snapshot harness found the Settings window by taking the first visible window
   that was not the shop's — and since the menu bar arrived, the status item has

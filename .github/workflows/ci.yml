@@ -336,3 +336,41 @@ jobs:
 
       - name: E2E smoke (cloud price ladder)
         run: xvfb-run -a npm run test:e2e:cloudplans
+
+  # The Mac app's own tests, on a Mac.
+  #
+  # WHY THIS EXISTS. Everything above runs on Linux, so for as long as the
+  # native app has existed none of its 705 tests has run on a pull request —
+  # the guards for the Quick Look extension's entry point, the word catalogue,
+  # the units written in Swift, the shared-rule bridge. #1101 merged green with
+  # one of them failing, and nobody could have known: the four required checks
+  # cannot see a single line of Swift.
+  #
+  # NO PATH FILTER, deliberately. A required check that does not report blocks
+  # a PR forever, and `lib/*.js` is bundled into this app — a change there with
+  # no `mac/` file touched is exactly the change that breaks it. See the note on
+  # `iOS contract` in CLAUDE.md for the version of this that got it wrong.
+  mac:
+    name: Mac app tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # The products first, and both extensions with them: the check that the
+      # Quick Look extensions carry no Swift entry point READS THE BUILT BINARY,
+      # and skips when there is nothing to read. Without this step it would sit
+      # green having opened nothing — which is how it behaved for its whole
+      # first day, for a different reason.
+      - name: Build the app and its extensions
+        run: swift build --package-path mac/KhaytCore --build-tests
+
+      - name: Mac app tests
+        run: swift test --package-path mac/KhaytCore --skip-build
+
+      # The bundled JavaScript is a COPY of lib/, and a copy drifts. The Node
+      # suite guards it too; this says so on the platform that runs it.
+      - name: The bundled rules are not a fork of lib/
+        run: |
+          bash mac/sync-js.sh >/dev/null
+          git diff --exit-code -- mac/KhaytCore/Sources/KhaytCore/JS \
+            || { echo "mac/KhaytCore/Sources/KhaytCore/JS is out of date — run mac/sync-js.sh"; exit 1; }

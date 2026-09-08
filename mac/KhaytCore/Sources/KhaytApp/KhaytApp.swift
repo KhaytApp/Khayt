@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import WebKit
 
 /// Not `@main`: `main.swift` is the entry point, because the writing direction
 /// has to be settled before AppKit starts. See `Direction.swift`.
@@ -525,7 +526,14 @@ final class Activator: NSObject, NSApplicationDelegate {
                 // would otherwise look like a header that never drew.
                 await settle()
                 captureSheet(named: "16-invoice-building", into: dir)
-                try? await Task.sleep(for: .seconds(2))
+                // WAITED FOR, NOT SLEPT THROUGH. Two seconds was enough until
+                // the machine was busy, and then both invoice pictures came
+                // back as an empty sheet — written without complaint, exactly
+                // like a document that failed to build. The paper's own `drawn`
+                // flag is `@State` inside the sheet and cannot be reached from
+                // here, but the WKWebView it makes is in the view tree and
+                // knows when it has finished.
+                await waitForTheDocument(upTo: 20)
                 captureSheet(named: "16-invoice", into: dir)
                 shop.clearQuestion()
                 await settle()
@@ -568,8 +576,12 @@ final class Activator: NSObject, NSApplicationDelegate {
             } else {
                 // Loudly, and with what WAS open: a silent miss here is how the
                 // nozzle glyph got photographed six times.
+                // `×`, not an `x`: the units guard reads a letter between two
+                // numbers as a unit written in Swift, and it is right to — it
+                // cannot tell this line from one a shop would read. The proper
+                // multiplication sign is what the rest of the app uses anyway.
                 let open = NSApp.windows.filter(\.isVisible)
-                    .map { "\(type(of: $0)) \(Int($0.frame.width))x\(Int($0.frame.height))" }
+                    .map { "\(type(of: $0)) \(Int($0.frame.width))×\(Int($0.frame.height))" }
                 FileHandle.standardError.write(Data(
                     "no settings window to capture — open: \(open.joined(separator: ", "))\n".utf8))
             }
@@ -767,6 +779,35 @@ final class Activator: NSObject, NSApplicationDelegate {
     ///
     /// `attachedSheet` is the honest way to find it: it is the sheet AppKit is
     /// actually showing, rather than whichever window happens to be frontmost.
+    /// Wait until the sheet's web view has finished loading.
+    ///
+    /// Says so when it gives up, because the picture it would otherwise write
+    /// is a blank sheet and a blank sheet is what a broken invoice looks like
+    /// too. Nothing about the file, its name or the harness's exit code
+    /// distinguishes the two.
+    @MainActor
+    static func waitForTheDocument(upTo seconds: Int) async {
+        func webView(in view: NSView) -> WKWebView? {
+            if let web = view as? WKWebView { return web }
+            for sub in view.subviews { if let found = webView(in: sub) { return found } }
+            return nil
+        }
+        for _ in 0..<(seconds * 10) {
+            try? await Task.sleep(for: .milliseconds(100))
+            guard let host = NSApp.windows.first(where: { $0.isVisible && $0.attachedSheet != nil }),
+                  let sheet = host.attachedSheet, let root = sheet.contentView,
+                  let web = webView(in: root) else { continue }
+            if !web.isLoading && web.estimatedProgress >= 1 {
+                // A frame for WebKit to paint what it has just finished laying
+                // out; `didFinish` is the load, not the draw.
+                try? await Task.sleep(for: .milliseconds(400))
+                return
+            }
+        }
+        FileHandle.standardError.write(Data(
+            "the invoice never finished drawing — 16-invoice.png is an empty sheet\n".utf8))
+    }
+
     static func captureSheet(named name: String, into dir: URL) {
         guard let host = NSApp.windows.first(where: { $0.isVisible && $0.attachedSheet != nil }),
               let sheet = host.attachedSheet,

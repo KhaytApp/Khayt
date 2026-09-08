@@ -98,7 +98,13 @@ private struct Card: View {
                         .onTapGesture(count: 2) {
                             if shop.canMoveJobs { shop.editingMachine = machine }
                         }
-                    if !machine.model.isEmpty {
+                    // NOT WHEN IT IS THE NAME AGAIN. Most shops call a printer
+                    // after its model, so "Snapmaker U1" sat under "Snapmaker
+                    // U1" on two cards out of three — a caption that says
+                    // nothing still costs a line and makes the row of cards
+                    // ragged. It earns its place on the third: "Bambu X1C" is
+                    // the shop's name for a Bambu Lab X1 Carbon.
+                    if !machine.model.isEmpty, !machine.model.caseInsensitiveEquals(machine.name) {
                         Text(machine.model).font(.caption).foregroundStyle(.secondary)
                     }
                 }

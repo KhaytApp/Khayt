@@ -539,7 +539,20 @@ final class Words {
                               "ar": "تظهر هنا البكرات المضافة في خيط."],
         "mac.needs_attention": ["en": "Needs attention", "ar": "يحتاج انتباهك"],
         "mac.the_floor":     ["en": "The floor",       "ar": "الورشة"],
+        // The SHELF: the sidebar row, the Go menu item, the screen itself.
         "mac.machines":      ["en": "Machines",        "ar": "الطابعات"],
+        // The dashboard TILE, which is a different thing wearing the same word.
+        // "Machines 0/3" beside "Printing 5" reads as a contradiction because
+        // it is one: the number counts printers ANSWERING ON THE NETWORK
+        // (`fleet.live`), not machines with work on them, so a shop with three
+        // printers all busy and none of them networked saw both at once under
+        // one heading.
+        //
+        // ITS OWN KEY, and that is the point. Renaming `mac.machines` fixed the
+        // tile and renamed the sidebar row and the Go menu item with it — the
+        // menu came back reading "Online ⌘5", which is not a place anyone
+        // navigates to.
+        "mac.machines_online": ["en": "Online",        "ar": "متصلة"],
         "mac.revenue":       ["en": "Revenue",         "ar": "الإيراد"],
         "mac.margin":        ["en": "Margin",          "ar": "هامش الربح"],
         "mac.avg_order":     ["en": "Average job",     "ar": "متوسط العمل"],

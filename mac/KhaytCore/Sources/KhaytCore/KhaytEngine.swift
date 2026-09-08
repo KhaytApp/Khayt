@@ -1264,11 +1264,10 @@ public actor KhaytEngine {
     public func invoiceHtml(order: JSONValue, settings: [String: JSONValue],
                             clients: [JSONValue], currencies: [String: JSONValue],
                             language: String, money: [String: JSONValue],
-                            sellerName: String, sellerAddress: String) throws -> InvoiceDocument {
+                            sellerFields: [String: JSONValue]) throws -> InvoiceDocument {
         try runtime.call2(INVOICE_SCRIPT,
                           [order, .object(settings), .array(clients), .object(currencies),
-                           .string(language), .object(money),
-                           .string(sellerName), .string(sellerAddress)],
+                           .string(language), .object(money), .object(sellerFields)],
                           as: InvoiceDocument.self)
     }
 
@@ -2432,7 +2431,11 @@ public actor KhaytEngine {
 ///
 /// `shopField` answers with what Swift resolved through the content languages,
 /// because which language a shop writes in is the app's question and it has
-/// already asked it.
+/// already asked it. It is a LOOKUP, not two special cases: the document asks
+/// for `biz`, `addr`, `tagline` and `footer`, and a version that answered
+/// `addr` and returned the shop's NAME for everything else printed the name
+/// twice at the top of every invoice and put it in the footer as well. The
+/// shop's tagline had never appeared on a document.
 ///
 /// `safeCssColor` and `safeBizLogo` REFUSE rather than pass through: a document
 /// that goes to a customer must not carry an arbitrary URL or an unvalidated
@@ -2440,7 +2443,7 @@ public actor KhaytEngine {
 private let INVOICE_SCRIPT = """
 (function () {
   var order = ARG0, settings = ARG1, clients = ARG2, currencies = ARG3;
-  var language = ARG4, money = ARG5, sellerName = ARG6, sellerAddress = ARG7;
+  var language = ARG4, money = ARG5, sellerFields = ARG6 || {};
 
   var ARABIC_DIGITS = '\u{0660}\u{0661}\u{0662}\u{0663}\u{0664}\u{0665}\u{0666}\u{0667}\u{0668}\u{0669}';
   var locales = globalThis.KhaytLocales || {};
@@ -2470,7 +2473,10 @@ private let INVOICE_SCRIPT = """
     // formatPrintDate is NOT overridden: turning an ISO string into a date a
     // customer reads is the document's own rule, and this app printed
     // "2026-07-02T14:32:00.000Z" under DATE for as long as it had its own.
-    shopField: function (base) { return base === 'addr' ? sellerAddress : sellerName; },
+    // A field the shop has not filled in is EMPTY, not the shop's name: the
+    // document already guards every optional slot, and a name in the footer is
+    // worse than no footer.
+    shopField: function (base) { return sellerFields[base] || ''; },
     // Refused rather than passed through: this document goes to a customer.
     safeBizLogo: function () { return ''; },
     safeCssColor: function (v, fallback) {
