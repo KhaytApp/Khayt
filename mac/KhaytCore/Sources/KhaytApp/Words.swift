@@ -565,6 +565,14 @@ final class Words {
         "mac.days_late":     ["en": "{n} days late",   "ar": "متأخر {n} يوماً"],
         "mac.days_late_one": ["en": "{n} day late",    "ar": "متأخر {n} يوماً"],
         "mac.no_figures":    ["en": "No figures yet",  "ar": "لا أرقام بعد"],
+        // The FIRST screen this app ever shows a shop. Not "0.00 revenue",
+        // which is what a quiet month looks like — this is a shop that has not
+        // opened, and the difference is the whole point of saying it in words.
+        "mac.no_money_yet":  ["en": "No jobs on the books yet",
+                              "ar": "لا أعمال في الدفتر بعد"],
+        "mac.no_money_yet_hint":
+            ["en": "Take a job and the money follows — what you earned, what it cost you, and what you are owed.",
+             "ar": "سجّل أول عمل وتظهر الأرقام: ما كسبته، وما كلّفك، وما لك عند العملاء."],
         "mac.no_figures_hint": ["en": "They appear once the shop's book has loaded.",
                                 "ar": "تظهر بعد تحميل دفتر المحل."],
         "mac.search_jobs": ["en": "Job, customer or number", "ar": "عمل أو عميل أو رقم"],

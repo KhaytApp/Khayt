@@ -1045,6 +1045,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: the first screen a new shop ever sees was eight zeros.** Revenue
+  0.00, gross profit 0.00, margin 0.00%, average job 0.00, jobs 0, completed 0,
+  on time "—", and then two thirds of an empty window. Every figure in that
+  section is over completed jobs, so a shop that has not taken one has nothing
+  to total — and every other screen in Khayt draws something when it is empty
+  while the front door totalled nothing and reported it. It says what it is
+  waiting for now, and the period picker is gone with it: five buttons that all
+  give the same nothing invite a press and answer identically.
+
+  A shop that HAS traded still sees its zeros when a month is quiet, because a
+  quiet month genuinely earned nothing and that is worth being told. The
+  question is asked of the whole book, never the period, so choosing "This
+  month" in a slow month cannot turn an established shop's front door into a
+  first-run screen.
+
 - **Fixed: wasted plastic got more expensive as a spool emptied.** The cost of
   a failed print divided the roll's price by what was LEFT on it rather than by
   what it weighed when it arrived, so the same plastic grew dearer every time

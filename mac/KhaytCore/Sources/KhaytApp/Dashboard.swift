@@ -448,15 +448,38 @@ private struct MoneyTiles: View {
             // Which period, said next to the figures rather than assumed. An
             // owner reading "revenue" needs to know whether that is this month
             // or all time before the number means anything.
-            Picker("", selection: $shop.kpiRange) {
-                ForEach(Dashboard.ranges, id: \.0) { key, word in
-                    Text(shop.words.callIt(word)).tag(key)
+            // NOT WHEN THERE IS NOTHING TO PICK A PERIOD OF. Every option gives
+            // the same nothing, so it is a control that invites a press and
+            // answers identically five times.
+            if !shop.hasNotTradedYet {
+                Picker("", selection: $shop.kpiRange) {
+                    ForEach(Dashboard.ranges, id: \.0) { key, word in
+                        Text(shop.words.callIt(word)).tag(key)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .padding(.bottom, 2)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .padding(.bottom, 2)
+
+            // A SHOP THAT HAS NOT TRADED YET IS NOT A SHOP WITH ZERO REVENUE.
+            //
+            // Every figure below is over completed jobs, so a book with none
+            // has nothing to state: 0.00 revenue, 0.00 gross, 0.00% margin,
+            // 0.00 average, "—" on time. Eight zeros and a dash, drawn full
+            // size, on the first screen this app ever shows anybody. Every
+            // other screen in the app draws something when it is empty; the
+            // front door totalled nothing and reported it.
+            //
+            // The floor above stays: how many machines are online is true on
+            // day one and is the thing a new shop set up first.
+            if shop.hasNotTradedYet {
+                EmptyHere(title: shop.words.callIt("mac.no_money_yet"),
+                          message: shop.words.callIt("mac.no_money_yet_hint"))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            } else {
 
             if let k = shop.kpis {
                 // ── THE ONE FIGURE ────────────────────────────────────────
@@ -532,6 +555,7 @@ private struct MoneyTiles: View {
                          symbol: "square.grid.2x2", tint: .secondary)
                 }
             }
+            }   // hasNotTradedYet
         }
     }
 }

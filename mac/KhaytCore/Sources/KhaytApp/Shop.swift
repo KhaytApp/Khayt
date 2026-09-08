@@ -1438,6 +1438,19 @@ final class Shop {
         return byCategory
     }
 
+    /// A shop that has not sold anything yet — as opposed to one that sold
+    /// nothing this month.
+    ///
+    /// The difference matters on the dashboard: a shop with a quiet September
+    /// genuinely earned 0.00 and should be told so, while a shop that opened
+    /// yesterday has nothing to total and a row of zeros tells it only that the
+    /// app can count to zero. Asked of the WHOLE book, not the period, so
+    /// changing the picker cannot turn the front door into an empty state.
+    var hasNotTradedYet: Bool { Self.hasNotTraded(orders: orders) }
+
+    /// Separated so it can be asked without a loaded shop — `FirstRunTests`.
+    static func hasNotTraded(orders: [Order]) -> Bool { orders.isEmpty }
+
     /// Khayt's own categories, in its own order.
     static let expenseCategories = ["filament", "electricity", "maintenance", "tools", "shipping", "other"]
 
