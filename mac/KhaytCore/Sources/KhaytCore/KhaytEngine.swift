@@ -186,6 +186,10 @@ public actor KhaytEngine {
         // it through a global, so listing it after would give every new job a
         // default eight-hour day instead of the shop's own.
         "working-week",
+        // When each queued job will actually be READY, and which will miss
+        // their due date because of it. `working-week` first: the day rate this
+        // projects with comes from the shop's own hours.
+        "schedule",
         // What a print costs money at when nobody has said otherwise. BEFORE
         // calculator-cost, because it supplies four of the six things that
         // module adds up — and a caller that omits them gets a price with
@@ -757,6 +761,72 @@ public actor KhaytEngine {
               return KhaytLabels.buildLabelSheet(labels, { heading: heading });
             })(ARG0, ARG1)
             """, [.array(labels), .string(heading)], as: String.self)
+    }
+
+    /// When the queue will actually finish, and what will be late because of it.
+    ///
+    /// `lib/schedule.js`. Jobs run sequentially per machine; the cumulative
+    /// print hours turn into calendar days at the shop's own daily rate, giving
+    /// each job a ready date — and a job whose ready date falls after its due
+    /// date is one somebody can still do something about.
+    ///
+    /// This is NOT the "late" the dashboard already shows. That one means
+    /// ALREADY past due, which is news that arrives too late to act on. This
+    /// one is a projection, and a shop told on Tuesday that Friday's job will
+    /// not make it can move it, split it, or ring the customer.
+    ///
+    /// `startDate` is passed in rather than read from a clock inside the module
+    /// so a projection is reproducible and testable to the day.
+    public struct Timeline: Decodable, Sendable {
+        public struct Job: Decodable, Sendable {
+            public let id: String
+            public let project: String
+            public let status: String
+            public let hours: Double
+            /// `YYYY-MM-DD`, the day this job finishes at the shop's rate.
+            public let etaDate: String
+            public let dueDate: String
+            public let late: Bool
+        }
+        public struct Machine: Decodable, Sendable {
+            public let machineId: String
+            public let unassigned: Bool
+            public let jobs: [Job]
+            public let totalHours: Double
+            public let days: Int
+            public let readyDate: String
+            public let lateCount: Int
+        }
+        public let machines: [Machine]
+        public let dailyHours: Double
+    }
+
+    /// The shop's average working hours per CALENDAR day.
+    ///
+    /// Weekly hours over seven, not over the days it opens: a job printing
+    /// through a weekend still takes those days off the calendar, and a
+    /// delivery date is a calendar date. Eight when the shop has not said.
+    public func dailyWorkingHours(settings: [String: JSONValue]) throws -> Double {
+        try runtime.call2("""
+            (function (settings) {
+              const wh = KhaytWorkingWeek.workingHours(settings);
+              const total = Object.values(wh).reduce((s, h) => s + (h > 0 ? h : 0), 0);
+              return total > 0 ? total / 7 : 8;
+            })(ARG0)
+            """, [.object(settings)], as: Double.self)
+    }
+
+    public func timeline(jobs: [JSONValue], dailyHours: Double,
+                         startDate: String) throws -> Timeline {
+        try runtime.call2("""
+            (function (jobs, daily, start) {
+              return KhaytSchedule.computeSchedule({
+                jobs: jobs, dailyHours: daily, startDate: start,
+              });
+            })(ARG0, ARG1, ARG2)
+            """,
+            [.array(jobs), .number(dailyHours), .string(startDate)],
+            as: Timeline.self)
     }
 
     public func lowStock(_ spools: [JSONValue],

@@ -518,6 +518,15 @@ final class Words {
         // A printable sheet of QR labels for the rack. The code on each one is
         // `KHAYT-SPOOL:<id>`, which is what the Electron app writes too — a
         // shop must be able to scan a rack labelled from either app.
+        // What the QUEUE is about to make late, which is a different piece of
+        // news from what already is. "Expected", not "will be": the projection
+        // is the shop's own working hours over the queue's print hours, and it
+        // is an estimate that should sound like one.
+        "mac.will_be_late":  ["en": "Expected to miss their due date",
+                              "ar": "يُتوقع تأخرها عن موعدها"],
+        "mac.due_expected":  ["en": "due {due} · expected {eta}",
+                              "ar": "الموعد {due} · متوقع {eta}"],
+
         "mac.shelf_labels":  ["en": "Shelf labels",   "ar": "ملصقات الرف"],
         "mac.print_labels":  ["en": "Print shelf labels…", "ar": "طباعة ملصقات الرف…"],
         "mac.print":         ["en": "Print",          "ar": "طباعة"],

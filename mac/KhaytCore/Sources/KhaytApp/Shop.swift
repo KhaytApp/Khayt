@@ -323,6 +323,8 @@ final class Shop {
             spoolRunway = (try? await engine?.runway(spools: inventoryRows, orders: orderRows,
                                                      now: Date())) ?? [:]
             spoolDryness = (try? await engine?.dryness(spools: inventoryRows, now: Date())) ?? [:]
+            timeline = await Self.project(orders: orders, engine: engine,
+                                          settings: settingsDict)
             // Once per book rather than per right-click: the list is twenty-two
             // fixed entries and a context menu is built while a grid draws.
             printerProfiles = (try? await engine?.printerProfiles()) ?? []
@@ -4303,6 +4305,73 @@ final class Shop {
     /// Whether each spool has gone damp, by id. Mostly `unknown` on a real
     /// shelf, and that is the honest answer — see `KhaytEngine.Dryness`.
     private(set) var spoolDryness: [String: KhaytEngine.Dryness] = [:]
+    /// When each queued job will actually be ready, and which will miss its due
+    /// date because of the queue in front of it.
+    ///
+    /// NOT the same as `late`, which means already past due. This one is a
+    /// projection: a shop told on Tuesday that Friday's job will not make it
+    /// can still move it, split it, or ring the customer. Worked out once when
+    /// the book loads — it reads the whole active queue and the shop's working
+    /// week, which is not a thing to redo per row per redraw.
+    private(set) var timeline: KhaytEngine.Timeline?
+
+    /// Ask the shared rule when the queue will finish.
+    ///
+    /// Only the jobs actually ON the floor: a quote nobody has accepted is not
+    /// in the queue, and counting it would push every real job's date out and
+    /// invent lateness that does not exist. `printTime` is the estimate the job
+    /// carries; a job with none contributes nothing but still takes its place
+    /// in the order, which is what a real queue does with an unestimated job.
+    ///
+    /// The start day is the SHOP'S calendar day, not UTC's. A projection made
+    /// at one in the morning in Riyadh must not be dated yesterday.
+    static func project(orders: [Order], engine: KhaytEngine?,
+                        settings: [String: JSONValue]) async -> KhaytEngine.Timeline? {
+        guard let engine else { return nil }
+        let onTheFloor: Set<String> = ["pending", "printing", "post", "qc", "on_hold"]
+        let queued = orders.filter { onTheFloor.contains($0.status) }
+        guard !queued.isEmpty else { return nil }
+        let jobs: [JSONValue] = queued.map { o in
+            .object([
+                "id": .string(o.id),
+                "machineId": .string(o.machineId ?? ""),
+                "hours": .number(o.printTime),
+                "dueDate": .string(o.dueDate ?? ""),
+                "project": .string(o.project),
+                "status": .string(o.status),
+            ])
+        }
+        let daily = (try? await engine.dailyWorkingHours(settings: settings)) ?? 8
+        let today = DateFormatter.shopDay.string(from: Date())
+        return try? await engine.timeline(jobs: jobs, dailyHours: daily, startDate: today)
+    }
+
+    /// The jobs projected to miss their due date, soonest due first.
+    var willBeLate: [Order] {
+        guard let timeline else { return [] }
+        var risky: [String: String] = [:]                 // id → its projected date
+        for machine in timeline.machines {
+            for job in machine.jobs where job.late { risky[job.id] = job.etaDate }
+        }
+        guard !risky.isEmpty else { return [] }
+        // A job that is ALREADY late is not news from a projection — it is in
+        // the attention panel, and saying it twice in two different words is
+        // how a screen teaches somebody to skim it.
+        let already = Set((facts?.attn.items ?? [])
+            .filter { $0.kind == "order" }.map(\.id))
+        return orders
+            .filter { risky[$0.id] != nil && !already.contains($0.id) }
+            .sorted { ($0.dueDate ?? "") < ($1.dueDate ?? "") }
+    }
+
+    /// The day a job is now expected to be ready, when that is known.
+    func readyDate(of id: Order.ID) -> String? {
+        guard let timeline else { return nil }
+        for machine in timeline.machines {
+            if let job = machine.jobs.first(where: { $0.id == id }) { return job.etaDate }
+        }
+        return nil
+    }
     /// Which machine each model fits, keyed by the model's id. Worked out once
     /// when the book loads rather than per row: a grid of four hundred models
     /// asking the runtime on every redraw is four hundred context hops.
