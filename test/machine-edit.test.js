@@ -249,3 +249,58 @@ test('a machine written before this field existed is left without one', () => {
   KhaytMachineEdit.applyEdit(m, { name: 'Older' }, {});
   assert.equal('kind' in m, false, 'and the module reads that as FDM, which it is');
 });
+
+// ── How Khayt reaches a machine ────────────────────────────────────────────
+//
+// `printerApi.apiKey` and `.accessCode` are registered secret paths, so the
+// record carries the SEALED string and no screen is ever handed the plaintext.
+// Which makes one rule load-bearing: a caller that is not changing the key
+// sends nothing, and what is stored survives. Get that wrong and every typo
+// corrected in a host field silently destroys a working credential.
+
+const withApi = () => ({
+  id: 'M1', name: 'U1',
+  printerApi: {
+    type: 'moonraker', host: '10.0.0.5', port: 7125,
+    apiKey: '__enc__SEALED', accessCode: '__enc__CODE', printerSlug: 'slug',
+  },
+});
+
+test('correcting the host does not disturb the stored credential', () => {
+  const m = withApi();
+  M.applyEdit(m, { printerApi: { type: 'moonraker', host: '10.0.0.9', port: 7125 } }, {});
+  assert.equal(m.printerApi.host, '10.0.0.9');
+  assert.equal(m.printerApi.apiKey, '__enc__SEALED', 'absent means leave it alone');
+  assert.equal(m.printerApi.accessCode, '__enc__CODE');
+});
+
+test('an empty string is the shop clearing the key, which is not the same as absent', () => {
+  const m = withApi();
+  M.applyEdit(m, { printerApi: { type: 'moonraker', host: '10.0.0.5', port: 7125, apiKey: '' } }, {});
+  assert.equal(m.printerApi.apiKey, '');
+  assert.equal(m.printerApi.accessCode, '__enc__CODE', 'and it clears only what was named');
+});
+
+test('switching a printer off keeps its credentials', () => {
+  const m = withApi();
+  M.applyEdit(m, { printerApi: { type: '', host: '', port: 0 } }, {});
+  assert.equal(m.printerApi.type, '');
+  assert.equal(m.printerApi.apiKey, '__enc__SEALED',
+    'a machine unplugged for a week should not need its key found again');
+});
+
+test('a port is a whole number or absent, never zero', () => {
+  const m = withApi();
+  M.applyEdit(m, { printerApi: { type: 'octoprint', host: 'box', port: 80.6 } }, {});
+  assert.equal(m.printerApi.port, 81);
+  M.applyEdit(m, { printerApi: { type: 'octoprint', host: 'box', port: 0 } }, {});
+  assert.equal(m.printerApi.port, undefined, 'zero is not a port; absent lets the default apply');
+});
+
+test('a machine with no connection yet can be given one', () => {
+  const m = { id: 'M2', name: 'Prusa CORE One' };
+  M.applyEdit(m, { printerApi: { type: 'prusalink', host: '192.168.1.40', port: 80, apiKey: '__enc__NEW' } }, {});
+  assert.equal(m.printerApi.type, 'prusalink');
+  assert.equal(m.printerApi.apiKey, '__enc__NEW');
+  assert.equal(m.printerApi.accessCode, '', 'nothing invented for a field nobody set');
+});

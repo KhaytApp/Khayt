@@ -674,6 +674,18 @@ final class Words {
         "mac.idle":          ["en": "Idle",            "ar": "متوقفة"],
         "mac.cannot_ask":    ["en": "Khayt cannot ask this machine",
                               "ar": "لا تستطيع خيط سؤال هذه الآلة"],
+        "mach.connection":   ["en": "Connection",      "ar": "الاتصال"],
+        "mach.protocol":     ["en": "Speaks",          "ar": "البروتوكول"],
+        "mach.protocol_none":["en": "Not connected",   "ar": "غير متصلة"],
+        "mach.key_ph":       ["en": "if the printer needs one", "ar": "إن كانت الطابعة تحتاجه"],
+        "mach.key_kept":     ["en": "saved — type to replace",  "ar": "محفوظ — اكتب للاستبدال"],
+        "mach.key_forget":   ["en": "Forget",          "ar": "انسَ"],
+        "mach.key_will_clear":["en": "The saved key will be cleared when you save.",
+                              "ar": "سيُمحى المفتاح المحفوظ عند الحفظ."],
+        "mach.key_where":    ["en": "Encrypted in your login Keychain, the same way Khayt stores it.",
+                              "ar": "يُحفظ مشفَّراً في سلسلة المفاتيح، كما تحفظه خيط."],
+        "mach.test":         ["en": "Test",            "ar": "اختبر"],
+        "mach.test_bad_draft":["en": "Fill in an address first.", "ar": "أدخل العنوان أولاً."],
         "mac.nozzle_wear":   ["en": "Nozzle wear",     "ar": "تآكل الفوهة"],
         // The dashed rectangle behind a bed plan. Without this the drawing
         // reads as a rendering fault rather than as a comparison.
@@ -1119,6 +1131,10 @@ final class Words {
         // all nine languages — and a key this app also supplied would shadow
         // Khayt's, which is what `a borrowed key never shadows one this app
         // supplies` refuses. One vocabulary, both apps.
+        // The printer's credential field. Electron's machine editor asks for
+        // the same thing, so the word is Khayt's rather than this app's — and
+        // supplying it here would shadow eight other languages with two.
+        "mach.api_key",
         "exp.vat_paid", "exp.vat_paid_hint", "exp.vat_reclaimed", "exp.vat_due",
         "inv.costs_a_job",
         "queue.quote", "queue.pending", "queue.printing", "queue.completed",

@@ -103,6 +103,30 @@ enum Secrets {
         return key
     }
 
+    /// Seal a credential the shop has just typed, for writing to the store.
+    ///
+    /// ── THE ONLY PLACE THIS APP ENCRYPTS ──────────────────────────────────
+    ///
+    /// The rule above — "opened at the point of use, never held on a model,
+    /// never written back" — is about credentials this app READ. This is the
+    /// other direction, and it exists so that a printer's API key typed into
+    /// the machine sheet lands in the book the same way Electron would have
+    /// written it: `__enc__` + OSCrypt, under the same Keychain key, readable
+    /// by both apps.
+    ///
+    /// Writing the plaintext instead would work, and would quietly put a
+    /// credential in a file that syncs, backs up and exports. So a key that
+    /// cannot be sealed is REFUSED rather than downgraded: the sheet tells the
+    /// shop the Keychain is not available and keeps what was already stored.
+    static func seal(_ text: String, for build: StoreReader.Build) async throws -> String {
+        guard !text.isEmpty else { return "" }
+        // Already sealed — carried through a form that never opened it.
+        guard !text.hasPrefix(SafeStorage.marker) else { return text }
+        guard let key = await key(for: build) else { throw Failure.noKeychain }
+        do { return try SafeStorage.seal(text, key: key) }
+        catch { throw Failure.unreadable(String(describing: error)) }
+    }
+
     /// Forget the session's key — for a test, and for a book being closed.
     static func forget() { keys = [:] }
 
