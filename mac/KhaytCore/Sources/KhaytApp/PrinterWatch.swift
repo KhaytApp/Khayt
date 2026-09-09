@@ -344,6 +344,7 @@ final class PrinterWatch {
         case redirected
         case http(Int, String)
         case notJSON
+        case noHistoryKept(String)
 
         var description: String {
             switch self {
@@ -359,6 +360,11 @@ final class PrinterWatch {
             case .http(let code, let body):
                 return "The printer's server answered \(code)"
                      + (body.isEmpty ? "." : ": \(body).")
+            case .noHistoryKept(let type):
+                return "A \(type.isEmpty ? "printer of this kind" : type) printer does not keep a "
+                     + "job history Khayt can read. Klipper (Moonraker) is the only one of the three "
+                     + "that does — the rest answer nothing at all, which arrives as a 404. Khayt "
+                     + "counts this machine's wear from the jobs in your own book instead."
             case .notJSON:
                 return "The printer's answer was not JSON."
             }
@@ -460,9 +466,29 @@ final class PrinterWatch {
     /// A LONGER TIMEOUT than a status poll. Five hundred jobs with their
     /// metadata is a real reply, and a printer that is also printing builds it
     /// slowly — Khayt allows thirty seconds for the same request.
+    /// Which printers keep a job history this app can read.
+    ///
+    /// ── THE COMMENT WAS RIGHT AND THE CONDITION WAS NOT ───────────────────
+    ///
+    /// The machine card said, in as many words, "Klipper keeps one; the other
+    /// six protocols do not expose one Khayt can read" — and then offered the
+    /// menu item whenever `notWatched(machine) == nil`, which is true for all
+    /// three protocols this app speaks. So a shop that linked a Prusa was
+    /// offered "Read history", and `/server/history/list` — Moonraker's path,
+    /// asked of a PrusaLink box — came back 404 with no explanation of why an
+    /// action the app had just offered could not work.
+    ///
+    /// Reported by a shop the day it linked its CORE One.
+    static func keepsHistory(_ machine: Machine) -> Bool {
+        (machine.printerApi?.type ?? "") == "moonraker"
+    }
+
     static func history(_ machine: Machine, engine: KhaytEngine) async throws -> [JSONValue] {
         guard notWatched(machine) == nil else {
             throw Refusal.notALanAddress(machine.printerApi?.host ?? "")
+        }
+        guard keepsHistory(machine) else {
+            throw Refusal.noHistoryKept(machine.printerApi?.type ?? "")
         }
         let base = try await baseURL(machine, engine: engine)
         let raw = try await get(base, path: "/server/history/list?limit=\(historyLimit)",
