@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 
 /// A printer on the shop floor.
 ///
@@ -126,12 +127,14 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
     /// How a shop picks this spool out of a list: what it is, and where — the
     /// two things that tell one 1kg PLA apart from another on the same shelf.
     ///
-    /// Takes the catalogue because the gram is in it. `common.grams` is `جم` in
-    /// Arabic, so a `g` written here is an English letter in an Arabic list.
-    @MainActor func label(_ words: Words) -> String {
-        let grams = weight.map { " · \(Int($0))\(words.callIt("common.grams"))" } ?? ""
+    /// Takes the catalogue because the unit is in it — `common.grams` is `جم`
+    /// in Arabic, so a `g` written here would be an English letter in an Arabic
+    /// list — and takes the item's UNIT, because a stack of plywood picked out
+    /// of a list read "Birch ply · 6g · Rack by the laser".
+    @MainActor func label(_ words: Words, unit: KhaytEngine.InventoryUnit? = nil) -> String {
+        let amount = weight.map { " · " + Quantity.say($0, unit, words) } ?? ""
         let where_ = storage.flatMap { $0.isEmpty ? nil : " · \($0)" } ?? ""
-        return material + grams + where_
+        return material + amount + where_
     }
 
     /// What a kilo of it cost, from what it weighed WHEN IT ARRIVED.
