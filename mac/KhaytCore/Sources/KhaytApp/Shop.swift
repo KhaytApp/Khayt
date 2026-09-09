@@ -320,6 +320,8 @@ final class Shop {
             giftCards = Self.decode(root, "giftCards", as: GiftCard.self)
             fits = await Self.measureFit(files, machines: machineRows, engine: engine)
             lowSpools = (try? await engine?.lowStock(inventoryRows, settings: settingsDict)) ?? [:]
+            spoolRunway = (try? await engine?.runway(spools: inventoryRows, orders: orderRows,
+                                                     now: Date())) ?? [:]
             // Once per book rather than per right-click: the list is twenty-two
             // fixed entries and a context menu is built while a grid draws.
             printerProfiles = (try? await engine?.printerProfiles()) ?? []
@@ -4263,6 +4265,15 @@ final class Shop {
     /// Which spools are running low, by id — the shared rule's answer, asked
     /// once for the whole shelf.
     private(set) var lowSpools: [String: Bool] = [:]
+    /// How long each spool has got, by id.
+    ///
+    /// The reorder list's own arithmetic, asked of every spool rather than
+    /// only the urgent ones — a shelf wants to know a spool is fine as much as
+    /// it wants to know one is not. Worked out once when the book loads: it
+    /// reads the whole order history, which is not a thing to do per card per
+    /// redraw. A spool absent from this map, or one whose `daysLeft` is nil,
+    /// has had nothing printed from it in the window and gets no line.
+    private(set) var spoolRunway: [String: KhaytEngine.Runway] = [:]
     /// Which machine each model fits, keyed by the model's id. Worked out once
     /// when the book loads rather than per row: a grid of four hundred models
     /// asking the runtime on every redraw is four hundred context hops.

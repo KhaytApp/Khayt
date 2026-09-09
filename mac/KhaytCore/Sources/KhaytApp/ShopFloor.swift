@@ -284,6 +284,7 @@ struct Inventory: View {
                         ForEach(shown) { spool in
                             SpoolCard(spool: spool, shop: shop,
                                       low: shop.lowSpools[spool.id] ?? false,
+                                      runway: shop.spoolRunway[spool.id],
                                       selected: selection == spool.id)
                                 .onTapGesture { selection = spool.id }
                                 .onTapGesture(count: 2) {
@@ -314,7 +315,23 @@ struct SpoolCard: View {
     let spool: Spool
     let shop: Shop
     let low: Bool
+    /// How long this one has got, or nil when nothing has been printed from it
+    /// in the window — an unknown future, which the card says nothing about
+    /// rather than guessing at.
+    var runway: KhaytEngine.Runway?
     var selected = false
+
+    /// Only for a spool with two months or less in it.
+    ///
+    /// A shelf that annotates every card annotates none of them: the line is
+    /// there to be noticed, and a roll with a year left is not news. Nil is
+    /// also the answer for a spool nothing has been printed from — see
+    /// `Shop.spoolRunway` — and for one already at nought, which the weight
+    /// above says better than a countdown to today would.
+    private var endsSoon: Double? {
+        guard let d = runway?.daysLeft, d <= 60 else { return nil }
+        return d
+    }
 
     private var colour: Color? {
         Swatch.rgb(fromHex: spool.color).map { Color(red: $0.r, green: $0.g, blue: $0.b) }
@@ -371,6 +388,25 @@ struct SpoolCard: View {
             } else if let cost = spool.cost {
                 Text(Money.text(cost, shop.currency))
                     .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+            }
+            // How long it has got. Amber only once it is inside a fortnight —
+            // the colour is the app's "wants a person", and a spool with six
+            // weeks in it does not.
+            if let days = endsSoon {
+                // DECIDED ON THE NUMBER THAT IS PRINTED, not the one behind it.
+                // The ASA spool had 14.2 days, which rounds to "empty in 14
+                // days" and failed a `<= 14` test — so the card said fourteen
+                // in the colour that means "no hurry". A reader cannot see the
+                // .2, and a figure that argues with its own colour is worse
+                // than either alone.
+                let shown = Int(days.rounded())
+                Text(shown < 1
+                     ? shop.words.callIt("mac.empty_now")
+                     : shop.words.callIt("mac.empty_in") + " "
+                       + shop.words.counting(shown, "mac.days_word"))
+                    .font(.caption2).monospacedDigit()
+                    .foregroundStyle(shown <= 14 ? AnyShapeStyle(Khayt.attention)
+                                                 : AnyShapeStyle(.tertiary))
             }
         }
         .frame(maxWidth: .infinity)

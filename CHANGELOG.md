@@ -1246,6 +1246,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **A spool says how long it has got.** "640 g" looks perfectly healthy; at the
+  rate this shop is using ASA it is a fortnight from empty, and the shelf now
+  says so. Only for a spool with two months or less left — a roll with a year in
+  it is not news, and a shelf that annotates every card annotates none — and in
+  amber only once it is inside a fortnight. A spool nothing has been printed
+  from says nothing at all: an unknown future is not an endless one, and writing
+  ∞ over it would be lying with more confidence than a blank.
+
+  The arithmetic is the reorder list's own, so the shelf and the reorder list
+  cannot disagree about the same spool.
+- **Every job in the sample shop consumed a spool the shop did not own.** All
+  forty-two of them named `seed-1` against a shelf of `sp-1`…`sp-6`, so nothing
+  that joins a job to a spool could produce anything: no consumption rate, no
+  runway, no reorder suggestion, and no screenshot of this app has ever shown
+  one. The sample's printed jobs now draw on the spools whose material they
+  match, and jobs that have not been printed yet name no spool at all — which is
+  how a shop actually works, and which is a missing reference rather than a
+  broken one. This changes only the demonstration book; nobody's own data moves.
 - **A print that runs out of filament now says so, instead of "stalled".** Khayt
   watched Klipper's filament sensors not at all: a print stopped for want of
   filament stopped advancing, and fifteen minutes later the app reported it as

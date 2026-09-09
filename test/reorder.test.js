@@ -146,3 +146,66 @@ test('supplierPriceFor picks the cheapest matching price across suppliers', () =
   assert.equal(R.supplierPriceFor(suppliers, 'TPU'), null);   // no match
   assert.equal(R.supplierPriceFor([], 'PLA'), null);
 });
+
+/* ── runway: how long has this spool got ─────────────────────── */
+
+const RNOW = Date.parse('2026-09-09T12:00:00Z');
+const done = (daysAgo, spoolId, grams) => ({
+  status: 'completed',
+  completedAt: new Date(RNOW - daysAgo * DAY).toISOString(),
+  parts: [{ spoolId, grams }],
+});
+
+test('runway: a spool being used has a rate and a date', () => {
+  const inv = [{ id: 'S1', weight: 800 }];
+  const orders = [done(5, 'S1', 400), done(10, 'S1', 200)];
+  const r = R.runwayByItem(inv, orders, { now: RNOW }).S1;
+  assert.equal(r.gramsPerDay, 20);              // 600 g over the 30-day window
+  assert.equal(r.daysLeft, 40);                 // 800 g at 20 g/day
+  assert.equal(new Date(r.emptyAt).toISOString().slice(0, 10), '2026-10-19');
+});
+
+test('runway: a spool nobody has printed with says null, not forever', () => {
+  const r = R.runwayByItem([{ id: 'S9', weight: 1000 }], [], { now: RNOW }).S9;
+  assert.equal(r.daysLeft, null, 'an unknown future was written as an infinite one');
+  assert.equal(r.emptyAt, null);
+  assert.equal(r.gramsPerDay, 0);
+});
+
+test('runway: work already queued comes off the top', () => {
+  // 800 g on the shelf, 300 g promised to open jobs → 500 g actually available.
+  const inv = [{ id: 'S1', weight: 800 }];
+  const orders = [
+    done(5, 'S1', 400),                                   // sets the rate: 400/30
+    { status: 'queued', parts: [{ spoolId: 'S1', grams: 300 }] },
+  ];
+  const r = R.runwayByItem(inv, orders, { now: RNOW }).S1;
+  assert.equal(r.committedG, 300);
+  assert.equal(r.available, 500);
+  assert.ok(r.daysLeft < 800 / r.gramsPerDay, 'the queue was ignored');
+});
+
+test('runway: oversold with no rate is nought days, not unknown', () => {
+  const inv = [{ id: 'S1', weight: 100 }];
+  const orders = [{ status: 'queued', parts: [{ spoolId: 'S1', grams: 400 }] }];
+  const r = R.runwayByItem(inv, orders, { now: RNOW }).S1;
+  assert.equal(r.available, 0);
+  assert.equal(r.daysLeft, 0, 'a spool already promised away read as "cannot say"');
+});
+
+test('runway: the shelf and the reorder list cannot disagree', () => {
+  // The reason `runway` was extracted. Same spool, both callers, one number.
+  const inv = [{ id: 'S1', weight: 120 }];
+  const orders = [done(3, 'S1', 300)];               // 10 g/day → 12 days left
+  const shelf = R.runwayByItem(inv, orders, { now: RNOW }).S1;
+  const list = R.reorderSuggestions(inv, orders, { now: RNOW, leadDays: 14 });
+  assert.equal(list.length, 1, 'the reorder list did not raise a spool with 12 days left');
+  assert.equal(list[0].daysLeft, Math.round(shelf.daysLeft));
+  assert.equal(list[0].gramsPerDay, Math.round(shelf.gramsPerDay * 10) / 10);
+});
+
+test('runway: an unused spool is still absent from the reorder list', () => {
+  // null days-left must not sort as 0 and shout for a reorder.
+  const list = R.reorderSuggestions([{ id: 'S9', weight: 1000 }], [], { now: RNOW, leadDays: 14 });
+  assert.deepEqual(list, []);
+});
