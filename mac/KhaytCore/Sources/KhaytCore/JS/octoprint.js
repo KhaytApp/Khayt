@@ -36,6 +36,9 @@
    */
   function readStatus(printer, job) {
     const S = status();
+    const num = (v) => (S ? S.reading(v)
+                          : (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))
+                             ? null : Number(v)));
     const j = job || {};
     return {
       // The connection's own word first; the job's `state` is the fallback that
@@ -43,11 +46,14 @@
       state: (printer && printer.state && printer.state.text) || j.state || 'Unknown',
       progress: S ? S.normalizeProgress(j.progress && j.progress.completion) : 0,
       filename: (j.job && j.job.file && j.job.file.name) || '',
-      timeRemaining: (j.progress && j.progress.printTimeLeft) || null,
-      tempNozzle: (printer && printer.temperature && printer.temperature.tool0
-                   && printer.temperature.tool0.actual) || null,
-      tempBed: (printer && printer.temperature && printer.temperature.bed
-                && printer.temperature.bed.actual) || null,
+      // `S.reading`, not `|| null`: OctoPrint reports `printTimeLeft: 0` at
+      // the instant a print finishes, and a nozzle or bed can genuinely be
+      // at 0. See the note on `reading` in `printer-status.js`.
+      timeRemaining: num(j.progress && j.progress.printTimeLeft),
+      tempNozzle: num(printer && printer.temperature && printer.temperature.tool0
+                      && printer.temperature.tool0.actual),
+      tempBed: num(printer && printer.temperature && printer.temperature.bed
+                   && printer.temperature.bed.actual),
       type: 'octoprint',
     };
   }
