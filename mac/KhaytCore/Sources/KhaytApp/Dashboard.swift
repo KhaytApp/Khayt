@@ -199,6 +199,7 @@ private struct FloorStrip: View {
     private struct Tile: View {
         let machine: Machine
         let shop: Shop
+        @State private var hovering = false
 
         private var status: KhaytEngine.PrinterStatus? { shop.printers.readings[machine.id]?.status }
         private var printing: Bool { PrinterWatch.isPrinting(status?.state ?? "") }
@@ -243,11 +244,29 @@ private struct FloorStrip: View {
                                   tint: printing ? Khayt.hot : Khayt.cyan,
                                   height: 34)
                     if printing {
+                        HStack(spacing: 5) {
+                            // The one moving thing on a still floor, and only
+                            // when something is actually being made.
+                            Circle().fill(Khayt.hot).frame(width: 6, height: 6).alive()
+                            Text("\(status?.progress ?? 0)")
+                                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                                .contentTransition(.numericText())
+                                .foregroundStyle(Khayt.hot)
+                            Text("%").font(.caption).foregroundStyle(Khayt.hot.opacity(0.7))
+                            Spacer(minLength: 0)
+                            // The time left is what a shop actually plans
+                            // around, so it is beside the figure rather than
+                            // on a line of its own to be read.
+                            if let left = status?.timeRemaining, left > 0 {
+                                Text(PrinterWatch.spell(left))
+                                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                            }
+                        }
                         Text(status?.filename.isEmpty == false
                              ? status!.filename : shop.words.callIt("mac.live"))
-                            .font(.caption).lineLimit(1).truncationMode(.middle)
-                        Text("\(status?.progress ?? 0)%")
-                            .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+                            .font(.caption2).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.middle)
                     } else {
                         Text(shop.words.callIt(connected ? "mac.idle" : "mac.not_connected"))
                             .font(.caption).foregroundStyle(.secondary)
@@ -255,6 +274,23 @@ private struct FloorStrip: View {
                 }
             }
             .frame(maxWidth: 260, alignment: .leading)
+            .contentShape(Rectangle())
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(hovering ? Khayt.ground : .clear)
+            )
+            .liftsOnHover(hovering)
+            .onHover { hovering = $0 }
+            // ── A TILE THAT LOOKS PRESSABLE HAS TO BE ─────────────────────
+            //
+            // Every one of these names a machine the shop can open, and until
+            // now the only way there was the sidebar. A drawing of a printer
+            // that does nothing when clicked teaches people that the drawings
+            // are decoration.
+            .onTapGesture { shop.shelf = .machines }
+            .help(machine.name)
         }
 
         private var swatch: Color {
