@@ -165,6 +165,9 @@ private struct Card: View {
                             Text(shop.words.callIt("mac.bed_against",
                                  ["w": .string("\(Int(shop.widestBed))"), "d": .string("\(Int(shop.deepestBed))")]))
                                 .font(.caption2).foregroundStyle(.tertiary)
+                                // It wrapped to one truncated line — "dashed:
+                                // the largest bed…" says nothing at all.
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 0)
                     }
