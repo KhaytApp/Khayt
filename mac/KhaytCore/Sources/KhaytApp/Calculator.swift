@@ -29,8 +29,19 @@ import KhaytCore
 struct Calculator: View {
     @Bindable var shop: Shop
 
-    @State private var grams = ""
-    @State private var hours = ""
+    /// ── THE ONE SCREEN THAT ONLY EXISTS FILLED IN ────────────────────────
+    ///
+    /// Empty, this screen is two fields and a sentence. Everything it is FOR —
+    /// the cost breakdown, what to charge, the margin the shop would actually
+    /// make — appears only once there is a weight or a time in it, and the
+    /// snapshot runner had never put one there. So the highest-stakes screen in
+    /// the app had been photographed exactly once, in the state where it does
+    /// nothing.
+    ///
+    /// `KHAYT_SNAPSHOT_PART` fills it, and only in the runner: an environment
+    /// variable this app is never launched with otherwise.
+    @State private var grams = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_PART"] ?? ""
+    @State private var hours = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_HOURS"] ?? ""
     @State private var qty = 1
     /// Which spool, and it starts on a real one.
     ///
@@ -99,22 +110,43 @@ struct Calculator: View {
                     .card()
                 }
 
-                DetailSection(shop.words.callIt("mac.calc_price")) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 14) {
-                            slider(shop.words.callIt("calc.quote.margin"), $margin, 0...300)
-                            slider(shop.words.callIt("calc.quote.discount"), $discount, 0...90)
-                            Toggle(shop.words.callIt("calc.rush_fee"), isOn: $rush).fixedSize()
-                            Spacer(minLength: 0)
+                // ── NOT BEFORE THERE IS SOMETHING TO PRICE ────────────────
+                //
+                // A live margin slider, a discount slider and a rush-fee switch
+                // sat above the words "Nothing to price yet" — three controls
+                // for a calculation that has not started, on the screen a shop
+                // prices a job on. Dragging any of them did nothing and said
+                // nothing, which is the sort of control that teaches somebody
+                // the app is not listening.
+                //
+                // The part comes first, then what to charge for it, then the
+                // answer. That is also the order the question is asked in.
+                if hasInput {
+                    // The CONTROLS, which are not the answer — both sections
+                    // were headed "What to charge", stacked, so the screen
+                    // asked the same question twice and answered underneath the
+                    // second one.
+                    DetailSection(shop.words.callIt("mac.calc_rates")) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 14) {
+                                slider(shop.words.callIt("calc.quote.margin"), $margin, 0...300)
+                                slider(shop.words.callIt("calc.quote.discount"), $discount, 0...90)
+                                Toggle(shop.words.callIt("calc.rush_fee"), isOn: $rush).fixedSize()
+                                Spacer(minLength: 0)
+                            }
                         }
+                        .card()
                     }
-                    .card()
+                    answer
+                } else {
+                    nothingYet
                 }
-
-                if hasInput { answer } else { nothingYet }
             }
             .padding(Metric.screen)
-            .frame(maxWidth: 900, alignment: .leading)
+            // 720, not 900. This form is six short fields and two pickers;
+            // stretched to 900 the last picker sat four hundred points from the
+            // one before it and the row stopped reading as a row.
+            .frame(maxWidth: 720, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .background(Khayt.ground)
@@ -170,13 +202,46 @@ struct Calculator: View {
 
         // The four buckets, which is the thing a shop argues with. Same figures
         // the job sheet shows, from the same call.
-        if let p = costed?.parts, p.material + p.machine + p.labor + p.buffer > 0 {
+        if let costedPart = costed, case let p = costedPart.parts,
+           p.material + p.machine + p.labor + p.buffer > 0 {
+            // ── THE FOUR SHOWN FIGURES ADD TO THE SHOWN COST ──────────────
+            //
+            // They did not. Each bucket is rounded to the halala on its own, so
+            // 15.70 + 3.50 + 67.50 + 8.67 came to 95.37 while the cost — the
+            // unrounded sum, rounded once — printed 95.36. A shop adding the
+            // row by eye got a different answer from the one beside it, which
+            // is the precise failure this whole line was added to prevent.
+            //
+            // The rounding lands in the BUFFER, which is what a buffer is: the
+            // other three are measured quantities and this one is the allowance
+            // that makes the total come out. The figure moves by at most a
+            // halala and the row is checkable.
+            let shownCost = costedPart.cost.rounded(toPlaces: 2)
+            let m = p.material.rounded(toPlaces: 2)
+            let mc = p.machine.rounded(toPlaces: 2)
+            let lb = p.labor.rounded(toPlaces: 2)
+            let bf = (shownCost - m - mc - lb).rounded(toPlaces: 2)
             DetailSection(shop.words.callIt("mac.calc_breakdown")) {
-                HStack(spacing: 10) {
-                    bucket("calc.bd.material", p.material)
-                    bucket("calc.bd.machine", p.machine)
-                    bucket("calc.bd.labor", p.labor)
-                    bucket("calc.bd.buffer", p.buffer)
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 10) {
+                        bucket("calc.bd.material", m)
+                        bucket("calc.bd.machine", mc)
+                        bucket("calc.bd.labor", lb)
+                        bucket("calc.bd.buffer", bf)
+                    }
+                    // AND THAT THEY ADD UP. Four figures beside a fifth, with
+                    // nothing saying the four make the fifth, is four figures a
+                    // shop has to add in its head before it can argue with any
+                    // of them — and arguing with them is what this section is
+                    // for.
+                    HStack(spacing: 5) {
+                        Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
+                        Text("\(Money.figure(m)) + \(Money.figure(mc)) + "
+                             + "\(Money.figure(lb)) + \(Money.figure(bf)) = "
+                             + "\(Money.figure(shownCost)) "
+                             + shop.words.callIt("mac.calc_breakdown_sum"))
+                            .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+                    }
                 }
             }
         }

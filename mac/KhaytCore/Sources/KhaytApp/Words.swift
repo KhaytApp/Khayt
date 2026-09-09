@@ -727,7 +727,14 @@ final class Words {
         // labels are reused where they read short; these are the rest.
         "mac.calc_title":    ["en": "Calculator", "ar": "الحاسبة"],
         "mac.calc_part":     ["en": "The part", "ar": "القطعة"],
+        // TWO SECTIONS, TWO HEADINGS. Both said "What to charge" — the
+        // controls and the answer, stacked, under the identical words. It was
+        // invisible for as long as the screen had never been photographed with
+        // a part in it, because the second section only exists once there is
+        // something to price.
         "mac.calc_price":    ["en": "What to charge", "ar": "كم تطلب"],
+        "mac.calc_rates":    ["en": "Margin and fees", "ar": "الهامش والرسوم"],
+        "mac.calc_breakdown_sum": ["en": "adds up to the cost", "ar": "مجموعها التكلفة"],
         "mac.calc_breakdown": ["en": "Where it goes", "ar": "أين يذهب"],
         "mac.calc_cost":     ["en": "cost", "ar": "التكلفة"],
         "mac.calc_weight":   ["en": "Weight", "ar": "الوزن"],

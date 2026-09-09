@@ -69,3 +69,48 @@ struct PnlAddsUpTests {
         }
     }
 }
+
+/// The calculator only exists filled in.
+///
+/// Empty it is two fields and a sentence; everything it is FOR — the cost, the
+/// breakdown, what to charge — appears only once there is a weight or a time.
+/// The snapshot runner had never put one there, so the highest-stakes screen in
+/// the app had been photographed exactly once, in the state where it does
+/// nothing. The first picture of it working showed two sections stacked under
+/// the identical heading "What to charge".
+@MainActor
+struct CalculatorShowsItsWorkingTests {
+
+    @Test("the four buckets add up to the cost, which is what the screen now says")
+    func bucketsSumToCost() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let spool = try #require(shop.spools.first { shop.unit(of: $0)?.unit == "g" })
+
+        // Through the shop, exactly as the screen does it — the arithmetic is
+        // `lib/`'s and neither this test nor that screen may re-do it.
+        let costed = try #require(await shop.costedPart(
+            spoolId: spool.id, grams: 180, hours: 4.5, qty: 1, machineId: nil))
+        let p = costed.parts
+        let sum = p.material + p.machine + p.labor + p.buffer
+        #expect(sum > 0, "nothing was costed, so the sum proves nothing")
+        #expect(abs(sum - costed.cost) < 0.02,
+                "the line under the buckets reads \(Money.figure(sum)) and the cost says \(Money.figure(costed.cost))")
+    }
+
+    /// Two sections cannot wear one heading. This is the guard for the bug the
+    /// first photograph found.
+    @Test("the pricing controls and the price have different headings")
+    func noDuplicateHeading() async throws {
+        let words = Words()
+        await words.load("en", engine: try KhaytEngine())
+        let ar = Words()
+        await ar.load("ar", engine: try KhaytEngine())
+        for w in [words, ar] {
+            #expect(w.callIt("mac.calc_rates") != w.callIt("mac.calc_price"),
+                    "both sections say '\(w.callIt("mac.calc_price"))'")
+            #expect(w.callIt("mac.calc_rates") != "mac.calc_rates")
+            #expect(w.callIt("mac.calc_breakdown_sum") != "mac.calc_breakdown_sum")
+        }
+    }
+}
