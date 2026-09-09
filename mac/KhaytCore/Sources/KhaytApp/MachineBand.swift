@@ -99,6 +99,7 @@ struct MachineBandView: View {
                 rows
             }
             LayerRule()
+            whyBlank
             legend
         }
         .background(Khayt.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -162,6 +163,33 @@ struct MachineBandView: View {
             Color.clear.frame(width: freeWidth + 10)
         }
         .padding(.horizontal, 14).padding(.top, 7).padding(.bottom, 3)
+    }
+
+    /// Why some lanes are empty, said once rather than per row.
+    ///
+    /// TWO DIFFERENT SENTENCES, and telling them apart is the whole point of
+    /// knowing a machine's kind. A printer that is not answering is a fault. A
+    /// laser cutter is not answering because nothing in this app can ask one —
+    /// it is working perfectly and Khayt has no protocol for it. They look
+    /// identical on a status panel and mean opposite things, so both appear
+    /// when both apply.
+    @ViewBuilder private var whyBlank: some View {
+        let blank = band.rows.filter { $0.blocks.isEmpty }
+        let noProtocol = blank.contains { shop.machineKinds[$0.machineId]?.polled == false }
+        let noAnswer = blank.contains { shop.machineKinds[$0.machineId]?.polled != false }
+        if noProtocol || noAnswer {
+            VStack(alignment: .leading, spacing: 2) {
+                if noAnswer {
+                    Text(shop.words.callIt("mac.band_cannot_ask"))
+                }
+                if noProtocol {
+                    Text(shop.words.callIt("mac.band_no_protocol"))
+                }
+            }
+            .font(.caption2).foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14).padding(.top, 6)
+        }
     }
 
     private var legend: some View {
@@ -306,20 +334,20 @@ struct MachineBandView: View {
                                 .frame(width: w * (gap.minutes / band.minutes), height: height)
                                 .offset(x: w * (gap.startMinute / band.minutes))
                         }
-                    } else {
-                        // TWO DIFFERENT SENTENCES, and telling them apart is
-                        // the whole point of knowing a machine's kind. A
-                        // printer that is not answering is a fault. A laser
-                        // cutter is not answering because nothing in this app
-                        // can ask one — it is working perfectly and Khayt has
-                        // no protocol for it. They look identical to a status
-                        // panel and mean opposite things.
-                        Text(shop.words.callIt(
-                            shop.machineKinds[row.machineId]?.polled == false
-                                ? "mac.band_no_protocol" : "mac.band_cannot_ask"))
-                            .font(.caption).foregroundStyle(.tertiary)
-                            .frame(height: height, alignment: .leading)
                     }
+                    // NOTHING here for a machine with no blocks.
+                    //
+                    // There used to be a sentence — "printing something Khayt
+                    // cannot time — nothing here is a guess" — drawn across the
+                    // lane. Three unpollable machines meant the same sixty
+                    // characters three times, starting at x=0 where the red
+                    // now-bar is, so the first letter was under it and the
+                    // hour grid ran through the words. It read as a broken
+                    // screen rather than as an explanation.
+                    //
+                    // The row already says "no estimate" at its right-hand end.
+                    // The reason is said ONCE, under the band, where a sentence
+                    // has room to be a sentence — see `whyBlank`.
 
                     // Now. Always at zero — the window starts at this moment —
                     // and drawn anyway, because a band with no now-line reads as

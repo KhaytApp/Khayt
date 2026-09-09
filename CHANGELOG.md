@@ -1246,6 +1246,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **The 48-hour band stopped explaining itself across the timeline.** A machine
+  Khayt cannot time had a sixty-character sentence drawn along its lane, from the
+  left edge — under the red "now" bar, with the hour grid running through the
+  words — and three such machines meant the same sentence three times. It read as
+  a broken screen rather than as an explanation. The lane is empty now, the row
+  still says "no estimate" at its end, and the reason is said once underneath,
+  where a sentence has room to be one. Both reasons appear when both apply: a
+  printer that is not answering is a fault, and a laser cutter that cannot be
+  asked is not.
+- **A job on the dashboard shows its order number.** The attention list and the
+  chase list both did; the new "expected to miss their due date" list did not —
+  and the sample shop has two different jobs called "HVAC duct adapter", one
+  finished and unpaid, one pending and about to be late, so the two sections read
+  as the same job written twice.
 - **Arabic counts two of a thing properly.** Arabic has a dual — not a plural of
   two, a form of its own — and the numeral is not said with it. The Mac app
   wrote `2 أيام`, which reads roughly the way "2 dayses" reads in English, and
