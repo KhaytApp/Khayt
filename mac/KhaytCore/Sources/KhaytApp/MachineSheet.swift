@@ -9,10 +9,20 @@ import KhaytCore
 /// is the point of Khayt's catalogue knowing it: an X1C ships hardened steel
 /// and an MK4S ships brass, a ten-fold difference in expected life.
 ///
-/// WHAT THIS SHEET DELIBERATELY DOES NOT OFFER: the printer's API, its webcam,
-/// and its downtime blocks. Those belong with the polling this app does not do
-/// yet, and a screen that writes connection settings it cannot test is worse
-/// than one that does not offer them. They are carried through untouched.
+/// ── THE CONNECTION, WHICH THIS SHEET USED TO REFUSE TO OFFER ─────────────
+///
+/// This header used to say the printer's API belonged "with the polling this
+/// app does not do yet". That stopped being true: the app polls, watches,
+/// raises alerts and draws a band off live readings. What had not changed was
+/// that there was nowhere to TYPE an address — so a shop could add a printer
+/// and had no way at all to link it, and the machines that did work only did
+/// so because Electron had written them.
+///
+/// The old sentence carried one condition worth keeping: "a screen that writes
+/// connection settings it cannot test is worse than one that does not offer
+/// them". So this one tests them, against the printer, before the shop leaves.
+///
+/// The webcam and the downtime blocks are still carried through untouched.
 struct MachineSheet: View {
     /// How wide this sheet is. A CONSTANT rather than a number in the body,
     /// because `SnapshotTests` photographs the sheet at a size of its own and
@@ -42,6 +52,20 @@ struct MachineSheet: View {
     @State private var nozzleInstalled: Date?
     @State private var nozzleThreshold: Double = 0
     @State private var nozzleAtInstall: Double = 0
+    // ── The connection ───────────────────────────────────────────────────
+    @State private var apiType = ""
+    @State private var apiHost = ""
+    @State private var apiPort = 0
+    /// What the shop has TYPED. Empty means "leave what is stored alone" —
+    /// the plaintext is never loaded into this sheet, so blank cannot mean
+    /// "no key". `forgetKey` is how a shop says that on purpose.
+    @State private var apiKey = ""
+    @State private var hasStoredKey = false
+    @State private var forgetKey = false
+    @State private var testing = false
+    /// What the printer said, or why it could not be reached.
+    @State private var testSaid: String?
+    @State private var testWorked = false
     @FocusState private var focused: Bool
 
     private var isNew: Bool { existing == nil }
@@ -134,6 +158,21 @@ struct MachineSheet: View {
                     TextField("", value: $targetHours, format: .number.precision(.fractionLength(0...1)))
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 70)
                 }
+            }
+
+            // ── HOW KHAYT REACHES IT ─────────────────────────────────────
+            //
+            // Only for a kind something here can actually ask.
+            // `lib/machine-kinds.js` says a laser cutter has no protocol in
+            // this repo, and offering it a host field would be inviting a shop
+            // to fill in a form that can never do anything.
+            if polled {
+                LayerRule()
+                Connection(
+                    shop: shop, type: $apiType, host: $apiHost, port: $apiPort,
+                    key: $apiKey, hasStoredKey: $hasStoredKey, forgetKey: $forgetKey,
+                    testing: $testing, said: $testSaid, worked: $testWorked,
+                    test: test)
             }
 
             // The whole wear block belongs to the nozzle, and only a filament
@@ -230,6 +269,12 @@ struct MachineSheet: View {
         nozzleInstalled = Order.day(machine.nozzle?.installedAt)
         nozzleThreshold = machine.nozzle?.gramsThreshold ?? 0
         nozzleAtInstall = machine.nozzle?.gramsAtInstall ?? 0
+        apiType = machine.printerApi?.type ?? ""
+        apiHost = machine.printerApi?.host ?? ""
+        apiPort = machine.printerApi?.port ?? 0
+        // Whether there IS one, never what it is. Opening a credential to put
+        // it in a text field is how a secret ends up in a screenshot.
+        hasStoredKey = !(machine.printerApi?.apiKey ?? "").isEmpty
         focused = true
     }
 
@@ -248,6 +293,81 @@ struct MachineSheet: View {
         kinds.first { $0.kind == kind }?.shows(field) ?? true
     }
 
+    /// Can anything in this repo ask a machine of this kind what it is doing?
+    private var polled: Bool { kinds.first { $0.kind == kind }?.polled ?? true }
+
+    /// Ask the printer, now, with what is on screen.
+    ///
+    /// ── WHY THIS BUTTON IS THE POINT ──────────────────────────────────────
+    ///
+    /// The sheet's old header refused to offer connection settings on the
+    /// grounds that "a screen that writes connection settings it cannot test
+    /// is worse than one that does not offer them", and it was right. A host
+    /// typed wrong, a port that is someone else's, a key the printer refuses —
+    /// none of it shows up until the shop wonders why the band is empty, hours
+    /// later, with nothing on screen ever having said no.
+    ///
+    /// So this asks the real printer over the real network before the shop
+    /// leaves the sheet, and prints what came back.
+    private func test() {
+        testing = true
+        testSaid = nil
+        guard let draft = draftMachine() else {
+            testing = false
+            testSaid = shop.words.callIt("mach.test_bad_draft")
+            testWorked = false
+            return
+        }
+        let typed = apiKey
+        let build = shop.source.build
+        let stored = existing?.printerApi?.apiKey ?? ""
+        Task {
+            defer { testing = false }
+            guard let engine = shop.engine else {
+                testSaid = shop.words.callIt("mac.move_no_engine"); testWorked = false; return
+            }
+            do {
+                // The typed key if there is one, else the stored one opened at
+                // the point of use — which is the only place this app opens a
+                // credential at all.
+                var key = typed
+                if key.isEmpty, !stored.isEmpty, let build {
+                    key = (try? await Secrets.open(stored, for: build)) ?? ""
+                }
+                let base = try await PrinterWatch.baseURL(draft, engine: engine)
+                let status = try await PrinterWatch.read(draft, engine: engine, base: base, key: key,
+                                                         fetch: { try await URLSession.shared.data(for: $0) })
+                testWorked = true
+                let state = status.state.isEmpty ? "—" : status.state
+                testSaid = status.filename.isEmpty
+                    ? state
+                    : "\(state) · \(status.filename)"
+            } catch {
+                testWorked = false
+                testSaid = PrinterWatch.say(error)
+            }
+        }
+    }
+
+    /// The machine as the form currently describes it, for the test above.
+    /// Built by decoding, because `Machine` is the store's shape and this sheet
+    /// must not become a second definition of it.
+    private func draftMachine() -> Machine? {
+        let api: [String: JSONValue] = [
+            "type": .string(apiType),
+            "host": .string(apiHost.trimmingCharacters(in: .whitespaces)),
+            "port": .number(Double(apiPort)),
+        ]
+        let record: JSONValue = .object([
+            "id": .string(existing?.id ?? "MACH-draft"),
+            "name": .string(name),
+            "printerApi": .object(api),
+        ])
+        guard let data = try? JSONEncoder().encode(record),
+              let machine = try? JSONDecoder().decode(Machine.self, from: data) else { return nil }
+        return machine
+    }
+
     private func commit() {
         var nozzle: [String: JSONValue] = [
             "material": .string(nozzleMaterial),
@@ -258,7 +378,7 @@ struct MachineSheet: View {
         // A threshold left at zero is one nobody has chosen; the rule fills it
         // from what that material is expected to last.
         if nozzleThreshold <= 0 { nozzle["gramsThreshold"] = .number(0) }
-        let input: [String: JSONValue] = [
+        var input: [String: JSONValue] = [
             "name": .string(name),
             "color": .string(NSColor(swatch).hexString ?? "#5b9cf0"),
             "kind": .string(kind),
@@ -269,7 +389,150 @@ struct MachineSheet: View {
         ]
         let id = existing?.id
         let catalogId = chosen
+        let typed = apiKey
+        let clearing = forgetKey
+        let build = shop.source.build
         dismiss()
-        Task { await shop.saveMachine(input, id: id, catalogId: catalogId) }
+        Task {
+            var api: [String: JSONValue] = [
+                "type": .string(apiType),
+                "host": .string(apiHost.trimmingCharacters(in: .whitespaces)),
+                "port": .number(Double(apiPort)),
+            ]
+            // ── THE KEY IS SEALED HERE OR NOT WRITTEN AT ALL ──────────────
+            //
+            // `apiKey` is a registered secret path, so what belongs on the
+            // record is `__enc__` + OSCrypt under the book's own Keychain key
+            // — the same bytes Electron writes and reads. Absent means the
+            // shared rule carries the stored one through untouched.
+            //
+            // A key that cannot be sealed is REFUSED rather than written in
+            // the clear: this file syncs, backs up and exports.
+            if clearing {
+                api["apiKey"] = .string("")
+            } else if !typed.isEmpty {
+                guard let build else {
+                    await MainActor.run { shop.spendProblem = shop.words.callIt("mac.move_sample") }
+                    return
+                }
+                do {
+                    api["apiKey"] = .string(try await Secrets.seal(typed, for: build))
+                } catch {
+                    await MainActor.run {
+                        shop.spendProblem = String(describing: error)
+                    }
+                    return
+                }
+            }
+            input["printerApi"] = .object(api)
+            await shop.saveMachine(input, id: id, catalogId: catalogId)
+        }
+    }
+}
+
+/// Address, protocol, credential — and a button that proves them.
+private struct Connection: View {
+    let shop: Shop
+    @Binding var type: String
+    @Binding var host: String
+    @Binding var port: Int
+    @Binding var key: String
+    @Binding var hasStoredKey: Bool
+    @Binding var forgetKey: Bool
+    @Binding var testing: Bool
+    @Binding var said: String?
+    @Binding var worked: Bool
+    let test: () -> Void
+
+    /// Only what this app can actually speak. A menu offering Bambu or Duet
+    /// would be a menu whose choices quietly do nothing.
+    private var protocols: [String] { PrinterWatch.spoken.sorted() }
+
+    private var reachable: Bool {
+        !type.isEmpty && !host.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(shop.words.callIt("mach.connection"))
+                .font(.system(size: 11, weight: .semibold))
+                .textCase(.uppercase).tracking(0.5).foregroundStyle(.secondary)
+
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text(shop.words.callIt("mach.protocol")).foregroundStyle(.secondary)
+                    Picker("", selection: $type) {
+                        Text(shop.words.callIt("mach.protocol_none")).tag("")
+                        ForEach(protocols, id: \.self) { Text($0).tag($0) }
+                    }
+                    .labelsHidden().fixedSize()
+                    .onChange(of: type) { _, now in
+                        // The default port for the protocol, so a shop that
+                        // picks Moonraker does not have to know it is 7125.
+                        if port == 0, !now.isEmpty { port = PrinterWatch.defaultPort(now) }
+                        said = nil
+                    }
+                }
+                if !type.isEmpty {
+                    GridRow {
+                        Text(shop.words.callIt("mac.address")).foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            TextField("192.168.1.40", text: $host)
+                                .textFieldStyle(.roundedBorder)
+                                .onChange(of: host) { _, _ in said = nil }
+                            Text(":").foregroundStyle(.tertiary)
+                            TextField("", value: $port, format: .number.grouping(.never))
+                                .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 62)
+                                .onChange(of: port) { _, _ in said = nil }
+                        }
+                    }
+                    GridRow {
+                        Text(shop.words.callIt("mach.api_key")).foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                SecureField(hasStoredKey && !forgetKey
+                                            ? shop.words.callIt("mach.key_kept")
+                                            : shop.words.callIt("mach.key_ph"), text: $key)
+                                    .textFieldStyle(.roundedBorder)
+                                    .disabled(forgetKey)
+                                    .onChange(of: key) { _, _ in said = nil }
+                                if hasStoredKey {
+                                    Button(shop.words.callIt(forgetKey ? "common.undo" : "mach.key_forget")) {
+                                        forgetKey.toggle()
+                                        if forgetKey { key = "" }
+                                        said = nil
+                                    }
+                                    .buttonStyle(.link).font(.caption)
+                                }
+                            }
+                            // WHAT HAPPENS TO IT, in a sentence. A field that
+                            // takes a credential and says nothing about where
+                            // it goes is one a shop is right to distrust.
+                            Text(shop.words.callIt(forgetKey ? "mach.key_will_clear" : "mach.key_where"))
+                                .font(.caption2).foregroundStyle(.tertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+
+            if !type.isEmpty {
+                HStack(spacing: 8) {
+                    Button(shop.words.callIt("mach.test")) { test() }
+                        .disabled(!reachable || testing)
+                    if testing { ProgressView().controlSize(.small) }
+                    if let said {
+                        HStack(spacing: 5) {
+                            Image(systemName: worked ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(worked ? Khayt.done : Khayt.attention)
+                            Text(said)
+                                .font(.caption).foregroundStyle(worked ? Khayt.done : Khayt.attention)
+                                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+        }
     }
 }
