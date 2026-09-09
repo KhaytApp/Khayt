@@ -34,7 +34,17 @@ struct CustomersTable: View {
             // a column that stretches to fill goes under the inspector and is
             // simply gone. Owed, the column this screen is sorted by, went
             // first. Columns that stop short leave trailing space instead.
-            .width(min: 140, ideal: 210, max: 300)
+            // NO MAXIMUM, so the name takes the slack.
+            //
+            // Every column here was capped, and the five maxima add up to 720
+            // points inside a pane that is eleven hundred wide — so the table
+            // could never fill its own window and left a third of it blank
+            // behind a trailing divider, which reads as a column somebody
+            // forgot to finish. It is the only table in this app that does
+            // that; the jobs, expenses, gift-card and catalogue tables all
+            // leave their first column unbounded, and a customer's name is the
+            // variable-length thing here in the same way.
+            .width(min: 140, ideal: 210)
 
             TableColumn(shop.words.callIt("flow.owed"), value: \.owed) { person in
                 if person.isSettled {

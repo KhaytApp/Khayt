@@ -1246,6 +1246,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **The customers table fills its window.** Every one of its five columns had a
+  maximum width, and the five maxima add up to 720 points inside a pane eleven
+  hundred wide — so a third of the screen sat blank behind a trailing divider,
+  which reads as a column somebody forgot to finish. It was the only table in
+  the app that did this. The name takes the slack now, as it does on the jobs,
+  expenses, gift-card and catalogue tables.
 - **The sample shop now pays VAT on what it buys, so the P&L can show the
   reclaim.** A registered shop remits what it collected on sales LESS what it
   paid on its own purchases, and Khayt has computed that for a long time — but
