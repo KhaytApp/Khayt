@@ -440,6 +440,23 @@ struct Reports: View {
                             .foregroundStyle(Khayt.cyan)
                         BigFigure(value: Money.figure(net), unit: Money.mark(shop.currency),
                                   tint: net < 0 ? Khayt.late : nil, size: 28)
+                        // ── AND THE SUM THAT MADE IT ─────────────────────
+                        //
+                        // The panel below lists Revenue, Expenses AND VAT, so a
+                        // reader subtracts all three and gets a figure four
+                        // thousand short of the one above. Net income is
+                        // revenue LESS EXPENSES: revenue is already net of the
+                        // tax, because tax collected on a sale is money held
+                        // for ZATCA and never income. The VAT line is what the
+                        // shop owes, sitting beside the arithmetic rather than
+                        // inside it — and a figure printed next to numbers it
+                        // does not come from is a figure that looks wrong.
+                        HStack(spacing: 5) {
+                            Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
+                            Text("\(Money.figure(rows.reduce(0) { $0 + $1.revenue })) − "
+                                 + "\(Money.figure(rows.reduce(0) { $0 + $1.expenses + $1.fixed }))")
+                                .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+                        }
                         Text(shop.words.callIt("an.pnl_title"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
@@ -455,6 +472,14 @@ struct Reports: View {
                                        Money.text(rows.reduce(0) { $0 + $1.revenue }, shop.currency))
                             DetailLine(shop.words.callIt("an.pnl_expenses"),
                                        Money.text(rows.reduce(0) { $0 + $1.expenses + $1.fixed }, shop.currency), dim: true)
+                            // Ruled off from the two above it, because it is
+                            // NOT a third subtraction — it is what the shop
+                            // owes ZATCA, and it has already been taken out of
+                            // the revenue line by the time that figure is
+                            // printed. Listed flush with the others it read as
+                            // a cost, and the obvious arithmetic came out four
+                            // thousand short of the net income beside it.
+                            LayerRule()
                             DetailLine(shop.words.callIt("an.pnl_vat"),
                                        Money.text(rows.reduce(0) { $0 + $1.vatCollected }, shop.currency), dim: true)
                         }

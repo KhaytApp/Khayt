@@ -1236,6 +1236,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: the Profit & Loss pane invited arithmetic that gave the wrong
+  answer.** It listed Revenue, Expenses and VAT under one heading, so anybody
+  subtracting the three got a figure thousands short of the net income printed
+  above them. Both numbers were right: net income is revenue less expenses,
+  because revenue is already stated net of the tax you collect — that money is
+  held for ZATCA and was never income. The VAT line is what you owe, and it now
+  sits ruled off from the two figures that make the total, with the sum written
+  under the total itself.
 - **Fixed: a rack with two sheets of acrylic on it reported "2 g".** The shelf
   had learned to count in sheets and millilitres and the dashboard had not, so
   it wrote the gram after every figure it showed.
