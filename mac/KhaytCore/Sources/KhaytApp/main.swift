@@ -45,4 +45,9 @@ case .run(let options):
     exit(code)
 }
 
+// See `DisplayCycle` for the crash this prevents and the measurement.
+// Before `NSApplication` exists: the first window is built during launch and
+// the assertion can fire on it.
+DisplayCycle.stopAssertingOnSwiftUIsLoop()
+
 KhaytApp.main()

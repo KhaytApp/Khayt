@@ -111,6 +111,55 @@ final class Activator: NSObject, NSApplicationDelegate {
         if let dir = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"] {
             Snapshot.run(into: URL(fileURLWithPath: dir))
         }
+        if let n = ProcessInfo.processInfo.environment["KHAYT_CHURN"], let rounds = Int(n) {
+            Churn.run(rounds: rounds)
+        }
+    }
+}
+
+/// Switch screens, fast, the way a person does — and see what falls over.
+///
+/// ── WHY THIS EXISTS ───────────────────────────────────────────────────────
+///
+/// A crash arrived from a real run: `-[NSWindow _postWindowNeedsUpdateConstraints]`
+/// throwing, reached from `-[NSSplitViewItem _setCollapsed:animated:]` inside a
+/// CATransaction commit handler. That is the inspector COLLAPSING — and the
+/// inspector's `isPresented` here is a computed binding, so it opens and closes
+/// as a side effect of changing screen. Switching from Jobs to Machines
+/// collapses it; switching back opens it.
+///
+/// The snapshot runner switches screens too and had never once hit it, because
+/// it sets a shelf and then waits ~400ms for everything to settle before the
+/// next one. A person clicking down a sidebar does not wait. This driver does
+/// not either: it changes shelf on consecutive runloop turns, with animation
+/// on, which is the state the snapshot runner deliberately avoids.
+///
+/// Only runs when `KHAYT_CHURN` is set, and it exits with the count it managed.
+@MainActor enum Churn {
+    static func run(rounds: Int) {
+        // The pairs that make the inspector move. Jobs, Library and Customers
+        // have one; the rest close it. A pair where both sides agree changes
+        // nothing and proves nothing.
+        let shelves: [Shop.Shelf] = [.jobs(nil), .machines, .library(nil), .expenses,
+                                .customers, .reports, .jobs(nil), .calculator]
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1200))
+            guard let shop = Snapshot.subject else {
+                print("churn: no window"); exit(2)
+            }
+            var done = 0
+            for i in 0..<rounds {
+                // WITH animation, which is what a click gives you and what the
+                // crashing stack was inside.
+                withAnimation { shop.shelf = shelves[i % shelves.count] }
+                done += 1
+                // One runloop turn. Long enough for the collapse to start, far
+                // too short for it to finish — which is the point.
+                try? await Task.sleep(for: .milliseconds(16))
+            }
+            print("churn: survived \(done) switches")
+            exit(0)
+        }
     }
 }
 
@@ -202,9 +251,58 @@ final class Activator: NSObject, NSApplicationDelegate {
                 .background(Khayt.ground))),
             ("98-empty-drawn", AnyView(
                 EmptyHere(title: "Nothing here yet",
-                          message: "A machine you add shows up here, with what it is printing.")
+                          message: "A machine you add shows up here, with what it is printing.",
+                          mark: .machines)
                     .frame(width: 460, height: 300)
                     .background(Khayt.ground))),
+            // EVERY mark at the size and tint an empty screen draws it.
+            //
+            // A mark is legible at 64pt in `98-marks` and legible in the
+            // sidebar at 16pt; 44pt in cyan at half opacity on the ground
+            // colour is a third case and neither of the others proves it. The
+            // waste mark's purge tower and the reports mark's bars are the two
+            // that lose their inner lines first.
+            ("98-empty-marks", AnyView(
+                VStack(alignment: .leading, spacing: 20) {
+                    ForEach([Array(Mark.allCases.prefix(8)),
+                             Array(Mark.allCases.dropFirst(8))], id: \.first) { row in
+                        HStack(spacing: 22) {
+                            ForEach(row, id: \.self) { mark in
+                                VStack(spacing: 7) {
+                                    Drawn(mark: mark, size: 44)
+                                        .foregroundStyle(Khayt.cyan.opacity(0.5))
+                                    Text(mark.rawValue).font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(width: 78)
+                            }
+                        }
+                    }
+                }
+                .padding(28)
+                .frame(width: 860, height: 240)
+                .background(Khayt.ground))),
+            ("98-empty-marks-dark", AnyView(
+                VStack(alignment: .leading, spacing: 20) {
+                    ForEach([Array(Mark.allCases.prefix(8)),
+                             Array(Mark.allCases.dropFirst(8))], id: \.first) { row in
+                        HStack(spacing: 22) {
+                            ForEach(row, id: \.self) { mark in
+                                VStack(spacing: 7) {
+                                    Drawn(mark: mark, size: 44)
+                                        .foregroundStyle(Khayt.cyan.opacity(0.5))
+                                    Text(mark.rawValue).font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(width: 78)
+                            }
+                        }
+                    }
+                }
+                .padding(28)
+                .frame(width: 860, height: 240)
+                .background(Khayt.ground)
+                .environment(\.colorScheme, .dark))),
             ("98-empty-drawn-dark", AnyView(
                 EmptyHere(title: "Nothing here yet",
                           message: "A machine you add shows up here, with what it is printing.")
