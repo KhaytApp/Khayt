@@ -199,6 +199,13 @@ struct RunningOut: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(job.project.isEmpty ? job.id : job.project)
                 .font(.callout).lineLimit(1)
+            // The order number, as the attention list and the chase list both
+            // show it. Not decoration: the sample book has two jobs called
+            // "HVAC duct adapter" — one finished and unpaid, one pending and
+            // about to be late — and without the number this section and the
+            // chase list below it read as the same job written twice.
+            Text(job.id)
+                .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
             Spacer(minLength: 12)
             // Both dates, because the gap is the point: "due the 12th, expected
             // the 15th" says how much trouble it is in, and one date alone does
