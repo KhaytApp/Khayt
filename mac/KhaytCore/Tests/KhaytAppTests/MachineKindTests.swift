@@ -251,3 +251,42 @@ struct InventoryUnitTests {
                 "before the book loads, a quantity is grams — which every old one is")
     }
 }
+
+/// Every place that writes a shelf quantity has to ask what it is counted in.
+///
+/// Three did not, and each was found by looking at a different screen: the
+/// dashboard's attention panel reported "2 g" for two sheets of acrylic, the
+/// colour studio reported "6 g" for six sheets of plywood, and a spool picked
+/// out of a list read "Birch ply · 6g · Rack by the laser".
+///
+/// The rule is one line — ask the item — and the failure is silent, because a
+/// gram after a number always looks like a unit.
+@MainActor
+struct EveryQuantityAsksItsUnitTests {
+
+    @Test("the sample shelf is not all grams, so a hardcoded gram is visibly wrong")
+    func theShelfIsMixed() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let units = Set(shop.spools.compactMap { shop.unit(of: $0)?.unit })
+        #expect(units.count >= 3, "one unit on the shelf hides every bug of this kind")
+    }
+
+    /// The spool label is what a picker shows when somebody chooses what to
+    /// print from, and it is the one that would put "6g" on a stack of ply.
+    @Test("a spool's own label is written in the item's unit")
+    func labelUsesTheUnit() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let sheets = try #require(shop.spools.first { shop.unit(of: $0)?.unit == "sheet" })
+        let said = sheets.label(shop.words, unit: shop.unit(of: sheets))
+        #expect(!said.contains(shop.words.callIt("common.grams")),
+                "a stack of plywood is labelled in grams: \(said)")
+        #expect(said.contains(shop.words.callIt("unit.sheet")), "label reads: \(said)")
+
+        // And a filament spool is still exactly what it was.
+        let spool = try #require(shop.spools.first { shop.unit(of: $0)?.unit == "g" })
+        #expect(spool.label(shop.words, unit: shop.unit(of: spool))
+            .contains(shop.words.callIt("common.grams")))
+    }
+}

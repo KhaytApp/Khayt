@@ -165,3 +165,16 @@ enum Quantity {
         return "\(n) \(word)"
     }
 }
+
+extension Double {
+    /// Rounded the way a figure on screen is rounded.
+    ///
+    /// So that arithmetic done on displayed values agrees with the values
+    /// displayed: four buckets each rounded to the halala summed to 95.37 while
+    /// the cost — the unrounded total, rounded once — printed 95.36, and a shop
+    /// adding the row by eye got a different answer from the one beside it.
+    func rounded(toPlaces places: Int) -> Double {
+        let f = pow(10.0, Double(places))
+        return (self * f).rounded() / f
+    }
+}

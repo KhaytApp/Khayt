@@ -768,6 +768,20 @@ final class Activator: NSObject, NSApplicationDelegate {
             await settle()
             capture(named: "28-calculator", into: dir)
 
+            // AND THE CALCULATOR WITH A PART IN IT. Empty it is two fields and
+            // a sentence; everything the screen exists for only appears once
+            // there is a weight, and until now nobody had ever seen that.
+            setenv("KHAYT_SNAPSHOT_PART", "180", 1)
+            setenv("KHAYT_SNAPSHOT_HOURS", "4.5", 1)
+            shop.shelf = .dashboard
+            await settle()
+            shop.shelf = .calculator
+            await settle()
+            try? await Task.sleep(for: .milliseconds(700))
+            capture(named: "28b-calculator-priced", into: dir)
+            unsetenv("KHAYT_SNAPSHOT_PART")
+            unsetenv("KHAYT_SNAPSHOT_HOURS")
+
             shop.shelf = .catalogue
             await settle()
             capture(named: "29-catalogue", into: dir)

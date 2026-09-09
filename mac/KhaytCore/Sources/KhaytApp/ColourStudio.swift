@@ -119,7 +119,11 @@ struct ColourStudio: View {
                         .filter { !$0.isEmpty }.joined(separator: " — "))
                     .lineLimit(1)
                 if let weight = m.weight {
-                    Text(Money.grams(weight) + " " + shop.words.callIt("common.grams"))
+                    // In the item's own unit. The shelf counts plywood in
+                    // sheets and this row said "6 g" — the same bug as the
+                    // dashboard's, in the second place that writes a shelf
+                    // quantity without asking what it is counted in.
+                    Text(Quantity.say(weight, shop.inventoryUnits[m.id], shop.words))
                         .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
                 }
             }
