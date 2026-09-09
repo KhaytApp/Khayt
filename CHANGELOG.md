@@ -33,6 +33,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   until you enter one.
 
 ### Added
+- **The sample shop's portfolio shows eight different things.** It was eight
+  photographs of the same slab in eight colours, on the one screen whose entire
+  purpose is showing finished work. A bracket, a chain, a hood, a socket, a set
+  of gripper fingers, a wing, a cube and a housing — each one the thing its row
+  is named after.
 
 - **The dashboard answers "what should I look at" instead of listing four
   things.** Every section said its name in the same small grey capitals, so
@@ -1236,6 +1241,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Fixed: the expenses and waste screens drew a wall of empty grey bands.** Six
+  waste entries came with twenty blank striped rows under them, filling the
+  window — which reads as a list that failed to load rather than as a short
+  list. Those two tables were the only ones in the app with no style set at all,
+  so they took the system's.
 - **Fixed: the Profit & Loss pane invited arithmetic that gave the wrong
   answer.** It listed Revenue, Expenses and VAT under one heading, so anybody
   subtracting the three got a figure thousands short of the net income printed

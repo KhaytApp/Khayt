@@ -66,8 +66,15 @@ struct Expenses: View {
         }
         // The app's ground shows through rather than the system's white — the
         // pane beside this one sits on it, and an opaque table drew a seam
-        // down the middle of the window. The alternating row stripes are the
-        // system's and still draw.
+        // down the middle of the window.
+        //
+        // AND NO STRIPES. These two tables were the only ones in the app with
+        // no `tableStyle` at all, so they took the system default: alternating
+        // fills, and — worse — the fill continues past the last row. A shop
+        // with six waste entries got six rows and then twenty empty grey bands
+        // down the rest of the window, which reads as a list that failed to
+        // load rather than as a short list.
+        .tableStyle(.inset(alternatesRowBackgrounds: false))
         .scrollContentBackground(.hidden)
         .overlay {
             if rows.isEmpty {
@@ -212,7 +219,9 @@ struct Waste: View {
             }
             .width(min: 90, ideal: 110)
         }
-        // As the expenses table above.
+        // As the expenses table above — including the stripes, which drew
+        // twenty empty bands under this shop's six waste entries.
+        .tableStyle(.inset(alternatesRowBackgrounds: false))
         .scrollContentBackground(.hidden)
         .contextMenu(forSelectionType: WasteEntry.ID.self) { ids in
             if let id = ids.first, shop.canMoveJobs {
