@@ -51,7 +51,7 @@ struct ColourStudio: View {
                 Text(shop.words.callIt("cmix.subtitle"))
                     .font(.callout).foregroundStyle(.secondary)
                 if coloured.isEmpty {
-                    EmptyHere(title: shop.words.callIt("cmix.no_filaments"))
+                    EmptyHere(title: shop.words.callIt("cmix.no_filaments"), mark: .colour)
                         .frame(maxWidth: .infinity)
                 } else {
                     matcher

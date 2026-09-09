@@ -346,9 +346,9 @@ private struct EmptyBook: View {
         } else if !shop.search.isEmpty {
             ContentUnavailableView.search(text: shop.search)
         } else if shop.stage != nil {
-            EmptyHere(title: shop.words.callIt("mac.nothing_at_stage"), message: shop.words.callIt("mac.stage_hint"))
+            EmptyHere(title: shop.words.callIt("mac.nothing_at_stage"), message: shop.words.callIt("mac.stage_hint"), mark: .jobs)
         } else {
-            EmptyHere(title: shop.words.callIt("mac.no_jobs"))
+            EmptyHere(title: shop.words.callIt("mac.no_jobs"), mark: .jobs)
         }
     }
 }

@@ -46,7 +46,7 @@ struct GiftCards: View {
     var body: some View {
         Group {
             if shop.giftCards.isEmpty {
-                EmptyHere(title: shop.words.callIt("giftCardEmpty")) {
+                EmptyHere(title: shop.words.callIt("giftCardEmpty"), mark: .giftCards) {
                     Button(shop.words.callIt("issueGiftCard")) { shop.issuingGiftCard = true }
                         .buttonStyle(.borderedProminent)
                 }
