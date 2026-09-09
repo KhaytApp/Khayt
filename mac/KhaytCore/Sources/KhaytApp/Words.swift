@@ -507,6 +507,14 @@ final class Words {
         // Today, or already promised away.
         "mac.empty_now":     ["en": "none left",      "ar": "لم يتبقَّ شيء"],
 
+        // Filament goes damp on a shelf and prints badly when it has. The
+        // interval is per material and per storage — a nylon in open air is a
+        // day, the same nylon in a sealed box is twenty — and it is a nudge,
+        // not a measurement, so the words are an instruction rather than a
+        // verdict about moisture nobody has measured.
+        "mac.dry_overdue":   ["en": "needs drying",   "ar": "بحاجة إلى تجفيف"],
+        "mac.dry_due":       ["en": "dry it soon",    "ar": "جفّفها قريبًا"],
+
         "mac.reading_file":   ["en": "Reading the file…", "ar": "جارٍ قراءة الملف…"],
         // The library's grouping menu.
         "mac.pick_a_model":  ["en": "Select a model first", "ar": "اختر نموذجًا أولًا"],

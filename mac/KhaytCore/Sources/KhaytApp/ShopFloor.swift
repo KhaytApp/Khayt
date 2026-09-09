@@ -285,6 +285,7 @@ struct Inventory: View {
                             SpoolCard(spool: spool, shop: shop,
                                       low: shop.lowSpools[spool.id] ?? false,
                                       runway: shop.spoolRunway[spool.id],
+                                      dryness: shop.spoolDryness[spool.id],
                                       selected: selection == spool.id)
                                 .onTapGesture { selection = spool.id }
                                 .onTapGesture(count: 2) {
@@ -319,6 +320,9 @@ struct SpoolCard: View {
     /// in the window — an unknown future, which the card says nothing about
     /// rather than guessing at.
     var runway: KhaytEngine.Runway?
+    /// Whether it has gone damp. Nil, and `unknown`, are the same silence: a
+    /// spool nobody has recorded drying is not a spool that is wet.
+    var dryness: KhaytEngine.Dryness?
     var selected = false
 
     /// Only for a spool with two months or less in it.
@@ -407,6 +411,17 @@ struct SpoolCard: View {
                     .font(.caption2).monospacedDigit()
                     .foregroundStyle(shown <= 14 ? AnyShapeStyle(Khayt.attention)
                                                  : AnyShapeStyle(.tertiary))
+            }
+            // Damp filament prints badly, and the shelf is where somebody is
+            // standing when they could do something about it. Only the two
+            // states that are news: `good` is quiet and `unknown` — which is
+            // most of a real shelf — says nothing at all, because a spool
+            // nobody has recorded drying is not a spool that is wet.
+            if let state = dryness?.state, state == "overdue" || state == "due" {
+                Text(shop.words.callIt(state == "overdue" ? "mac.dry_overdue" : "mac.dry_due"))
+                    .font(.caption2)
+                    .foregroundStyle(state == "overdue" ? AnyShapeStyle(Khayt.attention)
+                                                        : AnyShapeStyle(.tertiary))
             }
         }
         .frame(maxWidth: .infinity)

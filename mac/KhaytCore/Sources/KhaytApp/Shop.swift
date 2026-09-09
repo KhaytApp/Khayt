@@ -322,6 +322,7 @@ final class Shop {
             lowSpools = (try? await engine?.lowStock(inventoryRows, settings: settingsDict)) ?? [:]
             spoolRunway = (try? await engine?.runway(spools: inventoryRows, orders: orderRows,
                                                      now: Date())) ?? [:]
+            spoolDryness = (try? await engine?.dryness(spools: inventoryRows, now: Date())) ?? [:]
             // Once per book rather than per right-click: the list is twenty-two
             // fixed entries and a context menu is built while a grid draws.
             printerProfiles = (try? await engine?.printerProfiles()) ?? []
@@ -4274,6 +4275,9 @@ final class Shop {
     /// redraw. A spool absent from this map, or one whose `daysLeft` is nil,
     /// has had nothing printed from it in the window and gets no line.
     private(set) var spoolRunway: [String: KhaytEngine.Runway] = [:]
+    /// Whether each spool has gone damp, by id. Mostly `unknown` on a real
+    /// shelf, and that is the honest answer — see `KhaytEngine.Dryness`.
+    private(set) var spoolDryness: [String: KhaytEngine.Dryness] = [:]
     /// Which machine each model fits, keyed by the model's id. Worked out once
     /// when the book loads rather than per row: a grid of four hundred models
     /// asking the runtime on every redraw is four hundred context hops.

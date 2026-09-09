@@ -55,11 +55,14 @@ public actor KhaytEngine {
         // with no clue why. Verified identical to Node's answer with it.
         "nozzle-wear-data",
         "nozzle-wear",
-        // `filament-dryness` is NOT here. It reads `driedAt` — when a spool
-        // was last DRIED — and belongs to Bed Ready's dry log, whose records
-        // the `inventory` collection does not carry. Wiring it to the filament
-        // shelf produced a column of dashes and would have produced a column of
-        // wrong answers the moment anything filled that field in.
+        // Whether a spool has gone damp. It reads `driedAt`, which the
+        // `inventory` collection did not carry until now — the only one in the
+        // store lived on Bed Ready's `filamentDryLog`, a separate list of
+        // labels with nothing joining it to the shelf, so a shop tracked the
+        // same roll twice and the half that knew the material was not the half
+        // that knew when it was dried. `spool-edit.js` records it on the spool
+        // now, and this module answers about the spool itself.
+        "filament-dryness",
         // What one order is worth and what is owed on it, and which orders
         // count towards a period. Both lifted out of the renderer so this app
         // could use the same rules rather than invent a second opinion about
@@ -702,6 +705,39 @@ public actor KhaytEngine {
             """,
             [.array(spools), .array(orders), .number(now.timeIntervalSince1970 * 1000)],
             as: [String: Runway].self)
+    }
+
+    /// Whether a spool has gone damp, and how far past its interval it is.
+    ///
+    /// `lib/filament-dryness.js`. The intervals are per material and per
+    /// storage — a nylon on an open shelf is a day, the same nylon in a sealed
+    /// box with desiccant is twenty — and they are community rules of thumb
+    /// rather than a spec, which is why the screen phrases them as a nudge.
+    ///
+    /// `state` is `good`, `due`, `overdue` or **`unknown`**, and the last one
+    /// is most of a real shelf: a spool nobody has recorded drying has an
+    /// unknown state, not an overdue one. A shelf that accused every old spool
+    /// of being wet on the day this shipped would be ignored by the end of the
+    /// week.
+    public struct Dryness: Decodable, Sendable {
+        public let state: String
+        public let daysSince: Double?
+        public let intervalDays: Double
+        public let pct: Double
+    }
+
+    public func dryness(spools: [JSONValue], now: Date) throws -> [String: Dryness] {
+        try runtime.call2("""
+            (function (rows, now) {
+              const out = {};
+              for (const s of rows || []) {
+                if (s && s.id != null) out[String(s.id)] = KhaytFilamentDryness.dryStatus(s, now);
+              }
+              return out;
+            })(ARG0, ARG1)
+            """,
+            [.array(spools), .number(now.timeIntervalSince1970 * 1000)],
+            as: [String: Dryness].self)
     }
 
     public func lowStock(_ spools: [JSONValue],

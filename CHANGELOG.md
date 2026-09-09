@@ -1246,6 +1246,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **A spool says when it was last dried, and the shelf says when it is overdue.**
+  Filament goes damp on a shelf and prints badly when it has — stringing,
+  popping, brittle parts — and how fast depends on the material and how it is
+  stored: a nylon in open air is a day, the same nylon sealed with desiccant is
+  twenty. Khayt has known those intervals for a long time and could not apply
+  them to a single spool, because the only record of a drying in the whole store
+  lived on Bed Ready's separate dry log, a list of labels with nothing joining
+  it to the shelf. A shop was tracking the same roll twice, and the half that
+  knew the material was not the half that knew when it was dried.
+
+  A spool now records its own last drying, and the shelf says "dry it soon" as
+  the interval runs out and "needs drying" past it. **A spool nobody has
+  recorded drying says nothing at all** — an unknown state, not an overdue one.
+  A shelf that accused every old spool of being wet on the day this shipped
+  would be ignored by the end of the week.
 - **A spool says how long it has got.** "640 g" looks perfectly healthy; at the
   rate this shop is using ASA it is a fortnight from empty, and the shelf now
   says so. Only for a spool with two months or less left — a roll with a year in
