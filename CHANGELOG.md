@@ -1246,6 +1246,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **The waste log's costs in the sample shop were the pre-tax figures.** This app
+  prices a failed print itself, from the shelf's per-kilo rate and net of tax a
+  registered shop reclaims — and every one of the six sample entries held the
+  gross figure instead. The screen totalled 128.18 where this shop's own app
+  would write 79.53: a 61% overstatement of what its failures cost, on the
+  screen whose whole purpose is that number. One entry was wrong twice over,
+  priced at double its own shelf rate. A guard now checks each entry against
+  what the app would price it at.
 - **The customers table fills its window.** Every one of its five columns had a
   maximum width, and the five maxima add up to 720 points inside a pane eleven
   hundred wide — so a third of the screen sat blank behind a trailing divider,
