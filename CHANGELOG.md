@@ -1246,6 +1246,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **A print that runs out of filament now says so, instead of "stalled".** Khayt
+  watched Klipper's filament sensors not at all: a print stopped for want of
+  filament stopped advancing, and fifteen minutes later the app reported it as
+  stuck at whatever percentage it had reached. True, useless, and the wrong
+  errand — "load a spool" and "something is wrong" send you to the machine with
+  different things in your hands. It is one alert now, not two.
+
+  The sensors are **discovered** rather than guessed. The obvious
+  implementation, and the one another Moonraker client on GitHub ships, asks
+  for an object called `filament_switch_sensor filament_sensor`; on the
+  Snapmaker U1 that object does not exist and the query returns silence. What
+  that printer actually publishes is four `filament_motion_sensor` objects, one
+  per head, alongside two Snapmaker-specific things that look like sensors and
+  are not. On a toolchanger only the printing head's sensor is news: a spare
+  head sitting empty is an empty slot, not a runout. A sensor switched off
+  answers nothing — reading it anyway is how you send somebody to load a spool
+  that is already loaded — and a machine with no sensor reports "cannot tell"
+  rather than "filament fine".
 - **Zero is a reading, and four places said it was not.** `(obj && obj.field) ||
   null` turns a genuine 0 into "nothing reported". OctoPrint sends
   `printTimeLeft: 0` at the instant a print finishes, so the one moment the app

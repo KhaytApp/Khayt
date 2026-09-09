@@ -81,6 +81,16 @@ const moonrakerHistory = require('./lib/moonraker-history');
 // same machines. Two readings of the same JSON would be two opinions about
 // whether a shop's print is nearly done.
 const moonraker = require('./lib/moonraker');
+const filamentSensors = require('./lib/filament-sensors');
+/**
+ * Which filament sensors each Klipper machine publishes, by machine id.
+ *
+ * Discovered once per machine per run: Klipper's object list changes only
+ * across a firmware restart, and asking on every poll would add a request to
+ * the slowest link in the app. An empty array means "asked, has none" and is
+ * not the same as `undefined`, which means "have not asked yet".
+ */
+const moonrakerSensors = new Map();
 const octoprint = require('./lib/octoprint');
 const prusalink = require('./lib/prusalink');
 const contextMenu = require('./lib/main/context-menu');
@@ -4561,7 +4571,19 @@ async function fetchPrinterStatus(machine) {
     };
   }
   if (type === 'moonraker') {
-    const data = await get(`/printer/objects/query?${moonraker.QUERY}`);
+    // The filament sensors are DISCOVERED, once per machine per run, because a
+    // hardcoded object name finds nothing on the printer this was written
+    // against — see `lib/filament-sensors.js`. Klipper's object list changes
+    // only across a firmware restart, and a failed discovery simply means no
+    // runout reporting rather than a failed poll.
+    let sensorNames = moonrakerSensors.get(machine.id);
+    if (sensorNames === undefined) {
+      try {
+        sensorNames = filamentSensors.sensorNames(await get('/printer/objects/list'));
+      } catch (e) { sensorNames = []; }
+      moonrakerSensors.set(machine.id, sensorNames);
+    }
+    const data = await get(`/printer/objects/query?${moonraker.queryWith(sensorNames)}`);
     // On a toolchanger the live head is not toolhead zero, and only the machines
     // that need it pay for the second request. A failure there keeps toolhead
     // zero's reading rather than showing nothing.
@@ -4572,7 +4594,7 @@ async function fetchPrinterStatus(machine) {
       catch (e) { hot = null; }
     }
     return {
-      ...moonraker.readStatus(data, hot, hotName),
+      ...moonraker.readStatus(data, hot, hotName, sensorNames),
       // filament_used is a running total across toolchanges, not per-head:
       // print_stats.py rebases its last extruder position on the
       // `extruder:activate_extruder` event, so the jump between heads is not

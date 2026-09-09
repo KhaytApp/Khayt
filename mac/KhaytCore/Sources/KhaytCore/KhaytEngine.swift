@@ -258,6 +258,11 @@ public actor KhaytEngine {
         // its progress and ETA rules through a global, and without it a shop
         // would see 0% on every machine rather than an error.
         "printer-status",
+        // Before `moonraker`, which reaches its runout rule through a global
+        // the same way it reaches `printer-status`. Without it a Klipper
+        // machine reports `filamentOut: null` — "cannot tell" — on every poll,
+        // which is quiet and wrong rather than loud and wrong.
+        "filament-sensors",
         "moonraker",
         // The two other HTTP protocols whose reading is a module. Duet and
         // Repetier have modules too and are NOT here: both need a session

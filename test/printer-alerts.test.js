@@ -330,3 +330,56 @@ test('an absent enable leaves the Telegram behaviour exactly as it was', () => {
   assert.deepEqual(a.alerts, b.alerts);
   assert.equal(a.alerts.length, 1);
 });
+
+/* ── runout: the machine said it itself ──────────────────────── */
+
+const M = 'MACH-1';
+const printing = (over) => ({ [M]: { state: 'Printing', progress: 47, filename: 'a.gcode', ...over } });
+
+test('a runout on the printing head raises a runout, not a stall', () => {
+  // The stall clock has been running for an hour: without the runout rule this
+  // machine reports 'stall', which is true and the wrong errand.
+  const st = { [M]: { lastProgress: 47, lastProgressAt: T0 - 60 * MIN, cooldowns: {} } };
+  const res = computePrinterAlerts(printing({ filamentOut: false }), printing({ filamentOut: true }),
+    fullSettings(), T0, { alertState: st });
+  assert.deepEqual(types(res), ['runout'],
+    'the shop was told twice about one thing, once uselessly');
+  assert.match(res.alerts[0].message, /Out of filament/);
+});
+
+test('refilled and still not moving stalls on schedule', () => {
+  // The clock kept running while the machine was out, so a print that is fed
+  // and still stuck does not get a fresh fifteen minutes of silence.
+  const st = { [M]: { lastProgress: 47, lastProgressAt: T0 - 60 * MIN, cooldowns: {} } };
+  const res = computePrinterAlerts(printing({ filamentOut: true }), printing({ filamentOut: false }),
+    fullSettings(), T0, { alertState: st });
+  assert.deepEqual(types(res), ['stall']);
+});
+
+test('a loaded machine and a machine with no sensor both stay quiet', () => {
+  const prev = printing({ filamentOut: false });
+  assert.deepEqual(types(computePrinterAlerts(prev, printing({ filamentOut: false }), fullSettings(), T0)), []);
+  // null is "cannot tell", which is not "needs you".
+  assert.deepEqual(types(computePrinterAlerts(prev, printing({ filamentOut: null }), fullSettings(), T0)), []);
+  assert.deepEqual(types(computePrinterAlerts(prev, printing({}), fullSettings(), T0)), []);
+});
+
+test('a runout fires on the edge, not on every poll while it lasts', () => {
+  const s = fullSettings();
+  const out = printing({ filamentOut: true });
+  let st = {};
+
+  let res = computePrinterAlerts(printing({ filamentOut: false }), out, s, T0, { alertState: st });
+  assert.deepEqual(types(res), ['runout'], 'first fires');
+  st = res.state;
+
+  // Still out one poll later, and the shop already knows.
+  res = computePrinterAlerts(out, out, s, T0 + MIN, { alertState: st });
+  assert.deepEqual(types(res), [], 'it shouted every poll until somebody noticed');
+});
+
+test('the runout alert can be switched off like the others', () => {
+  const res = computePrinterAlerts(printing({ filamentOut: false }), printing({ filamentOut: true }),
+    fullSettings(), T0, { enable: { error: true, offline: true, stall: true, runout: false } });
+  assert.deepEqual(types(res), []);
+});
