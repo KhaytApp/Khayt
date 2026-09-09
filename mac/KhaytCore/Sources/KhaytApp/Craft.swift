@@ -157,8 +157,19 @@ struct CraftArt: View {
 struct EmptyHere<Actions: View>: View {
     let title: String
     var message: String?
-    /// Shown instead of the drawing where a screen has a better idea — the
-    /// library's own thumbnail placeholder, say. Nil takes the nozzle.
+    /// The app's own mark for THIS screen, where there is one.
+    ///
+    /// Twenty-four screens shared one drawing — a nozzle laying a first layer —
+    /// which is right for the app and says nothing about which screen you are
+    /// looking at. An empty shelf should show a spool, an empty machines screen
+    /// a printer, an empty waste log a purge tower: the same set the sidebar
+    /// draws, at forty points, so the empty state names its own screen.
+    ///
+    /// Nil keeps the nozzle, which is correct for the screens that are about
+    /// the work itself rather than about a kind of thing.
+    var mark: Mark?
+    /// Shown instead of either where a screen has a better idea — the library's
+    /// own thumbnail placeholder, say.
     var symbol: String?
     /// What a shop can do from here, where there is something. An empty screen
     /// with the button that fills it is the difference between a dead end and
@@ -171,6 +182,9 @@ struct EmptyHere<Actions: View>: View {
                 Image(systemName: symbol)
                     .font(.system(size: 40, weight: .light))
                     .foregroundStyle(Khayt.cyan.opacity(0.55))
+            } else if let mark {
+                Drawn(mark: mark, size: 44)
+                    .foregroundStyle(Khayt.cyan.opacity(0.5))
             } else {
                 CraftArt()
             }
@@ -196,8 +210,9 @@ struct EmptyHere<Actions: View>: View {
 
 extension EmptyHere where Actions == EmptyView {
     /// The ordinary case: a drawing and some words, nothing to press.
-    init(title: String, message: String? = nil, symbol: String? = nil) {
-        self.init(title: title, message: message, symbol: symbol, actions: { EmptyView() })
+    init(title: String, message: String? = nil, mark: Mark? = nil, symbol: String? = nil) {
+        self.init(title: title, message: message, mark: mark, symbol: symbol,
+                  actions: { EmptyView() })
     }
 }
 

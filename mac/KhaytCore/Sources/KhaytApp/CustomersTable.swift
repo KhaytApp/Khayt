@@ -109,7 +109,7 @@ struct CustomersTable: View {
                 if !shop.search.isEmpty {
                     ContentUnavailableView.search(text: shop.search)
                 } else {
-                    EmptyHere(title: shop.words.callIt("mac.no_customers"), message: shop.words.callIt("mac.no_customers_hint"))
+                    EmptyHere(title: shop.words.callIt("mac.no_customers"), message: shop.words.callIt("mac.no_customers_hint"), mark: .clients)
                 }
             }
         }
@@ -231,7 +231,7 @@ struct CustomerInspector: View {
                 .padding(16)
             }
         } else {
-            EmptyHere(title: shop.words.callIt("mac.no_customer"), message: shop.words.callIt("mac.no_customer_hint"))
+            EmptyHere(title: shop.words.callIt("mac.no_customer"), message: shop.words.callIt("mac.no_customer_hint"), mark: .clients)
         }
     }
 }

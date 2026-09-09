@@ -33,6 +33,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   until you enter one.
 
 ### Added
+- **An empty screen shows its own mark.** Twenty-four of them shared one drawing
+  — a nozzle laying a first layer — which is right for the app and says nothing
+  about which screen you are looking at. An empty shelf shows a spool now, an
+  empty machines screen a printer, an empty catalogue a price tag. The screens
+  that are about the work itself rather than a kind of thing keep the nozzle.
 - **The sample shop's portfolio shows eight different things.** It was eight
   photographs of the same slab in eight colours, on the one screen whose entire
   purpose is showing finished work. A bracket, a chain, a hood, a socket, a set

@@ -48,7 +48,7 @@ struct Machines: View {
         .background(Khayt.ground)
         .overlay {
             if shop.machines.isEmpty {
-                EmptyHere(title: shop.words.callIt("mac.no_machines"), message: shop.words.callIt("mac.no_machines_hint"))
+                EmptyHere(title: shop.words.callIt("mac.no_machines"), message: shop.words.callIt("mac.no_machines_hint"), mark: .machines)
             }
         }
         .toolbar {
@@ -275,7 +275,7 @@ struct Inventory: View {
     var body: some View {
         Group {
             if shop.spools.isEmpty {
-                EmptyHere(title: shop.words.callIt("mac.no_filament"))
+                EmptyHere(title: shop.words.callIt("mac.no_filament"), mark: .filament)
             } else if shown.isEmpty {
                 ContentUnavailableView.search(text: shop.search)
             } else {
