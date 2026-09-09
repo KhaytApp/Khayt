@@ -1246,6 +1246,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **The sample shop now pays VAT on what it buys, so the P&L can show the
+  reclaim.** A registered shop remits what it collected on sales LESS what it
+  paid on its own purchases, and Khayt has computed that for a long time — but
+  not one of the nine sample expenses carried a tax line, so "VAT" and "VAT to
+  remit" were identical in every row of every screenshot ever taken, the reclaim
+  rule was exercised by nothing, and the expense figure beside them was the
+  gross figure wearing a label that said otherwise. Seven of the nine carry one
+  now; two deliberately do not, because an unregistered supplier and an import
+  reclaim nothing and that has to stay a case somebody can see. Nothing changes
+  in your own book — this is the demonstration data.
 - **The 48-hour band stopped explaining itself across the timeline.** A machine
   Khayt cannot time had a sixty-character sentence drawn along its lane, from the
   left edge — under the red "now" bar, with the hour grid running through the
