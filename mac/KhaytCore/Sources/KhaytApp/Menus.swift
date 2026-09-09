@@ -144,6 +144,15 @@ private struct BookMenu: View {
         .disabled(!shop.canMoveJobs || shop.importing)
         .keyboardShortcut("i", modifiers: [.command, .shift])
 
+        // The whole rack, from the menu; one spool from its own context menu on
+        // the shelf. Not a write, so it does not wait on `canMoveJobs` — a
+        // read-only book can still print labels for the rack it describes —
+        // but an empty shelf has nothing to label.
+        Button(Words.upfront("mac.print_labels")) {
+            Task { await shop.askForShelfLabels() }
+        }
+        .disabled(shop.spools.isEmpty)
+
         Button(Words.upfront("mac.check_cloud") + "\u{2026}") { shop.checkingCloud = true }
             .disabled(!shop.cloudConnected)
         // The way back out of automatic sync, and the only one there is.

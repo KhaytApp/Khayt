@@ -1246,6 +1246,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **The Mac app can print shelf labels.** A sheet of QR labels for the rack —
+  one per spool, with the material, the colour the shop calls it, how much is
+  left **in that item's own unit**, and the id in small type for when the camera
+  will not focus. Scanning one gives `KHAYT-SPOOL:<id>`, which is exactly what
+  the Electron app writes, so a rack labelled half from one app and half from
+  the other is still one rack. The sheet itself is built by the same
+  `lib/labels.js` both apps share, and the QR codes are drawn by macOS rather
+  than by anything added to the app. It shows you the sheet before it prints,
+  because forty labels is forty labels' worth of paper.
 - **A spool says when it was last dried, and the shelf says when it is overdue.**
   Filament goes damp on a shelf and prints badly when it has — stringing,
   popping, brittle parts — and how fast depends on the material and how it is

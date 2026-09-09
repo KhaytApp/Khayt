@@ -3653,6 +3653,30 @@ final class Shop {
         pendingInvoice = PendingHold(id: id, project: job.project)
     }
 
+    /// The label sheet waiting to be looked at, as finished HTML.
+    ///
+    /// Built once when the shop asks rather than per redraw: a QR code per
+    /// spool is real work — CoreImage rasterises each one — and a shelf of
+    /// forty would redo it on every frame of the sheet's animation.
+    var pendingLabels: LabelSheetRequest?
+
+    /// Build a printable sheet of shelf labels, for the spools given or for the
+    /// whole shelf when none are.
+    ///
+    /// The HTML comes from `lib/labels.js` — the same builder the Electron app
+    /// prints from, so a rack labelled half from one app and half from the
+    /// other is one rack — and the QR images come from CoreImage. Nothing is
+    /// printed here: the sheet is shown first, because a shop should see forty
+    /// labels before it spends forty labels' worth of paper.
+    func askForShelfLabels(_ ids: [String] = []) async {
+        let chosen = ids.isEmpty ? spools : spools.filter { ids.contains($0.id) }
+        guard !chosen.isEmpty, let engine else { return }
+        let entries = chosen.map { ShelfLabels.entry(for: $0, shop: self) }
+        let heading = words.callIt("mac.shelf_labels")
+        guard let html = try? await engine.labelSheet(entries, heading: heading) else { return }
+        pendingLabels = LabelSheetRequest(html: html, count: chosen.count)
+    }
+
     func clearQuestion() {
         pendingHold = nil
         pendingQC = nil
@@ -3660,6 +3684,7 @@ final class Shop {
         pendingEdit = nil
         pendingQcFail = nil
         pendingInvoice = nil
+        pendingLabels = nil
     }
 
     /// Whether a job may be moved at all: a real book, held by this app, with

@@ -515,6 +515,15 @@ final class Words {
         "mac.dry_overdue":   ["en": "needs drying",   "ar": "بحاجة إلى تجفيف"],
         "mac.dry_due":       ["en": "dry it soon",    "ar": "جفّفها قريبًا"],
 
+        // A printable sheet of QR labels for the rack. The code on each one is
+        // `KHAYT-SPOOL:<id>`, which is what the Electron app writes too — a
+        // shop must be able to scan a rack labelled from either app.
+        "mac.shelf_labels":  ["en": "Shelf labels",   "ar": "ملصقات الرف"],
+        "mac.print_labels":  ["en": "Print shelf labels…", "ar": "طباعة ملصقات الرف…"],
+        "mac.print":         ["en": "Print",          "ar": "طباعة"],
+        "mac.labels_count":  ["en": "labels",         "ar": "ملصقات"],
+        "mac.labels_count_one": ["en": "label",       "ar": "ملصق"],
+
         "mac.reading_file":   ["en": "Reading the file…", "ar": "جارٍ قراءة الملف…"],
         // The library's grouping menu.
         "mac.pick_a_model":  ["en": "Select a model first", "ar": "اختر نموذجًا أولًا"],
