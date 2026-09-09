@@ -137,7 +137,24 @@ final class Words {
     /// sentence. These are a COUNT and a NOUN assembled by the window, and
     /// "1 machines" is what assembling them without asking gives you.
     func counting(_ n: Int, _ key: String) -> String {
-        "\(n) " + callIt(n == 1 ? key + "_one" : key)
+        // ── ARABIC COUNTS TWO OF A THING DIFFERENTLY ──────────────────────
+        //
+        // Arabic has a DUAL: not a plural of two, a form of its own, and the
+        // numeral is not said with it. "Two days" is `يومين`, not `2 أيام` —
+        // which is what this returned, and which reads to an Arabic speaker
+        // the way "2 dayses" reads in English.
+        //
+        // Only where the word has been given a `_two`. Every key without one
+        // behaves exactly as before, so this cannot quietly change a string
+        // nobody has looked at — and the nine counted strings in this app can
+        // be corrected one at a time by somebody who speaks the language.
+        //
+        // The dual carries no numeral because the form already says "two".
+        // Writing `2 يومين` says it twice.
+        if language == "ar", n == 2, let dual = Self.own[key + "_two"]?["ar"], !dual.isEmpty {
+            return dual
+        }
+        return "\(n) " + callIt(n == 1 ? key + "_one" : key)
     }
 
     /// The same, with the placeholders filled.
@@ -493,6 +510,9 @@ final class Words {
                               "ar": "{n} أعمال غير مدفوعة تجاوزت موعدها"],
         "mac.jobs_word":     ["en": "jobs",           "ar": "أعمال"],
         "mac.jobs_word_one": ["en": "job",            "ar": "عمل"],
+        // Nominative: these stand alone as a label rather than after a
+        // preposition, so the dual takes its `ـان` ending.
+        "mac.jobs_word_two": ["en": "jobs",           "ar": "عملان"],
 
         // How long a spool has got, at the rate the shop is using it.
         //
@@ -504,6 +524,9 @@ final class Words {
         "mac.empty_in":      ["en": "empty in",       "ar": "ينفد خلال"],
         "mac.days_word":     ["en": "days",           "ar": "أيام"],
         "mac.days_word_one": ["en": "day",            "ar": "يوم"],
+        // Genitive: this word only ever follows `خلال` ("within"), and a
+        // preposition takes the genitive dual — `خلال يومين`, not `خلال يومان`.
+        "mac.days_word_two": ["en": "days",           "ar": "يومين"],
         // Today, or already promised away.
         "mac.empty_now":     ["en": "none left",      "ar": "لم يتبقَّ شيء"],
 
@@ -532,6 +555,7 @@ final class Words {
         "mac.print":         ["en": "Print",          "ar": "طباعة"],
         "mac.labels_count":  ["en": "labels",         "ar": "ملصقات"],
         "mac.labels_count_one": ["en": "label",       "ar": "ملصق"],
+        "mac.labels_count_two": ["en": "labels", "ar": "ملصقان"],
 
         "mac.reading_file":   ["en": "Reading the file…", "ar": "جارٍ قراءة الملف…"],
         // The library's grouping menu.
@@ -712,14 +736,18 @@ final class Words {
         // One of a thing. English needs the singular and Arabic reads better
         // with it, and the window said "1 machines" until it had one.
         "mac.models_count_one": ["en": "model", "ar": "مجسم"],
+        "mac.models_count_two": ["en": "models", "ar": "مجسمان"],
         "mac.customers_count_one": ["en": "customer", "ar": "عميل"],
+        "mac.customers_count_two": ["en": "customers", "ar": "عميلان"],
         // Counting words, not the sidebar's labels. Reusing those gave the
         // window "6 Filament" and "3 Machines" — a nav label has a capital and
         // is a heading, and neither is a thing you can put a number in front of.
         "mac.spools_count":  ["en": "spools",   "ar": "بكرات"],
         "mac.machines_count": ["en": "machines", "ar": "طابعات"],
         "mac.spools_count_one": ["en": "spool",   "ar": "بكرة"],
+        "mac.spools_count_two": ["en": "spools", "ar": "بكرتان"],
         "mac.machines_count_one": ["en": "machine", "ar": "طابعة"],
+        "mac.machines_count_two": ["en": "printers", "ar": "طابعتان"],
         // What the shop spent, and what it wasted
         "mac.search_expenses": ["en": "Note, category or job", "ar": "ملاحظة أو تصنيف أو عمل"],
         "mac.search_waste":  ["en": "Material, reason or failure", "ar": "خامة أو سبب أو نوع العطل"],

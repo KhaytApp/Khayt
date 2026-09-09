@@ -1246,6 +1246,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Arabic counts two of a thing properly.** Arabic has a dual — not a plural of
+  two, a form of its own — and the numeral is not said with it. The Mac app
+  wrote `2 أيام`, which reads roughly the way "2 dayses" reads in English, and
+  it did so wherever a count met a noun: two days, two jobs, two spools, two
+  printers, two customers. Seven counted words have their dual now; a word
+  without one behaves exactly as before, so the rest can be corrected one at a
+  time. Numbers other than two are unchanged, and English is untouched.
 - **The dashboard says which jobs are going to be late, before they are.** The
   attention panel says a job IS late, which is true and arrives too late to do
   anything with. This says a job WILL BE, because of the work queued in front of
