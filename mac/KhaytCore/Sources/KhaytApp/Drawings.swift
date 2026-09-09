@@ -183,10 +183,19 @@ struct Waterfall: View {
     }
 
     /// The running total at the start and end of each bar.
+    ///
+    /// BOTH anchored bars are measured from zero, but only the OPENING one
+    /// starts the running total. Missing that, every bar after the first was
+    /// measured from zero as well: the quarter drew revenue above the line and
+    /// the whole of expenses below it, as two unrelated columns, and the sum of
+    /// the picture was not the net income printed beside it.
     private var spans: [Span] {
         var run = 0.0
-        return steps.map { step in
-            if step.anchored { return Span(step: step, from: 0, to: step.amount) }
+        return steps.enumerated().map { index, step in
+            if step.anchored {
+                if index == 0 { run = step.amount }
+                return Span(step: step, from: 0, to: step.amount)
+            }
             let from = run
             run += step.amount
             return Span(step: step, from: from, to: run)
@@ -195,58 +204,78 @@ struct Waterfall: View {
 
     var body: some View {
         let values: [Double] = spans.flatMap { [$0.from, $0.to] } + [0]
-        let hi = (values.max() ?? 0) * 1.12
-        let lo = (values.min() ?? 0) * 1.14
+        let hi = (values.max() ?? 0) * 1.28
+        let lo = (values.min() ?? 0) * 1.30
         let span = max(hi - lo, 1)
 
-        GeometryReader { geo in
-            let plot = geo.size.height - 34          // room for the names
-            let step = geo.size.width / CGFloat(max(spans.count, 1))
+        // ── A CANVAS, NOT A GeometryReader FULL OF VIEWS ──────────────────
+        //
+        // The first version of this drew each bar as a `RoundedRectangle` and
+        // each figure as a `Text`, positioned inside a `GeometryReader`. It
+        // rendered correctly and it hung the app: the reader proposes a size,
+        // the positioned children report an ideal size back, that changes the
+        // proposal, and AppKit never reaches a fixed point. Sampled while stuck,
+        // the main thread was 132 frames deep in
+        // `-[NSView _layoutSubtreeWithOldSize:]` under one AppKitScrollView,
+        // and every screen the snapshot runner photographs after this one was
+        // lost with it.
+        //
+        // `Canvas` has no child views to feed anything back. It takes the size
+        // it is given, draws, and takes no part in layout — which is the right
+        // shape for a chart anyway.
+        Canvas { context, size in
+            let plot = size.height - 34            // room for the names
+            let step = size.width / CGFloat(max(spans.count, 1))
             let barW = min(46, step * 0.58)
-            // A closure, not a `func`: a ViewBuilder body cannot contain a
-            // declaration, and the error it gives says so about the whole
-            // closure rather than about this line.
-            let y: (Double) -> CGFloat = { CGFloat((hi - $0) / span) * plot }
+            func y(_ v: Double) -> CGFloat { CGFloat((hi - v) / span) * plot }
 
-            ZStack(alignment: .topLeading) {
-                // The zero line, which is the only rule on the chart that
-                // means anything, so it is the only one drawn darker.
-                Rectangle().fill(Khayt.hairline)
-                    .frame(height: 1)
-                    .offset(y: y(0))
+            // The zero line — the only rule on the chart that means anything,
+            // so the only one drawn at all.
+            context.fill(Path(CGRect(x: 0, y: y(0), width: size.width, height: 1)),
+                         with: .color(Khayt.hairline))
 
-                ForEach(Array(spans.enumerated()), id: \.offset) { index, span1 in
-                    let bar = span1.step, from = span1.from, to = span1.to
-                    let top = min(y(from), y(to))
-                    let tall = max(3, abs(y(to) - y(from)))
-                    let tint: Color = bar.anchored && index > 0
-                        ? (bar.amount < 0 ? Khayt.late : Khayt.done)
-                        : (bar.amount >= 0 ? Self.inward : Self.out)
-                    let centre = step * CGFloat(index) + step / 2
-
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(tint)
-                        .frame(width: barW, height: tall)
-                        .position(x: centre, y: top + tall / 2)
-
-                    // Every bar is labelled. The lightest ramp step sits under
-                    // 3:1 against this surface, and that is only allowed where
-                    // the value is written on the bar.
-                    Text(Money.figure(bar.amount))
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(bar.anchored && index > 0 ? tint : Color.secondary)
-                        .fixedSize()
-                        .position(x: centre,
-                                  y: bar.amount >= 0 ? top - 8 : top + tall + 8)
-
-                    Text(bar.label)
-                        .font(.system(size: 10.5, weight: bar.anchored ? .semibold : .regular))
-                        .foregroundStyle(bar.anchored ? Color.primary : Color.secondary)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .position(x: centre, y: plot + 16)
+            for (index, bar) in spans.enumerated() {
+                let top = min(y(bar.from), y(bar.to))
+                // The step from one bar to the next, so the row reads as one
+                // running total rather than as a bar chart of unrelated
+                // figures. Dashed and faint: it is a guide, not a value.
+                if index > 0, !bar.step.anchored {
+                    let previous = step * CGFloat(index - 1) + step / 2 + barW / 2
+                    var line = Path()
+                    line.move(to: CGPoint(x: previous + 1, y: y(bar.from)))
+                    line.addLine(to: CGPoint(x: step * CGFloat(index) + step / 2 - barW / 2 - 1,
+                                             y: y(bar.from)))
+                    context.stroke(line, with: .color(Khayt.hairline),
+                                   style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
                 }
+                let tall = max(3, abs(y(bar.to) - y(bar.from)))
+                let closing = bar.step.anchored && index > 0
+                let tint: Color = closing
+                    ? (bar.step.amount < 0 ? Khayt.late : Khayt.done)
+                    : (bar.step.amount >= 0 ? Self.inward : Self.out)
+                let centre = step * CGFloat(index) + step / 2
+
+                context.fill(
+                    Path(roundedRect: CGRect(x: centre - barW / 2, y: top, width: barW, height: tall),
+                         cornerRadius: 4, style: .continuous),
+                    with: .color(tint))
+
+                // Every bar carries its figure. The light step of the ramp sits
+                // under 3:1 on this surface, and that is only allowed where the
+                // value is written on the bar.
+                context.draw(
+                    Text(Money.figure(bar.step.amount))
+                        .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(closing ? tint : Color.secondary),
+                    at: CGPoint(x: centre, y: bar.step.amount >= 0 ? top - 8 : top + tall + 8),
+                    anchor: .center)
+
+                context.draw(
+                    Text(bar.step.label)
+                        .font(.system(size: 10.5, weight: bar.step.anchored ? .semibold : .regular))
+                        .foregroundStyle(bar.step.anchored ? Color.primary : Color.secondary),
+                    at: CGPoint(x: centre, y: plot + 16),
+                    anchor: .center)
             }
         }
         .frame(height: height)
