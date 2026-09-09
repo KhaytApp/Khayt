@@ -257,6 +257,10 @@ public actor KhaytEngine {
         // What a printer is doing. `printer-status` first: `moonraker` reaches
         // its progress and ETA rules through a global, and without it a shop
         // would see 0% on every machine rather than an error.
+        // How long each spool has got at the rate it is being used. Self-
+        // contained — it reaches for no other module — and the shelf and the
+        // reorder list share its arithmetic so the two cannot disagree.
+        "reorder",
         "printer-status",
         // Before `moonraker`, which reaches its runout rule through a global
         // the same way it reaches `printer-status`. Without it a Klipper
@@ -662,6 +666,44 @@ public actor KhaytEngine {
     /// deduction never disagree about the same spool." A Swift
     /// `weight <= 200` beside it would be a fifth opinion, and the one the
     /// shop reads on the shelf.
+    /// How long each spool has got, at the rate the shop is using it.
+    ///
+    /// `lib/reorder.js` — the same arithmetic the reorder list uses, asked of
+    /// EVERY spool rather than only the urgent ones. `daysLeft` is nil for a
+    /// spool nothing has been printed with in the window: an unknown future,
+    /// which is not the same as an endless one, and a shelf that writes ∞ over
+    /// it is lying with more confidence than a blank.
+    public struct Runway: Decodable, Sendable {
+        public let gramsPerDay: Double
+        public let daysLeft: Double?
+        public let available: Double
+        public let committedG: Double
+        /// Milliseconds since the epoch, or nil when `daysLeft` is.
+        public let emptyAt: Double?
+    }
+
+    public func runway(spools: [JSONValue], orders: [JSONValue],
+                       now: Date) throws -> [String: Runway] {
+        try runtime.call2("""
+            (function (inv, orders, now) {
+              // `partGrams` is NOT optional in practice. Its default reads
+              // `part.grams`, and a Khayt job part records its weight under
+              // `printWeight` with a pile of rules about multi-colour jobs and
+              // waste on top — so the default finds nothing, every rate comes
+              // out zero, and every spool reports an unknown future. That is
+              // exactly what happened here: the shelf line was written, built,
+              // and drew for no spool in the sample book at all.
+              return KhaytReorder.runwayByItem(inv, orders, {
+                now: now,
+                windowDays: 30,
+                partGrams: KhaytOrderDeduction.partGramsConsumed,
+              });
+            })(ARG0, ARG1, ARG2)
+            """,
+            [.array(spools), .array(orders), .number(now.timeIntervalSince1970 * 1000)],
+            as: [String: Runway].self)
+    }
+
     public func lowStock(_ spools: [JSONValue],
                          settings: [String: JSONValue]) throws -> [String: Bool] {
         try runtime.call2("""

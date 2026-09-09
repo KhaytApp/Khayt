@@ -494,6 +494,19 @@ final class Words {
         "mac.jobs_word":     ["en": "jobs",           "ar": "أعمال"],
         "mac.jobs_word_one": ["en": "job",            "ar": "عمل"],
 
+        // How long a spool has got, at the rate the shop is using it.
+        //
+        // "in" rather than "on": the figure comes from a trailing thirty-day
+        // average and is an estimate, so it must not read like an appointment.
+        // Only shown for a spool with two months or less left — a roll with a
+        // year in it does not need a line, and a shelf that annotates every
+        // card annotates none of them.
+        "mac.empty_in":      ["en": "empty in",       "ar": "ينفد خلال"],
+        "mac.days_word":     ["en": "days",           "ar": "أيام"],
+        "mac.days_word_one": ["en": "day",            "ar": "يوم"],
+        // Today, or already promised away.
+        "mac.empty_now":     ["en": "none left",      "ar": "لم يتبقَّ شيء"],
+
         "mac.reading_file":   ["en": "Reading the file…", "ar": "جارٍ قراءة الملف…"],
         // The library's grouping menu.
         "mac.pick_a_model":  ["en": "Select a model first", "ar": "اختر نموذجًا أولًا"],
