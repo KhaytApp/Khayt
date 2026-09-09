@@ -94,6 +94,19 @@ struct LayerLinesShape: Shape {
     /// Fewer, fatter rows for the drawing; more, finer ones for a bar.
     var widths: [CGFloat] = [0.92, 0.78, 0.96, 0.66, 0.88, 0.72, 0.98, 0.60, 0.84, 0.74]
 
+    /// Without this, `progress` is not animatable and `.animation` on the view
+    /// above is silently inert — the stack still jumps a whole row at a time
+    /// with nothing in between, and nothing anywhere reports that the
+    /// animation did nothing.
+    ///
+    /// Interpolating it makes the layers arrive ONE AT A TIME rather than all
+    /// at once, because `drawn` rounds: that is the right picture, since that
+    /// is how they are actually laid.
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
     func path(in r: CGRect) -> Path {
         var path = Path()
         let rows = widths.count
@@ -261,6 +274,8 @@ struct LayerProgress: View {
     var tint: Color = Khayt.hot
     var height: CGFloat = 18
 
+    @Environment(\.accessibilityReduceMotion) private var reduced
+
     var body: some View {
         ZStack(alignment: .leading) {
             // The layers still to come, ghosted — so the bar has a length
@@ -270,6 +285,11 @@ struct LayerProgress: View {
             LayerLinesShape(progress: max(0, min(1, progress))).fill(tint)
         }
         .frame(height: height)
+        // A print gaining a layer is the one thing on this screen that is
+        // actually happening, and it used to snap from one row to the next
+        // with nothing in between. `LayerLinesShape.progress` is animatable
+        // through `Shape`, so the stack GROWS.
+        .animation(Motion.of(Motion.progress, unless: reduced), value: progress)
         .accessibilityHidden(true)
     }
 }
