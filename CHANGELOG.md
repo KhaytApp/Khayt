@@ -1246,6 +1246,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **The dashboard says which jobs are going to be late, before they are.** The
+  attention panel says a job IS late, which is true and arrives too late to do
+  anything with. This says a job WILL BE, because of the work queued in front of
+  it — "due 12 Sep · expected 14 Sep" — and a shop told on Tuesday that Friday's
+  job will not make it can still move it, split it across two machines, or ring
+  the customer while that is a courtesy rather than an apology. The projection is
+  the queue's print hours over the shop's own working hours per calendar day, and
+  a job already in the attention panel is left out of it: saying the same job
+  twice in two different words is how a screen teaches somebody to skim it.
 - **A snapshot run that hangs now says so.** The runner spins sometimes —
   AppKit enters a layout pass it never finishes and pins a core — and from
   outside that looked exactly like a finished run: a folder of pictures, no

@@ -39,6 +39,10 @@ struct Dashboard: View {
         // the printers'. A shop opening this app to ask "is it still going"
         // should not have to change screens.
         RunningNow(shop: shop)
+        // What the queue is about to make late. UNDER the attention panel and
+        // above the invoices: "this is already wrong" outranks "this is going
+        // to be", which outranks "somebody owes us money".
+        RunningOut(shop: shop)
         // And what went wrong while nobody was looking. A notification
         // dismissed while the shop was making coffee is a notification it never
         // had, so the alerts are on the screen as well.
@@ -141,7 +145,91 @@ struct Dashboard: View {
 /// until the shop turns them on. So this draws nothing on a book that has not
 /// asked for it, which is the point: a permanently empty section is a section
 /// people stop reading.
-private struct ToChase: View {
+private /// Jobs the queue is going to make late, before they are.
+///
+/// ── A DIFFERENT KIND OF NEWS ───────────────────────────────────────────────
+///
+/// The attention panel above says a job IS late, which is true and arrives too
+/// late to act on. This says a job WILL BE, because of the work in front of it
+/// — and a shop told on Tuesday that Friday's job will not make it can move it,
+/// split it across two machines, or ring the customer while that is still a
+/// courtesy rather than an apology.
+///
+/// The projection is `lib/schedule.js`'s: the queue's print hours over the
+/// shop's own working hours per calendar day. It is an estimate and is worded
+/// like one — "expected", not "will be".
+///
+/// A job already in the attention panel is excluded, in `Shop.willBeLate`.
+/// Saying the same job twice in two different words is how a screen teaches
+/// somebody to skim it.
+struct RunningOut: View {
+    @Bindable var shop: Shop
+
+    /// Six, and then a count. The same rule the attention list keeps: a list
+    /// that silently stops is a list that misstates how much is wrong.
+    private var shown: [Order] { Array(shop.willBeLate.prefix(6)) }
+    private var hidden: Int { max(0, shop.willBeLate.count - shown.count) }
+
+    var body: some View {
+        if !shop.willBeLate.isEmpty {
+            DetailSection(shop.words.callIt("mac.will_be_late"),
+                          accent: Khayt.attention, count: shop.willBeLate.count) {
+                VStack(spacing: 0) {
+                    ForEach(shown) { job in
+                        row(job)
+                        if job.id != shown.last?.id || hidden > 0 { LayerRule() }
+                    }
+                    if hidden > 0 {
+                        HStack {
+                            Text(shop.words.callIt("mac.attn_more",
+                                                   ["n": .number(Double(hidden))]))
+                                .font(.callout).foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        .padding(.vertical, 5)
+                    }
+                }
+                .card()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ job: Order) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(job.project.isEmpty ? job.id : job.project)
+                .font(.callout).lineLimit(1)
+            Spacer(minLength: 12)
+            // Both dates, because the gap is the point: "due the 12th, expected
+            // the 15th" says how much trouble it is in, and one date alone does
+            // not.
+            if let due = job.dueDate, !due.isEmpty, let eta = shop.readyDate(of: job.id) {
+                Text(shop.words.callIt("mac.due_expected",
+                                       ["due": .string(Self.day(due)),
+                                        "eta": .string(Self.day(eta))]))
+                    .font(.caption).monospacedDigit()
+                    .foregroundStyle(Khayt.attention)
+            }
+        }
+        .padding(.vertical, 5)
+        .contentShape(Rectangle())
+        // Open the job, the way every other row on this screen does: the jobs
+        // table with it selected, so the inspector beside it answers "why".
+        .onTapGesture {
+            shop.shelf = .jobs(nil)
+            shop.selection = job.id
+        }
+    }
+
+    /// `2026-09-12` as the shop reads it. The stored form is unambiguous and
+    /// nobody wants to read it.
+    static func day(_ iso: String) -> String {
+        guard let d = DateFormatter.shopDay.date(from: iso) else { return iso }
+        return d.formatted(.dateTime.day().month(.abbreviated))
+    }
+}
+
+struct ToChase: View {
     let shop: Shop
 
     /// ── NOT WHAT THE PANEL ABOVE ALREADY SAYS ─────────────────────────────

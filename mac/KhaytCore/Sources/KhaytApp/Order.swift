@@ -9,6 +9,24 @@ import SwiftUI
 /// also genuinely loose data: `clientId`, `dueDate` and `paymentMethod` are all
 /// null across every order in the seed store, `price` arrives as an integer
 /// where `costBasis` arrives as a double, and `priority` is a bool.
+extension DateFormatter {
+    /// Today, as the SHOP would write it: `yyyy-MM-dd` in the machine's own
+    /// time zone.
+    ///
+    /// Not UTC. A projection made at one in the morning in Riyadh is dated
+    /// today, not yesterday — the same trap that once put a purchase on the
+    /// wrong day, and the reason `Order.dayFormatter` beside this one is
+    /// deliberately UTC: it PARSES a stored date, which is written in UTC,
+    /// while this one WRITES a date a person will read.
+    static let shopDay: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+}
+
 struct Order: Identifiable, Decodable, Hashable, Sendable {
     let id: String
     let date: String
