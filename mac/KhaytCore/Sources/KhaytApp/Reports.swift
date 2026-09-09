@@ -39,7 +39,22 @@ struct Reports: View {
                     .frame(maxHeight: .infinity)
             } else {
                 HSplitView {
-                    table
+                    // ── THE ARITHMETIC, THEN THE TABLE ────────────────────
+                    //
+                    // This page was the one screen in the app with no drawing
+                    // on it at all: a table and a panel of totals. It printed
+                    // a quarter's net in a cell, and a number in a cell is a
+                    // number a shop either trusts or does not.
+                    //
+                    // The chart is the same arithmetic `lib/pnl-report.js`
+                    // already did, laid out so it can be checked by eye. The
+                    // table stays underneath — a chart is not a replacement
+                    // for the figures, and the lightest bar on it is only
+                    // legible BECAUSE the figures are there.
+                    VStack(spacing: 0) {
+                        if let latest = rows.first { QuarterDrawn(shop: shop, row: latest) }
+                        table
+                    }
                     Totals(shop: shop, rows: rows)
                         .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
                 }
@@ -407,6 +422,58 @@ struct Reports: View {
             case "61-90", "31-60": AnyShapeStyle(Khayt.attention)
             default: AnyShapeStyle(.secondary)
             }
+        }
+    }
+
+    /// The most recent quarter, drawn.
+    ///
+    /// Only ONE quarter. A waterfall reads left to right as one running total,
+    /// so two quarters side by side on one axis would draw a sum nobody is
+    /// asking for — the table below is where quarters are compared.
+    private struct QuarterDrawn: View {
+        let shop: Shop
+        let row: PnlPeriod
+
+        /// Revenue, everything that took a piece out of it, and what was left.
+        ///
+        /// `revenue` is already net of tax and `fixed` is not inside
+        /// `expenses` — the panel beside this adds them, and so does
+        /// `lib/pnl-report.js` when it works out `net`. So these four bars are
+        /// the whole of the arithmetic and nothing here re-derives it.
+        private var steps: [WaterfallStep] {
+            var out: [WaterfallStep] = [
+                WaterfallStep(label: shop.words.callIt("an.revenue"),
+                              amount: row.revenue, anchored: true),
+                WaterfallStep(label: shop.words.callIt("an.pnl_expenses"), amount: -row.expenses),
+            ]
+            // Only when there is any. A bar of zero height under a label is a
+            // row of the table that wandered onto the chart.
+            if row.fixed != 0 {
+                out.append(WaterfallStep(label: shop.words.callIt("mac.of_which_fixed"),
+                                         amount: -row.fixed))
+            }
+            out.append(WaterfallStep(label: shop.words.callIt("an.pnl_net"),
+                                     amount: row.net, anchored: true))
+            return out
+        }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Drawn(mark: .reports, size: 13).foregroundStyle(.tertiary)
+                    Text(shop.words.callIt("mac.quarter_drawn", ["q": .string(row.period)]))
+                        .font(.system(size: 11, weight: .semibold))
+                        .textCase(.uppercase).tracking(0.5)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(shop.words.callIt("an.pnl_orders") + " \(row.orders)")
+                        .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                }
+                Waterfall(steps: steps, currency: shop.currency, height: 220)
+            }
+            .card(padding: 14)
+            .padding(Metric.screen)
+            .padding(.bottom, 0)
         }
     }
 
