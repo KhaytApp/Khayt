@@ -1246,6 +1246,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Zero is a reading, and four places said it was not.** `(obj && obj.field) ||
+  null` turns a genuine 0 into "nothing reported". OctoPrint sends
+  `printTimeLeft: 0` at the instant a print finishes, so the one moment the app
+  could have said "done" it said the time was unknown, and the 48-hour band fell
+  back to estimating from a percentage it already knew was 100. A nozzle or bed
+  genuinely at 0 °C — a cold machine, or a disconnected thermistor, which
+  Klipper publishes as 0 — read as "not reporting" rather than "reporting zero",
+  which are different machines to somebody deciding whether a printer is alive.
+  Moonraker's nozzle line was already right and the bed line two lines below it
+  was wrong; both go through one shared helper now, so there is nowhere left for
+  them to disagree.
 - **The Mac app could close itself while you were clicking down the sidebar.**
   It died with `NSGenericException: The window has been marked as needing
   another Update Constraints in Window pass…`, which is AppKit's loop detector:

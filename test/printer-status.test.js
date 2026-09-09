@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { normalizeProgress, fileProgressPct, etaSeconds, layerProgressPct, moonrakerProgress, explainPrinterHttp, vendorMessage } = require('../lib/printer-status.js');
+const S = require('../lib/printer-status.js');
 const { duetHeaterTemp } = require('../lib/duet.js');
 
 /**
@@ -303,4 +304,60 @@ test('a printer error body cannot run away with the status line', () => {
   assert.equal(vendorMessage(''), '');
   assert.equal(vendorMessage('not json at all'), 'not json at all');
   assert.equal(vendorMessage('{"nothing":"useful"}'), '');
+});
+
+/**
+ * Zero is a reading, and four adapters used to say it was not.
+ *
+ * `(obj && obj.field) || null` turns a genuine 0 into "nothing reported",
+ * because `0 || null` is `null`. It was written four times across two
+ * adapters, and once — Moonraker's nozzle line — it was written correctly two
+ * lines from a wrong one, which is how it survived.
+ */
+test('reading: zero is a number, absence is null', () => {
+  assert.equal(S.reading(0), 0, 'a genuine zero must survive');
+  assert.equal(S.reading(-5), -5);
+  assert.equal(S.reading('21.4'), 21.4, 'firmwares send numbers as strings');
+  assert.equal(S.reading(null), null);
+  assert.equal(S.reading(undefined), null);
+  assert.equal(S.reading(''), null, 'an unread sensor is not a sensor at 0');
+  assert.equal(S.reading('nan'), null);
+  assert.equal(S.reading(NaN), null);
+  assert.equal(S.reading(Infinity), null);
+});
+
+test('reading: the empty string is not zero, which Number() disagrees with', () => {
+  // The trap this guards: `Number('')` is 0, so a coercion without the guard
+  // invents a reading for a sensor that reported none.
+  assert.equal(Number(''), 0);
+  assert.equal(S.reading(''), null);
+});
+
+test('a print with zero seconds left says zero, not unknown', () => {
+  // OctoPrint's own value at the instant a print finishes. Reported as null,
+  // the 48-hour band fell back to estimating from a percentage of 100.
+  const O = require('../lib/octoprint.js');
+  const got = O.readStatus(
+    { state: { text: 'Operational' }, temperature: { tool0: { actual: 0 }, bed: { actual: 0 } } },
+    { progress: { completion: 100, printTimeLeft: 0 }, job: { file: { name: 'a.gcode' } } });
+  assert.equal(got.timeRemaining, 0, 'a finished print reported no time left at all');
+  assert.equal(got.tempNozzle, 0, 'a cold nozzle read as a silent one');
+  assert.equal(got.tempBed, 0);
+});
+
+test('a Klipper bed at zero reads zero, like the nozzle beside it', () => {
+  const M = require('../lib/moonraker.js');
+  const at = (t) => ({ result: { status: {
+    print_stats: { state: 'standby' }, virtual_sdcard: {}, toolhead: {},
+    extruder: { temperature: t }, heater_bed: { temperature: t } } } });
+  const cold = M.readStatus(at(0), null, null);
+  assert.equal(cold.tempNozzle, 0);
+  assert.equal(cold.tempBed, 0, 'the bed line disagreed with the nozzle line above it');
+
+  // And a machine that reports no heaters at all still reports nothing.
+  const silent = M.readStatus(
+    { result: { status: { print_stats: { state: 'standby' }, virtual_sdcard: {}, toolhead: {} } } },
+    null, null);
+  assert.equal(silent.tempNozzle, null);
+  assert.equal(silent.tempBed, null);
 });
