@@ -3135,7 +3135,8 @@
       "orderId": null,
       "receiptPath": null,
       "recurring": null,
-      "nextDue": null
+      "nextDue": null,
+      "vatAmount": 161.74
     },
     {
       "id": "EXP-0008",
@@ -3146,7 +3147,8 @@
       "orderId": null,
       "receiptPath": null,
       "recurring": "monthly",
-      "nextDue": "2026-10-01"
+      "nextDue": "2026-10-01",
+      "vatAmount": 79.57
     },
     {
       "id": "EXP-0007",
@@ -3157,7 +3159,8 @@
       "orderId": null,
       "receiptPath": null,
       "recurring": null,
-      "nextDue": null
+      "nextDue": null,
+      "vatAmount": 23.48
     },
     {
       "id": "EXP-0006",
@@ -3168,7 +3171,8 @@
       "orderId": "ORD-01000",
       "receiptPath": null,
       "recurring": null,
-      "nextDue": null
+      "nextDue": null,
+      "vatAmount": 12.39
     },
     {
       "id": "EXP-0005",
@@ -3190,7 +3194,8 @@
       "orderId": null,
       "receiptPath": null,
       "recurring": null,
-      "nextDue": null
+      "nextDue": null,
+      "vatAmount": 76.3
     },
     {
       "id": "EXP-0003",
@@ -3201,7 +3206,8 @@
       "orderId": null,
       "receiptPath": null,
       "recurring": null,
-      "nextDue": null
+      "nextDue": null,
+      "vatAmount": 116.09
     },
     {
       "id": "EXP-0002",
@@ -3223,7 +3229,8 @@
       "orderId": null,
       "receiptPath": null,
       "recurring": null,
-      "nextDue": null
+      "nextDue": null,
+      "vatAmount": 73.04
     }
   ],
   "wasteLog": [
