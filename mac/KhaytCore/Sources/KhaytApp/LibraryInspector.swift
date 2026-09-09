@@ -39,7 +39,7 @@ struct LibraryInspector: View {
                 .padding(16)
             }
         } else {
-            EmptyHere(title: shop.words.callIt("mac.no_model"), message: shop.words.callIt("mac.no_model_hint"))
+            EmptyHere(title: shop.words.callIt("mac.no_model"), message: shop.words.callIt("mac.no_model_hint"), mark: .library)
         }
     }
 

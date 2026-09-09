@@ -249,7 +249,8 @@ struct Calculator: View {
 
     private var nothingYet: some View {
         EmptyHere(title: shop.words.callIt("mac.calc_nothing"),
-                  message: shop.words.callIt("mac.calc_nothing_hint"))
+                  message: shop.words.callIt("mac.calc_nothing_hint"),
+                  mark: .calculator)
             .frame(height: 260)
     }
 

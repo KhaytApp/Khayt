@@ -6,6 +6,37 @@ struct ShopWindow: View {
     // Both restored on relaunch. Reopening an app onto a different screen from
     // the one you left is a small thing that makes it feel like a web page.
     @SceneStorage("inspector.showing") private var showInspector = true
+    /// Whether the panel is on screen RIGHT NOW, which is not the same question
+    /// as whether this screen wants one.
+    ///
+    /// ── WHY THIS IS STATE AND NOT A COMPUTED VALUE ────────────────────────
+    ///
+    /// It was computed inline from the shelf, so changing screen resized the
+    /// detail pane AND replaced its contents in one state update. AppKit then
+    /// collapses an `NSSplitViewItem` while SwiftUI is rebuilding the view
+    /// inside it, and somewhere in that overlap SwiftUI's own bridging changes
+    /// a layout constraint from inside the window's constraint pass:
+    ///
+    ///     NSHostingView._willUpdateConstraintsForSubtree
+    ///     NSLayoutConstraint.setConstant
+    ///     AppKitPlatformViewHost._layoutMetricsInvalidatedForHostedView
+    ///     NSHostingView.setNeedsUpdate
+    ///     -[NSWindow _postWindowNeedsUpdateConstraints]   → throw → abort
+    ///
+    /// AppKit will not forgive an invalidation raised during its own pass, and
+    /// the exception escapes the display-cycle observer uncaught, so the app
+    /// dies rather than glitches. It came in from a real morning's use and
+    /// reproduced 4 times in 6 under `KHAYT_CHURN`, which changes shelf on
+    /// consecutive runloop turns.
+    ///
+    /// Splitting it in two fixes it: the shelf changes now, and the panel
+    /// follows on the NEXT turn, by which time the pane has settled. Nobody
+    /// can see one frame, and the two layout passes no longer overlap.
+    ///
+    /// A capture-only or timing-only explanation was wrong twice before on
+    /// this same assertion. This one has a driver that reproduces it and a
+    /// driver that proves the fix — `ChurnTests` runs both.
+    @State private var panelIsOpen = true
     /// A request from the menu bar to put the caret in the search field.
     @State private var searchWanted = false
     @SceneStorage("shelf") private var storedShelf = ""
@@ -14,6 +45,21 @@ struct ShopWindow: View {
     /// and which every registration in `Shop` is guarded for.
     @Environment(\.undoManager) private var undoManager
 
+
+    /// Does the screen you are on have a panel at all?
+    ///
+    /// Closed on the dashboard, not filled with a placeholder: that screen is
+    /// already a summary, and a panel beside it has nothing to say. Closed on
+    /// the screens that carry their own detail — a card, or a table wide
+    /// enough to read — because a panel there would repeat.
+    private var wantsPanel: Bool {
+        showInspector && !shop.showingDashboard && !shop.showingBoard
+            && !shop.showingMachines && !shop.showingInventory
+            && !shop.showingExpenses && !shop.showingWaste && !shop.showingReports
+            && !shop.showingCatalogue && !shop.showingColour && !shop.showingPortfolio
+            && !shop.showingCalculator
+            && !shop.showingGiftCards
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -83,14 +129,30 @@ struct ShopWindow: View {
         // already a summary, and a panel beside it has nothing to say. The
         // binding is read-only there so the toolbar button cannot open an empty
         // one either.
+        // The panel follows the shelf, one runloop turn behind — see the note
+        // on `panelIsOpen`. `wantsPanel` is still the single place that says
+        // WHICH screens have one; this only defers WHEN it moves.
+        // Two things, and BOTH were needed. Deferring alone took the churn
+        // driver from 4 crashes in 6 to 2 in 8 — better, and still a crash.
+        // The surviving two came through a different frame,
+        // `+[NSAnimationManager performAnimations:]`, which is the collapse
+        // ANIMATING: AppKit drives `displayIfNeeded` from a display link and
+        // lays the whole window out again inside it.
+        //
+        // A panel that slides is not worth an app that dies. Without the
+        // animation the collapse is one layout pass, on a settled pane, on a
+        // turn of its own.
+        .onChange(of: wantsPanel, initial: true) { _, wanted in
+            guard panelIsOpen != wanted else { return }
+            Task { @MainActor in
+                var quietly = Transaction()
+                quietly.disablesAnimations = true
+                withTransaction(quietly) { panelIsOpen = wanted }
+            }
+        }
         .inspector(isPresented: Binding(
-            get: { showInspector && !shop.showingDashboard && !shop.showingBoard
-                   && !shop.showingMachines && !shop.showingInventory
-                   && !shop.showingExpenses && !shop.showingWaste && !shop.showingReports
-                   && !shop.showingCatalogue && !shop.showingColour && !shop.showingPortfolio
-                   && !shop.showingCalculator
-                   && !shop.showingGiftCards },
-            set: { showInspector = $0 }
+            get: { panelIsOpen && wantsPanel },
+            set: { showInspector = $0; panelIsOpen = $0 && wantsPanel }
         )) {
             Group {
                 if shop.showingMachines || shop.showingInventory || shop.showingBoard

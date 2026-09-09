@@ -249,7 +249,7 @@ private struct EmptyShelf: View {
         } else if !shop.search.isEmpty {
             ContentUnavailableView.search(text: shop.search)
         } else {
-            EmptyHere(title: shop.words.callIt("mac.no_models"), message: shop.words.callIt("mac.no_models_hint"))
+            EmptyHere(title: shop.words.callIt("mac.no_models"), message: shop.words.callIt("mac.no_models_hint"), mark: .library)
         }
     }
 }

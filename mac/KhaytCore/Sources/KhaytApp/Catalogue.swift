@@ -80,7 +80,7 @@ struct Catalogue: View {
         .background(Khayt.ground)
         .overlay {
             if shop.catalogueRows.isEmpty {
-                EmptyHere(title: shop.words.callIt("mac.no_products"), message: shop.words.callIt("mac.no_products_hint"))
+                EmptyHere(title: shop.words.callIt("mac.no_products"), message: shop.words.callIt("mac.no_products_hint"), mark: .catalogue)
             }
         }
     }

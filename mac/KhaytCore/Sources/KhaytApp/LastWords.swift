@@ -110,3 +110,42 @@ enum LastWords {
         try? FileManager.default.removeItem(at: file(for: build))
     }
 }
+
+/// Switch off an AppKit assertion that SwiftUI trips on its own.
+///
+/// ── THE CRASH ─────────────────────────────────────────────────────────────
+///
+///   NSGenericException: The window has been marked as needing another Update
+///   Constraints in Window pass, but it has already had more Update Constraints
+///   in Window passes than there are views in the window.
+///
+/// That is AppKit's LOOP DETECTOR, not a rule about when constraints may be
+/// invalidated — the distinction cost two wrong diagnoses before anybody read
+/// the reason string. SwiftUI's `AppKitPlatformViewHost` re-invalidates the
+/// hosting view more times than the window has views, and AppKit throws from a
+/// display-cycle observer, where nothing catches it, so the process dies.
+///
+/// It is a framework bug, with a twelve-line reproducer on Apple's forums
+/// (thread 780803): a `.sheet` inside a `NavigationSplitView`. `ShopWindow` has
+/// sixteen sheets on one split view, which is presumably why this shop meets
+/// it daily and most apps never do. Both halves of the loop are SwiftUI
+/// internals; there is nothing on our side of the line to fix.
+///
+/// With the assertion off, AppKit does what it does at every other cycle limit:
+/// stops iterating and draws what it has. The cost is a frame that may be one
+/// pass stale. The alternative is the app closing while somebody is working.
+///
+/// `register` rather than `set`, so it is a DEFAULT and not a preference — it
+/// writes nothing to disk, and anybody who wants the assertion back can have it
+/// with `defaults write app.khayt.mac NSWindowAssertWhenDisplayCycleLimitReached -bool YES`.
+///
+/// MEASURED: `KHAYT_CHURN=200` crashed 4 runs in 6 without this and 0 in 12
+/// with it. Delete this when a macOS release fixes the framework, and run the
+/// churn driver to find out.
+enum DisplayCycle {
+    static let key = "NSWindowAssertWhenDisplayCycleLimitReached"
+
+    static func stopAssertingOnSwiftUIsLoop() {
+        UserDefaults.standard.register(defaults: [key: false])
+    }
+}

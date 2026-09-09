@@ -78,7 +78,7 @@ struct Expenses: View {
         .scrollContentBackground(.hidden)
         .overlay {
             if rows.isEmpty {
-                EmptyHere(title: shop.words.callIt(shop.expenses.isEmpty ? "exp.empty" : "exp.empty_filter"))
+                EmptyHere(title: shop.words.callIt(shop.expenses.isEmpty ? "exp.empty" : "exp.empty_filter"), mark: .expenses)
             }
         }
     }
@@ -153,7 +153,7 @@ struct Expenses: View {
 
         private func recompute() async {
             guard let engine = shop.engine else { budgets = []; return }
-            var settings = shop.settingsDict
+            let settings = shop.settingsDict
             let table: [String: JSONValue]
             if case .object(let b)? = settings["expBudgets"] { table = b } else { table = [:] }
             budgets = (try? await engine.budgetProgress(shop.expenseTotalsThisMonth,
@@ -232,7 +232,7 @@ struct Waste: View {
         }
         .overlay {
             if rows.isEmpty {
-                EmptyHere(title: shop.words.callIt("waste.empty"))
+                EmptyHere(title: shop.words.callIt("waste.empty"), mark: .waste)
             }
         }
     }

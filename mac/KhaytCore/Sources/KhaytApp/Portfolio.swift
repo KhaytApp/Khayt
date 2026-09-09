@@ -47,7 +47,7 @@ struct Portfolio: View {
     var body: some View {
         Group {
             if shop.snapshots.isEmpty {
-                EmptyHere(title: shop.words.callIt("pf.empty"))
+                EmptyHere(title: shop.words.callIt("pf.empty"), mark: .portfolio)
             } else if shown.isEmpty {
                 ContentUnavailableView.search(text: shop.search)
             } else {
