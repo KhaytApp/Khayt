@@ -1246,6 +1246,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **A snapshot run that hangs now says so.** The runner spins sometimes —
+  AppKit enters a layout pass it never finishes and pins a core — and from
+  outside that looked exactly like a finished run: a folder of pictures, no
+  error, nothing to notice unless somebody counted them. A watchdog on its own
+  thread now names the step it got stuck on and exits, and `KHAYT_SNAPSHOT_SKIP`
+  lets a run leave out a section so iterating on one screen does not cost sixty
+  captures. Developer tooling; nothing a shop sees.
 - **The Mac app can print shelf labels.** A sheet of QR labels for the rack —
   one per spool, with the material, the colour the shop calls it, how much is
   left **in that item's own unit**, and the id in small type for when the camera
