@@ -23,6 +23,17 @@ struct Dashboard: View {
     /// What the shop is doing and what wants a person. The left column when
     /// there are two, and the top of the screen when there is one.
     @ViewBuilder private var theWork: some View {
+        // ── THE FLOOR, FIRST AND DRAWN ────────────────────────────────────
+        //
+        // The dashboard opened on four stacked lists of words, and the first
+        // question a shop has walking in is not a question about words: it is
+        // "what is running". `RunningNow` below answers it — but only for the
+        // machines that ARE running, so a floor with nothing on it drew
+        // nothing at all, and a floor with one printer going said nothing
+        // about the other four.
+        //
+        // This is every machine, always, one tile each, and the state is the
+        // drawing rather than the caption.
         if let attention = shop.attention, !attention.items.isEmpty {
             // First, and above the figures. A shop that opens this app is
             // asking "is anything wrong" before it asks "how are we doing", and
@@ -134,6 +145,127 @@ struct Dashboard: View {
                     EmptyHere(title: shop.words.callIt("mac.no_figures"), message: shop.words.callIt("mac.no_figures_hint"))
                 }
             }
+        }
+    }
+}
+
+/// Every machine on the floor, drawn, in one band across the top.
+///
+/// The layer stack IS the state: laid down and warm while a machine is
+/// printing, ghosted while it is idle. A machine Khayt has no protocol for
+/// gets its bed drawn instead — a progress bar for a laser cutter would be a
+/// picture of something the machine does not do, and `lib/machine-kinds.js`
+/// is where that is decided rather than here.
+private struct FloorStrip: View {
+    let shop: Shop
+
+    var body: some View {
+        if !shop.machines.isEmpty {
+            Group {
+                // ── AN HStack, NOT A LazyVGrid ────────────────────────────
+                //
+                // The first version used `LazyVGrid(.adaptive(minimum:
+                // maximum:))`, and an adaptive grid inside this screen's
+                // width-capped ScrollView is a sizing loop: the grid asks how
+                // wide it may be, the answer depends on how many columns it
+                // chose, and AppKit never settles. It rendered — the dashboard
+                // photographed fine — and then hung the app on the NEXT heavy
+                // screen, which is the part that made it hard to see.
+                //
+                // `StatStrip` in Surface.swift has solved this shape already:
+                // one HStack, a rule between each pair, no grid. A shop has a
+                // handful of machines, not forty, so there is nothing here a
+                // grid was buying.
+                HStack(spacing: 0) {
+                    ForEach(Array(shop.machines.enumerated()), id: \.element.id) { index, machine in
+                        if index > 0 {
+                            Rectangle().fill(Khayt.layerLine)
+                                .frame(width: 1).padding(.vertical, 6)
+                        }
+                        Tile(machine: machine, shop: shop)
+                            .padding(.horizontal, 12)
+                    }
+                    // A shop with one printer got one tile the width of the
+                    // window, and a layer stack sixteen hundred points wide
+                    // reads as faint stripes rather than as a print. The
+                    // tiles stay tile-sized and the row starts at the left.
+                    Spacer(minLength: 0)
+                }
+                .card(padding: 12)
+            }
+        }
+    }
+
+    private struct Tile: View {
+        let machine: Machine
+        let shop: Shop
+
+        private var status: KhaytEngine.PrinterStatus? { shop.printers.readings[machine.id]?.status }
+        private var printing: Bool { PrinterWatch.isPrinting(status?.state ?? "") }
+        /// Can a machine of this KIND be asked anything at all?
+        ///
+        /// ── NOT THE SAME QUESTION AS "IS IT CONFIGURED" ───────────────────
+        ///
+        /// The first version asked `PrinterWatch.notWatched(machine)`, which
+        /// answers "has somebody given this machine an address" — and the
+        /// sample shop has given none of them one. So all five tiles said
+        /// "Khayt cannot ask this machine", including three filament printers
+        /// that Khayt speaks four protocols for.
+        ///
+        /// `lib/machine-kinds.js` answers the question actually being asked:
+        /// a laser cutter and a UV flatbed have no protocol in this repo at
+        /// all, and that is a fact about the KIND. A filament printer with no
+        /// address is simply not set up yet, which is a different sentence and
+        /// a fixable one.
+        private var askable: Bool { shop.kind(of: machine)?.polled ?? true }
+        /// Set up to be asked — an address, and a protocol Khayt speaks.
+        private var connected: Bool { PrinterWatch.notWatched(machine) == nil }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(swatch)
+                        .frame(width: 3, height: 15)
+                    Text(machine.name)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .lineLimit(1).truncationMode(.tail)
+                    Spacer(minLength: 0)
+                }
+                if !askable, let x = machine.bed?.x, let y = machine.bed?.y {
+                    BedPlan(x: x, y: y, widest: shop.widestBed, deepest: shop.deepestBed,
+                            box: CGSize(width: 74, height: 38))
+                    Text(shop.words.callIt("mac.cannot_ask"))
+                        .font(.caption2).foregroundStyle(.tertiary)
+                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    LayerProgress(progress: printing ? Double(status?.progress ?? 0) / 100 : 0,
+                                  tint: printing ? Khayt.hot : Khayt.cyan,
+                                  height: 34)
+                    if printing {
+                        Text(status?.filename.isEmpty == false
+                             ? status!.filename : shop.words.callIt("mac.live"))
+                            .font(.caption).lineLimit(1).truncationMode(.middle)
+                        Text("\(status?.progress ?? 0)%")
+                            .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+                    } else {
+                        Text(shop.words.callIt(connected ? "mac.idle" : "mac.not_connected"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: 260, alignment: .leading)
+        }
+
+        private var swatch: Color {
+            guard var hex = machine.color?.trimmingCharacters(in: .whitespaces), !hex.isEmpty else {
+                return .secondary
+            }
+            if hex.hasPrefix("#") { hex.removeFirst() }
+            guard hex.count == 6, let v = Int(hex, radix: 16) else { return .secondary }
+            return Color(red: Double((v >> 16) & 0xFF) / 255,
+                         green: Double((v >> 8) & 0xFF) / 255,
+                         blue: Double(v & 0xFF) / 255)
         }
     }
 }
@@ -555,6 +687,9 @@ private struct Work: View {
             // ONE CARD, RULED — not four. These four figures are one thing: the
             // state of the floor right now. Drawn as four separate cards they
             // spent almost all their ink on borders.
+            // The machines themselves, above the count of them. "Printing 0"
+            // is the book's answer; the tiles are the printers'.
+            FloorStrip(shop: shop)
             StatStrip(stats: [
                 // Amber only when something IS printing. A colour that means
                 // "being made right now" sitting on a zero says the opposite of

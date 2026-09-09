@@ -671,6 +671,9 @@ final class Words {
         "mac.power":         ["en": "Power",           "ar": "الطاقة"],
         "mac.address":       ["en": "Address",         "ar": "العنوان"],
         "mac.quarter_drawn": ["en": "Where {q} went",  "ar": "أين ذهب {q}"],
+        "mac.idle":          ["en": "Idle",            "ar": "متوقفة"],
+        "mac.cannot_ask":    ["en": "Khayt cannot ask this machine",
+                              "ar": "لا تستطيع خيط سؤال هذه الآلة"],
         "mac.nozzle_wear":   ["en": "Nozzle wear",     "ar": "تآكل الفوهة"],
         // The dashed rectangle behind a bed plan. Without this the drawing
         // reads as a rendering fault rather than as a comparison.
