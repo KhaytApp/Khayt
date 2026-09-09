@@ -85,7 +85,12 @@ private struct Card: View {
                     // the other six protocols do not expose one Khayt can read,
                     // and a menu item that always answers "not this printer" is
                     // an item that teaches people to ignore the menu.
-                    if PrinterWatch.notWatched(machine) == nil {
+                    //
+                    // This asked `notWatched == nil`, which is true for all
+                    // THREE protocols this app speaks — so it offered the item
+                    // for a Prusa and handed back a 404 from Moonraker's path.
+                    // The predicate now says what the comment always said.
+                    if PrinterWatch.keepsHistory(machine) {
                         Button(shop.words.callIt("mac.read_history")) {
                             Task { await shop.importPrinterHistory(machine) }
                         }
