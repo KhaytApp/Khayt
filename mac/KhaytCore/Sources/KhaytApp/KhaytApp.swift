@@ -392,6 +392,18 @@ final class Activator: NSObject, NSApplicationDelegate {
         FileHandle.standardError.write(Data("window set to \(Int(w))x\(Int(h)) pt\n".utf8))
     }
 
+    /// Which parts of the run KHAYT_SNAPSHOT_SKIP asks to leave out.
+    ///
+    /// A comma-separated list. Nothing is skipped by default, and a skipped
+    /// section prints a line to stderr — a short run that says nothing is a
+    /// complete run as far as anybody reading the folder can tell.
+    static func skipped(_ name: String) -> Bool {
+        guard let list = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SKIP"] else { return false }
+        return list.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .contains(name)
+    }
+
     static func run(into dir: URL) {
         // Every write below is `try?`, so a directory that is not there costs a
         // whole run and says nothing at all — 31 "wrote …" lines and no files.
@@ -449,6 +461,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             let want: NSAppearance.Name = dark ? .darkAqua : .aqua
             NSApp.appearance = NSAppearance(named: want)
             for window in NSApp.windows { window.appearance = NSAppearance(named: want) }
+            startWatchdog()
             resizeIfAsked()
             captureDetached(into: dir)
             // The window has to have laid out and drawn once. Two seconds is
@@ -715,7 +728,15 @@ final class Activator: NSObject, NSApplicationDelegate {
             }
             await settle()
             try? await Task.sleep(for: .seconds(1))
-            if let settings = settingsWindow() {
+            // KHAYT_SNAPSHOT_SKIP=settings leaves the Settings window shut.
+            //
+            // Added while bisecting a hang, and kept because iterating on one
+            // screen should not cost a full run of sixty captures. The value is
+            // a comma-separated list matched against the names below.
+            if skipped("settings") {
+                // Say so, so a short run is never mistaken for a complete one.
+                FileHandle.standardError.write(Data("skipping settings\n".utf8))
+            } else if let settings = settingsWindow() {
                 for pane in SettingsPane.allCases {
                     shop.settingsPane = pane
                     await settle()
@@ -958,6 +979,65 @@ final class Activator: NSObject, NSApplicationDelegate {
         try? await Task.sleep(for: .milliseconds(700))
     }
 
+    // ── A HANG SHOULD BE LOUD ────────────────────────────────
+    //
+    // This runner spins sometimes: AppKit enters a layout pass it never
+    // finishes, pins a core, and the process sits there. From outside that
+    // looked like a folder with forty-two files in it and no error — a short
+    // run is indistinguishable from a complete one unless somebody counts the
+    // pictures, and nobody counts the pictures. It cost most of an afternoon
+    // and three wrong diagnoses before anybody established that a clean tree
+    // does it too.
+    //
+    // The watchdog cannot live on the main actor, because the main actor is
+    // the thing that is stuck. It is a plain thread reading a plain variable,
+    // which is all a diagnostic needs.
+
+    /// The step the run is on, and when it started. Written by the main actor,
+    /// read by the watchdog thread — `nonisolated(unsafe)` because a torn read
+    /// of a diagnostic is not worth a lock, and the worst case is one wrong
+    /// step name in a message that is already telling somebody to look.
+    nonisolated(unsafe) private static var step = "starting"
+    nonisolated(unsafe) private static var stepAt = Date()
+
+    /// Name the step about to run, for the watchdog to blame.
+    private static func doing(_ name: String) {
+        step = name
+        stepAt = Date()
+    }
+
+    /// Start the thread that gives up on our behalf.
+    ///
+    /// `exit(3)` rather than a crash: a hung run should end in a way a shell
+    /// can test, and a stack from the watchdog thread would only ever show the
+    /// watchdog. Whoever needs the stack can `sample` the process before the
+    /// deadline — the message says so.
+    /// KHAYT_SNAPSHOT_DEADLINE overrides the deadline, in seconds.
+    ///
+    /// Chiefly so the watchdog itself can be tested: set it to 1 and an
+    /// ordinary healthy run trips it, which proves the thread runs, reads the
+    /// step and exits — a watchdog nobody has seen bark is a watchdog nobody
+    /// should rely on.
+    private static func startWatchdog(seconds: Double = 90) {
+        let seconds = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DEADLINE"]
+            .flatMap(Double.init) ?? seconds
+        let thread = Thread {
+            while true {
+                Thread.sleep(forTimeInterval: 5)
+                let stuck = Date().timeIntervalSince(stepAt)
+                guard stuck > seconds else { continue }
+                let note = "snapshot run STUCK at \(step) for \(Int(stuck))s — giving up.\n"
+                    + "The main thread is almost certainly in an AppKit layout loop; "
+                    + "`sample Khayt` before the deadline to see where.\n"
+                FileHandle.standardError.write(Data(note.utf8))
+                exit(3)
+            }
+        }
+        thread.name = "khayt.snapshot.watchdog"
+        thread.stackSize = 64 * 1024
+        thread.start()
+    }
+
     /// Photograph each scrolling pane on its own.
     ///
     /// The whole-window shot loses a pane sometimes — two `NSScrollView`s on
@@ -1062,6 +1142,7 @@ final class Activator: NSObject, NSApplicationDelegate {
     }
 
     static func capture(named name: String, into dir: URL) {
+        doing(name)
         guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }) else {
             FileHandle.standardError.write(Data("no window to capture\n".utf8))
             return
@@ -1072,6 +1153,7 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// Photograph one particular window — the Settings window, which is not
     /// the first visible one.
     static func capture(named name: String, window: NSWindow, into dir: URL) {
+        doing(name)
         guard // The theme frame, not the content view. A unified toolbar sits
               // in the title bar, which is a sibling of the content rather than
               // inside it, so photographing the content alone drops the source
