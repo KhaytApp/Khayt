@@ -189,6 +189,7 @@ struct ShopWindow: View {
         .sheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }
         .sheet(item: $shop.editingCustomer) { CustomerSheet(shop: shop, existing: $0) }
         .sheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
+        .sheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
         .sheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }
         .sheet(isPresented: $shop.addingSpool) { SpoolSheet(shop: shop, existing: nil) }
         .sheet(isPresented: $shop.issuingGiftCard) { GiftCardSheet(shop: shop) }

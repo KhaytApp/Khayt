@@ -55,6 +55,10 @@ public actor KhaytEngine {
         // with no clue why. Verified identical to Node's answer with it.
         "nozzle-wear-data",
         "nozzle-wear",
+        // A printable sheet of QR labels for the shelf. Pure HTML in, pure HTML
+        // out; the QR images are data URLs the caller resolves, because
+        // generating one is a platform job and this module is shared.
+        "labels",
         // Whether a spool has gone damp. It reads `driedAt`, which the
         // `inventory` collection did not carry until now — the only one in the
         // store lived on Bed Ready's `filamentDryLog`, a separate list of
@@ -738,6 +742,21 @@ public actor KhaytEngine {
             """,
             [.array(spools), .number(now.timeIntervalSince1970 * 1000)],
             as: [String: Dryness].self)
+    }
+
+    /// A printable sheet of QR labels, from `lib/labels.js`.
+    ///
+    /// The same builder the Electron app prints from, so a label made here and
+    /// a label made there are the same label. Each entry is
+    /// `{title, lines[], sub?, qr}` and `qr` is a data URL the CALLER makes —
+    /// drawing a QR code is a platform job, and this module is shared with a
+    /// renderer that has its own way of doing it.
+    public func labelSheet(_ labels: [JSONValue], heading: String) throws -> String {
+        try runtime.call2("""
+            (function (labels, heading) {
+              return KhaytLabels.buildLabelSheet(labels, { heading: heading });
+            })(ARG0, ARG1)
+            """, [.array(labels), .string(heading)], as: String.self)
     }
 
     public func lowStock(_ spools: [JSONValue],

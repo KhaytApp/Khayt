@@ -292,6 +292,14 @@ struct Inventory: View {
                                     if shop.canMoveJobs { shop.editingSpool = spool }
                                 }
                                 .contextMenu {
+                                    // Labelling is not a write, so it does not
+                                    // wait on `canMoveJobs` the way editing
+                                    // does — a read-only book can still print
+                                    // a sheet for the rack it is describing.
+                                    Button(shop.words.callIt("mac.print_labels")) {
+                                        Task { await shop.askForShelfLabels([spool.id]) }
+                                    }
+                                    Divider()
                                     if shop.canMoveJobs {
                                         Button(shop.words.callIt("mac.edit_spool")) {
                                             shop.editingSpool = spool
