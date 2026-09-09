@@ -55,6 +55,17 @@ final class Shop {
     /// Wear per machine, keyed by id. `nozzleWear` answers for one machine at
     /// a time, so this is one call each — a handful of printers, not a table.
     private(set) var wear: [String: NozzleWear] = [:]
+
+    /// The biggest bed on this floor, which every bed plan is drawn against.
+    ///
+    /// A minimum of one so the drawing cannot divide by zero on a book whose
+    /// machines have no bed recorded, and it is the WIDEST and DEEPEST across
+    /// the shop rather than one machine's — a laser 1300 wide and 900 deep and
+    /// a flatbed 508 × 330 have different proportions, and comparing every card
+    /// against a single rectangle is the only way the cards compare to
+    /// each other.
+    var widestBed: Double { max(machines.compactMap { $0.bed?.x }.max() ?? 1, 1) }
+    var deepestBed: Double { max(machines.compactMap { $0.bed?.y }.max() ?? 1, 1) }
     /// Where this shop's models live. Resolved once per book, because it reads
     /// settings and probes the disk, and every cell asks about it.
     private(set) var libraryRoots: LibraryLocation.Roots?

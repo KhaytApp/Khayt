@@ -670,7 +670,12 @@ final class Words {
         "mac.extruder":      ["en": "Extruder",        "ar": "الباثق"],
         "mac.power":         ["en": "Power",           "ar": "الطاقة"],
         "mac.address":       ["en": "Address",         "ar": "العنوان"],
+        "mac.quarter_drawn": ["en": "Where {q} went",  "ar": "أين ذهب {q}"],
         "mac.nozzle_wear":   ["en": "Nozzle wear",     "ar": "تآكل الفوهة"],
+        // The dashed rectangle behind a bed plan. Without this the drawing
+        // reads as a rendering fault rather than as a comparison.
+        "mac.bed_against":   ["en": "dashed: the largest bed here, {w} × {d}",
+                              "ar": "المتقطع: أكبر منصة هنا، {w} × {d}"],
         "mac.nozzle_due":    ["en": "due a change",    "ar": "تحتاج تغييراً"],
         "mac.installed":     ["en": "Installed",       "ar": "رُكّبت"],
         "mac.takes":         ["en": "Takes",           "ar": "تقبل"],
