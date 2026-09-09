@@ -32,19 +32,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   your book carries no such figure and reclaims nothing, so none of them changes
   until you enter one.
 
-### Fixed
-- **The Mac app could close itself while you were clicking down the sidebar.**
-  It died with `NSGenericException: The window has been marked as needing
-  another Update Constraints in Window pass…`, which is AppKit's loop detector:
-  SwiftUI's own hosting-view bridging re-invalidates the window more times than
-  the window has views, and the exception is thrown where nothing catches it.
-  It is a framework bug — Apple's forums carry a twelve-line reproducer, a
-  `.sheet` inside a `NavigationSplitView`, and this window has sixteen sheets —
-  so the fix is to stop AppKit asserting on it, which is what several shipping
-  Mac apps do. AppKit then stops iterating and draws what it has, the way it
-  does at every other cycle limit. A driver that switches screen on consecutive
-  runloop turns crashed 4 runs in 6 before and 0 in 12 after.
-
 ### Added
 - **An empty screen shows its own mark.** Twenty-four of them shared one drawing
   — a nozzle laying a first layer — which is right for the app and says nothing
@@ -1259,6 +1246,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **The Mac app could close itself while you were clicking down the sidebar.**
+  It died with `NSGenericException: The window has been marked as needing
+  another Update Constraints in Window pass…`, which is AppKit's loop detector:
+  SwiftUI's own hosting-view bridging re-invalidates the window more times than
+  the window has views, and the exception is thrown where nothing catches it.
+  It is a framework bug — Apple's forums carry a twelve-line reproducer, a
+  `.sheet` inside a `NavigationSplitView`, and this window has sixteen sheets —
+  so the fix is to stop AppKit asserting on it, which is what several shipping
+  Mac apps do. AppKit then stops iterating and draws what it has, the way it
+  does at every other cycle limit. A driver that switches screen on consecutive
+  runloop turns crashed 4 runs in 6 before and 0 in 12 after.
 - **Fixed: the calculator asked "What to charge" twice.** The pricing controls
   and the price itself sat under the identical heading, one above the other. It
   had been that way since the screen was written and was invisible for as long
