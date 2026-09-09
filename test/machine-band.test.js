@@ -279,3 +279,62 @@ test('every block carries the same fields, whatever kind it is', () => {
   assert.equal(running.beyond, false);
   assert.equal(running.shortfall, null);
 });
+
+// ── The printer is a witness on its own ────────────────────────────────────
+//
+// Reported from a real shop: "even though the U1 is printing and it shows it,
+// it tells me it's free". Its book held nineteen jobs, every one of them
+// `completed`, and its U1 was answering Moonraker mid-print. The reading was
+// discarded because nothing in the book said `printing`, and the band drew
+// forty-eight free hours on a machine with plastic coming out of it.
+
+test('a printer that is printing is busy even when the book has no job for it', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [job({ id: 'done', status: 'completed' })],
+    live: { M1: { progress: 41, timeRemaining: 3 * 3600 } },
+    now: NOW, hours: 48,
+  });
+  const row = b.rows[0];
+  assert.equal(row.state, 'printing', 'the printer said so; the book not knowing does not undo that');
+  assert.equal(row.blocks.length, 1);
+  assert.equal(row.blocks[0].endsAt, NOW + 3 * HOUR);
+  assert.equal(row.bookedMinutes, 180);
+  assert.equal(row.freeMinutes, 45 * 60, 'not 48 — three of them are spoken for');
+});
+
+test('nothing is invented about a job the book does not hold', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [],
+    live: { M1: { timeRemaining: HOUR / 1000 } },
+    now: NOW, hours: 48,
+  });
+  const block = b.rows[0].blocks[0];
+  assert.equal(block.title, '', 'Khayt knows the machine is busy, not what it is making');
+  assert.equal(block.orderId, '');
+  assert.equal(b.rows[0].runningOrderId, null);
+});
+
+test('a printer that will not say how long is left is unknown, not free', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [],
+    live: { M1: { progress: 41 } },
+    now: NOW, hours: 48,
+  });
+  const row = b.rows[0];
+  assert.equal(row.state, 'printing');
+  assert.equal(row.known, false, 'its next free hour is unknown, which is not the same as none');
+  assert.equal(row.freeMinutes, 0);
+  assert.equal(b.countedMachines, 0, 'and it is left out of a utilisation figure it would distort');
+});
+
+test('a silent machine with nothing booked is still free', () => {
+  const b = MB.band({
+    machines: [machine('M1', 'U1')],
+    orders: [], live: {}, now: NOW, hours: 48,
+  });
+  assert.equal(b.rows[0].state, 'free');
+  assert.equal(b.rows[0].freeMinutes, 48 * 60);
+});
