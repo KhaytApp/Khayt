@@ -3002,7 +3002,8 @@
       "colourVariant": "Galaxy Black",
       "spoolWeight": 1000,
       "vatAmount": 9.78,
-      "unit": "g"
+      "unit": "g",
+      "driedAt": "2026-08-29"
     },
     {
       "id": "sp-2",
@@ -3011,13 +3012,14 @@
       "weight": 720,
       "rev": 1,
       "openedAt": "2026-07-02",
-      "storage": "shelf",
+      "storage": "drybox",
       "updatedAt": "2026-07-02T09:00:00.000Z",
       "color": "#2E7FD4",
       "colourVariant": "Sky Blue",
       "spoolWeight": 1000,
       "vatAmount": 11.09,
-      "unit": "g"
+      "unit": "g",
+      "driedAt": "2026-07-05"
     },
     {
       "id": "sp-3",
@@ -3026,13 +3028,14 @@
       "weight": 480,
       "rev": 1,
       "openedAt": "2026-08-30",
-      "storage": "drybox",
+      "storage": "open",
       "updatedAt": "2026-08-30T09:00:00.000Z",
       "color": "#C0392B",
       "colourVariant": "Signal Red",
       "spoolWeight": 750,
       "vatAmount": 14.35,
-      "unit": "g"
+      "unit": "g",
+      "driedAt": "2026-08-25"
     },
     {
       "id": "sp-4",

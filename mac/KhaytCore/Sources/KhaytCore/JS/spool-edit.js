@@ -152,6 +152,21 @@
     if (has('weight')) spool.weight = Math.max(0, num(i.weight, 0));
     if (has('purchasedAt')) spool.purchasedAt = i.purchasedAt || undefined;
     if (has('openedAt')) spool.openedAt = i.openedAt || undefined;
+    // WHEN THIS SPOOL WAS LAST DRIED, on the spool itself.
+    //
+    // Khayt already knew how to answer "is this filament wet?" —
+    // `filament-dryness.js` has the intervals per material and per storage —
+    // and could not, because the only `driedAt` in the store lived on Bed
+    // Ready's `filamentDryLog`, a separate list of labels a shop keeps beside
+    // its shelf with nothing joining the two. A shop was tracking the same
+    // roll twice, and the half that knew the material was not the half that
+    // knew when it was dried.
+    //
+    // Absent means "never dried, or nobody wrote it down" — which
+    // `dryStatus` reports as `unknown`, not as `overdue`. A shelf that
+    // accused every old spool of being wet the day this shipped would be
+    // ignored by the end of the week.
+    if (has('driedAt')) spool.driedAt = i.driedAt || undefined;
     if (has('lot')) spool.lot = orAbsent(i.lot);
     if (has('locationId')) spool.locationId = trim(i.locationId) || undefined;
     // Print settings: zero means "not set", not "print at zero degrees".

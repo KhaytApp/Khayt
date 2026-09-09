@@ -372,3 +372,33 @@ test('an item written before this field existed is left without one', () => {
   KhaytSpoolEdit.applyEdit(spool, { cost: 75 }, {});
   assert.equal('unit' in spool, false, 'and the module reads that as grams, which it is');
 });
+
+/* ── driedAt: the shelf can finally answer "is this wet?" ────── */
+
+test('a spool records when it was last dried', () => {
+  const s = { id: 'sp-x', material: 'PETG', weight: 500 };
+  applyEdit(s, { driedAt: '2026-09-01' }, {});
+  assert.equal(s.driedAt, '2026-09-01');
+  // Cleared, not set to the empty string — an absent field is "never recorded".
+  applyEdit(s, { driedAt: '' }, {});
+  assert.equal(s.driedAt, undefined);
+});
+
+test('a spool nobody has dried is unknown to the dryness rule, not overdue', () => {
+  const Dry = require('../lib/filament-dryness.js');
+  const s = { id: 'sp-x', material: 'PA-CF', storage: 'shelf' };
+  const got = Dry.dryStatus(s, Date.now());
+  assert.equal(got.state, 'unknown', 'an unrecorded spool was accused of being wet');
+  assert.equal(got.daysSince, null);
+});
+
+test('the dryness rule reads a spool record directly, which is the point', () => {
+  // Before `driedAt` lived on the spool, this rule could only be asked about a
+  // Bed Ready dry-log record — a separate list with nothing joining it to the
+  // shelf. The shop tracked the same roll twice.
+  const Dry = require('../lib/filament-dryness.js');
+  const spool = { id: 'sp-x', material: 'Sunlu TPU', storage: 'open' };
+  applyEdit(spool, { driedAt: new Date(Date.now() - 9 * 86400000).toISOString() }, {});
+  assert.equal(Dry.dryStatus(spool, Date.now()).state, 'overdue',
+    'nine days of open air on a TPU is well past its three');
+});
