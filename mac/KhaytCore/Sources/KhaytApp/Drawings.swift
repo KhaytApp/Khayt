@@ -40,6 +40,13 @@ struct WearGauge: View {
     let pct: Double
     var size: CGFloat = 46
 
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    /// Drawn from empty on first appearance, so the ring is READ as a
+    /// quantity rather than seen as a static piece of furniture. It sweeps
+    /// once, on arrival, and never again — a gauge that re-animates every time
+    /// a screen redraws is a distraction, not information.
+    @State private var shown: Double = 0
+
     private var over: Bool { pct >= 100 }
     private var tint: Color { over ? Khayt.attention : Khayt.cyan }
     /// The ring's own stroke, and the radius its centreline sits on.
@@ -52,7 +59,7 @@ struct WearGauge: View {
                 .stroke(Khayt.layerLine, lineWidth: stroke)
                 .frame(width: radius * 2, height: radius * 2)
             Circle()
-                .trim(from: 0, to: min(1, max(0, pct / 100)))
+                .trim(from: 0, to: min(1, max(0, shown / 100)))
                 .stroke(tint, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
                 .frame(width: radius * 2, height: radius * 2)
                 .rotationEffect(.degrees(-90))
@@ -69,9 +76,13 @@ struct WearGauge: View {
             // number — the same treatment `BigFigure` gives a unit, for the
             // same reason.
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text("\(Int(pct.rounded()))")
+                Text("\(Int(shown.rounded()))")
                     .font(.system(size: size * 0.30, weight: .semibold, design: .rounded))
                     .monospacedDigit()
+                    // The figure counts up with the ring rather than sitting at
+                    // its final value while the arc travels — two halves of one
+                    // reading that disagreed for two thirds of a second.
+                    .contentTransition(.numericText())
                 if size >= 40 {
                     Text("%").font(.system(size: size * 0.17, weight: .medium, design: .rounded))
                 }
@@ -79,6 +90,15 @@ struct WearGauge: View {
             .foregroundStyle(tint)
         }
         .frame(width: size, height: size)
+        .onAppear {
+            guard !reduced else { shown = pct; return }
+            withAnimation(Motion.gauge) { shown = pct }
+        }
+        // A wear figure that changes while the screen is open — a print
+        // finishing — moves to the new reading rather than jumping.
+        .onChange(of: pct) { _, now in
+            withAnimation(Motion.of(Motion.gauge, unless: reduced)) { shown = now }
+        }
         // The row beside this carries the words; a label here would be read out
         // twice, which is the rule the rest of the drawings follow.
         .accessibilityHidden(true)
