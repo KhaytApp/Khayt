@@ -56,7 +56,7 @@ struct Kanban: View {
                 // Seven columns all saying "nothing here" is a board that looks
                 // broken. It is a search that matched nothing, and it should say
                 // which search.
-                ContentUnavailableView.search(text: shop.search)
+                NothingMatched(shop: shop, mark: .board)
             }
         }
         // The same primary action the jobs table carries. A shop looking at a

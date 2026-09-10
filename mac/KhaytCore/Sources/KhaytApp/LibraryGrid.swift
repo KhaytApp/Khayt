@@ -247,7 +247,7 @@ private struct EmptyShelf: View {
                 Label(shop.words.callIt("mac.library_wont_open"), systemImage: "exclamationmark.octagon")
             } description: { Text(problem) }
         } else if !shop.search.isEmpty {
-            ContentUnavailableView.search(text: shop.search)
+            NothingMatched(shop: shop, mark: .library)
         } else {
             EmptyHere(title: shop.words.callIt("mac.no_models"), message: shop.words.callIt("mac.no_models_hint"), mark: .library)
         }

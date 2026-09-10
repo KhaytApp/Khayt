@@ -598,6 +598,20 @@ final class Words {
         "mac.pct_paid":      ["en": "{n}% paid",       "ar": "مدفوع {n}%"],
         "mac.book_wont_open": ["en": "This book will not open", "ar": "لا يُفتح هذا الدفتر"],
         "mac.nothing_at_stage": ["en": "Nothing at this stage", "ar": "لا شيء في هذه المرحلة"],
+        // A search that emptied the screen. The term is quoted because a shop
+        // that has mistyped one letter needs to SEE the letter it typed, and
+        // an unquoted word in a sentence hides a stray space entirely.
+        "mac.nothing_matches": ["en": "Nothing matches “{q}”", "ar": "لا شيء يطابق «{q}»"],
+        // NO LEADING ELLIPSIS IN THE ARABIC. It reads as a continuation of the
+        // title in English and it cannot in Arabic: a leading "…" is a neutral
+        // character, and bidi resolves it against the run it sits beside, so it
+        // rendered at the LEFT edge — the visual END of an Arabic line. The
+        // sentence appeared to trail off before it began. Photographed with
+        // KHAYT_LANG=ar; nothing in the string suggests it.
+        "mac.and_only_stage":  ["en": "…and the sidebar is showing only {stage}.",
+                                "ar": "والشريط الجانبي يعرض {stage} فقط."],
+        "mac.clear_search":    ["en": "Clear Search",   "ar": "امسح البحث"],
+        "mac.show_all_stages": ["en": "Show All Stages", "ar": "اعرض كل المراحل"],
         "mac.stage_hint":    ["en": "Jobs will appear here as they reach it.",
                               "ar": "تظهر الأعمال هنا حين تبلغ هذه المرحلة."],
         // The window itself.

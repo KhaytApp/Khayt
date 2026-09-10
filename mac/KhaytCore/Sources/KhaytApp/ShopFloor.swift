@@ -316,7 +316,7 @@ struct Inventory: View {
             if shop.spools.isEmpty {
                 EmptyHere(title: shop.words.callIt("mac.no_filament"), mark: .filament)
             } else if shown.isEmpty {
-                ContentUnavailableView.search(text: shop.search)
+                NothingMatched(shop: shop, mark: .filament)
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 14) {
