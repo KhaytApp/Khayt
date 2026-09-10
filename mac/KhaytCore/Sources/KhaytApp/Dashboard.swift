@@ -233,10 +233,26 @@ private struct FloorStrip: View {
                         .lineLimit(1).truncationMode(.tail)
                     Spacer(minLength: 0)
                 }
-                if !askable, let x = machine.bed?.x, let y = machine.bed?.y {
+                // ── AN EMPTY PROGRESS BAR READS AS A SCREEN STILL LOADING ──
+                //
+                // A machine with no address is not printing and never will be
+                // until somebody sets it up, so `LayerProgress` drew its ghost
+                // layers at zero: ragged LEFT-ALIGNED lines, which is exactly
+                // what `Craft.swift` says reads as a paragraph rather than as a
+                // printed object — "centre for art, align for a progress bar".
+                // At zero it is not a bar, it is decoration, and on the front
+                // door three of them sat under the words "No connection set up"
+                // looking like a dashboard that had not finished drawing.
+                //
+                // A machine Khayt cannot see gets its BED instead: a real
+                // drawing of the thing, at its real size against the biggest on
+                // the floor. The two sentences stay different — one is not set
+                // up yet and the other cannot be asked at all — because those
+                // are different facts and only one of them is fixable.
+                if !askable || !connected, let x = machine.bed?.x, let y = machine.bed?.y {
                     BedPlan(x: x, y: y, widest: shop.widestBed, deepest: shop.deepestBed,
                             box: CGSize(width: 74, height: 38))
-                    Text(shop.words.callIt("mac.cannot_ask"))
+                    Text(shop.words.callIt(askable ? "mac.not_connected" : "mac.cannot_ask"))
                         .font(.caption2).foregroundStyle(.tertiary)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 } else {
