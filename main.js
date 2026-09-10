@@ -91,6 +91,16 @@ const filamentSensors = require('./lib/filament-sensors');
  * not the same as `undefined`, which means "have not asked yet".
  */
 const moonrakerSensors = new Map();
+/**
+ * The slicer's estimate for the file each Moonraker machine is printing.
+ *
+ * `machine.id → { filename, meta }`. Moonraker's per-file metadata is static,
+ * so this is asked once when the filename changes and held while that file
+ * prints — not every poll, which would be a request per tick for a number that
+ * cannot move. A failed lookup is remembered as a null `meta` for that
+ * filename, so a file the slicer left no estimate in is not re-asked forever.
+ */
+const moonrakerFileMeta = new Map();
 const octoprint = require('./lib/octoprint');
 const prusalink = require('./lib/prusalink');
 const contextMenu = require('./lib/main/context-menu');
@@ -4593,8 +4603,20 @@ async function fetchPrinterStatus(machine) {
       try { hot = await get(`/printer/objects/query?${encodeURIComponent(hotName)}`); }
       catch (e) { hot = null; }
     }
+    // The slicer's own estimate for this file, so the ETA is not extrapolated
+    // from the first two percent of a print — see `etaWithEstimate`.
+    const printing = (data && data.result && data.result.status
+                      && data.result.status.print_stats && data.result.status.print_stats.filename) || '';
+    let held = moonrakerFileMeta.get(machine.id);
+    if (!held || held.filename !== printing) {
+      const path = moonraker.metadataPath(printing);
+      let meta = null;
+      if (path) { try { meta = await get(path); } catch (e) { meta = null; } }
+      held = { filename: printing, meta };
+      moonrakerFileMeta.set(machine.id, held);
+    }
     return {
-      ...moonraker.readStatus(data, hot, hotName, sensorNames),
+      ...moonraker.readStatus(data, hot, hotName, sensorNames, held.meta),
       // filament_used is a running total across toolchanges, not per-head:
       // print_stats.py rebases its last extruder position on the
       // `extruder:activate_extruder` event, so the jump between heads is not

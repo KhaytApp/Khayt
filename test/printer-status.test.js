@@ -361,3 +361,67 @@ test('a Klipper bed at zero reads zero, like the nozzle beside it', () => {
   assert.equal(silent.tempNozzle, null);
   assert.equal(silent.tempBed, null);
 });
+
+/**
+ * ── THE TIME LEFT, WHEN THE SLICER HAS SAID HOW LONG THE FILE IS ───────────
+ *
+ * Both numbers below were measured on the shop's own Snapmaker U1, and they
+ * pull in opposite directions — which is the whole reason the rule is a ramp
+ * and not a preference for one estimator.
+ */
+const HOUR = 3600;
+
+test('two percent in, the clock is nonsense and the slicer is not', () => {
+  // 2026-09-10, live on the dashboard: 27 minutes elapsed, 2% done, on a file
+  // the slicer had named BLHT_PETG_4h24m.gcode.
+  const elapsed = 1653, f = 0.02, sliced = 4.4 * HOUR;
+  assert.equal(S.etaSeconds(elapsed, f), 80997,
+    'the extrapolation on its own: twenty-two and a half hours');
+  const better = S.etaWithEstimate(sliced, elapsed, f);
+  assert.ok(better > 4 * HOUR && better < 4.5 * HOUR,
+    `expected about four and a quarter hours, got ${(better / HOUR).toFixed(2)}h`);
+});
+
+test('a quarter of the way in, the machine has measured itself and wins', () => {
+  // The bench fixture in moonraker.test.js: 53 layers of 212, 7,291s elapsed,
+  // on a file named 3h58m. A quarter of the print took HALF the estimate, so
+  // believing the slicer here would answer 1h56m for something running at a
+  // pace that says 6h. The clock is right and must not be diluted.
+  const elapsed = 7291.6, f = 53 / 212, sliced = (3 + 58 / 60) * HOUR;
+  assert.equal(S.etaWithEstimate(sliced, elapsed, f), S.etaSeconds(elapsed, f),
+    'by 25% the ramp is complete and this is the extrapolation, unchanged');
+});
+
+test('a print running to schedule gets the same answer from both, throughout', () => {
+  const total = 4.4 * HOUR;
+  for (const f of [0.3, 0.5, 0.75, 0.9]) {
+    const elapsed = total * f;                       // exactly on pace
+    const left = S.etaWithEstimate(total, elapsed, f);
+    assert.ok(Math.abs(left - total * (1 - f)) <= 1,
+      `at ${f * 100}% expected ${Math.round(total * (1 - f))}s, got ${left}s`);
+  }
+});
+
+test('an answer from the first second, where there used to be none', () => {
+  assert.equal(S.etaSeconds(0, 0), null, 'nothing to extrapolate from');
+  // Rounded, because `4.4 * 3600` is 15840.000000000002 and the rule returns
+  // whole seconds — a duration in tenths of a millisecond is not a fact.
+  assert.equal(S.etaWithEstimate(4.4 * HOUR, 0, 0), Math.round(4.4 * HOUR),
+    'the whole file is the honest answer before anything has happened');
+});
+
+test('no estimate is not an estimate of zero', () => {
+  // A file sliced by something that wrote no estimated_time must fall back to
+  // extrapolating, not report "no time left".
+  for (const bad of [null, undefined, 0, -1, NaN, 'soon']) {
+    assert.equal(S.etaWithEstimate(bad, 1653, 0.5), null, `${String(bad)} must be null`);
+  }
+});
+
+test('it never returns a negative, however far behind the print is', () => {
+  // Elapsed past the whole estimate: the slicer half goes to nothing and the
+  // clock half carries it, but the answer stays a duration.
+  const left = S.etaWithEstimate(1 * HOUR, 10 * HOUR, 0.9);
+  assert.ok(left >= 0, `got ${left}`);
+  assert.equal(S.etaWithEstimate(4 * HOUR, 4 * HOUR, 1), 0, 'finished is zero, not negative');
+});

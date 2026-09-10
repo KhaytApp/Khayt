@@ -140,3 +140,59 @@ test('the query asks for every object the reading needs, and no more', () => {
   assert.deepEqual(M.QUERY.split('&').sort(),
     ['extruder', 'heater_bed', 'print_stats', 'toolhead', 'virtual_sdcard']);
 });
+
+/**
+ * ── THE SLICER'S ESTIMATE FOR THE FILE ─────────────────────────────────────
+ *
+ * Moonraker publishes no time-remaining of its own — every other adapter reads
+ * one from the printer — so this adapter worked it out from elapsed ÷ done.
+ * Two percent into a print that is worthless, and the number it produced was on
+ * the dashboard: see `etaWithEstimate` in lib/printer-status.js.
+ *
+ * `/server/files/metadata` carries `estimated_time`, extracted by Moonraker's
+ * own metadata.py from what the slicer wrote into the G-code.
+ */
+test('the metadata path is asked for by name, and not at all when idle', () => {
+  assert.equal(M.metadataPath('output_1_1_PETG_3h58m.gcode'),
+               '/server/files/metadata?filename=output_1_1_PETG_3h58m.gcode');
+  // A path in a subfolder, and a space, both of which Klipper allows.
+  assert.equal(M.metadataPath('jobs/a b.gcode'),
+               '/server/files/metadata?filename=jobs%2Fa%20b.gcode');
+  for (const idle of ['', '   ', null, undefined]) {
+    assert.equal(M.metadataPath(idle), null,
+      'an idle printer has no file to ask about, and the request would 404');
+  }
+});
+
+test('an absent estimate is absent, not zero', () => {
+  assert.equal(M.slicerTotalSeconds({ result: { estimated_time: 14280 } }), 14280);
+  for (const none of [{}, { result: {} }, { result: { estimated_time: 0 } },
+                      { result: { estimated_time: 'soon' } }, null]) {
+    assert.equal(M.slicerTotalSeconds(none), null);
+  }
+});
+
+test('the ETA falls back to extrapolation when the slicer left no estimate', () => {
+  // Which is exactly what this adapter did before the metadata was fetched, so
+  // a file sliced by something that writes no estimate is no worse off.
+  const status = M.readStatus(printing, liveHead, 'extruder2', [], null);
+  assert.ok(Math.abs(status.timeRemaining - 21874) < 5, `got ${status.timeRemaining}`);
+});
+
+test('two percent in, the metadata is what saves the figure', () => {
+  // The bench reply, rewound to the state the shop's dashboard was showing on
+  // 2026-09-10: 27 minutes elapsed, 2% of the layers done.
+  const early = JSON.parse(JSON.stringify(printing));
+  early.result.status.print_stats.print_duration = 1653;
+  early.result.status.print_stats.info = { total_layer: 212, current_layer: 4 };
+  early.result.status.print_stats.filename = 'BLHT_PETG_4h24m.gcode';
+
+  const guessing = M.readStatus(early, liveHead, 'extruder2', [], null);
+  assert.ok(guessing.timeRemaining > 20 * 3600,
+    `without the estimate this is the twenty-two-hour answer, got ${guessing.timeRemaining}`);
+
+  const told = M.readStatus(early, liveHead, 'extruder2', [],
+                            { result: { estimated_time: 4.4 * 3600 } });
+  assert.ok(told.timeRemaining > 4 * 3600 && told.timeRemaining < 4.5 * 3600,
+    `expected about four and a quarter hours, got ${(told.timeRemaining / 3600).toFixed(2)}h`);
+});

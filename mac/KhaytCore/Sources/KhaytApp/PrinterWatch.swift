@@ -354,6 +354,13 @@ final class PrinterWatch {
     /// `fetch` is a seam: the orchestration — which endpoints are asked for and
     /// which failures may be survived — is where the 2026-08-27 audit found its
     /// defects, and it is the half that cannot be tested by driving a parser.
+    /// The slicer's metadata for the file each machine is printing, by machine.
+    ///
+    /// Keyed on the metadata PATH, which encodes the filename — see the use
+    /// below. Held rather than re-asked because Moonraker's file metadata is
+    /// static for a given file and a poll runs every few seconds.
+    private static var fileMeta: [String: (path: String, meta: [String: JSONValue]?)] = [:]
+
     static func read(_ machine: Machine, engine: KhaytEngine, base: URL, key: String,
                      fetch: @escaping (URLRequest) async throws -> (Data, URLResponse))
         async throws -> KhaytEngine.PrinterStatus {
@@ -400,7 +407,35 @@ final class PrinterWatch {
             if let hotName {
                 hot = try? await get("/printer/objects/query?" + hotName.uriComponent)
             }
-            return try await engine.moonrakerStatus(reply, hot: hot, hotName: hotName)
+            // ── THE SLICER'S OWN ESTIMATE FOR THIS FILE ──────────────────
+            //
+            // Without it the adapter works the time left out from how much of
+            // the print has happened so far, and two percent in that is
+            // worthless: this shop's U1 reported twenty-two and a half hours
+            // left on a file the slicer had named `4h24m`.
+            //
+            // Moonraker's per-file metadata cannot change while that file is
+            // printing, so it is asked ONCE per file and held. The path encodes
+            // the filename, which makes it the cache key: a new file asks
+            // again, the same file never does, and an idle printer (no path)
+            // asks nothing.
+            //
+            // A failed lookup is remembered as a nil `meta` FOR THAT PATH, so a
+            // file whose slicer wrote no estimate is not re-requested every few
+            // seconds for the length of the print. It falls back to
+            // extrapolating, which is what this did before.
+            var meta: [String: JSONValue]?
+            if let path = try? await engine.moonrakerMetadataPath(forReply: reply) {
+                if let held = fileMeta[machine.id], held.path == path {
+                    meta = held.meta
+                } else {
+                    meta = try? await get(path)
+                    fileMeta[machine.id] = (path: path, meta: meta)
+                }
+            } else {
+                fileMeta[machine.id] = nil
+            }
+            return try await engine.moonrakerStatus(reply, hot: hot, hotName: hotName, fileMeta: meta)
         }
     }
 

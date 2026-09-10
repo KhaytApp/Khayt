@@ -1365,6 +1365,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **A printer's "time left" could be wildly wrong for the first few minutes of a
+  print.** On a Klipper machine Khayt worked the figure out from how much of the
+  job had finished so far, which early on is guesswork: two percent into a
+  four-and-a-half-hour job it read **twenty-two and a half hours**, on the
+  dashboard, as the first thing you see. It now uses the estimate your slicer
+  wrote into the file until the print has run long enough to time itself, and
+  the machine's own measured pace after that. You also get a figure straight
+  away instead of a blank for the first percent. Bambu, OctoPrint, PrusaLink and
+  Duet machines are unaffected — those printers report their own time left and
+  Khayt has always used it.
 - **The Mac calculator did not say what "Target profit margin" means.** It is a
   markup on cost — price = cost × (1 + margin%) — which is what Khayt has always
   computed and what the Windows and Linux app has always said on that field. On
@@ -1392,7 +1402,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **The Portfolio grid ran off both edges of the window.** Every card measured
   wider than the column it sat in, so the first project's name was cut to
   "urbine bracket" and the last card had no right-hand edge. The photographs are
-  cropped to their frame now, and the grid fits.
+  sized the way the model library sizes its tiles now, and the grid fits.
 - **Cards in a row floated at different heights.** On the shelf, five spools sat
   at three different top edges; on Machines, a printer with a short card hung a
   long way below its neighbours. A card that is shorter than the one beside it
