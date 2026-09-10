@@ -37,10 +37,13 @@ struct CompletionActualsTests {
                 "notes are sent for a job that never went through QC")
     }
 
-    /// The order matters and is not arbitrary. `order-deduction` takes this
-    /// job's filament off the shelf as PART of completing it, so a move made
-    /// before the actual weight landed deducts the estimate — and the shelf
-    /// then disagrees with the job by exactly the amount the shop just typed.
+    /// The order matters: the move hands this record to the engine and stores
+    /// what comes back, so actuals written afterwards would land on a copy the
+    /// book has already replaced.
+    ///
+    /// NOT because the deduction reads them — it does not, in either app. See
+    /// `MoveJobTests.theShelfStillFollowsTheEstimate`, which pins that and says
+    /// why it is left alone.
     @Test("the actuals are written onto the job before the move is applied")
     func actualsLandBeforeTheDeduction() {
         let shop = Self.source("Shop.swift")

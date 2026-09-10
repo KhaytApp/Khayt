@@ -88,7 +88,8 @@ struct MoveJobTests {
     }
 
     static func move(_ root: inout [String: JSONValue], _ id: String, _ stage: Stage,
-                     holdReason: String? = nil, qcNotes: String? = nil)
+                     holdReason: String? = nil, qcNotes: String? = nil,
+                     actuals: Shop.Actuals? = nil)
     async throws -> (undo: [Shop.ChangedRecord], notices: [String]) {
         let engine = try KhaytEngine()
         // Words loaded, not bare: a notice is only useful if it comes back as a
@@ -100,7 +101,8 @@ struct MoveJobTests {
         // hands back; these cases are about the book, so it is dropped here and
         // tested in TelegramTests.
         let out = try await Shop.applyMove(to: &root, id: id, stage: stage, engine: engine,
-                                           words: words, holdReason: holdReason, qcNotes: qcNotes)
+                                           words: words, holdReason: holdReason, qcNotes: qcNotes,
+                                           actuals: actuals)
         return (out.undo, out.notices)
     }
 
@@ -340,6 +342,77 @@ struct MoveJobTests {
         #expect(Self.string(job["qcPassedAt"])?.hasSuffix("Z") == true)
         #expect(Self.string(job["qcNotes"]) == "surface is clean")
         #expect(job["inspector"] == .null, "nobody was named, and nobody is recorded")
+    }
+
+    /// ── WHAT IT REALLY TOOK, ALL THE WAY INTO THE BOOK ───────────────────
+    ///
+    /// The sheet that collects these was tested by reading the source, which
+    /// proves the call is made and NOT that the figures survive the move. They
+    /// have to: `applyMove` writes the actuals onto the order, then hands that
+    /// order to the engine, which returns its own updated copy — a step that
+    /// rebuilds the record from anything captured earlier would drop them
+    /// silently, and the job would read as completed with no actuals at all.
+    @Test("the figures the shop typed are in the book afterwards")
+    func actualsSurviveTheMove() async throws {
+        var root = Self.book()
+        _ = try await Self.move(&root, "J1", .completed,
+                                actuals: .init(hours: 3.456, grams: 214.06,
+                                               timeSource: "moonraker", weightSource: "manual"))
+        let job = try #require(Self.row(root, "printLog", "J1"))
+        #expect(job["actualPrintTime"] == JSONValue.number(3.46), "hours are rounded to two")
+        #expect(job["actualWeight"] == JSONValue.number(214.1), "grams to one")
+        guard case .object(let src)? = job["actualsSource"] else {
+            Issue.record("no provenance on the record"); return
+        }
+        // PER AXIS, and carried through unchanged. A record that flattens these
+        // to one value cannot say that the printer timed the job and the shop
+        // weighed it, which is the ordinary case for a PrusaLink machine.
+        #expect(src["time"] == JSONValue.string("moonraker"))
+        #expect(src["weight"] == JSONValue.string("manual"))
+        #expect(src["at"] != nil, "nothing says when this was recorded")
+    }
+
+    /// A move with no actuals must not stamp empty ones. Every job finished
+    /// before this existed has none, and a `0 g` actual would report every one
+    /// of them as having used no filament.
+    @Test("a completion with nothing typed writes no actuals at all")
+    func noActualsMeansNoFields() async throws {
+        var root = Self.book()
+        _ = try await Self.move(&root, "J1", .completed)
+        let job = try #require(Self.row(root, "printLog", "J1"))
+        #expect(job["actualWeight"] == nil)
+        #expect(job["actualPrintTime"] == nil)
+        #expect(job["actualsSource"] == nil)
+    }
+
+    /// ── THE SHELF STILL LOSES THE QUOTED GRAMS, NOT THE REAL ONES ────────
+    ///
+    /// Pinned because it is surprising, and because a comment in `applyMove`
+    /// used to claim the opposite.
+    ///
+    /// `order-deduction.deductForOrder` DOES take an `actualGrams` — "what the
+    /// PRINTER says the job used, when anything measured it" — and nothing
+    /// passes it. Not this app, and not `renderer/inventory.js`, whose
+    /// `deductionContext()` supplies settings, inventory, consumables,
+    /// machines and today, and no actuals. So a job that used 260 g against a
+    /// 160 g quote takes 160 g off the shelf in BOTH apps, and the shop is
+    /// short by the difference until it counts a spool by hand.
+    ///
+    /// Left alone here on purpose. Changing it on the Mac alone would make the
+    /// two apps disagree about a shop's shelf, which is the one thing the
+    /// shared rules exist to prevent — so it is a decision for both, not a
+    /// side effect of adding a sheet.
+    @Test("the shelf loses the QUOTED grams, even when the job reported more")
+    func theShelfStillFollowsTheEstimate() async throws {
+        var root = Self.book()
+        _ = try await Self.move(&root, "J1", .completed,
+                                actuals: .init(hours: 4, grams: 260))
+        // The fixture's job is quoted at 160 g across two parts, S1 holds 100
+        // and the shortfall comes off S2 — exactly as it does with no actuals
+        // at all, which is the finding.
+        #expect(Self.number(Self.row(root, "inventory", "S1")?["weight"]) == 0)
+        #expect(Self.number(Self.row(root, "inventory", "S2")?["weight"]) == 840,
+                "S2 moved, so the deduction is reading the actual after all")
     }
 
     @Test("a completion that was not an inspection claims nothing about one")

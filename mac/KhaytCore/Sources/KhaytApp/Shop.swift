@@ -4057,11 +4057,18 @@ final class Shop {
         // ── WHAT IT REALLY TOOK, WRITTEN BEFORE THE MOVE IS MADE ──────────
         //
         // Onto the order first, then the move — which is the order Electron
-        // uses and not an arbitrary one. `order-deduction` takes this job's
-        // filament off the shelf as part of completing it, and a move that ran
-        // before the actual weight landed would deduct the ESTIMATE and leave
-        // the shelf disagreeing with the job by exactly the amount the shop
-        // has just corrected.
+        // uses. The move hands this record to the engine and stores what comes
+        // back, so actuals written afterwards would be written onto a copy the
+        // book has already replaced.
+        //
+        // AND NOT BECAUSE THE DEDUCTION READS THEM. It does not, in either
+        // app: `deductForOrder` takes an `actualGrams` — "what the PRINTER says
+        // the job used" — and nobody passes it, `renderer/inventory.js`'s
+        // `deductionContext()` included. So a job that used 260 g against a
+        // 160 g quote still takes 160 g off the shelf. That is a gap in the
+        // shared rule rather than in this app, and closing it here alone would
+        // make the two disagree about a shop's shelf, so it is left alone and
+        // pinned by `MoveJobTests.theShelfStillFollowsTheEstimate`.
         //
         // Both figures and their provenance travel together. A record with
         // actuals and no `actualsSource` reads as measured to anything that
