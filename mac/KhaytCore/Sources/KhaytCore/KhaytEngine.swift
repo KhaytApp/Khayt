@@ -1322,6 +1322,33 @@ public actor KhaytEngine {
                                 [order, status, ctx], as: StatusGate.self)
     }
 
+    /// Every column's answer at once, for the job about to be dragged.
+    ///
+    /// One crossing rather than seven. The board asks this the moment a card is
+    /// picked up, so the columns that would refuse it can say so BEFORE it is
+    /// dropped — `statusGate` above has always been able to answer that, and
+    /// for as long as it existed nothing asked. A shop learnt which moves were
+    /// allowed by making them and reading the error.
+    ///
+    /// Keyed by status. A status the module refuses to consider at all still
+    /// gets an entry, because a missing key and a blocked column look the same
+    /// to the caller and only one of them is true.
+    public func statusGates(order: JSONValue, to statuses: [String],
+                            orders: [JSONValue],
+                            settings: [String: JSONValue]) throws -> [String: StatusGate] {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { orders: ARG2, settings: ARG3 };
+          var out = {};
+          ARG1.forEach(function (status) {
+            out[status] = globalThis.KhaytOrderStatus.gate(ARG0, status, ctx);
+          });
+          return out;
+        })()
+        """#, [order, .array(statuses.map { .string($0) }),
+               .array(orders), .object(settings)], as: [String: StatusGate].self)
+    }
+
     /// Where this move would reach outside the shop's own book.
     ///
     /// Ask BEFORE moving anything. A webhook, a Telegram message, an email or a

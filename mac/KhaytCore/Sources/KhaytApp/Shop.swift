@@ -3704,6 +3704,112 @@ final class Shop {
     /// the shared rules running. The sample shop is for looking at.
     var canMoveJobs: Bool { source.isReal && ownership != nil }
 
+
+    // ── WHICH COLUMNS WOULD TAKE THE CARD IN THE AIR ──────────────────────────
+    //
+    // Answered when a card is picked UP, not when it is dropped. Every column
+    // lit up identically while a job was dragged over it, and a move the rules
+    // refuse was refused after the drop, as an error — so a shop learnt where a
+    // job could go by trying, and the board it was reading gave it no help.
+    // `KhaytOrderStatus.gate` has always been able to answer this, and
+    // `KhaytEngine.statusGate` was written for exactly this use and documented
+    // as "what greys out a drop target before anything is dragged onto it".
+    // Nothing called it.
+
+    /// The job being dragged, or nil.
+    var draggingJob: Order.ID?
+    /// What each column said about that job, keyed by status.
+    ///
+    /// EMPTY IS NOT "EVERY COLUMN REFUSES". It is "the answer has not arrived",
+    /// which is true for the first moments of every drag, and a board that
+    /// greys out all seven columns while it thinks is a board that looks broken.
+    private(set) var dragGates: [String: StatusGate] = [:]
+
+    /// The raw rows the last load read. Named for the KPIs because that is what
+    /// first needed them; every engine call that takes the whole book wants the
+    /// same two, and re-reading the store to answer a drag would be a disk read
+    /// for a hover.
+    private var bookOrders: [JSONValue] { kpiOrders }
+    private var bookSettings: [String: JSONValue] { kpiSettings }
+
+    /// A card has been picked up: ask every column at once.
+    func beganDragging(_ id: Order.ID) {
+        draggingJob = id
+        dragGates = [:]
+        watchForDragEnd()
+        guard canMoveJobs, let engine else { return }
+        guard let order = bookOrders.first(where: { Self.recordId($0) == id }) else { return }
+        let statuses = Stage.boardColumns.map(\.rawValue)
+        let book = bookOrders
+        let settings = bookSettings
+        Task { [weak self] in
+            let gates = try? await engine.statusGates(order: order, to: statuses,
+                                                      orders: book, settings: settings)
+            // The card may have been dropped, or another picked up, while this
+            // was crossing into the engine. Answers about a job nobody is
+            // holding would dim the columns for the next drag.
+            guard let self, self.draggingJob == id else { return }
+            self.dragGates = gates ?? [:]
+        }
+    }
+
+
+    /// The card has landed, or the drag was abandoned.
+    func stoppedDragging() {
+        draggingJob = nil
+        dragGates = [:]
+        releaseWatchers.forEach { NSEvent.removeMonitor($0) }
+        releaseWatchers = []
+    }
+
+    /// The mouse-up that ends a drag, wherever it happens.
+    ///
+    /// A DRAG THAT IS ABANDONED TELLS NOBODY. `dropDestination` fires when a
+    /// card lands on a column; a card released over the sidebar, over another
+    /// application, or back where it started produces no callback at all — and
+    /// the board would sit there with four columns greyed out and outlined in
+    /// red, about a job nobody is holding, until the next drag or the next
+    /// reload. A state that can only be cleared by the happy path is a state
+    /// that gets stuck.
+    ///
+    /// Both monitors, because either alone has a hole: the local one never sees
+    /// a release outside this app, and the global one never sees one inside it.
+    ///
+    /// AND NOT `isTargeted`, which is the obvious-looking hook and is wrong: it
+    /// goes false every time the pointer crosses from one column to the next,
+    /// so clearing on it would end the drag halfway across the board — the
+    /// feature would work only for the first column tried.
+    /// Removed in `stoppedDragging`, always — see the menu-bar timer in
+    /// `MenuBar.swift` for what an unremoved AppKit monitor costs.
+    private func watchForDragEnd() {
+        releaseWatchers.forEach { NSEvent.removeMonitor($0) }
+        releaseWatchers = []
+        let ended: @Sendable () -> Void = { [weak self] in
+            Task { @MainActor in self?.stoppedDragging() }
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp]) { event in
+            ended(); return event
+        } { releaseWatchers.append(local) }
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp], handler: { _ in
+            ended()
+        }) { releaseWatchers.append(global) }
+    }
+
+    private var releaseWatchers: [Any] = []
+
+
+    /// Why this column would refuse the card in the air — nil if it would take
+    /// it, nil while the answer has not arrived, and nil when nothing is being
+    /// dragged.
+    ///
+    /// The column the card is ALREADY IN is not a refusal. Dropping a card back
+    /// where it started is not a move and the board must not draw it as barred.
+    func dragRefusal(_ stage: Stage) -> String? {
+        guard let id = draggingJob, let gate = dragGates[stage.rawValue] else { return nil }
+        if orders.first(where: { $0.id == id }).flatMap(Stage.of) == stage { return nil }
+        return gate.ok ? nil : words.gateRefusal(gate)
+    }
+
     /// What stopped a move, when something did. Cleared by the next attempt.
     var moveProblem: String?
     /// What the last move had to say — the due date it pushed out, the spools
