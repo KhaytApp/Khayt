@@ -33,6 +33,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   until you enter one.
 
 ### Added
+- **Finishing a job on the Mac asks what it actually took.** Print time and
+  grams, pre-filled with what you quoted, so a job that ran as expected is one
+  Return away and one that did not can be corrected on the spot. Before, the
+  Mac app recorded only the estimate — so the margin it showed on every finished
+  job was the margin you quoted, not the one you made. A job leaving inspection
+  is still asked once: its QC notes are in the same sheet rather than a second
+  one.
+
+  The figures are recorded as TYPED, not measured, and the sheet says so. Khayt
+  keeps the two apart on purpose, and the Quoting page below counts only what a
+  printer reported — so filling this in improves what a job cost you, and does
+  not yet feed that page. Reading the figures off the printer is the next step.
+
 - **The Mac app shows which of your models you are quoting too cheaply.** A new
   Quoting page under Reports compares what each model was quoted at with what a
   printer actually reported — per MODEL, not per job, because an order happened

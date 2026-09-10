@@ -326,6 +326,27 @@ import KhaytCore
                    "35-quoting", size: CGSize(width: 640, height: 620))
     }
 
+    /// The sheet a finished job now opens, both with and without QC notes.
+    ///
+    /// Its whole job is to be dismissed quickly by a shop whose print ran as
+    /// quoted, and to make correcting a figure obvious to one whose did not —
+    /// which is a thing to look at rather than reason about.
+    @Test("what did it take, with and without the QC question")
+    func completionSheet() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let finishing = Shop.PendingCompletion(id: "ORD-01008", project: "Falcon hood — Najd Architects",
+                                               estHours: 23.86, estGrams: 184.6, leavingQC: false)
+        try render(CompletionSheet(shop: shop, subject: finishing),
+                   "36-completion", size: CGSize(width: 420, height: 300))
+        var fromQC = finishing
+        fromQC = Shop.PendingCompletion(id: finishing.id, project: finishing.project,
+                                        estHours: finishing.estHours, estGrams: finishing.estGrams,
+                                        leavingQC: true)
+        try render(CompletionSheet(shop: shop, subject: fromQC),
+                   "37-completion-qc", size: CGSize(width: 420, height: 370))
+    }
+
     /// Where a model came from, both ways round.
     ///
     /// The line a shop is looking for is "may not be sold", and it has to read

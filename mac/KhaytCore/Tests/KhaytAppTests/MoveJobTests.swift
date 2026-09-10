@@ -351,7 +351,16 @@ struct MoveJobTests {
         #expect(job["qcPassedAt"] == nil)
     }
 
-    @Test("the two moves that ask a question first, and only those")
+    /// EVERY COMPLETION ASKS NOW, and it used to ask only when the job was
+    /// leaving inspection — which this test pinned.
+    ///
+    /// The change is the point rather than a side effect. `order-status.gate`
+    /// sets `needsActuals` for exactly one move, into `completed`, and nothing
+    /// in this app read it: a job finished here kept its estimate as its only
+    /// figure, so its margin was the quoted margin and `Quoting` had no Mac
+    /// path to any data. A job leaving QC is still asked ONCE — the notes live
+    /// in the same sheet.
+    @Test("a hold and a completion ask a question first, and only those")
     func questionsAsked() async {
         let shop = Shop(source: .sample)
         await shop.load(.sample)
@@ -363,10 +372,27 @@ struct MoveJobTests {
         #expect(shop.questionFor(inQC.id, moving: .printing) == nil)
         #expect(shop.questionFor(inQC.id, moving: .post) == nil)
 
-        // Completing asks only when the job is leaving inspection.
-        let asks = shop.questionFor(inQC.id, moving: .completed) != nil
-        #expect(asks == (Stage.of(inQC) == .qc),
-                "finishing a job that was in QC is an inspection; finishing one that was printing is not")
+        // And a completion asks whatever the job was doing before it.
+        #expect(shop.questionFor(inQC.id, moving: .completed) != nil,
+                "finishing a job records what it took, whether or not it was inspected")
+    }
+
+    /// The sheet carries the QC question only for a job that was actually in
+    /// inspection — otherwise every completion would collect notes about an
+    /// inspection that never happened, and `completionWithoutQC` above is the
+    /// test that this must not claim one.
+    @Test("only a job leaving inspection is asked for QC notes")
+    func qcIsAskedOnlyLeavingQC() async {
+        let shop = Shop(source: .sample)
+        await shop.load(.sample)
+        for job in shop.orders where Stage.of(job) != nil {
+            guard shop.questionFor(job.id, moving: .completed) != nil else { continue }
+            shop.questionFor(job.id, moving: .completed)?()
+            guard let asking = shop.pendingCompletion else { continue }
+            #expect(asking.leavingQC == (Stage.of(job) == .qc),
+                    "\(job.id) is in \(Stage.of(job)?.rawValue ?? "?") and leavingQC is \(asking.leavingQC)")
+            shop.clearQuestion()
+        }
     }
 
     @Test("the ids this app mints are the ids Khayt mints")
