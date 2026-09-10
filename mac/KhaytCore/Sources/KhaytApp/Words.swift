@@ -622,6 +622,11 @@ final class Words {
         // something and finding nothing saved.
         "mac.downtime_backwards": ["en": "This window ends before it starts, and will not be saved.",
                                    "ar": "هذه الفترة تنتهي قبل أن تبدأ، ولن تُحفظ."],
+        // The scheduler with nothing to schedule. `sched.none_to_assign` is
+        // shared with the Electron board and says the fact; this says why it
+        // is not a problem, and lives here because only this app draws it.
+        "mac.nothing_to_assign_why": ["en": "Every job waiting for a machine already has one.",
+                                      "ar": "كل طلب ينتظر آلة لديه واحدة بالفعل."],
         "mac.cam_find":      ["en": "Find it",           "ar": "ابحث عنها"],
         "mac.cam_no_frame":  ["en": "No picture yet",     "ar": "لا صورة بعد"],
         "mac.cam_unreachable": ["en": "Camera not answering", "ar": "الكاميرا لا تجيب"],

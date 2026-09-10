@@ -1930,6 +1930,9 @@ final class Shop {
     private(set) var schedulePlan: KhaytEngine.SchedulePlan?
     /// Why there is no proposal, in the shop's own words.
     private(set) var scheduleProblem: String?
+    /// Nothing is waiting for a machine — every job already has one. A state,
+    /// not a fault, and kept apart from `scheduleProblem` for that reason.
+    private(set) var scheduleIdle = false
     /// How many jobs the last apply moved.
     private(set) var scheduleApplied: Int?
 
@@ -1982,6 +1985,7 @@ final class Shop {
     /// `applySchedule` is the one that touches the book.
     func proposeSchedule() async {
         scheduleProblem = nil
+        scheduleIdle = false
         scheduleApplied = nil
         schedulePlan = nil
         guard let engine else {
@@ -1989,7 +1993,18 @@ final class Shop {
         }
         let waiting = schedulableRows
         guard !waiting.isEmpty else {
-            scheduleProblem = words.callIt("sched.none_to_assign"); return
+            // ── NOT A PROBLEM, AND IT WAS FILED AS ONE ───────────────────
+            //
+            // `scheduleProblem` is the field for "the app cannot do this":
+            // no engine, a thrown error, a refusal from the rule. The sheet
+            // draws it under the system's warning triangle, deliberately,
+            // because those are faults.
+            //
+            // Every job already having a machine is the OPPOSITE of a fault.
+            // It went in the same field, so a shop that had finished
+            // assigning its work opened the scheduler and was shown a
+            // warning sign telling it so.
+            scheduleIdle = true; return
         }
         do {
             // Everything still to happen — see `stillToHappen`. Not just the
