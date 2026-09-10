@@ -91,7 +91,40 @@ async function boot() {
   return { window, doc, exported, copied };
 }
 
-const settle = (window) => new Promise((r) => window.setTimeout(r, 60));
+/**
+ * Let the panel finish recomputing.
+ *
+ * ── THIS USED TO BE A 60ms SLEEP, AND IT FLAKED ───────────────────────────
+ *
+ * `new Promise((r) => window.setTimeout(r, 60))` passes every time this file
+ * is run on its own and fails perhaps one run in five under `npm test`, where
+ * Node is running many test files at once and 60ms of wall clock is not 60ms
+ * of this panel's work. Two of these tests failed that way and passed on a
+ * re-run, which is the worst kind of failure: it teaches everyone to re-run
+ * rather than to read.
+ *
+ * A fixed sleep is a guess about someone else's machine. This waits for the
+ * panel to STOP CHANGING instead — the derived values it recomputes are all on
+ * screen, so two identical reads a tick apart mean the work is done — and it
+ * gives up after a generous deadline rather than hanging a suite.
+ */
+const settle = async (window, { quietMs = 40, timeoutMs = 5000 } = {}) => {
+  const doc = window.document;
+  // Everything the panel derives ends up in these panes, so their combined
+  // text is a fingerprint of "what the maker can see".
+  const shot = () => doc.getElementById('hueforge-tab')?.textContent ?? '';
+  const tick = () => new Promise((r) => window.setTimeout(r, 10));
+  const deadline = Date.now() + timeoutMs;
+  let last = null, quietSince = null;
+  for (;;) {
+    const now = shot();
+    if (now !== last) { last = now; quietSince = null; }
+    else if (quietSince === null) quietSince = Date.now();
+    else if (Date.now() - quietSince >= quietMs) return;
+    if (Date.now() > deadline) return;   // the assertion says what went wrong, not this
+    await tick();
+  }
+};
 const click = (window, el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 
 /** What the maker is editing: the filament rows, bottom → top. */
