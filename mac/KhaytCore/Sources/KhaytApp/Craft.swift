@@ -293,3 +293,68 @@ struct LayerProgress: View {
         .accessibilityHidden(true)
     }
 }
+
+/// A screen a search has emptied — which is not a screen with nothing on it.
+///
+/// `ContentUnavailableView.search` was the last of Apple's empty states left in
+/// this app, and it was on seven screens: jobs, board, shelf, library,
+/// customers, gift cards, portfolio. Every one of them showed the same grey
+/// magnifying glass every other Mac app shows, on the state a shop reaches most
+/// often — it types three letters and the screen goes blank.
+///
+/// Two things it could not do, beyond looking like everyone else's:
+///
+/// **It cannot say what else is narrowing.** The jobs table filters by the
+/// sidebar's stage AND by the search box. Ask for "bracket" while the sidebar
+/// is showing Delivered and the empty screen blames the word, when the job is
+/// sitting in Printing. The component is only given the text, so the text is
+/// all it can name.
+///
+/// **It has nothing to press.** A shop that has narrowed itself into a blank
+/// screen has to go and find the search field again to get out. The way out
+/// belongs on the screen that is in the way.
+struct NothingMatched: View {
+    let shop: Shop
+    /// The screen's own mark, so an emptied shelf still says "shelf".
+    let mark: Mark
+
+    private var term: String { shop.search.trimmingCharacters(in: .whitespaces) }
+
+    var body: some View {
+        let words = shop.words
+        VStack(spacing: 14) {
+            // The screen's own mark, in grey rather than the cyan an ordinary
+            // empty screen uses. Solid: see `Drawn` for the dashed variant that
+            // was drawn, photographed and thrown away.
+            Drawn(mark: mark, size: 44)
+                .foregroundStyle(.secondary.opacity(0.7))
+            VStack(spacing: 5) {
+                Text(words.callIt("mac.nothing_matches", ["q": .string(term)]))
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                if let stage = shop.stage {
+                    Text(words.callIt("mac.and_only_stage",
+                                      ["stage": .string(words.callIt(stage.key))]))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 320)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            HStack(spacing: 10) {
+                Button(words.callIt("mac.clear_search")) { shop.search = "" }
+                    .buttonStyle(.borderedProminent)
+                // Only where a stage is the OTHER half of the narrowing.
+                // Offering "show every stage" on the shelf, which has no
+                // stages, is a button that does nothing to the screen it is on.
+                if shop.stage != nil {
+                    Button(words.callIt("mac.show_all_stages")) { shop.shelf = .jobs(nil) }
+                }
+            }
+            .padding(.top, 4)
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}

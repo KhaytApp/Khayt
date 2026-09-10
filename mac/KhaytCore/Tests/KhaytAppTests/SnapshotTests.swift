@@ -23,6 +23,13 @@ import AppKit
         ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"].map { URL(fileURLWithPath: $0) }
     }
 
+    func renderDark(_ view: some View, _ name: String, size: CGSize) throws {
+        try render(view.environment(\.colorScheme, .dark)
+                       .background(Khayt.ground)
+                       .environment(\.colorScheme, .dark),
+                   name, size: size)
+    }
+
     func render(_ view: some View, _ name: String, size: CGSize) throws {
         guard let dir = Self.outputDir else { return }
         let renderer = ImageRenderer(content:
@@ -202,6 +209,46 @@ import AppKit
                    symbol: "checkmark.circle", tint: Khayt.done)
         }.frame(width: 720), "30-import-banners", size: CGSize(width: 720, height: 160))
         _ = shop
+    }
+
+    /// The state a search leaves behind, on the two screens that reach it
+    /// differently — a shelf, where the word is the only filter, and the jobs
+    /// table, where the sidebar's stage is narrowing too.
+    ///
+    /// Drawn beside the ORDINARY empty state on purpose. The whole claim of the
+    /// absent mark is that a shop can tell "no spools yet" from "no spool
+    /// called petg", and that claim can only be judged in a picture with both
+    /// in it.
+    @Test("a search that matched nothing, beside a screen with nothing on it")
+    func searchedIntoNothing() async throws {
+        // THE SAMPLE BOOK IS LOADED, and that is not incidental. A stage's
+        // name comes from the shared Khayt catalogue, which an unopened `Shop`
+        // has not read — so the first version of this picture said "…showing
+        // only queue.delivered", the raw key, and nothing in the source could
+        // have told me. A screen that names a filter has to be photographed
+        // with the words that name it.
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.search = "petg"
+        try render(HStack(spacing: 0) {
+            NothingMatched(shop: shop, mark: .filament)
+            Divider()
+            EmptyHere(title: "No spools yet", message: "Add one at the shelf.", mark: .filament)
+        }.frame(width: 900), "32-nothing-matched", size: CGSize(width: 900, height: 300))
+
+        let jobs = Shop()
+        await jobs.load(.sample)
+        jobs.search = "bracket"
+        jobs.shelf = .jobs(.delivered)
+        #expect(jobs.words.callIt(Stage.delivered.key) != Stage.delivered.key,
+                "the stage would be named by its raw key on this screen")
+        try render(NothingMatched(shop: jobs, mark: .jobs).frame(width: 560),
+                   "33-nothing-matched-stage", size: CGSize(width: 560, height: 300))
+        // And on the dark ground. `render` forces light, because a picture
+        // taken in whatever appearance the machine happens to be in is not a
+        // picture of anything — so dark has to be asked for.
+        try renderDark(NothingMatched(shop: jobs, mark: .jobs).frame(width: 560),
+                       "34-nothing-matched-dark", size: CGSize(width: 560, height: 300))
     }
 
     /// Where a model came from, both ways round.

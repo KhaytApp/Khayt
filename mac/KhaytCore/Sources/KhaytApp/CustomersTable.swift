@@ -117,7 +117,7 @@ struct CustomersTable: View {
         .overlay {
             if rows.isEmpty {
                 if !shop.search.isEmpty {
-                    ContentUnavailableView.search(text: shop.search)
+                    NothingMatched(shop: shop, mark: .clients)
                 } else {
                     EmptyHere(title: shop.words.callIt("mac.no_customers"), message: shop.words.callIt("mac.no_customers_hint"), mark: .clients)
                 }
