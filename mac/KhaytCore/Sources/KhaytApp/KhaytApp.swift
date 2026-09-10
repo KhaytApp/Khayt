@@ -1269,6 +1269,24 @@ final class Activator: NSObject, NSApplicationDelegate {
 
     /// Photograph one particular window — the Settings window, which is not
     /// the first visible one.
+    ///
+    /// ── THE SIDEBAR IS NOT MISSING, IT IS NOT PHOTOGRAPHABLE ─────────────
+    ///
+    /// Every shot this function takes comes back with the navigation column
+    /// blank — white on one screen, solid black on the next. The sidebar is
+    /// fine. `capturePanes` photographs that same view directly and gets all
+    /// twenty rows, their counts and their stage dots.
+    ///
+    /// The column is an `NSVisualEffectView`, and vibrancy is composited by the
+    /// window server rather than drawn by `-drawRect:`. `cacheDisplay` only
+    /// asks views to draw, so the material contributes nothing and whatever was
+    /// in the bitmap stays there. The same thing happens one level down, to the
+    /// selection material behind a selected row: it is why the selected item in
+    /// `*-pane1.png` is a black pill rather than a tinted one.
+    ///
+    /// So READ THE PANE SHOT FOR THE SIDEBAR, and do not go looking for a
+    /// layout bug in the window shot. Capturing it properly needs a screen
+    /// recording grant this process does not have.
     static func capture(named name: String, window: NSWindow, into dir: URL) {
         doing(name)
         guard // The theme frame, not the content view. A unified toolbar sits
@@ -1280,7 +1298,22 @@ final class Activator: NSObject, NSApplicationDelegate {
             FileHandle.standardError.write(Data("no window to capture\n".utf8))
             return
         }
-        view.cacheDisplay(in: view.bounds, to: rep)
+        // ── THE APPEARANCE, WHICH THIS PATH ALONE WAS MISSING ────────────
+        //
+        // `captureSheet` explains why this wrapper exists and `capturePanes`
+        // has it too. This function — which takes THIRTY of the thirty-six
+        // shots — did not. `cacheDisplay` draws with whatever
+        // `NSAppearance.current` happens to be, and outside a real draw cycle
+        // that is aqua, so every dynamic system colour in every full-window
+        // screenshot resolved LIGHT regardless of what the app was set to.
+        //
+        // In light mode that is right by luck, which is why it survived: the
+        // shot and the app agreed for the wrong reason. It is exactly the bug
+        // this repo keeps writing down — a fix with a caller in two places out
+        // of three — and the third was the one doing most of the work.
+        view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            view.cacheDisplay(in: view.bounds, to: rep)
+        }
         guard let png = rep.representation(using: .png, properties: [:]) else { return }
         try? png.write(to: dir.appending(path: name + ".png"))
 

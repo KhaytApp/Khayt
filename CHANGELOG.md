@@ -1371,6 +1371,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   now round to one decimal like everything else on the line, and a whole number
   no longer grows a `.0`. Nothing about what you charged changes — this is the
   wording of the document, not its arithmetic.
+- **Internal: the screenshot runner drew thirty of its thirty-six shots in the
+  wrong appearance.** Nothing a shop can see — this is the tool that
+  photographs the Mac app for review. Two of its three capture paths already
+  forced the app's own appearance while drawing; the third, which takes most of
+  the pictures, did not, so every dynamic system colour resolved light whatever
+  the app was set to. In light mode the shot and the app agreed for the wrong
+  reason, which is why it lasted.
 - **A spool added from your phone was missing what the roll weighed when it
   arrived — so its cost per kilo was wrong.** The shelf keeps two weights: what
   a roll weighed new, which never changes, and what is left of it, which falls
