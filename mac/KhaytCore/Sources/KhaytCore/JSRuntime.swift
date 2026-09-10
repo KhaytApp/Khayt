@@ -60,7 +60,7 @@ public final class JSRuntime {
         //
         // `lib/webcam.js` reads a host with `new URL(u).hostname` inside its
         // SSRF guard, and its `try/catch` turns the missing global into
-        // `hostname === ''` — so `assertSameHostAsPrinter` refused every address
+        // `hostname === ''` — so `assertWebcamHostAllowed` refused every address
         // ever put to it. That fails CLOSED, which is the right direction and
         // still means no camera on this Mac would ever have drawn.
         //

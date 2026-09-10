@@ -117,30 +117,71 @@ test('parseMoonrakerWebcams reads the first registered camera', () => {
   assert.equal(W.parseMoonrakerWebcams({}, MOON), null);
 });
 
-test('SSRF GUARD: a snapshot may only be fetched from the machine’s own printer host', () => {
-  assert.equal(W.assertSameHostAsPrinter('http://192.168.1.50/webcam/?action=snapshot', OCTO).ok, true);
-  // The classic pivot attempts — all refused because the host isn't the printer's.
+test('SSRF GUARD: a camera may be the printer, or a literal address on this network', () => {
+  assert.equal(W.assertWebcamHostAllowed('http://192.168.1.50/webcam/?action=snapshot', OCTO).ok, true);
+
+  // ── THIS ONE CHANGED, AND ON PURPOSE ─────────────────────────────────────
+  //
+  // `http://192.168.1.99/other-device` used to be in the list below, refused
+  // for being a host that is not the printer's. It is allowed now, because a
+  // camera on its own address is the ordinary case and not an attack: measured
+  // on a real floor, a Buddy3D camera for a Prusa CORE One sits at .71 with the
+  // printer at .79 and is not reachable through the printer at all.
+  assert.equal(W.assertWebcamHostAllowed('http://192.168.1.99/other-device', OCTO).ok, true,
+    'a second device on the same private network is a camera, not a pivot');
+
+  // Everything that can leave the building, or reach something that is not a
+  // camera, is still refused.
   for (const evil of [
-    'http://127.0.0.1:8080/admin',
+    'http://127.0.0.1:8080/admin',                // whatever is listening here
     'http://169.254.169.254/latest/meta-data/',   // cloud metadata
-    'http://192.168.1.99/other-device',
-    'http://internal.corp/secrets',
+    'http://[fd00::1]@evil.example.com/',         // userinfo dressed as a LAN host
+    'http://100.100.100.200/latest/meta-data/',   // Alibaba metadata, inside CGNAT
+    'http://internal.corp/secrets',               // a NAME is not a literal
     'https://evil.example.com/collect',
+    'http://8.8.8.8/',
+    'http://2130706433/',                         // 127.0.0.1 as an integer
+    'http://0177.0.0.1/',                         // and as octal
+    'http://172.32.0.1/',                         // just outside 172.16.0.0/12
   ]) {
-    const r = W.assertSameHostAsPrinter(evil, OCTO);
+    const r = W.assertWebcamHostAllowed(evil, OCTO);
     assert.equal(r.ok, false, `SSRF NOT BLOCKED: ${evil}`);
-    assert.equal(r.reason, 'host_mismatch');
   }
-  assert.equal(W.assertSameHostAsPrinter('file:///etc/passwd', OCTO).ok, false, 'non-http scheme refused');
-  assert.equal(W.assertSameHostAsPrinter('not a url', OCTO).reason, 'invalid_url');
-  assert.equal(W.assertSameHostAsPrinter('http://x/y', {}).reason, 'no_printer_host');
+  assert.equal(W.assertWebcamHostAllowed('file:///etc/passwd', OCTO).ok, false, 'non-http scheme refused');
+  assert.equal(W.assertWebcamHostAllowed('not a url', OCTO).reason, 'invalid_url');
+  assert.equal(W.assertWebcamHostAllowed('http://x/y', {}).reason, 'no_printer_host');
 });
 
-test('SSRF guard ignores port/scheme differences but pins the hostname', () => {
+test('the allow-list is the three private ranges and unique-local v6, and nothing beside', () => {
+  for (const yes of ['10.0.0.1', '10.255.255.254', '172.16.0.1', '172.31.255.254',
+                     '192.168.0.1', '192.168.255.254', 'fd00::1', 'fc00::abcd']) {
+    assert.equal(W.isLanLiteral(yes), true, `should be a LAN literal: ${yes}`);
+  }
+  for (const no of ['11.0.0.1', '172.15.255.255', '172.32.0.1', '192.169.0.1',
+                    '127.0.0.1', '0.0.0.0', '169.254.1.1', '100.64.0.1',
+                    '8.8.8.8', '::1', 'fe80::1', 'printer.local', '',
+                    '192.168.01.1', '192.168.0.256', '2130706433']) {
+    assert.equal(W.isLanLiteral(no), false, `must NOT be a LAN literal: ${no}`);
+  }
+});
+
+test('the printer may still be named, but nothing else may', () => {
+  // The printer's host is not new trust — it is the address the shop already
+  // talks to — so a name is fine there and only there.
+  const named = { type: 'octoprint', host: 'printer.local' };
+  assert.equal(W.assertWebcamHostAllowed('http://printer.local/webcam/?action=snapshot', named).ok, true);
+  assert.equal(W.assertWebcamHostAllowed('http://camera.local/snapshot', named).ok, false,
+    'a second NAME could resolve anywhere, and to somewhere else after the check');
+  assert.equal(W.assertWebcamHostAllowed('http://192.168.4.4/snapshot', named).ok, true,
+    'but a literal on the network is fine even when the printer is named');
+});
+
+test('port and scheme still do not matter; the host still does', () => {
   // Same host on the camera's own port is legitimate (Moonraker cam on :8080).
-  assert.equal(W.assertSameHostAsPrinter('http://192.168.1.60:8080/?action=snapshot', MOON).ok, true);
-  // A different host on the printer's port is still refused.
-  assert.equal(W.assertSameHostAsPrinter('http://192.168.1.61:7125/?action=snapshot', MOON).ok, false);
+  assert.equal(W.assertWebcamHostAllowed('http://192.168.1.60:8080/?action=snapshot', MOON).ok, true);
+  // A different PRIVATE host is now allowed; a public one on any port is not.
+  assert.equal(W.assertWebcamHostAllowed('http://192.168.1.61:7125/?action=snapshot', MOON).ok, true);
+  assert.equal(W.assertWebcamHostAllowed('http://203.0.113.9:8080/?action=snapshot', MOON).ok, false);
 });
 
 test('sanitizeWebcam clamps enums and normalizes URLs', () => {
@@ -332,12 +373,12 @@ test('the API port is never carried into a camera URL', () => {
 });
 
 test('candidates stay inside the host pinning that makes the proxy safe', () => {
-  // Every candidate is fetched through assertSameHostAsPrinter, so one that could
+  // Every candidate is fetched through assertWebcamHostAllowed, so one that could
   // not pass it would be a hole rather than a dead end.
   const api = { type: 'moonraker', host: '192.168.68.56', port: 7125 };
   for (const c of W.webcamCandidates(api)) {
-    assert.equal(W.assertSameHostAsPrinter(c.snapshotUrl, api).ok, true, c.snapshotUrl);
-    assert.equal(W.assertSameHostAsPrinter(c.streamUrl, api).ok, true, c.streamUrl);
+    assert.equal(W.assertWebcamHostAllowed(c.snapshotUrl, api).ok, true, c.snapshotUrl);
+    assert.equal(W.assertWebcamHostAllowed(c.streamUrl, api).ok, true, c.streamUrl);
   }
 });
 

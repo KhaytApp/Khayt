@@ -34,11 +34,23 @@ struct CameraFetchTests {
     /// or not at all, this app would have made the request before deciding it
     /// was not allowed to. Counting the requests is the only way to tell those
     /// apart from outside.
-    @Test("a camera on another host is refused without a request being made")
+    @Test("a camera off this network is refused without a request being made")
     func nothingIsFetchedFromElsewhere() async throws {
+        // ── THIS ADDRESS CHANGED, AND ON PURPOSE ─────────────────────────
+        //
+        // It used to be `192.168.1.99` — another host on the same private
+        // network — refused for not being the printer's. That is allowed now:
+        // a camera on its own address is the ordinary case, not an attack.
+        // See `assertWebcamHostAllowed`.
+        //
+        // What must still never be fetched is an address that can leave the
+        // building, so that is what this asks about. The COUNT is the point:
+        // if the guard ran after the fetch instead of before it, the request
+        // would already have gone out carrying the printer's credential, and
+        // from outside the only way to tell is to count.
         let shop = await Self.shop()
         let machine = try Self.machine(host: "192.168.1.50",
-                                       snapshot: "http://192.168.1.99/webcam/?action=snapshot")
+                                       snapshot: "https://evil.example.com/collect")
         var asked = 0
         let frame = await Camera.fetch(machine, shop: shop) { _ in
             asked += 1
@@ -46,6 +58,20 @@ struct CameraFetchTests {
         }
         #expect(asked == 0, "\(asked) request(s) went out to a host the guard refuses")
         #expect(frame == .failed("refused"))
+    }
+
+    /// And the case the refusal above used to cover, now that it is allowed.
+    @Test("a camera that is its own device on this network is fetched")
+    func aCameraOfItsOwnIsAllowed() async throws {
+        let shop = await Self.shop()
+        let machine = try Self.machine(host: "192.168.1.50",
+                                       snapshot: "http://192.168.1.99/webcam/?action=snapshot")
+        var asked = 0
+        _ = await Camera.fetch(machine, shop: shop) { _ in
+            asked += 1
+            return (Data(), HTTPURLResponse())
+        }
+        #expect(asked == 1, "a Buddy3D beside a CORE One is exactly this shape")
     }
 
     /// And the printer's own host is allowed, or the guard would be a way of
