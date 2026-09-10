@@ -584,6 +584,27 @@ final class Activator: NSObject, NSApplicationDelegate {
             // missing translation looks like and was only an early photograph.
             FileHandle.standardError.write(Data("menus: \(menuTree())\n".utf8))
             capture(named: "00b-dashboard-sample", into: dir)
+
+            // ── AND THE JOBS TABLE, WHILE THE SAMPLE IS OPEN ──────────────
+            //
+            // The reason three lines above applies to the screen a shop LIVES
+            // in and was not being applied to it: `01-jobs` was shot against
+            // the real book alone, and a book auto-logged from printer history
+            // has no prices — nineteen rows reading 0.00, "Delivered",
+            // "settled", every one of them. Every column that carries money,
+            // every stage but one, and the part counts were invisible.
+            //
+            // Shot here rather than after the swap so the sample is not loaded
+            // a third time; the live book still gets its own picture below,
+            // because what a shop's own data looks like is worth seeing too.
+            shop.shelf = .jobs(nil)
+            await settle()
+            capture(named: "01b-jobs-sample", into: dir)
+            shop.selection = (shop.shown.first { !$0.isSettled } ?? shop.shown.first)?.id
+            await settle()
+            capture(named: "02b-job-selected-sample", into: dir)
+            shop.selection = nil
+
             await shop.load(Shop.available.first(where: \.isReal) ?? .sample)
             await settle()
             shop.shelf = .jobs(nil)
