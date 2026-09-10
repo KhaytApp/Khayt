@@ -249,10 +249,26 @@ private struct FloorStrip: View {
                 // the floor. The two sentences stay different — one is not set
                 // up yet and the other cannot be asked at all — because those
                 // are different facts and only one of them is fixable.
-                if !askable || !connected, let x = machine.bed?.x, let y = machine.bed?.y {
+                // ── AND AN IDLE MACHINE IS NOT PRINTING EITHER ─────────────
+                //
+                // The condition above used to be `!askable || !connected`,
+                // which fixed the ghost layers for a machine Khayt cannot see
+                // and left them drawn for one it CAN see that simply is not
+                // printing. On the real shop's front door that is both
+                // machines: two tiles of pale ragged lines under the word
+                // "Idle", which is the loading-skeleton look this whole
+                // comment was written to get rid of.
+                //
+                // The bar is only about a print IN PROGRESS. Whether Khayt can
+                // reach the machine has nothing to do with it — an idle
+                // printer has no progress to draw whether it answers or not.
+                // So the test is `printing`, and the three sentences below say
+                // WHICH kind of not-printing this is.
+                if !printing, let x = machine.bed?.x, let y = machine.bed?.y {
                     BedPlan(x: x, y: y, widest: shop.widestBed, deepest: shop.deepestBed,
                             box: CGSize(width: 74, height: 38))
-                    Text(shop.words.callIt(askable ? "mac.not_connected" : "mac.cannot_ask"))
+                    Text(shop.words.callIt(!askable ? "mac.cannot_ask"
+                                           : !connected ? "mac.not_connected" : "mac.idle"))
                         .font(.caption2).foregroundStyle(.tertiary)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 } else {

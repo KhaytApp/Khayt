@@ -1365,6 +1365,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **An idle printer on the dashboard still looked like a screen that had not
+  finished loading.** A machine Khayt cannot reach was fixed to show its bed
+  instead of an empty progress bar; a machine Khayt CAN reach that simply is not
+  printing kept the empty bar — pale ragged lines under the word "Idle". On a
+  shop whose printers are connected and quiet, that was the whole front door.
+  An idle machine now draws its bed too, and says it is idle.
 - **An invoice printed the print time to three decimal places.** A slicer
   reports 8.745 hours, and that is what a customer's invoice said, beside a
   weight that had always been rounded: "PETG-CF · 8.745 hrs · 559 g". The hours
