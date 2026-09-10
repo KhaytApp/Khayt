@@ -143,11 +143,22 @@ extension UTType {
     static let khaytJob = UTType(exportedAs: "app.khayt.mac.job")
 }
 
+// NOT PHOTOGRAPHED, and it was tried both ways. `ImageRenderer` draws nothing
+// inside a `ScrollView` and the columns live in one, so a picture of the board
+// is a picture of the ground colour; rendering one column alone gets
+// `ImageRenderer`'s refusal placeholder instead, because `.lane()` is a
+// material. The window capture loses SwiftUI's own drawing. So the treatment
+// below is the CONSERVATIVE one — a tint outline on what will accept, a recede
+// on what will not — rather than anything whose reading has to be judged by eye.
 private struct Column: View {
     let stage: Stage
     let jobs: [Order]
     let shop: Shop
     @State private var isTarget = false
+    @Environment(\.accessibilityReduceMotion) private var reduced
+
+    /// Why this column would refuse the card currently in the air, or nil.
+    private var refusal: String? { shop.dragRefusal(stage) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -191,18 +202,47 @@ private struct Column: View {
         // long one, wide enough for a two-line job name.
         .frame(width: 196, alignment: .leading)
         .lane()
+        // WHERE THE CARD IN THE AIR MAY GO — shown positively.
+        //
+        // The columns that would TAKE it outline themselves the moment it is
+        // picked up; the ones that would refuse recede and say why on hover.
+        // Outlining the refusals instead was the first draft and it is the
+        // wrong way round: it puts the eye on what cannot be done and paints a
+        // full column as an alarm, when a full column is a shop working.
+        .opacity(refusal == nil ? 1 : 0.5)
         .overlay {
-            // Only while something is over it: a permanently outlined column
-            // reads as selected, and four selected columns read as none.
+            // Outlined while a card is over it, as before — and now also while
+            // a card is in the air and this column would have it. A permanently
+            // outlined column reads as selected, so neither happens at rest.
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(.tint, lineWidth: 2)
-                .opacity(isTarget && shop.canMoveJobs ? 1 : 0)
+                .opacity(shop.canMoveJobs && refusal == nil
+                         && (isTarget || shop.draggingJob != nil) ? 1 : 0)
+        }
+        // The reason, on the column it is about, and only while it is under the
+        // pointer. Seven columns each carrying a sentence is a board nobody can
+        // read; one is an answer.
+        .overlay(alignment: .top) {
+            if let refusal, isTarget {
+                Text(refusal)
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8).padding(.vertical, 5)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
+                    .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(.separator))
+                    .padding(6)
+                    .transition(.opacity)
+            }
         }
         .dropDestination(for: DraggedJob.self) { dropped, _ in
             guard let job = dropped.first else { return false }
             // A card dropped back where it started is not a move. Performing it
             // would stamp a status history entry and a revision for nothing.
             guard Stage.of(job: job.id, in: shop) != stage else { return false }
+            // Refused BEFORE the move is attempted, now that the answer is
+            // already here. `moveJob` asks the rules again and refuses again —
+            // this does not replace that, it stops the drop looking accepted.
+            guard shop.dragRefusal(stage) == nil else { return false }
             // A hold asks why first — it is the one move whose reason a shop
             // will want three weeks later. Every other move just happens.
             if let ask = shop.questionFor(job.id, moving: stage) { ask(); return true }
@@ -210,6 +250,7 @@ private struct Column: View {
             return true
         } isTargeted: { isTarget = $0 }
         .animation(.easeOut(duration: 0.12), value: isTarget)
+        .animation(Motion.of(Motion.hover, unless: reduced), value: refusal == nil)
     }
 }
 
@@ -295,7 +336,7 @@ private struct JobCard: View {
         // A read-only book is not draggable at all. Offering the gesture and
         // then refusing every drop teaches nothing except that the app is
         // unreliable.
-        .modifier(Draggable(enabled: shop.canMoveJobs, id: job.id))
+        .modifier(Draggable(enabled: shop.canMoveJobs, id: job.id, shop: shop))
     }
 }
 
@@ -303,10 +344,22 @@ private struct JobCard: View {
 private struct Draggable: ViewModifier {
     let enabled: Bool
     let id: String
+    let shop: Shop
+
+    /// Evaluated at the START of a drag, not at draw time. Anything here that
+    /// ran per-frame would ask the engine on every redraw of the board.
+    private func payload() -> DraggedJob {
+        shop.beganDragging(id)
+        return DraggedJob(id: id)
+    }
 
     func body(content: Content) -> some View {
         if enabled {
-            content.draggable(DraggedJob(id: id))
+            // `draggable` takes an AUTOCLOSURE, so `payload()` runs when the
+            // drag begins rather than when the card is drawn — which is the
+            // only hook SwiftUI offers for "a card was picked up", and the
+            // moment the columns need to know which job is in the air.
+            content.draggable(payload())
         } else {
             content
         }

@@ -33,6 +33,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   until you enter one.
 
 ### Added
+- **The board shows where a job may go while you are still holding it.** Drag a
+  card and every column that will take it outlines itself; a column that will
+  not — because you have set a limit on how many jobs may be in it at once, or
+  because an assembly's parts are not all finished — recedes and says why when
+  you hover it. Before, every column looked equally willing and the move was
+  refused after you let go, as an error, so the only way to learn where a job
+  could go was to try. The rules deciding it are the same ones Khayt uses; this
+  asks them earlier.
+
 - **A search that finds nothing says which search, and gets you out of it.**
   Seven screens — jobs, board, shelf, library, customers, gift cards,
   portfolio — answered an empty search with the same grey magnifying glass
