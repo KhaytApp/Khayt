@@ -83,13 +83,51 @@ final class Camera {
     static func fetch(_ machine: Machine, shop: Shop,
                       get: ((URLRequest) async throws -> (Data, URLResponse))? = nil) async -> Frame {
         guard let engine = shop.engine else { return .none }
-        guard machine.hasCamera, let cam = machine.webcam,
-              let still = cam.snapshotUrl, !still.isEmpty else { return .none }
+        guard machine.hasCamera, let cam = machine.webcam else { return .none }
+
         // The printer's own record, as the shared rules want it: the host it
         // is pinned to, and the type that decides which credential header goes
         // with a snapshot. The key travels SEALED and is opened at the moment
         // it is sent, never held — the same rule the poller follows.
         guard let api = await shop.printerApiRow(machine) else { return .failed("no printer") }
+
+        // ── AN RTSP CAMERA IS FETCHED A DIFFERENT WAY ────────────────────
+        //
+        // Not every camera serves a JPEG. The Buddy3D that sits beside a Prusa
+        // CORE One has RTSP and nothing else — no HTTP server at all — so there
+        // is no snapshot URL to ask for and the printer cannot help, because it
+        // is a separate device that never sees the frames.
+        //
+        // The address lives in `streamUrl` with `streamType: "rtsp"` rather
+        // than in `snapshotUrl`, because `snapshotUrlFor` in the shared module
+        // says plainly that a snapshot URL is never a stream — buffering one as
+        // a still is how you accumulate memory until the request times out.
+        // This does not buffer it: `RtspSession` decodes a single keyframe and
+        // hangs up.
+        if cam.streamType == "rtsp", let feed = cam.streamUrl, !feed.isEmpty {
+            do {
+                // The same host rule as everything else. An address in the book
+                // arrived by restore or by sync and was not necessarily chosen
+                // by the person sitting here.
+                try await engine.assertWebcamHost(feed, printerApi: api)
+            } catch {
+                return .failed("refused")
+            }
+            guard let session = try? RtspSession(url: feed) else { return .failed("bad address") }
+            do { return .picture(try await session.still()) }
+            catch Rtsp.Failure.refused(404) {
+                // The camera is there and has not been told to publish locally.
+                // A Buddy3D answers exactly this until "RTSP stream on local
+                // network" is switched on in the Prusa app, and that is a thing
+                // the shop can fix — so it is not "unreachable".
+                return .waiting
+            }
+            catch { return .failed("unreachable") }
+        }
+
+
+        // No RTSP, so this is an ordinary HTTP still — and it needs an address.
+        guard let still = cam.snapshotUrl, !still.isEmpty else { return .none }
 
         // ── THE PIN, ASKED EVERY TIME ────────────────────────────────────
         //

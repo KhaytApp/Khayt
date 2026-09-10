@@ -50,6 +50,8 @@ import Testing
         // A camera that is its own device on the same network: allowed now.
         try await engine.assertWebcamHost("http://192.168.1.99/webcam/?action=snapshot",
                                           printerApi: printer)
+        // Including an RTSP one, which is the case this was opened up for.
+        try await engine.assertWebcamHost("rtsp://192.168.1.71/live", printerApi: printer)
 
         for elsewhere in ["http://169.254.169.254/latest/meta-data/",
                           "http://100.100.100.200/latest/meta-data/",
