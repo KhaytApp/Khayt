@@ -94,6 +94,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   could go was to try. The rules deciding it are the same ones Khayt uses; this
   asks them earlier.
 
+- **The Mac app shows your printers' cameras.** A still on each machine's card,
+  refreshed every few seconds, the right way up — rotate and flip are yours to
+  set. **Find it** asks the printer where its camera is rather than making you
+  know: it tries every address that kind of printer is known to use, because one
+  guess is not enough — a Snapmaker U1 answers nothing on the address most
+  cameras use and does have one behind its own web server. A camera that has
+  just been plugged in and has no picture yet says exactly that, rather than
+  reporting itself broken.
+
+  A snapshot is only ever fetched from the printer's own address, so a camera
+  setting that arrives in a restored backup or over sync cannot point Khayt at
+  anything else on your network.
+
 - **A search that finds nothing says which search, and gets you out of it.**
   Seven screens — jobs, board, shelf, library, customers, gift cards,
   portfolio — answered an empty search with the same grey magnifying glass

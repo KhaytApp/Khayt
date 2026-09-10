@@ -52,6 +52,55 @@ public final class JSRuntime {
             self?.lastException = value?.toString() ?? "unknown JavaScript exception"
         }
 
+        // ── JAVASCRIPTCORE HAS NO `URL`, AND A SHARED RULE NEEDS ONE ──────
+        //
+        // `URL` is a host object, not part of ECMAScript, so a plain `JSContext`
+        // does not have it — Node and every browser do, which is why nothing
+        // noticed until a module that uses it was bundled here.
+        //
+        // `lib/webcam.js` reads a host with `new URL(u).hostname` inside its
+        // SSRF guard, and its `try/catch` turns the missing global into
+        // `hostname === ''` — so `assertSameHostAsPrinter` refused every address
+        // ever put to it. That fails CLOSED, which is the right direction and
+        // still means no camera on this Mac would ever have drawn.
+        //
+        // THE PARSING IS FOUNDATION'S, NOT A SHIM'S. A hand-rolled URL parser is
+        // a security component: `http://evil.com@192.168.1.50/` has to resolve
+        // the way a browser resolves it, and getting that subtly wrong inside
+        // the one guard that stops an SSRF is worse than not having it. So this
+        // exposes `URLComponents` and the JS side only reads fields off it.
+        let hostOf: @convention(block) (String) -> [String: Any]? = { raw in
+            guard let parts = URLComponents(string: raw), let scheme = parts.scheme else { return nil }
+            return ["hostname": (parts.host ?? "").lowercased(),
+                    "protocol": scheme.lowercased() + ":",
+                    "port": parts.port.map(String.init) ?? "",
+                    "pathname": parts.path]
+        }
+        context.setObject(hostOf, forKeyedSubscript: "__khaytParseURL" as NSString)
+        context.evaluateScript(#"""
+        (function () {
+          if (typeof globalThis.URL !== 'undefined') return;
+          // Enough of the interface for what the shared modules read, and no
+          // more. A field nobody uses is a field nobody has checked.
+          function KhaytURL(input) {
+            if (!(this instanceof KhaytURL)) return new KhaytURL(input);
+            var parts = globalThis.__khaytParseURL(String(input));
+            if (!parts || !parts.hostname) throw new TypeError('Invalid URL: ' + input);
+            this.hostname = parts.hostname;
+            this.protocol = parts.protocol;
+            this.port = parts.port;
+            this.pathname = parts.pathname;
+            this.host = parts.port ? parts.hostname + ':' + parts.port : parts.hostname;
+            this.href = String(input);
+          }
+          KhaytURL.prototype.toString = function () { return this.href; };
+          globalThis.URL = KhaytURL;
+        })();
+        """#)
+        if let problem = lastException {
+            throw KhaytJSError.evaluationFailed("installing URL: \(problem)")
+        }
+
         for module in modules {
             guard let url = bundle.url(forResource: module, withExtension: "js", subdirectory: "JS") else {
                 throw KhaytJSError.moduleMissing("\(module).js")

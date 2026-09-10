@@ -170,6 +170,18 @@ public actor KhaytEngine {
         // `printerCompletions`, which is how this app can offer a measured
         // figure without polling a printer itself.
         "printer-poll-cache",
+        // The camera half. Every decision about a webcam is in here — where a
+        // printer of each family might serve one, what the owner typed
+        // normalised against the printer's host, whether a response is an image
+        // worth showing, and WHICH HOST a snapshot may be fetched from at all.
+        //
+        // That last one is not a detail: a webcam lives on the LAN, so private
+        // addresses have to be allowed, which would be an open SSRF hole if the
+        // URL were free-form. `assertSameHostAsPrinter` pins it to the host
+        // already configured for that machine's printer API, and the owner does
+        // not choose the host at fetch time. Nothing here may fetch a snapshot
+        // without asking it first.
+        "webcam",
         // What a finished job takes off the shelf: the grams, the hourly
         // consumables, the bought-in components, the packaging. Lifted out of
         // renderer/inventory.js because the move being shared is not enough —
@@ -1561,6 +1573,103 @@ public actor KhaytEngine {
         try runtime.call2(#"""
         globalThis.KhaytPollCache.completionsToPersist(ARG0)
         """#, [cache], as: JSONValue.self)
+    }
+
+
+    // MARK: - The camera on a machine
+
+    /// A machine's webcam settings, as `lib/webcam.js` keeps them.
+    public struct Webcam: Codable, Sendable, Equatable {
+        public var enabled: Bool
+        public var snapshotUrl: String
+        public var streamUrl: String
+        public var rotate: Int
+        public var flipH: Bool
+        public var flipV: Bool
+
+        public init(enabled: Bool = false, snapshotUrl: String = "", streamUrl: String = "",
+                    rotate: Int = 0, flipH: Bool = false, flipV: Bool = false) {
+            self.enabled = enabled; self.snapshotUrl = snapshotUrl; self.streamUrl = streamUrl
+            self.rotate = rotate; self.flipH = flipH; self.flipV = flipV
+        }
+    }
+
+    /// Whatever the owner typed, normalised and bounded — the module's own
+    /// `sanitizeWebcam`, so a relative `/webcam/?action=snapshot` becomes an
+    /// absolute URL against the printer's host exactly as it does in Khayt.
+    public func sanitizeWebcam(_ input: JSONValue, printerApi: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytWebcam.sanitizeWebcam(ARG0, ARG1)",
+                          [input, printerApi], as: JSONValue.self)
+    }
+
+    /// The addresses a printer of this family might serve a camera on, best
+    /// first — plural, because one guess is demonstrably not enough. Checked
+    /// against a Snapmaker U1 on stock firmware, the derived
+    /// `:8080/?action=snapshot` reaches nothing while the nginx on port 80 does
+    /// have a `/webcam/` route. Both conventions are real and the printer's
+    /// answer does not say which it uses, so a probe decides.
+    public func webcamCandidates(printerApi: JSONValue) throws -> [String] {
+        try runtime.call2(#"""
+        (globalThis.KhaytWebcam.webcamCandidates(ARG0) || [])
+          .map(function (c) { return c && c.snapshotUrl; })
+          .filter(Boolean)
+        """#, [printerApi], as: [String].self)
+    }
+
+    /// Refused a webcam fetch, and why.
+    public struct WebcamRefused: Error, CustomStringConvertible, Equatable {
+        /// `host_mismatch`, `invalid_url`, `no_printer_host`, `bad_scheme`.
+        public let reason: String
+        public var description: String { "the camera address was refused: \(reason)" }
+    }
+
+    /// May a snapshot be fetched from this URL for this machine?
+    ///
+    /// THE ONE THAT MUST NOT BE SKIPPED. A camera lives on the LAN, so private
+    /// addresses are allowed — which would be an open SSRF hole if the URL were
+    /// free-form. The module pins it to the host already configured for the
+    /// printer, and the owner does not choose that at fetch time.
+    ///
+    /// ── IT IS CALLED `assert…` AND IT DOES NOT THROW ─────────────────────
+    ///
+    /// `assertSameHostAsPrinter` RETURNS `{ ok, reason }`. The first version of
+    /// this crossing called it, discarded the answer and returned `true`, so
+    /// every address was allowed — the exact hole the function exists to close,
+    /// reopened inside it. The name reads like a throw in most codebases; the
+    /// module's own doc comment says otherwise and I read past it.
+    ///
+    /// So this throws, and returns nothing a caller could mistake for a
+    /// verdict: `try` is the only way past it.
+    public func assertWebcamHost(_ url: String, printerApi: JSONValue) throws {
+        struct Verdict: Decodable { let ok: Bool; let reason: String? }
+        let v = try runtime.call2("globalThis.KhaytWebcam.assertSameHostAsPrinter(ARG0, ARG1)",
+                                  [.string(url), printerApi], as: Verdict.self)
+        guard v.ok else { throw WebcamRefused(reason: v.reason ?? "refused") }
+    }
+
+    /// Is this response an image worth showing, or what is wrong with it?
+    ///
+    /// `nil` means yes. A reason means no, and `no_frame_yet` is NOT a fault:
+    /// PrusaLink documents 204 as "No Content / No Error" and 503 as the camera
+    /// being temporarily unavailable — a registered camera warming up. Both used
+    /// to render as "Camera offline", which is the one thing they do not mean.
+    public func checkSnapshot(status: Int, contentType: String?, contentLength: Int?) throws -> String? {
+        struct Verdict: Decodable { let ok: Bool; let reason: String? }
+        let v = try runtime.call2("globalThis.KhaytWebcam.checkSnapshotHeaders(ARG0, ARG1, ARG2)",
+                                  [.number(Double(status)),
+                                   contentType.map(JSONValue.string) ?? .null,
+                                   contentLength.map { .number(Double($0)) } ?? .null],
+                                  as: Verdict.self)
+        return v.ok ? nil : (v.reason ?? "refused")
+    }
+
+    /// The credential headers a snapshot needs, mirroring what the status
+    /// adapters already send for the same printer type. PrusaLink's camera
+    /// endpoint answers 401 without a key, so a correct URL that sends nothing
+    /// always fails.
+    public func webcamAuthHeaders(printerApi: JSONValue) throws -> [String: String] {
+        try runtime.call2("globalThis.KhaytWebcam.authHeadersFor(ARG0)",
+                          [printerApi], as: [String: String].self)
     }
 
     /// Where this move would reach outside the shop's own book.

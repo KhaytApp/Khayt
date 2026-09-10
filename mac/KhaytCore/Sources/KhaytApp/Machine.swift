@@ -21,6 +21,24 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
     let nozzle: Nozzle?
     let printerApi: PrinterApi?
 
+    /// The camera on this machine, if the shop has set one up.
+    ///
+    /// Decoded but never DERIVED here: where a camera might live and what a
+    /// relative path means against the printer's host are `lib/webcam.js`'s,
+    /// asked through the engine. This is only what the book already says.
+    let webcam: Webcam?
+
+    struct Webcam: Decodable, Hashable, Sendable {
+        let enabled: Bool?
+        let snapshotUrl: String?
+        let streamUrl: String?
+        /// 0, 90, 180 or 270. A camera zip-tied to a gantry is rarely the right
+        /// way up.
+        let rotate: Int?
+        let flipH: Bool?
+        let flipV: Bool?
+    }
+
     struct Bed: Decodable, Hashable, Sendable {
         let x: Double?
         let y: Double?
@@ -61,6 +79,13 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
     }
 
     var hasPrinterHistory: Bool { printerHistory?.importedAt?.isEmpty == false }
+
+    /// Is there a camera to draw at all? `lib/webcam.js`'s `hasCamera` in one
+    /// line: switched on, and with somewhere to fetch from.
+    var hasCamera: Bool {
+        guard let webcam, webcam.enabled == true else { return false }
+        return !(webcam.snapshotUrl ?? "").isEmpty || !(webcam.streamUrl ?? "").isEmpty
+    }
 
     var model: String { printerModelName ?? vendor ?? "" }
 

@@ -387,7 +387,17 @@ final class Shop {
             // shop, whose printers are somebody else's addresses on somebody
             // else's network.
             printers.source = next.build
-            if next.build != nil { printers.start(shop: self) } else { printers.stop() }
+            if next.build != nil {
+                printers.start(shop: self)
+                cameras.start(shop: self)
+            } else {
+                printers.stop()
+                // AND THE SAMPLE HAS NO CAMERAS. Its machines carry no webcam,
+                // and pointing a fetch at one that is not there would be five
+                // failed requests every few seconds for a book that is only
+                // being looked at.
+                cameras.stop()
+            }
             // The shop's published delivery dates. Not for the sample book,
             // whose cloud settings belong to nobody.
             if next.build != nil { startPublishingLeadTime() } else { stopPublishingLeadTime() }
@@ -1021,6 +1031,32 @@ final class Shop {
             if case .object(let m) = $0 { return m["id"] == .string(id) }
             return false
         }
+    }
+
+
+    /// A machine's `printerApi` as the shared rules want it, with the key
+    /// OPENED — for the one caller that has to send it.
+    ///
+    /// A snapshot from a PrusaLink or OctoPrint camera is authenticated: a
+    /// correct URL that sends nothing answers 401 every time. The key is opened
+    /// here, at the moment it is used, and handed straight to the request — the
+    /// same rule `PrinterWatch` follows, and the reason the Telegram token bug
+    /// happened when somebody passed the sealed string through instead.
+    ///
+    /// Safe only because the caller has already pinned the host: these headers
+    /// carry the shop's printer credential and must reach the printer alone.
+    func printerApiRow(_ machine: Machine) async -> JSONValue? {
+        guard let api = machine.printerApi, let host = api.host, !host.isEmpty else { return nil }
+        var row: [String: JSONValue] = [
+            "type": .string(api.type ?? ""),
+            "host": .string(host),
+        ]
+        if let port = api.port { row["port"] = .number(Double(port)) }
+        if let sealed = api.apiKey, !sealed.isEmpty, let build = source.build,
+           let opened = try? await Secrets.open(sealed, for: build) {
+            row["apiKey"] = .string(opened)
+        }
+        return .object(row)
     }
 
     /// What the cart comes to, before anything is written.
@@ -3245,6 +3281,10 @@ final class Shop {
     }
 
     let printers = PrinterWatch()
+
+    /// The stills from those printers' cameras, on a slower timer of their own —
+    /// a picture is worth refetching every few seconds, a status every ten.
+    let cameras = Camera()
 
     // MARK: - Putting a backup back
 

@@ -360,6 +360,36 @@ import KhaytCore
                    "38-completion-measured", size: CGSize(width: 420, height: 360))
     }
 
+    /// The camera tile, in the four states a shop actually sees.
+    ///
+    /// The picture case is a drawn image rather than a real JPEG so the shot
+    /// does not depend on a printer being on this Mac's network — what is being
+    /// looked at is the frame, the corner note and the rounding, not the photo.
+    @Test("a camera tile: a picture, warming up, failed, and none")
+    func cameraTiles() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let cam = Machine.Webcam(enabled: true, snapshotUrl: "http://x/1.jpg",
+                                 streamUrl: "", rotate: 0, flipH: false, flipV: false)
+        // A plate-ish rectangle, so the tile has something with edges in it.
+        let drawn = NSImage(size: NSSize(width: 320, height: 180), flipped: false) { rect in
+            NSColor(red: 0.24, green: 0.35, blue: 0.44, alpha: 1).setFill(); rect.fill()
+            NSColor(red: 0.94, green: 0.92, blue: 0.90, alpha: 1).setFill()
+            NSRect(x: 60, y: 30, width: 200, height: 120).fill()
+            return true
+        }
+        let bytes: Data = drawn.tiffRepresentation
+            .flatMap { NSBitmapImageRep(data: $0) }
+            .flatMap { $0.representation(using: NSBitmapImageRep.FileType.png, properties: [:]) } ?? Data()
+
+        try render(VStack(spacing: 10) {
+            CameraTile(frame: .picture(bytes), webcam: cam, words: shop.words)
+            CameraTile(frame: .waiting, webcam: cam, words: shop.words)
+            CameraTile(frame: .failed("unreachable"), webcam: cam, words: shop.words)
+        }.frame(width: 320).padding(Metric.screen).background(Khayt.ground),
+                   "39-camera-tiles", size: CGSize(width: 320, height: 430))
+    }
+
     /// Where a model came from, both ways round.
     ///
     /// The line a shop is looking for is "may not be sold", and it has to read
