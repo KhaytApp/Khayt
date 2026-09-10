@@ -539,8 +539,19 @@ struct OperationsPane: View {
                     Text(shop.words.callIt("set.wh_hint"))
                 }
                 Section {
-                    numberRow("set.lead_daily_hours", $draft.dailyHours)
-                    numberRow("set.lead_days_week", $draft.workingDaysPerWeek)
+                    // ── THE HOURS AND THE DAYS ARE THE GRID ABOVE ────────
+                    //
+                    // "Printing hours per working day" and "Working days per
+                    // week" used to be typed here, a few rows under a Working
+                    // Hours grid that says the same two things per day. Both
+                    // were editable and they disagreed silently: a shop that
+                    // closed Friday in the grid still had its promises counted
+                    // on whatever was left in these boxes.
+                    //
+                    // The promise reads the grid now, so these would be two
+                    // fields a shop can change with no effect — which is worse
+                    // than the disagreement was. They are gone, and the footer
+                    // says where the numbers come from.
                     numberRow("set.lead_finishing", $draft.finishingDays)
                     numberRow("set.lead_dispatch", $draft.dispatchDays)
                     numberRow("set.lead_safety", $draft.safetyDays)
@@ -548,7 +559,10 @@ struct OperationsPane: View {
                 } header: {
                     Text(shop.words.callIt("set.lead_title"))
                 } footer: {
-                    Text(shop.words.callIt("set.lead_safety_hint"))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(shop.words.callIt("mac.lead_from_hours"))
+                        Text(shop.words.callIt("set.lead_safety_hint"))
+                    }
                 }
                 Section(shop.words.callIt("set.wip_limits")) {
                     ForEach(Draft.columns, id: \.self) { col in

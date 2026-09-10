@@ -5203,8 +5203,6 @@ function loadSettingsIntoForm() {
   {
     const lt = settings.leadTime || {};
     const put = (id, v) => { const el = $(id); if (el) el.value = v; };
-    put('#set_leadDailyHours', lt.dailyHours != null ? lt.dailyHours : 8);
-    put('#set_leadDaysPerWeek', lt.workingDaysPerWeek != null ? lt.workingDaysPerWeek : 5);
     put('#set_leadFinishingDays', lt.finishingDays != null ? lt.finishingDays : 1);
     put('#set_leadDispatchDays', lt.dispatchDays != null ? lt.dispatchDays : 1);
     put('#set_leadSafetyDays', lt.safetyDays != null ? lt.safetyDays : 1);
@@ -5469,7 +5467,6 @@ function readSettingsForm() {
     paymentInstructions: opt('#set_paymentInstructions'), betaUpdates: tick('#set_betaUpdates'),
     quoteValidityDays: opt('#set_quoteValidityDays'),
     leadTime: group([
-      ['dailyHours', '#set_leadDailyHours'], ['workingDaysPerWeek', '#set_leadDaysPerWeek'],
       ['finishingDays', '#set_leadFinishingDays'], ['dispatchDays', '#set_leadDispatchDays'],
       ['safetyDays', '#set_leadSafetyDays'], ['publishToCloud', '#set_leadPublish', 'tick'],
     ]),

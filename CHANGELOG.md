@@ -1371,6 +1371,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   printing kept the empty bar — pale ragged lines under the word "Idle". On a
   shop whose printers are connected and quiet, that was the whole front door.
   An idle machine now draws its bed too, and says it is idle.
+- **Delivery dates ignored the working week you typed in.** Settings has a
+  Working Hours grid — one number per day — and, a few rows below it under
+  Delivery Estimates, a separate "Working days per week" and "Printing hours per
+  working day". Two ways of saying the same thing, both editable, and only the
+  second was counted. A shop open six days, or closed on a Thursday, had its
+  promises worked out on whatever was left in the other boxes. The promise now
+  reads the grid, and those two boxes are gone from Settings, because a field
+  you can change with no effect is worse than the disagreement was. **If you are
+  on the default week — Sunday to Thursday, eight hours — nothing changes.** It
+  moves only for a shop that set its own hours, which is the shop the dates were
+  wrong for.
 - **An invoice printed the print time to three decimal places.** A slicer
   reports 8.745 hours, and that is what a customer's invoice said, beside a
   weight that had always been rounded: "PETG-CF · 8.745 hrs · 559 g". The hours

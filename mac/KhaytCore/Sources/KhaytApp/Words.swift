@@ -627,6 +627,9 @@ final class Words {
         // is not a problem, and lives here because only this app draws it.
         "mac.nothing_to_assign_why": ["en": "Every job waiting for a machine already has one.",
                                       "ar": "كل طلب ينتظر آلة لديه واحدة بالفعل."],
+        // Where the two numbers that used to be typed here now come from.
+        "mac.lead_from_hours": ["en": "Hours a day and days a week come from Working Hours above.",
+                                "ar": "ساعات اليوم وأيام الأسبوع مأخوذة من ساعات العمل أعلاه."],
         "mac.cam_find":      ["en": "Find it",           "ar": "ابحث عنها"],
         "mac.cam_no_frame":  ["en": "No picture yet",     "ar": "لا صورة بعد"],
         "mac.cam_unreachable": ["en": "Camera not answering", "ar": "الكاميرا لا تجيب"],

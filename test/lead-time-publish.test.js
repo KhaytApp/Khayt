@@ -162,3 +162,64 @@ test('a snapshot still builds when nothing has ever been polled', () => {
     settings, printLog: [], machines: [{ id: 'M1' }], today: '2026-08-31', nowIso: '2026-08-31T09:00:00.000Z',
   }));
 });
+
+/**
+ * ── THE WORKING WEEK THE SHOP TYPED ────────────────────────────────────────
+ *
+ * The Operations pane holds a Working Hours grid — one number per day of the
+ * week — and, a few rows below it, "Working days per week" and "Printing hours
+ * per working day" under Delivery Estimates. Two models of one fact, both
+ * editable, on the same screen.
+ *
+ * The promise counted the second pair and ignored the grid. `KhaytWorkingWeek
+ * .workingDaysPerWeek` existed for this and had no callers at all.
+ *
+ * None of the tests above reach it, because `build()` passes no `workingHours`
+ * and the default week is five days at eight hours — exactly what the other box
+ * says. The disagreement only exists for a shop that customised its week, so
+ * that is the shop these describe.
+ */
+const week = (hours, leadTime = {}) => P.buildSnapshot({
+  settings: { leadTime: { ...ON, ...leadTime }, workingHours: hours },
+  printLog: [{ id: 'j1', status: 'pending', printTime: 40, machineId: 'm1' }],
+  machines: [{ id: 'm1' }],
+  today: '2026-08-31',
+  nowIso: '2026-08-31T09:00:00Z',
+});
+
+test('a six-day shop is promised on six days, not on the five in the other box', () => {
+  const six = week({ sun: 8, mon: 8, tue: 8, wed: 8, thu: 8, fri: 0, sat: 8 });
+  assert.equal(six.workingDaysPerWeek, 6,
+    'the grid says six days are open; the leadTime box still says five');
+});
+
+test('a shop that closed a day is promised on the days it kept', () => {
+  const four = week({ sun: 8, mon: 8, tue: 8, wed: 8, thu: 0, fri: 0, sat: 0 });
+  assert.equal(four.workingDaysPerWeek, 4);
+  // And it must be SLOWER than the six-day shop on the same queue. The whole
+  // point is that a customer's date moves when the shop's week does.
+  const six = week({ sun: 8, mon: 8, tue: 8, wed: 8, thu: 8, fri: 0, sat: 8 });
+  assert.ok(four.availableFrom > six.availableFrom,
+    `four open days must not promise sooner than six (${four.availableFrom} vs ${six.availableFrom})`);
+});
+
+test('the hours in a day come from the grid too', () => {
+  const long = week({ sun: 12, mon: 12, tue: 12, wed: 12, thu: 12, fri: 0, sat: 0 });
+  assert.equal(long.dailyHours, 12, 'twelve-hour days, not the eight in the other box');
+  // Closed days are not averaged in: a five-day shop at twelve hours works
+  // twelve-hour days, not twelve times five over seven.
+  const mixed = week({ sun: 8, mon: 8, tue: 8, wed: 8, thu: 10, fri: 0, sat: 0 });
+  assert.equal(mixed.dailyHours, 8.4, 'the mean over the OPEN days');
+});
+
+test('a book with no working week at all still gets a promise', () => {
+  // A shop from before the grid, or a caller that passed no settings: the
+  // stored figures are all there is, and a date is better than nothing.
+  const none = P.buildSnapshot({
+    settings: { leadTime: { ...ON, workingDaysPerWeek: 3, dailyHours: 6 }, workingHours: {} },
+    printLog: [{ id: 'j1', status: 'pending', printTime: 40, machineId: 'm1' }],
+    machines: [{ id: 'm1' }], today: '2026-08-31', nowIso: '2026-08-31T09:00:00Z',
+  });
+  assert.equal(none.workingDaysPerWeek, 3);
+  assert.equal(none.dailyHours, 6);
+});
