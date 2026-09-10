@@ -1365,6 +1365,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **The Mac calculator did not say what "Target profit margin" means.** It is a
+  markup on cost — price = cost × (1 + margin%) — which is what Khayt has always
+  computed and what the Windows and Linux app has always said on that field. On
+  the Mac there was only the slider, so 30% looked like 30% of the price when it
+  is 30% on top of the cost, and the difference on a typical job is about seven
+  points of what you actually keep. The sentence is on the screen now. **No
+  price changes**: the arithmetic is exactly what it was.
 - **An idle printer on the dashboard still looked like a screen that had not
   finished loading.** A machine Khayt cannot reach was fixed to show its bed
   instead of an empty progress bar; a machine Khayt CAN reach that simply is not
