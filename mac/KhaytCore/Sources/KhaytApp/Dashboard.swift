@@ -17,7 +17,6 @@ struct Dashboard: View {
         ("quarter", "an.range.quarter"), ("year", "an.range.year"), ("all", "an.range.all"),
     ]
 
-    private let columns = [GridItem(.adaptive(minimum: 210, maximum: 320), spacing: 14)]
 
 
     /// What the shop is doing and what wants a person. The left column when

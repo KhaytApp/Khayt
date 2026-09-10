@@ -9,7 +9,15 @@ import KhaytCore
 struct Machines: View {
     let shop: Shop
 
-    private let columns = [GridItem(.adaptive(minimum: 280, maximum: 420), spacing: 16)]
+    // `alignment: .top`, and it is not decoration. A `GridItem` with no
+    // alignment CENTRES its cell in the row, and these cards are not the same
+    // height — a machine with a longer materials list, or a spool carrying
+    // "needs drying", is taller than the ones beside it. So every shorter card
+    // floated: the shelf drew five spools in one row with THREE different top
+    // edges, and the machines screen put the Roland a hundred and eighty points
+    // below its neighbours, which reads as a card that has come loose rather
+    // than as a short card.
+    private let columns = [GridItem(.adaptive(minimum: 280, maximum: 420), spacing: 16, alignment: .top)]
 
     /// Recomputed when the printers say something new, and once a minute
     /// regardless — the now-line and every gap move with the clock, and a band
@@ -313,7 +321,8 @@ struct Inventory: View {
     @Bindable var shop: Shop
     @State private var selection: Spool.ID?
 
-    private let columns = [GridItem(.adaptive(minimum: 210, maximum: 280), spacing: 14)]
+    /// Top-aligned for the reason `MachineFloor` gives: an unaligned `GridItem` centres.
+    private let columns = [GridItem(.adaptive(minimum: 210, maximum: 280), spacing: 14, alignment: .top)]
 
     private var shown: [Spool] {
         let term = shop.search.trimmingCharacters(in: .whitespaces).lowercased()
