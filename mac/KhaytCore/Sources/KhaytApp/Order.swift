@@ -123,9 +123,18 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         /// by picking one. Absent on a job auto-logged from a printer's own
         /// history, which knows a filename and nothing about the library.
         let printFileId: String?
+        /// THE NAME THE PRINTER KNOWS THIS PART BY.
+        ///
+        /// A machine's completion carries a gcode filename and nothing else, so
+        /// this is the only honest link between an order and the figures a
+        /// printer reported for it — `renderer/order-flows.js` matches on
+        /// exactly this field. Absent on a job that was never sent to a
+        /// machine, which is why the caller falls back to the newest completion
+        /// and the sheet names which print it is offering.
+        let fileRef: String?
 
         private enum CodingKeys: String, CodingKey {
-            case id, name, material, qty, printWeight, unitCost, colour, printFileId
+            case id, name, material, qty, printWeight, unitCost, colour, printFileId, fileRef
         }
 
         init(from decoder: Decoder) throws {
@@ -138,6 +147,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
             unitCost = try c.decodeIfPresent(Double.self, forKey: .unitCost) ?? 0
             colour = try c.decodeIfPresent(String.self, forKey: .colour) ?? ""
             printFileId = try c.decodeIfPresent(String.self, forKey: .printFileId)
+            fileRef = try c.decodeIfPresent(String.self, forKey: .fileRef)
         }
     }
 

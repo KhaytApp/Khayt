@@ -112,6 +112,9 @@ public final class JSRuntime {
                           // `color-mix.js` publishes `KhaytColor` — the file is
                           // named for the mixing, the global for the subject.
                           "color-mix": "KhaytColor",
+                          // `printer-poll-cache.js` publishes `KhaytPollCache` —
+                          // the file says whose cache it is, the global does not.
+                          "printer-poll-cache": "KhaytPollCache",
                           // The converter's chain. Three of these are named for
                           // what they produce rather than for their global, and
                           // one of them — `mf-mesh` — is read under a THIRD name

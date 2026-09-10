@@ -323,6 +323,11 @@ final class Shop {
             catalogueRows = (try? await engine?.catalogue(
                 productRows, language: words.language, settings: Self.settings(root))) ?? []
             if case .array(let fleet)? = root["machines"] { machineRows = fleet } else { machineRows = [] }
+            // The finished jobs the printers still remember. Written by Khayt
+            // on a timer; read here, never written — this app does not poll
+            // into the cache, so anything it wrote would be a guess overwriting
+            // a measurement.
+            printerCompletions = root["printerCompletions"] ?? .object([:])
             clients = Self.decodeClients(root)
             clientNames = (try? await engine?.customerNames(
                 clientRows, language: words.language, settings: Self.settings(root))) ?? [:]
@@ -818,7 +823,8 @@ final class Shop {
     /// quietly computed over a shrinking subset of its work.
     var pendingQC: PendingHold?
 
-    /// A job being finished, and what it was quoted at.
+    /// A job being finished, what it was quoted at, and what — if anything —
+    /// the printer said it actually took.
     struct PendingCompletion: Identifiable, Equatable {
         let id: Order.ID
         let project: String
@@ -827,6 +833,36 @@ final class Shop {
         /// Whether this job is leaving inspection, which is the only case that
         /// also wants QC notes.
         let leavingQC: Bool
+        /// Nil until the answer arrives — an engine call, and the sheet must
+        /// open at once rather than after a round trip.
+        var measured: KhaytEngine.ActualsPrefill?
+    }
+
+    /// The finished jobs the shop's printers still remember.
+    ///
+    /// Khayt freezes a print's filament and duration on the edge out of
+    /// printing — the counters are per-job and reset when the next one starts —
+    /// and persists them here. This app does not poll into that cache yet, so a
+    /// shop running only this one gets an honest "nothing measured" and a shop
+    /// running both gets the measurement.
+    private(set) var printerCompletions: JSONValue = .object([:])
+
+    /// Ask what the printer said, once the sheet is already up.
+    func askWhatThePrinterSaid(for id: Order.ID) async {
+        guard let engine, let job = orders.first(where: { $0.id == id }) else { return }
+        guard let machineId = job.machineId, !machineId.isEmpty else { return }
+        let pre = try? await engine.actualsPrefill(
+            completions: printerCompletions, machineId: machineId,
+            // The printer knows a FILENAME, and the only honest link between an
+            // order and a set of figures is that name matching. A job with no
+            // print file gets the machine's newest completion, which the sheet
+            // then names so the shop can see whose numbers these are.
+            filename: job.parts.compactMap(\.fileRef).first,
+            estimateHours: job.printTime, estimateGrams: Self.quotedGrams(job),
+            now: Date())
+        guard var asking = pendingCompletion, asking.id == id, let pre else { return }
+        asking.measured = pre
+        pendingCompletion = asking
     }
 
     var pendingCompletion: PendingCompletion?
@@ -3682,7 +3718,14 @@ final class Shop {
                 id: id, project: job.project,
                 estHours: job.printTime, estGrams: Self.quotedGrams(job),
                 leavingQC: Stage.of(job) == .qc)
-            return { self.pendingCompletion = finishing }
+            return {
+                self.pendingCompletion = finishing
+                // The sheet opens NOW, with the estimate in the boxes, and the
+                // printer's answer replaces it when it arrives. A sheet that
+                // waited for a JavaScriptCore round trip would be a click that
+                // does nothing for a moment, which reads as a click that missed.
+                Task { await self.askWhatThePrinterSaid(for: id) }
+            }
         }
         // A job leaving inspection for anywhere else FAILED it. Sending it back
         // without recording that is how a shop's scrap costs go unrecorded and
@@ -3877,6 +3920,16 @@ final class Shop {
     struct Actuals: Equatable {
         var hours: Double
         var grams: Double
+        /// Which instrument read each axis, or `manual` where the shop typed
+        /// it. Per-axis because a printer can report one and not the other:
+        /// PrusaLink gives a duration and no filament, so calling that record
+        /// "measured" would put a fabricated variance into every report.
+        ///
+        /// A figure the shop CHANGED is manual whatever the printer said —
+        /// correcting a measurement makes it a correction, and the record
+        /// claiming otherwise is how a wrong number gets trusted twice.
+        var timeSource: String = "manual"
+        var weightSource: String = "manual"
     }
 
     func moveJob(_ id: Order.ID, to stage: Stage,
@@ -4017,8 +4070,8 @@ final class Shop {
             fields["actualPrintTime"] = .number((actuals.hours * 100).rounded() / 100)
             fields["actualWeight"] = .number((actuals.grams * 10).rounded() / 10)
             fields["actualsSource"] = .object([
-                "time": .string("manual"),
-                "weight": .string("manual"),
+                "time": .string(actuals.timeSource),
+                "weight": .string(actuals.weightSource),
                 "at": .string(ISO8601DateFormatter().string(from: Date())),
             ])
             target = .object(fields)

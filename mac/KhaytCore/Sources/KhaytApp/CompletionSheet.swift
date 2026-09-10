@@ -25,9 +25,12 @@ struct CompletionSheet: View {
     @State private var hours: String = ""
     @State private var grams: String = ""
     @State private var notes: String = ""
+    /// Boxes the shop has typed in, so a late answer from the printer does not
+    /// overwrite a figure under the cursor.
+    @State private var touched: Set<Field> = []
     @FocusState private var focused: Field?
 
-    private enum Field { case hours, grams, notes }
+    private enum Field: Hashable { case hours, grams, notes }
 
     var body: some View {
         let words = shop.words
@@ -38,12 +41,18 @@ struct CompletionSheet: View {
             HStack(alignment: .top, spacing: 14) {
                 Figure(label: words.callIt("act.print_time"),
                        unit: words.callIt("common.hours"), quoted: words.callIt("act.est"),
-                       estimate: subject.estHours, decimals: 1, text: $hours)
+                       estimate: subject.estHours, decimals: 1, text: $hours,
+                       measured: subject.measured?.timeMeasured == true,
+                       measuredWord: words.callIt("act.measured"))
                     .focused($focused, equals: .hours)
+                    .onChange(of: hours) { _, _ in touched.insert(.hours) }
                 Figure(label: words.callIt("act.weight"),
                        unit: words.callIt("common.grams"), quoted: words.callIt("act.est"),
-                       estimate: subject.estGrams, decimals: 0, text: $grams)
+                       estimate: subject.estGrams, decimals: 0, text: $grams,
+                       measured: subject.measured?.weightMeasured == true,
+                       measuredWord: words.callIt("act.measured"))
                     .focused($focused, equals: .grams)
+                    .onChange(of: grams) { _, _ in touched.insert(.grams) }
             }
 
             // NOT "measured". These came off a keyboard, the record says so,
@@ -51,14 +60,42 @@ struct CompletionSheet: View {
             // sheet says it too rather than letting a shop believe otherwise.
             //
             // Khayt's own `act.hint` says the rest — why a shop is being asked
-            // and that the boxes are pre-filled — in nine languages. Written a
-            // second time here it would be the same sentence in two, drifting.
-            Text(words.callIt("act.hint"))
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(words.callIt("mac.completion_typed"))
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // and that the boxes are pre-filled WITH THE ESTIMATE — in nine
+            // languages. Written a second time here it would be the same
+            // sentence in two, drifting.
+            //
+            // AND NOT SHOWN WHEN A PRINTER SUPPLIED THE FIGURES, because then
+            // the sentence is false: the boxes hold a measurement, the note
+            // below says exactly that, and two lines contradicting each other
+            // is worse than one missing.
+            if subject.measured?.measured != true {
+                Text(words.callIt("act.hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            // WHICH PRINT THESE NUMBERS BELONG TO, when a printer supplied
+            // them. A completion stays offerable for 24 hours, and a shop
+            // running five-hour jobs back to back will have started another
+            // long before that — so the figures on screen can belong to the
+            // PREVIOUS print while wearing a "measured" label. Naming the file
+            // is the difference between a claim and a checkable one.
+            if let pre = subject.measured, pre.measured {
+                Text(pre.filename.map {
+                    words.callIt("act.from_printer_file",
+                                 ["source": .string(pre.source ?? words.callIt("act.your_printer")),
+                                  "file": .string($0)])
+                } ?? words.callIt("act.from_printer",
+                                  ["source": .string(pre.source ?? words.callIt("act.your_printer"))]))
+                    .font(.caption)
+                    .padding(.horizontal, 8).padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Khayt.done.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(words.callIt("mac.completion_typed"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if subject.leavingQC {
                 VStack(alignment: .leading, spacing: 4) {
@@ -80,17 +117,25 @@ struct CompletionSheet: View {
         }
         .padding(20)
         .frame(width: 420)
-        .onAppear {
-            // Pre-filled from the ESTIMATE, and that is a deliberate choice
-            // with a cost. A shop that glances and confirms writes the estimate
-            // back under a second name, and the variance it reports is zero.
-            // The alternative — empty fields — makes the common case (the job
-            // ran as quoted) into typing, and a dialog that is work to dismiss
-            // is a dialog a shop learns to cancel.
-            hours = Money.quantity(subject.estHours, decimals: 1)
-            grams = Money.quantity(subject.estGrams, decimals: 0)
-            focused = .hours
-        }
+        .onAppear { fill() ; focused = .hours }
+        // The printer's answer arrives after the sheet is already up — an
+        // engine call, and a sheet that waited for one would be a click that
+        // appears to have missed. Only overwrites a box the shop has not
+        // touched: a figure being typed while the answer lands must not be
+        // replaced under the cursor.
+        .onChange(of: subject.measured) { _, _ in fill(onlyIfUntouched: true) }
+    }
+
+    private func fill(onlyIfUntouched: Bool = false) {
+        // The measurement when there is one, and the ESTIMATE otherwise — which
+        // is a deliberate choice with a cost: a shop that glances and confirms
+        // writes the estimate back under a second name and reports a variance
+        // of zero. Empty boxes would make the common case into typing, and a
+        // dialog that is work to dismiss is one a shop learns to cancel.
+        let time = Money.quantity(subject.measured?.timeH ?? subject.estHours, decimals: 1)
+        let weight = Money.quantity(subject.measured?.weightG ?? subject.estGrams, decimals: 0)
+        if !onlyIfUntouched || !touched.contains(.hours) { hours = time }
+        if !onlyIfUntouched || !touched.contains(.grams) { grams = weight }
     }
 
     private func commit() {
@@ -101,11 +146,29 @@ struct CompletionSheet: View {
         // completed with a blank weight would deduct nothing from the shelf.
         let h = Self.number(hours) ?? subject.estHours
         let g = Self.number(grams) ?? subject.estGrams
+        // ── WHOSE FIGURE IS THIS, AXIS BY AXIS ────────────────────────────
+        //
+        // Measured only where the printer reported that axis AND the shop left
+        // the number alone. A figure that was typed over is a correction, and a
+        // record that calls it a measurement is a wrong number trusted twice —
+        // `Quoting` would then compare the shop's own guess against its own
+        // estimate and report the variance as evidence.
+        let pre = subject.measured
+        let unchanged: (Double, Double?) -> Bool = { typed, offered in
+            guard let offered else { return false }
+            return abs(typed - offered) < 0.005
+        }
+        let instrument = pre?.source ?? "printer"
         shop.clearQuestion()
         Task {
             await shop.moveJob(id, to: .completed,
                                qcNotes: leavingQC ? said : nil,
-                               actuals: .init(hours: h, grams: g))
+                               actuals: .init(
+                                hours: h, grams: g,
+                                timeSource: (pre?.timeMeasured == true && unchanged(h, pre?.timeH))
+                                    ? instrument : "manual",
+                                weightSource: (pre?.weightMeasured == true && unchanged(g, pre?.weightG))
+                                    ? instrument : "manual"))
         }
     }
 
@@ -129,6 +192,11 @@ struct CompletionSheet: View {
         let estimate: Double
         let decimals: Int
         @Binding var text: String
+        /// Whether a printer reported THIS axis. Said on the field rather than
+        /// once for the sheet, because a mixed answer is the normal one: a
+        /// PrusaLink box measures the duration and never the filament.
+        let measured: Bool
+        let measuredWord: String
 
         var body: some View {
             VStack(alignment: .leading, spacing: 4) {
@@ -138,9 +206,16 @@ struct CompletionSheet: View {
                     .monospacedDigit()
                 // What was quoted, kept on screen. Without it the shop is being
                 // asked to correct a number it cannot see.
-                Text("\(quoted): \(Money.quantity(estimate, decimals: decimals))")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.tertiary)
+                HStack(spacing: 5) {
+                    if measured {
+                        Text(measuredWord)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(Khayt.done)
+                    }
+                    Text("\(quoted): \(Money.quantity(estimate, decimals: decimals))")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
     }

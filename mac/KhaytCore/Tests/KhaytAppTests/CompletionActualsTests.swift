@@ -56,14 +56,20 @@ struct CompletionActualsTests {
     /// anything that checks the source only when it is present — and the
     /// difference between a measurement and a shop's best guess is the entire
     /// reason the field exists.
-    @Test("what was typed is recorded as typed")
+    /// A record with actuals and no `actualsSource` reads as measured to
+    /// anything that checks the source only when it is present — and the
+    /// difference between a measurement and a shop's best guess is the entire
+    /// reason the field exists.
+    @Test("the figures never travel without saying whose they are")
     func provenanceTravelsWithTheFigures() {
         let shop = Self.source("Shop.swift")
         #expect(shop.contains("\"actualsSource\"] = .object("), "no provenance is written")
-        #expect(shop.contains("\"time\": .string(\"manual\")"), "typed time is not marked manual")
-        #expect(shop.contains("\"weight\": .string(\"manual\")"), "typed weight is not marked manual")
-        // And the sheet says so, rather than letting a shop believe the figures
-        // carry more weight than they do.
+        // Typed is the DEFAULT, so a caller that forgets to say cannot
+        // accidentally claim a measurement.
+        #expect(shop.contains("var timeSource: String = \"manual\""),
+                "the default source is not manual")
+        #expect(shop.contains("var weightSource: String = \"manual\""))
+        // And a sheet with nothing measured says so in words.
         #expect(Self.source("CompletionSheet.swift").contains("mac.completion_typed"))
     }
 
@@ -102,5 +108,62 @@ struct CompletionActualsTests {
         #expect(CompletionSheet.number("587.5") == 587.5)
         #expect(CompletionSheet.number("") == nil)
         #expect(CompletionSheet.number("abc") == nil)
+    }
+    /// ── WHOSE FIGURE IS THIS ──────────────────────────────────────────────
+    ///
+    /// Measured only where the printer reported THAT AXIS and the shop left the
+    /// number alone. Both halves matter: PrusaLink reports a duration and never
+    /// filament, so calling the record measured on both would fabricate a
+    /// variance; and a figure typed over is a correction, which a record
+    /// calling it a measurement turns into a wrong number trusted twice —
+    /// `Quoting` would compare the shop's own guess against its own estimate
+    /// and report it as evidence.
+    @Test("a figure kept as the printer gave it is measured; one typed over is not")
+    func sourceFollowsTheAxisAndTheEdit() {
+        let sheet = Self.source("CompletionSheet.swift")
+        #expect(sheet.contains("pre?.timeMeasured == true && unchanged(h, pre?.timeH)"),
+                "time is called measured without checking the printer measured it")
+        #expect(sheet.contains("pre?.weightMeasured == true && unchanged(g, pre?.weightG)"),
+                "weight is called measured without checking the printer measured it")
+        // And the write path uses what the sheet decided rather than a constant.
+        let shop = Self.source("Shop.swift")
+        #expect(shop.contains("\"time\": .string(actuals.timeSource)"),
+                "the record hard-codes a source again")
+        #expect(shop.contains("\"weight\": .string(actuals.weightSource)"))
+    }
+
+    /// The printer's answer is an engine call and lands after the sheet is up.
+    /// Overwriting a box the shop is typing in would replace a figure under the
+    /// cursor — and the figure it replaced would be the correction.
+    @Test("a late answer does not overwrite what the shop has typed")
+    func lateAnswerRespectsTyping() {
+        let sheet = Self.source("CompletionSheet.swift")
+        #expect(sheet.contains("fill(onlyIfUntouched: true)"),
+                "the printer's answer overwrites every box")
+        #expect(sheet.contains("touched.insert(.hours)") && sheet.contains("touched.insert(.grams)"),
+                "nothing records that a box was typed in")
+    }
+
+    /// A shop with no printer linked, and this app on its own, must not be told
+    /// the boxes hold a measurement — nor be shown a hint saying they hold the
+    /// estimate when they hold the printer's figures.
+    @Test("the sheet does not say two contradictory things about the same boxes")
+    func theHintMatchesTheBoxes() {
+        let sheet = Self.source("CompletionSheet.swift")
+        #expect(sheet.contains("if subject.measured?.measured != true {"),
+                "the “pre-filled with estimated values” hint shows over measured figures")
+        #expect(sheet.contains("act.from_printer_file"),
+                "measured figures do not say which print they came from")
+    }
+
+    /// This app READS the completions Khayt persists and never writes them. A
+    /// cache written from here would be a guess overwriting a measurement.
+    @Test("the completions cache is read, not written")
+    func completionsAreReadOnly() {
+        let shop = Self.source("Shop.swift")
+        #expect(shop.contains("private(set) var printerCompletions"),
+                "the cache is writable from outside the shop")
+        #expect(shop.contains("printerCompletions = root[\"printerCompletions\"]"),
+                "nothing loads what the printers remember")
     }
 }
