@@ -68,27 +68,34 @@ struct Portfolio: View {
             // The library's own thumbnail view: loaded off the main thread and
             // cached, which a grid of a shop's whole history needs as much as
             // the model grid does.
+            // ── SIZED THE WAY THE LIBRARY SIZES ITS TILES ────────────────
+            //
+            // THE PREVIOUS ATTEMPT AT THIS DID NOT WORK, and the changelog said
+            // it did. `.frame(maxWidth: .infinity)` was added on the reasoning
+            // that `.clipped()` clips the drawing and not the layout — which is
+            // true, and was not the cause. Photographed afterwards, the grid
+            // still hung off both edges of the pane: the first card's title
+            // still read "urbine bracket", cut by the sidebar, and measuring it
+            // put the card's left border about twenty-three points outside the
+            // pane it is supposed to be inside.
+            //
+            // What is certain from that measurement: the columns are the right
+            // width (six at 187.8pt, pitch 200) and the CELLS are wider than
+            // their columns, so each is centred and the outer two hang off the
+            // ends. What is NOT certain is which modifier makes the cell wider,
+            // and guessing again is how this file would collect a third wrong
+            // explanation.
+            //
+            // So it copies `LibraryGrid`, which draws the same `Thumbnail` in
+            // the same kind of adaptive grid in this same app and has never
+            // overflowed. It constrains BOTH axes from the offered width —
+            // `aspectRatio(_:contentMode: .fit)` — rather than pinning a height
+            // and hoping the width follows.
+            //
+            // Verify in a photograph before believing it.
             Thumbnail(source: snap.thumb.map(ThumbnailSource.inlineData))
-                // ── `.clipped()` CLIPS THE DRAWING, NOT THE LAYOUT ───────
-                //
-                // This set the height and nothing else. `Thumbnail` fills its
-                // space with `.aspectRatio(contentMode: .fill)`, so given a
-                // height and no width it reports the width that COVERS that
-                // height — for a landscape photo, half as wide again as the
-                // column it is in. `.clipped()` then hid the overflow while
-                // leaving the cell measuring its full size, so every cell was
-                // wider than its column and the whole grid ran off both edges
-                // of the pane: the first card's name read "urbine bracket" and
-                // the last one had no right-hand border at all.
-                //
-                // `maxWidth: .infinity` takes the width the column offers and
-                // reports THAT, which is what the clip was always assuming.
-                // The library does the same thing two other ways — a square
-                // `.aspectRatio(1, contentMode: .fit)` and a fixed 320×320 —
-                // and neither of those screens has ever overflowed.
-                .frame(maxWidth: .infinity)
-                .frame(height: 150)
-                .clipped()
+                .aspectRatio(3 / 2, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 1) {
                 Text(snap.project.isEmpty ? snap.orderId : snap.project)
                     .font(.callout).lineLimit(1)

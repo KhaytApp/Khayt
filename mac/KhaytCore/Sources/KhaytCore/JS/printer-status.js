@@ -97,6 +97,80 @@
 
 
   /**
+   * Time left, using the slicer's own estimate for the file where it helps.
+   *
+   * ── WHY `etaSeconds` ALONE IS NOT ENOUGH ──────────────────────────────────
+   *
+   * `etaSeconds` extrapolates from what has happened: elapsed ÷ done. That is
+   * a good answer once a print has run long enough to have a rate, and noise
+   * before it — the first minutes are heating, a purge line and a slow first
+   * layer, none of which run at the speed of the rest.
+   *
+   * Measured on the shop's own Snapmaker U1, 2026-09-10: two percent in,
+   * twenty-seven minutes elapsed, on a file the slicer had named
+   * `BLHT_PETG_4h24m.gcode`. The extrapolation said TWENTY-TWO AND A HALF
+   * HOURS — five times over, on the dashboard, as the first thing the shop
+   * sees. `moonrakerProgress` above records the same shape of mistake being
+   * corrected for progress ("176 hours, on a five-hour print"); the ETA half
+   * was left extrapolating.
+   *
+   * Every other adapter reads the printer's own figure — Bambu's
+   * `mc_remaining_time`, OctoPrint's `progress.printTimeLeft`, Duet's
+   * `timesLeft.file`, PrusaLink's `job.time_remaining`. Moonraker publishes no
+   * such number, but it does publish the slicer's `estimated_time` per file.
+   *
+   * ── AND WHY THE SLICER ALONE IS NOT EITHER ────────────────────────────────
+   *
+   * The bench fixture in test/moonraker.test.js is the other end of it: the
+   * same U1, 53 layers of 212 (25%), 7,291 seconds elapsed, on a file named
+   * `3h58m`. A quarter of the print took HALF the estimate. Believing the
+   * slicer there answers 1h56m for something running at a pace that says 6h04m,
+   * and that is not a rounding difference — the slicer's estimate is a guess
+   * about a machine it has never met, and by 53 layers this machine has
+   * measured itself.
+   *
+   * ── SO: EACH ESTIMATOR WHERE IT IS ACTUALLY GOOD ──────────────────────────
+   *
+   *     from the slicer    estimated × (1 − f)     good at the start
+   *     from the clock     elapsed × (1 − f) / f   good once there is a rate
+   *
+   * weighted by `w`, which ramps from 0 to 1 across f = 5%…25% — the clock has
+   * said nothing worth hearing below the first, and has the floor by the
+   * second. The band is a judgement and those two measurements are what it is
+   * judged against; it is written as a constant so the next person with a third
+   * measurement can move it deliberately.
+   *
+   * No floor on `f` is needed: at zero the answer is the whole estimate, so a
+   * shop gets a usable figure from the first second instead of a blank for the
+   * first percent.
+   *
+   * @param {number} estimatedTotalSeconds the slicer's estimate for the whole file
+   * @param {number} elapsedSeconds        seconds actually printing
+   * @param {number} progressFraction      0–1, layers preferred over bytes
+   * @returns {number|null} seconds left, or null when there is no estimate to use
+   */
+  const ETA_CLOCK_FROM = 0.05;   // below this the elapsed time says nothing
+  const ETA_CLOCK_FULL = 0.25;   // by this the machine has measured itself
+
+  function etaWithEstimate(estimatedTotalSeconds, elapsedSeconds, progressFraction) {
+    const total = Number(estimatedTotalSeconds);
+    // No estimate is not an estimate of zero. The caller falls back to
+    // `etaSeconds`, which is what it had before this existed.
+    if (!Number.isFinite(total) || total <= 0) return null;
+    const elapsed = Math.max(0, Number(elapsedSeconds) || 0);
+    let f = Number(progressFraction);
+    if (!Number.isFinite(f) || f < 0) f = 0;
+    if (f >= 1) return 0;
+
+    const fromSlicer = total * (1 - f);
+    if (f <= ETA_CLOCK_FROM) return Math.max(0, Math.round(fromSlicer));
+
+    const fromClock = (elapsed / f) * (1 - f);
+    const w = Math.min(1, (f - ETA_CLOCK_FROM) / (ETA_CLOCK_FULL - ETA_CLOCK_FROM));
+    return Math.max(0, Math.round((1 - w) * fromSlicer + w * fromClock));
+  }
+
+  /**
    * Percentage from layers printed.
    *
    * Klipper publishes `print_stats.info.{current_layer,total_layer}`. It is a
@@ -230,7 +304,7 @@
   // two transports that need it. This file is the CROSS-adapter normaliser —
   // progress, ETA, clamping — and a Duet heater-index rule was never that.
   const api = {
-    reading, normalizeProgress, fileProgressPct, etaSeconds, layerProgressPct, moonrakerProgress,
+    reading, normalizeProgress, fileProgressPct, etaSeconds, etaWithEstimate, layerProgressPct, moonrakerProgress,
     explainPrinterHttp, vendorMessage,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

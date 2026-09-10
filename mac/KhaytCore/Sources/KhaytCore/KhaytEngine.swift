@@ -2286,6 +2286,30 @@ public actor KhaytEngine {
         return name.isEmpty ? nil : name
     }
 
+    /// Where the slicer's estimate for the file now printing lives, if anywhere.
+    ///
+    /// Nil for an idle printer: there is no file to ask about and the request
+    /// would 404. The reply is STATIC for a given file, so the caller asks once
+    /// per filename rather than once per poll.
+    /// Takes the poll reply rather than a filename, so the shape of Moonraker's
+    /// object tree stays in `lib/moonraker.js` — the one place that already
+    /// knows it — instead of being dug through twice in Swift.
+    ///
+    /// The path doubles as the cache key: it encodes the filename, so a caller
+    /// that holds the last one it asked for refetches exactly when the file
+    /// changes and never otherwise.
+    public func moonrakerMetadataPath(forReply reply: [String: JSONValue]) throws -> String? {
+        // The empty string stands in for null across the bridge, as above.
+        let path = try runtime.call2(#"""
+        (function () {
+          var st = (ARG0 && ARG0.result && ARG0.result.status) || {};
+          var ps = st.print_stats || {};
+          return KhaytMoonraker.metadataPath(ps.filename) || '';
+        })()
+        """#, [.object(reply)], as: String.self)
+        return path.isEmpty ? nil : path
+    }
+
     /// What a Klipper machine is doing, from its own answer.
     ///
     /// Four corrections live inside `lib/moonraker.js`, each found on a real
@@ -2301,17 +2325,28 @@ public actor KhaytEngine {
     /// in the same crossing, means a poll cannot end up with a status from one
     /// moment and a measurement from another.
     public func moonrakerStatus(_ reply: [String: JSONValue],
-                                hot: [String: JSONValue]?, hotName: String?) throws -> PrinterStatus {
+                                hot: [String: JSONValue]?, hotName: String?,
+                                fileMeta: [String: JSONValue]? = nil) throws -> PrinterStatus {
+        // ARG3 is the slicer's metadata for the file being printed. Without it
+        // the adapter extrapolates the time left from however much of the print
+        // has happened, which two percent in is worthless — this printer said
+        // twenty-two and a half hours on a four-and-a-half-hour file.
+        //
+        // `sensorNames` is not passed from here and never has been: the fourth
+        // argument to `readStatus` is the discovered filament-sensor list, and
+        // this app does not discover them yet. It stays `null` so the metadata
+        // lands in the fifth position rather than being read as sensors.
         try runtime.call2(#"""
         (function () {
-          var s = KhaytMoonraker.readStatus(ARG0, ARG1, ARG2);
+          var s = KhaytMoonraker.readStatus(ARG0, ARG1, ARG2, null, ARG3);
           s.actuals = KhaytPrinterActuals.extractActuals('moonraker', ARG0, {});
           return s;
         })()
         """#,
                           [.object(reply),
                            hot.map(JSONValue.object) ?? .null,
-                           hotName.map(JSONValue.string) ?? .null],
+                           hotName.map(JSONValue.string) ?? .null,
+                           fileMeta.map(JSONValue.object) ?? .null],
                           as: PrinterStatus.self)
     }
 
