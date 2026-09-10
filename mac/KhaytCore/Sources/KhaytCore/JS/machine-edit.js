@@ -169,6 +169,40 @@
       const x = num(bed.x, 0), y = num(bed.y, 0), z = num(bed.z, 0);
       m.bed = (x > 0 && y > 0 && z > 0) ? { x, y, z } : undefined;
     }
+    /* How Khayt reaches this machine.
+     *
+     * ── A CREDENTIAL IS ONLY WRITTEN WHEN ONE IS SENT ──────────────────────
+     *
+     * `apiKey` and `accessCode` are registered secret paths
+     * (`lib/store-secret-paths.js`), so what is on the record is the SEALED
+     * string. A screen must never be handed the plaintext just to hand it
+     * back, so a caller that is not changing the key sends nothing at all —
+     * `undefined` — and what is stored is carried through untouched.
+     *
+     * That distinction is the whole safety of this block. Reading `a.apiKey`
+     * with a `|| ''` fallback would blank a working credential every time
+     * somebody corrected a typo in the host, and would do it silently.
+     *
+     * An empty STRING is different from absent, and means the shop cleared it.
+     */
+    if (has('printerApi')) {
+      const a = i.printerApi || {};
+      const was = m.printerApi || {};
+      const port = Math.round(num(a.port, 0));
+      const next = {
+        type: trim(a.type),
+        host: trim(a.host),
+        port: port > 0 ? port : undefined,
+        // Carried rather than edited: it is Bambu's, and no screen here sets it.
+        printerSlug: was.printerSlug || '',
+        apiKey: a.apiKey === undefined ? (was.apiKey || '') : String(a.apiKey),
+        accessCode: a.accessCode === undefined ? (was.accessCode || '') : String(a.accessCode),
+      };
+      // Switching a printer off must not throw its credentials away — a shop
+      // that unplugs a machine for a week should not have to find its key
+      // again to plug it back in.
+      m.printerApi = next;
+    }
     if (has('nozzle')) {
       const n = i.nozzle || {};
       const material = trim(n.material) || 'brass';

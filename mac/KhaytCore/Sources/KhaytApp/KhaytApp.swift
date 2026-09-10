@@ -762,12 +762,29 @@ final class Activator: NSObject, NSApplicationDelegate {
             // nothing — and because the sample is what most people will open
             // these two screens in first.
             shop.period = .all
-            shop.shelf = .expenses
-            await settle()
-            capture(named: "18-expenses", into: dir)
-            shop.shelf = .waste
-            await settle()
-            capture(named: "19-waste", into: dir)
+            // ── SKIPPABLE, BECAUSE IT CAN HANG ────────────────────────────
+            //
+            // Laying out the expenses screen puts AppKit into a runaway
+            // constraint pass — 132 frames of `_layoutSubtreeWithOldSize:`
+            // recursing under one `AppKitScrollView`, sampled rather than
+            // guessed at. It takes the whole run with it, and everything
+            // photographed AFTER this point (the reports, the machines, the
+            // shelf, the colour studio) is lost with it.
+            //
+            // Until that is fixed, `KHAYT_SNAPSHOT_SKIP=spending` steps over
+            // the two screens rather than losing the eleven behind them. The
+            // skip prints to stderr, so a short run cannot pass for a
+            // complete one.
+            if skipped("spending") {
+                FileHandle.standardError.write(Data("skipping spending\n".utf8))
+            } else {
+                shop.shelf = .expenses
+                await settle()
+                capture(named: "18-expenses", into: dir)
+                shop.shelf = .waste
+                await settle()
+                capture(named: "19-waste", into: dir)
+            }
             shop.shelf = .reports
             await settle()
             // The P&L is computed by the runtime after the screen appears, so

@@ -1,6 +1,7 @@
 import Testing
 import SwiftUI
 import AppKit
+import KhaytCore
 @testable import KhaytApp
 
 /// Renders the interface to PNGs so it can be looked at.
@@ -21,6 +22,13 @@ import AppKit
 
     static var outputDir: URL? {
         ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"].map { URL(fileURLWithPath: $0) }
+    }
+
+    func renderDark(_ view: some View, _ name: String, size: CGSize) throws {
+        try render(view.environment(\.colorScheme, .dark)
+                       .background(Khayt.ground)
+                       .environment(\.colorScheme, .dark),
+                   name, size: size)
     }
 
     func render(_ view: some View, _ name: String, size: CGSize) throws {
@@ -76,24 +84,51 @@ import AppKit
     /// page — and the test passed, every time, because writing a PNG cannot
     /// fail on what is not in it. A blank band down the middle of a sheet is
     /// never right, and it is the shape every "rendered nothing" bug takes.
+    ///
+    /// ── AND IT WAS NOT CATCHING THEM ──────────────────────────────────────
+    ///
+    /// It asked whether a pixel was darker than 0.92 in its weakest channel.
+    /// `Khayt.ground` is a warm off-white — near enough #EFEBE6 — whose weakest
+    /// channel is 0.90, so EVERY PIXEL OF AN EMPTY PAGE counted as ink and the
+    /// fraction came out at 1.0. On the dark ground it is worse: every pixel is
+    /// far below 0.92, so the check could not fail there either. A picture of
+    /// the board rendered edge-to-edge blank and passed.
+    ///
+    /// It asks a different question now: how much of this page is NOT the
+    /// colour most of it is? That needs to know nothing about the palette, it
+    /// works the same in both appearances, and a page of one flat colour scores
+    /// zero however light or dark that colour happens to be.
     private func expectInkInTheMiddle(_ rep: NSBitmapImageRep, _ name: String) {
         let top = rep.pixelsHigh / 4, bottom = rep.pixelsHigh * 3 / 4
-        var ink = 0, seen = 0
         // Every fourth pixel each way: enough to find a line of text, and a
         // sixteenth of the work on a 2x bitmap.
+        var samples: [(CGFloat, CGFloat, CGFloat)] = []
+        var histogram: [Int: Int] = [:]
+        /// Quantised to 32 levels a channel, so antialiasing along one edge of
+        /// one glyph does not become thirty different "backgrounds".
+        func bucket(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> Int {
+            (Int(r * 31) << 10) | (Int(g * 31) << 5) | Int(b * 31)
+        }
         for y in stride(from: top, to: bottom, by: 4) {
             for x in stride(from: 0, to: rep.pixelsWide, by: 4) {
-                guard let c = rep.colorAt(x: x, y: y) else { continue }
-                seen += 1
+                guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
                 var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-                c.usingColorSpace(.deviceRGB)?.getRed(&r, green: &g, blue: &b, alpha: &a)
-                if a > 0.1, min(r, min(g, b)) < 0.92 { ink += 1 }
+                c.getRed(&r, green: &g, blue: &b, alpha: &a)
+                guard a > 0.1 else { continue }
+                samples.append((r, g, b))
+                histogram[bucket(r, g, b), default: 0] += 1
             }
         }
-        guard seen > 0 else { return }
-        let fraction = Double(ink) / Double(seen)
+        guard !samples.isEmpty, let ground = histogram.max(by: { $0.value < $1.value })?.key else { return }
+        let gr = CGFloat((ground >> 10) & 31) / 31
+        let gg = CGFloat((ground >> 5) & 31) / 31
+        let gb = CGFloat(ground & 31) / 31
+        // Far enough from the ground to be something drawn, loose enough that a
+        // one-level rounding difference is not.
+        let ink = samples.filter { max(abs($0.0 - gr), max(abs($0.1 - gg), abs($0.2 - gb))) > 0.08 }.count
+        let fraction = Double(ink) / Double(samples.count)
         #expect(fraction > 0.002,
-                "\(name) is blank down the middle — \(ink) of \(seen) sampled pixels have anything in them")
+                "\(name) is blank down the middle — \(ink) of \(samples.count) sampled pixels are anything other than the background")
     }
 
     @Test("the sample shop loads and renders")
@@ -202,6 +237,46 @@ import AppKit
                    symbol: "checkmark.circle", tint: Khayt.done)
         }.frame(width: 720), "30-import-banners", size: CGSize(width: 720, height: 160))
         _ = shop
+    }
+
+    /// The state a search leaves behind, on the two screens that reach it
+    /// differently — a shelf, where the word is the only filter, and the jobs
+    /// table, where the sidebar's stage is narrowing too.
+    ///
+    /// Drawn beside the ORDINARY empty state on purpose. The whole claim of the
+    /// absent mark is that a shop can tell "no spools yet" from "no spool
+    /// called petg", and that claim can only be judged in a picture with both
+    /// in it.
+    @Test("a search that matched nothing, beside a screen with nothing on it")
+    func searchedIntoNothing() async throws {
+        // THE SAMPLE BOOK IS LOADED, and that is not incidental. A stage's
+        // name comes from the shared Khayt catalogue, which an unopened `Shop`
+        // has not read — so the first version of this picture said "…showing
+        // only queue.delivered", the raw key, and nothing in the source could
+        // have told me. A screen that names a filter has to be photographed
+        // with the words that name it.
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.search = "petg"
+        try render(HStack(spacing: 0) {
+            NothingMatched(shop: shop, mark: .filament)
+            Divider()
+            EmptyHere(title: "No spools yet", message: "Add one at the shelf.", mark: .filament)
+        }.frame(width: 900), "32-nothing-matched", size: CGSize(width: 900, height: 300))
+
+        let jobs = Shop()
+        await jobs.load(.sample)
+        jobs.search = "bracket"
+        jobs.shelf = .jobs(.delivered)
+        #expect(jobs.words.callIt(Stage.delivered.key) != Stage.delivered.key,
+                "the stage would be named by its raw key on this screen")
+        try render(NothingMatched(shop: jobs, mark: .jobs).frame(width: 560),
+                   "33-nothing-matched-stage", size: CGSize(width: 560, height: 300))
+        // And on the dark ground. `render` forces light, because a picture
+        // taken in whatever appearance the machine happens to be in is not a
+        // picture of anything — so dark has to be asked for.
+        try renderDark(NothingMatched(shop: jobs, mark: .jobs).frame(width: 560),
+                       "34-nothing-matched-dark", size: CGSize(width: 560, height: 300))
     }
 
     /// Where a model came from, both ways round.

@@ -33,6 +33,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   until you enter one.
 
 ### Added
+- **The board shows where a job may go while you are still holding it.** Drag a
+  card and every column that will take it outlines itself; a column that will
+  not — because you have set a limit on how many jobs may be in it at once, or
+  because an assembly's parts are not all finished — recedes and says why when
+  you hover it. Before, every column looked equally willing and the move was
+  refused after you let go, as an error, so the only way to learn where a job
+  could go was to try. The rules deciding it are the same ones Khayt uses; this
+  asks them earlier.
+
+- **A search that finds nothing says which search, and gets you out of it.**
+  Seven screens — jobs, board, shelf, library, customers, gift cards,
+  portfolio — answered an empty search with the same grey magnifying glass
+  every Mac app shows. It could not tell you that the sidebar was ALSO
+  narrowing, so asking for "bracket" while the sidebar showed Delivered blamed
+  the word when the job was sitting in Printing; and it gave you nothing to
+  press, so getting out meant going back to find the search box. Each screen
+  now draws its own mark, quotes what you typed, names the stage when a stage
+  is narrowing too, and offers Clear Search — and Show All Stages where that is
+  the other half of it.
+
 - **An empty screen shows its own mark.** Twenty-four of them shared one drawing
   — a nozzle laying a first layer — which is right for the app and says nothing
   about which screen you are looking at. An empty shelf shows a spool now, an

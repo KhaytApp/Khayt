@@ -57,6 +57,7 @@ extension Mark {
     /// The stroke, as a fraction of the mark's size.
     static let weight: CGFloat = 1.7 / 24
 
+
     var ink: Ink {
         switch self {
 
@@ -173,6 +174,24 @@ extension Mark {
 struct Drawn: View {
     let mark: Mark
     var size: CGFloat = 16
+
+    // A DASHED VARIANT WAS TRIED HERE AND THROWN AWAY, and it is worth saying
+    // why, because it reads perfectly well as an idea and only fails as a
+    // picture — which is the second time this app has been caught by exactly
+    // that (see the layer lines that read as skeleton-loading bars in
+    // `Craft.swift`).
+    //
+    // "The shape of the thing, not found": the same mark, stroked with a dash
+    // and no bead. Rendered, `filament` — two concentric rings — became a ring
+    // of evenly spaced dots, which is a SPINNER: an empty state that says the
+    // screen has not finished loading. And `jobs` — three short strokes —
+    // dashed into eight crumbs and stopped being a drawing at all. These marks
+    // are built from short segments on a 24-unit grid, and there is no dash
+    // length that survives that: long enough to read on a ring is longer than
+    // most of the strokes in the set.
+    //
+    // What separates the two empty states instead is the colour and the words.
+    // The mark's job is to name the SCREEN, and it does that solid.
 
     var body: some View {
         let ink = mark.ink

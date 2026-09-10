@@ -85,7 +85,12 @@ private struct Card: View {
                     // the other six protocols do not expose one Khayt can read,
                     // and a menu item that always answers "not this printer" is
                     // an item that teaches people to ignore the menu.
-                    if PrinterWatch.notWatched(machine) == nil {
+                    //
+                    // This asked `notWatched == nil`, which is true for all
+                    // THREE protocols this app speaks — so it offered the item
+                    // for a Prusa and handed back a 404 from Moonraker's path.
+                    // The predicate now says what the comment always said.
+                    if PrinterWatch.keepsHistory(machine) {
                         Button(shop.words.callIt("mac.read_history")) {
                             Task { await shop.importPrinterHistory(machine) }
                         }
@@ -145,7 +150,34 @@ private struct Card: View {
             // nothing beneath it reads as a screen that failed to load.
             if hasSpecs {
             DetailSection(shop.words.callIt("mac.the_machine")) {
-                if let bed = machine.bedSize { DetailLine(shop.words.callIt("mac.bed"), bed) }
+                // ── THE BED, DRAWN ────────────────────────────────────────
+                //
+                // "270 × 270 × 270 mm" is a fact a shop compares against the
+                // next card by reading both and doing the arithmetic. Drawn
+                // against the biggest bed on the floor it is compared by
+                // looking, which is what somebody standing in front of the
+                // bench actually wants to know.
+                if let bed = machine.bedSize, let x = machine.bed?.x, let y = machine.bed?.y {
+                    HStack(alignment: .center, spacing: 12) {
+                        BedPlan(x: x, y: y, widest: shop.widestBed, deepest: shop.deepestBed)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(shop.words.callIt("mac.bed"))
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text(bed).font(.callout.weight(.semibold)).monospacedDigit()
+                            // The dashed rectangle needs naming, or a small
+                            // square inside a big one reads as a rendering
+                            // fault rather than as a comparison.
+                            Text(shop.words.callIt("mac.bed_against",
+                                 ["w": .string("\(Int(shop.widestBed))"), "d": .string("\(Int(shop.deepestBed))")]))
+                                .font(.caption2).foregroundStyle(.tertiary)
+                                // It wrapped to one truncated line — "dashed:
+                                // the largest bed…" says nothing at all.
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.bottom, 2)
+                }
                 // ── ONLY WHAT THIS KIND OF MACHINE HAS ───────────────────
                 //
                 // A laser cutter has no nozzle, no extruder and no colour
@@ -175,23 +207,30 @@ private struct Card: View {
 
             if let wear, let nozzle = machine.nozzle {
                 DetailSection(shop.words.callIt("mac.nozzle_wear")) {
-                    // The bar is the figure. `lib/nozzle-wear.js` weights an
-                    // abrasive kilo differently from a plain one, and this shows
-                    // its answer rather than grams over threshold.
-                    ProgressView(value: min(1, wear.pct / 100)) {
-                        HStack {
+                    // ── THE RING IS THE FIGURE ────────────────────────────
+                    //
+                    // This was a `ProgressView`, and a stock capsule has one
+                    // flaw that matters here: it stops at full. A nozzle at 99%
+                    // and a nozzle at 140% drew the same bar, and only the word
+                    // beside it said which. `WearGauge` draws the overshoot
+                    // outside the ring.
+                    //
+                    // The figure is still `lib/nozzle-wear.js`'s — it weights
+                    // an abrasive kilo differently from a plain one, and this
+                    // shows its answer rather than grams over threshold.
+                    HStack(alignment: .center, spacing: 11) {
+                        WearGauge(pct: wear.pct)
+                        VStack(alignment: .leading, spacing: 2) {
                             Text("\(Int(wear.wear)) / \(Int(wear.threshold)) \(shop.words.callIt("common.grams"))")
-                                .monospacedDigit()
-                            Spacer()
+                                .font(.callout).monospacedDigit()
                             if wear.over {
-                                Text(shop.words.callIt("mac.nozzle_due")).foregroundStyle(Khayt.attention)
-                            } else {
-                                Text("\(Int(wear.pct))%").monospacedDigit().foregroundStyle(.secondary)
+                                Text(shop.words.callIt("mac.nozzle_due"))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Khayt.attention)
                             }
                         }
-                        .font(.caption)
+                        Spacer(minLength: 0)
                     }
-                    .tint(wear.over ? Khayt.attention : .accentColor)
                     if let installed = nozzle.installedAt, let day = Order.day(installed) {
                         DetailLine(shop.words.callIt("mac.installed"),
                                    day.formatted(date: .abbreviated, time: .omitted), dim: true)
@@ -277,7 +316,7 @@ struct Inventory: View {
             if shop.spools.isEmpty {
                 EmptyHere(title: shop.words.callIt("mac.no_filament"), mark: .filament)
             } else if shown.isEmpty {
-                ContentUnavailableView.search(text: shop.search)
+                NothingMatched(shop: shop, mark: .filament)
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 14) {

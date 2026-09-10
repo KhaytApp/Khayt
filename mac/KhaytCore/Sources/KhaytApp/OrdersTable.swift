@@ -344,7 +344,7 @@ private struct EmptyBook: View {
                 Text(problem)
             }
         } else if !shop.search.isEmpty {
-            ContentUnavailableView.search(text: shop.search)
+            NothingMatched(shop: shop, mark: .jobs)
         } else if shop.stage != nil {
             EmptyHere(title: shop.words.callIt("mac.nothing_at_stage"), message: shop.words.callIt("mac.stage_hint"), mark: .jobs)
         } else {

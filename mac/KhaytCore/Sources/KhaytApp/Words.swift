@@ -598,6 +598,20 @@ final class Words {
         "mac.pct_paid":      ["en": "{n}% paid",       "ar": "مدفوع {n}%"],
         "mac.book_wont_open": ["en": "This book will not open", "ar": "لا يُفتح هذا الدفتر"],
         "mac.nothing_at_stage": ["en": "Nothing at this stage", "ar": "لا شيء في هذه المرحلة"],
+        // A search that emptied the screen. The term is quoted because a shop
+        // that has mistyped one letter needs to SEE the letter it typed, and
+        // an unquoted word in a sentence hides a stray space entirely.
+        "mac.nothing_matches": ["en": "Nothing matches “{q}”", "ar": "لا شيء يطابق «{q}»"],
+        // NO LEADING ELLIPSIS IN THE ARABIC. It reads as a continuation of the
+        // title in English and it cannot in Arabic: a leading "…" is a neutral
+        // character, and bidi resolves it against the run it sits beside, so it
+        // rendered at the LEFT edge — the visual END of an Arabic line. The
+        // sentence appeared to trail off before it began. Photographed with
+        // KHAYT_LANG=ar; nothing in the string suggests it.
+        "mac.and_only_stage":  ["en": "…and the sidebar is showing only {stage}.",
+                                "ar": "والشريط الجانبي يعرض {stage} فقط."],
+        "mac.clear_search":    ["en": "Clear Search",   "ar": "امسح البحث"],
+        "mac.show_all_stages": ["en": "Show All Stages", "ar": "اعرض كل المراحل"],
         "mac.stage_hint":    ["en": "Jobs will appear here as they reach it.",
                               "ar": "تظهر الأعمال هنا حين تبلغ هذه المرحلة."],
         // The window itself.
@@ -670,7 +684,27 @@ final class Words {
         "mac.extruder":      ["en": "Extruder",        "ar": "الباثق"],
         "mac.power":         ["en": "Power",           "ar": "الطاقة"],
         "mac.address":       ["en": "Address",         "ar": "العنوان"],
+        "mac.quarter_drawn": ["en": "Where {q} went",  "ar": "أين ذهب {q}"],
+        "mac.idle":          ["en": "Idle",            "ar": "متوقفة"],
+        "mac.cannot_ask":    ["en": "Khayt cannot ask this machine",
+                              "ar": "لا تستطيع خيط سؤال هذه الآلة"],
+        "mach.connection":   ["en": "Connection",      "ar": "الاتصال"],
+        "mach.protocol":     ["en": "Speaks",          "ar": "البروتوكول"],
+        "mach.protocol_none":["en": "Not connected",   "ar": "غير متصلة"],
+        "mach.key_ph":       ["en": "if the printer needs one", "ar": "إن كانت الطابعة تحتاجه"],
+        "mach.key_kept":     ["en": "saved — type to replace",  "ar": "محفوظ — اكتب للاستبدال"],
+        "mach.key_forget":   ["en": "Forget",          "ar": "انسَ"],
+        "mach.key_will_clear":["en": "The saved key will be cleared when you save.",
+                              "ar": "سيُمحى المفتاح المحفوظ عند الحفظ."],
+        "mach.key_where":    ["en": "Encrypted in your login Keychain, the same way Khayt stores it.",
+                              "ar": "يُحفظ مشفَّراً في سلسلة المفاتيح، كما تحفظه خيط."],
+        "mach.test":         ["en": "Test",            "ar": "اختبر"],
+        "mach.test_bad_draft":["en": "Fill in an address first.", "ar": "أدخل العنوان أولاً."],
         "mac.nozzle_wear":   ["en": "Nozzle wear",     "ar": "تآكل الفوهة"],
+        // The dashed rectangle behind a bed plan. Without this the drawing
+        // reads as a rendering fault rather than as a comparison.
+        "mac.bed_against":   ["en": "dashed: the largest bed here, {w} × {d}",
+                              "ar": "المتقطع: أكبر منصة هنا، {w} × {d}"],
         "mac.nozzle_due":    ["en": "due a change",    "ar": "تحتاج تغييراً"],
         "mac.installed":     ["en": "Installed",       "ar": "رُكّبت"],
         "mac.takes":         ["en": "Takes",           "ar": "تقبل"],
@@ -1111,6 +1145,10 @@ final class Words {
         // all nine languages — and a key this app also supplied would shadow
         // Khayt's, which is what `a borrowed key never shadows one this app
         // supplies` refuses. One vocabulary, both apps.
+        // The printer's credential field. Electron's machine editor asks for
+        // the same thing, so the word is Khayt's rather than this app's — and
+        // supplying it here would shadow eight other languages with two.
+        "mach.api_key",
         "exp.vat_paid", "exp.vat_paid_hint", "exp.vat_reclaimed", "exp.vat_due",
         "inv.costs_a_job",
         "queue.quote", "queue.pending", "queue.printing", "queue.completed",
