@@ -602,6 +602,8 @@ final class Words {
         "mac.quoting":      ["en": "Quoting",  "ar": "التسعير"],
         // The camera on a printer.
         "mac.camera":        ["en": "Camera",            "ar": "الكاميرا"],
+        // A machine the shop booked out of service on purpose.
+        "mac.band_down":     ["en": "Maintenance",       "ar": "صيانة"],
         "mac.cam_find":      ["en": "Find it",           "ar": "ابحث عنها"],
         "mac.cam_no_frame":  ["en": "No picture yet",     "ar": "لا صورة بعد"],
         "mac.cam_unreachable": ["en": "Camera not answering", "ar": "الكاميرا لا تجيب"],

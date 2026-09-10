@@ -2732,13 +2732,21 @@ public actor KhaytEngine {
         public let unknownMachines: Int
         public let capacityMinutes: Double
         public let bookedMinutes: Double
+        /// Hours the shop has booked its machines OUT of action for.
+        ///
+        /// Not booked and not free. `utilised` is measured against what is
+        /// left after these, because an hour spent servicing a printer is not
+        /// an hour the shop failed to sell — charging it to the denominator
+        /// makes a shop look idle for the thing that keeps its machines
+        /// working.
+        public let downMinutes: Double
         public let freeMinutes: Double
         public let utilised: Double
 
         public struct Row: Decodable, Sendable, Hashable, Identifiable {
             public let machineId: String
             public let name: String
-            /// `printing` | `queued` | `free`
+            /// `printing` | `queued` | `down` | `free`
             public let state: String
             /// False for a machine Khayt cannot ask. Such a row draws no blocks
             /// and is left out of the totals — see `lib/machine-band.js`.
@@ -2746,6 +2754,8 @@ public actor KhaytEngine {
             public let blocks: [Block]
             public let gaps: [Gap]
             public let bookedMinutes: Double
+            /// Out of action for maintenance, inside the window.
+            public let downMinutes: Double
             public let freeMinutes: Double
             public let overrunMinutes: Double
             public let runningOrderId: String?
@@ -2754,7 +2764,11 @@ public actor KhaytEngine {
 
         public struct Block: Decodable, Sendable, Hashable, Identifiable {
             public let orderId: String
-            /// `printing` | `queued` | `blocked`
+            /// `printing` | `queued` | `blocked` | `down`
+            ///
+            /// `down` is a maintenance window the shop booked, not work: it has
+            /// no order, its `title` is whatever note the shop wrote, and it is
+            /// counted in neither the booked hours nor the free ones.
             public let kind: String
             /// True for everything behind the running job. Nothing schedules
             /// those; they are laid end to end, and a shop that reads a

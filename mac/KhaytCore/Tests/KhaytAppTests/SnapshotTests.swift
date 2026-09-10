@@ -390,6 +390,54 @@ import KhaytCore
                    "39-camera-tiles", size: CGSize(width: 320, height: 430))
     }
 
+    /// The band with a machine booked out for maintenance in it.
+    ///
+    /// `downtimeBlocks` had been editable in Khayt for releases and nothing
+    /// that plans work read them, so this state has never been drawn anywhere.
+    /// What is being looked at: that the window is visible without reading like
+    /// a fault, and that the queue behind it starts AFTER it rather than
+    /// through it.
+    @Test("a band with a maintenance window")
+    func bandWithDowntime() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        // A WHOLE SECOND. `ISO8601DateFormatter` drops the fraction, so a
+        // `Date()` with sub-second precision comes back a hair different and
+        // the window measures 359.99999999999994 minutes — a fixture artefact
+        // that reads exactly like an off-by-one in the module.
+        let now = Date(timeIntervalSince1970: (Date().timeIntervalSince1970).rounded())
+        let iso = ISO8601DateFormatter()
+        // Two machines: one out of action this afternoon with work queued
+        // behind it, one ordinary, so the two read side by side.
+        let machines: [JSONValue] = [
+            .object(["id": .string("M1"), "name": .string("Prusa CORE One"),
+                     "downtimeBlocks": .array([.object([
+                        "from": .string(iso.string(from: now.addingTimeInterval(3 * 3600))),
+                        "to": .string(iso.string(from: now.addingTimeInterval(9 * 3600))),
+                        "note": .string("Belt change"),
+                     ])])]),
+            .object(["id": .string("M2"), "name": .string("Bambu X1C")]),
+        ]
+        let orders: [JSONValue] = [
+            .object(["id": .string("A"), "status": .string("pending"),
+                     "machineId": .string("M1"), "printTime": .number(5),
+                     "project": .string("Falcon hood"), "parts": .array([])]),
+            .object(["id": .string("B"), "status": .string("pending"),
+                     "machineId": .string("M2"), "printTime": .number(7),
+                     "project": .string("Ramadan lantern"), "parts": .array([])]),
+        ]
+        let band = try await engine.machineBand(
+            machines: machines, orders: orders, inventory: [],
+            live: ["M1": .object([:]), "M2": .object([:])],
+            now: now, hours: 48)
+        let down = try #require(band.rows.first).downMinutes
+        #expect(down == 360, "the window is on the band as \(down) minutes, not 360")
+
+        try render(MachineBandView(shop: shop, band: band).frame(width: 820),
+                   "40-band-downtime", size: CGSize(width: 820, height: 260))
+    }
+
     /// Where a model came from, both ways round.
     ///
     /// The line a shop is looking for is "may not be sold", and it has to read
