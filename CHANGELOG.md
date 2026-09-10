@@ -1052,10 +1052,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   whole because the message could not be sent. It goes after the job is saved,
   and if it does not go out the shop is told rather than left to find out.
 
-- **The Mac app can add and correct a printer.** Name it, pick a model to fill
-  in its bed, colours, power and what its nozzle is made of, and record a
-  nozzle change. Its connection settings and webcam are left to Khayt and
-  carried through untouched.
+- **The Mac app can add, correct and CONNECT a printer.** Name it, pick a model
+  to fill in its bed, colours, power and what its nozzle is made of, and record
+  a nozzle change. Its address, port and key can be entered there too — with a
+  Test button that asks the real printer over your real network and shows you
+  what came back, before you leave the sheet. Until now the Mac app could add a
+  printer and give you no way to reach it, so the only machines that reported
+  anything were the ones Khayt itself had set up. The key is sealed by macOS
+  under the same Keychain entry Khayt uses, is never shown back to you, and a
+  key that cannot be sealed is refused rather than written in the clear —
+  because this file syncs, backs up and exports. Leaving the key box untouched
+  leaves the stored one alone; emptying it clears it. The webcam is still
+  Khayt's, and carried through untouched.
 
 - **The Mac app can correct the shelf.** Add a spool, fix a weight after a
   print ran long, change a price — with the price it used to be kept, so a
@@ -1246,6 +1254,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **A spool added from your phone was missing what the roll weighed when it
+  arrived — so its cost per kilo was wrong.** The shelf keeps two weights: what
+  a roll weighed new, which never changes, and what is left of it, which falls
+  every time you print. Only the first can price a kilo of material. A spool
+  typed at the desk recorded both; one booked in at the shelf recorded only what
+  was left, so a 750 g roll was costed as though it were a kilo — a quarter
+  under — and "what does this material cost me" had nothing to divide by on
+  exactly the rolls you scan most. Spools added from the phone from now on carry
+  it. A roll already on your shelf cannot be corrected, because once you have
+  printed with it there is no record of the other half.
+- **The temperatures and product code your phone read off a roll were thrown
+  away.** Scanning a label or an NFC tag reads the print temperature, the bed
+  temperature and the supplier's code — the reason for pointing a camera at a
+  spool at all — and the desktop dropped all three in silence on the way in. It
+  keeps them now.
+- **A spool booked in late at night was dated to the day before.** The phone
+  dated it in UTC, so between midnight and 03:00 in Riyadh a roll landed on
+  yesterday's shelf. The date is your shop's now, as it already is everywhere
+  else in the app.
+- **Weighing a part-used roll from your phone changed the shelf and nothing
+  else.** The correction showed on the shelf, while every calculation — what the
+  next print deducts, when the roll is low enough to reorder — carried on from
+  the figure you had just replaced. All of it reads the corrected weight now.
 - **The waste log's costs in the sample shop were the pre-tax figures.** This app
   prices a failed print itself, from the shelf's per-kilo rate and net of tax a
   registered shop reclaims — and every one of the six sample entries held the
