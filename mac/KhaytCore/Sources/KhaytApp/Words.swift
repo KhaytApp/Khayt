@@ -604,6 +604,13 @@ final class Words {
         "mac.camera":        ["en": "Camera",            "ar": "الكاميرا"],
         // A machine the shop booked out of service on purpose.
         "mac.band_down":     ["en": "Maintenance",       "ar": "صيانة"],
+        "mac.downtime_none": ["en": "Not booked out for anything.",
+                              "ar": "غير محجوزة لأي صيانة."],
+        // Said while it can still be corrected. The shared rule DROPS a window
+        // that runs backwards, silently — which would be a shop typing
+        // something and finding nothing saved.
+        "mac.downtime_backwards": ["en": "This window ends before it starts, and will not be saved.",
+                                   "ar": "هذه الفترة تنتهي قبل أن تبدأ، ولن تُحفظ."],
         "mac.cam_find":      ["en": "Find it",           "ar": "ابحث عنها"],
         "mac.cam_no_frame":  ["en": "No picture yet",     "ar": "لا صورة بعد"],
         "mac.cam_unreachable": ["en": "Camera not answering", "ar": "الكاميرا لا تجيب"],

@@ -167,6 +167,46 @@
     if (has('maxColors')) m.maxColors = Math.max(1, Math.round(num(i.maxColors, 1)));
     if (has('targetHoursPerDay')) m.targetHoursPerDay = Math.max(0, num(i.targetHoursPerDay, 0)) || null;
     if (has('locationId')) m.locationId = trim(i.locationId) || '';
+    /* ── WHEN THIS MACHINE IS OUT OF ACTION ──────────────────────────────
+     *
+     * `downtimeBlocks` is `[{ from, to, reason }]`, and it is no longer a note
+     * to itself: the band draws the window, the scheduler counts it against a
+     * machine's load, and the delivery promise a storefront quotes stops
+     * offering those hours. Three things read it, so what gets written matters
+     * more than it did when a badge was the only consumer.
+     *
+     * ── LOCAL WALL-CLOCK, THE SHAPE KHAYT'S OWN MODAL WRITES ─────────────
+     *
+     * `YYYY-MM-DDTHH:mm`, no zone — what a `datetime-local` input produces.
+     * "Thursday 2pm" is what a shop means by a maintenance window, and both
+     * apps have to write one shape or a window set on the Mac and read in
+     * Khayt would be a different four hours. The trap is real and is the
+     * lesser one: a naive time read in another timezone moves. A shop that
+     * services its printers from two continents has a better problem.
+     *
+     * A row missing an end, or running backwards, is DROPPED rather than
+     * repaired — a maintenance window nobody can read is not one to guess at,
+     * and it would otherwise silently take hours off a machine's capacity.
+     */
+    if (has('downtimeBlocks')) {
+      const rows = Array.isArray(i.downtimeBlocks) ? i.downtimeBlocks : [];
+      const clean = [];
+      for (const b of rows) {
+        if (!b) continue;
+        const from = trim(b.from);
+        const to = trim(b.to);
+        if (!from || !to) continue;
+        const a = new Date(from).getTime();
+        const z = new Date(to).getTime();
+        if (!Number.isFinite(a) || !Number.isFinite(z) || z <= a) continue;
+        clean.push({ from, to, reason: trim(b.reason || b.note).slice(0, 120) });
+      }
+      // Oldest first, so a list a shop scrolls reads like a calendar.
+      clean.sort((x, y) => new Date(x.from) - new Date(y.from));
+      // A cap, because this rides in every sync and every backup of the record
+      // it sits on. Fifty windows is years of servicing.
+      m.downtimeBlocks = clean.slice(0, 50);
+    }
     if (has('compatMaterials') && Array.isArray(i.compatMaterials)) {
       m.compatMaterials = i.compatMaterials.slice();
     }

@@ -76,6 +76,10 @@ struct MachineSheet: View {
     /// What a probe found, or why it did not. Cleared by the next attempt.
     @State private var camNote: String?
     @State private var camLooking = false
+
+    /// When this machine is out of action. Loaded from the record and written
+    /// back through the shared rule, which drops a window that cannot be read.
+    @State private var downtime: [Shop.DowntimeBlock] = []
     @State private var hasStoredKey = false
     @State private var forgetKey = false
     @State private var testing = false
@@ -203,6 +207,15 @@ struct MachineSheet: View {
                     note: $camNote, looking: $camLooking, find: findCamera)
             }
 
+            // ── WHEN IT IS OUT OF ACTION ─────────────────────────────────
+            //
+            // OUTSIDE the `polled` block, for every kind of machine: a laser is
+            // booked out for a lens change the same way a printer is booked out
+            // for a belt, and the band, the scheduler and the delivery promise
+            // read these whatever the machine is.
+            LayerRule()
+            DowntimeEditor(shop: shop, blocks: $downtime)
+
             // The whole wear block belongs to the nozzle, and only a filament
             // printer has one. What wears on a resin printer is its FEP film
             // and its screen, on two different clocks; on a laser it is the
@@ -297,6 +310,9 @@ struct MachineSheet: View {
         nozzleInstalled = Order.day(machine.nozzle?.installedAt)
         nozzleThreshold = machine.nozzle?.gramsThreshold ?? 0
         nozzleAtInstall = machine.nozzle?.gramsAtInstall ?? 0
+        downtime = (machine.downtimeBlocks ?? []).map {
+            .init(from: $0.from ?? "", to: $0.to ?? "", reason: $0.words)
+        }
         camEnabled = machine.webcam?.enabled ?? false
         camSnapshot = machine.webcam?.snapshotUrl ?? ""
         camRotate = machine.webcam?.rotate ?? 0
@@ -499,6 +515,7 @@ struct MachineSheet: View {
         let still = camSnapshot.trimmingCharacters(in: .whitespaces)
         let turn = camRotate
         let mirrorH = camFlipH, mirrorV = camFlipV
+        let windows = downtime
         let build = shop.source.build
         dismiss()
         Task {
@@ -538,6 +555,14 @@ struct MachineSheet: View {
             // rotation to the four it allows, and drops anything that is not an
             // http(s) URL — so a camera saved here is one this app and Khayt
             // will both fetch from, or none at all.
+            // Through the shared rule like everything else here: it drops a
+            // window that runs backwards or cannot be read, sorts them and caps
+            // the list. A row typed wrongly is refused in ONE place rather than
+            // by two apps with two opinions.
+            input["downtimeBlocks"] = .array(windows.map {
+                .object(["from": .string($0.from), "to": .string($0.to),
+                         "reason": .string($0.reason)])
+            })
             let cam: JSONValue = .object([
                 "enabled": .bool(wantsCamera),
                 "snapshotUrl": .string(still),
@@ -723,5 +748,101 @@ private struct CameraSettings: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+}
+
+/// When a machine is out of action, and why.
+///
+/// ── THE MAC COULD HONOUR THESE AND NOT SET ONE ───────────────────────────
+///
+/// The band draws the window, the scheduler counts it against the machine's
+/// load, and the delivery promise stops offering those hours — all three read
+/// `downtimeBlocks`, and only Khayt could write one. A shop working on the Mac
+/// could see that a printer was booked out and had to open the other app to
+/// say so.
+///
+/// ── LOCAL WALL-CLOCK, THE SHAPE KHAYT WRITES ─────────────────────────────
+///
+/// `YYYY-MM-DDTHH:mm`, no zone, which is what a `datetime-local` input
+/// produces. "Thursday 2pm" is what a shop means by a maintenance window, and
+/// both apps have to write one shape or a window set here and read there would
+/// be a different four hours.
+struct DowntimeEditor: View {
+    let shop: Shop
+    @Binding var blocks: [Shop.DowntimeBlock]
+
+    var body: some View {
+        let words = shop.words
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(words.callIt("mach.downtime")).font(.callout.weight(.medium))
+                Spacer()
+                Button(words.callIt("mach.downtime_add")) {
+                    // Tomorrow morning to tomorrow afternoon: a shape to edit
+                    // rather than four empty fields to fill.
+                    let start = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+                    blocks.append(.init(from: Self.stamp(Self.at(start, hour: 9)),
+                                        to: Self.stamp(Self.at(start, hour: 13)),
+                                        reason: ""))
+                }
+            }
+            if blocks.isEmpty {
+                Text(words.callIt("mac.downtime_none"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(blocks.indices, id: \.self) { at in
+                HStack(spacing: 8) {
+                    DatePicker("", selection: binding(at, \.from), displayedComponents: [.date, .hourAndMinute])
+                        .labelsHidden().datePickerStyle(.compact)
+                    Text("→").foregroundStyle(.tertiary)
+                    DatePicker("", selection: binding(at, \.to), displayedComponents: [.date, .hourAndMinute])
+                        .labelsHidden().datePickerStyle(.compact)
+                    TextField(words.callIt("mach.downtime_reason"), text: reason(at))
+                        .textFieldStyle(.roundedBorder).frame(minWidth: 90)
+                    Button {
+                        blocks.remove(at: at)
+                    } label: { Image(systemName: "minus.circle") }
+                        .buttonStyle(.borderless)
+                        .help(words.callIt("common.delete"))
+                }
+                // A window that reads backwards is dropped on save by the
+                // shared rule, silently — which would be a shop typing
+                // something and finding nothing there. It is said here instead,
+                // while it can still be corrected.
+                if !blocks[at].isReadable {
+                    Text(words.callIt("mac.downtime_backwards"))
+                        .font(.caption2).foregroundStyle(Khayt.attention)
+                }
+            }
+        }
+    }
+
+    private func binding(_ at: Int, _ path: WritableKeyPath<Shop.DowntimeBlock, String>) -> Binding<Date> {
+        Binding(
+            get: { Self.parse(blocks[at][keyPath: path]) ?? Date() },
+            set: { blocks[at][keyPath: path] = Self.stamp($0) })
+    }
+
+    private func reason(_ at: Int) -> Binding<String> {
+        Binding(get: { blocks[at].reason }, set: { blocks[at].reason = $0 })
+    }
+
+    /// `2026-09-10T14:00` — no zone, no seconds, matching Khayt's own field.
+    static func stamp(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        return f.string(from: date)
+    }
+
+    static func parse(_ text: String) -> Date? {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        return f.date(from: text)
+    }
+
+    private static func at(_ day: Date, hour: Int) -> Date {
+        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
     }
 }

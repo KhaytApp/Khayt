@@ -28,6 +28,20 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
     /// asked through the engine. This is only what the book already says.
     let webcam: Webcam?
 
+    /// When this machine is out of action. Three things read it — the band,
+    /// the scheduler and the delivery promise — so an unreadable row is not
+    /// cosmetic; see `lib/machine-edit.js`.
+    let downtimeBlocks: [Downtime]?
+
+    struct Downtime: Decodable, Hashable, Sendable {
+        let from: String?
+        let to: String?
+        /// Khayt's machine modal writes `reason`; `note` is accepted too.
+        let reason: String?
+        let note: String?
+        var words: String { (reason?.isEmpty == false ? reason : note) ?? "" }
+    }
+
     struct Webcam: Decodable, Hashable, Sendable {
         let enabled: Bool?
         let snapshotUrl: String?

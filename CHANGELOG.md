@@ -104,7 +104,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   promised a date that assumed a machine you knew would be in pieces. All three
   read it now. The window is on the band with your own note on it, work waits
   for it, and your utilisation is measured against the hours you actually have,
-  so servicing a printer no longer makes the shop look idle.
+  so servicing a printer no longer makes the shop look idle. **The Mac app can
+  book a machine out too** — any machine, not only the ones it can poll, since a
+  laser goes down for a lens change the same way a printer does for a belt. A
+  window that ends before it starts says so while you can still fix it, rather
+  than vanishing on save.
 
 - **The Mac app shows your printers' cameras.** A still on each machine's card,
   refreshed every few seconds, the right way up — rotate and flip are yours to

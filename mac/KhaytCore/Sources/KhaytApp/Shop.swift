@@ -835,6 +835,26 @@ final class Shop {
 
     /// A job being finished, what it was quoted at, and what — if anything —
     /// the printer said it actually took.
+    /// A window a machine is out of action for.
+    ///
+    /// `from` and `to` are `YYYY-MM-DDTHH:mm` local wall-clock, the shape
+    /// Khayt's own `datetime-local` field writes — see `DowntimeEditor` for why
+    /// both apps must write the same one.
+    struct DowntimeBlock: Identifiable, Equatable, Hashable {
+        var from: String
+        var to: String
+        var reason: String
+        var id: String { from + "|" + to + "|" + reason }
+
+        /// Does this window run forwards? The shared rule DROPS one that does
+        /// not, so a sheet that cannot say so lets a shop type something and
+        /// find nothing saved.
+        var isReadable: Bool {
+            guard let a = DowntimeEditor.parse(from), let z = DowntimeEditor.parse(to) else { return false }
+            return z > a
+        }
+    }
+
     struct PendingCompletion: Identifiable, Equatable {
         let id: Order.ID
         let project: String

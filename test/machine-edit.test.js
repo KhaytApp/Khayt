@@ -304,3 +304,62 @@ test('a machine with no connection yet can be given one', () => {
   assert.equal(m.printerApi.apiKey, '__enc__NEW');
   assert.equal(m.printerApi.accessCode, '', 'nothing invented for a field nobody set');
 });
+
+// ── Maintenance windows ────────────────────────────────────────────────────
+//
+// Three things read these now — the band, the scheduler and the delivery
+// promise a storefront quotes — so a row that cannot be read would silently
+// take hours off a machine's capacity rather than merely look odd on a badge.
+
+const editDowntime = (blocks) => {
+  const m = { id: 'M1', name: 'U1' };
+  M.applyEdit(m, { downtimeBlocks: blocks }, {});
+  return m.downtimeBlocks;
+};
+
+test('a window is kept with the shop\'s own reason', () => {
+  const out = editDowntime([{ from: '2026-09-10T14:00', to: '2026-09-10T18:00', reason: 'Belt change' }]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].reason, 'Belt change');
+  // The shape Khayt's own modal writes, kept as typed — a naive local time,
+  // because "Thursday 2pm" is what a shop means.
+  assert.equal(out[0].from, '2026-09-10T14:00');
+});
+
+test('a window that cannot be read is dropped, not repaired', () => {
+  const out = editDowntime([
+    { from: '2026-09-10T14:00', to: '' },                          // no end
+    { from: '', to: '2026-09-10T18:00' },                          // no start
+    { from: '2026-09-10T18:00', to: '2026-09-10T14:00' },          // backwards
+    { from: 'whenever', to: 'later' },                             // not dates
+    null,
+    { from: '2026-09-10T14:00', to: '2026-09-10T18:00' },          // the good one
+  ]);
+  assert.equal(out.length, 1, `kept ${out.length}: ${JSON.stringify(out)}`);
+  assert.equal(out[0].reason, '', 'a window with no reason is still a window');
+});
+
+test('windows come back oldest first, whatever order they were typed in', () => {
+  const out = editDowntime([
+    { from: '2026-09-20T09:00', to: '2026-09-20T11:00' },
+    { from: '2026-09-10T09:00', to: '2026-09-10T11:00' },
+  ]);
+  assert.equal(out[0].from, '2026-09-10T09:00');
+});
+
+test('the list is capped, because it rides in every sync of this record', () => {
+  const many = Array.from({ length: 80 }, (_, n) => ({
+    from: `2026-09-${String((n % 27) + 1).padStart(2, '0')}T09:00`,
+    to: `2026-09-${String((n % 27) + 1).padStart(2, '0')}T11:00`,
+  }));
+  assert.equal(editDowntime(many).length, 50);
+});
+
+test('a machine edited without touching downtime keeps what it had', () => {
+  // The module's own rule: absent means leave alone. A sheet that shows no
+  // maintenance section must not wipe the windows Khayt set.
+  const m = { id: 'M1', name: 'U1', downtimeBlocks: [{ from: 'a', to: 'b', reason: 'kept' }] };
+  M.applyEdit(m, { name: 'U1 renamed' }, {});
+  assert.equal(m.downtimeBlocks.length, 1);
+  assert.equal(m.downtimeBlocks[0].reason, 'kept');
+});
