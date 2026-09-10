@@ -13,10 +13,16 @@
  * * the nozzle block, whose threshold falls back to the material's expected
  *   life rather than to a number nobody chose.
  *
- * The rest — the printer's API, the webcam, downtime blocks — is NOT here and
- * is not offered by the Mac app: it belongs with the polling that app does not
- * do yet, and a screen that writes connection settings it cannot test is worse
- * than a screen that does not offer them.
+ * DOWNTIME BLOCKS are not here. The Mac app does not offer them.
+ *
+ * The printer's API and the webcam were on that list too, and are not any more.
+ * The reason given was that they "belong with the polling that app does not do
+ * yet" — and it polls, watches, alerts, draws a band off live readings and
+ * records what a finished print used. The condition kept from that sentence is
+ * the one worth keeping: a screen that writes connection settings it cannot
+ * test is worse than one that does not offer them. So the Mac's sheet asks the
+ * real printer before the shop leaves it, and asks the real printer where its
+ * camera is rather than making the shop know.
  *
  * PURE: no DOM, no clock. `KhaytNozzleWear` is consulted through the global it
  * assigns itself to, present in both apps.

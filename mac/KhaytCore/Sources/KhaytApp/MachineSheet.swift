@@ -22,7 +22,12 @@ import KhaytCore
 /// connection settings it cannot test is worse than one that does not offer
 /// them". So this one tests them, against the printer, before the shop leaves.
 ///
-/// The webcam and the downtime blocks are still carried through untouched.
+/// The camera is here too, under the connection, because it depends on it: the
+/// address is normalised against the printer's host, the credential that
+/// fetches a still is the printer's, and a snapshot may only be fetched from
+/// that same host at all.
+///
+/// The downtime blocks are still carried through untouched.
 struct MachineSheet: View {
     /// How wide this sheet is. A CONSTANT rather than a number in the body,
     /// because `SnapshotTests` photographs the sheet at a size of its own and
