@@ -65,9 +65,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
   A figure you typed is recorded as typed, and the Quoting page counts only what
   a machine reported — so a correction never becomes evidence about your own
-  estimate. The Mac app reads this cache and does not yet fill it: a shop
-  running Khayt alongside gets the measurements today, and Mac-only polling into
-  it is still to come.
+  estimate. **The Mac app now fills this itself**, from the same polls it
+  already makes to draw your machines, so a shop that never opens Khayt still
+  gets measured figures. It writes only when a print actually ends, and only to
+  a book this Mac holds — a Khayt with the book open is keeping the same record
+  and two writers would overwrite each other.
 
 - **The Mac app shows which of your models you are quoting too cheaply.** A new
   Quoting page under Reports compares what each model was quoted at with what a

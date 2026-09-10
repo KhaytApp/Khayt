@@ -1519,6 +1519,50 @@ public actor KhaytEngine {
                           as: ActualsPrefill.self)
     }
 
+
+    /// Fold one poll into a machine's cache, freezing a finished job's figures.
+    ///
+    /// `printer-poll-cache.mergePollSuccess` decides what a "finished job"
+    /// is — the edge OUT of printing, where a pause does not count because a
+    /// paused job is not over — and which reading to keep, preferring the one
+    /// taken after the end because Moonraker and OctoPrint both hold a
+    /// completed job's stats until the next print begins and the last poll
+    /// before the end can be several percent short.
+    ///
+    /// None of that is worth a second opinion in Swift, and a second opinion is
+    /// what a shop would get: Khayt writes this cache too, and the two apps
+    /// have to agree about what a print used.
+    public func mergePoll(previous: JSONValue, status: JSONValue, now: Date) throws -> JSONValue {
+        try runtime.call2(#"""
+        globalThis.KhaytPollCache.mergePollSuccess(ARG0, ARG1, ARG2)
+        """#, [previous, status, .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
+    }
+
+    /// Did that merge just capture a job that was not there before?
+    ///
+    /// The question the caller actually has, because the answer decides whether
+    /// a shop's book is written to. Asked of the module rather than by
+    /// comparing timestamps here: "a job just ended" is its rule, and a poll
+    /// re-merged by a caller must not read as a second completion.
+    public func completionIsNew(before: JSONValue, after: JSONValue) throws -> Bool {
+        try runtime.call2(#"""
+        globalThis.KhaytPollCache.completionIsNew(ARG0, ARG1)
+        """#, [before, after], as: Bool.self)
+    }
+
+    /// The part of a poll cache worth writing to disk: finished jobs, and
+    /// nothing live.
+    ///
+    /// A saved STATUS would come back as a confident "Printing · 47%" for a
+    /// machine that has been off all night, which is the exact failure the
+    /// dashboard's freshness check exists to prevent — so the module refuses to
+    /// carry one and this cannot be persuaded otherwise from here.
+    public func completionsToPersist(_ cache: JSONValue) throws -> JSONValue {
+        try runtime.call2(#"""
+        globalThis.KhaytPollCache.completionsToPersist(ARG0)
+        """#, [cache], as: JSONValue.self)
+    }
+
     /// Where this move would reach outside the shop's own book.
     ///
     /// Ask BEFORE moving anything. A webhook, a Telegram message, an email or a
@@ -2064,9 +2108,23 @@ public actor KhaytEngine {
     /// printer: layers before bytes, the live toolhead rather than head zero,
     /// `print_duration` rather than `total_duration`, and an ETA that refuses
     /// to extrapolate from noise. None of them is re-decided here.
+    /// ── AND WHAT THE JOB HAS USED, FROM THE SAME REPLY ───────────────────
+    ///
+    /// `extractActuals` is handed the RAW response rather than the status this
+    /// returns, because what it reads are fields the status does not carry and
+    /// deliberately does not: Moonraker's `print_duration`, PrusaLink's
+    /// `time_printing`, OctoPrint's `progress.printTime`. Reading them here,
+    /// in the same crossing, means a poll cannot end up with a status from one
+    /// moment and a measurement from another.
     public func moonrakerStatus(_ reply: [String: JSONValue],
                                 hot: [String: JSONValue]?, hotName: String?) throws -> PrinterStatus {
-        try runtime.call2("KhaytMoonraker.readStatus(ARG0, ARG1, ARG2)",
+        try runtime.call2(#"""
+        (function () {
+          var s = KhaytMoonraker.readStatus(ARG0, ARG1, ARG2);
+          s.actuals = KhaytPrinterActuals.extractActuals('moonraker', ARG0, {});
+          return s;
+        })()
+        """#,
                           [.object(reply),
                            hot.map(JSONValue.object) ?? .null,
                            hotName.map(JSONValue.string) ?? .null],
@@ -2080,7 +2138,17 @@ public actor KhaytEngine {
     /// `/api/job` answers fine in exactly that state. `lib/octoprint.js`.
     public func octoprintStatus(printer: [String: JSONValue]?,
                                 job: [String: JSONValue]) throws -> PrinterStatus {
-        try runtime.call2("KhaytOctoprint.readStatus(ARG0, ARG1)",
+        // The JOB response carries `progress.printTime`, which is time already
+        // spent printing and a real reading. Its `filament` is not one, and
+        // `extractActuals` refuses it — see the note in `printer-actuals.js`
+        // about OctoPrint filling that from the file's GCODE analysis.
+        try runtime.call2(#"""
+        (function () {
+          var s = KhaytOctoprint.readStatus(ARG0, ARG1);
+          s.actuals = KhaytPrinterActuals.extractActuals('octoprint', ARG1, {});
+          return s;
+        })()
+        """#,
                           [printer.map(JSONValue.object) ?? .null, .object(job)],
                           as: PrinterStatus.self)
     }
@@ -2092,7 +2160,18 @@ public actor KhaytEngine {
     /// return. `lib/prusalink.js`.
     public func prusalinkStatus(status: [String: JSONValue],
                                 job: [String: JSONValue]?) throws -> PrinterStatus {
-        try runtime.call2("KhaytPrusalink.readStatus(ARG0, ARG1)",
+        // `extractActuals` reads `raw.job.time_printing`, so the job response
+        // is wrapped back under the key it expects rather than passed bare.
+        // PrusaLink reports a duration and no filament at any firmware
+        // version — a mixed answer, which everything downstream is built to
+        // carry rather than round off.
+        try runtime.call2(#"""
+        (function () {
+          var s = KhaytPrusalink.readStatus(ARG0, ARG1);
+          s.actuals = KhaytPrinterActuals.extractActuals('prusalink', { job: ARG1 }, {});
+          return s;
+        })()
+        """#,
                           [.object(status), job.map(JSONValue.object) ?? .null],
                           as: PrinterStatus.self)
     }
@@ -2115,7 +2194,12 @@ public actor KhaytEngine {
     }
 
     /// What a machine is doing, as every adapter reports it.
-    public struct PrinterStatus: Decodable, Sendable, Equatable {
+    /// Codable, not merely Decodable: `printer-poll-cache` is handed a status
+    /// to fold into a machine's cache, so this has to go back across the bridge
+    /// as well as come from it — and encoding the real thing rather than a
+    /// hand-built subset means the cache cannot quietly lose a field somebody
+    /// adds here later.
+    public struct PrinterStatus: Codable, Sendable, Equatable {
         public let state: String
         public let progress: Int
         /// `layers` or `bytes` — which signal the percentage came from, because
@@ -2133,15 +2217,42 @@ public actor KhaytEngine {
         public let tempNozzle: Double?
         public let tempBed: Double?
         public let type: String
+        /// WHAT THIS JOB HAS USED SO FAR, when the protocol reports it.
+        ///
+        /// Read off the same raw reply the status came from, by
+        /// `printer-actuals.extractActuals`, which knows what each protocol
+        /// means by the fields that look like measurements — Moonraker's
+        /// `print_duration` and not `total_duration`, and NOT OctoPrint's
+        /// `job.filament`, which is the file's slicing estimate and identical
+        /// at 1% and at 99%.
+        ///
+        /// Nil for a protocol that reports nothing, and nil for a machine that
+        /// is not printing. It is per-JOB and resets when the next print
+        /// starts, which is why `printer-poll-cache` freezes it on the edge out
+        /// of printing rather than reading it when a shop closes the order.
+        public let actuals: Actuals?
+
+        /// One reading. Null rather than zero for a side nobody measured: a
+        /// zero-length or zero-second reading is a printer that has not run,
+        /// and reporting it as 0 g would tell a shop the print was free.
+        public struct Actuals: Codable, Sendable, Equatable {
+            public let durationS: Double?
+            public let filamentGrams: Double?
+            public let filamentMm: Double?
+            /// Which instrument read it.
+            public let source: String?
+        }
 
         /// Public so a caller with no printer on the network can stand one up —
         /// the snapshot runner and the tests both need a machine that answers,
         /// and neither can put one on this Mac's wifi.
         public init(state: String, progress: Int, progressSource: String?, filename: String,
-                    timeRemaining: Double?, tempNozzle: Double?, tempBed: Double?, type: String) {
+                    timeRemaining: Double?, tempNozzle: Double?, tempBed: Double?, type: String,
+                    actuals: Actuals? = nil) {
             self.state = state; self.progress = progress; self.progressSource = progressSource
             self.filename = filename; self.timeRemaining = timeRemaining
             self.tempNozzle = tempNozzle; self.tempBed = tempBed; self.type = type
+            self.actuals = actuals
         }
     }
 
