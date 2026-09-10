@@ -600,6 +600,17 @@ final class Words {
         "mac.nothing_at_stage": ["en": "Nothing at this stage", "ar": "لا شيء في هذه المرحلة"],
         // What a model really costs against what it is quoted at.
         "mac.quoting":      ["en": "Quoting",  "ar": "التسعير"],
+        // What each machine earned, and what it cost to keep earning it.
+        "mac.mpl_title":        ["en": "By machine",   "ar": "حسب الآلة"],
+        "mac.mpl_all_machines": ["en": "All machines", "ar": "كل الآلات"],
+        "mac.mpl_not_net":      ["en": "What each job consumed — its filament, expenses filed against it, and the machine's servicing. Your labour, power and rent are in the Profit & Loss, not here.",
+                                 "ar": "ما استهلكه كل عمل — خيطه، والمصروفات المسجّلة عليه، وصيانة الآلة. أما العمالة والكهرباء والإيجار فهي في الأرباح والخسائر، لا هنا."],
+        "mac.mpl_empty":        ["en": "No machine finished anything in this period",
+                                 "ar": "لم تُنهِ أي آلة عملاً في هذه الفترة"],
+        // NOT "no data". A shop reaches this by looking at a period it did no
+        // work in, which is a thing it can change by looking at another one.
+        "mac.mpl_empty_why":    ["en": "Choose a longer period, or finish a job on a machine and it appears here.",
+                                 "ar": "اختر فترة أطول، أو أنهِ عملاً على آلة فتظهر هنا."],
         // The camera on a printer.
         "mac.camera":        ["en": "Camera",            "ar": "الكاميرا"],
         // A machine the shop booked out of service on purpose.

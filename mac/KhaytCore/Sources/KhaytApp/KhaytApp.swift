@@ -584,6 +584,27 @@ final class Activator: NSObject, NSApplicationDelegate {
             // missing translation looks like and was only an early photograph.
             FileHandle.standardError.write(Data("menus: \(menuTree())\n".utf8))
             capture(named: "00b-dashboard-sample", into: dir)
+
+            // ── AND THE JOBS TABLE, WHILE THE SAMPLE IS OPEN ──────────────
+            //
+            // The reason three lines above applies to the screen a shop LIVES
+            // in and was not being applied to it: `01-jobs` was shot against
+            // the real book alone, and a book auto-logged from printer history
+            // has no prices — nineteen rows reading 0.00, "Delivered",
+            // "settled", every one of them. Every column that carries money,
+            // every stage but one, and the part counts were invisible.
+            //
+            // Shot here rather than after the swap so the sample is not loaded
+            // a third time; the live book still gets its own picture below,
+            // because what a shop's own data looks like is worth seeing too.
+            shop.shelf = .jobs(nil)
+            await settle()
+            capture(named: "01b-jobs-sample", into: dir)
+            shop.selection = (shop.shown.first { !$0.isSettled } ?? shop.shown.first)?.id
+            await settle()
+            capture(named: "02b-job-selected-sample", into: dir)
+            shop.selection = nil
+
             await shop.load(Shop.available.first(where: \.isReal) ?? .sample)
             await settle()
             shop.shelf = .jobs(nil)
@@ -652,6 +673,14 @@ final class Activator: NSObject, NSApplicationDelegate {
             // no use at all for looking at a design.
             await shop.load(.sample)
             shop.shelf = .board
+            await settle()
+            // TWICE, and the second one is not superstition. The inspector is
+            // dismissed on this shelf — `wantsPanel` excludes the board — but
+            // dismissal is ANIMATED, and one settle photographs it half
+            // collapsed: a 310-point column still reserved and empty, which
+            // takes two and a half of the seven columns off the picture. The
+            // board is fine; the photograph was not, and a reviewer reading it
+            // would file a bug against a layout that does not have one.
             await settle()
             capture(named: "09-board", into: dir)
 
@@ -767,35 +796,6 @@ final class Activator: NSObject, NSApplicationDelegate {
             }
             await settle()
             try? await Task.sleep(for: .seconds(1))
-            // KHAYT_SNAPSHOT_SKIP=settings leaves the Settings window shut.
-            //
-            // Added while bisecting a hang, and kept because iterating on one
-            // screen should not cost a full run of sixty captures. The value is
-            // a comma-separated list matched against the names below.
-            if skipped("settings") {
-                // Say so, so a short run is never mistaken for a complete one.
-                FileHandle.standardError.write(Data("skipping settings\n".utf8))
-            } else if let settings = settingsWindow() {
-                for pane in SettingsPane.allCases {
-                    shop.settingsPane = pane
-                    await settle()
-                    capture(named: "17-settings-\(pane.rawValue)", window: settings, into: dir)
-                }
-                settings.close()
-                await settle()
-            } else {
-                // Loudly, and with what WAS open: a silent miss here is how the
-                // nozzle glyph got photographed six times.
-                // `×`, not an `x`: the units guard reads a letter between two
-                // numbers as a unit written in Swift, and it is right to — it
-                // cannot tell this line from one a shop would read. The proper
-                // multiplication sign is what the rest of the app uses anyway.
-                let open = NSApp.windows.filter(\.isVisible)
-                    .map { "\(type(of: $0)) \(Int($0.frame.width))×\(Int($0.frame.height))" }
-                FileHandle.standardError.write(Data(
-                    "no settings window to capture — open: \(open.joined(separator: ", "))\n".utf8))
-            }
-
             // What the shop spent and what it wasted. The sample, because this
             // Mac's own book has neither and an empty table is a picture of
             // nothing — and because the sample is what most people will open
@@ -836,6 +836,18 @@ final class Activator: NSObject, NSApplicationDelegate {
             await settle()
             try? await Task.sleep(for: .milliseconds(600))
             capture(named: "20b-owing", into: dir)
+
+            // The two pages added since — neither had ever been photographed
+            // from the running app, only through `ImageRenderer`, which cannot
+            // host a `ScrollView` and draws AppKit controls as placeholders.
+            shop.reportPage = .quoting
+            await settle()
+            capture(named: "20c-quoting", into: dir)
+            shop.reportPage = .machines
+            await settle()
+            capture(named: "20d-by-machine", into: dir)
+            shop.reportPage = .profit
+            await settle()
             // And the third: who the money came from. Same reason as the P&L —
             // the lists are computed by the runtime after the screen appears.
             shop.reportPage = .best
@@ -975,6 +987,55 @@ final class Activator: NSObject, NSApplicationDelegate {
             await settle()
             capture(named: "06-customers", into: dir)
             capturePanes(named: "06-customers", into: dir)
+
+            // ── SETTINGS IS PHOTOGRAPHED LAST, AND THAT IS DELIBERATE ─────
+            //
+            // It hangs. Roughly one run in two the main thread goes into an
+            // AppKit constraint-layout pass on `17-settings-preferences` and
+            // never comes out — `sample` shows 1,576 of 1,576 samples inside
+            // `_layoutViewTree`, with a dynamic colour provider consulted from
+            // within it. That predates this note: `KHAYT_SNAPSHOT_SKIP` above
+            // was added "while bisecting a hang", and the cause was never
+            // found.
+            //
+            // What that cost was NINETEEN OTHER CAPTURES. Settings sat at
+            // position seventeen of thirty-six, so a stall there took the
+            // machines, the shelf, the calculator, the catalogue and the
+            // reports with it — and a run that dies two-thirds of the way
+            // through looks, in the output directory, like a run that simply
+            // has fewer screens.
+            //
+            // Moving it to the end does not fix the hang. It makes the hang
+            // cost one screen instead of twenty, which is worth doing on its
+            // own and is worth saying plainly rather than dressing up as a fix.
+            // KHAYT_SNAPSHOT_SKIP=settings leaves the Settings window shut.
+            //
+            // Added while bisecting a hang, and kept because iterating on one
+            // screen should not cost a full run of sixty captures. The value is
+            // a comma-separated list matched against the names below.
+            if skipped("settings") {
+                // Say so, so a short run is never mistaken for a complete one.
+                FileHandle.standardError.write(Data("skipping settings\n".utf8))
+            } else if let settings = settingsWindow() {
+                for pane in SettingsPane.allCases {
+                    shop.settingsPane = pane
+                    await settle()
+                    capture(named: "17-settings-\(pane.rawValue)", window: settings, into: dir)
+                }
+                settings.close()
+                await settle()
+            } else {
+                // Loudly, and with what WAS open: a silent miss here is how the
+                // nozzle glyph got photographed six times.
+                // `×`, not an `x`: the units guard reads a letter between two
+                // numbers as a unit written in Swift, and it is right to — it
+                // cannot tell this line from one a shop would read. The proper
+                // multiplication sign is what the rest of the app uses anyway.
+                let open = NSApp.windows.filter(\.isVisible)
+                    .map { "\(type(of: $0)) \(Int($0.frame.width))×\(Int($0.frame.height))" }
+                FileHandle.standardError.write(Data(
+                    "no settings window to capture — open: \(open.joined(separator: ", "))\n".utf8))
+            }
 
             try? await Task.sleep(for: .milliseconds(300))
             NSApp.terminate(nil)

@@ -164,6 +164,10 @@ public final class JSRuntime {
                           // `printer-poll-cache.js` publishes `KhaytPollCache` —
                           // the file says whose cache it is, the global does not.
                           "printer-poll-cache": "KhaytPollCache",
+                          // `machine-pl.js` publishes `KhaytMachinePL` — the
+                          // derived name capitalises only the first letter of
+                          // each hyphenated part, so it misses the second L.
+                          "machine-pl": "KhaytMachinePL",
                           // The converter's chain. Three of these are named for
                           // what they produce rather than for their global, and
                           // one of them — `mf-mesh` — is read under a THIRD name

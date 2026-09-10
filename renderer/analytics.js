@@ -1984,34 +1984,28 @@ function renderMachinePL() {
     return;
   }
 
-  // Determine year for maintenance cost filtering
-  // Build per-machine aggregation
-  const machMap = {};
-  for (const m of machines) {
-    // Maintenance must respect the SELECTED RANGE, like revenue and material cost two
-    // lines above. It used to be filtered by calendar year, so choosing "This month"
-    // charged January's nozzle-and-belt overhaul against July's revenue and a profitable
-    // printer read as loss-making — the exact number an owner uses to decide whether to
-    // retire a machine.
-    const maintCost = machMaintLog
-      .filter(e => e.machineId === m.id && inRange(e.date, analyticsRange, 'analytics'))
-      .reduce((s, e) => s + (+e.cost || 0), 0);
-    machMap[m.id] = { name: m.name, color: m.color || '#888', jobs: 0, revenue: 0, materialCost: 0, linkedExp: 0, maintCost };
-  }
-  machMap['__none__'] = { name: t('dash.unassigned'), color: '#888', jobs: 0, revenue: 0, materialCost: 0, linkedExp: 0, maintCost: 0 };
-
-  for (const o of completed) {
-    const key = o.machineId && machMap[o.machineId] ? o.machineId : '__none__';
-    machMap[key].jobs++;
-    machMap[key].revenue += orderNetRevenueBase(o);
-    machMap[key].materialCost += (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0);
-    // Linked expenses
-    machMap[key].linkedExp += expenses
-      .filter(e => e.orderId === o.id)
-      .reduce((s, e) => s + (+e.amount || 0), 0);
-  }
-
-  const rows = Object.values(machMap).filter(r => r.jobs > 0);
+  // ── THE RULE IS `lib/machine-pl.js`, NOT THIS FUNCTION ────────────────
+  //
+  // This computed it inline, which was fine until a second app wanted the same
+  // answer. Then there are two implementations of "what did this machine earn"
+  // and the one a shop happens to be looking at decides — and this is the
+  // number an owner uses to decide whether to RETIRE a machine.
+  //
+  // MAINTENANCE RESPECTS THE SELECTED RANGE, like revenue and material above.
+  // It used to be filtered by calendar year, so choosing "This month" charged
+  // January's nozzle-and-belt overhaul against July's revenue and a profitable
+  // printer read as loss-making. The module does not know what a range is —
+  // all four collections are filtered here, the same way, before they go in.
+  const { rows } = KhaytMachinePL.machineProfit({
+    machines,
+    completed,
+    expenses: expenses.filter(e => e.orderId),
+    maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
+    unassigned: t('dash.unassigned'),
+  }, {
+    revenueOf: orderNetRevenueBase,
+    partCostOf: partTotalCost,
+  });
   if (rows.length === 0) {
     el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.no_data'))}</p>`;
     return;
@@ -2035,9 +2029,13 @@ function renderMachinePL() {
         </thead>
         <tbody>
           ${rows.map(r => {
-            const net = r.revenue - r.materialCost - r.linkedExp - r.maintCost;
-            const margin = r.revenue > 0 ? (net / r.revenue * 100) : 0;
-            const marginCol = margin >= 30 ? 'var(--success)' : margin >= 10 ? 'var(--warning)' : 'var(--danger)';
+            // Both figures come from the rule now. `marginPct` is NULL for a
+            // machine that earned nothing — which is not the same claim as 0%,
+            // and is why this reads it rather than recomputing.
+            const net = r.net;
+            const margin = r.marginPct;
+            const marginCol = margin === null ? 'var(--text-muted)'
+              : margin >= 30 ? 'var(--success)' : margin >= 10 ? 'var(--warning)' : 'var(--danger)';
             return `<tr style="border-top:1px solid rgba(255,255,255,0.06);">
               <td style="padding:6px 8px;">
                 <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${safeCssColor(r.color)};margin-inline-end:6px;vertical-align:middle;"></span>
@@ -2046,10 +2044,10 @@ function renderMachinePL() {
               <td style="text-align:right; padding:6px 8px;">${r.jobs}</td>
               <td style="text-align:right; padding:6px 8px; font-variant-numeric:tabular-nums;">${fmtMoney(r.revenue)}</td>
               <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.materialCost)}</td>
-              <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.linkedExp)}</td>
-              <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.maintCost)}</td>
+              <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.linkedExpenses)}</td>
+              <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.maintenance)}</td>
               <td style="text-align:right; padding:6px 8px; font-weight:700; color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}; font-variant-numeric:tabular-nums;">${fmtMoney(net)}</td>
-              <td style="text-align:right; padding:6px 8px; font-weight:600; color:${marginCol};">${margin.toFixed(1)}%</td>
+              <td style="text-align:right; padding:6px 8px; font-weight:600; color:${marginCol};">${margin === null ? '—' : margin.toFixed(1) + '%'}</td>
             </tr>`;
           }).join('')}
         </tbody>

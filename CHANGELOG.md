@@ -71,6 +71,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   a book this Mac holds — a Khayt with the book open is keeping the same record
   and two writers would overwrite each other.
 
+- **The Mac app shows what each machine earned.** A By machine page under
+  Reports: revenue, then the three things taken off it — the filament each job
+  used, expenses filed against those jobs, and what you spent servicing that
+  machine — then what is left, best earner first. It follows the period buttons,
+  because the same printer can be the best one quarter and the worst the next.
+  A machine that finished nothing in the period has no row rather than a row of
+  zeroes, and one that earned nothing shows no margin rather than 0%. The page
+  says plainly what it does not count: your labour, power and rent are in the
+  Profit & Loss, not here.
+
 - **The Mac app shows which of your models you are quoting too cheaply.** A new
   Quoting page under Reports compares what each model was quoted at with what a
   printer actually reported — per MODEL, not per job, because an order happened
