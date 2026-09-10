@@ -3245,9 +3245,25 @@ private let MOVE_SCRIPT = """
   for (var i = 0; i < moved.effects.length; i++) {
     var e = moved.effects[i];
     if (e.type === 'deduct_filament') {
+      // ── WHAT THE JOB REALLY USED, WHERE ANYTHING KNOWS IT ───────────────
+      //
+      // `actualGrams` scales every part's claim to the figure on the record.
+      // Absent — every job finished before a shop started recording them — the
+      // estimate stands exactly as it always has.
+      //
+      // Read off the ORDER rather than passed in, so the Mac and Khayt spend
+      // the same number from the same field. `promptActuals` writes it before
+      // the effects run, and so does `applyMove`; a deduction that read it
+      // from an argument would be a second place for the two to disagree.
+      //
+      // MEASURED OR TYPED, both count. Whether a printer read the figure or
+      // the shop did decides whether it is evidence about an ESTIMATE — which
+      // is `Quoting`'s question — and not what left the shelf. What left the
+      // shelf left it however the shop found out.
       var d = KhaytOrderDeduction.deductForOrder(order, {
         settings: settings, inventory: inventory, consumables: consumables,
-        machines: machines, today: today
+        machines: machines, today: today,
+        actualGrams: order.actualWeight
       });
       notices = notices.concat(d.notices);
       performed.push(e.type);

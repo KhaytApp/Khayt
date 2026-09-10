@@ -2223,7 +2223,28 @@ function deductionContext() {
 }
 
 function deductFilamentForOrder(order, { skipRender = false } = {}) {
-  const out = Deduction().deductForOrder(order, deductionContext(), { skipRender });
+  // ── WHAT THE JOB REALLY USED, WHERE ANYTHING KNOWS IT ────────────────────
+  //
+  // `actualGrams` scales every part's claim to the figure on the record.
+  // Absent — every job finished before a shop started recording them — the
+  // estimate stands exactly as it always has, which is what `deductForOrder`
+  // has done for every deduction Khayt has ever made.
+  //
+  // It has taken this since #978 and nothing passed it: that change was about
+  // FAILED prints, where the grams go through `deductActual` instead, and it
+  // left completions where they were on purpose. What has changed since is
+  // that a completion can now BE measured — `promptActuals` writes the figure
+  // onto the order before these effects run, and the Mac app's own sheet does
+  // the same — so the number exists and nothing was spending it. A shop whose
+  // print used 260 g against a 160 g quote was short 100 g on its shelf, every
+  // time, with nothing to reconcile it.
+  //
+  // MEASURED OR TYPED, both count. Whether a printer read the figure or the
+  // shop did decides whether it is evidence about an ESTIMATE — which is what
+  // the variance reports ask — and not what left the shelf. What left the
+  // shelf left it however the shop found out.
+  const out = Deduction().deductForOrder(order, { ...deductionContext(), actualGrams: order.actualWeight },
+                                         { skipRender });
   showDeductionNotices(out.notices);
   runDeductionEffects(out.effects);
 }

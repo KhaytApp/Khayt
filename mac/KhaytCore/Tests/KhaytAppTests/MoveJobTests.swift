@@ -385,43 +385,59 @@ struct MoveJobTests {
         #expect(job["actualsSource"] == nil)
     }
 
-    /// ── THE SHELF STILL LOSES THE QUOTED GRAMS, NOT THE REAL ONES ────────
+    /// ── THE SHELF LOSES WHAT THE JOB REALLY USED ─────────────────────────
     ///
-    /// Pinned because it is surprising, and because a comment in `applyMove`
-    /// used to claim the opposite.
-    ///
-    /// `order-deduction.deductForOrder` DOES take an `actualGrams` — "what the
+    /// `deductForOrder` has taken an `actualGrams` since #978 — "what the
     /// PRINTER says the job used, when anything measured it" — and nothing
-    /// passes it. Not this app, and not `renderer/inventory.js`, whose
-    /// `deductionContext()` supplies settings, inventory, consumables,
-    /// machines and today, and no actuals. So a job that used 260 g against a
-    /// 160 g quote takes 160 g off the shelf in BOTH apps, and the shop is
-    /// short by the difference until it counts a spool by hand.
+    /// passed it. That change was about FAILED prints, where the grams go
+    /// through `deductActual` instead, and it left completions where they were
+    /// on purpose: "absent — which is every job Khayt has ever deducted for —
+    /// the estimate stands exactly as before".
     ///
-    /// AND IT IS NOT AN OVERSIGHT, which is worth saying because "a rule with
-    /// no caller" is this codebase's most repeated bug and this is not one of
-    /// them. #978 added the parameter in a change about FAILED prints, where
-    /// the wiring goes through `deductActual` instead, and said so in as many
-    /// words: "absent — which is every job Khayt has ever deducted for — the
-    /// estimate stands exactly as before". Completions were left where they
-    /// were, deliberately, in a change that was not about them.
+    /// What changed since is that a completion can now BE measured. So a job
+    /// that used 260 g against a 160 g quote took 160 g off the shelf and the
+    /// shop was short 100 g, every time, with nothing to reconcile it.
     ///
-    /// What has changed since is that a completion can now BE measured. The
-    /// figure exists; nothing spends it. Left alone here regardless: doing it
-    /// on the Mac alone would make the two apps disagree about a shop's shelf,
-    /// which is the one thing the shared rules exist to prevent — so it is a
-    /// decision for both, not a side effect of adding a sheet.
-    @Test("the shelf loses the QUOTED grams, even when the job reported more")
-    func theShelfStillFollowsTheEstimate() async throws {
-        var root = Self.book()
+    /// Both apps read it off the same field on the same record, so neither can
+    /// spend a different number from the other.
+    @Test("a job that used more than it was quoted takes the real grams off the shelf")
+    func theShelfFollowsTheActual() async throws {
+        var root = Self.book()          // quoted at 160 g: S1 holds 100, S2 covers the rest
         _ = try await Self.move(&root, "J1", .completed,
                                 actuals: .init(hours: 4, grams: 260))
-        // The fixture's job is quoted at 160 g across two parts, S1 holds 100
-        // and the shortfall comes off S2 — exactly as it does with no actuals
-        // at all, which is the finding.
+        // 260 g owed rather than 160: S1 still empties, and S2 carries the
+        // extra hundred instead of the extra sixty.
         #expect(Self.number(Self.row(root, "inventory", "S1")?["weight"]) == 0)
-        #expect(Self.number(Self.row(root, "inventory", "S2")?["weight"]) == 840,
-                "S2 moved, so the deduction is reading the actual after all")
+        let s2 = Self.number(Self.row(root, "inventory", "S2")?["weight"]) ?? -1
+        #expect(s2 == 740, "S2 is at \(s2) g — 840 means the estimate was deducted")
+    }
+
+    /// A MEASUREMENT SMALLER THAN THE QUOTE COUNTS TOO, which is the case a
+    /// shop notices: a print that stopped short, or one that simply used less
+    /// than the slicer thought. Deducting the quote would take filament off a
+    /// shelf that still has it.
+    @Test("a job that used less takes less")
+    func aShortJobTakesLess() async throws {
+        var root = Self.book()
+        _ = try await Self.move(&root, "J1", .completed,
+                                actuals: .init(hours: 1, grams: 80))
+        #expect(Self.number(Self.row(root, "inventory", "S1")?["weight"]) == 20,
+                "S1 is at \(Self.number(Self.row(root, "inventory", "S1")?["weight"]) ?? -1) — 0 means the estimate was deducted")
+        #expect(Self.number(Self.row(root, "inventory", "S2")?["weight"]) == 900,
+                "the second spool was drawn on for a job the first could cover")
+    }
+
+    /// AND EVERY JOB FINISHED BEFORE THIS EXISTED IS UNTOUCHED. A book full of
+    /// records with no actuals must deduct exactly what it always did — this is
+    /// the assertion that says the change cannot rewrite a shop's history or
+    /// its habits, only what it does with a figure it now has.
+    @Test("a completion with no actuals deducts the estimate, exactly as before")
+    func noActualsIsUnchanged() async throws {
+        var root = Self.book()
+        _ = try await Self.move(&root, "J1", .completed)
+        #expect(Self.number(Self.row(root, "inventory", "S1")?["weight"]) == 0)
+        #expect(Self.number(Self.row(root, "inventory", "S2")?["weight"]) == 840)
+        #expect(Self.number(Self.row(root, "inventory", "S3")?["weight"]) == 900)
     }
 
     @Test("a completion that was not an inspection claims nothing about one")
