@@ -6,6 +6,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Before you update
 
+- **Finishing a job now takes off the shelf what the job actually used, not
+  what it was quoted.** Only where a figure exists: if you record what a print
+  really took — or your printer reports it — that is the number deducted. A job
+  that used 260 g against a 160 g quote now takes 260 g, and one that stopped
+  short takes what it got through. Every job you have already finished is
+  untouched, and a job with no recorded actual deducts the estimate exactly as
+  it always has, so nothing changes until you start recording them.
+
+  **Your stock figures were drifting, and this stops it.** Khayt has taken an
+  optional "what it really used" since the release that made failed prints
+  deduct, and nothing was passing it — so the difference between the quote and
+  the truth stayed on the shelf as filament you did not have. Nothing
+  reconciled it, so it grew with every job. If your spools have been reading
+  high, this is why; you may want to weigh them once after updating.
+
 - **Your Profit & Loss will show a lower profit, and the old figure was wrong.**
   Revenue no longer counts the VAT you collect on a sale, because that money is
   not yours: ZATCA and IFRS 15 both treat tax collected from a customer as a

@@ -80,6 +80,71 @@ test('deductFilamentForOrder emits ONE aggregated toast and surfaces low-stock',
   assert.equal(order.materialDeducted, true);
 });
 
+
+/* ── WHAT A JOB REALLY USED, OFF THE SHELF ─────────────────────────────────
+ *
+ * `deductForOrder` has taken an `actualGrams` since #978 — "what the PRINTER
+ * says the job used, when anything measured it" — and nothing passed it. That
+ * change was about FAILED prints, where the grams go through `deductActual`
+ * instead, and it left completions where they were on purpose: "absent — which
+ * is every job Khayt has ever deducted for — the estimate stands exactly as
+ * before".
+ *
+ * What has changed since is that a completion can now BE measured, in both
+ * apps. So a job that used 260 g against a 160 g quote took 160 g off the
+ * shelf, and the shop was short 100 g with nothing to reconcile it.
+ *
+ * The three cases below are the whole change: more, less, and none — and the
+ * last one is the one that matters most, because it says a book full of jobs
+ * finished before this existed still deducts exactly what it always did.
+ */
+function shelfFor(order) {
+  const api = require('../renderer/inventory.js');
+  global.settings = { autoDeduct: true, lowStockThreshold: 200 };
+  global.inventory = [{ id: 'S1', material: 'PLA', weight: 1000, reorderPoint: 100 }];
+  global.consumables = [];
+  global.toast = () => {};
+  global.t = (key, fields) => `${key}:${JSON.stringify(fields || {})}`;
+  global.saveAll = () => {};
+  global.renderInventory = () => {};
+  global.renderConsumables = () => {};
+  api.deductFilamentForOrder(order, { skipRender: true });
+  return global.inventory[0].weight;
+}
+
+const quotedAt160 = () => ({
+  id: 'O1',
+  parts: [{ filamentId: 'S1', printWeight: 160, qty: 1 }],
+});
+
+test('a job that used more than it was quoted takes the real grams off the shelf', () => {
+  const order = { ...quotedAt160(), actualWeight: 260 };
+  assert.equal(shelfFor(order), 740, 'the shelf lost the estimate, not the measurement');
+});
+
+test('a job that used less takes less', () => {
+  // The case a shop notices: a print that stopped short, or one that simply
+  // used less than the slicer thought. Deducting the quote takes filament off
+  // a shelf that still has it.
+  const order = { ...quotedAt160(), actualWeight: 80 };
+  assert.equal(shelfFor(order), 920, 'the shelf lost more than the job used');
+});
+
+test('a job with no actuals deducts the estimate, exactly as before', () => {
+  // Every job finished before this existed. The change must not rewrite what a
+  // shop has already done, only what it does with a figure it now has.
+  assert.equal(shelfFor(quotedAt160()), 840);
+});
+
+test('a zero actual is not a measurement of nothing', () => {
+  // `actualWeight: 0` is what a record carries when somebody cleared the box,
+  // not a print that used no filament — and `deductForOrder`'s own guard reads
+  // "not finite or <= 0 means scale by 1". Pinned here because a shelf that
+  // stopped deducting entirely would look like nothing was wrong for weeks.
+  const order = { ...quotedAt160(), actualWeight: 0 };
+  assert.equal(shelfFor(order), 840, 'a zero actual stopped the deduction');
+});
+
 test('deductFilamentForOrder uses non-low summary when nothing drops below', () => {
   const api = require('../renderer/inventory.js');
   const toasts = [];
