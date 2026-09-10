@@ -18,9 +18,21 @@ const STATE = fs.readFileSync(path.join(ROOT, 'renderer', 'app-state.js'), 'utf8
  * nothing published — or worse, untick it and keep publishing.
  */
 
+/*
+ * `set_leadDailyHours` and `set_leadDaysPerWeek` ARE NOT HERE ANY MORE, and
+ * that is the point of this note rather than an omission.
+ *
+ * They were two boxes asking for hours a day and days a week, four rows under a
+ * Working Hours grid that holds the same two facts per day. Both were editable
+ * and they disagreed in silence. `buildSnapshot` reads the grid now, so leaving
+ * the boxes on the form would be two fields a shop can change with no effect —
+ * which this guard would have called correctly wired, because wiring is all it
+ * can see.
+ *
+ * The fields below still exist, still have nothing else expressing them, and
+ * still must survive the round trip.
+ */
 const FIELDS = [
-  'set_leadDailyHours',
-  'set_leadDaysPerWeek',
   'set_leadFinishingDays',
   'set_leadDispatchDays',
   'set_leadSafetyDays',
@@ -43,6 +55,10 @@ test('the defaults match the engine, so a blank form is not a faster shop', () =
   // A field left empty must fall back to what lib/lead-time.js would have used.
   // Defaulting hours-per-day high, or days-per-week to seven, would quietly
   // promise a shop that works round the clock.
+  //
+  // `dailyHours` and `workingDaysPerWeek` are no longer typed on the form, but
+  // they are still the FALLBACK `buildSnapshot` uses for a book with no working
+  // week to read — so their defaults still have to be the conservative ones.
   assert.match(STATE, /dailyHours:\s*8/);
   assert.match(STATE, /workingDaysPerWeek:\s*5/);
   assert.match(STATE, /safetyDays:\s*1/);
