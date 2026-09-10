@@ -41,10 +41,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   is still asked once: its QC notes are in the same sheet rather than a second
   one.
 
-  The figures are recorded as TYPED, not measured, and the sheet says so. Khayt
-  keeps the two apart on purpose, and the Quoting page below counts only what a
-  printer reported — so filling this in improves what a job cost you, and does
-  not yet feed that page. Reading the figures off the printer is the next step.
+  **And where your printer measured the job, those are the figures it offers.**
+  Khayt freezes a print's filament and duration the moment it finishes — the
+  machine's counters reset when the next job starts — and the Mac app now reads
+  them. The sheet marks each figure Measured or Estimated separately, because a
+  PrusaLink box reports a duration and never filament, and it names the print
+  the numbers came from: a finished job stays on offer for 24 hours, and a shop
+  running five-hour prints back to back would otherwise be shown the previous
+  one's figures under a confident label. Change a number and it goes back to
+  being yours, not the printer's.
+
+  A figure you typed is recorded as typed, and the Quoting page counts only what
+  a machine reported — so a correction never becomes evidence about your own
+  estimate. The Mac app reads this cache and does not yet fill it: a shop
+  running Khayt alongside gets the measurements today, and Mac-only polling into
+  it is still to come.
 
 - **The Mac app shows which of your models you are quoting too cheaply.** A new
   Quoting page under Reports compares what each model was quoted at with what a

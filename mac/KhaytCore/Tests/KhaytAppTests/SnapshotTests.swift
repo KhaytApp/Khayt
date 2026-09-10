@@ -344,7 +344,20 @@ import KhaytCore
                                         estHours: finishing.estHours, estGrams: finishing.estGrams,
                                         leavingQC: true)
         try render(CompletionSheet(shop: shop, subject: fromQC),
-                   "37-completion-qc", size: CGSize(width: 420, height: 370))
+                   "37-completion-qc", size: CGSize(width: 420, height: 400))
+
+        // AND WITH THE PRINTER'S OWN FIGURES, which is the state the whole
+        // chain exists for and the one a shop with a linked machine sees. A
+        // mixed answer on purpose: PrusaLink reports a duration and never
+        // filament, so one axis is measured and the other is not, and the sheet
+        // has to say which without making the other look wrong.
+        func prefill(_ json: String) throws -> KhaytEngine.ActualsPrefill {
+            try JSONDecoder().decode(KhaytEngine.ActualsPrefill.self, from: Data(json.utf8))
+        }
+        var measured = finishing
+        measured.measured = try prefill(#"{"timeH":26.5,"weightG":184.6,"timeMeasured":true,"weightMeasured":false,"measured":true,"source":"prusalink","filename":"falcon-hood-v4.bgcode","staleReason":null}"#)
+        try render(CompletionSheet(shop: shop, subject: measured),
+                   "38-completion-measured", size: CGSize(width: 420, height: 360))
     }
 
     /// Where a model came from, both ways round.

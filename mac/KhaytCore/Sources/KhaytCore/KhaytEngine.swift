@@ -162,6 +162,14 @@ public actor KhaytEngine {
         "order-file-link",
         "printer-actuals",
         "estimate-variance",
+        // …and the cache those measurements are frozen into. A printer's
+        // filament and duration counters are per-JOB and reset when the next
+        // print starts, so "read them when the shop marks the order done" is
+        // not a plan — the machine may be two jobs further on. Khayt freezes
+        // them on the edge out of printing and PERSISTS them under
+        // `printerCompletions`, which is how this app can offer a measured
+        // figure without polling a printer itself.
+        "printer-poll-cache",
         // What a finished job takes off the shelf: the grams, the hourly
         // consumables, the bought-in components, the packaging. Lifted out of
         // renderer/inventory.js because the move being shared is not enough —
@@ -1446,6 +1454,69 @@ public actor KhaytEngine {
             "gramsDeltaPct": r.gramsDeltaPct.map { JSONValue.number($0) } ?? .null,
             "hoursDeltaPct": r.hoursDeltaPct.map { JSONValue.number($0) } ?? .null,
         ])
+    }
+
+
+    // MARK: - What the printer said this job took
+
+    /// A completion's figures, offered for a job about to be marked done.
+    ///
+    /// `timeMeasured` and `weightMeasured` are separate because a printer can
+    /// report one and not the other, and pretending otherwise in either
+    /// direction is a lie: PrusaLink gives a duration and no filament, and
+    /// OctoPrint's `job.filament` looks like a measurement and is the file's
+    /// slicing estimate — identical at 1% and at 99%.
+    public struct ActualsPrefill: Decodable, Sendable, Equatable {
+        public let timeH: Double?
+        public let weightG: Double?
+        public let timeMeasured: Bool
+        public let weightMeasured: Bool
+        public let measured: Bool
+        /// Which instrument read them — `moonraker`, `octoprint`, `prusalink`.
+        public let source: String?
+        /// The job the figures belong to. Shown, not just carried: a completion
+        /// stays offerable for 24 hours and a shop running five-hour jobs back
+        /// to back will have started another long before that, so the numbers
+        /// on screen can belong to the PREVIOUS print while wearing a
+        /// "measured" label.
+        public let filename: String?
+        /// `too-old` or `nothing-measured`, when there is nothing to offer.
+        public let staleReason: String?
+    }
+
+    /// The measured figures for one job, from what Khayt froze when the print
+    /// ended — or the estimate, said to be the estimate.
+    ///
+    /// `completions` is the store's `printerCompletions`, which the Electron
+    /// app persists on a timer. This app does not poll printers into that cache
+    /// yet; it reads what is there, so a shop running both gets the measurement
+    /// and a shop running only this one gets an honest "nothing measured".
+    ///
+    /// Matching on the printer's FILENAME is the only honest link between an
+    /// order and a set of figures. Without one the newest completion is
+    /// returned, which is right when a shop marks a job done as it finishes and
+    /// wrong the moment two printers are busy — hence the filename on screen.
+    public func actualsPrefill(completions: JSONValue, machineId: String,
+                               filename: String?,
+                               estimateHours: Double, estimateGrams: Double,
+                               now: Date) throws -> ActualsPrefill {
+        try runtime.call2(#"""
+        (function () {
+          var cache = globalThis.KhaytPollCache.restoreCompletions(ARG0);
+          var entry = cache && cache[ARG1];
+          var found = entry ? globalThis.KhaytPollCache.findCompletion(entry, { filename: ARG2 }) : null;
+          return globalThis.KhaytPrinterActuals.prefillActuals({
+            estimate: { printTime: ARG3, weightG: ARG4 },
+            completion: found,
+            now: ARG5,
+          });
+        })()
+        """#,
+                          [completions, .string(machineId),
+                           filename.map(JSONValue.string) ?? .null,
+                           .number(estimateHours), .number(estimateGrams),
+                           .number(now.timeIntervalSince1970 * 1000)],
+                          as: ActualsPrefill.self)
     }
 
     /// Where this move would reach outside the shop's own book.
