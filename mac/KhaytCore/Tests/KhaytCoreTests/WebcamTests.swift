@@ -18,30 +18,45 @@ import Testing
     /// ── THE SSRF PIN ─────────────────────────────────────────────────────
     ///
     /// A webcam lives on the LAN, so private addresses have to be allowed —
-    /// which would be an open hole if the URL were free-form. It is pinned to
-    /// the host already configured for that machine's printer, and the owner
-    /// does not choose the host at fetch time.
+    /// which would be an open hole if the URL were free-form.
     ///
     /// This matters more on the Mac than it reads: a snapshot URL is stored in
     /// the book, and a book arrives by RESTORE and by CLOUD SYNC. The URL on
     /// the record was not necessarily typed by the person sitting in front of
     /// this Mac.
-    @Test("a snapshot may only be fetched from the printer's own host")
-    func theHostIsPinned() async throws {
+    ///
+    /// ── THIS TEST USED TO PIN IT TO THE PRINTER, AND NO LONGER DOES ──────
+    ///
+    /// `http://192.168.1.99/...` was in the refused list below, for being a
+    /// host that is not the printer's. It is allowed now: a camera on its own
+    /// address is the ordinary case. Measured on a real floor, a Buddy3D beside
+    /// a Prusa CORE One is at .71 with the printer at .79, speaks RTSP only,
+    /// and is not reachable through the printer at all.
+    ///
+    /// What is still refused is everything that can leave the building or reach
+    /// something that is not a camera — and, importantly, any NAME that is not
+    /// the printer's, because a name resolves and what it resolves to can
+    /// change between the check and the fetch.
+    @Test("a snapshot may be the printer, or a literal address on this network")
+    func theHostIsOnThisNetwork() async throws {
         let engine = try KhaytEngine()
         let printer = Self.api("moonraker", "192.168.1.50")
 
-        // The printer's own host, on any port and path: allowed.
+        // The printer's own host, on any port and path: allowed, as before.
         try await engine.assertWebcamHost("http://192.168.1.50/webcam/?action=snapshot",
                                           printerApi: printer)
         try await engine.assertWebcamHost("http://192.168.1.50:8080/?action=snapshot",
                                           printerApi: printer)
+        // A camera that is its own device on the same network: allowed now.
+        try await engine.assertWebcamHost("http://192.168.1.99/webcam/?action=snapshot",
+                                          printerApi: printer)
 
-        // Anything else: refused. Including the two that would matter —
-        // somewhere else on the shop's LAN, and somewhere off it entirely.
-        for elsewhere in ["http://192.168.1.99/webcam/?action=snapshot",
-                          "http://169.254.169.254/latest/meta-data/",
+        for elsewhere in ["http://169.254.169.254/latest/meta-data/",
+                          "http://100.100.100.200/latest/meta-data/",
                           "http://example.com/x.jpg",
+                          "http://camera.local/x.jpg",
+                          "http://8.8.8.8/x.jpg",
+                          "http://2130706433/x.jpg",
                           "http://127.0.0.1:7125/printer/objects/query"] {
             await #expect(throws: (any Error).self,
                           "\(elsewhere) was allowed for a printer at 192.168.1.50") {

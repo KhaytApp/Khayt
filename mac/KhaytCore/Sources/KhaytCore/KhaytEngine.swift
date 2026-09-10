@@ -177,7 +177,7 @@ public actor KhaytEngine {
         //
         // That last one is not a detail: a webcam lives on the LAN, so private
         // addresses have to be allowed, which would be an open SSRF hole if the
-        // URL were free-form. `assertSameHostAsPrinter` pins it to the host
+        // URL were free-form. `assertWebcamHostAllowed` allows the printer or a LAN address
         // already configured for that machine's printer API, and the owner does
         // not choose the host at fetch time. Nothing here may fetch a snapshot
         // without asking it first.
@@ -1648,7 +1648,7 @@ public actor KhaytEngine {
     /// verdict: `try` is the only way past it.
     public func assertWebcamHost(_ url: String, printerApi: JSONValue) throws {
         struct Verdict: Decodable { let ok: Bool; let reason: String? }
-        let v = try runtime.call2("globalThis.KhaytWebcam.assertSameHostAsPrinter(ARG0, ARG1)",
+        let v = try runtime.call2("globalThis.KhaytWebcam.assertWebcamHostAllowed(ARG0, ARG1)",
                                   [.string(url), printerApi], as: Verdict.self)
         guard v.ok else { throw WebcamRefused(reason: v.reason ?? "refused") }
     }

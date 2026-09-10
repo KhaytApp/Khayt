@@ -597,6 +597,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   photograph to put in it.
 
 ### Changed
+- **A camera no longer has to be the printer.** Khayt would only fetch a picture
+  from the same address as the machine itself, which is right for a printer with
+  a camera built in and wrong for every camera that is its own device — a
+  Buddy3D beside a CORE One, a webcam on a spare Pi, or any cheap network camera
+  pointed at a machine that has none. You can now give a machine a camera
+  anywhere on your own network. Addresses that are not on your network are still
+  refused, and so is anything that answers by redirecting somewhere else.
 
 - **The sample catalogue reads in Arabic now.** Ten of its twenty products had
   no Arabic name at all, so a shop looking around Khayt in Arabic — which is the

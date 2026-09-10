@@ -116,6 +116,26 @@ final class Camera {
 
         do {
             let (data, response) = try await (get ?? { try await URLSession.shared.data(for: $0) })(request)
+
+            // ── WHERE THE ANSWER ACTUALLY CAME FROM ──────────────────────
+            //
+            // The host was checked before the request. `URLSession` follows
+            // redirects on its own, so a permitted address answering 302 with a
+            // `Location:` anywhere at all would have been fetched WITH THE
+            // PRINTER'S CREDENTIAL ATTACHED, and the check above would never
+            // have seen it.
+            //
+            // That mattered less while the only permitted host was the printer
+            // itself; now that a camera may be its own device on the network,
+            // the redirect is the way back out of the allow-list. Electron's
+            // proxy has always passed `redirect: 'manual'`; this is the same
+            // refusal, made after the fact because `URLSession` does not offer
+            // the before.
+            if let landed = response.url?.absoluteString, landed != still {
+                do { try await engine.assertWebcamHost(landed, printerApi: api) }
+                catch { return .failed("refused") }
+            }
+
             let http = response as? HTTPURLResponse
             let refusal = try? await engine.checkSnapshot(
                 status: http?.statusCode ?? 0,
