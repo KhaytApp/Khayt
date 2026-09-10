@@ -1017,15 +1017,36 @@ failed.
 
 ## Not yet built
 
-The rest of analytics, gift cards, the portfolio, the colour studio, the
-converter, the cloud portal, the LAN server, and four of the seven printer
-protocols. `KhaytCore` came first because the alternative, screens against a
-half-trusted engine, is how the two apps come to disagree about a shop's money.
+The rest of analytics, the cloud portal, the LAN server, and three of the six
+printer protocols — `bambu`, `duet` and `repetier`. `KhaytCore` came first
+because the alternative, screens against a half-trusted engine, is how the two
+apps come to disagree about a shop's money.
 
-Two things this list used to name are done. **Merging** what the cloud holds a
-newer copy of is no longer Electron's alone — `lib/cloud-inbox.js` is the same
-fold, and `Check the cloud` brings a chain down. And the **delivery promise** a
-storefront quotes from is published from here now; see below.
+THE PARAGRAPH ABOVE IS THE LIST, and `NotYetBuiltTests` reads exactly it — the
+first paragraph of this section and nothing after it. That is the guard, and it
+exists because this list had been wrong for months: it named gift cards, the
+portfolio, the colour studio and the converter long after all four shipped, and
+this is the section a person reads to decide what to build next. A list of work
+that is already done is worse than no list, because it is believed.
+
+**Analytics is the one with real distance left in it.**
+`renderer/analytics.js` draws thirty-nine charts and tables — cash flow, cycle
+time, client LTV, machine P&L, a throughput heatmap, a quote funnel, aged
+receivables. `Reports.swift` draws the quarters, the best sellers, what is owed
+and the totals. What is here is the money itself; what is missing is most of
+the ways of looking at it.
+
+**The protocols are counted against the six a machine can actually be set to** —
+`renderer/machines.js` offers seven options and one of them is `none`.
+`PrinterWatch.spoken` is the Mac's three: Moonraker, OctoPrint, PrusaLink.
+
+Six things this list used to name are done. **Gift cards**, **the portfolio**
+and **the colour studio** are shelves in the sidebar. **The converter** is
+`Converter.swift`, reached from a model's own actions and from the File menu.
+**Merging** what the cloud holds a newer copy of is no longer Electron's alone —
+`lib/cloud-inbox.js` is the same fold, and `Check the cloud` brings a chain
+down. And the **delivery promise** a storefront quotes from is published from
+here now; see below.
 
 ### Opening a model in the shop's slicer
 
