@@ -220,6 +220,21 @@ final class Activator: NSObject, NSApplicationDelegate {
     ///
     /// `ImageRenderer` rather than a window: these are plain shapes and text,
     /// which it draws correctly, and no book state has to be faked to see them.
+    /// A plate-ish rectangle, so the camera tile has something with edges in
+    /// it without a printer being switched on.
+    @MainActor
+    static func plateBytes() -> Data {
+        let image = NSImage(size: NSSize(width: 320, height: 180), flipped: false) { rect in
+            NSColor(red: 0.24, green: 0.35, blue: 0.44, alpha: 1).setFill(); rect.fill()
+            NSColor(red: 0.94, green: 0.92, blue: 0.90, alpha: 1).setFill()
+            NSRect(x: 60, y: 30, width: 200, height: 120).fill()
+            return true
+        }
+        return image.tiffRepresentation
+            .flatMap { NSBitmapImageRep(data: $0) }
+            .flatMap { $0.representation(using: NSBitmapImageRep.FileType.png, properties: [:]) } ?? Data()
+    }
+
     @MainActor
     private static func captureDetached(into dir: URL) {
         let cases: [(String, AnyView)] = [
@@ -309,6 +324,30 @@ final class Activator: NSObject, NSApplicationDelegate {
                     .frame(width: 460, height: 300)
                     .background(Khayt.ground)
                     .environment(\.colorScheme, .dark))),
+            // ── THE CAMERA TILE, WHICH NO SAMPLE BOOK CAN REACH ──────────
+            //
+            // A camera needs a printer on this Mac's network answering with a
+            // JPEG. A sample book cannot have one, so giving its machines a
+            // `webcam` would put a permanent "Camera not answering" on the
+            // shop floor and call that a demonstration. This is exactly what
+            // `captureDetached` is for.
+            //
+            // The picture case draws its own frame rather than fetching one,
+            // so the shot does not depend on anything being switched on. What
+            // is being looked at is the tile — the rounding, the corner, and
+            // that the two EMPTY states have edges and say which nothing they
+            // are, which is the bug the first version had.
+            ("98-camera-tiles", AnyView(
+                VStack(spacing: 10) {
+                    CameraTile(frame: .picture(Snapshot.plateBytes()),
+                               webcam: nil, words: Snapshot.subject?.words)
+                    CameraTile(frame: .waiting, webcam: nil, words: Snapshot.subject?.words)
+                    CameraTile(frame: .failed("unreachable"), webcam: nil,
+                               words: Snapshot.subject?.words)
+                }
+                .frame(width: 320)
+                .padding(18)
+                .background(Khayt.ground))),
             ("98-layer-progress", AnyView(
                 VStack(alignment: .leading, spacing: 5) {
                     // A figure, not a job name: an English sample string here
