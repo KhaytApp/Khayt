@@ -438,6 +438,43 @@ import KhaytCore
                    "40-band-downtime", size: CGSize(width: 820, height: 260))
     }
 
+    /// What each machine earned, from the sample book.
+    ///
+    /// The arithmetic has its own tests. What is being looked at here is
+    /// whether the row can be FOLLOWED — revenue, then the three things taken
+    /// off it, then the net — rather than trusted, and whether a machine that
+    /// earned nothing reads as having no margin rather than as breaking even.
+    @Test("what each machine earned")
+    func machineProfitPage() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let done = shop.orderRows.filter {
+            if case .object(let o) = $0, case .string(let s)? = o["status"] { return s == "completed" }
+            return false
+        }
+        let report = try await engine.machineProfit(
+            machines: shop.machineRows, completed: done,
+            expenses: [], maintenance: [
+                // One serviced machine, so the column is not a row of dashes —
+                // the sample keeps no maintenance log.
+                // A REAL ID. The first version used "MACH-1", which no sample
+                // machine has, so the 420 landed nowhere and the column drew
+                // 0.00 on every row — a fixture that demonstrated nothing and
+                // looked like it had.
+                .object(["machineId": .string("MACH-core-one"), "cost": .number(420)]),
+            ],
+            settings: shop.settingsDict, clients: shop.clientRows,
+            unassigned: shop.words.callIt("dash.unassigned"))
+        #expect(!report.rows.isEmpty, "the sample cannot reach this page")
+
+        // `.rows`, not the page: `ImageRenderer` returns a fully transparent
+        // bitmap for a `ScrollView`, which the ink check now catches.
+        try render(MachineProfitPage(shop: shop, report: report).rows(report)
+                    .frame(width: 900).background(Khayt.ground),
+                   "41-machine-profit", size: CGSize(width: 900, height: 560))
+    }
+
     /// Where a model came from, both ways round.
     ///
     /// The line a shop is looking for is "may not be sold", and it has to read

@@ -182,6 +182,12 @@ public actor KhaytEngine {
         // not choose the host at fetch time. Nothing here may fetch a snapshot
         // without asking it first.
         "webcam",
+        // What each machine earned, and what it cost to keep earning it —
+        // lifted out of `renderer/analytics.js`, where it was one screen's
+        // arithmetic. This is the figure an owner retires a machine on, so two
+        // implementations of it is the one thing the shared rules exist to
+        // prevent.
+        "machine-pl",
         // What a finished job takes off the shelf: the grams, the hourly
         // consumables, the bought-in components, the packaging. Lifted out of
         // renderer/inventory.js because the move being shared is not enough —
@@ -1670,6 +1676,75 @@ public actor KhaytEngine {
     public func webcamAuthHeaders(printerApi: JSONValue) throws -> [String: String] {
         try runtime.call2("globalThis.KhaytWebcam.authHeadersFor(ARG0)",
                           [printerApi], as: [String: String].self)
+    }
+
+
+    // MARK: - What each machine earned
+
+    /// One machine's quarter, or month, or whatever range the caller filtered.
+    public struct MachineProfit: Decodable, Sendable, Identifiable, Equatable {
+        public let machineId: String
+        public let name: String
+        public let color: String
+        public let jobs: Int
+        public let revenue: Double
+        public let materialCost: Double
+        /// Expenses filed against one of this machine's orders.
+        public let linkedExpenses: Double
+        public let maintenance: Double
+        public let net: Double
+        /// NULL for a machine that earned nothing. Not zero — zero reads as
+        /// "broke even", and the truth is that there is no answer.
+        public let marginPct: Double?
+        public var id: String { machineId }
+    }
+
+    public struct MachineProfitTotals: Decodable, Sendable, Equatable {
+        public let jobs: Int
+        public let revenue: Double
+        public let materialCost: Double
+        public let linkedExpenses: Double
+        public let maintenance: Double
+        public let net: Double
+    }
+
+    public struct MachineProfitReport: Decodable, Sendable, Equatable {
+        public let rows: [MachineProfit]
+        public let totals: MachineProfitTotals
+    }
+
+    /// What each machine earned, and what it cost to keep earning it.
+    ///
+    /// THE RANGE IS THE CALLER'S. The module does not know what one is, and all
+    /// four collections have to be filtered THE SAME WAY before they go in —
+    /// that symmetry is a bug this code already carries a note about, where
+    /// maintenance was filtered by calendar year while revenue was filtered by
+    /// the chosen range, so "This month" charged January's belt overhaul
+    /// against July's revenue and a profitable printer read as loss-making.
+    ///
+    /// Revenue and part cost come from `order-money` and `calculator-cost`, the
+    /// same two rules the rest of this app's money comes from, so a machine's
+    /// share of a quarter cannot disagree with the quarter.
+    public func machineProfit(machines: [JSONValue], completed: [JSONValue],
+                              expenses: [JSONValue], maintenance: [JSONValue],
+                              settings: [String: JSONValue], clients: [JSONValue],
+                              unassigned: String) throws -> MachineProfitReport {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG4, clients: ARG5 };
+          return globalThis.KhaytMachinePL.machineProfit({
+            machines: ARG0, completed: ARG1, expenses: ARG2,
+            maintenance: ARG3, unassigned: ARG6,
+          }, {
+            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            partCostOf: function (p) { return globalThis.KhaytCalculatorCost.partTotalCost(p, ctx); },
+          });
+        })()
+        """#,
+                          [.array(machines), .array(completed), .array(expenses),
+                           .array(maintenance), .object(settings), .array(clients),
+                           .string(unassigned)],
+                          as: MachineProfitReport.self)
     }
 
     /// Where this move would reach outside the shop's own book.

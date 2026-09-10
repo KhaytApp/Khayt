@@ -328,6 +328,12 @@ final class Shop {
             // into the cache, so anything it wrote would be a guess overwriting
             // a measurement.
             printerCompletions = root["printerCompletions"] ?? .object([:])
+            // What the shop has spent SERVICING its machines. `hub_maint_log_v1`
+            // is the key `renderer/app-state.js` writes it under; it is read
+            // here and nowhere else, by the machine P&L.
+            if case .array(let serviced)? = root["hub_maint_log_v1"] {
+                maintenanceRows = serviced
+            } else { maintenanceRows = [] }
             clients = Self.decodeClients(root)
             clientNames = (try? await engine?.customerNames(
                 clientRows, language: words.language, settings: Self.settings(root))) ?? [:]
@@ -1498,6 +1504,8 @@ final class Shop {
     private(set) var wasteLog: [WasteEntry] = []
     /// The raw rows, for the rules that read fields this app does not decode.
     private(set) var expenseRows: [JSONValue] = []
+    /// Machine maintenance entries — `{ machineId, date, cost }`.
+    private(set) var maintenanceRows: [JSONValue] = []
     private(set) var wasteRows: [JSONValue] = []
 
     /// Which period the two screens are showing. On the shop, not the view, so
@@ -1548,6 +1556,44 @@ final class Shop {
     /// crossing each time would be thousands of them. `PeriodTests` runs it
     /// against `lib/date-range.js` over every range and a year of dates, so the
     /// two cannot answer differently.
+
+    /// Everything the machine P&L needs, filtered to the chosen period — ALL
+    /// FOUR THE SAME WAY.
+    ///
+    /// That symmetry is the whole care here. `renderer/analytics.js` carries a
+    /// note about the version that got it wrong: maintenance was filtered by
+    /// calendar YEAR while revenue and material were filtered by the chosen
+    /// range, so picking "This month" charged January's nozzle-and-belt
+    /// overhaul against July's revenue — and a profitable printer read as
+    /// loss-making, which is the exact figure an owner uses to decide whether
+    /// to retire a machine.
+    ///
+    /// `lib/machine-pl.js` does not know what a range is, deliberately. It is
+    /// decided once, here.
+    func completedInPeriod() async -> (orders: [JSONValue],
+                                       expenses: [JSONValue],
+                                       maintenance: [JSONValue]) {
+        let orders = orderRows.filter { row in
+            guard case .object(let o) = row,
+                  case .string(let status)? = o["status"], status == "completed",
+                  case .string(let date)? = o["date"] else { return false }
+            return inPeriod(date)
+        }
+        // An expense with no order behind it is a shop cost, not a machine's —
+        // the shop's own P&L has it, and charging it to a printer would count
+        // it twice.
+        let spend = expenseRows.filter { row in
+            guard case .object(let e) = row, case .string(let id)? = e["orderId"], !id.isEmpty,
+                  case .string(let date)? = e["date"] else { return false }
+            return inPeriod(date)
+        }
+        let serviced = maintenanceRows.filter { row in
+            guard case .object(let m) = row, case .string(let date)? = m["date"] else { return false }
+            return inPeriod(date)
+        }
+        return (orders, spend, serviced)
+    }
+
     func inPeriod(_ date: String, now: Date = Date()) -> Bool {
         Self.inPeriod(date, period: period, now: now)
     }

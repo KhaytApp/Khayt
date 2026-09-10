@@ -97,14 +97,15 @@ enum Period: String, CaseIterable, Identifiable {
 /// snapshot run can turn the page — the same reason the period and the
 /// settings pane are.
 enum ReportPage: String, CaseIterable, Identifiable {
-    case profit, owing, best, quoting
+    case profit, owing, best, quoting, machines
     var id: String { rawValue }
     var key: String {
         switch self {
-        case .profit:  return "an.pnl_title"
-        case .owing:   return "an.aged_receivables"
-        case .best:    return "mac.best"
-        case .quoting: return "mac.quoting"
+        case .profit:   return "an.pnl_title"
+        case .owing:    return "an.aged_receivables"
+        case .best:     return "mac.best"
+        case .quoting:  return "mac.quoting"
+        case .machines: return "mac.mpl_title"
         }
     }
 }

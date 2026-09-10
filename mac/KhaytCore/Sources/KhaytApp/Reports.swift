@@ -17,6 +17,7 @@ struct Reports: View {
     @State private var rows: [PnlPeriod] = []
     @State private var owed: Receivables?
     @State private var best: KhaytEngine.TopLists?
+    @State private var machinePL: KhaytEngine.MachineProfitReport?
     @State private var variance: [KhaytEngine.ModelVariance] = []
     /// The sentence each row earned, keyed by model. Worked out here rather
     /// than in the row's body: it is an engine call, and a body runs whenever
@@ -41,6 +42,8 @@ struct Reports: View {
                 Best(shop: shop, best: best)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice)
+            } else if shop.reportPage == .machines {
+                MachineProfitPage(shop: shop, report: machinePL)
             } else if rows.isEmpty {
                 EmptyHere(title: shop.words.callIt("an.pnl_empty"), mark: .reports)
                     .frame(maxHeight: .infinity)
@@ -85,6 +88,10 @@ struct Reports: View {
         // one model across a year is the evidence, and a quarter that happened
         // to contain one of them is not.
         .task(id: shop.orderRows.count) { await recomputeVariance() }
+        // With the PERIOD, unlike the variance: "which machine earned" is a
+        // question about a stretch of time, and the same machine can be the
+        // best one quarter and the worst the next. That is the point of asking.
+        .task(id: shop.period) { await recomputeMachinePL() }
     }
 
     private var table: some View {
@@ -203,6 +210,25 @@ struct Reports: View {
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
         await recomputeBest()
+    }
+
+    private func recomputeMachinePL() async {
+        guard let engine = shop.engine else { return }
+        // ── ALL FOUR FILTERED THE SAME WAY ────────────────────────────────
+        //
+        // The module does not know what a range is, and the bug this code
+        // already carries a note about is exactly this asymmetry: maintenance
+        // was once filtered by calendar year while revenue was filtered by the
+        // chosen range, so "This month" charged January's belt overhaul against
+        // July's revenue and a profitable printer read as loss-making.
+        let done = await shop.completedInPeriod()
+        machinePL = try? await engine.machineProfit(
+            machines: shop.machineRows,
+            completed: done.orders,
+            expenses: done.expenses,
+            maintenance: done.maintenance,
+            settings: shop.settingsDict, clients: shop.clientRows,
+            unassigned: shop.words.callIt("dash.unassigned"))
     }
 
     private func recomputeVariance() async {
