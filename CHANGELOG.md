@@ -1365,6 +1365,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **An invoice printed the print time to three decimal places.** A slicer
+  reports 8.745 hours, and that is what a customer's invoice said, beside a
+  weight that had always been rounded: "PETG-CF · 8.745 hrs · 559 g". The hours
+  now round to one decimal like everything else on the line, and a whole number
+  no longer grows a `.0`. Nothing about what you charged changes — this is the
+  wording of the document, not its arithmetic.
 - **A spool added from your phone was missing what the roll weighed when it
   arrived — so its cost per kilo was wrong.** The shelf keeps two weights: what
   a roll weighed new, which never changes, and what is left of it, which falls

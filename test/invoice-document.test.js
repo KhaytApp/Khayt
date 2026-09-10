@@ -221,3 +221,36 @@ test('a job with no parts still produces a document', () => {
   assert.ok(doc.length > 500);
   assert.match(doc, /INV-2026-0021/);
 });
+
+test('print time is written the way a person reads it, not the way a slicer reports it', () => {
+  // ── WHY THIS CASE DID NOT EXIST ──────────────────────────────────────────
+  //
+  // Every fixture carried a round print time, so the sixteen tests above all
+  // passed against a document that said "PETG-CF · 8.745 hrs · 559 g" — the
+  // grams rounded, the hours beside them not. The case the fixtures could not
+  // reach was never drawn, so nobody saw it. This reaches it.
+  const c = CASES.find((x) => x.name === 'plain-en');
+  const order = Object.assign({}, c.order, {
+    parts: [{ name: 'Turbine bracket', material: 'PETG-CF', printTime: 8.745,
+              printWeight: 559.4, baseCost: 100, qty: 1 }],
+  });
+  const doc = render(order, c.opts, c.money);
+
+  assert.match(doc, /8\.7 hrs/, 'one decimal — a shop knows a print time to about six minutes');
+  assert.doesNotMatch(doc, /8\.745/,
+    'three decimals claim a precision nothing in the shop measured, on a '
+    + 'document a customer keeps');
+  // Its neighbour, unchanged: the point is that the two now agree.
+  assert.match(doc, /559 g/, 'the grams were always rounded');
+});
+
+test('a whole number of hours does not grow a decimal point', () => {
+  const c = CASES.find((x) => x.name === 'plain-en');
+  const order = Object.assign({}, c.order, {
+    parts: [{ name: 'Turbine bracket', material: 'PLA', printTime: 6,
+              printWeight: 120, baseCost: 100, qty: 1 }],
+  });
+  const doc = render(order, c.opts, c.money);
+  assert.match(doc, /6 hrs/, '"6 hrs" is what a person writes');
+  assert.doesNotMatch(doc, /6\.0 hrs/, '"6.0 hrs" is what a spreadsheet writes');
+});
