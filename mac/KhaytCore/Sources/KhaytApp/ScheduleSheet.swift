@@ -50,7 +50,16 @@ struct ScheduleSheet: View {
     }
 
     @ViewBuilder private var content: some View {
-        if let problem = shop.scheduleProblem {
+        if shop.scheduleIdle {
+            // Everything already has a machine. The app's own drawing, in the
+            // colour an ordinary empty screen uses — not the warning glyph
+            // below, which is for the app failing rather than for the shop
+            // having nothing left to do.
+            EmptyHere(title: shop.words.callIt("sched.none_to_assign"),
+                      message: shop.words.callIt("mac.nothing_to_assign_why"),
+                      mark: .board) {}
+                .frame(maxHeight: .infinity)
+        } else if let problem = shop.scheduleProblem {
             // A refusal keeps the system's warning glyph rather than a drawing:
             // this is the app saying it cannot do the thing.
             ContentUnavailableView(problem, systemImage: "exclamationmark.triangle")

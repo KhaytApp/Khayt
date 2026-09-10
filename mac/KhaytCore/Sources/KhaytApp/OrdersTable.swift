@@ -311,7 +311,19 @@ private struct Owed: View {
                     .monospacedDigit()
                 Capsule()
                     .fill(.quaternary)
-                    .frame(height: 2)
+                    // ── NOT THE FULL WIDTH OF THE CELL ──────────────────
+                    //
+                    // It was, and a 2pt hairline spanning a table cell edge
+                    // to edge is a RULE, not a meter. It landed on the row
+                    // separator underneath it and the two read as one line,
+                    // so the column looked like a table with a rendering
+                    // fault rather than one carrying a figure.
+                    //
+                    // Sixty points, right-aligned, is about the width of the
+                    // figure above it: short enough that nothing else in the
+                    // table is that shape, and tied to the number it belongs
+                    // to rather than to the cell it happens to sit in.
+                    .frame(width: 60, height: 2)
                     .overlay(alignment: .leading) {
                         GeometryReader { geo in
                             Capsule()
@@ -319,6 +331,8 @@ private struct Owed: View {
                                 .frame(width: geo.size.width * paidFraction)
                         }
                     }
+                    // And clear of the separator, which it was sitting on.
+                    .padding(.bottom, 2)
                     .help(paidFraction > 0
                           ? words.callIt("mac.pct_paid",
                                          ["n": .number((paidFraction * 100).rounded())])

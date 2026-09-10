@@ -1378,6 +1378,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the pictures, did not, so every dynamic system colour resolved light whatever
   the app was set to. In light mode the shot and the app agreed for the wrong
   reason, which is why it lasted.
+- **The scheduler showed a warning sign when there was nothing to schedule.**
+  Opening "Suggest assignments" with every job already on a machine drew the
+  system's warning triangle over "No unassigned orders" — the same treatment as
+  a real refusal, for the state a shop reaches by finishing its assigning. It
+  now gets an ordinary empty screen with the board's own drawing, and says why
+  there is nothing to do.
+- **On the jobs table, the bar showing how much of a job is paid looked like a
+  rendering fault.** It ran the full width of the cell at two points tall, so it
+  landed on the line between rows and the two read as one. It is short now, and
+  sits under the figure it belongs to.
 - **A spool added from your phone was missing what the roll weighed when it
   arrived — so its cost per kilo was wrong.** The shelf keeps two weights: what
   a roll weighed new, which never changes, and what is left of it, which falls
