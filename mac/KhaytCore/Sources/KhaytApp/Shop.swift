@@ -818,6 +818,31 @@ final class Shop {
     /// quietly computed over a shrinking subset of its work.
     var pendingQC: PendingHold?
 
+    /// A job being finished, and what it was quoted at.
+    struct PendingCompletion: Identifiable, Equatable {
+        let id: Order.ID
+        let project: String
+        let estHours: Double
+        let estGrams: Double
+        /// Whether this job is leaving inspection, which is the only case that
+        /// also wants QC notes.
+        let leavingQC: Bool
+    }
+
+    var pendingCompletion: PendingCompletion?
+
+    /// What the job was quoted to weigh — the sum of its parts, times their
+    /// quantities.
+    ///
+    /// The same shape `lib/order-file-link.js` uses to allocate a finished
+    /// job's real figures back to those parts, so the number the shop is asked
+    /// to correct is the number everything downstream compares against. An
+    /// order carries no total weight of its own; taking the first part's would
+    /// under-quote every multi-part job on this screen.
+    static func quotedGrams(_ job: Order) -> Double {
+        job.parts.reduce(0) { $0 + $1.printWeight * Double(max(1, $1.qty)) }
+    }
+
     struct PendingHold: Identifiable, Sendable {
         let id: Order.ID
         let project: String
@@ -3645,7 +3670,20 @@ final class Shop {
         guard let job = orders.first(where: { $0.id == id }) else { return nil }
         let subject = PendingHold(id: id, project: job.project)
         if to == .on_hold { return { self.pendingHold = subject } }
-        if to == .completed && Stage.of(job) == .qc { return { self.pendingQC = subject } }
+        // EVERY completion asks what it took, not only one out of inspection.
+        // `order-status.gate` sets `needsActuals` for this move and no other,
+        // and nothing in this app read it — so a job finished here recorded
+        // what it was quoted at and never what it cost.
+        //
+        // A job leaving QC is asked once, in this sheet, rather than being
+        // handed a second dialog for its notes.
+        if to == .completed {
+            let finishing = PendingCompletion(
+                id: id, project: job.project,
+                estHours: job.printTime, estGrams: Self.quotedGrams(job),
+                leavingQC: Stage.of(job) == .qc)
+            return { self.pendingCompletion = finishing }
+        }
         // A job leaving inspection for anywhere else FAILED it. Sending it back
         // without recording that is how a shop's scrap costs go unrecorded and
         // its pass rate is computed over the jobs that happened to pass.
@@ -3693,6 +3731,7 @@ final class Shop {
     func clearQuestion() {
         pendingHold = nil
         pendingQC = nil
+        pendingCompletion = nil
         pendingPayment = nil
         pendingEdit = nil
         pendingQcFail = nil
@@ -3824,8 +3863,25 @@ final class Shop {
     /// has told the shop it has stock it has already used.
     ///
     /// Read `Kanban` for what a person sees; this is what happens.
+    /// What a finished job really took, as the shop typed it.
+    ///
+    /// `source` is `manual` and nothing else, and that is not a placeholder to
+    /// fill in later — these figures came off a keyboard. A margin report that
+    /// cannot tell a measurement from a shop's best guess is the whole reason
+    /// the field exists, and `Quoting` refuses typed figures outright: a typed
+    /// actual is usually the estimate confirmed, so counting it would compare
+    /// an estimate to itself.
+    ///
+    /// Measured figures need the printer's own completion, which means
+    /// `PrinterWatch` remembering the job that just ended. It does not yet.
+    struct Actuals: Equatable {
+        var hours: Double
+        var grams: Double
+    }
+
     func moveJob(_ id: Order.ID, to stage: Stage,
-                 holdReason: String? = nil, qcNotes: String? = nil) async {
+                 holdReason: String? = nil, qcNotes: String? = nil,
+                 actuals: Actuals? = nil) async {
         moveProblem = nil
         moveNotices = []
         guard let build = source.build else {
@@ -3848,7 +3904,7 @@ final class Shop {
             ) { root in
                 (undoSnapshot, said, telegram) = try await Self.applyMove(
                     to: &root, id: id, stage: stage, engine: engine, words: self.words,
-                    holdReason: holdReason, qcNotes: qcNotes)
+                    holdReason: holdReason, qcNotes: qcNotes, actuals: actuals)
             }
             // Only once the swap has happened. The last ownership check is after
             // the mutation, so a book that changed hands mid-move throws here —
@@ -3929,10 +3985,11 @@ final class Shop {
     static func applyMove(to root: inout [String: JSONValue],
                                   id: Order.ID, stage: Stage,
                                   engine: KhaytEngine, words: Words,
-                                  holdReason: String? = nil, qcNotes: String? = nil)
+                                  holdReason: String? = nil, qcNotes: String? = nil,
+                                  actuals: Actuals? = nil)
     async throws -> (undo: [ChangedRecord], notices: [String], telegram: TelegramMessage?) {
 
-        let orders = rows(root, "printLog")
+        var orders = rows(root, "printLog")
         let inventory = rows(root, "inventory")
         let consumables = rows(root, "consumables")
         let machines = rows(root, "machines")
@@ -3940,8 +3997,33 @@ final class Shop {
         var settings: [String: JSONValue] = [:]
         if case .object(let s)? = root["settings"] { settings = s }
 
-        guard let target = orders.first(where: { recordId($0) == id }) else {
+        guard var target = orders.first(where: { recordId($0) == id }) else {
             throw MoveRefused(sentence: words.callIt("mac.move_gone"))
+        }
+
+        // ── WHAT IT REALLY TOOK, WRITTEN BEFORE THE MOVE IS MADE ──────────
+        //
+        // Onto the order first, then the move — which is the order Electron
+        // uses and not an arbitrary one. `order-deduction` takes this job's
+        // filament off the shelf as part of completing it, and a move that ran
+        // before the actual weight landed would deduct the ESTIMATE and leave
+        // the shelf disagreeing with the job by exactly the amount the shop
+        // has just corrected.
+        //
+        // Both figures and their provenance travel together. A record with
+        // actuals and no `actualsSource` reads as measured to anything that
+        // checks the source only when it is present.
+        if let actuals, case .object(var fields) = target {
+            fields["actualPrintTime"] = .number((actuals.hours * 100).rounded() / 100)
+            fields["actualWeight"] = .number((actuals.grams * 10).rounded() / 10)
+            fields["actualsSource"] = .object([
+                "time": .string("manual"),
+                "weight": .string("manual"),
+                "at": .string(ISO8601DateFormatter().string(from: Date())),
+            ])
+            target = .object(fields)
+            if let at = orders.firstIndex(where: { recordId($0) == id }) { orders[at] = target }
+            root["printLog"] = .array(orders)
         }
 
         // Asked BEFORE anything is written. A webhook, an email or a portal

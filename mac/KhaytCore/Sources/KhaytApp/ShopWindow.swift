@@ -182,6 +182,7 @@ struct ShopWindow: View {
         // of them can raise it.
         .sheet(item: $shop.pendingHold) { AskFirst(shop: shop, subject: $0, kind: .hold) }
         .sheet(item: $shop.pendingQC) { AskFirst(shop: shop, subject: $0, kind: .qcPass) }
+        .sheet(item: $shop.pendingCompletion) { CompletionSheet(shop: shop, subject: $0) }
         .sheet(item: $shop.pendingPayment) { PaymentSheet(shop: shop, subject: $0) }
         .sheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }
         .sheet(item: $shop.pendingQcFail) { QcFailSheet(shop: shop, subject: $0) }

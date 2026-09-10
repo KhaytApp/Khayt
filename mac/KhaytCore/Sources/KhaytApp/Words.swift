@@ -600,6 +600,15 @@ final class Words {
         "mac.nothing_at_stage": ["en": "Nothing at this stage", "ar": "لا شيء في هذه المرحلة"],
         // What a model really costs against what it is quoted at.
         "mac.quoting":      ["en": "Quoting",  "ar": "التسعير"],
+        // Finishing a job, and what it really took.
+        // The title, the button and the hint are Khayt's own `act.*` — the two
+        // apps ask this question with the same words in nine languages, and a
+        // second English sentence here would be one to keep in step for ever.
+        // NOT "measured". A figure off a keyboard and a figure off a printer
+        // are different claims, the record keeps them apart, and the screens
+        // that need a measurement ignore this one — so the sheet says so.
+        "mac.completion_typed":   ["en": "Recorded as typed by hand, not read from the printer.",
+                                   "ar": "تُسجَّل ككتابة يدوية، لا كقراءة من الطابعة."],
         // `mac.filament` is already written above — the sidebar's shelf — and a
         // second copy is a fatal `Dictionary literal contains duplicate keys`
         // at launch, not a warning. `DuplicateWordKeyTests` guards it and could
