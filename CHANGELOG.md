@@ -1382,6 +1382,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   on the default week — Sunday to Thursday, eight hours — nothing changes.** It
   moves only for a shop that set its own hours, which is the shop the dates were
   wrong for.
+- **The Portfolio grid ran off both edges of the window.** Every card measured
+  wider than the column it sat in, so the first project's name was cut to
+  "urbine bracket" and the last card had no right-hand edge. The photographs are
+  cropped to their frame now, and the grid fits.
+- **Cards in a row floated at different heights.** On the shelf, five spools sat
+  at three different top edges; on Machines, a printer with a short card hung a
+  long way below its neighbours. A card that is shorter than the one beside it
+  now lines up with it instead of drifting to the middle of the row.
 - **An invoice printed the print time to three decimal places.** A slicer
   reports 8.745 hours, and that is what a customer's invoice said, beside a
   weight that had always been rounded: "PETG-CF · 8.745 hrs · 559 g". The hours

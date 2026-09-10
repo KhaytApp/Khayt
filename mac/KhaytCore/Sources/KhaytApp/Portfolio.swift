@@ -19,7 +19,7 @@ import KhaytCore
 struct Portfolio: View {
     @Bindable var shop: Shop
 
-    private let columns = [GridItem(.adaptive(minimum: 180, maximum: 260), spacing: 12)]
+    private let columns = [GridItem(.adaptive(minimum: 180, maximum: 260), spacing: 12, alignment: .top)]
 
     /// THE WINDOW'S search field, not one of this screen's own.
     ///
@@ -69,6 +69,24 @@ struct Portfolio: View {
             // cached, which a grid of a shop's whole history needs as much as
             // the model grid does.
             Thumbnail(source: snap.thumb.map(ThumbnailSource.inlineData))
+                // ── `.clipped()` CLIPS THE DRAWING, NOT THE LAYOUT ───────
+                //
+                // This set the height and nothing else. `Thumbnail` fills its
+                // space with `.aspectRatio(contentMode: .fill)`, so given a
+                // height and no width it reports the width that COVERS that
+                // height — for a landscape photo, half as wide again as the
+                // column it is in. `.clipped()` then hid the overflow while
+                // leaving the cell measuring its full size, so every cell was
+                // wider than its column and the whole grid ran off both edges
+                // of the pane: the first card's name read "urbine bracket" and
+                // the last one had no right-hand border at all.
+                //
+                // `maxWidth: .infinity` takes the width the column offers and
+                // reports THAT, which is what the clip was always assuming.
+                // The library does the same thing two other ways — a square
+                // `.aspectRatio(1, contentMode: .fit)` and a fixed 320×320 —
+                // and neither of those screens has ever overflowed.
+                .frame(maxWidth: .infinity)
                 .frame(height: 150)
                 .clipped()
             VStack(alignment: .leading, spacing: 1) {
