@@ -8,6 +8,7 @@ const {
   machineLoadMins,
   urgencyScore,
   machineAcceptsMaterial,
+  downtimeHours,
 } = require('../lib/scheduling');
 
 // A fixed "now" so dueDate-based urgency is deterministic. 2026-06-16 local.
@@ -272,4 +273,67 @@ test('no due dates anywhere: still places by priority then stable id', () => {
   // urgent first, then alphabetical id among equal-priority.
   assert.equal(findAssign(res, 'm').position, 0);
   assert.ok(findAssign(res, 'a').position < findAssign(res, 'z').position);
+});
+
+// ── A MACHINE BOOKED OUT IS A MACHINE WITH LESS TO GIVE ────────────────────
+//
+// `downtimeBlocks` was recorded since 3.0 and read by a badge and a chart. Not
+// by the scheduler, so it would put a job on a printer the shop had already
+// booked out and call it the earliest finish.
+
+const HOUR_MS = 3600000;
+const NOW_SCHED = Date.UTC(2026, 8, 8, 7, 0, 0);
+const window_ = (fromH, toH) => ({
+  from: new Date(NOW_SCHED + fromH * HOUR_MS).toISOString(),
+  to: new Date(NOW_SCHED + toH * HOUR_MS).toISOString(),
+});
+
+test('work goes to the machine that is not booked out', () => {
+  const machines = [
+    { id: 'M1', downtimeBlocks: [window_(1, 9)] },   // out for eight hours
+    { id: 'M2' },
+  ];
+  const res = proposeSchedule(machines, [
+    { id: 'a', status: 'pending', printTime: 2 },
+  ], { now: NOW_SCHED });
+  assert.equal(res.assignments[0].machineId, 'M2',
+    'the job went to the printer the shop had booked out for maintenance');
+});
+
+test('the down machine is still used when it is the only one', () => {
+  // The work has to go somewhere, and the shop can see the projected finish.
+  // Refusing outright would be a scheduler that stops scheduling.
+  const res = proposeSchedule([{ id: 'M1', downtimeBlocks: [window_(1, 9)] }], [
+    { id: 'a', status: 'pending', printTime: 2 },
+  ], { now: NOW_SCHED });
+  assert.equal(res.assignments[0].machineId, 'M1');
+  assert.equal(res.unassignable.length, 0);
+});
+
+test('a window already past does not count against a machine', () => {
+  const machines = [{ id: 'M1', downtimeBlocks: [window_(-40, -20)] }, { id: 'M2' }];
+  const res = proposeSchedule(machines, [
+    { id: 'a', status: 'pending', printTime: 2 },
+  ], { now: NOW_SCHED });
+  // Tie on load, so the deterministic tiebreak picks the lower id — which is
+  // the behaviour with no downtime at all.
+  assert.equal(res.assignments[0].machineId, 'M1');
+});
+
+test('a window beyond the horizon does not shorten today', () => {
+  const machines = [{ id: 'M1', downtimeBlocks: [window_(24 * 60, 24 * 80)] }, { id: 'M2' }];
+  const res = proposeSchedule(machines, [
+    { id: 'a', status: 'pending', printTime: 2 },
+  ], { now: NOW_SCHED });
+  assert.equal(res.assignments[0].machineId, 'M1',
+    'a window booked for next quarter changed where work goes today');
+});
+
+test('downtime is counted in HOURS, the unit this scheduler balances in', () => {
+  // The field names say minutes and the unit is hours — `projectedFinishMins`
+  // comes to 2 for two one-hour jobs. Returning minutes here would have made
+  // every maintenance window count sixty times over, which is the kind of
+  // mistake that looks like a scheduler with an opinion.
+  const hours = downtimeHours({ downtimeBlocks: [window_(1, 5)] }, NOW_SCHED, 14);
+  assert.equal(hours, 4);
 });

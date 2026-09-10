@@ -348,7 +348,10 @@ test('a silent machine with nothing booked is still free', () => {
 // it had just been told about. That is worse than not having the feature: the
 // shop believes it said something.
 
-const down = (from, to, note) => ({ from: new Date(from).toISOString(), to: new Date(to).toISOString(), note });
+// `reason` is the field Khayt's own machine modal writes. A block built with
+// `note` is accepted too, and one test uses each so neither can quietly stop
+// being read.
+const down = (from, to, reason) => ({ from: new Date(from).toISOString(), to: new Date(to).toISOString(), reason });
 
 test('a maintenance window is on the band, and is not free time', () => {
   const b = MB.band({
@@ -361,6 +364,15 @@ test('a maintenance window is on the band, and is not free time', () => {
   const block = row.blocks.find(x => x.kind === 'down');
   assert.ok(block, 'the window is not on the band at all');
   assert.equal(block.title, 'Belt change', 'the shop is not told what it is');
+  // …and the other spelling, so a caller using `note` is not silently blanked.
+  const alt = MB.band({
+    machines: [Object.assign(machine('M1', 'U1'), {
+      downtimeBlocks: [{ from: new Date(NOW + 10 * HOUR).toISOString(),
+                         to: new Date(NOW + 14 * HOUR).toISOString(), note: 'Nozzle' }],
+    })],
+    orders: [], live: { M1: {} }, now: NOW, hours: 48,
+  });
+  assert.equal(alt.rows[0].blocks.find(x => x.kind === 'down').title, 'Nozzle');
   assert.equal(row.downMinutes, 4 * 60);
   // NOT booked — utilisation is a figure about work, and a shop is not busier
   // for having serviced a printer.

@@ -94,14 +94,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   could go was to try. The rules deciding it are the same ones Khayt uses; this
   asks them earlier.
 
-- **A machine booked out for maintenance is no longer offered as free time.**
-  You have been able to record downtime on a machine since 3.0, and nothing that
-  plans work ever read it — the band showing the next 48 hours went on drawing
-  those hours as available, and a job queued behind the window was drawn running
-  straight through it. Now the window is on the band, work queued behind it
-  starts after it, and the hours are counted as neither busy nor free. Your
-  utilisation figure is measured against the hours you actually have, so
-  servicing a printer no longer makes the shop look idle.
+- **A machine booked out for maintenance is no longer offered as free time, or
+  planned on, or promised against.** You have been able to record downtime on a
+  machine since 3.0, and nothing that plans work ever read it. The band showing
+  the next 48 hours drew those hours as available and drew queued work running
+  straight through the window; the scheduler put jobs on a printer you had
+  already booked out and called it the earliest finish; and the delivery date
+  your storefront quotes counted those hours as capacity — so a customer was
+  promised a date that assumed a machine you knew would be in pieces. All three
+  read it now. The window is on the band with your own note on it, work waits
+  for it, and your utilisation is measured against the hours you actually have,
+  so servicing a printer no longer makes the shop look idle.
 
 - **The Mac app shows your printers' cameras.** A still on each machine's card,
   refreshed every few seconds, the right way up — rotate and flip are yours to

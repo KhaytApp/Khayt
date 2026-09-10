@@ -256,3 +256,49 @@ test('the correction never makes a promise earlier than the work takes', () => {
     }
   }
 });
+
+// ── A LANE BOOKED OUT IS A LANE WITH LESS TO GIVE ──────────────────────────
+//
+// `usableMachines` already drops an OFFLINE printer, on the principle that a
+// shop with one machine down should tell a customer the true date rather than
+// one that assumes a repair. A machine booked out for a belt change on Thursday
+// is the same case said in advance, and nothing acted on it.
+
+test('a lane booked out for maintenance does not promise those hours', () => {
+  const base = {
+    jobHours: 4, queue: [], machineIds: ['M1', 'M2'],
+    dailyHours: 8, workingDaysPerWeek: 7, finishingDays: 0, dispatchDays: 0,
+    safetyDays: 0, today: '2026-09-08',
+  };
+  const clear = L.promise(base);
+  // Sixteen hours out of the only two lanes is two days of this shop's capacity.
+  const down = L.promise({ ...base, downtimeHours: { M1: 16, M2: 16 } });
+  assert.ok(down.printedBy > clear.printedBy,
+    `maintenance did not move the promise: ${clear.printedBy} → ${down.printedBy}`);
+});
+
+test('the promise goes to the lane that is actually free', () => {
+  const base = {
+    jobHours: 4, queue: [], machineIds: ['M1', 'M2'],
+    dailyHours: 8, workingDaysPerWeek: 7, finishingDays: 0, dispatchDays: 0,
+    safetyDays: 0, today: '2026-09-08',
+  };
+  // One lane out for a week, the other clear. A customer is told about the
+  // clear one, because that is where the job will run.
+  const one = L.promise({ ...base, downtimeHours: { M1: 200 } });
+  assert.equal(one.printedBy, L.promise(base).printedBy,
+    'a second, free lane did not save the promise');
+});
+
+test('a shop with no lanes recorded is unchanged by any of this', () => {
+  // Everything falls into one queue and there is no machine to book out — the
+  // true reading for the single-printer shops this is mostly for.
+  const noLanes = {
+    jobHours: 4, queue: [{ hours: 10 }], machineIds: [],
+    dailyHours: 8, workingDaysPerWeek: 7, finishingDays: 0, dispatchDays: 0,
+    safetyDays: 0, today: '2026-09-08',
+  };
+  assert.equal(
+    L.promise(noLanes).printedBy,
+    L.promise({ ...noLanes, downtimeHours: { M1: 99 } }).printedBy);
+});
