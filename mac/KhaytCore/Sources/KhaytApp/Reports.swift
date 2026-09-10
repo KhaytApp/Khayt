@@ -17,6 +17,11 @@ struct Reports: View {
     @State private var rows: [PnlPeriod] = []
     @State private var owed: Receivables?
     @State private var best: KhaytEngine.TopLists?
+    @State private var variance: [KhaytEngine.ModelVariance] = []
+    /// The sentence each row earned, keyed by model. Worked out here rather
+    /// than in the row's body: it is an engine call, and a body runs whenever
+    /// anything near it changes.
+    @State private var advice: [String: KhaytEngine.VarianceAdvice] = [:]
     @State private var order: [KeyPathComparator<PnlPeriod>] = [.init(\.period, order: .reverse)]
     @SceneStorage("reports.columns") private var columns: TableColumnCustomization<PnlPeriod>
 
@@ -34,6 +39,8 @@ struct Reports: View {
                 Owing(shop: shop, owed: owed)
             } else if shop.reportPage == .best {
                 Best(shop: shop, best: best)
+            } else if shop.reportPage == .quoting {
+                Quoting(shop: shop, rows: variance, said: advice)
             } else if rows.isEmpty {
                 EmptyHere(title: shop.words.callIt("an.pnl_empty"), mark: .reports)
                     .frame(maxHeight: .infinity)
@@ -74,6 +81,10 @@ struct Reports: View {
         // at once and the receivables age themselves — so recomputing all three
         // when it changes would be three answers to a question one asked.
         .task(id: shop.period) { await recomputeBest() }
+        // Every finished job in the book, not the chosen period: four prints of
+        // one model across a year is the evidence, and a quarter that happened
+        // to contain one of them is not.
+        .task(id: shop.orderRows.count) { await recomputeVariance() }
     }
 
     private var table: some View {
@@ -192,6 +203,21 @@ struct Reports: View {
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
         await recomputeBest()
+    }
+
+    private func recomputeVariance() async {
+        guard let engine = shop.engine else { return }
+        // `minSamples: 1` — a single print IS evidence, and the row says so by
+        // carrying its own count and confidence. Hiding it until there are two
+        // would mean a shop that has just started measuring sees nothing and
+        // concludes the screen is broken.
+        let rows = (try? await engine.estimateVariance(orders: shop.orderRows, minSamples: 1)) ?? []
+        var said: [String: KhaytEngine.VarianceAdvice] = [:]
+        for row in rows {
+            if let one = try? await engine.varianceAdvice(row) { said[row.printFileId] = one }
+        }
+        variance = rows
+        advice = said
     }
 
     private func recomputeBest() async {

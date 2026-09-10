@@ -144,6 +144,24 @@ public actor KhaytEngine {
         // raising is the worst kind, so it is listed rather than guarded against.
         "assembly",
         "order-status",
+        // ── HOW WRONG THE SHOP'S OWN ESTIMATES ARE ────────────────────────
+        //
+        // Three modules for one answer, and none of them can give it alone.
+        // `order-file-link` allocates a finished job's real figures back to the
+        // parts that made it — carrying which print file each came from, and
+        // whether a printer MEASURED the figures or somebody typed them.
+        // `printer-actuals` compares one estimate to one actual, returning null
+        // rather than zero for a side it does not know, which is what keeps "we
+        // have no idea" out of a median instead of dragging it toward nothing.
+        // `estimate-variance` groups the readings by MODEL, which is the unit a
+        // shop can act on: an order happened once, at a price already charged.
+        //
+        // `estimate-variance` takes the other two as arguments rather than
+        // reaching for them, so the load order here is for a reader's benefit
+        // rather than the runtime's.
+        "order-file-link",
+        "printer-actuals",
+        "estimate-variance",
         // What a finished job takes off the shelf: the grams, the hourly
         // consumables, the bought-in components, the packaging. Lifted out of
         // renderer/inventory.js because the move being shared is not enough —
@@ -1347,6 +1365,87 @@ public actor KhaytEngine {
         })()
         """#, [order, .array(statuses.map { .string($0) }),
                .array(orders), .object(settings)], as: [String: StatusGate].self)
+    }
+
+
+    // MARK: - How wrong the shop's own estimates are
+
+    /// One model, and what it really costs against what it is quoted at.
+    ///
+    /// The unit is the MODEL, not the order, and that is the whole point.
+    /// Analytics can already say "your estimates run 12% short on average",
+    /// which is true and useless: an order happened once, to one customer, at a
+    /// price already charged. "This bracket is quoted at 41 g and 3.2 h; across
+    /// four prints it took 48 g and 3.8 h" is a sentence that changes a price.
+    public struct ModelVariance: Decodable, Sendable, Identifiable, Equatable {
+        public let printFileId: String
+        public let name: String
+        /// How many finished prints this is drawn from.
+        public let sampled: Int
+        /// `good`, `fair` or `thin` — `lib/estimate-variance.js` decides where
+        /// the lines are, so the two apps cannot disagree about what counts as
+        /// enough evidence.
+        public let confidence: String
+        public let estGrams: Double?
+        public let actGrams: Double?
+        /// Null, never zero, when one side of the comparison is unknown.
+        public let gramsDeltaPct: Double?
+        public let estHours: Double?
+        public let actHours: Double?
+        public let hoursDeltaPct: Double?
+        public let lastAt: String?
+        public var id: String { printFileId }
+    }
+
+    /// The one sentence a row is worth, or nil when it has not earned one.
+    public struct VarianceAdvice: Decodable, Sendable, Equatable {
+        /// `time` or `filament` — whichever is further out.
+        public let axis: String
+        public let pct: Int
+        public let sampled: Int
+        public let confidence: String
+    }
+
+    /// Every model worth looking at, worst under-quoted first.
+    ///
+    /// MEASURED AND EXACT ONLY, and the module applies both filters: a typed
+    /// actual is usually the estimate confirmed, so counting those would
+    /// compare an estimate to itself and report a variance near zero — and a
+    /// multi-part job's figures were divided to get here, so they are not
+    /// evidence about any one model.
+    ///
+    /// That is why a busy shop can still see an empty panel, and why the screen
+    /// says so in those words rather than "no data".
+    public func estimateVariance(orders: [JSONValue],
+                                 minSamples: Int = 2) throws -> [ModelVariance] {
+        try runtime.call2(#"""
+        globalThis.KhaytEstimateVariance.varianceByModel(ARG0, {
+          allocate: globalThis.KhaytOrderFileLink.allocateActuals,
+          compare: globalThis.KhaytPrinterActuals.compareToEstimate,
+        }, { minSamples: ARG1 })
+        """#, [.array(orders), .number(Double(minSamples))], as: [ModelVariance].self)
+    }
+
+    /// What to say about one of those rows, if anything.
+    ///
+    /// Only a model that is consistently UNDER-quoted earns a sentence. A shop
+    /// that charges too much finds out from its customers; a panel that reports
+    /// every 3% wobble as news is a panel nobody reads.
+    public func varianceAdvice(_ row: ModelVariance, thresholdPct: Double = 10) throws -> VarianceAdvice? {
+        try runtime.call2(#"""
+        globalThis.KhaytEstimateVariance.advice(ARG0, { thresholdPct: ARG1 })
+        """#, [encodeVarianceRow(row), .number(thresholdPct)], as: VarianceAdvice?.self)
+    }
+
+    /// The row, back the way the module wants it. Only the fields `advice`
+    /// reads, because sending the rest would be inventing a contract.
+    private func encodeVarianceRow(_ r: ModelVariance) -> JSONValue {
+        .object([
+            "sampled": .number(Double(r.sampled)),
+            "confidence": .string(r.confidence),
+            "gramsDeltaPct": r.gramsDeltaPct.map { JSONValue.number($0) } ?? .null,
+            "hoursDeltaPct": r.hoursDeltaPct.map { JSONValue.number($0) } ?? .null,
+        ])
     }
 
     /// Where this move would reach outside the shop's own book.

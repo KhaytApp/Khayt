@@ -33,6 +33,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   until you enter one.
 
 ### Added
+- **The Mac app shows which of your models you are quoting too cheaply.** A new
+  Quoting page under Reports compares what each model was quoted at with what a
+  printer actually reported — per MODEL, not per job, because an order happened
+  once at a price already charged, while "this hood is quoted at 197 g and
+  across two prints it took 226" is a sentence you can act on. Worst first, with
+  the number of prints behind each row, and a plain line only where a model is
+  consistently under-quoted by enough to matter. Quoting generously is never
+  reported: you hear about that from your customers.
+
+  It counts only jobs a printer measured, on prints of a single part — a typed
+  actual is usually the estimate confirmed, and a multi-part job's figures were
+  divided to get there. So a busy shop can still see an empty page, and the page
+  says which of the two is missing rather than "no data".
+
 - **The board shows where a job may go while you are still holding it.** Drag a
   card and every column that will take it outlines itself; a column that will
   not — because you have set a limit on how many jobs may be in it at once, or
