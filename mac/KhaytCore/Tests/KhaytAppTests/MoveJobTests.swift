@@ -398,10 +398,19 @@ struct MoveJobTests {
     /// 160 g quote takes 160 g off the shelf in BOTH apps, and the shop is
     /// short by the difference until it counts a spool by hand.
     ///
-    /// Left alone here on purpose. Changing it on the Mac alone would make the
-    /// two apps disagree about a shop's shelf, which is the one thing the
-    /// shared rules exist to prevent — so it is a decision for both, not a
-    /// side effect of adding a sheet.
+    /// AND IT IS NOT AN OVERSIGHT, which is worth saying because "a rule with
+    /// no caller" is this codebase's most repeated bug and this is not one of
+    /// them. #978 added the parameter in a change about FAILED prints, where
+    /// the wiring goes through `deductActual` instead, and said so in as many
+    /// words: "absent — which is every job Khayt has ever deducted for — the
+    /// estimate stands exactly as before". Completions were left where they
+    /// were, deliberately, in a change that was not about them.
+    ///
+    /// What has changed since is that a completion can now BE measured. The
+    /// figure exists; nothing spends it. Left alone here regardless: doing it
+    /// on the Mac alone would make the two apps disagree about a shop's shelf,
+    /// which is the one thing the shared rules exist to prevent — so it is a
+    /// decision for both, not a side effect of adding a sheet.
     @Test("the shelf loses the QUOTED grams, even when the job reported more")
     func theShelfStillFollowsTheEstimate() async throws {
         var root = Self.book()
