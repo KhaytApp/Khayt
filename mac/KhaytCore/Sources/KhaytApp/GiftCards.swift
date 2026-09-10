@@ -51,7 +51,7 @@ struct GiftCards: View {
                         .buttonStyle(.borderedProminent)
                 }
             } else if shown.isEmpty {
-                ContentUnavailableView.search(text: shop.search)
+                NothingMatched(shop: shop, mark: .giftCards)
             } else {
                 Table(shown) {
                     TableColumn(shop.words.callIt("giftCardCode")) { card in
