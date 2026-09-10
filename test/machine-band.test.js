@@ -338,3 +338,131 @@ test('a silent machine with nothing booked is still free', () => {
   assert.equal(b.rows[0].state, 'free');
   assert.equal(b.rows[0].freeMinutes, 48 * 60);
 });
+
+// ── A machine booked out for maintenance ───────────────────────────────────
+//
+// `downtimeBlocks` has been editable in Khayt's machine modal for releases and
+// NOTHING THAT PLANS WORK READ IT — not this band, not scheduling, not the
+// lead-time promise. A shop could book a printer out for a belt change and
+// every screen answering "when is this machine free" went on offering the hours
+// it had just been told about. That is worse than not having the feature: the
+// shop believes it said something.
+
+// `reason` is the field Khayt's own machine modal writes. A block built with
+// `note` is accepted too, and one test uses each so neither can quietly stop
+// being read.
+const down = (from, to, reason) => ({ from: new Date(from).toISOString(), to: new Date(to).toISOString(), reason });
+
+test('a maintenance window is on the band, and is not free time', () => {
+  const b = MB.band({
+    machines: [Object.assign(machine('M1', 'U1'), {
+      downtimeBlocks: [down(NOW + 10 * HOUR, NOW + 14 * HOUR, 'Belt change')],
+    })],
+    orders: [], live: { M1: {} }, now: NOW, hours: 48,
+  });
+  const row = b.rows[0];
+  const block = row.blocks.find(x => x.kind === 'down');
+  assert.ok(block, 'the window is not on the band at all');
+  assert.equal(block.title, 'Belt change', 'the shop is not told what it is');
+  // …and the other spelling, so a caller using `note` is not silently blanked.
+  const alt = MB.band({
+    machines: [Object.assign(machine('M1', 'U1'), {
+      downtimeBlocks: [{ from: new Date(NOW + 10 * HOUR).toISOString(),
+                         to: new Date(NOW + 14 * HOUR).toISOString(), note: 'Nozzle' }],
+    })],
+    orders: [], live: { M1: {} }, now: NOW, hours: 48,
+  });
+  assert.equal(alt.rows[0].blocks.find(x => x.kind === 'down').title, 'Nozzle');
+  assert.equal(row.downMinutes, 4 * 60);
+  // NOT booked — utilisation is a figure about work, and a shop is not busier
+  // for having serviced a printer.
+  assert.equal(row.bookedMinutes, 0);
+  // …and NOT free, which is the whole bug.
+  assert.equal(row.freeMinutes, 48 * 60 - 4 * 60);
+  assert.equal(row.state, 'down');
+});
+
+test('a free stretch does not run through the maintenance window', () => {
+  const b = MB.band({
+    machines: [Object.assign(machine('M1', 'U1'), {
+      downtimeBlocks: [down(NOW + 10 * HOUR, NOW + 14 * HOUR, '')],
+    })],
+    orders: [], live: { M1: {} }, now: NOW, hours: 48,
+  });
+  const gaps = b.rows[0].gaps;
+  // Two gaps, before and after — not one 48-hour stretch straight through it.
+  assert.equal(gaps.length, 2, `got ${gaps.length} gap(s): ${JSON.stringify(gaps)}`);
+  assert.equal(gaps[0].minutes, 10 * 60);
+  assert.equal(gaps[1].startMinute, 14 * 60);
+});
+
+test('a queued job waits for the machine rather than printing through it', () => {
+  const b = MB.band({
+    machines: [Object.assign(machine('M1', 'U1'), {
+      downtimeBlocks: [down(NOW + 2 * HOUR, NOW + 6 * HOUR, '')],
+    })],
+    // Four hours of work, and the machine goes down two hours from now.
+    orders: [job({ id: 'A', printTime: 4 })],
+    live: { M1: {} }, now: NOW, hours: 48,
+  });
+  const queued = b.rows[0].blocks.find(x => x.orderId === 'A');
+  assert.equal(queued.startsAt, NOW + 6 * HOUR,
+    'the job was laid across a window the machine is out of action for');
+});
+
+test('a job pushed out of one window is not laid into the next', () => {
+  const b = MB.band({
+    machines: [Object.assign(machine('M1', 'U1'), {
+      downtimeBlocks: [down(NOW + 1 * HOUR, NOW + 3 * HOUR, ''),
+                       down(NOW + 4 * HOUR, NOW + 8 * HOUR, '')],
+    })],
+    orders: [job({ id: 'A', printTime: 4 })],
+    live: { M1: {} }, now: NOW, hours: 48,
+  });
+  const queued = b.rows[0].blocks.find(x => x.orderId === 'A');
+  assert.equal(queued.startsAt, NOW + 8 * HOUR,
+    'clearing the first window landed the job inside the second');
+});
+
+test('maintenance is not counted against how busy the shop is', () => {
+  const b = MB.band({
+    machines: [Object.assign(machine('M1', 'U1'), {
+      downtimeBlocks: [down(NOW, NOW + 24 * HOUR, '')],
+    })],
+    orders: [job({ id: 'A', printTime: 12 })],
+    live: { M1: {} }, now: NOW, hours: 48,
+  });
+  // 48 hours of window, 24 booked out, 12 of work in what is left.
+  assert.equal(b.downMinutes, 24 * 60);
+  assert.equal(b.bookedMinutes, 12 * 60);
+  // Utilisation is against the hours the shop HAS, not the hours the calendar
+  // has: 12 of 24, not 12 of 48. Charging maintenance to the denominator makes
+  // a shop look idle for keeping its printers working.
+  assert.equal(Math.round(b.utilised * 100), 50);
+});
+
+test('a window that has already passed, or runs backwards, is ignored', () => {
+  const b = MB.band({
+    machines: [Object.assign(machine('M1', 'U1'), {
+      downtimeBlocks: [
+        down(NOW - 20 * HOUR, NOW - 10 * HOUR, 'last week'),
+        down(NOW + 6 * HOUR, NOW + 2 * HOUR, 'typed backwards'),
+        { from: '', to: new Date(NOW + 2 * HOUR).toISOString() },
+        null,
+      ],
+    })],
+    orders: [], live: { M1: {} }, now: NOW, hours: 48,
+  });
+  assert.equal(b.rows[0].downMinutes, 0);
+  assert.equal(b.rows[0].freeMinutes, 48 * 60, 'a bad block cost the shop hours it has');
+});
+
+test('a machine with no downtime is exactly as it was', () => {
+  const plain = { machines: [machine('M1', 'U1')], orders: [job({ id: 'A', printTime: 4 })],
+                  live: { M1: {} }, now: NOW, hours: 48 };
+  const b = MB.band(plain);
+  assert.equal(b.rows[0].downMinutes, 0);
+  assert.equal(b.rows[0].bookedMinutes, 4 * 60);
+  assert.equal(b.rows[0].freeMinutes, 44 * 60);
+  assert.equal(b.rows[0].blocks.find(x => x.orderId === 'A').startsAt, NOW);
+});

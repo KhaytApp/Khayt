@@ -600,6 +600,37 @@ final class Words {
         "mac.nothing_at_stage": ["en": "Nothing at this stage", "ar": "لا شيء في هذه المرحلة"],
         // What a model really costs against what it is quoted at.
         "mac.quoting":      ["en": "Quoting",  "ar": "التسعير"],
+        // The camera on a printer.
+        "mac.camera":        ["en": "Camera",            "ar": "الكاميرا"],
+        // A machine the shop booked out of service on purpose.
+        "mac.band_down":     ["en": "Maintenance",       "ar": "صيانة"],
+        "mac.downtime_none": ["en": "Not booked out for anything.",
+                              "ar": "غير محجوزة لأي صيانة."],
+        // Said while it can still be corrected. The shared rule DROPS a window
+        // that runs backwards, silently — which would be a shop typing
+        // something and finding nothing saved.
+        "mac.downtime_backwards": ["en": "This window ends before it starts, and will not be saved.",
+                                   "ar": "هذه الفترة تنتهي قبل أن تبدأ، ولن تُحفظ."],
+        "mac.cam_find":      ["en": "Find it",           "ar": "ابحث عنها"],
+        "mac.cam_no_frame":  ["en": "No picture yet",     "ar": "لا صورة بعد"],
+        "mac.cam_unreachable": ["en": "Camera not answering", "ar": "الكاميرا لا تجيب"],
+        "mac.cam_still":     ["en": "Snapshot address",  "ar": "عنوان اللقطة"],
+        "mac.cam_rotate":    ["en": "Rotate",            "ar": "تدوير"],
+        "mac.cam_flip_h":    ["en": "Flip across",       "ar": "قلب أفقي"],
+        "mac.cam_flip_v":    ["en": "Flip down",         "ar": "قلب رأسي"],
+        "mac.cam_found":     ["en": "Found a camera, and it answered with a picture.",
+                              "ar": "وُجدت كاميرا، وأجابت بصورة."],
+        // A registered camera that has not captured a frame yet is a camera.
+        // Saying "none found" here would be wrong in the one case a shop is
+        // most likely to hit — the moment after plugging one in.
+        "mac.cam_warming":   ["en": "Found a camera. It has no picture yet — give it a moment.",
+                              "ar": "وُجدت كاميرا. لا صورة بعد — امنحها لحظة."],
+        "mac.cam_none":      ["en": "No camera answered on the addresses this kind of printer uses. If you know its address, type it above.",
+                              "ar": "لم تُجب أي كاميرا على العناوين المعتادة لهذا النوع من الطابعات. إن كنت تعرف العنوان فاكتبه أعلاه."],
+        "mac.cam_needs_host": ["en": "Give the printer an address first — a camera is looked for on the same machine.",
+                               "ar": "أعطِ الطابعة عنواناً أولاً — تُطلب الكاميرا من الجهاز نفسه."],
+        "mac.cam_same_host": ["en": "A path is enough — /webcam/?action=snapshot. It is read from the printer's own address, and only from there.",
+                              "ar": "المسار يكفي — ‎/webcam/?action=snapshot‎. تُقرأ من عنوان الطابعة نفسه، ومنه وحده."],
         // Finishing a job, and what it really took.
         // The title, the button and the hint are Khayt's own `act.*` — the two
         // apps ask this question with the same words in nine languages, and a

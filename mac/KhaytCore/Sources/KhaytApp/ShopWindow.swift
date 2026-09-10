@@ -94,7 +94,7 @@ struct ShopWindow: View {
                 } else if shop.showingBoard {
                     Kanban(shop: shop)
                 } else if shop.showingMachines {
-                    Machines(shop: shop)
+                    Machines(shop: shop).environment(shop.cameras)
                 } else if shop.showingInventory {
                     Inventory(shop: shop)
                 } else if shop.showingExpenses {

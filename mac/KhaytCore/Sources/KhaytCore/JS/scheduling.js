@@ -114,6 +114,58 @@ function machineLoadMins(machine, orders) {
   );
 }
 
+/**
+ * Hours a machine is booked OUT of action, from `now` forward.
+ *
+ * ── RECORDED SINCE 3.0 AND NEVER CONSULTED HERE ───────────────────────────
+ *
+ * `machine.downtimeBlocks` was read by a badge and a chart and by nothing that
+ * plans work — so this scheduler would put a job on a printer the shop had
+ * already booked out for a belt change, and say it was the earliest finish.
+ *
+ * ── WHY LOAD, AND NOT A CALENDAR ──────────────────────────────────────────
+ *
+ * This scheduler does not work in wall-clock times; it balances MINUTES OF
+ * LOAD and picks the machine with the least. So a maintenance window is
+ * expressed the way everything else here is expressed: as minutes that machine
+ * cannot print in. A printer booked out for six hours looks six hours busier
+ * and the work goes elsewhere, which is the behaviour a shop is asking for
+ * when it records one.
+ *
+ * That is deliberately weaker than the band, which knows real times and can
+ * say a job STARTS after a window. Making this calendar-aware is a different
+ * scheduler; making it stop ignoring downtime is this.
+ *
+ * `horizonDays` bounds it, because a window booked for next year is not a
+ * reason to avoid a machine today.
+ *
+ * ── HOURS, WHATEVER THE FIELD NAMES SAY ───────────────────────────────────
+ *
+ * `machineLoadMins` sums `printTimeOf`, which is documented as HOURS, and
+ * `projectedFinishMins` is hours too — `test/scheduling.test.js` asserts it
+ * comes to 2 for two one-hour jobs. Both names are wrong and are left alone;
+ * they are a public shape other code reads. What matters here is that a figure
+ * added to that load must be in the same unit, and returning minutes would
+ * have made every maintenance window count SIXTY TIMES over.
+ */
+function downtimeHours(machine, now, horizonDays) {
+  const blocks = Array.isArray(machine && machine.downtimeBlocks) ? machine.downtimeBlocks : [];
+  if (!blocks.length) return 0;
+  const from = Number.isFinite(now) ? now : Date.now();
+  const to = from + Math.max(1, horizonDays) * DAY_MS;
+  let total = 0;
+  for (const b of blocks) {
+    if (!b || !b.from || !b.to) continue;
+    const bFrom = new Date(b.from).getTime();
+    const bTo = new Date(b.to).getTime();
+    if (!Number.isFinite(bFrom) || !Number.isFinite(bTo) || bTo <= bFrom) continue;
+    const start = Math.max(from, bFrom);
+    const end = Math.min(to, bTo);
+    if (end > start) total += (end - start) / 3600000;
+  }
+  return total;
+}
+
 /** True when the order is an un-printed, schedulable job. */
 function isSchedulable(order, includeAssigned) {
   if (!order) return false;
@@ -157,6 +209,10 @@ function proposeSchedule(machines, orders, opts) {
   const now = Number.isFinite(options.now) ? options.now : 0;
   const includeAssigned = !!options.includeAssigned;
   // Tolerance (hours) within which batching may override pure load-balancing.
+  /// How far ahead a maintenance window still counts against a machine. A
+  /// window booked for next year is not a reason to avoid a printer today.
+  const downtimeHorizonDays = Number.isFinite(options.downtimeHorizonDays)
+    ? Math.max(1, options.downtimeHorizonDays) : 14;
   const batchTol = Number.isFinite(options.batchToleranceMins)
     ? options.batchToleranceMins
     : 0;
@@ -172,7 +228,12 @@ function proposeSchedule(machines, orders, opts) {
   // material at the tail of each machine's (seed + proposed) queue for batching.
   const state = new Map();
   for (const m of machineList) {
-    const seedLoad = machineLoadMins(m, orderList);
+    // Work already on it, PLUS the hours it is booked out for. Both are hours
+    // this machine cannot take new work in, and the pick below is "least
+    // loaded" — so a printer down for a belt change stops being the obvious
+    // answer, which is the entire point of recording one.
+    const seedLoad = machineLoadMins(m, orderList)
+      + downtimeHours(m, now, downtimeHorizonDays);
     let seedTailMaterial = null;
     if (seedLoad > 0) {
       // Last assigned order on this machine (input order = queue order seed).
@@ -288,6 +349,7 @@ function proposeSchedule(machines, orders, opts) {
 const api = {
   proposeSchedule,
   machineLoadMins,
+  downtimeHours,
   // exposed for reuse / tests
   urgencyScore,
   machineAcceptsMaterial,

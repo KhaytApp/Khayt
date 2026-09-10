@@ -22,7 +22,12 @@ import KhaytCore
 /// connection settings it cannot test is worse than one that does not offer
 /// them". So this one tests them, against the printer, before the shop leaves.
 ///
-/// The webcam and the downtime blocks are still carried through untouched.
+/// The camera is here too, under the connection, because it depends on it: the
+/// address is normalised against the printer's host, the credential that
+/// fetches a still is the printer's, and a snapshot may only be fetched from
+/// that same host at all.
+///
+/// The downtime blocks are still carried through untouched.
 struct MachineSheet: View {
     /// How wide this sheet is. A CONSTANT rather than a number in the body,
     /// because `SnapshotTests` photographs the sheet at a size of its own and
@@ -60,6 +65,21 @@ struct MachineSheet: View {
     /// the plaintext is never loaded into this sheet, so blank cannot mean
     /// "no key". `forgetKey` is how a shop says that on purpose.
     @State private var apiKey = ""
+
+    // The camera. `camSnapshot` may be typed as a path — `/webcam/?action=snapshot`
+    // — and the shared rule makes it absolute against the printer's host.
+    @State private var camEnabled = false
+    @State private var camSnapshot = ""
+    @State private var camRotate = 0
+    @State private var camFlipH = false
+    @State private var camFlipV = false
+    /// What a probe found, or why it did not. Cleared by the next attempt.
+    @State private var camNote: String?
+    @State private var camLooking = false
+
+    /// When this machine is out of action. Loaded from the record and written
+    /// back through the shared rule, which drops a window that cannot be read.
+    @State private var downtime: [Shop.DowntimeBlock] = []
     @State private var hasStoredKey = false
     @State private var forgetKey = false
     @State private var testing = false
@@ -173,7 +193,28 @@ struct MachineSheet: View {
                     key: $apiKey, hasStoredKey: $hasStoredKey, forgetKey: $forgetKey,
                     testing: $testing, said: $testSaid, worked: $testWorked,
                     test: test)
+
+                // ── AND THE CAMERA ───────────────────────────────────────
+                //
+                // Under the connection because it depends on it: the address is
+                // normalised against the printer's host, the credential that
+                // fetches a still is the printer's, and a snapshot may only be
+                // fetched from that same host at all.
+                LayerRule()
+                CameraSettings(
+                    shop: shop, enabled: $camEnabled, snapshot: $camSnapshot,
+                    rotate: $camRotate, flipH: $camFlipH, flipV: $camFlipV,
+                    note: $camNote, looking: $camLooking, find: findCamera)
             }
+
+            // ── WHEN IT IS OUT OF ACTION ─────────────────────────────────
+            //
+            // OUTSIDE the `polled` block, for every kind of machine: a laser is
+            // booked out for a lens change the same way a printer is booked out
+            // for a belt, and the band, the scheduler and the delivery promise
+            // read these whatever the machine is.
+            LayerRule()
+            DowntimeEditor(shop: shop, blocks: $downtime)
 
             // The whole wear block belongs to the nozzle, and only a filament
             // printer has one. What wears on a resin printer is its FEP film
@@ -269,6 +310,14 @@ struct MachineSheet: View {
         nozzleInstalled = Order.day(machine.nozzle?.installedAt)
         nozzleThreshold = machine.nozzle?.gramsThreshold ?? 0
         nozzleAtInstall = machine.nozzle?.gramsAtInstall ?? 0
+        downtime = (machine.downtimeBlocks ?? []).map {
+            .init(from: $0.from ?? "", to: $0.to ?? "", reason: $0.words)
+        }
+        camEnabled = machine.webcam?.enabled ?? false
+        camSnapshot = machine.webcam?.snapshotUrl ?? ""
+        camRotate = machine.webcam?.rotate ?? 0
+        camFlipH = machine.webcam?.flipH ?? false
+        camFlipV = machine.webcam?.flipV ?? false
         apiType = machine.printerApi?.type ?? ""
         apiHost = machine.printerApi?.host ?? ""
         apiPort = machine.printerApi?.port ?? 0
@@ -309,6 +358,77 @@ struct MachineSheet: View {
     ///
     /// So this asks the real printer over the real network before the shop
     /// leaves the sheet, and prints what came back.
+
+    /// Look for a camera on this printer, and say what was found.
+    ///
+    /// ── ONE GUESS IS NOT ENOUGH, AND THAT IS MEASURED ────────────────────
+    ///
+    /// `webcamCandidates` returns every address a printer of this family might
+    /// serve one on, best first, because a Snapmaker U1 on stock firmware
+    /// answers nothing at all on the derived `:8080/?action=snapshot` while the
+    /// nginx on port 80 does have a `/webcam/` route. Both conventions are
+    /// real, and nothing in the printer's answer says which it uses. So each is
+    /// tried until one returns an image.
+    ///
+    /// A camera that answers 204 or 503 COUNTS AS FOUND. PrusaLink documents
+    /// those as "no frame yet" and "temporarily unavailable" — a registered
+    /// camera warming up is a camera, and refusing it here would tell a shop it
+    /// has none.
+    private func findCamera() {
+        camNote = nil
+        camLooking = true
+        let host = apiHost.trimmingCharacters(in: .whitespaces)
+        let type = apiType
+        let typed = apiKey
+        let build = shop.source.build
+        Task {
+            defer { camLooking = false }
+            guard let engine = shop.engine, !host.isEmpty else {
+                camNote = shop.words.callIt("mac.cam_needs_host"); return
+            }
+            var api: [String: JSONValue] = ["type": .string(type), "host": .string(host)]
+            if apiPort > 0 { api["port"] = .number(Double(apiPort)) }
+            // The key as typed if the shop has just entered one, otherwise the
+            // stored one opened for this single use. A probe that cannot
+            // authenticate reports "no camera" for a camera that is there.
+            if !typed.isEmpty {
+                api["apiKey"] = .string(typed)
+            } else if let sealed = existing?.printerApi?.apiKey, !sealed.isEmpty, let build,
+                      let opened = try? await Secrets.open(sealed, for: build) {
+                api["apiKey"] = .string(opened)
+            }
+            let row = JSONValue.object(api)
+            guard let candidates = try? await engine.webcamCandidates(printerApi: row),
+                  !candidates.isEmpty else {
+                camNote = shop.words.callIt("mac.cam_none"); return
+            }
+            for candidate in candidates {
+                if (try? await engine.assertWebcamHost(candidate, printerApi: row)) == nil { continue }
+                guard let url = URL(string: candidate) else { continue }
+                var request = URLRequest(url: url)
+                request.timeoutInterval = 4
+                if let headers = try? await engine.webcamAuthHeaders(printerApi: row) {
+                    for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+                }
+                guard let (data, response) = try? await URLSession.shared.data(for: request) else { continue }
+                let http = response as? HTTPURLResponse
+                let refusal = try? await engine.checkSnapshot(
+                    status: http?.statusCode ?? 0,
+                    contentType: http?.value(forHTTPHeaderField: "Content-Type"),
+                    contentLength: data.count)
+                if refusal == nil || refusal == "no_frame_yet" {
+                    camSnapshot = candidate
+                    camEnabled = true
+                    camNote = refusal == "no_frame_yet"
+                        ? shop.words.callIt("mac.cam_warming")
+                        : shop.words.callIt("mac.cam_found")
+                    return
+                }
+            }
+            camNote = shop.words.callIt("mac.cam_none")
+        }
+    }
+
     private func test() {
         testing = true
         testSaid = nil
@@ -391,6 +511,11 @@ struct MachineSheet: View {
         let catalogId = chosen
         let typed = apiKey
         let clearing = forgetKey
+        let wantsCamera = camEnabled
+        let still = camSnapshot.trimmingCharacters(in: .whitespaces)
+        let turn = camRotate
+        let mirrorH = camFlipH, mirrorV = camFlipV
+        let windows = downtime
         let build = shop.source.build
         dismiss()
         Task {
@@ -425,6 +550,29 @@ struct MachineSheet: View {
                 }
             }
             input["printerApi"] = .object(api)
+            // THROUGH THE SHARED RULE, not written as typed. `sanitizeWebcam`
+            // makes a path absolute against the printer's host, bounds the
+            // rotation to the four it allows, and drops anything that is not an
+            // http(s) URL — so a camera saved here is one this app and Khayt
+            // will both fetch from, or none at all.
+            // Through the shared rule like everything else here: it drops a
+            // window that runs backwards or cannot be read, sorts them and caps
+            // the list. A row typed wrongly is refused in ONE place rather than
+            // by two apps with two opinions.
+            input["downtimeBlocks"] = .array(windows.map {
+                .object(["from": .string($0.from), "to": .string($0.to),
+                         "reason": .string($0.reason)])
+            })
+            let cam: JSONValue = .object([
+                "enabled": .bool(wantsCamera),
+                "snapshotUrl": .string(still),
+                "rotate": .number(Double(turn)),
+                "flipH": .bool(mirrorH), "flipV": .bool(mirrorV),
+            ])
+            if let engine = shop.engine,
+               let clean = try? await engine.sanitizeWebcam(cam, printerApi: .object(api)) {
+                input["webcam"] = clean
+            }
             await shop.saveMachine(input, id: id, catalogId: catalogId)
         }
     }
@@ -534,5 +682,167 @@ private struct Connection: View {
                 }
             }
         }
+    }
+}
+
+/// The camera half of the machine sheet.
+///
+/// Deliberately short. A shop sets a camera up once, and the fields that matter
+/// are whether it is on, where it is, and which way up — the rest of what
+/// `lib/webcam.js` carries (stream type, timelapse mode, cloud relay) belongs
+/// to features this app does not have, and offering them would be asking for
+/// answers nothing here reads.
+private struct CameraSettings: View {
+    let shop: Shop
+    @Binding var enabled: Bool
+    @Binding var snapshot: String
+    @Binding var rotate: Int
+    @Binding var flipH: Bool
+    @Binding var flipV: Bool
+    @Binding var note: String?
+    @Binding var looking: Bool
+    let find: () -> Void
+
+    var body: some View {
+        let words = shop.words
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Toggle(words.callIt("mac.camera"), isOn: $enabled)
+                Spacer()
+                // A shop should not have to know that its camera lives on
+                // `/webcam/?action=snapshot`. This asks the printer.
+                Button(words.callIt("mac.cam_find"), action: find)
+                    .disabled(looking)
+                if looking { ProgressView().controlSize(.small) }
+            }
+
+            if enabled {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(words.callIt("mac.cam_still")).font(.caption).foregroundStyle(.secondary)
+                    // NO PLACEHOLDER. An example address is not English and
+                    // not translatable, but it would be the one literal on this
+                    // screen that never went through `Words` — and the guard
+                    // that catches those is right to be blunt. The shape is in
+                    // the caption below, which is a sentence and has an Arabic.
+                    TextField("", text: $snapshot)
+                        .textFieldStyle(.roundedBorder)
+                    // A PATH IS ENOUGH. The shared rule makes it absolute
+                    // against the printer's host, which is also the only host it
+                    // may ever be fetched from.
+                    Text(words.callIt("mac.cam_same_host"))
+                        .font(.caption2).foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: 14) {
+                    Picker(words.callIt("mac.cam_rotate"), selection: $rotate) {
+                        ForEach([0, 90, 180, 270], id: \.self) { Text("\($0)°").tag($0) }
+                    }
+                    .pickerStyle(.segmented).fixedSize()
+                    Toggle(words.callIt("mac.cam_flip_h"), isOn: $flipH)
+                    Toggle(words.callIt("mac.cam_flip_v"), isOn: $flipV)
+                }
+            }
+
+            if let note {
+                Text(note).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+/// When a machine is out of action, and why.
+///
+/// ── THE MAC COULD HONOUR THESE AND NOT SET ONE ───────────────────────────
+///
+/// The band draws the window, the scheduler counts it against the machine's
+/// load, and the delivery promise stops offering those hours — all three read
+/// `downtimeBlocks`, and only Khayt could write one. A shop working on the Mac
+/// could see that a printer was booked out and had to open the other app to
+/// say so.
+///
+/// ── LOCAL WALL-CLOCK, THE SHAPE KHAYT WRITES ─────────────────────────────
+///
+/// `YYYY-MM-DDTHH:mm`, no zone, which is what a `datetime-local` input
+/// produces. "Thursday 2pm" is what a shop means by a maintenance window, and
+/// both apps have to write one shape or a window set here and read there would
+/// be a different four hours.
+struct DowntimeEditor: View {
+    let shop: Shop
+    @Binding var blocks: [Shop.DowntimeBlock]
+
+    var body: some View {
+        let words = shop.words
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(words.callIt("mach.downtime")).font(.callout.weight(.medium))
+                Spacer()
+                Button(words.callIt("mach.downtime_add")) {
+                    // Tomorrow morning to tomorrow afternoon: a shape to edit
+                    // rather than four empty fields to fill.
+                    let start = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+                    blocks.append(.init(from: Self.stamp(Self.at(start, hour: 9)),
+                                        to: Self.stamp(Self.at(start, hour: 13)),
+                                        reason: ""))
+                }
+            }
+            if blocks.isEmpty {
+                Text(words.callIt("mac.downtime_none"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(blocks.indices, id: \.self) { at in
+                HStack(spacing: 8) {
+                    DatePicker("", selection: binding(at, \.from), displayedComponents: [.date, .hourAndMinute])
+                        .labelsHidden().datePickerStyle(.compact)
+                    Text("→").foregroundStyle(.tertiary)
+                    DatePicker("", selection: binding(at, \.to), displayedComponents: [.date, .hourAndMinute])
+                        .labelsHidden().datePickerStyle(.compact)
+                    TextField(words.callIt("mach.downtime_reason"), text: reason(at))
+                        .textFieldStyle(.roundedBorder).frame(minWidth: 90)
+                    Button {
+                        blocks.remove(at: at)
+                    } label: { Image(systemName: "minus.circle") }
+                        .buttonStyle(.borderless)
+                        .help(words.callIt("common.delete"))
+                }
+                // A window that reads backwards is dropped on save by the
+                // shared rule, silently — which would be a shop typing
+                // something and finding nothing there. It is said here instead,
+                // while it can still be corrected.
+                if !blocks[at].isReadable {
+                    Text(words.callIt("mac.downtime_backwards"))
+                        .font(.caption2).foregroundStyle(Khayt.attention)
+                }
+            }
+        }
+    }
+
+    private func binding(_ at: Int, _ path: WritableKeyPath<Shop.DowntimeBlock, String>) -> Binding<Date> {
+        Binding(
+            get: { Self.parse(blocks[at][keyPath: path]) ?? Date() },
+            set: { blocks[at][keyPath: path] = Self.stamp($0) })
+    }
+
+    private func reason(_ at: Int) -> Binding<String> {
+        Binding(get: { blocks[at].reason }, set: { blocks[at].reason = $0 })
+    }
+
+    /// `2026-09-10T14:00` — no zone, no seconds, matching Khayt's own field.
+    static func stamp(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        return f.string(from: date)
+    }
+
+    static func parse(_ text: String) -> Date? {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        return f.date(from: text)
+    }
+
+    private static func at(_ day: Date, hour: Int) -> Date {
+        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
     }
 }

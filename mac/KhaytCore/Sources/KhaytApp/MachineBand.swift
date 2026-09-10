@@ -200,6 +200,13 @@ struct MachineBandView: View {
                 text: shop.words.callIt("mac.band_queued"))
             Key(fill: Khayt.attention.opacity(0.16), line: Khayt.attention,
                 text: shop.words.callIt("mac.band_blocked"))
+            // ONLY WHEN THERE IS ONE. A key for a block this shop never draws
+            // is a line of legend explaining something that is not on screen,
+            // and the row is already four items and a total wide.
+            if band.downMinutes > 0 {
+                Key(fill: Khayt.note.opacity(0.10), line: Khayt.note,
+                    text: shop.words.callIt("mac.band_down"))
+            }
             HStack(spacing: 5) {
                 Rectangle().fill(Khayt.note).frame(width: 13, height: 1)
                 Text(shop.words.callIt("mac.band_free")).font(.caption2)
@@ -304,6 +311,7 @@ struct MachineBandView: View {
             switch row.state {
             case "printing": return Khayt.hot
             case "queued": return .secondary
+            case "down": return Khayt.note
             default: return Khayt.note
             }
         }
@@ -414,6 +422,11 @@ struct MachineBandView: View {
             switch block.kind {
             case "printing": return Khayt.hot
             case "blocked": return Khayt.attention
+            // A MACHINE THE SHOP TOOK OUT OF SERVICE ON PURPOSE. Not warm —
+            // nothing is happening — and not an alarm either: booking a belt
+            // change is the shop working, and painting it like a fault would
+            // teach a shop to avoid recording one.
+            case "down": return Khayt.note
             default: return Khayt.hairline
             }
         }
@@ -421,6 +434,7 @@ struct MachineBandView: View {
             switch block.kind {
             case "printing": return Khayt.hot.opacity(0.13)
             case "blocked": return Khayt.attention.opacity(0.13)
+            case "down": return Khayt.note.opacity(0.10)
             default: return Khayt.recessed
             }
         }
@@ -428,6 +442,13 @@ struct MachineBandView: View {
         /// What the block says under its name: the shortage if it has one, the
         /// overrun if it has one, and its length otherwise.
         private var sub: String {
+            // A maintenance window has no order behind it, so it says what it
+            // is — and the shop's own note is the block's title, which may be
+            // empty. "Maintenance · 4 h" is still an answer; a blank block is
+            // not.
+            if block.kind == "down" {
+                return shop.words.callIt("mac.band_down") + " · " + Hours.spell(block.minutes)
+            }
             if let short = block.shortfall {
                 return shop.words.callIt("mac.band_short", [
                     "grams": .number(short.short), "material": .string(short.material),

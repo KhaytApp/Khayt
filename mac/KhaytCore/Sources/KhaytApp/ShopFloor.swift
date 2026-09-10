@@ -72,6 +72,8 @@ struct Machines: View {
 }
 
 private struct Card: View {
+    /// The stills, refetched on their own timer — see `Camera`.
+    @Environment(Camera.self) private var camera
     let machine: Machine
     let wear: NozzleWear?
     let shop: Shop
@@ -121,6 +123,17 @@ private struct Card: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // ── THE CAMERA, FIRST ─────────────────────────────────────────
+            //
+            // Above the name rather than tucked under the details: a shop
+            // glancing at this screen is asking "is it still going and does the
+            // plate look right", and the answer is the picture. Only where
+            // there is one — a placeholder on every machine would make a screen
+            // mostly grey rectangles.
+            if machine.hasCamera {
+                CameraTile(frame: camera.frames[machine.id] ?? .none, webcam: machine.webcam,
+                           words: shop.words)
+            }
             HStack(spacing: 8) {
                 // The colour the shop gave this machine, which is how it is
                 // recognised on every other screen in Khayt.

@@ -94,6 +94,35 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   could go was to try. The rules deciding it are the same ones Khayt uses; this
   asks them earlier.
 
+- **A machine booked out for maintenance is no longer offered as free time, or
+  planned on, or promised against.** You have been able to record downtime on a
+  machine since 3.0, and nothing that plans work ever read it. The band showing
+  the next 48 hours drew those hours as available and drew queued work running
+  straight through the window; the scheduler put jobs on a printer you had
+  already booked out and called it the earliest finish; and the delivery date
+  your storefront quotes counted those hours as capacity — so a customer was
+  promised a date that assumed a machine you knew would be in pieces. All three
+  read it now. The window is on the band with your own note on it, work waits
+  for it, and your utilisation is measured against the hours you actually have,
+  so servicing a printer no longer makes the shop look idle. **The Mac app can
+  book a machine out too** — any machine, not only the ones it can poll, since a
+  laser goes down for a lens change the same way a printer does for a belt. A
+  window that ends before it starts says so while you can still fix it, rather
+  than vanishing on save.
+
+- **The Mac app shows your printers' cameras.** A still on each machine's card,
+  refreshed every few seconds, the right way up — rotate and flip are yours to
+  set. **Find it** asks the printer where its camera is rather than making you
+  know: it tries every address that kind of printer is known to use, because one
+  guess is not enough — a Snapmaker U1 answers nothing on the address most
+  cameras use and does have one behind its own web server. A camera that has
+  just been plugged in and has no picture yet says exactly that, rather than
+  reporting itself broken.
+
+  A snapshot is only ever fetched from the printer's own address, so a camera
+  setting that arrives in a restored backup or over sync cannot point Khayt at
+  anything else on your network.
+
 - **A search that finds nothing says which search, and gets you out of it.**
   Seven screens — jobs, board, shelf, library, customers, gift cards,
   portfolio — answered an empty search with the same grey magnifying glass
