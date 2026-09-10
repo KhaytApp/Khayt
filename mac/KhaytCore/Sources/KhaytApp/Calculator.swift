@@ -134,6 +134,34 @@ struct Calculator: View {
                                 Toggle(shop.words.callIt("calc.rush_fee"), isOn: $rush).fixedSize()
                                 Spacer(minLength: 0)
                             }
+                            // ── WHAT "MARGIN" MEANS HERE, IN THE ARITHMETIC ──
+                            //
+                            // `lib/pricing.js` documents its own parameter as
+                            // "Percent markup on cost" and computes
+                            // `baseCost * (1 + margin / 100)`. That is a MARKUP,
+                            // and the slider beside it says "Target profit
+                            // margin" — two different numbers. At 30% on a 95.36
+                            // cost the price is 123.97 and the actual margin is
+                            // 23.1%, which is seven points below what a shop
+                            // reading the label would expect to keep.
+                            //
+                            // The other host has always said so: `tip.margin`
+                            // reads "Your profit on top of cost. Price = cost ×
+                            // (1 + margin%)" and is on the field in Electron.
+                            // This app showed the slider and nothing else.
+                            //
+                            // So the SENTENCE is what was missing, not the
+                            // arithmetic. Changing the formula would silently
+                            // reprice every quote in every shop to fix a word;
+                            // the existing string, already translated into nine
+                            // languages, says exactly what the formula does.
+                            //
+                            // Under the row rather than on hover: a tooltip
+                            // nobody opens is the same as no sentence at all,
+                            // and this one is worth 7% of a price.
+                            Text(shop.words.callIt("tip.margin"))
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         .card()
                     }
