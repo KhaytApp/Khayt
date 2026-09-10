@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Before you update
 
+- **Finishing a job now takes off the shelf what the job actually used, not
+  what it was quoted — so check your spools once after updating.** Only where a
+  figure exists: if you record what a print really took, or your printer
+  reports it, that is the number deducted. A job that used 260 g against a
+  160 g quote now takes 260 g, and one that stopped short takes what it got
+  through. Every job you have already finished is untouched, and a job with no
+  recorded actual deducts the estimate exactly as it always has, so nothing
+  changes until you start recording them. Until now the difference between the
+  quote and the truth stayed on the shelf as filament you did not have, with
+  nothing to reconcile it, so it grew with every job — if your spools have been
+  reading high, that is why.
+
 - **Your Profit & Loss will show a lower profit, and the old figure was wrong.**
   Revenue no longer counts the VAT you collect on a sale, because that money is
   not yours: ZATCA and IFRS 15 both treat tax collected from a customer as a
@@ -33,6 +45,46 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   until you enter one.
 
 ### Added
+- **Finishing a job on the Mac asks what it actually took.** Print time and
+  grams, pre-filled with what you quoted, so a job that ran as expected is one
+  Return away and one that did not can be corrected on the spot. Before, the
+  Mac app recorded only the estimate — so the margin it showed on every finished
+  job was the margin you quoted, not the one you made. A job leaving inspection
+  is still asked once: its QC notes are in the same sheet rather than a second
+  one.
+
+  **And where your printer measured the job, those are the figures it offers.**
+  Khayt freezes a print's filament and duration the moment it finishes — the
+  machine's counters reset when the next job starts — and the Mac app now reads
+  them. The sheet marks each figure Measured or Estimated separately, because a
+  PrusaLink box reports a duration and never filament, and it names the print
+  the numbers came from: a finished job stays on offer for 24 hours, and a shop
+  running five-hour prints back to back would otherwise be shown the previous
+  one's figures under a confident label. Change a number and it goes back to
+  being yours, not the printer's.
+
+  A figure you typed is recorded as typed, and the Quoting page counts only what
+  a machine reported — so a correction never becomes evidence about your own
+  estimate. **The Mac app now fills this itself**, from the same polls it
+  already makes to draw your machines, so a shop that never opens Khayt still
+  gets measured figures. It writes only when a print actually ends, and only to
+  a book this Mac holds — a Khayt with the book open is keeping the same record
+  and two writers would overwrite each other.
+
+- **The Mac app shows which of your models you are quoting too cheaply.** A new
+  Quoting page under Reports compares what each model was quoted at with what a
+  printer actually reported — per MODEL, not per job, because an order happened
+  once at a price already charged, while "this hood is quoted at 197 g and
+  across two prints it took 226" is a sentence you can act on. Worst first, with
+  the number of prints behind each row, and a plain line only where a model is
+  consistently under-quoted by enough to matter. Quoting generously is never
+  reported: you hear about that from your customers.
+
+  It counts only jobs a printer measured, on prints of a single part — a typed
+  actual is usually the estimate confirmed, and a multi-part job's figures were
+  divided to get there. So a busy shop can still see an empty page, and the page
+  says which of the two is missing rather than "no data".
+
 - **The board shows where a job may go while you are still holding it.** Drag a
   card and every column that will take it outlines itself; a column that will
   not — because you have set a limit on how many jobs may be in it at once, or

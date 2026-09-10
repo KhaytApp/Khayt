@@ -72,6 +72,28 @@ enum Money {
     /// altogether and hands back "1234567.89".
     private static let digits = Locale(identifier: "en_US")
 
+
+    /// A quantity that is NOT money — grams, hours, millilitres.
+    ///
+    /// Here rather than in the screen that wanted it, because the one thing it
+    /// has to get right is the digits rule above: Western figures, whatever
+    /// language the app is in. A formatter built next to the view that uses it
+    /// is a formatter that will one day be built with `Locale.current` and
+    /// write Arabic-Indic grams on an Arabic screen, which nothing in Khayt
+    /// does outside an invoice a shop asked for.
+    ///
+    /// Two decimals is a money habit and wrong here: nobody weighs a spool to
+    /// the centigram, and `559.10 g` asks a reader to skip four digits to find
+    /// the two that matter.
+    static func quantity(_ value: Double, decimals: Int) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.locale = digits
+        f.minimumFractionDigits = decimals
+        f.maximumFractionDigits = decimals
+        return f.string(from: value as NSNumber) ?? "\(value)"
+    }
+
     static func text(_ amount: Double, _ currency: String) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal

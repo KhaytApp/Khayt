@@ -144,6 +144,32 @@ public actor KhaytEngine {
         // raising is the worst kind, so it is listed rather than guarded against.
         "assembly",
         "order-status",
+        // ── HOW WRONG THE SHOP'S OWN ESTIMATES ARE ────────────────────────
+        //
+        // Three modules for one answer, and none of them can give it alone.
+        // `order-file-link` allocates a finished job's real figures back to the
+        // parts that made it — carrying which print file each came from, and
+        // whether a printer MEASURED the figures or somebody typed them.
+        // `printer-actuals` compares one estimate to one actual, returning null
+        // rather than zero for a side it does not know, which is what keeps "we
+        // have no idea" out of a median instead of dragging it toward nothing.
+        // `estimate-variance` groups the readings by MODEL, which is the unit a
+        // shop can act on: an order happened once, at a price already charged.
+        //
+        // `estimate-variance` takes the other two as arguments rather than
+        // reaching for them, so the load order here is for a reader's benefit
+        // rather than the runtime's.
+        "order-file-link",
+        "printer-actuals",
+        "estimate-variance",
+        // …and the cache those measurements are frozen into. A printer's
+        // filament and duration counters are per-JOB and reset when the next
+        // print starts, so "read them when the shop marks the order done" is
+        // not a plan — the machine may be two jobs further on. Khayt freezes
+        // them on the edge out of printing and PERSISTS them under
+        // `printerCompletions`, which is how this app can offer a measured
+        // figure without polling a printer itself.
+        "printer-poll-cache",
         // What a finished job takes off the shelf: the grams, the hourly
         // consumables, the bought-in components, the packaging. Lifted out of
         // renderer/inventory.js because the move being shared is not enough —
@@ -1349,6 +1375,194 @@ public actor KhaytEngine {
                .array(orders), .object(settings)], as: [String: StatusGate].self)
     }
 
+
+    // MARK: - How wrong the shop's own estimates are
+
+    /// One model, and what it really costs against what it is quoted at.
+    ///
+    /// The unit is the MODEL, not the order, and that is the whole point.
+    /// Analytics can already say "your estimates run 12% short on average",
+    /// which is true and useless: an order happened once, to one customer, at a
+    /// price already charged. "This bracket is quoted at 41 g and 3.2 h; across
+    /// four prints it took 48 g and 3.8 h" is a sentence that changes a price.
+    public struct ModelVariance: Decodable, Sendable, Identifiable, Equatable {
+        public let printFileId: String
+        public let name: String
+        /// How many finished prints this is drawn from.
+        public let sampled: Int
+        /// `good`, `fair` or `thin` — `lib/estimate-variance.js` decides where
+        /// the lines are, so the two apps cannot disagree about what counts as
+        /// enough evidence.
+        public let confidence: String
+        public let estGrams: Double?
+        public let actGrams: Double?
+        /// Null, never zero, when one side of the comparison is unknown.
+        public let gramsDeltaPct: Double?
+        public let estHours: Double?
+        public let actHours: Double?
+        public let hoursDeltaPct: Double?
+        public let lastAt: String?
+        public var id: String { printFileId }
+    }
+
+    /// The one sentence a row is worth, or nil when it has not earned one.
+    public struct VarianceAdvice: Decodable, Sendable, Equatable {
+        /// `time` or `filament` — whichever is further out.
+        public let axis: String
+        public let pct: Int
+        public let sampled: Int
+        public let confidence: String
+    }
+
+    /// Every model worth looking at, worst under-quoted first.
+    ///
+    /// MEASURED AND EXACT ONLY, and the module applies both filters: a typed
+    /// actual is usually the estimate confirmed, so counting those would
+    /// compare an estimate to itself and report a variance near zero — and a
+    /// multi-part job's figures were divided to get here, so they are not
+    /// evidence about any one model.
+    ///
+    /// That is why a busy shop can still see an empty panel, and why the screen
+    /// says so in those words rather than "no data".
+    public func estimateVariance(orders: [JSONValue],
+                                 minSamples: Int = 2) throws -> [ModelVariance] {
+        try runtime.call2(#"""
+        globalThis.KhaytEstimateVariance.varianceByModel(ARG0, {
+          allocate: globalThis.KhaytOrderFileLink.allocateActuals,
+          compare: globalThis.KhaytPrinterActuals.compareToEstimate,
+        }, { minSamples: ARG1 })
+        """#, [.array(orders), .number(Double(minSamples))], as: [ModelVariance].self)
+    }
+
+    /// What to say about one of those rows, if anything.
+    ///
+    /// Only a model that is consistently UNDER-quoted earns a sentence. A shop
+    /// that charges too much finds out from its customers; a panel that reports
+    /// every 3% wobble as news is a panel nobody reads.
+    public func varianceAdvice(_ row: ModelVariance, thresholdPct: Double = 10) throws -> VarianceAdvice? {
+        try runtime.call2(#"""
+        globalThis.KhaytEstimateVariance.advice(ARG0, { thresholdPct: ARG1 })
+        """#, [encodeVarianceRow(row), .number(thresholdPct)], as: VarianceAdvice?.self)
+    }
+
+    /// The row, back the way the module wants it. Only the fields `advice`
+    /// reads, because sending the rest would be inventing a contract.
+    private func encodeVarianceRow(_ r: ModelVariance) -> JSONValue {
+        .object([
+            "sampled": .number(Double(r.sampled)),
+            "confidence": .string(r.confidence),
+            "gramsDeltaPct": r.gramsDeltaPct.map { JSONValue.number($0) } ?? .null,
+            "hoursDeltaPct": r.hoursDeltaPct.map { JSONValue.number($0) } ?? .null,
+        ])
+    }
+
+
+    // MARK: - What the printer said this job took
+
+    /// A completion's figures, offered for a job about to be marked done.
+    ///
+    /// `timeMeasured` and `weightMeasured` are separate because a printer can
+    /// report one and not the other, and pretending otherwise in either
+    /// direction is a lie: PrusaLink gives a duration and no filament, and
+    /// OctoPrint's `job.filament` looks like a measurement and is the file's
+    /// slicing estimate — identical at 1% and at 99%.
+    public struct ActualsPrefill: Decodable, Sendable, Equatable {
+        public let timeH: Double?
+        public let weightG: Double?
+        public let timeMeasured: Bool
+        public let weightMeasured: Bool
+        public let measured: Bool
+        /// Which instrument read them — `moonraker`, `octoprint`, `prusalink`.
+        public let source: String?
+        /// The job the figures belong to. Shown, not just carried: a completion
+        /// stays offerable for 24 hours and a shop running five-hour jobs back
+        /// to back will have started another long before that, so the numbers
+        /// on screen can belong to the PREVIOUS print while wearing a
+        /// "measured" label.
+        public let filename: String?
+        /// `too-old` or `nothing-measured`, when there is nothing to offer.
+        public let staleReason: String?
+    }
+
+    /// The measured figures for one job, from what Khayt froze when the print
+    /// ended — or the estimate, said to be the estimate.
+    ///
+    /// `completions` is the store's `printerCompletions`, which the Electron
+    /// app persists on a timer. This app does not poll printers into that cache
+    /// yet; it reads what is there, so a shop running both gets the measurement
+    /// and a shop running only this one gets an honest "nothing measured".
+    ///
+    /// Matching on the printer's FILENAME is the only honest link between an
+    /// order and a set of figures. Without one the newest completion is
+    /// returned, which is right when a shop marks a job done as it finishes and
+    /// wrong the moment two printers are busy — hence the filename on screen.
+    public func actualsPrefill(completions: JSONValue, machineId: String,
+                               filename: String?,
+                               estimateHours: Double, estimateGrams: Double,
+                               now: Date) throws -> ActualsPrefill {
+        try runtime.call2(#"""
+        (function () {
+          var cache = globalThis.KhaytPollCache.restoreCompletions(ARG0);
+          var entry = cache && cache[ARG1];
+          var found = entry ? globalThis.KhaytPollCache.findCompletion(entry, { filename: ARG2 }) : null;
+          return globalThis.KhaytPrinterActuals.prefillActuals({
+            estimate: { printTime: ARG3, weightG: ARG4 },
+            completion: found,
+            now: ARG5,
+          });
+        })()
+        """#,
+                          [completions, .string(machineId),
+                           filename.map(JSONValue.string) ?? .null,
+                           .number(estimateHours), .number(estimateGrams),
+                           .number(now.timeIntervalSince1970 * 1000)],
+                          as: ActualsPrefill.self)
+    }
+
+
+    /// Fold one poll into a machine's cache, freezing a finished job's figures.
+    ///
+    /// `printer-poll-cache.mergePollSuccess` decides what a "finished job"
+    /// is — the edge OUT of printing, where a pause does not count because a
+    /// paused job is not over — and which reading to keep, preferring the one
+    /// taken after the end because Moonraker and OctoPrint both hold a
+    /// completed job's stats until the next print begins and the last poll
+    /// before the end can be several percent short.
+    ///
+    /// None of that is worth a second opinion in Swift, and a second opinion is
+    /// what a shop would get: Khayt writes this cache too, and the two apps
+    /// have to agree about what a print used.
+    public func mergePoll(previous: JSONValue, status: JSONValue, now: Date) throws -> JSONValue {
+        try runtime.call2(#"""
+        globalThis.KhaytPollCache.mergePollSuccess(ARG0, ARG1, ARG2)
+        """#, [previous, status, .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
+    }
+
+    /// Did that merge just capture a job that was not there before?
+    ///
+    /// The question the caller actually has, because the answer decides whether
+    /// a shop's book is written to. Asked of the module rather than by
+    /// comparing timestamps here: "a job just ended" is its rule, and a poll
+    /// re-merged by a caller must not read as a second completion.
+    public func completionIsNew(before: JSONValue, after: JSONValue) throws -> Bool {
+        try runtime.call2(#"""
+        globalThis.KhaytPollCache.completionIsNew(ARG0, ARG1)
+        """#, [before, after], as: Bool.self)
+    }
+
+    /// The part of a poll cache worth writing to disk: finished jobs, and
+    /// nothing live.
+    ///
+    /// A saved STATUS would come back as a confident "Printing · 47%" for a
+    /// machine that has been off all night, which is the exact failure the
+    /// dashboard's freshness check exists to prevent — so the module refuses to
+    /// carry one and this cannot be persuaded otherwise from here.
+    public func completionsToPersist(_ cache: JSONValue) throws -> JSONValue {
+        try runtime.call2(#"""
+        globalThis.KhaytPollCache.completionsToPersist(ARG0)
+        """#, [cache], as: JSONValue.self)
+    }
+
     /// Where this move would reach outside the shop's own book.
     ///
     /// Ask BEFORE moving anything. A webhook, a Telegram message, an email or a
@@ -1894,9 +2108,23 @@ public actor KhaytEngine {
     /// printer: layers before bytes, the live toolhead rather than head zero,
     /// `print_duration` rather than `total_duration`, and an ETA that refuses
     /// to extrapolate from noise. None of them is re-decided here.
+    /// ── AND WHAT THE JOB HAS USED, FROM THE SAME REPLY ───────────────────
+    ///
+    /// `extractActuals` is handed the RAW response rather than the status this
+    /// returns, because what it reads are fields the status does not carry and
+    /// deliberately does not: Moonraker's `print_duration`, PrusaLink's
+    /// `time_printing`, OctoPrint's `progress.printTime`. Reading them here,
+    /// in the same crossing, means a poll cannot end up with a status from one
+    /// moment and a measurement from another.
     public func moonrakerStatus(_ reply: [String: JSONValue],
                                 hot: [String: JSONValue]?, hotName: String?) throws -> PrinterStatus {
-        try runtime.call2("KhaytMoonraker.readStatus(ARG0, ARG1, ARG2)",
+        try runtime.call2(#"""
+        (function () {
+          var s = KhaytMoonraker.readStatus(ARG0, ARG1, ARG2);
+          s.actuals = KhaytPrinterActuals.extractActuals('moonraker', ARG0, {});
+          return s;
+        })()
+        """#,
                           [.object(reply),
                            hot.map(JSONValue.object) ?? .null,
                            hotName.map(JSONValue.string) ?? .null],
@@ -1910,7 +2138,17 @@ public actor KhaytEngine {
     /// `/api/job` answers fine in exactly that state. `lib/octoprint.js`.
     public func octoprintStatus(printer: [String: JSONValue]?,
                                 job: [String: JSONValue]) throws -> PrinterStatus {
-        try runtime.call2("KhaytOctoprint.readStatus(ARG0, ARG1)",
+        // The JOB response carries `progress.printTime`, which is time already
+        // spent printing and a real reading. Its `filament` is not one, and
+        // `extractActuals` refuses it — see the note in `printer-actuals.js`
+        // about OctoPrint filling that from the file's GCODE analysis.
+        try runtime.call2(#"""
+        (function () {
+          var s = KhaytOctoprint.readStatus(ARG0, ARG1);
+          s.actuals = KhaytPrinterActuals.extractActuals('octoprint', ARG1, {});
+          return s;
+        })()
+        """#,
                           [printer.map(JSONValue.object) ?? .null, .object(job)],
                           as: PrinterStatus.self)
     }
@@ -1922,7 +2160,18 @@ public actor KhaytEngine {
     /// return. `lib/prusalink.js`.
     public func prusalinkStatus(status: [String: JSONValue],
                                 job: [String: JSONValue]?) throws -> PrinterStatus {
-        try runtime.call2("KhaytPrusalink.readStatus(ARG0, ARG1)",
+        // `extractActuals` reads `raw.job.time_printing`, so the job response
+        // is wrapped back under the key it expects rather than passed bare.
+        // PrusaLink reports a duration and no filament at any firmware
+        // version — a mixed answer, which everything downstream is built to
+        // carry rather than round off.
+        try runtime.call2(#"""
+        (function () {
+          var s = KhaytPrusalink.readStatus(ARG0, ARG1);
+          s.actuals = KhaytPrinterActuals.extractActuals('prusalink', { job: ARG1 }, {});
+          return s;
+        })()
+        """#,
                           [.object(status), job.map(JSONValue.object) ?? .null],
                           as: PrinterStatus.self)
     }
@@ -1945,7 +2194,12 @@ public actor KhaytEngine {
     }
 
     /// What a machine is doing, as every adapter reports it.
-    public struct PrinterStatus: Decodable, Sendable, Equatable {
+    /// Codable, not merely Decodable: `printer-poll-cache` is handed a status
+    /// to fold into a machine's cache, so this has to go back across the bridge
+    /// as well as come from it — and encoding the real thing rather than a
+    /// hand-built subset means the cache cannot quietly lose a field somebody
+    /// adds here later.
+    public struct PrinterStatus: Codable, Sendable, Equatable {
         public let state: String
         public let progress: Int
         /// `layers` or `bytes` — which signal the percentage came from, because
@@ -1963,15 +2217,42 @@ public actor KhaytEngine {
         public let tempNozzle: Double?
         public let tempBed: Double?
         public let type: String
+        /// WHAT THIS JOB HAS USED SO FAR, when the protocol reports it.
+        ///
+        /// Read off the same raw reply the status came from, by
+        /// `printer-actuals.extractActuals`, which knows what each protocol
+        /// means by the fields that look like measurements — Moonraker's
+        /// `print_duration` and not `total_duration`, and NOT OctoPrint's
+        /// `job.filament`, which is the file's slicing estimate and identical
+        /// at 1% and at 99%.
+        ///
+        /// Nil for a protocol that reports nothing, and nil for a machine that
+        /// is not printing. It is per-JOB and resets when the next print
+        /// starts, which is why `printer-poll-cache` freezes it on the edge out
+        /// of printing rather than reading it when a shop closes the order.
+        public let actuals: Actuals?
+
+        /// One reading. Null rather than zero for a side nobody measured: a
+        /// zero-length or zero-second reading is a printer that has not run,
+        /// and reporting it as 0 g would tell a shop the print was free.
+        public struct Actuals: Codable, Sendable, Equatable {
+            public let durationS: Double?
+            public let filamentGrams: Double?
+            public let filamentMm: Double?
+            /// Which instrument read it.
+            public let source: String?
+        }
 
         /// Public so a caller with no printer on the network can stand one up —
         /// the snapshot runner and the tests both need a machine that answers,
         /// and neither can put one on this Mac's wifi.
         public init(state: String, progress: Int, progressSource: String?, filename: String,
-                    timeRemaining: Double?, tempNozzle: Double?, tempBed: Double?, type: String) {
+                    timeRemaining: Double?, tempNozzle: Double?, tempBed: Double?, type: String,
+                    actuals: Actuals? = nil) {
             self.state = state; self.progress = progress; self.progressSource = progressSource
             self.filename = filename; self.timeRemaining = timeRemaining
             self.tempNozzle = tempNozzle; self.tempBed = tempBed; self.type = type
+            self.actuals = actuals
         }
     }
 
@@ -3075,9 +3356,25 @@ private let MOVE_SCRIPT = """
   for (var i = 0; i < moved.effects.length; i++) {
     var e = moved.effects[i];
     if (e.type === 'deduct_filament') {
+      // ── WHAT THE JOB REALLY USED, WHERE ANYTHING KNOWS IT ───────────────
+      //
+      // `actualGrams` scales every part's claim to the figure on the record.
+      // Absent — every job finished before a shop started recording them — the
+      // estimate stands exactly as it always has.
+      //
+      // Read off the ORDER rather than passed in, so the Mac and Khayt spend
+      // the same number from the same field. `promptActuals` writes it before
+      // the effects run, and so does `applyMove`; a deduction that read it
+      // from an argument would be a second place for the two to disagree.
+      //
+      // MEASURED OR TYPED, both count. Whether a printer read the figure or
+      // the shop did decides whether it is evidence about an ESTIMATE — which
+      // is `Quoting`'s question — and not what left the shelf. What left the
+      // shelf left it however the shop found out.
       var d = KhaytOrderDeduction.deductForOrder(order, {
         settings: settings, inventory: inventory, consumables: consumables,
-        machines: machines, today: today
+        machines: machines, today: today,
+        actualGrams: order.actualWeight
       });
       notices = notices.concat(d.notices);
       performed.push(e.type);

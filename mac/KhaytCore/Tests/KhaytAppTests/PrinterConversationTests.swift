@@ -87,6 +87,37 @@ struct PrinterConversationTests {
         #expect(status.filename == "bracket.gcode")
         #expect(status.tempNozzle == 214.9)
         #expect(status.timeRemaining == 2400)
+
+        // ── AND WHAT THE JOB HAS USED SO FAR ─────────────────────────────
+        //
+        // `progress.printTime` is "Time already spent printing, in seconds" —
+        // a real reading off a running job. There is none in this payload, so
+        // there is no duration, and that is the honest answer.
+        //
+        // FILAMENT IS NEVER MEASURED BY OCTOPRINT and this must never claim it
+        // is: `job.filament.tool0` looks exactly like one — per-tool, in mm and
+        // cm³, and OctoPrint's own datamodel calls it "Length of filament
+        // used" — and it is the file's GCODE analysis, computed at upload,
+        // identical at 1% and at 99%. Read as an actual it is worse than
+        // nothing.
+        #expect(status.actuals?.filamentGrams == nil,
+                "OctoPrint's slicing estimate was taken for a measurement")
+    }
+
+    @Test("OctoPrint's elapsed print time is a measurement, and its filament is not")
+    func octoprintActuals() async throws {
+        let status = try await PrinterWatch.read(
+            Self.machine("octoprint"), engine: try KhaytEngine(), base: Self.base, key: "k",
+            fetch: Self.server([
+                "/api/printer": (200, #"{"state":{"text":"Printing"},"temperature":{}}"#),
+                // `filament` is present and is the file's analysis. `printTime`
+                // is the reading.
+                "/api/job": (200, #"{"state":"Printing","job":{"file":{"name":"b.gcode"},"filament":{"tool0":{"length":91000,"volume":219}}},"progress":{"completion":99,"printTime":7200}}"#),
+            ]))
+        #expect(status.actuals?.durationS == 7200, "the elapsed time was not read")
+        #expect(status.actuals?.filamentGrams == nil,
+                "219 cm³ of slicing estimate was recorded as filament used")
+        #expect(status.actuals?.source == "octoprint")
     }
 
     // MARK: - PrusaLink
@@ -107,6 +138,26 @@ struct PrinterConversationTests {
         #expect(seen.contains("/api/v1/job"))
         #expect(status.filename == "spice rack v2.gcode", "the long name, not the 8.3 short form")
         #expect(status.progress == 61)
+    }
+
+    /// A MIXED ANSWER, which is the normal one for this printer and which
+    /// everything downstream is built to carry rather than round off.
+    ///
+    /// Buddy reports `time_printing` in seconds and no filament at any firmware
+    /// version, so the completion sheet marks the duration Measured and leaves
+    /// the weight on the estimate — saying which, per field.
+    @Test("PrusaLink measures the duration and never the filament")
+    func prusalinkActuals() async throws {
+        let status = try await PrinterWatch.read(
+            Self.machine("prusalink"), engine: try KhaytEngine(), base: Self.base, key: "k",
+            fetch: Self.server([
+                "/api/v1/status": (200, #"{"printer":{"state":"PRINTING"},"job":{"progress":61}}"#),
+                "/api/v1/job": (200, #"{"file":{"name":"HOOD.GCO"},"time_printing":9540}"#),
+            ]))
+        #expect(status.actuals?.durationS == 9540, "time_printing was not read")
+        #expect(status.actuals?.filamentGrams == nil,
+                "PrusaLink reports no filament, so nothing may claim it did")
+        #expect(status.actuals?.source == "prusalink")
     }
 
     @Test("PrusaLink answering 204 costs the name and nothing else")

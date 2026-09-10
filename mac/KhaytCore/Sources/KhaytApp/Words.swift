@@ -598,6 +598,41 @@ final class Words {
         "mac.pct_paid":      ["en": "{n}% paid",       "ar": "مدفوع {n}%"],
         "mac.book_wont_open": ["en": "This book will not open", "ar": "لا يُفتح هذا الدفتر"],
         "mac.nothing_at_stage": ["en": "Nothing at this stage", "ar": "لا شيء في هذه المرحلة"],
+        // What a model really costs against what it is quoted at.
+        "mac.quoting":      ["en": "Quoting",  "ar": "التسعير"],
+        // Finishing a job, and what it really took.
+        // The title, the button and the hint are Khayt's own `act.*` — the two
+        // apps ask this question with the same words in nine languages, and a
+        // second English sentence here would be one to keep in step for ever.
+        // NOT "measured". A figure off a keyboard and a figure off a printer
+        // are different claims, the record keeps them apart, and the screens
+        // that need a measurement ignore this one — so the sheet says so.
+        "mac.completion_typed":   ["en": "Recorded as typed by hand, not read from the printer.",
+                                   "ar": "تُسجَّل ككتابة يدوية، لا كقراءة من الطابعة."],
+        // `mac.filament` is already written above — the sidebar's shelf — and a
+        // second copy is a fatal `Dictionary literal contains duplicate keys`
+        // at launch, not a warning. `DuplicateWordKeyTests` guards it and could
+        // not help here: the literal traps before any test runs.
+        "mac.time":         ["en": "Time",     "ar": "الوقت"],
+        "mac.not_measured": ["en": "Not measured", "ar": "غير مقاس"],
+        "mac.pct_over":     ["en": "{pct}% over",  "ar": "{pct}% زيادة"],
+        "mac.pct_under":    ["en": "{pct}% under", "ar": "{pct}% أقل"],
+        "mac.prints_word_one": ["en": "print",  "ar": "طبعة"],
+        "mac.prints_word":     ["en": "prints", "ar": "طبعات"],
+        // English has no dual, so its `_two` is just the plural — as every other
+        // `_two` key here carries one. `counting` only reaches for this form in
+        // Arabic; the English side exists so the both-languages guard means
+        // what it says rather than growing an exception.
+        "mac.prints_word_two": ["en": "prints", "ar": "طبعتين"],
+        "mac.quoting_advice_filament": ["en": "Quoted {pct}% short on filament — the price is under what this costs.",
+                                        "ar": "التسعير أقل بـ{pct}% في الخيط — السعر دون تكلفته الفعلية."],
+        "mac.quoting_advice_time":     ["en": "Takes {pct}% longer than quoted — the machine time is under-charged.",
+                                        "ar": "تستغرق {pct}% أطول من المقدَّر — وقت الآلة غير محسوب بالكامل."],
+        "mac.quoting_empty":     ["en": "Nothing measured yet", "ar": "لا قياسات بعد"],
+        // NOT "no data". A shop with a full book gets this screen too, and the
+        // two reasons are both things it can go and change.
+        "mac.quoting_empty_why": ["en": "This compares what a model was quoted at with what a printer reported. It needs jobs finished with figures read from the machine, on prints of a single part.",
+                                  "ar": "تقارن هذه الصفحة ما قُدِّر للنموذج بما أبلغت عنه الطابعة. تحتاج أعمالاً منتهية بأرقام مقروءة من الآلة، على طبعات ذات قطعة واحدة."],
         // A search that emptied the screen. The term is quoted because a shop
         // that has mistyped one letter needs to SEE the letter it typed, and
         // an unquoted word in a sentence hides a stray space entirely.

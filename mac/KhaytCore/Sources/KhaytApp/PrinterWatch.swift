@@ -181,6 +181,70 @@ final class PrinterWatch {
         alertState = .object([:])
     }
 
+
+    // ── FREEZING WHAT A FINISHED JOB USED ────────────────────────────────────
+    //
+    // A printer's filament and duration counters are per-JOB and reset when the
+    // next print starts, so the only moment they are true is the edge out of
+    // printing. Khayt has captured them there for a while and persisted them
+    // under `printerCompletions`; this app read that cache and could not fill
+    // it, so a shop running only the Mac never saw a measured figure on the
+    // sheet that asks what a job took.
+
+    /// Each machine's cache entry, in the shape `printer-poll-cache` keeps.
+    /// Live status included — only the completions are ever written to disk.
+    private var pollCache: [String: JSONValue] = [:]
+
+    /// Fold one answered poll in, and write the book only if a job just ended.
+    private func capture(_ machineId: String, status: KhaytEngine.PrinterStatus,
+                         shop: Shop) async {
+        guard let engine = shop.engine else { return }
+        // Through JSON rather than by hand: `PrinterStatus` is `Codable` for
+        // exactly this, and a status assembled field by field here would drop
+        // whatever somebody adds to it next without anything saying so.
+        guard let data = try? JSONEncoder().encode(status),
+              let row = try? JSONDecoder().decode(JSONValue.self, from: data) else { return }
+        let before = pollCache[machineId] ?? .object([:])
+        guard let after = try? await engine.mergePoll(previous: before, status: row, now: Date())
+        else { return }
+        pollCache[machineId] = after
+        // A WRITE PER POLL WOULD BE A WRITE EVERY TEN SECONDS, per machine, for
+        // a cache that changes when a print ENDS. The module answers "did a job
+        // just finish" itself, so the book is touched at most once per job.
+        guard (try? await engine.completionIsNew(before: before, after: after)) == true else { return }
+        await persistCompletions(shop: shop, engine: engine)
+    }
+
+    /// Write the finished jobs to the shop's book.
+    ///
+    /// ── ONLY A BOOK THIS APP HOLDS ────────────────────────────────────────
+    ///
+    /// `StoreWriter.update` refuses unless this Mac owns the store, which is
+    /// the right answer rather than an obstacle: a Khayt that owns the book is
+    /// polling these printers itself and writing the same cache, and two
+    /// writers would each overwrite the other's completions. The sample is not
+    /// a book at all and is never written.
+    ///
+    /// Read-modify-write INSIDE the chain, for the reason main.js gives at its
+    /// own `persistCompletions`: building the write from a long-lived in-memory
+    /// copy is how a save made seconds ago is overwritten by a snapshot taken
+    /// before it.
+    private func persistCompletions(shop: Shop, engine: KhaytEngine) async {
+        guard let build = shop.source.build else { return }
+        guard let saved = try? await engine.completionsToPersist(.object(pollCache)) else { return }
+        do {
+            try StoreWriter.update(build) { root in
+                root["printerCompletions"] = saved
+            }
+        } catch {
+            // NOT SAID OUT LOUD. A shop cannot act on it, the measurement is
+            // still in memory for this session's sheets, and the ordinary
+            // reason is the one that is not a fault: Khayt has the book open
+            // and is keeping this cache itself.
+            return
+        }
+    }
+
     /// Ask every machine once, one after another.
     ///
     /// Serially rather than all at once: a shop has a handful of printers, and
@@ -190,7 +254,7 @@ final class PrinterWatch {
         var asked = false
         for machine in shop.machines where Self.notWatched(machine) == nil {
             if Task.isCancelled { return }
-            await poll(machine, engine: shop.engine)
+            await poll(machine, shop: shop)
             asked = true
         }
         // The fleet tile is `dashboard-facts`'s answer and it reads this cache,
@@ -250,7 +314,8 @@ final class PrinterWatch {
         return parts.joined(separator: " · ")
     }
 
-    private func poll(_ machine: Machine, engine: KhaytEngine?) async {
+    private func poll(_ machine: Machine, shop: Shop) async {
+        let engine = shop.engine
         guard let engine else { return }
         do {
             let base = try await Self.baseURL(machine, engine: engine)
@@ -268,6 +333,10 @@ final class PrinterWatch {
             }
             readings[machine.id] = Reading(status: status, problem: nil, at: Date(),
                                            consecutiveFailures: 0)
+            // AFTER the reading is recorded, because a shop looking at the
+            // screen should not wait on a store write to see its printer's
+            // progress move. This is the only thing that notices a job ending.
+            await capture(machine.id, status: status, shop: shop)
         } catch {
             let before = readings[machine.id]?.consecutiveFailures ?? 0
             readings[machine.id] = Reading(status: nil, problem: Self.say(error), at: Date(),

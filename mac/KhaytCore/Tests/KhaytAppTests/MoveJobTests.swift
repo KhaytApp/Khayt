@@ -88,7 +88,8 @@ struct MoveJobTests {
     }
 
     static func move(_ root: inout [String: JSONValue], _ id: String, _ stage: Stage,
-                     holdReason: String? = nil, qcNotes: String? = nil)
+                     holdReason: String? = nil, qcNotes: String? = nil,
+                     actuals: Shop.Actuals? = nil)
     async throws -> (undo: [Shop.ChangedRecord], notices: [String]) {
         let engine = try KhaytEngine()
         // Words loaded, not bare: a notice is only useful if it comes back as a
@@ -100,7 +101,8 @@ struct MoveJobTests {
         // hands back; these cases are about the book, so it is dropped here and
         // tested in TelegramTests.
         let out = try await Shop.applyMove(to: &root, id: id, stage: stage, engine: engine,
-                                           words: words, holdReason: holdReason, qcNotes: qcNotes)
+                                           words: words, holdReason: holdReason, qcNotes: qcNotes,
+                                           actuals: actuals)
         return (out.undo, out.notices)
     }
 
@@ -342,6 +344,102 @@ struct MoveJobTests {
         #expect(job["inspector"] == .null, "nobody was named, and nobody is recorded")
     }
 
+    /// ── WHAT IT REALLY TOOK, ALL THE WAY INTO THE BOOK ───────────────────
+    ///
+    /// The sheet that collects these was tested by reading the source, which
+    /// proves the call is made and NOT that the figures survive the move. They
+    /// have to: `applyMove` writes the actuals onto the order, then hands that
+    /// order to the engine, which returns its own updated copy — a step that
+    /// rebuilds the record from anything captured earlier would drop them
+    /// silently, and the job would read as completed with no actuals at all.
+    @Test("the figures the shop typed are in the book afterwards")
+    func actualsSurviveTheMove() async throws {
+        var root = Self.book()
+        _ = try await Self.move(&root, "J1", .completed,
+                                actuals: .init(hours: 3.456, grams: 214.06,
+                                               timeSource: "moonraker", weightSource: "manual"))
+        let job = try #require(Self.row(root, "printLog", "J1"))
+        #expect(job["actualPrintTime"] == JSONValue.number(3.46), "hours are rounded to two")
+        #expect(job["actualWeight"] == JSONValue.number(214.1), "grams to one")
+        guard case .object(let src)? = job["actualsSource"] else {
+            Issue.record("no provenance on the record"); return
+        }
+        // PER AXIS, and carried through unchanged. A record that flattens these
+        // to one value cannot say that the printer timed the job and the shop
+        // weighed it, which is the ordinary case for a PrusaLink machine.
+        #expect(src["time"] == JSONValue.string("moonraker"))
+        #expect(src["weight"] == JSONValue.string("manual"))
+        #expect(src["at"] != nil, "nothing says when this was recorded")
+    }
+
+    /// A move with no actuals must not stamp empty ones. Every job finished
+    /// before this existed has none, and a `0 g` actual would report every one
+    /// of them as having used no filament.
+    @Test("a completion with nothing typed writes no actuals at all")
+    func noActualsMeansNoFields() async throws {
+        var root = Self.book()
+        _ = try await Self.move(&root, "J1", .completed)
+        let job = try #require(Self.row(root, "printLog", "J1"))
+        #expect(job["actualWeight"] == nil)
+        #expect(job["actualPrintTime"] == nil)
+        #expect(job["actualsSource"] == nil)
+    }
+
+    /// ── THE SHELF LOSES WHAT THE JOB REALLY USED ─────────────────────────
+    ///
+    /// `deductForOrder` has taken an `actualGrams` since #978 — "what the
+    /// PRINTER says the job used, when anything measured it" — and nothing
+    /// passed it. That change was about FAILED prints, where the grams go
+    /// through `deductActual` instead, and it left completions where they were
+    /// on purpose: "absent — which is every job Khayt has ever deducted for —
+    /// the estimate stands exactly as before".
+    ///
+    /// What changed since is that a completion can now BE measured. So a job
+    /// that used 260 g against a 160 g quote took 160 g off the shelf and the
+    /// shop was short 100 g, every time, with nothing to reconcile it.
+    ///
+    /// Both apps read it off the same field on the same record, so neither can
+    /// spend a different number from the other.
+    @Test("a job that used more than it was quoted takes the real grams off the shelf")
+    func theShelfFollowsTheActual() async throws {
+        var root = Self.book()          // quoted at 160 g: S1 holds 100, S2 covers the rest
+        _ = try await Self.move(&root, "J1", .completed,
+                                actuals: .init(hours: 4, grams: 260))
+        // 260 g owed rather than 160: S1 still empties, and S2 carries the
+        // extra hundred instead of the extra sixty.
+        #expect(Self.number(Self.row(root, "inventory", "S1")?["weight"]) == 0)
+        let s2 = Self.number(Self.row(root, "inventory", "S2")?["weight"]) ?? -1
+        #expect(s2 == 740, "S2 is at \(s2) g — 840 means the estimate was deducted")
+    }
+
+    /// A MEASUREMENT SMALLER THAN THE QUOTE COUNTS TOO, which is the case a
+    /// shop notices: a print that stopped short, or one that simply used less
+    /// than the slicer thought. Deducting the quote would take filament off a
+    /// shelf that still has it.
+    @Test("a job that used less takes less")
+    func aShortJobTakesLess() async throws {
+        var root = Self.book()
+        _ = try await Self.move(&root, "J1", .completed,
+                                actuals: .init(hours: 1, grams: 80))
+        #expect(Self.number(Self.row(root, "inventory", "S1")?["weight"]) == 20,
+                "S1 is at \(Self.number(Self.row(root, "inventory", "S1")?["weight"]) ?? -1) — 0 means the estimate was deducted")
+        #expect(Self.number(Self.row(root, "inventory", "S2")?["weight"]) == 900,
+                "the second spool was drawn on for a job the first could cover")
+    }
+
+    /// AND EVERY JOB FINISHED BEFORE THIS EXISTED IS UNTOUCHED. A book full of
+    /// records with no actuals must deduct exactly what it always did — this is
+    /// the assertion that says the change cannot rewrite a shop's history or
+    /// its habits, only what it does with a figure it now has.
+    @Test("a completion with no actuals deducts the estimate, exactly as before")
+    func noActualsIsUnchanged() async throws {
+        var root = Self.book()
+        _ = try await Self.move(&root, "J1", .completed)
+        #expect(Self.number(Self.row(root, "inventory", "S1")?["weight"]) == 0)
+        #expect(Self.number(Self.row(root, "inventory", "S2")?["weight"]) == 840)
+        #expect(Self.number(Self.row(root, "inventory", "S3")?["weight"]) == 900)
+    }
+
     @Test("a completion that was not an inspection claims nothing about one")
     func completionWithoutQC() async throws {
         var root = Self.book()   // J1 is printing, not in QC
@@ -351,7 +449,16 @@ struct MoveJobTests {
         #expect(job["qcPassedAt"] == nil)
     }
 
-    @Test("the two moves that ask a question first, and only those")
+    /// EVERY COMPLETION ASKS NOW, and it used to ask only when the job was
+    /// leaving inspection — which this test pinned.
+    ///
+    /// The change is the point rather than a side effect. `order-status.gate`
+    /// sets `needsActuals` for exactly one move, into `completed`, and nothing
+    /// in this app read it: a job finished here kept its estimate as its only
+    /// figure, so its margin was the quoted margin and `Quoting` had no Mac
+    /// path to any data. A job leaving QC is still asked ONCE — the notes live
+    /// in the same sheet.
+    @Test("a hold and a completion ask a question first, and only those")
     func questionsAsked() async {
         let shop = Shop(source: .sample)
         await shop.load(.sample)
@@ -363,10 +470,27 @@ struct MoveJobTests {
         #expect(shop.questionFor(inQC.id, moving: .printing) == nil)
         #expect(shop.questionFor(inQC.id, moving: .post) == nil)
 
-        // Completing asks only when the job is leaving inspection.
-        let asks = shop.questionFor(inQC.id, moving: .completed) != nil
-        #expect(asks == (Stage.of(inQC) == .qc),
-                "finishing a job that was in QC is an inspection; finishing one that was printing is not")
+        // And a completion asks whatever the job was doing before it.
+        #expect(shop.questionFor(inQC.id, moving: .completed) != nil,
+                "finishing a job records what it took, whether or not it was inspected")
+    }
+
+    /// The sheet carries the QC question only for a job that was actually in
+    /// inspection — otherwise every completion would collect notes about an
+    /// inspection that never happened, and `completionWithoutQC` above is the
+    /// test that this must not claim one.
+    @Test("only a job leaving inspection is asked for QC notes")
+    func qcIsAskedOnlyLeavingQC() async {
+        let shop = Shop(source: .sample)
+        await shop.load(.sample)
+        for job in shop.orders where Stage.of(job) != nil {
+            guard shop.questionFor(job.id, moving: .completed) != nil else { continue }
+            shop.questionFor(job.id, moving: .completed)?()
+            guard let asking = shop.pendingCompletion else { continue }
+            #expect(asking.leavingQC == (Stage.of(job) == .qc),
+                    "\(job.id) is in \(Stage.of(job)?.rawValue ?? "?") and leavingQC is \(asking.leavingQC)")
+            shop.clearQuestion()
+        }
     }
 
     @Test("the ids this app mints are the ids Khayt mints")

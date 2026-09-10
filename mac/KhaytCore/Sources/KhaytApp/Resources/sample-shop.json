@@ -54,7 +54,14 @@
           "filename": "ORD-01000-turbine-bracket.jpg",
           "addedAt": "2026-07-02T11:32:00Z"
         }
-      ]
+      ],
+      "actualWeight": 587.06,
+      "actualPrintTime": 11.1936,
+      "actualsSource": {
+        "time": "octoprint",
+        "weight": "octoprint",
+        "at": "2026-07-02T18:00:00.000Z"
+      }
     },
     {
       "id": "ORD-01001",
@@ -451,7 +458,14 @@
           "filename": "ORD-01008-falcon-hood.jpg",
           "addedAt": "2026-08-26T19:01:00Z"
         }
-      ]
+      ],
+      "actualWeight": 214.1,
+      "actualPrintTime": 26.4809,
+      "actualsSource": {
+        "time": "moonraker",
+        "weight": "moonraker",
+        "at": "2026-08-26T18:00:00.000Z"
+      }
     },
     {
       "id": "ORD-01009",
@@ -840,7 +854,14 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-29T14:24:00Z",
-      "productId": "PRD-B5BCAD"
+      "productId": "PRD-B5BCAD",
+      "actualWeight": 236.66,
+      "actualPrintTime": 6.3806,
+      "actualsSource": {
+        "time": "prusalink",
+        "weight": "prusalink",
+        "at": "2026-08-29T18:00:00.000Z"
+      }
     },
     {
       "id": "ORD-01017",
@@ -896,7 +917,14 @@
           "filename": "ORD-01017-robot-gripper-fingers.jpg",
           "addedAt": "2026-06-04T13:19:00Z"
         }
-      ]
+      ],
+      "actualWeight": 11722.84,
+      "actualPrintTime": 177.8405,
+      "actualsSource": {
+        "time": "moonraker",
+        "weight": "moonraker",
+        "at": "2026-06-04T18:00:00.000Z"
+      }
     },
     {
       "id": "ORD-01018",
@@ -1093,7 +1121,14 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-07-07T09:46:00Z",
-      "productId": "PRD-6A91F9"
+      "productId": "PRD-6A91F9",
+      "actualWeight": 541.62,
+      "actualPrintTime": 51.1096,
+      "actualsSource": {
+        "time": "manual",
+        "weight": "manual",
+        "at": "2026-07-07T18:00:00.000Z"
+      }
     },
     {
       "id": "ORD-01022",
@@ -1443,7 +1478,14 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-09-01T15:46:00Z",
-      "productId": "PRD-2CF8FF"
+      "productId": "PRD-2CF8FF",
+      "actualWeight": 238.05,
+      "actualPrintTime": 14.5736,
+      "actualsSource": {
+        "time": "moonraker",
+        "weight": "moonraker",
+        "at": "2026-09-01T18:00:00.000Z"
+      }
     },
     {
       "id": "ORD-01029",
@@ -1588,7 +1630,14 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-07T14:34:00Z",
-      "productId": "PRD-A86347"
+      "productId": "PRD-A86347",
+      "actualWeight": 440.36,
+      "actualPrintTime": 6.4896,
+      "actualsSource": {
+        "time": "manual",
+        "weight": "manual",
+        "at": "2026-08-07T18:00:00.000Z"
+      }
     },
     {
       "id": "ORD-01032",
@@ -1826,7 +1875,14 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-05-14T19:49:00Z",
-      "productId": "PRD-B5BCAD"
+      "productId": "PRD-B5BCAD",
+      "actualWeight": 2795.48,
+      "actualPrintTime": 45.2088,
+      "actualsSource": {
+        "time": "prusalink",
+        "weight": "prusalink",
+        "at": "2026-05-14T18:00:00.000Z"
+      }
     },
     {
       "id": "ORD-01037",

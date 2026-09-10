@@ -33,9 +33,22 @@ import KhaytCore
 
     func render(_ view: some View, _ name: String, size: CGSize) throws {
         guard let dir = Self.outputDir else { return }
+        // ── AND THE WRITING DIRECTION, WHICH THIS DID NOT SET ─────────────
+        //
+        // `KHAYT_LANG=ar` switched the WORDS and nothing else, so every Arabic
+        // picture this harness has ever written showed Arabic text in a
+        // left-to-right layout: the title still on the left, the trailing
+        // figure still on the right, an `HStack` of buttons still in English
+        // order. That is not a picture of the Arabic app, and it is a
+        // convincing one — the words are right, so nothing looks wrong.
+        //
+        // `Direction` already owns the question for the real window; this asks
+        // it the same way rather than testing the variable a second time.
+        let rtl = Direction.rtlLanguages.contains(Direction.shopLanguage())
         let renderer = ImageRenderer(content:
             view.frame(width: size.width, height: size.height)
                 .environment(\.colorScheme, .light)
+                .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
         )
         renderer.scale = 2
         guard let image = renderer.nsImage,
@@ -119,7 +132,16 @@ import KhaytCore
                 histogram[bucket(r, g, b), default: 0] += 1
             }
         }
-        guard !samples.isEmpty, let ground = histogram.max(by: { $0.value < $1.value })?.key else { return }
+        // NO OPAQUE PIXELS AT ALL is the blankest a page can be, and returning
+        // early on it — which this did — skips the one assertion in the file on
+        // exactly the case it exists for. A view `ImageRenderer` will not host
+        // comes back fully transparent and reads as white only because whatever
+        // opens the PNG composites it onto white.
+        guard !samples.isEmpty else {
+            Issue.record("\(name) rendered nothing at all — every sampled pixel is transparent")
+            return
+        }
+        guard let ground = histogram.max(by: { $0.value < $1.value })?.key else { return }
         let gr = CGFloat((ground >> 10) & 31) / 31
         let gg = CGFloat((ground >> 5) & 31) / 31
         let gb = CGFloat(ground & 31) / 31
@@ -277,6 +299,65 @@ import KhaytCore
         // picture of anything — so dark has to be asked for.
         try renderDark(NothingMatched(shop: jobs, mark: .jobs).frame(width: 560),
                        "34-nothing-matched-dark", size: CGSize(width: 560, height: 300))
+    }
+
+    /// What the shop's models really cost against what it quotes for them.
+    ///
+    /// The whole page, from the sample book — which had to be given actuals
+    /// before this could be drawn at all: all 42 of its jobs carried estimates
+    /// and not one an actual, so the panel and every other measured-actuals
+    /// feature drew nothing whatever book you opened.
+    @Test("what a model really costs, against the quote")
+    func quotingPanel() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let rows = try await engine.estimateVariance(orders: shop.orderRows, minSamples: 1)
+        #expect(!rows.isEmpty, "the sample cannot reach this screen — nothing to look at")
+        var said: [String: KhaytEngine.VarianceAdvice] = [:]
+        for row in rows {
+            if let one = try await engine.varianceAdvice(row) { said[row.printFileId] = one }
+        }
+        #expect(!said.isEmpty, "no row earned a sentence, so the sentence is undrawn")
+        // `.list`, not the screen: `ImageRenderer` draws nothing inside a
+        // `ScrollView` and returns a fully transparent bitmap for it.
+        try render(Quoting(shop: shop, rows: rows, said: said).list
+                    .frame(width: 640).background(Khayt.ground),
+                   "35-quoting", size: CGSize(width: 640, height: 620))
+    }
+
+    /// The sheet a finished job now opens, both with and without QC notes.
+    ///
+    /// Its whole job is to be dismissed quickly by a shop whose print ran as
+    /// quoted, and to make correcting a figure obvious to one whose did not —
+    /// which is a thing to look at rather than reason about.
+    @Test("what did it take, with and without the QC question")
+    func completionSheet() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let finishing = Shop.PendingCompletion(id: "ORD-01008", project: "Falcon hood — Najd Architects",
+                                               estHours: 23.86, estGrams: 184.6, leavingQC: false)
+        try render(CompletionSheet(shop: shop, subject: finishing),
+                   "36-completion", size: CGSize(width: 420, height: 300))
+        var fromQC = finishing
+        fromQC = Shop.PendingCompletion(id: finishing.id, project: finishing.project,
+                                        estHours: finishing.estHours, estGrams: finishing.estGrams,
+                                        leavingQC: true)
+        try render(CompletionSheet(shop: shop, subject: fromQC),
+                   "37-completion-qc", size: CGSize(width: 420, height: 400))
+
+        // AND WITH THE PRINTER'S OWN FIGURES, which is the state the whole
+        // chain exists for and the one a shop with a linked machine sees. A
+        // mixed answer on purpose: PrusaLink reports a duration and never
+        // filament, so one axis is measured and the other is not, and the sheet
+        // has to say which without making the other look wrong.
+        func prefill(_ json: String) throws -> KhaytEngine.ActualsPrefill {
+            try JSONDecoder().decode(KhaytEngine.ActualsPrefill.self, from: Data(json.utf8))
+        }
+        var measured = finishing
+        measured.measured = try prefill(#"{"timeH":26.5,"weightG":184.6,"timeMeasured":true,"weightMeasured":false,"measured":true,"source":"prusalink","filename":"falcon-hood-v4.bgcode","staleReason":null}"#)
+        try render(CompletionSheet(shop: shop, subject: measured),
+                   "38-completion-measured", size: CGSize(width: 420, height: 360))
     }
 
     /// Where a model came from, both ways round.
