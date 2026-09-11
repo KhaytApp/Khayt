@@ -451,6 +451,12 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // Which products actually earn.
+        "mac.pp_title":      ["en": "What earns",     "ar": "ما الذي يكسب"],
+        "mac.pp_per_hour":   ["en": "per machine hour", "ar": "لكل ساعة تشغيل"],
+        "mac.pp_best":       ["en": "{name} earns the most per machine hour — {amount} — which is the thing to push.",
+                              "ar": "{name} الأعلى ربحًا لكل ساعة تشغيل — {amount} — وهو ما يستحق الترويج."],
+        "mac.pp_hours":      ["en": "{n} h",          "ar": "{n} ساعة"],
         // How many quotes turn into work.
         "mac.qf_by_value":   ["en": "of the money",   "ar": "من قيمة العروض"],
         "mac.qf_by_count":   ["en": "of the quotes",  "ar": "من عدد العروض"],

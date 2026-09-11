@@ -1749,30 +1749,30 @@ function renderProductProfitability() {
   const el = $('#productProfitSection');
   if (!el) return;
 
-  const completed = printLog.filter(o => o.status === 'completed' && !o.voidedAt && _countsForBusiness(o) && inRange(o.date, analyticsRange, 'analytics'));
-  if (completed.length === 0) {
+  // `lib/product-profit.js`, not the rollup that used to be here. Two changes
+  // a reader will notice:
+  //
+  //   IT COUNTS `delivered`. This filtered on `completed` alone, so every
+  //   product that actually reached a customer dropped out of its own
+  //   profitability row.
+  //
+  //   IT RANKS BY PROFIT, not by revenue. The row a shop opens this table to
+  //   find is the big seller that earns nothing, and ranking by revenue put
+  //   that row at the top looking like the best thing in the shop.
+  const report = KhaytProductProfit.productProfit({
+    orders: (printLog || []).filter(o => inRange(o.date, analyticsRange, 'analytics')),
+    products: products || [], expenses: expenses || [], untagged: t('an.untagged'),
+  }, {
+    revenueOf: orderNetRevenueBase, partCostOf: partTotalCost,
+    nameOf: localName, countsForBusiness: _countsForBusiness,
+  });
+  if (report.rows.length === 0) {
     el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.no_data'))}</p>`;
     return;
   }
-
-  // Aggregate by productId (fall back to 'Untagged' bucket)
-  const map = {};
-  for (const o of completed) {
-    const key = o.productId || '__none__';
-    if (!map[key]) {
-      const prod = products.find(p => p.id === key);
-      map[key] = { name: prod ? localName(prod) : t('an.untagged'), revenue: 0, cost: 0, count: 0 };
-    }
-    map[key].revenue += orderNetRevenueBase(o);
-    map[key].count++;
-    // Estimate cost from parts if available
-    const partCost = (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0);
-    // Add linked expenses to cost (Feature 4)
-    const linkedExpCost = expenses.filter(e => e.orderId === o.id).reduce((s, e) => s + (+e.amount || 0), 0);
-    map[key].cost += partCost + linkedExpCost;
-  }
-
-  const rows = Object.values(map).sort((a, b) => b.revenue - a.revenue);
+  const rows = report.rows.map(r => ({
+    name: r.name, revenue: r.revenue, cost: r.cost, count: r.jobs,
+  }));
   const maxRev = Math.max(...rows.map(r => r.revenue), 1);
 
   el.innerHTML = `
