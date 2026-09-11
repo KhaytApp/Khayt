@@ -451,6 +451,13 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // How many quotes turn into work.
+        "mac.qf_by_value":   ["en": "of the money",   "ar": "من قيمة العروض"],
+        "mac.qf_by_count":   ["en": "of the quotes",  "ar": "من عدد العروض"],
+        "mac.qf_decide":     ["en": "{n} days to decide, typically",
+                              "ar": "{n} يومًا للبتّ عادةً"],
+        "mac.qf_open":       ["en": "{n} quotes still open, worth {amount}. The oldest has been waiting {days} days.",
+                              "ar": "{n} عروض ما زالت مفتوحة بقيمة {amount}. أقدمها ينتظر منذ {days} يومًا."],
         // Whether the shop can take another job.
         "mac.cap_clear_days": ["en": "clear in {n} days", "ar": "يخلو خلال {n} يومًا"],
         "mac.cap_clear_soon": ["en": "free today",       "ar": "متاح اليوم"],

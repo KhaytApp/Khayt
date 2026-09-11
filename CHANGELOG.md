@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **How many quotes turn into work — and how much of the money does.** Two win
+  rates side by side on the Mac's quoting screen, because they disagree and the
+  gap is the finding: winning most of your quotes and a minority of the money
+  means you are losing the jobs that matter. It also says how long customers
+  typically take to decide, and calls out the quotes still sitting open, what
+  they are worth, and how long the oldest has waited — a funnel is a report, an
+  open quote is a phone call.
+
 - **"Can we take this job?" is now a date, on the machines screen.** Agreed,
   unfinished work against the hours each machine is actually run — and instead
   of a percentage you have to convert, it says *clear in 3 days* or *26 days
@@ -107,6 +115,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **The quote conversion rate was too low for every shop that marks work
+  delivered.** The funnel's last step counted only orders at *completed* —
+  and *delivered* comes after it, so every job that actually reached a customer
+  dropped out of the final step. A cancelled order was also counted as
+  converted, and work outside the shop's trade was counted at all.
 
 - **Overbooked looked exactly like full.** The capacity forecast capped the
   load at 100%, so a machine with three weeks of work queued drew the same full

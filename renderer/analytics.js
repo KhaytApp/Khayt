@@ -616,26 +616,27 @@ function renderQuoteFunnelChart() {
   const el = $('#quoteFunnelChart');
   if (!el) return;
 
-  // Step 1: All orders that were at some point a quote
-  const allQuoteOrders = printLog.filter(o =>
-    o.status === 'quote' || o.quoteSentAt || o.quoteAcceptedAt
-  );
-  // Step 2: Quotes that were explicitly sent
-  const sent = allQuoteOrders.filter(o => o.quoteSentAt);
-  // Step 3: Quotes accepted by client
-  const accepted = allQuoteOrders.filter(o => o.quoteAcceptedAt);
-  // Step 4: Accepted quotes converted to active orders (status not 'quote', not voided)
-  const converted = accepted.filter(o => o.status !== 'quote' && !o.voidedAt);
-  // Step 5: Converted that are now completed
-  const completedConv = converted.filter(o => o.status === 'completed');
-
-  const steps = [
-    { key: 'an.funnel_created',   count: allQuoteOrders.length, color: '#6366f1' },
-    { key: 'an.funnel_sent',      count: sent.length,           color: '#3b82f6' },
-    { key: 'an.funnel_accepted',  count: accepted.length,       color: '#22c55e' },
-    { key: 'an.funnel_converted', count: converted.length,      color: '#f59e0b' },
-    { key: 'an.funnel_completed', count: completedConv.length,  color: '#10b981' },
-  ];
+  // `lib/quote-funnel.js`, not the filters that used to be here. The last step
+  // counted `status === 'completed'` ONLY — and `delivered` is past completed
+  // in Khayt's pipeline, so every job that reached a customer fell out of the
+  // funnel's final step and the rate printed below was too low for every shop
+  // that marks work delivered. A CANCELLED order also counted as converted,
+  // and the business scope was ignored.
+  const funnel = KhaytQuoteFunnel.quoteFunnel(
+    { orders: printLog || [], now: Date.now() },
+    { priceOf: orderNetRevenueBase, countsForBusiness: _countsForBusiness });
+  const colours = {
+    created: '#6366f1', sent: '#3b82f6', accepted: '#22c55e',
+    converted: '#f59e0b', finished: '#10b981',
+  };
+  const labels = {
+    created: 'an.funnel_created', sent: 'an.funnel_sent', accepted: 'an.funnel_accepted',
+    converted: 'an.funnel_converted', finished: 'an.funnel_completed',
+  };
+  const steps = funnel.steps.map((s) => ({
+    key: labels[s.key], count: s.count, color: colours[s.key],
+  }));
+  const allQuoteOrders = { length: funnel.steps[0].count };
 
   if (allQuoteOrders.length === 0) {
     el.innerHTML = '';
@@ -667,9 +668,8 @@ function renderQuoteFunnelChart() {
       </div>`;
   }).join('');
 
-  const overallRate = allQuoteOrders.length > 0
-    ? Math.round((completedConv.length / allQuoteOrders.length) * 100)
-    : 0;
+  const overallRate = funnel.totals.winRateByCount == null
+    ? 0 : Math.round(funnel.totals.winRateByCount * 100);
 
   el.innerHTML = `
     <div class="card" style="margin-bottom:16px;">

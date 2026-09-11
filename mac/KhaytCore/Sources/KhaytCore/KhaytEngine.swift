@@ -371,6 +371,8 @@ public actor KhaytEngine {
         "client-value",
         // Whether the shop can take another job, and when it would start.
         "capacity",
+        // How many quotes turn into work, and how much of the money does.
+        "quote-funnel",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1874,6 +1876,58 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - How many quotes turn into work
+
+    /// The quote funnel, and the two win rates that disagree with each other.
+    ///
+    /// `lib/quote-funnel.js`. The last step counts `delivered` as well as
+    /// `completed` — delivered is PAST completed in Khayt's pipeline, and
+    /// leaving it out is what made the other app's win rate too low for every
+    /// shop that marks work delivered.
+    public struct QuoteFunnel: Decodable, Sendable {
+        public let steps: [Step]
+        public let totals: Totals
+
+        public struct Step: Decodable, Sendable, Identifiable, Hashable {
+            /// `created`, `sent`, `accepted`, `converted`, `finished`.
+            public let key: String
+            public let count: Int
+            public let value: Double
+            public var id: String { key }
+        }
+
+        public struct Totals: Decodable, Sendable {
+            /// Nil for a shop that has never quoted — which is not a rate of
+            /// nought.
+            public let winRateByCount: Double?
+            /// And by money, because ten small quotes won and one large one
+            /// lost is a very different month from the reverse.
+            public let winRateByValue: Double?
+            public let medianDaysToDecide: Double?
+            public let openCount: Int
+            public let openValue: Double
+            public let oldestOpenDays: Int?
+        }
+    }
+
+    public func quoteFunnel(orders: [JSONValue], now: Date,
+                            settings: [String: JSONValue], clients: [JSONValue])
+        throws -> QuoteFunnel {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG2, clients: ARG3 };
+          return globalThis.KhaytQuoteFunnel.quoteFunnel({ orders: ARG0, now: ARG1 }, {
+            priceOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            countsForBusiness: function (o) {
+              return globalThis.KhaytBusinessScope
+                ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
+            },
+          });
+        })()
+        """#, [.array(orders), .number(now.timeIntervalSince1970 * 1000),
+               .object(settings), .array(clients)], as: QuoteFunnel.self)
     }
 
     // MARK: - Can the shop take this job?

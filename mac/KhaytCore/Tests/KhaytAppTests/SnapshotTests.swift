@@ -702,4 +702,30 @@ import KhaytCore
                    "46-capacity", size: CGSize(width: 600, height: 620))
     }
 
+    /// How many quotes turn into work, and how much of the money does.
+    ///
+    /// The two rates side by side are the thing to look at: when they are far
+    /// apart, the gap IS the finding.
+    @Test("the quote funnel, both rates and the open ones")
+    func quoteFunnelCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let funnel = try await engine.quoteFunnel(
+            orders: shop.orderRows,
+            now: Date(timeIntervalSince1970: 1_789_084_800),   // 2026-09-11
+            settings: shop.settingsDict, clients: shop.clientRows)
+        #expect(funnel.totals.winRateByCount != nil, "the sample cannot reach this card")
+
+        try render(VStack(spacing: 16) {
+            QuoteFunnelCard(shop: shop, report: funnel)
+                .card(rail: Khayt.cyan, padding: 14)
+            // And the state a shop that has never quoted sees.
+            QuoteFunnelCard(shop: shop, report: nil)
+                .card(rail: Khayt.cyan, padding: 14)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "47-quote-funnel", size: CGSize(width: 600, height: 540))
+    }
+
 }

@@ -27,17 +27,34 @@ struct Quoting: View {
     /// than per-row in the body: it is an engine call, and a `View` body runs
     /// whenever anything near it changes.
     let said: [String: KhaytEngine.VarianceAdvice]
+    /// How many quotes turn into work. Beside how ACCURATE the quotes are,
+    /// because those are the two halves of one question: a shop whose quotes
+    /// are precise and rarely accepted is priced wrong, and one whose quotes
+    /// are always accepted and always over is priced low.
+    var funnel: KhaytEngine.QuoteFunnel?
 
     var body: some View {
-        if rows.isEmpty {
-            EmptyHere(title: shop.words.callIt("mac.quoting_empty"),
-                      message: shop.words.callIt("mac.quoting_empty_why"),
-                      mark: .reports)
-                .frame(maxHeight: .infinity)
-        } else {
-            ScrollView { list }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                // The funnel FIRST, and shown even when there is no variance to
+                // report: how many quotes are won is knowable from the day a
+                // shop opens, and how far a quote misses needs measured prints.
+                // Hiding the first behind the second is why this screen was
+                // blank for a shop that had never measured anything.
+                QuoteFunnelCard(shop: shop, report: funnel)
+                    .card(rail: Khayt.cyan, padding: 14)
+
+                if rows.isEmpty {
+                    EmptyHere(title: shop.words.callIt("mac.quoting_empty"),
+                              message: shop.words.callIt("mac.quoting_empty_why"),
+                              mark: .reports)
+                } else {
+                    list
+                }
+            }
+            .padding(Metric.screen)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     /// The rows, outside the `ScrollView` that holds them.
@@ -52,7 +69,6 @@ struct Quoting: View {
                 Row(shop: shop, row: row, said: said[row.printFileId])
             }
         }
-        .padding(Metric.screen)
     }
 
     private struct Row: View {
