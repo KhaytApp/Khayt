@@ -3092,6 +3092,16 @@ final class Shop {
             from: "", to: "", unassigned: words.callIt("dash.unassigned"))
     }
 
+    /// What the shelf costs, and whether that has moved.
+    ///
+    /// The RAW inventory rows: `materialCost` reads `spoolWeight` and the unit,
+    /// and `Spool` carries neither — re-encoding the decoded shelf would price
+    /// every sheet good as if it were filament.
+    func materialCost() async -> KhaytEngine.MaterialCost? {
+        guard let engine else { return nil }
+        return try? await engine.materialCost(inventory: inventoryRows, minimum: 2)
+    }
+
     /// Keep the shop's saved reports.
     ///
     /// The same narrowness as `saveSlicers` and for the same reason: one named

@@ -381,6 +381,8 @@ public actor KhaytEngine {
         "machine-reliability",
         // When the shop actually finishes work.
         "throughput",
+        // What the shelf costs, and whether that has moved.
+        "material-cost",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1884,6 +1886,56 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - What the shelf costs
+
+    /// What the shop's materials cost, and whether that has moved.
+    ///
+    /// `lib/material-cost.js`. A shop quoting off last year's filament price is
+    /// quoting at a loss, and nothing has answered this: the other app has a
+    /// supplier price history, which needs a suppliers list and purchase
+    /// records that no shop's book here actually has. The SPOOLS have it.
+    ///
+    /// Priced in each item's OWN rate unit — a kilo, a litre, one sheet. A
+    /// per-kilo figure for everything reported the sample shop's acrylic at
+    /// 42,000, because a sheet is not weighed.
+    public struct MaterialCost: Decodable, Sendable {
+        public let rows: [Row]
+        public let totals: Totals
+
+        public struct Row: Decodable, Sendable, Identifiable, Hashable {
+            public let material: String
+            /// What one rate unit costs, most recently bought.
+            public let perUnit: Double
+            /// `kg`, `L`, `sheet` — which one `perUnit` is of.
+            public let rate: String
+            public let spoolCount: Int
+            public let earliest: String?
+            public let latest: String?
+            /// First purchase against the most recent. Nil until there have
+            /// been enough to compare — two rolls a month apart from different
+            /// sellers is noise, not a trend.
+            public let changePct: Double?
+            public var id: String { material }
+        }
+
+        public struct Totals: Decodable, Sendable {
+            public let materials: Int
+            /// The one that has risen most. Only a RISE, and only where there
+            /// is enough history for "risen" to mean anything.
+            public let steepest: Row?
+            public let dearest: Row?
+            public let anyChangeKnown: Bool
+        }
+    }
+
+    public func materialCost(inventory: [JSONValue], minimum: Int) throws -> MaterialCost {
+        try runtime.call2(#"""
+        globalThis.KhaytMaterialCost.materialCost({
+          inventory: ARG0, minimum: ARG1,
+        }, {})
+        """#, [.array(inventory), .number(Double(minimum))], as: MaterialCost.self)
     }
 
     // MARK: - When the shop finishes work

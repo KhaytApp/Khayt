@@ -363,6 +363,10 @@ struct Inventory: View {
     /// "needs drying" and "empty in 14 days" is two lines taller than one that
     /// is simply full, and nine of them came out as two rows of two heights.
     @State private var tallest: CGFloat = 0
+    /// What the shelf costs, and whether that has moved. Here rather than in
+    /// the reports because it is a fact about the shelf, and this is the screen
+    /// a shop is on when it is deciding what to reorder.
+    @State private var prices: KhaytEngine.MaterialCost?
 
     /// Top-aligned for the reason `MachineFloor` gives: an unaligned `GridItem` centres.
     private let columns = [GridItem(.adaptive(minimum: 210, maximum: 280), spacing: 14, alignment: .top)]
@@ -384,6 +388,19 @@ struct Inventory: View {
                 NothingMatched(shop: shop, mark: .filament)
             } else {
                 ScrollView {
+                    // ── WHAT IT COSTS, ABOVE WHAT IS ON IT ────────────────
+                    //
+                    // The cards below say what the shop HAS. This says what it
+                    // is paying, and whether that has moved — which is the
+                    // question a shop has while looking at a shelf it is about
+                    // to reorder from. Only when nothing is being searched for:
+                    // a price summary of the whole shelf above three filtered
+                    // cards describes a different set from the one on screen.
+                    if shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        MaterialCostCard(shop: shop, report: prices)
+                            .card(rail: Khayt.cyan, padding: 14)
+                            .padding(.bottom, 14)
+                    }
                     LazyVGrid(columns: columns, spacing: 14) {
                         ForEach(shown) { spool in
                             SpoolCard(spool: spool, shop: shop,
@@ -421,6 +438,11 @@ struct Inventory: View {
                 }
                 .background(Khayt.ground)
             }
+        }
+        // Recomputed when the shelf changes. A price is a fact about what was
+        // bought, so it moves only when a spool is added or edited.
+        .task(id: shop.spools.count) {
+            prices = await shop.materialCost()
         }
     }
 }
