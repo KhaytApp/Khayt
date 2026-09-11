@@ -21,6 +21,18 @@ const WATCHED = [
   (f) => f === 'preload.js',
   (f) => f.startsWith('lib/'),
   (f) => f.startsWith('renderer/'),
+  // ── THE MAC APP SHIPS TOO, AND THIS DID NOT KNOW ────────────────────────
+  //
+  // This list was written when Khayt was one product. The native Mac app is a
+  // second one now — its own version, its own release lane, its own downloads
+  // — and none of it was watched, so every user-visible Mac change since has
+  // passed this check without a line. The 4.0.0-alpha.3 notes were written by
+  // hand at cut time, which is precisely the reconstruction-after-the-fact
+  // this file exists to end; it simply had not been told the Mac app exists.
+  //
+  // `Sources/` and not `mac/`: the tests, the build script and the package
+  // manifest are exempt for the same reason `test/` is.
+  (f) => f.startsWith('mac/KhaytCore/Sources/'),
 ];
 
 /**

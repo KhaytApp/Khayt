@@ -6,6 +6,33 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A product can be written down on the Mac.** The catalogue could be
+  read here and not added to: making a product meant opening the Windows and
+  Linux app. There is an editor now, with one tab per language your catalogue
+  carries rather than a fixed English and Arabic — a shop selling in German gets
+  a German tab. Everything the sheet does not show is left exactly as it was:
+  the parts, the prices per quantity, the photo and the documents.
+
+- **(Mac) The catalogue can be looked at, not only read.** A grid of photographs
+  beside the existing table, which stays the default because it is the only view
+  that puts margin next to weight. The library has had this argument made for it
+  since it shipped — a print shop recognises a thing by looking at it — and the
+  catalogue is where it is truest.
+
+- **(Mac) Importing models is on the library, and keeps your folders.** The only
+  way in was a menu item called "Add model" in the Book menu; the library screen
+  itself offered nothing, and dropping a folder on it did nothing. There is an
+  *Import models* button on the library now, and you can drag files or folders
+  straight onto it.
+
+  **It also keeps the grouping you already had.** Every imported model used to
+  arrive ungrouped, so a download of seven models in seven folders had to be
+  regrouped by hand. The folder a model came from is now the group it lands in —
+  and packaging folders are seen through: a model at
+  `Saudi Kings/King Abdulaziz/STL/presupported/crown.stl` is filed under *King
+  Abdulaziz*, not under *presupported*.
+
+
 - **Quality on the Mac: how much is right *first* time.** Pass rate is the easy
   number and the less useful one — a shop that reprints until it passes has a
   pass rate near 100% and a quality problem. First-pass yield collapses a
@@ -167,6 +194,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **(Mac) Four screens had a search box that did nothing.** The calculator, the
+  colour studio, the reports and the dashboard are not lists, and the field on
+  them could be typed into to no effect — while saying "Job, customer or
+  number". It is gone from those. The catalogue, which *is* a list, now searches
+  by name, description, material and group; the shelf and the catalogue also
+  stop asking for a job number when what they filter is filament and products.
 
 - **A shop that had never inspected anything was shown a 0% pass rate.** Which
   reads as "everything failed" about a shop that has simply not started. Both
