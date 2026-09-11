@@ -367,6 +367,8 @@ public actor KhaytEngine {
         "break-even",
         // What reached and left the bank, as opposed to what was earned.
         "cash-flow",
+        // Which customers are worth keeping.
+        "client-value",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1870,6 +1872,78 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - Who the customers are worth
+
+    /// What each customer has been worth over its whole life with the shop.
+    ///
+    /// `lib/client-value.js`. Lifetime value is revenue EARNED — finished,
+    /// unvoided, in the shop's trade — the same set `top-lists` and the P&L
+    /// count. A quote is not lifetime value however large it is, which is the
+    /// bug the module was written to end.
+    public struct ClientValue: Decodable, Sendable {
+        public let rows: [Row]
+        public let totals: Totals
+
+        public struct Row: Decodable, Sendable, Identifiable, Hashable {
+            public let clientId: String
+            public let name: String
+            public let value: Double
+            public let jobs: Int
+            public let averageJob: Double
+            /// Days since the last finished job. Nil for a customer that has
+            /// never had one — which is not the same as a very old one.
+            public let daysSince: Int?
+            /// Has this customer stopped coming back? False for one that never
+            /// started: it has not gone anywhere.
+            public let quiet: Bool
+            public let shareOfRevenue: Double
+            /// Agreed work not yet earned. Not part of `value`, and a quote is
+            /// not part of this.
+            public let inFlight: Double
+            public var id: String { clientId }
+        }
+
+        public struct Totals: Decodable, Sendable {
+            public let earned: Double
+            public let clients: Int
+            /// How badly it would hurt to lose the biggest one. A shop with 60%
+            /// of its revenue in one customer has a different business from one
+            /// with 6%.
+            public let topShare: Double
+            public let quiet: Int
+        }
+    }
+
+    public func clientValue(clients: [JSONValue], orders: [JSONValue],
+                            now: Date, quietDays: Int, limit: Int,
+                            settings: [String: JSONValue], language: String)
+        throws -> ClientValue {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG5, clients: ARG0 };
+          return globalThis.KhaytClientValue.clientValue({
+            clients: ARG0, orders: ARG1, now: ARG2, quietDays: ARG3, limit: ARG4,
+          }, {
+            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            countsForBusiness: function (o) {
+              return globalThis.KhaytBusinessScope
+                ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
+            },
+            // The shop's own text may be written in more than one language.
+            nameOf: function (c) {
+              return globalThis.KhaytContentLanguages.read(c, 'name', ARG6, ARG5)
+                || (c && (c.name || c.company)) || '';
+            },
+          });
+        })()
+        """#,
+                          [.array(clients), .array(orders),
+                           .number(now.timeIntervalSince1970 * 1000),
+                           .number(Double(quietDays)), .number(Double(limit)),
+                           .object(settings), .string(language)],
+                          as: ClientValue.self)
     }
 
     // MARK: - Cash flow

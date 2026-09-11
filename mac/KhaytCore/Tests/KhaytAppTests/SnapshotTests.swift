@@ -623,4 +623,30 @@ import KhaytCore
                    "44-cash-flow", size: CGSize(width: 660, height: 480))
     }
 
+    /// Which customers are worth keeping.
+    ///
+    /// The sentence above the table is the part worth looking at — a ranked
+    /// list is something a shop already knows, and how much of the business
+    /// rests on the first row is not.
+    @Test("what each customer has been worth, and who has stopped coming back")
+    func clientValueTable() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let worth = try await engine.clientValue(
+            clients: shop.clientRows, orders: shop.orderRows,
+            now: Date(timeIntervalSince1970: 1_789_084_800),   // 2026-09-11
+            quietDays: 90, limit: 8,
+            settings: shop.settingsDict, language: shop.words.language)
+        #expect(!worth.rows.isEmpty, "the sample cannot reach this table")
+        // A screen only reviewed with every row in one state has half been
+        // reviewed: the amber line only appears on a customer that stopped.
+        #expect(worth.totals.quiet > 0, "no quiet customer, so that row is undrawn")
+
+        try render(ClientValueTable(shop: shop, report: worth)
+                    .card(rail: Khayt.cyan, padding: 14)
+                    .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "45-client-value", size: CGSize(width: 600, height: 560))
+    }
+
 }

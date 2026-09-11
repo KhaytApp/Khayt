@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Client lifetime value on the Mac — with the sentence the table could not
+  say.** What each customer has been worth over its whole life with the shop,
+  who has stopped coming back, and who has work in flight. Above it, the thing
+  a ranked list cannot tell you by being read: how much of the whole business
+  rests on the first row. A shop with 60% of its revenue in one customer has a
+  different business from one with 6%.
+
 - **Cash flow on the Mac: what actually reached the bank.** Money in above the
   line, money out below it, on one shared scale — so a month where the shop was
   busy and no better off is a shape rather than a subtraction you have to do.
@@ -93,6 +100,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **A quote counted as lifetime value.** The client value table counted every
+  order carrying a customer's name, with no check on whether it was ever
+  agreed — so somebody who asked for ten quotes and bought nothing could sit at
+  the top of the list, which is the one place that must not reward asking. It
+  counted voided orders and out-of-trade work too. Lifetime value is now
+  revenue *earned*, the same set the quarters count.
+- **A customer who had never bought anything was flagged as a churn risk.** It
+  had not gone anywhere. Only a customer who bought and then stopped is marked
+  quiet now, so the list stays one a shop can act on.
 
 - **The cash-flow chart counted a deposit as the whole job.** A payment date is
   recorded on *any* payment, and the chart put the job's entire revenue on that

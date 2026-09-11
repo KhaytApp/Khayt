@@ -26,6 +26,9 @@ struct Reports: View {
     /// because a shop can be profitable and unable to pay the rent, and the
     /// P&L alone cannot say which it is.
     @State private var flow: KhaytEngine.CashFlow?
+    /// What each customer has been worth over its whole life with the shop —
+    /// beside the top lists, which answer "who is biggest this period".
+    @State private var worth: KhaytEngine.ClientValue?
     /// How far each machine runs from its quote, and the shop's own figure.
     /// Not filtered to the chosen period: a machine's calibration is not a
     /// property of this quarter, and the measured-only filter already thins the
@@ -53,7 +56,7 @@ struct Reports: View {
             if shop.reportPage == .owing {
                 Owing(shop: shop, owed: owed)
             } else if shop.reportPage == .best {
-                Best(shop: shop, best: best)
+                Best(shop: shop, best: best, worth: worth)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice)
             } else if shop.reportPage == .machines {
@@ -236,6 +239,7 @@ struct Reports: View {
             currencies: Invoice.currencyTable(shop), now: Date())) ?? []
         await recomputeBreakEven()
         await recomputeCashFlow()
+        await recomputeClientValue()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
@@ -290,6 +294,18 @@ struct Reports: View {
             orders: shop.orderRows, expenses: shop.expenseRows,
             endMonth: month.string(from: Date()), months: 6,
             settings: shop.settingsDict, clients: shop.clientRows)
+    }
+
+    private func recomputeClientValue() async {
+        guard let engine = shop.engine else { return }
+        // NOT filtered to the chosen period. Lifetime value is a lifetime — a
+        // customer's whole history with the shop is the point of it, and
+        // narrowing it to a quarter would make it the top-clients list above
+        // with a different heading.
+        worth = try? await engine.clientValue(
+            clients: shop.clientRows, orders: shop.orderRows, now: Date(),
+            quietDays: 90, limit: 10,
+            settings: shop.settingsDict, language: shop.words.language)
     }
 
     private func recomputeMachinePL() async {
@@ -354,21 +370,35 @@ struct Reports: View {
     private struct Best: View {
         let shop: Shop
         let best: KhaytEngine.TopLists?
+        let worth: KhaytEngine.ClientValue?
 
         var body: some View {
             // Two cards rather than two halves of one pane divided by a rule.
             // The rule was doing the work a gap and two edges do better, and it
             // left both lists sitting directly on the window with nothing to
             // say where either began.
-            HStack(alignment: .top, spacing: 14) {
-                Ranking(title: shop.words.callIt("an.top_clients"),
-                        rows: best?.clients ?? [], empty: "an.no_top_clients",
-                        shop: shop, showing: .revenue)
-                Ranking(title: shop.words.callIt("an.top_products"),
-                        rows: best?.products ?? [], empty: "an.no_top_products",
-                        shop: shop, showing: .count)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 14) {
+                        Ranking(title: shop.words.callIt("an.top_clients"),
+                                rows: best?.clients ?? [], empty: "an.no_top_clients",
+                                shop: shop, showing: .revenue)
+                        Ranking(title: shop.words.callIt("an.top_products"),
+                                rows: best?.products ?? [], empty: "an.no_top_products",
+                                shop: shop, showing: .count)
+                    }
+                    // ── AND WHO IS WORTH KEEPING ──────────────────────────
+                    //
+                    // The lists above answer "who was biggest THIS period",
+                    // which is the question a shop asks monthly. This answers
+                    // "who has been worth the most, ever, and who has stopped
+                    // coming back" — the question it should ask before it
+                    // decides who to chase.
+                    ClientValueTable(shop: shop, report: worth)
+                        .card(rail: Khayt.cyan, padding: 14)
+                }
+                .padding(Metric.screen)
             }
-            .padding(Metric.screen)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
 
