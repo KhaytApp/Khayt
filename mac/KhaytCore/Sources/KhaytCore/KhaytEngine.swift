@@ -375,6 +375,8 @@ public actor KhaytEngine {
         "quote-funnel",
         // Which products actually earn, and which earn per machine hour.
         "product-profit",
+        // Growing, or serving the same people?
+        "customer-mix",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1878,6 +1880,60 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - Growing, or serving the same people?
+
+    /// Revenue split between customers buying for the first time and customers
+    /// coming back.
+    ///
+    /// `lib/customer-mix.js`. Who is NEW is decided from the whole history and
+    /// by the ORDER rather than by the day — a customer whose first two jobs
+    /// landed on one day counted as new twice in the rule this replaces.
+    public struct CustomerMix: Decodable, Sendable {
+        public let fresh: Side
+        public let returning: Side
+        public let totals: Totals
+
+        public struct Side: Decodable, Sendable {
+            public let revenue: Double
+            public let jobs: Int
+            public let clients: Int
+            /// Nil when nothing finished at all: 0% would read as "none of your
+            /// money came from new customers", which is a claim.
+            public let shareOfRevenue: Double?
+        }
+
+        public struct Totals: Decodable, Sendable {
+            public let revenue: Double
+            public let jobs: Int
+            /// DISTINCT across both halves. A customer that was new and then
+            /// came back inside the window is in both, and is one person.
+            public let clients: Int
+            /// What the average new customer's first order is worth — what a
+            /// shop is buying when it spends on getting found.
+            public let firstOrderValue: Double?
+        }
+    }
+
+    public func customerMix(orders: [JSONValue], from: String, to: String,
+                            settings: [String: JSONValue], clients: [JSONValue])
+        throws -> CustomerMix {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG3, clients: ARG4 };
+          return globalThis.KhaytCustomerMix.customerMix({
+            orders: ARG0, from: ARG1, to: ARG2,
+          }, {
+            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            countsForBusiness: function (o) {
+              return globalThis.KhaytBusinessScope
+                ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
+            },
+          });
+        })()
+        """#, [.array(orders), .string(from), .string(to),
+               .object(settings), .array(clients)], as: CustomerMix.self)
     }
 
     // MARK: - Which products actually earn

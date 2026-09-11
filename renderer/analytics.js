@@ -1553,23 +1553,31 @@ function renderMachineAccuracy() {
 function renderNewVsReturning() {
   const el = $('#newVsReturningSection');
   if (!el) return;
-  const completed = printLog.filter(o => o.status === 'completed' && o.clientId && o.date);
-  if (completed.length === 0) { el.innerHTML = ''; return; }
+  // `lib/customer-mix.js`, not the arithmetic that used to be here. It decided
+  // who was new by comparing DATES — `firstOrderDate[id] === o.date` — so a
+  // customer whose first two jobs landed on the same day counted as new twice,
+  // and a shop taking two jobs from one new customer recorded two
+  // new-customer sales. Identity is the ORDER, not the day.
+  //
+  // It also counted voided orders, ignored the business scope, and counted
+  // `completed` only — so work that reached the customer was in neither half.
+  //
+  // The window is applied by the module; history is handed over whole, because
+  // who is NEW cannot be decided from a slice of it.
+  const mix = KhaytCustomerMix.customerMix({ orders: printLog || [] }, {
+    revenueOf: orderNetRevenueBase,
+    countsForBusiness: _countsForBusiness,
+    // The range picker's own predicate. It offers named periods — "this
+    // quarter" — and `lib/date-range.js` already answers what they mean, so
+    // the module takes the question rather than a pair of dates re-derived
+    // here, which would be a second answer.
+    inWindow: (o) => inRange(o.date, analyticsRange, 'analytics'),
+  });
+  if (mix.totals.jobs === 0) { el.innerHTML = ''; return; }
 
-  // First-ever order per client determines their "new" date
-  const firstOrderDate = {};
-  for (const o of [...completed].sort((a, b) => (a.date || '').localeCompare(b.date || ''))) {
-    if (!firstOrderDate[o.clientId]) firstOrderDate[o.clientId] = o.date;
-  }
-
-  const inRangeOrders = completed.filter(o => inRange(o.date, analyticsRange, 'analytics'));
-  let newRev = 0, retRev = 0, newCount = 0, retCount = 0;
-  for (const o of inRangeOrders) {
-    const isNew = firstOrderDate[o.clientId] === o.date; // first order = new client
-    if (isNew) { newRev += orderNetRevenueBase(o); newCount++; }
-    else        { retRev += orderNetRevenueBase(o); retCount++; }
-  }
-  const total = newRev + retRev;
+  const newRev = mix.fresh.revenue, retRev = mix.returning.revenue;
+  const newCount = mix.fresh.jobs, retCount = mix.returning.jobs;
+  const total = mix.totals.revenue;
   const newPct  = total > 0 ? Math.round(newRev / total * 100) : 0;
   const retPct  = 100 - newPct;
 

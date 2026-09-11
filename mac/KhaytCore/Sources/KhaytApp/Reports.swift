@@ -34,6 +34,8 @@ struct Reports: View {
     /// Which products actually earn — beside the list of what sells most,
     /// which is a different question and often a different order.
     @State private var earns: KhaytEngine.ProductProfit?
+    /// Whether the shop is growing or serving the same people.
+    @State private var mix: KhaytEngine.CustomerMix?
     /// How far each machine runs from its quote, and the shop's own figure.
     /// Not filtered to the chosen period: a machine's calibration is not a
     /// property of this quarter, and the measured-only filter already thins the
@@ -61,7 +63,7 @@ struct Reports: View {
             if shop.reportPage == .owing {
                 Owing(shop: shop, owed: owed)
             } else if shop.reportPage == .best {
-                Best(shop: shop, best: best, worth: worth, earns: earns)
+                Best(shop: shop, best: best, worth: worth, earns: earns, mix: mix)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice, funnel: funnel)
             } else if shop.reportPage == .machines {
@@ -247,6 +249,7 @@ struct Reports: View {
         await recomputeClientValue()
         await recomputeFunnel()
         await recomputeProductProfit()
+        await recomputeCustomerMix()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
@@ -334,6 +337,16 @@ struct Reports: View {
             language: shop.words.language)
     }
 
+    private func recomputeCustomerMix() async {
+        guard let engine = shop.engine else { return }
+        // The whole book, and no window. Who is NEW cannot be decided from a
+        // slice of history, and over a quarter a small shop's split is a
+        // handful of decisions rather than a proportion.
+        mix = try? await engine.customerMix(
+            orders: shop.orderRows, from: "", to: "",
+            settings: shop.settingsDict, clients: shop.clientRows)
+    }
+
     private func recomputeMachinePL() async {
         guard let engine = shop.engine else { return }
         // ── ALL FOUR FILTERED THE SAME WAY ────────────────────────────────
@@ -398,6 +411,7 @@ struct Reports: View {
         let best: KhaytEngine.TopLists?
         let worth: KhaytEngine.ClientValue?
         let earns: KhaytEngine.ProductProfit?
+        let mix: KhaytEngine.CustomerMix?
 
         var body: some View {
             // Two cards rather than two halves of one pane divided by a rule.
@@ -421,6 +435,11 @@ struct Reports: View {
                     // "who has been worth the most, ever, and who has stopped
                     // coming back" — the question it should ask before it
                     // decides who to chase.
+                    // Above the lifetime table, because it is the question
+                    // that frames it: a shop reading who its best customers are
+                    // should know first whether it is finding new ones.
+                    CustomerMixCard(shop: shop, report: mix)
+                        .card(rail: Khayt.cyan, padding: 14)
                     ClientValueTable(shop: shop, report: worth)
                         .card(rail: Khayt.cyan, padding: 14)
                     // ── AND WHICH OF THEM EARNS ───────────────────────────

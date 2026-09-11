@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Where the work comes from, on the Mac.** How much of the money is new
+  customers and how much is people coming back — and how many *people* each
+  figure represents, because twelve sales to one person is not twelve
+  customers. A shop living on returning work is stable and not growing; one
+  living on new work is growing and keeping nobody. It also says what a new
+  customer's first order is worth on average, which is what you are buying when
+  you spend on getting found.
+
 - **What actually earns, on the Mac — including per machine hour.** Which of
   the things you sell makes money, ranked by profit rather than by revenue,
   because the big seller that earns nothing is exactly the row you opened the
@@ -123,6 +131,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **A new customer's second job on the same day counted as a second new
+  customer.** The new-versus-returning split decided who was new by comparing
+  dates, so a shop taking two jobs from one new customer on day one recorded
+  two new-customer sales. It was also counting voided orders, ignoring the
+  business scope, and leaving out delivered work — so a job that reached the
+  customer was in neither half.
 
 - **Products vanished from the profitability table once they shipped.** It
   counted orders at *completed* only, and *delivered* comes after it — so the
