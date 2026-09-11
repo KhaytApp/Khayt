@@ -4,7 +4,9 @@ Living priorities for maintainers. Not a public commitment calendar — reorder 
 
 ## Now (post-3.7.0, the Electron line closed — on `main`)
 
-**Stable is v3.7.0** (2026-09-11) — the 3.7.0 line, cut from `main` rather than
+**Stable is v3.7.0**, PUBLISHED 2026-09-11 on all three platforms and verified
+manifest-by-manifest (see [docs/RELEASE-HOLD.md](./docs/RELEASE-HOLD.md)) — the
+3.7.0 line, cut from `main` rather than
 promoted from `v3.7.0-beta.25` unchanged, because 225 commits had landed since
 that cut: the money corrections, the measured-actuals chain and three dependency
 security fixes. The promotion gate and the one condition WAIVED are recorded in
