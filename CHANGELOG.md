@@ -15,7 +15,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   developer and notarised, and ours, that the archive matches a signature only
   we can produce — so replacing the download is not enough to replace the app.
 - **The Mac app has its own version, and its own downloads.** It is
-  `4.0.0-alpha.1`, numbered separately from the Windows and Linux app, because
+  `4.0.0-alpha.2` — `alpha.1` was withdrawn the same hour it was published,
+  before anyone had it, because it could not check for updates (see Fixed). It
+  is numbered separately from the Windows and Linux app, because
   the two ship on their own schedules now and a Mac build calling itself
   `3.7.0` would be reporting which app it is not. Releases live at
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
