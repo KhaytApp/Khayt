@@ -114,13 +114,29 @@ cd mac/KhaytCore && swift run Khayt    # or the bare binary, for working on it
 ```
 
 `make-app.sh` assembles a real, double-clickable application: the release binary,
-the SwiftPM resource bundles, the Khayt icon, an `Info.plist`, and an ad-hoc
+the SwiftPM resource bundles, the Khayt icon, an `Info.plist`, Sparkle, and a
 signature. `--install` puts a copy in `/Applications` as **Khayt Native.app**, so
 it sits beside the Electron app rather than on top of it.
 
-**It is not the shipping build.** Ad-hoc signing means this Mac will run it and no
-other will; a Developer ID, a hardened runtime and notarisation are what make it
-something a shop can download, and none of that exists yet.
+**It IS the shipping build now**, and this paragraph said the opposite for as
+long as that was true. A build made here with a Developer ID in the login
+keychain carries the hardened runtime, a secure timestamp and the one
+entitlement JavaScriptCore needs; `./mac/make-app.sh --notarize` submits it,
+staples the ticket and asks Gatekeeper. On a Mac with no identity it still
+falls back to ad-hoc — which runs here and nowhere else, deliberately, because
+an ad-hoc signature cannot carry restricted entitlements.
+
+**Published from `mac-release.yml`, dispatched, never tagged in this repo.**
+The releases live in [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac)
+and the Sparkle feed at `https://khaytapp.com/mac/appcast.xml`. Nothing is
+tagged here because this repo's `releases.atom` is what the Electron app's
+updater walks, and a `v4.0.0-alpha.*` tag in it parses as newer than the
+Electron line — it would not merely appear in that feed, it would be chosen.
+Bed Ready learned this first; see the note at the top of `release.yml`.
+
+**The version is `mac/version.json`, not `package.json`.** Two fields, and the
+`build` integer is the one Sparkle compares — see [VERSION.md](./VERSION.md)
+for why deriving it from the marketing string silently breaks updates.
 
 **⌘R reloads from disk.** The store is read once, at launch, so anything the
 Electron app writes after that is invisible here until asked for — and while this
