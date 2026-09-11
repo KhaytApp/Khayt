@@ -1320,6 +1320,12 @@ final class Words {
         "mac.import_models": ["en": "Import models", "ar": "استيراد مجسمات"],
         "mac.import_models_hint": ["en": "Add models from a folder — or drag them onto the library.",
                                    "ar": "أضف مجسمات من مجلد — أو اسحبها إلى المكتبة."],
+        // Khayt's own help. macOS supplies an empty Help menu; an app that
+        // leaves it empty has said it has none.
+        "mac.help_title":    ["en": "Khayt Help",   "ar": "مساعدة خيط"],
+        "mac.help_search":   ["en": "Search help",  "ar": "ابحث في المساعدة"],
+        "mac.help_none":     ["en": "No help article is selected",
+                              "ar": "لم يُختَر أي موضوع"],
         "mac.view_list":     ["en": "List",         "ar": "قائمة"],
         "mac.view_grid":     ["en": "Grid",         "ar": "شبكة"],
         "mac.edit_product":  ["en": "Edit product", "ar": "تعديل المنتج"],

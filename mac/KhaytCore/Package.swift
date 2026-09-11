@@ -70,7 +70,18 @@ let package = Package(
         .executableTarget(name: "KhaytApp",
                           dependencies: ["KhaytCore",
                                          .product(name: "Sparkle", package: "Sparkle")],
-                          resources: [.process("Resources")]),
+                          resources: [
+                              .process("Resources"),
+                              // `.copy`, NOT `.process`, and in its own folder
+                              // outside `Resources/` — because `.process`
+                              // FLATTENS a directory tree into the bundle root,
+                              // so `Help/en/jobs.md` and `Help/ar/jobs.md`
+                              // become two resources both named `jobs.md` and
+                              // the build refuses them as a collision. `.copy`
+                              // keeps the folders, which is the whole point:
+                              // the language IS the folder.
+                              .copy("Help"),
+                          ]),
         // What Finder shows for a .3mf. Depends on KhaytCore for the zip
         // reader and the rule about which member of a 3MF is the picture —
         // both moved there so the app and the extension read one copy.
