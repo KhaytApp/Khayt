@@ -123,6 +123,22 @@ jobs:
           echo "feed: $FEED"
           echo "key:  ${KEY:0:12}… · Sparkle embedded · ticket stapled"
 
+      # ── AND THE CHECK THAT WOULD HAVE CAUGHT THE NEXT ONE ───────────────
+      #
+      # v4.0.0-alpha.1 and alpha.2 shipped signed, notarised, stapled, and
+      # unable to LAUNCH. `Bundle.module` compiles down to the absolute path of
+      # the .build directory on the machine that built it, so every build made
+      # on a developer's Mac ran — by reaching outside the app — and every build
+      # a shop downloaded died on its first line.
+      #
+      # Launching it here would prove nothing: this runner is a build machine
+      # too, and .build is sitting right there. So the app is asked WHERE it
+      # found its resources, and the answer has to be inside itself.
+      - name: The bundle must be self-contained
+        run: |
+          set -euo pipefail
+          mac/dist/Khayt.app/Contents/MacOS/Khayt --check-resources
+
       # ── THE ARCHIVE, AND ITS SIGNATURE ──────────────────────────────────
       #
       # `ditto`, not `zip`: a versioned framework is a farm of symlinks and the

@@ -280,7 +280,7 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     /// a second document that agreed with the first until one of them was
     /// edited.
     static let stylesheet: String = {
-        guard let url = Bundle.module.url(forResource: "invoice", withExtension: "css"),
+        guard let url = AppResources.bundle.url(forResource: "invoice", withExtension: "css"),
               let css = try? String(contentsOf: url, encoding: .utf8) else { return "" }
         return css
     }()

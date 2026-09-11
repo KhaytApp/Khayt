@@ -80,6 +80,55 @@ struct BundledLogicIsNotAForkTests {
         }
     }
 
+    /// `Bundle.module` is a loaded gun, and it has gone off twice.
+    ///
+    /// SwiftPM compiles it, per target, into exactly two hard-coded paths: the
+    /// bundle ROOT (where codesign forbids putting anything, so an assembled
+    /// `.app` never has it) and the absolute path of the `.build` directory on
+    /// the machine that compiled it. So it works on the build machine and
+    /// nowhere else — the one failure mode a developer cannot see. 4.0.0-alpha.1
+    /// and alpha.2 both shipped an app that died on its first line:
+    ///
+    ///     Fatal error: could not load resource bundle: from
+    ///     /Applications/Khayt.app/KhaytCore_KhaytCore.bundle or
+    ///     /Users/runner/work/Khayt/Khayt/mac/KhaytCore/.build/…
+    ///
+    /// `BundledResources` looks in `Contents/Resources`, where `make-app.sh`
+    /// actually puts them. This is why nothing may go back to asking SwiftPM.
+    ///
+    /// Scoped to first-party sources: `BundledResources` and `AppResources`
+    /// name it deliberately, as the last-resort fallback for `swift test`, and
+    /// SwiftPM's own generated accessor under `.build` is not ours to police.
+    @Test("no target reaches for Bundle.module directly")
+    func bundleModuleIsNeverUsedDirectly() throws {
+        let sources = Self.repoRoot.appending(path: "mac/KhaytCore/Sources")
+        let allowed: Set<String> = ["BundledResources.swift", "AppResources.swift"]
+        var offenders: [String] = []
+
+        let walker = FileManager.default.enumerator(at: sources,
+                                                    includingPropertiesForKeys: nil)
+        while let url = walker?.nextObject() as? URL {
+            guard url.pathExtension == "swift",
+                  !allowed.contains(url.lastPathComponent) else { continue }
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for (number, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+                // Prose about the trap is the point of half these files, so a
+                // comment line is not an offence — only code that calls it.
+                let code = line.drop { $0 == " " || $0 == "\t" }
+                if code.hasPrefix("//") || code.hasPrefix("///") || code.hasPrefix("*") { continue }
+                if line.contains("Bundle.module") {
+                    offenders.append("\(url.lastPathComponent):\(number + 1)")
+                }
+            }
+        }
+
+        #expect(offenders.isEmpty, """
+            \(offenders.joined(separator: ", ")) calls Bundle.module. It resolves to the
+            build directory of whichever machine compiled it, so it works here and
+            crashes on every Mac a shop downloads it to. Use BundledResources.
+            """)
+    }
+
     @Test("the module list and the bundled folder agree")
     func noStragglers() throws {
         let dir = Self.repoRoot.appending(path: "mac/KhaytCore/Sources/KhaytCore/JS")
