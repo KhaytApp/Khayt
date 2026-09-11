@@ -3083,27 +3083,22 @@ function renderThroughputHeatmap() {
   const el = $('#throughputHeatmapSection');
   if (!el) return;
 
-  const completed = printLog.filter(o =>
-    o.status === 'completed' && o.completedAt && inRange(o.date, analyticsRange, 'analytics')
-  );
+  // `lib/throughput.js`. It filtered on `completed` alone, so work that had
+  // reached a customer was not in the picture of when the shop is busy.
+  const wh = KhaytWorkingWeek.workingHours(settings);
+  const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const flow = KhaytThroughput.throughput({
+    orders: printLog || [],
+    openDays: DAY_KEYS.map((k) => (wh[k] || 0) > 0),
+  }, { inWindow: (o) => inRange(o.date, analyticsRange, 'analytics') });
 
-  if (completed.length < 10) {
+  if (!flow.totals.enough) {
     el.innerHTML = `<p style="color:var(--text-muted); font-size:13px;">${escapeHtml(t('an.heatmap_no_data'))}</p>`;
     return;
   }
 
-  // Build 7×24 matrix
-  const matrix = Array.from({ length: 7 }, () => Array(24).fill(0));
-  completed.forEach(o => {
-    try {
-      const d = new Date(o.completedAt);
-      const dow = d.getDay();   // 0=Sun..6=Sat
-      const hod = d.getHours(); // 0..23
-      matrix[dow][hod]++;
-    } catch (_) {}
-  });
-
-  const maxVal = Math.max(1, ...matrix.flat());
+  const matrix = flow.matrix;
+  const maxVal = Math.max(1, flow.totals.peak);
   // 2023-01-01 was a Sunday, so index 0 lines up with getDay() === 0.
   const dayFmt = new Intl.DateTimeFormat(localeTag(), { weekday: 'short' });
   const DAY_NAMES = Array.from({ length: 7 }, (_, i) => dayFmt.format(new Date(Date.UTC(2023, 0, i + 1))));

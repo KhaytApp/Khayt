@@ -804,4 +804,34 @@ import KhaytCore
                    "50-machine-scrap", size: CGSize(width: 600, height: 400))
     }
 
+    /// When the shop actually finishes work.
+    ///
+    /// The findings are above the grid on purpose: at the volume a small shop
+    /// generates, a 168-cell grid of mostly-empty cells looks exactly like a
+    /// pattern, and a reader will find one in it.
+    @Test("when work finishes, and how much of it on a closed day")
+    func throughputCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let open = try await engine.openDays(settings: shop.settingsDict)
+        let when = try await engine.throughput(
+            orders: shop.orderRows, openDays: open, minimum: 10)
+        #expect(when.totals.enough, "the sample only draws the thin state")
+
+        // And the thin state, which is what a shop sees in its first month.
+        let thin = try await engine.throughput(
+            orders: Array(shop.orderRows.prefix(3)), openDays: open, minimum: 10)
+
+        try render(VStack(spacing: 16) {
+            ThroughputCard(shop: shop, report: when)
+                .card(rail: Khayt.cyan, padding: 14)
+            ThroughputCard(shop: shop, report: thin)
+                .card(rail: Khayt.cyan, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 620).padding(Metric.screen).background(Khayt.ground),
+                   "51-throughput", size: CGSize(width: 660, height: 520))
+    }
+
 }

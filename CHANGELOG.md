@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **When work actually finishes, on the Mac — and how much of it on days you
+  are closed.** The heatmap is there, but the two things you can act on are
+  above it in words: the day and hour most work lands, and the share finishing
+  on a day the shop is shut. That last one is either printers running
+  unattended over a weekend, which is fine and worth knowing, or somebody
+  coming in on their day off, which is worth knowing for a different reason —
+  and nothing has said it before. When there isn't enough finished work to read
+  a pattern, it says so rather than drawing a grid of noise.
+
 - **Which printer is costing you, on the Mac.** Khayt has always charted waste
   by failure type — which tells you the shop has a warping problem — and never
   by machine, which is what tells you *which printer has it*. The machines

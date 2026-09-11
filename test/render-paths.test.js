@@ -74,6 +74,8 @@ function loadAnalyticsStack() {
   require('../lib/product-profit.js'); // globalThis.KhaytProductProfit
   require('../lib/calculator-cost.js'); // partTotalCost, which product profit costs with
   require('../lib/customer-mix.js'); // globalThis.KhaytCustomerMix
+  require('../lib/throughput.js');   // globalThis.KhaytThroughput
+  require('../lib/working-week.js'); // globalThis.KhaytWorkingWeek, which it reads the open days from
   require('../renderer/dashboard.js'); // renderMaterialUsageChart / renderFilamentAnalytics
   require('../renderer/analytics.js');
 }
