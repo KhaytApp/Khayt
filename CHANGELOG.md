@@ -6,6 +6,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **Security (Mac): a printer camera that answered with a redirect was handed
+  the printer's own credential.** A camera is allowed to be a separate device
+  from the printer it belongs to, and the request to it carries the printer's
+  API key. macOS follows redirects by itself, so a camera answering "look over
+  there instead" had that key delivered to wherever it pointed — and the check
+  that the address was allowed had already run, before the request, and never
+  saw the second hop. Redirects are now refused outright rather than followed
+  and questioned afterwards, which is what the Windows and Linux app has always
+  done. A camera that redirects now reads as a camera that refused.
+- **(Maintainers) The Mac app could not be notarised, so it could not open on
+  any Mac but the one that built it.** It was signed with a real Developer ID
+  but without the hardened runtime and without a secure timestamp, both of
+  which Apple's notary service requires — `codesign` reported `flags=0x0(none)`
+  where a distributable build reports `flags=0x10000(runtime)`. It now carries
+  both, plus the one entitlement it genuinely needs: Apple's own documentation
+  names "the fast-path of the JavaScriptCore framework" as its first example of
+  something requiring `allow-jit`, and Khayt runs every tax, pricing and
+  estimator rule through JavaScriptCore.
 - **(Maintainers) The macOS release build stopped signing when the runner image
   moved.** `v3.7.0` built Windows and Linux and failed macOS in 26 seconds:
   electron-builder could not unlock the temporary keychain it had itself just
