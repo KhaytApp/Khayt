@@ -39,6 +39,8 @@ struct Reports: View {
     /// When work actually finishes — which day, which hour, and how much of it
     /// on days the shop is shut.
     @State private var when: KhaytEngine.Throughput?
+    /// How much passes inspection, and how much first time.
+    @State private var quality: KhaytEngine.QcMetrics?
     /// How far each machine runs from its quote, and the shop's own figure.
     /// Not filtered to the chosen period: a machine's calibration is not a
     /// property of this quarter, and the measured-only filter already thins the
@@ -66,7 +68,8 @@ struct Reports: View {
             if shop.reportPage == .owing {
                 Owing(shop: shop, owed: owed)
             } else if shop.reportPage == .best {
-                Best(shop: shop, best: best, worth: worth, earns: earns, mix: mix, when: when)
+                Best(shop: shop, best: best, worth: worth, earns: earns, mix: mix,
+                     when: when, quality: quality)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice, funnel: funnel)
             } else if shop.reportPage == .machines {
@@ -254,6 +257,7 @@ struct Reports: View {
         await recomputeProductProfit()
         await recomputeCustomerMix()
         await recomputeThroughput()
+        await recomputeQuality()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
@@ -359,6 +363,14 @@ struct Reports: View {
             orders: shop.orderRows, openDays: open, minimum: 10)
     }
 
+    private func recomputeQuality() async {
+        guard let engine = shop.engine else { return }
+        // The whole book. A first-pass yield over one quarter of a small shop
+        // is four or five inspections, and one bad week would move it thirty
+        // points — which makes it noise rather than a rate.
+        quality = try? await engine.qcMetrics(orders: shop.orderRows)
+    }
+
     private func recomputeMachinePL() async {
         guard let engine = shop.engine else { return }
         // ── ALL FOUR FILTERED THE SAME WAY ────────────────────────────────
@@ -425,6 +437,7 @@ struct Reports: View {
         let earns: KhaytEngine.ProductProfit?
         let mix: KhaytEngine.CustomerMix?
         let when: KhaytEngine.Throughput?
+        let quality: KhaytEngine.QcMetrics?
 
         var body: some View {
             // Two cards rather than two halves of one pane divided by a rule.
@@ -464,6 +477,13 @@ struct Reports: View {
                         .card(rail: Khayt.cyan, padding: 14)
                     ThroughputCard(shop: shop, report: when)
                         .card(rail: Khayt.cyan, padding: 14)
+                    // Beside what the shop MADE, because work done twice was
+                    // billed once — the gap between the two figures on this
+                    // card is time the shop was not paid for.
+                    QualityCard(shop: shop, report: quality)
+                        .card(rail: (quality?.firstPassYield ?? 1) < 0.75
+                                    ? Khayt.attention : Khayt.cyan,
+                              padding: 14)
                 }
                 .padding(Metric.screen)
             }

@@ -451,6 +451,17 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // How much passes inspection first time.
+        "mac.qc_title":      ["en": "Quality",        "ar": "الجودة"],
+        "mac.qc_first":      ["en": "right first time", "ar": "صحيح من أول مرة"],
+        "mac.qc_passed":     ["en": "passed inspection", "ar": "اجتاز الفحص"],
+        "mac.qc_gap":        ["en": "{n} jobs passed only after being reprinted.",
+                              "ar": "{n} من الأعمال اجتازت بعد إعادة الطباعة فقط."],
+        "mac.qc_worst":      ["en": "Most often: {fault}.", "ar": "الأكثر تكرارًا: {fault}."],
+        "mac.qc_rma":        ["en": "{n} came back under warranty, costing {amount} to put right.",
+                              "ar": "{n} عادت تحت الضمان بتكلفة {amount} لإصلاحها."],
+        "mac.qc_none":       ["en": "Nothing has been through inspection yet.",
+                              "ar": "لم يمر أي عمل بالفحص بعد."],
         // What the shelf costs.
         "mac.mc_title":      ["en": "What materials cost", "ar": "تكلفة المواد"],
         "mac.mc_per":        ["en": "per {unit}",        "ar": "لكل {unit}"],

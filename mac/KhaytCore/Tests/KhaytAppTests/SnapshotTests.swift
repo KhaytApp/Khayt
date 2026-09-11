@@ -852,4 +852,31 @@ import KhaytCore
                    "52-material-cost", size: CGSize(width: 560, height: 620))
     }
 
+    /// How much passes inspection, and how much first time.
+    ///
+    /// The two rates side by side are the point: a shop that reprints until it
+    /// passes has a pass rate near 100% and a quality problem, and only the
+    /// first figure says so.
+    @Test("quality, in the two rates that disagree")
+    func qualityCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let quality = try await engine.qcMetrics(orders: shop.orderRows)
+        #expect(quality.qcd > 0, "the sample cannot reach this card")
+        #expect(try #require(quality.firstPassYield) < #require(quality.passRate),
+                "the two rates agree, so the gap that is the point is undrawn")
+
+        try render(VStack(spacing: 16) {
+            QualityCard(shop: shop, report: quality)
+                .card(rail: Khayt.cyan, padding: 14)
+            // And the state a shop sees before it has inspected anything.
+            QualityCard(shop: shop, report: nil)
+                .card(rail: Khayt.cyan, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 520).padding(Metric.screen).background(Khayt.ground),
+                   "53-quality", size: CGSize(width: 560, height: 420))
+    }
+
 }

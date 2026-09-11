@@ -383,6 +383,8 @@ public actor KhaytEngine {
         "throughput",
         // What the shelf costs, and whether that has moved.
         "material-cost",
+        // How much passes inspection, and how much first time.
+        "qc-metrics",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1886,6 +1888,47 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - How much passes inspection first time
+
+    /// QC, in the two figures that disagree.
+    ///
+    /// `lib/qc-metrics.js`, lifted out of `renderer/order-flows.js` — pure
+    /// already, and in a file this app cannot load.
+    ///
+    /// Pass rate is the easy figure and the less useful one: a shop that
+    /// reprints until it passes has a pass rate near 100% and a quality
+    /// problem. First-pass yield collapses a reprint chain to one job.
+    public struct QcMetrics: Decodable, Sendable {
+        public let qcd: Int
+        public let passed: Int
+        public let failed: Int
+        /// Nil when nothing has been inspected. Nought would render as
+        /// "everything failed" about a shop that has simply not started.
+        public let passRate: Double?
+        /// Jobs, not inspections — a reprint chain counts once.
+        public let roots: Int
+        public let firstPass: Int
+        public let firstPassYield: Double?
+        public let defectsByType: [String: Int]
+        /// The commonest defect. A shop can go and do something about "layer
+        /// shift" and nothing about a percentage.
+        public let worstDefect: Defect?
+        public let rmaCount: Int
+        /// What the shop ate putting warranty work right — the cost of the
+        /// replacement, not what the customer was charged, which was nothing.
+        public let rmaCost: Double
+
+        public struct Defect: Decodable, Sendable, Hashable {
+            public let type: String
+            public let count: Int
+        }
+    }
+
+    public func qcMetrics(orders: [JSONValue]) throws -> QcMetrics {
+        try runtime.call2("globalThis.KhaytQcMetrics.qcMetrics(ARG0)",
+                          [.array(orders)], as: QcMetrics.self)
     }
 
     // MARK: - What the shelf costs

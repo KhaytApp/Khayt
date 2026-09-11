@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Quality on the Mac: how much is right *first* time.** Pass rate is the easy
+  number and the less useful one — a shop that reprints until it passes has a
+  pass rate near 100% and a quality problem. First-pass yield collapses a
+  reprint chain to one job, so the gap between the two figures is exactly the
+  work you did twice and billed once. It also names the commonest defect, and
+  what warranty work cost you to put right.
+
 - **What your materials cost, on the Mac's inventory shelf.** A shop quoting
   off last year's filament price is quoting at a loss, and nothing has answered
   it: the supplier price history needs a suppliers list and purchase records
@@ -160,6 +167,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **A shop that had never inspected anything was shown a 0% pass rate.** Which
+  reads as "everything failed" about a shop that has simply not started. Both
+  quality rates now say nothing when there is nothing behind them.
 
 - **A new customer's second job on the same day counted as a second new
   customer.** The new-versus-returning split decided who was new by comparing

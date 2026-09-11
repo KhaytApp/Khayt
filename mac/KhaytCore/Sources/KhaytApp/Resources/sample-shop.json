@@ -61,6 +61,18 @@
         "time": "octoprint",
         "weight": "octoprint",
         "at": "2026-07-02T18:00:00.000Z"
+      },
+      "qcStatus": "fail",
+      "qcFailedAt": "2026-07-02T15:10:00Z",
+      "defects": [
+        {
+          "type": "warping"
+        }
+      ],
+      "rma": {
+        "openedAt": "2026-07-02",
+        "reason": "Cracked at the mount after a week",
+        "reprintId": "ORD-01026"
       }
     },
     {
@@ -157,7 +169,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-06-15T09:08:00Z",
-      "productId": "PRD-0522F9"
+      "productId": "PRD-0522F9",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-06-15T14:20:00Z"
     },
     {
       "id": "ORD-01003",
@@ -214,7 +228,9 @@
         }
       ],
       "quoteSentAt": "2026-06-15",
-      "quoteAcceptedAt": "2026-06-18"
+      "quoteAcceptedAt": "2026-06-18",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-07-06T14:20:00Z"
     },
     {
       "id": "ORD-01004",
@@ -475,7 +491,9 @@
         "at": "2026-08-26T18:00:00.000Z"
       },
       "quoteSentAt": "2026-08-12",
-      "quoteAcceptedAt": "2026-08-17"
+      "quoteAcceptedAt": "2026-08-17",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-08-26T14:20:00Z"
     },
     {
       "id": "ORD-01009",
@@ -678,7 +696,9 @@
         }
       ],
       "quoteSentAt": "2026-05-09",
-      "quoteAcceptedAt": "2026-05-16"
+      "quoteAcceptedAt": "2026-05-16",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-05-16T14:20:00Z"
     },
     {
       "id": "ORD-01013",
@@ -728,7 +748,9 @@
       "updatedAt": "2026-05-07T11:44:00Z",
       "productId": "PRD-49E07C",
       "quoteSentAt": "2026-04-27",
-      "quoteAcceptedAt": "2026-05-06"
+      "quoteAcceptedAt": "2026-05-06",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-05-07T14:20:00Z"
     },
     {
       "id": "ORD-01014",
@@ -880,7 +902,14 @@
         "time": "prusalink",
         "weight": "prusalink",
         "at": "2026-08-29T18:00:00.000Z"
-      }
+      },
+      "qcStatus": "fail",
+      "qcFailedAt": "2026-08-29T15:10:00Z",
+      "defects": [
+        {
+          "type": "stringing"
+        }
+      ]
     },
     {
       "id": "ORD-01017",
@@ -1001,7 +1030,14 @@
         }
       ],
       "quoteSentAt": "2026-05-30",
-      "quoteAcceptedAt": "2026-06-08"
+      "quoteAcceptedAt": "2026-06-08",
+      "qcStatus": "fail",
+      "qcFailedAt": "2026-06-13T15:10:00Z",
+      "defects": [
+        {
+          "type": "layer_shift"
+        }
+      ]
     },
     {
       "id": "ORD-01019",
@@ -1153,7 +1189,9 @@
         "time": "manual",
         "weight": "manual",
         "at": "2026-07-07T18:00:00.000Z"
-      }
+      },
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-07-07T14:20:00Z"
     },
     {
       "id": "ORD-01022",
@@ -1210,7 +1248,14 @@
         }
       ],
       "quoteSentAt": "2026-07-17",
-      "quoteAcceptedAt": "2026-07-19"
+      "quoteAcceptedAt": "2026-07-19",
+      "qcStatus": "fail",
+      "qcFailedAt": "2026-08-07T15:10:00Z",
+      "defects": [
+        {
+          "type": "bed_adhesion"
+        }
+      ]
     },
     {
       "id": "ORD-01023",
@@ -1260,7 +1305,9 @@
       "updatedAt": "2026-06-25T16:21:00Z",
       "productId": "PRD-8F047C",
       "quoteSentAt": "2026-06-21",
-      "quoteAcceptedAt": "2026-06-22"
+      "quoteAcceptedAt": "2026-06-22",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-06-25T14:20:00Z"
     },
     {
       "id": "ORD-01024",
@@ -1391,7 +1438,7 @@
       "price": 1081.35,
       "priceBeforeDiscount": null,
       "currency": "SAR",
-      "costBasis": 323.28,
+      "costBasis": 184.5,
       "paymentStatus": "paid",
       "paidAmount": 1081.35,
       "paymentMethod": null,
@@ -1407,7 +1454,12 @@
       "updatedAt": "2026-09-03T16:29:00Z",
       "productId": "PRD-EF6642",
       "quoteSentAt": "2026-08-13",
-      "quoteAcceptedAt": "2026-08-16"
+      "quoteAcceptedAt": "2026-08-16",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-09-03T14:20:00Z",
+      "reprintOf": "ORD-01000",
+      "reprintChain": "ORD-01000",
+      "reprintReason": "rma"
     },
     {
       "id": "ORD-01027",
@@ -1464,7 +1516,9 @@
         }
       ],
       "quoteSentAt": "2026-06-22",
-      "quoteAcceptedAt": "2026-07-01"
+      "quoteAcceptedAt": "2026-07-01",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-07-02T14:20:00Z"
     },
     {
       "id": "ORD-01028",
@@ -1522,7 +1576,12 @@
         "at": "2026-09-01T18:00:00.000Z"
       },
       "quoteSentAt": "2026-08-18",
-      "quoteAcceptedAt": "2026-08-27"
+      "quoteAcceptedAt": "2026-08-27",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-09-01T14:20:00Z",
+      "reprintOf": "ORD-01018",
+      "reprintChain": "ORD-01018",
+      "reprintReason": "quality"
     },
     {
       "id": "ORD-01029",
@@ -1572,7 +1631,9 @@
       "updatedAt": "2026-06-16T17:10:00Z",
       "productId": "PRD-F68FC0",
       "quoteSentAt": "2026-06-09",
-      "quoteAcceptedAt": "2026-06-10"
+      "quoteAcceptedAt": "2026-06-10",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-06-16T14:20:00Z"
     },
     {
       "id": "ORD-01030",
@@ -1678,7 +1739,9 @@
         "time": "manual",
         "weight": "manual",
         "at": "2026-08-07T18:00:00.000Z"
-      }
+      },
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-08-07T14:20:00Z"
     },
     {
       "id": "ORD-01032",
@@ -1874,7 +1937,9 @@
       "updatedAt": "2026-08-11T08:20:00Z",
       "productId": "PRD-77CFAD",
       "quoteSentAt": "2026-07-28",
-      "quoteAcceptedAt": "2026-07-30"
+      "quoteAcceptedAt": "2026-07-30",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-08-11T14:20:00Z"
     },
     {
       "id": "ORD-01036",
@@ -1932,7 +1997,9 @@
         "at": "2026-05-14T18:00:00.000Z"
       },
       "quoteSentAt": "2026-05-10",
-      "quoteAcceptedAt": "2026-05-11"
+      "quoteAcceptedAt": "2026-05-11",
+      "qcStatus": "pass",
+      "qcPassedAt": "2026-05-14T14:20:00Z"
     },
     {
       "id": "ORD-01037",

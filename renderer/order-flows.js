@@ -16,12 +16,12 @@ let pendingReprintMeta = null;
 // Explicit qcStatus, derived on read when the field is absent (back-compat with
 // pre-QC orders that only carry qcPassedAt/qcFailedAt).
 function qcStatusOf(order) {
-  if (!order) return null;
-  if (order.qcStatus) return order.qcStatus;
-  if (order.qcPassedAt) return 'pass';
-  if (order.qcFailedAt) return 'fail';
-  if (order.status === 'qc') return 'pending';
-  return null;
+  // The shared rule, so this file and `lib/qc-metrics.js` cannot come to
+  // disagree about what "passed" means.
+  const m = (typeof globalThis !== 'undefined' && globalThis.KhaytQcMetrics)
+    ? globalThis.KhaytQcMetrics
+    : require('../lib/qc-metrics.js');
+  return m.qcStatusOf(order);
 }
 
 // Up-to-two-letter initials for an inspector, for the compact QC badge.
@@ -66,41 +66,18 @@ function applyReprintMeta(newOrder, meta, log) {
   return newOrder;
 }
 
-// QC / warranty analytics over a set of orders. Pure — pass the (already
-// range-filtered) order list. Reprint chains collapse to their root so a
-// multi-reprint job counts once for first-pass yield.
-function computeQcMetrics(orders) {
-  const list = (orders || []).filter(Boolean);
-  const qcd = list.filter(o => { const s = qcStatusOf(o); return s === 'pass' || s === 'fail'; });
-  const passed = qcd.filter(o => qcStatusOf(o) === 'pass').length;
-  const failed = qcd.length - passed;
-  // Unique QC'd chains (root = reprintChain, or the order id if it's an original).
-  const roots = new Set(qcd.map(o => o.reprintChain || o.id));
-  // First-pass yield: originals (reprintOf == null) that passed ÷ QC'd chains.
-  const firstPass = list.filter(o => !o.reprintOf && qcStatusOf(o) === 'pass').length;
-  const defectsByType = {};
-  for (const o of list) for (const d of (o.defects || [])) {
-    const k = d.type || 'other';
-    defectsByType[k] = (defectsByType[k] || 0) + 1;
-  }
-  const rmaCount = list.filter(o => o.rma).length;
-  // Warranty (shop) cost = material/COGS of the RMA replacement reprints.
-  const rmaCost = list
-    .filter(o => o.reprintReason === 'rma')
-    .reduce((s, o) => s + (+o.costBasis || 0), 0);
-  return {
-    qcd: qcd.length,
-    passed,
-    failed,
-    passRate: qcd.length ? passed / qcd.length : 0,
-    roots: roots.size,
-    firstPass,
-    firstPassYield: roots.size ? firstPass / roots.size : 0,
-    defectsByType,
-    rmaCount,
-    rmaCost: +rmaCost.toFixed(2),
-  };
-}
+// QC / warranty analytics live in `lib/qc-metrics.js` now — the Mac app cannot
+// load this file, and the arithmetic is the same question in both. Re-exported
+// because every caller here has always reached it through this module.
+//
+// One behaviour changed with the move: `passRate` and `firstPassYield` are NULL
+// for a shop that has inspected nothing, where they used to be 0 — which
+// rendered as "0% pass", i.e. everything failed, about a shop that had simply
+// not started.
+const QcMetrics = (typeof globalThis !== 'undefined' && globalThis.KhaytQcMetrics)
+  ? globalThis.KhaytQcMetrics
+  : require('../lib/qc-metrics.js');
+function computeQcMetrics(orders) { return QcMetrics.qcMetrics(orders); }
 
 // Auto-suggest whether a delivered order's RMA is inside its warranty window.
 function computeWithinWarranty(deliveredAt, warrantyDays, nowMs) {
