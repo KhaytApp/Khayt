@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **One object can be dropped from a print that is already running.** A plate of
+  twelve parts where one has come loose finishes with eleven good parts and a
+  ball of spaghetti — and Khayt could only watch it happen or cancel the whole
+  plate. On a Klipper or Moonraker printer it can now skip what is left of a
+  single named object and let the rest of the plate finish. It matters most on a
+  toolchanger, where a plate is often one model per head, so one failure was
+  costing every part on it.
+
+  **It cannot be undone.** Klipper has no way to put an object back — the layers
+  skipped while it was dropped are not reprinted — so anything asking for this
+  has to name the object and say so first.
+
 - **(Mac) A product can be written down on the Mac.** The catalogue could be
   read here and not added to: making a product meant opening the Windows and
   Linux app. There is an editor now, with one tab per language your catalogue

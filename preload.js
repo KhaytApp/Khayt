@@ -275,6 +275,10 @@ contextBridge.exposeInMainWorld('hubAPI', {
   // Pause / resume / cancel the running job. Main validates the host and the
   // command name; nothing here is trusted.
   printerCommand:      (machine, command) => ipcRenderer.invoke('hub:printer-command', { machine, command }),
+  // What is on the plate, and dropping one of it. Klipper only, and the drop
+  // cannot be undone — see lib/exclude-object.js.
+  printerPlate:        (machine) => ipcRenderer.invoke('hub:printer-plate', { machine }),
+  printerExcludeObject: (machine, name) => ipcRenderer.invoke('hub:printer-exclude-object', { machine, name }),
   printerHistory: (payload) => ipcRenderer.invoke('hub:printer-history', payload),
   setAppLanguage: (lang, menuStrings) => ipcRenderer.invoke('hub:set-app-language', lang, menuStrings),
   onPrinterStatusUpdate: (() => {

@@ -72,6 +72,7 @@ const { normalizeProgress, fileProgressPct, explainPrinterHttp } = require('./li
 const KhaytDuet = require('./lib/duet');
 const KhaytRepetier = require('./lib/repetier');
 const printerCommands = require('./lib/printer-commands');
+const excludeObject = require('./lib/exclude-object');
 const { normalizeStoreSnapshot, STORE_VERSION } = require('./lib/store-validate');
 const upgradeBackup = require('./lib/upgrade-backup');
 const { createStoreIo, MAX_STORE_BYTES } = require('./lib/store-io');
@@ -4440,6 +4441,70 @@ async function sendPrinterCommand(machine, command) {
     return { ok: false, error: String((e && e.message) || e) };
   }
 }
+
+/**
+ * What is on a Klipper printer's plate, and dropping one of it.
+ *
+ * ── WHY THIS IS NOT A FOURTH `printer-command` ────────────────────────────
+ *
+ * `pause`, `resume` and `cancel` are whole-job verbs that every protocol has a
+ * shape for. This is Klipper's alone, it takes an ARGUMENT, and that argument
+ * is a name out of a sliced file which ends up inside a G-code script. It gets
+ * its own path so the name is checked against what the printer just reported
+ * — see `lib/exclude-object.js` for why that check is the whole safety story.
+ *
+ * The plate is read here, in the main process, immediately before the command
+ * is built. Not passed in from the renderer: a list the renderer is holding is
+ * a list from some seconds ago, and the object it names may have finished.
+ */
+async function plateObjects(machine) {
+  const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
+  if (type !== 'moonraker') {
+    return { ok: false, error: 'Only Klipper/Moonraker printers can drop one object' };
+  }
+  const printerHost = sanitizePrinterHost(host);
+  if (!isAllowedPrinterHost(printerHost)) return { ok: false, error: 'Invalid printer host' };
+  const portNum = parseInt(port || defaultPrinterPort(type), 10);
+  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
+    return { ok: false, error: 'Invalid port number' };
+  }
+  const headers = {};
+  if (apiKey) headers['X-Api-Key'] = apiKey;
+  const base = `http://${printerHost}:${portNum}`;
+  try {
+    const res = await fetch(`${base}/printer/objects/query?${excludeObject.QUERY}`, {
+      headers, redirect: 'manual', signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return { ok: false, error: `Printer answered HTTP ${res.status}` };
+    return { ok: true, base, headers, data: await res.json() };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+}
+
+ipcMain.handle('hub:printer-plate', async (_e, { machine } = {}) => {
+  const read = await plateObjects(machine);
+  if (!read.ok) return read;
+  const plate = excludeObject.plate(read.data);
+  return { ok: true, ...plate, remaining: excludeObject.remaining(read.data) };
+});
+
+ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) => {
+  const read = await plateObjects(machine);
+  if (!read.ok) return read;
+  const req = excludeObject.excludeRequest(name, read.data);
+  if (req.refused) return { ok: false, error: req.refused };
+  try {
+    const res = await fetch(read.base + req.path, {
+      method: req.method, headers: read.headers,
+      redirect: 'manual', signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return { ok: false, error: `Printer answered HTTP ${res.status}` };
+    return { ok: true, dropped: name };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
 
 ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) =>
   sendPrinterCommand(machine, command));
