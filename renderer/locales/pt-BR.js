@@ -3307,6 +3307,7 @@
   "an.waste_trend": "Desperdício por tipo de falha",
   "an.cycle_time": "Tempo médio de ciclo (dias)",
   "an.cash_flow": "Fluxo de caixa",
+  "an.cf_undated": "{amount} foram recebidos em dias que nunca foram registrados, então não aparecem no gráfico.",
   "an.collected": "Recebido",
   "an.expenses_paid": "Despesas",
   "an.exp_by_cat": "Despesas por categoria",

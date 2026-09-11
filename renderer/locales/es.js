@@ -3306,6 +3306,7 @@
   "an.waste_trend": "Residuos por tipo de fallo",
   "an.cycle_time": "Tiempo de ciclo promedio (días)",
   "an.cash_flow": "Flujo de caja — Cobrado vs. Gastos",
+  "an.cf_undated": "Se cobraron {amount} en días que nunca se registraron, así que no aparecen en el gráfico.",
   "an.collected": "Cobrado",
   "an.expenses_paid": "Gastos pagados",
   "an.exp_by_cat": "Gastos por categoría",

@@ -3306,6 +3306,7 @@
   "an.waste_trend": "Abfall nach Fehlertyp",
   "an.cycle_time": "Ø Zykluszeit (Tage)",
   "an.cash_flow": "Cashflow — Einnahmen vs. Ausgaben",
+  "an.cf_undated": "{amount} wurde an Tagen eingenommen, die nie erfasst wurden, und erscheint daher nicht im Diagramm.",
   "an.collected": "Eingenommen",
   "an.expenses_paid": "Ausgaben bezahlt",
   "an.exp_by_cat": "Ausgaben nach Kategorie",

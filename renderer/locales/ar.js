@@ -3311,6 +3311,7 @@
   "an.waste_trend": "الهدر حسب نوع الفشل",
   "an.cycle_time": "متوسط وقت الدورة (أيام)",
   "an.cash_flow": "التدفق النقدي",
+  "an.cf_undated": "حُصِّل {amount} في أيام لم تُسجَّل، لذا لا يظهر في الرسم.",
   "an.collected": "محصّل",
   "an.expenses_paid": "المصاريف",
   "an.exp_by_cat": "المصاريف حسب الفئة",

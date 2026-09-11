@@ -451,6 +451,9 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // Cash flow — money paid on a day nobody wrote down.
+        "mac.cf_undated":    ["en": "{amount} was collected on days that were never recorded, so it is not on the chart.",
+                              "ar": "حُصِّل {amount} في أيام لم تُسجَّل، لذا لا يظهر في الرسم."],
         // Report builder — the shared catalogue has the screen's own words
         // but not the sentence that says which knob to turn.
         // The shape of a typed day. Translated rather than left as the ISO

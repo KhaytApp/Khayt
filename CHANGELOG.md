@@ -6,6 +6,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Cash flow on the Mac: what actually reached the bank.** Money in above the
+  line, money out below it, on one shared scale — so a month where the shop was
+  busy and no better off is a shape rather than a subtraction you have to do.
+  It sits under the quarters because a shop can be profitable and unable to pay
+  the rent, and the P&L on its own cannot say which it is.
+
 - **Break-even, on the Mac, beside what you made.** What the shop has to bill
   this month before any of it is profit — rent, the licence, the connection,
   the accountant — drawn as a distance rather than a number, because what a
@@ -87,6 +93,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **The cash-flow chart counted a deposit as the whole job.** A payment date is
+  recorded on *any* payment, and the chart put the job's entire revenue on that
+  day — so a 10% deposit on a 20,000 job drew 20,000 of money-in, on the one
+  chart whose whole subject is money you actually have. It now counts what was
+  actually paid. It was also counting voided orders, and work marked as outside
+  the shop's trade, which every neighbouring figure excludes.
+- **The cash-flow chart could read "collected nothing" for a shop that had been
+  paid.** Payment dates were added to Khayt after it had been in use, so older
+  orders carry an amount and no date, and a timeline cannot place them — they
+  were simply dropped, silently. The chart now says how much was collected on
+  days that were never recorded, instead of leaving it out and looking normal.
 
 - **Break-even was telling shops to bill LESS than they must.** It costed a job
   by looking up each part's spool and pricing its grams, and skipped any part

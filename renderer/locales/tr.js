@@ -3306,6 +3306,7 @@
   "an.waste_trend": "Hata Türüne Göre Fire",
   "an.cycle_time": "Ort. Döngü Süresi (gün)",
   "an.cash_flow": "Nakit Akışı",
+  "an.cf_undated": "{amount} hiç kaydedilmemiş günlerde tahsil edildi, bu yüzden grafikte yok.",
   "an.collected": "Tahsil edilen",
   "an.expenses_paid": "Giderler",
   "an.exp_by_cat": "Kategoriye Göre Giderler",

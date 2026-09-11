@@ -1093,22 +1093,27 @@ function renderCashFlowChart() {
     });
   }
 
+  // `lib/cash-flow.js`, not the arithmetic that used to be here — which had
+  // three faults, and the first is the one that matters:
+  //
+  //   `paidAt` is set on ANY payment, a deposit included, and this counted the
+  //   job's WHOLE revenue on that day. A 10% deposit on a 20,000 job drew
+  //   20,000 of cash in, on the one chart whose entire subject is money the
+  //   shop actually has.
+  //
+  // It also counted voided orders, and ignored the business scope that every
+  // neighbouring figure applies.
+  const flow = KhaytCashFlow.cashFlow({
+    orders: printLog || [],
+    expenses: expenses || [],
+    endMonth: localMonthStr(today),
+    months: months.length,
+  }, { revenueOf: orderNetRevenueBase, countsForBusiness: _countsForBusiness });
   const revByMonth = {};
   const expByMonth = {};
-  months.forEach(m => { revByMonth[m.key] = 0; expByMonth[m.key] = 0; });
+  for (const r of flow.rows) { revByMonth[r.month] = r.collected; expByMonth[r.month] = r.paidOut; }
 
-  for (const o of (printLog || [])) {
-    if (!o.paidAt) continue;
-    const mk = localMonthStr(new Date(o.paidAt));
-    if (revByMonth[mk] !== undefined) revByMonth[mk] += orderNetRevenueBase(o);
-  }
-  for (const e of (expenses || [])) {
-    if (!e.date) continue;
-    const mk = localMonthStr(new Date(e.date));
-    if (expByMonth[mk] !== undefined) expByMonth[mk] += +e.amount || 0;
-  }
-
-  const hasData = months.some(m => revByMonth[m.key] > 0 || expByMonth[m.key] > 0);
+  const hasData = flow.totals.anyMovement;
   if (!hasData) {
     el.innerHTML = `<div class="card" style="margin-bottom:16px;"><h3 class="card-head"><span class="swatch"></span>${escapeHtml(t('an.cash_flow') || 'Cash Flow')}</h3><p style="color:var(--text-muted);padding:12px 0;font-size:13px;">${escapeHtml(t('an.no_data') || 'No data yet')}</p></div>`;
     return;
@@ -1139,6 +1144,7 @@ function renderCashFlowChart() {
       <div style="overflow-x:auto;">
         <svg width="${chartW}" height="${H}" style="display:block;min-width:200px;">${bars}</svg>
       </div>
+      ${flow.totals.undated > 0 ? `<p style="color:var(--text-muted);font-size:12px;margin:6px 0 0;">${escapeHtml(t('an.cf_undated', { amount: fmtPrice(flow.totals.undated) }))}</p>` : ''}
     </div>`;
 }
 

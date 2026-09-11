@@ -62,6 +62,12 @@ function loadAnalyticsStack() {
   require('../renderer/currency.js');
   require('../lib/tax.js');          // sets globalThis.KhaytTax — money paths need it
   require('../renderer/app-helpers.js');
+  // The shared modules the analytics screen reaches through globals. In the app
+  // they are `<script>` tags; a missing one here throws from inside whichever
+  // chart needs it — which is what this test is for, so they belong in the
+  // stack rather than inside a try.
+  require('../lib/break-even.js');   // globalThis.KhaytBreakEven
+  require('../lib/cash-flow.js');    // globalThis.KhaytCashFlow
   require('../renderer/dashboard.js'); // renderMaterialUsageChart / renderFilamentAnalytics
   require('../renderer/analytics.js');
 }
