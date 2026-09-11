@@ -451,6 +451,13 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // Growing, or serving the same people?
+        "mac.cm_title":      ["en": "Where the work comes from", "ar": "من أين يأتي العمل"],
+        "mac.cm_new":        ["en": "New customers",  "ar": "عملاء جدد"],
+        "mac.cm_returning":  ["en": "Coming back",    "ar": "عملاء عائدون"],
+        "mac.cm_people":     ["en": "{n} people",     "ar": "{n} أشخاص"],
+        "mac.cm_first":      ["en": "A new customer's first order is worth {amount} on average.",
+                              "ar": "أول طلب لعميل جديد يساوي {amount} في المتوسط."],
         // Which products actually earn.
         "mac.pp_title":      ["en": "What earns",     "ar": "ما الذي يكسب"],
         "mac.pp_per_hour":   ["en": "per machine hour", "ar": "لكل ساعة تشغيل"],

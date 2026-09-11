@@ -760,4 +760,27 @@ import KhaytCore
                    "48-product-profit", size: CGSize(width: 600, height: 520))
     }
 
+    /// Growing, or serving the same people?
+    @Test("where the work comes from, new against returning")
+    func customerMixCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let mix = try await engine.customerMix(
+            orders: shop.orderRows, from: "", to: "",
+            settings: shop.settingsDict, clients: shop.clientRows)
+        #expect(mix.fresh.jobs > 0 && mix.returning.jobs > 0,
+                "the sample reaches only one half, so the card is half reviewed")
+
+        try render(VStack(spacing: 16) {
+            CustomerMixCard(shop: shop, report: mix)
+                .card(rail: Khayt.cyan, padding: 14)
+            CustomerMixCard(shop: shop, report: nil)
+                .card(rail: Khayt.cyan, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 520).padding(Metric.screen).background(Khayt.ground),
+                   "49-customer-mix", size: CGSize(width: 560, height: 400))
+    }
+
 }

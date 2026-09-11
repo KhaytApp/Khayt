@@ -73,6 +73,7 @@ function loadAnalyticsStack() {
   require('../lib/quote-funnel.js'); // globalThis.KhaytQuoteFunnel
   require('../lib/product-profit.js'); // globalThis.KhaytProductProfit
   require('../lib/calculator-cost.js'); // partTotalCost, which product profit costs with
+  require('../lib/customer-mix.js'); // globalThis.KhaytCustomerMix
   require('../renderer/dashboard.js'); // renderMaterialUsageChart / renderFilamentAnalytics
   require('../renderer/analytics.js');
 }
