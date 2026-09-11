@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Which printer is costing you, on the Mac.** Khayt has always charted waste
+  by failure type — which tells you the shop has a warping problem — and never
+  by machine, which is what tells you *which printer has it*. The machines
+  screen now shows what each one scraps as a share of everything it printed,
+  and names the fault it keeps hitting. Ranked by rate rather than by grams,
+  because ranking by grams always names the busiest machine, which is the wrong
+  one to sell.
+
 - **Where the work comes from, on the Mac.** How much of the money is new
   customers and how much is people coming back — and how many *people* each
   figure represents, because twelve sales to one person is not twelve

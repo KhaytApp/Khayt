@@ -783,4 +783,25 @@ import KhaytCore
                    "49-customer-mix", size: CGSize(width: 560, height: 400))
     }
 
+    /// Which machine is costing the shop, and what it keeps doing wrong.
+    @Test("what gets scrapped, by machine")
+    func machineReliabilityCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let scrap = try await engine.machineReliability(
+            machines: shop.machineRows, orders: shop.orderRows, waste: shop.wasteRows,
+            from: "", to: "", unassigned: shop.words.callIt("dash.unassigned"))
+        #expect(scrap.rows.filter { $0.scraps > 0 }.count > 1,
+                "only one machine scraps, so the ranking shows nothing")
+
+        try render(VStack(spacing: 16) {
+            MachineReliabilityCard(shop: shop, report: scrap)
+                .card(rail: Khayt.cyan, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "50-machine-scrap", size: CGSize(width: 600, height: 400))
+    }
+
 }

@@ -377,6 +377,8 @@ public actor KhaytEngine {
         "product-profit",
         // Growing, or serving the same people?
         "customer-mix",
+        // Which machine is costing the shop, and what it keeps doing wrong.
+        "machine-reliability",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1880,6 +1882,69 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - Which machine is costing the shop
+
+    /// Scrap per machine, against what that machine actually put out.
+    ///
+    /// `lib/machine-reliability.js`, and NEITHER APP HAS HAD THIS. Waste is
+    /// charted by failure type over time — which says the shop has a warping
+    /// problem — and never by machine, which is what says which printer has it.
+    ///
+    /// Ranked by RATE, not by grams: ranking by grams always names the busiest
+    /// machine, which is the wrong printer to sell.
+    public struct MachineReliability: Decodable, Sendable {
+        public let rows: [Row]
+        public let totals: Totals
+
+        public struct Row: Decodable, Sendable, Identifiable, Hashable {
+            public let machineId: String
+            public let name: String
+            public let color: String
+            public let jobs: Int
+            public let grams: Double
+            public let hours: Double
+            public let scraps: Int
+            public let scrapGrams: Double
+            public let scrapCost: Double
+            /// Nil for a machine that has handled nothing at all.
+            public let scrapRate: Double?
+            /// What it keeps doing wrong — the actionable half. "Warping" sends
+            /// somebody to the chamber temperature; a number does not.
+            public let worstFault: Fault?
+            public var id: String { machineId }
+        }
+
+        public struct Fault: Decodable, Sendable, Hashable {
+            public let type: String
+            public let grams: Double
+        }
+
+        public struct Totals: Decodable, Sendable {
+            public let jobs: Int
+            public let grams: Double
+            public let scrapGrams: Double
+            public let scraps: Int
+            public let scrapCost: Double
+            public let scrapRate: Double?
+            /// The machine to look at, and only once it has run enough for a
+            /// rate to mean anything.
+            public let worst: Row?
+        }
+    }
+
+    public func machineReliability(machines: [JSONValue], orders: [JSONValue],
+                                   waste: [JSONValue], from: String, to: String,
+                                   unassigned: String) throws -> MachineReliability {
+        try runtime.call2(#"""
+        globalThis.KhaytMachineReliability.machineReliability({
+          machines: ARG0, orders: ARG1, waste: ARG2,
+          from: ARG3, to: ARG4, unassigned: ARG5,
+        }, {})
+        """#, [.array(machines), .array(orders), .array(waste),
+               .string(from), .string(to), .string(unassigned)],
+              as: MachineReliability.self)
     }
 
     // MARK: - Growing, or serving the same people?
