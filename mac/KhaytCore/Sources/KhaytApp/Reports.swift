@@ -18,6 +18,12 @@ struct Reports: View {
     @State private var owed: Receivables?
     @State private var best: KhaytEngine.TopLists?
     @State private var machinePL: KhaytEngine.MachineProfitReport?
+    /// How far each machine runs from its quote, and the shop's own figure.
+    /// Not filtered to the chosen period: a machine's calibration is not a
+    /// property of this quarter, and the measured-only filter already thins the
+    /// readings enough without also throwing away last month's.
+    @State private var accuracy: [KhaytEngine.MachineAccuracy] = []
+    @State private var shopAccuracy: KhaytEngine.MachineAccuracy?
     @State private var variance: [KhaytEngine.ModelVariance] = []
     /// The sentence each row earned, keyed by model. Worked out here rather
     /// than in the row's body: it is an engine call, and a body runs whenever
@@ -43,7 +49,8 @@ struct Reports: View {
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice)
             } else if shop.reportPage == .machines {
-                MachineProfitPage(shop: shop, report: machinePL)
+                MachineProfitPage(shop: shop, report: machinePL,
+                                  accuracy: accuracy, shopAccuracy: shopAccuracy)
             } else if rows.isEmpty {
                 EmptyHere(title: shop.words.callIt("an.pnl_empty"), mark: .reports)
                     .frame(maxHeight: .infinity)
@@ -92,6 +99,12 @@ struct Reports: View {
         // question about a stretch of time, and the same machine can be the
         // best one quarter and the worst the next. That is the point of asking.
         .task(id: shop.period) { await recomputeMachinePL() }
+        // And NOT with the period, beside it on the same screen. "Which machine
+        // earned" is a question about a stretch of time; "is this machine
+        // slower than its slicer thinks" is a question about the machine, and
+        // answering it from one quarter's prints would throw away most of the
+        // little evidence the measured-only filter leaves.
+        .task(id: shop.orderRows.count) { await recomputeAccuracy() }
     }
 
     private var table: some View {
@@ -229,6 +242,16 @@ struct Reports: View {
             maintenance: done.maintenance,
             settings: shop.settingsDict, clients: shop.clientRows,
             unassigned: shop.words.callIt("dash.unassigned"))
+    }
+
+    private func recomputeAccuracy() async {
+        guard let engine = shop.engine else { return }
+        // `minSamples: 1`, like the model panel: one measured print IS evidence,
+        // and the row carries its own count and confidence so it can say how
+        // much. Hiding it until there are two means a shop that has just started
+        // measuring sees nothing and concludes the screen is broken.
+        accuracy = (try? await engine.machineAccuracy(orders: shop.orderRows, minSamples: 1)) ?? []
+        shopAccuracy = try? await engine.shopAccuracy(orders: shop.orderRows, minSamples: 1)
     }
 
     private func recomputeVariance() async {

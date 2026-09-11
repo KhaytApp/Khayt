@@ -17,11 +17,33 @@ import KhaytCore
 struct MachineProfitPage: View {
     let shop: Shop
     let report: KhaytEngine.MachineProfitReport?
+    /// How far each machine runs from the time it was quoted at, and the shop's
+    /// own figure. Beside the money on purpose: "this printer earned 4,000" and
+    /// "this printer takes 20% longer than you quote" are the same sentence
+    /// read twice, and a shop deciding what to charge needs both at once.
+    ///
+    /// Drawn even when the P&L above it is empty — the periods are different.
+    /// The money is filtered to the chosen range; accuracy is every measured
+    /// print there has ever been, because a machine's calibration is not a
+    /// property of this quarter.
+    var accuracy: [KhaytEngine.MachineAccuracy] = []
+    var shopAccuracy: KhaytEngine.MachineAccuracy?
 
     var body: some View {
         let words = shop.words
         if let report, !report.rows.isEmpty {
-            ScrollView { rows(report) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    rows(report)
+                    Accuracy(shop: shop, rows: accuracy, all: shopAccuracy)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else if !accuracy.isEmpty {
+            // The money is empty and the calibration is not, which happens
+            // whenever a shop looks at a quiet month. Showing the empty state
+            // over figures this screen HAS would be hiding them.
+            ScrollView { Accuracy(shop: shop, rows: accuracy, all: shopAccuracy) }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
             // NOT "no data". A shop reaches this by having finished no work in
@@ -135,6 +157,119 @@ struct MachineProfitPage: View {
             if pct >= 30 { return Khayt.done }
             if pct >= 10 { return Khayt.attention }
             return Khayt.late
+        }
+    }
+
+    /// What the machines said about themselves.
+    ///
+    /// Split out of `rows` for the same reason that is: `ImageRenderer` draws
+    /// nothing inside a `ScrollView` and does not say so, so anything the
+    /// harness must photograph has to exist outside one.
+    struct Accuracy: View {
+        let shop: Shop
+        let rows: [KhaytEngine.MachineAccuracy]
+        let all: KhaytEngine.MachineAccuracy?
+
+        var body: some View {
+            let words = shop.words
+            if !rows.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(words.callIt("an.machine_accuracy"))
+                            .font(.callout.weight(.semibold))
+                        Spacer()
+                        if let all, let pct = all.hoursDeltaPct {
+                            // The shop's own figure, off the same readings as
+                            // the rows beneath it. The two used to be computed
+                            // separately and nothing made them agree.
+                            Text(signed(pct))
+                                .font(.callout.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(tint(pct))
+                            Text(words.counting(all.sampled, "mac.acc_prints"))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    ForEach(rows) { row in Line(shop: shop, row: row) }
+
+                    // ── WHAT IS NOT COUNTED, AND WHY THE PANEL CAN LOOK THIN ─
+                    //
+                    // Only prints a PRINTER timed. The completion dialog
+                    // pre-fills the estimate, so a typed actual is usually the
+                    // estimate confirmed — counting those would compare an
+                    // estimate to itself and report every machine as perfectly
+                    // calibrated. A shop seeing two prints here rather than
+                    // twenty is seeing the truth about its evidence.
+                    Text(words.callIt("mac.acc_measured_only"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 2)
+                }
+                .padding(Metric.screen)
+            }
+        }
+
+        /// Over is what costs a shop money. Under is worth knowing and is not a
+        /// fault, so it does not get a warning colour — a machine that finishes
+        /// early painted red teaches people to ignore the colour.
+        private func tint(_ pct: Double) -> Color {
+            if pct >= 25 { return Khayt.late }
+            if pct >= 10 { return Khayt.attention }
+            return Khayt.done
+        }
+
+        private func signed(_ pct: Double) -> String {
+            (pct >= 0 ? "+" : "−") + Money.quantity(abs(pct), decimals: 1) + "%"
+        }
+
+        private struct Line: View {
+            let shop: Shop
+            let row: KhaytEngine.MachineAccuracy
+
+            var body: some View {
+                let words = shop.words
+                let machine = shop.machines.first { $0.id == row.machineId }
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Swatch.rgb(fromHex: machine?.color).map {
+                            Color(red: $0.r, green: $0.g, blue: $0.b)
+                        } ?? Color.secondary)
+                        .frame(width: 4, height: 15)
+                    Text(machine?.name ?? row.machineId)
+                        .font(.callout.weight(.medium))
+                    Text(words.counting(row.sampled, "mac.acc_prints"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    // Quoted, then measured, then the gap — in that order,
+                    // because the gap is only readable if the two figures it
+                    // came from are on the same line.
+                    Text(hours(row.estHours)).font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Text("→").font(.caption).foregroundStyle(.secondary)
+                    Text(hours(row.actHours)).font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Text(row.hoursDeltaPct.map(signed) ?? "—")
+                        .font(.callout.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(row.hoursDeltaPct.map(tint) ?? .secondary)
+                        .frame(minWidth: 56, alignment: .trailing)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .card(padding: 12)
+            }
+
+            private func hours(_ h: Double?) -> String {
+                guard let h else { return "—" }
+                return Money.quantity(h, decimals: 1) + shop.words.callIt("common.hours_short")
+            }
+
+            private func tint(_ pct: Double) -> Color {
+                if pct >= 25 { return Khayt.late }
+                if pct >= 10 { return Khayt.attention }
+                return Khayt.done
+            }
+
+            private func signed(_ pct: Double) -> String {
+                (pct >= 0 ? "+" : "−") + Money.quantity(abs(pct), decimals: 1) + "%"
+            }
         }
     }
 
