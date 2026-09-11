@@ -70,6 +70,7 @@ function loadAnalyticsStack() {
   require('../lib/cash-flow.js');    // globalThis.KhaytCashFlow
   require('../lib/client-value.js'); // globalThis.KhaytClientValue
   require('../lib/capacity.js');     // globalThis.KhaytCapacity
+  require('../lib/quote-funnel.js'); // globalThis.KhaytQuoteFunnel
   require('../renderer/dashboard.js'); // renderMaterialUsageChart / renderFilamentAnalytics
   require('../renderer/analytics.js');
 }

@@ -29,6 +29,8 @@ struct Reports: View {
     /// What each customer has been worth over its whole life with the shop —
     /// beside the top lists, which answer "who is biggest this period".
     @State private var worth: KhaytEngine.ClientValue?
+    /// How many quotes turn into work, beside how accurate they are.
+    @State private var funnel: KhaytEngine.QuoteFunnel?
     /// How far each machine runs from its quote, and the shop's own figure.
     /// Not filtered to the chosen period: a machine's calibration is not a
     /// property of this quarter, and the measured-only filter already thins the
@@ -58,7 +60,7 @@ struct Reports: View {
             } else if shop.reportPage == .best {
                 Best(shop: shop, best: best, worth: worth)
             } else if shop.reportPage == .quoting {
-                Quoting(shop: shop, rows: variance, said: advice)
+                Quoting(shop: shop, rows: variance, said: advice, funnel: funnel)
             } else if shop.reportPage == .machines {
                 MachineProfitPage(shop: shop, report: machinePL,
                                   accuracy: accuracy, shopAccuracy: shopAccuracy)
@@ -240,6 +242,7 @@ struct Reports: View {
         await recomputeBreakEven()
         await recomputeCashFlow()
         await recomputeClientValue()
+        await recomputeFunnel()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
@@ -306,6 +309,16 @@ struct Reports: View {
             clients: shop.clientRows, orders: shop.orderRows, now: Date(),
             quietDays: 90, limit: 10,
             settings: shop.settingsDict, language: shop.words.language)
+    }
+
+    private func recomputeFunnel() async {
+        guard let engine = shop.engine else { return }
+        // NOT filtered to the chosen period. A win rate over one quarter of a
+        // small shop is a handful of decisions, and the figure moves twenty
+        // points on one job — which makes it noise rather than a rate.
+        funnel = try? await engine.quoteFunnel(
+            orders: shop.orderRows, now: Date(),
+            settings: shop.settingsDict, clients: shop.clientRows)
     }
 
     private func recomputeMachinePL() async {

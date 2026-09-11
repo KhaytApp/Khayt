@@ -212,7 +212,9 @@
           "filename": "ORD-01003-cable-chain--40-links.jpg",
           "addedAt": "2026-07-06T14:26:00Z"
         }
-      ]
+      ],
+      "quoteSentAt": "2026-06-15",
+      "quoteAcceptedAt": "2026-06-18"
     },
     {
       "id": "ORD-01004",
@@ -260,7 +262,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-16T12:00:00Z",
-      "productId": "PRD-9FE0F9"
+      "productId": "PRD-9FE0F9",
+      "quoteSentAt": "2026-07-26",
+      "quoteAcceptedAt": "2026-07-29"
     },
     {
       "id": "ORD-01005",
@@ -307,7 +311,8 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-22T10:37:00Z",
-      "productId": "PRD-51069B"
+      "productId": "PRD-51069B",
+      "quoteSentAt": "2026-08-22"
     },
     {
       "id": "ORD-01006",
@@ -354,7 +359,8 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-29T11:43:00Z",
-      "productId": "PRD-EF6642"
+      "productId": "PRD-EF6642",
+      "quoteSentAt": "2026-08-29"
     },
     {
       "id": "ORD-01007",
@@ -402,7 +408,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-28T17:31:00Z",
-      "productId": "PRD-68297E"
+      "productId": "PRD-68297E",
+      "quoteSentAt": "2026-08-14",
+      "quoteAcceptedAt": "2026-08-15"
     },
     {
       "id": "ORD-01008",
@@ -465,7 +473,9 @@
         "time": "moonraker",
         "weight": "moonraker",
         "at": "2026-08-26T18:00:00.000Z"
-      }
+      },
+      "quoteSentAt": "2026-08-12",
+      "quoteAcceptedAt": "2026-08-17"
     },
     {
       "id": "ORD-01009",
@@ -513,7 +523,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-03T13:42:00Z",
-      "productId": "PRD-F68FC0"
+      "productId": "PRD-F68FC0",
+      "quoteSentAt": "2026-07-20",
+      "quoteAcceptedAt": "2026-07-23"
     },
     {
       "id": "ORD-01010",
@@ -560,7 +572,8 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-16T15:04:00Z",
-      "productId": "PRD-BA8B48"
+      "productId": "PRD-BA8B48",
+      "quoteSentAt": "2026-08-16"
     },
     {
       "id": "ORD-01011",
@@ -663,7 +676,9 @@
           "filename": "ORD-01012-prosthetic-socket-trial.jpg",
           "addedAt": "2026-05-16T09:16:00Z"
         }
-      ]
+      ],
+      "quoteSentAt": "2026-05-09",
+      "quoteAcceptedAt": "2026-05-16"
     },
     {
       "id": "ORD-01013",
@@ -711,7 +726,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-05-07T11:44:00Z",
-      "productId": "PRD-49E07C"
+      "productId": "PRD-49E07C",
+      "quoteSentAt": "2026-04-27",
+      "quoteAcceptedAt": "2026-05-06"
     },
     {
       "id": "ORD-01014",
@@ -805,7 +822,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-22T10:08:00Z",
-      "productId": "PRD-77CFAD"
+      "productId": "PRD-77CFAD",
+      "quoteSentAt": "2026-08-01",
+      "quoteAcceptedAt": "2026-08-04"
     },
     {
       "id": "ORD-01016",
@@ -924,7 +943,9 @@
         "time": "moonraker",
         "weight": "moonraker",
         "at": "2026-06-04T18:00:00.000Z"
-      }
+      },
+      "quoteSentAt": "2026-05-31",
+      "quoteAcceptedAt": "2026-06-04"
     },
     {
       "id": "ORD-01018",
@@ -978,7 +999,9 @@
           "filename": "ORD-01018-wind-tunnel-model.jpg",
           "addedAt": "2026-06-13T18:07:00Z"
         }
-      ]
+      ],
+      "quoteSentAt": "2026-05-30",
+      "quoteAcceptedAt": "2026-06-08"
     },
     {
       "id": "ORD-01019",
@@ -1025,7 +1048,8 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-14T20:30:00Z",
-      "productId": "PRD-293BE2"
+      "productId": "PRD-293BE2",
+      "quoteSentAt": "2026-08-16"
     },
     {
       "id": "ORD-01020",
@@ -1073,7 +1097,8 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-26T11:05:00Z",
-      "productId": "PRD-3E4E75"
+      "productId": "PRD-3E4E75",
+      "quoteSentAt": "2026-08-26"
     },
     {
       "id": "ORD-01021",
@@ -1183,7 +1208,9 @@
           "filename": "ORD-01022-kaaba-desk-piece.jpg",
           "addedAt": "2026-08-07T13:32:00Z"
         }
-      ]
+      ],
+      "quoteSentAt": "2026-07-17",
+      "quoteAcceptedAt": "2026-07-19"
     },
     {
       "id": "ORD-01023",
@@ -1231,7 +1258,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-06-25T16:21:00Z",
-      "productId": "PRD-8F047C"
+      "productId": "PRD-8F047C",
+      "quoteSentAt": "2026-06-21",
+      "quoteAcceptedAt": "2026-06-22"
     },
     {
       "id": "ORD-01024",
@@ -1279,7 +1308,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-18T19:35:00Z",
-      "productId": "PRD-9FE0F9"
+      "productId": "PRD-9FE0F9",
+      "quoteSentAt": "2026-07-28",
+      "quoteAcceptedAt": "2026-07-31"
     },
     {
       "id": "ORD-01025",
@@ -1374,7 +1405,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-09-03T16:29:00Z",
-      "productId": "PRD-EF6642"
+      "productId": "PRD-EF6642",
+      "quoteSentAt": "2026-08-13",
+      "quoteAcceptedAt": "2026-08-16"
     },
     {
       "id": "ORD-01027",
@@ -1429,7 +1462,9 @@
           "filename": "ORD-01027-gearbox-housing.jpg",
           "addedAt": "2026-07-02T17:01:00Z"
         }
-      ]
+      ],
+      "quoteSentAt": "2026-06-22",
+      "quoteAcceptedAt": "2026-07-01"
     },
     {
       "id": "ORD-01028",
@@ -1485,7 +1520,9 @@
         "time": "moonraker",
         "weight": "moonraker",
         "at": "2026-09-01T18:00:00.000Z"
-      }
+      },
+      "quoteSentAt": "2026-08-18",
+      "quoteAcceptedAt": "2026-08-27"
     },
     {
       "id": "ORD-01029",
@@ -1533,7 +1570,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-06-16T17:10:00Z",
-      "productId": "PRD-F68FC0"
+      "productId": "PRD-F68FC0",
+      "quoteSentAt": "2026-06-09",
+      "quoteAcceptedAt": "2026-06-10"
     },
     {
       "id": "ORD-01030",
@@ -1581,7 +1620,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-06-27T13:57:00Z",
-      "productId": "PRD-BA8B48"
+      "productId": "PRD-BA8B48",
+      "quoteSentAt": "2026-06-23",
+      "quoteAcceptedAt": "2026-06-27"
     },
     {
       "id": "ORD-01031",
@@ -1684,7 +1725,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-06-15T13:32:00Z",
-      "productId": "PRD-3C492B"
+      "productId": "PRD-3C492B",
+      "quoteSentAt": "2026-06-03",
+      "quoteAcceptedAt": "2026-06-07"
     },
     {
       "id": "ORD-01033",
@@ -1731,7 +1774,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-09-01T10:18:00Z",
-      "productId": "PRD-49E07C"
+      "productId": "PRD-49E07C",
+      "quoteSentAt": "2026-08-22",
+      "quoteAcceptedAt": "2026-08-31"
     },
     {
       "id": "ORD-01034",
@@ -1778,7 +1823,8 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-13T13:00:00Z",
-      "productId": "PRD-3B7A21"
+      "productId": "PRD-3B7A21",
+      "quoteSentAt": "2026-08-15"
     },
     {
       "id": "ORD-01035",
@@ -1826,7 +1872,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-11T08:20:00Z",
-      "productId": "PRD-77CFAD"
+      "productId": "PRD-77CFAD",
+      "quoteSentAt": "2026-07-28",
+      "quoteAcceptedAt": "2026-07-30"
     },
     {
       "id": "ORD-01036",
@@ -1882,7 +1930,9 @@
         "time": "prusalink",
         "weight": "prusalink",
         "at": "2026-05-14T18:00:00.000Z"
-      }
+      },
+      "quoteSentAt": "2026-05-10",
+      "quoteAcceptedAt": "2026-05-11"
     },
     {
       "id": "ORD-01037",
@@ -1930,7 +1980,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-30T13:19:00Z",
-      "productId": "PRD-0E40B5"
+      "productId": "PRD-0E40B5",
+      "quoteSentAt": "2026-08-16",
+      "quoteAcceptedAt": "2026-08-17"
     },
     {
       "id": "ORD-01038",
@@ -1977,7 +2029,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-06-14T16:04:00Z",
-      "productId": "PRD-9A0055"
+      "productId": "PRD-9A0055",
+      "quoteSentAt": "2026-06-02",
+      "quoteAcceptedAt": "2026-06-06"
     },
     {
       "id": "ORD-01039",
@@ -2024,7 +2078,9 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-14T14:32:00Z",
-      "productId": "PRD-293BE2"
+      "productId": "PRD-293BE2",
+      "quoteSentAt": "2026-08-07",
+      "quoteAcceptedAt": "2026-08-14"
     },
     {
       "id": "ORD-01040",
@@ -2072,7 +2128,8 @@
       "statusHistory": [],
       "rev": 1,
       "updatedAt": "2026-08-31T18:28:00Z",
-      "productId": "PRD-3E4E75"
+      "productId": "PRD-3E4E75",
+      "quoteSentAt": "2026-08-31"
     },
     {
       "id": "ORD-01041",
