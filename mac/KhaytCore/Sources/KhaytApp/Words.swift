@@ -451,6 +451,13 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // Whether the shop can take another job.
+        "mac.cap_clear_days": ["en": "clear in {n} days", "ar": "يخلو خلال {n} يومًا"],
+        "mac.cap_clear_soon": ["en": "free today",       "ar": "متاح اليوم"],
+        "mac.cap_over":       ["en": "{n} days behind",  "ar": "متأخر {n} يومًا"],
+        "mac.cap_untargeted": ["en": "{h} h of booked work is on machines with no daily target, so it is in no percentage here.",
+                               "ar": "{h} ساعة من العمل المحجوز على آلات بلا هدف يومي، فلا تدخل في أي نسبة هنا."],
+        "mac.cap_hours":      ["en": "{booked} h of {available} h", "ar": "{booked} من {available} ساعة"],
         // Who the customers are worth.
         "mac.cv_share":      ["en": "{pct}% of everything the shop has earned is this one customer.",
                               "ar": "{pct}% من كل ما كسبه المحل يأتي من هذا العميل وحده."],

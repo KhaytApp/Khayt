@@ -369,6 +369,8 @@ public actor KhaytEngine {
         "cash-flow",
         // Which customers are worth keeping.
         "client-value",
+        // Whether the shop can take another job, and when it would start.
+        "capacity",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1872,6 +1874,59 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - Can the shop take this job?
+
+    /// Agreed, unfinished work against the hours each machine is actually run.
+    ///
+    /// `lib/capacity.js`. The load is NOT clamped at 100: a machine booked
+    /// three weeks over is a different answer from one exactly full, and the
+    /// rule this replaces clamped that difference away. `daysToClear` is the
+    /// figure a shop acts on — a percentage is a fact, a date is a decision.
+    public struct Capacity: Decodable, Sendable {
+        public let rows: [Row]
+        public let totals: Totals
+
+        public struct Row: Decodable, Sendable, Identifiable, Hashable {
+            public let machineId: String
+            public let name: String
+            public let color: String
+            public let hoursPerDay: Double
+            public let bookedHours: Double
+            public let jobs: Int
+            public let availableHours: Double
+            /// Nil when the machine has no target — a percentage of nothing is
+            /// not zero.
+            public let loadPct: Double?
+            public let daysToClear: Double?
+            public let overbooked: Bool
+            public var id: String { machineId }
+        }
+
+        public struct Totals: Decodable, Sendable {
+            public let bookedHours: Double
+            public let availableHours: Double
+            /// Hours on machines with no target, or on no machine at all. Held
+            /// apart because they cannot be a percentage of anything — and
+            /// saying nothing about them is how they stay invisible.
+            public let untargeted: Double
+            public let jobs: Int
+            public let loadPct: Double?
+            public let daysToClear: Double?
+            public let overbooked: Bool
+            public let noTargets: Bool
+        }
+    }
+
+    public func capacity(machines: [JSONValue], orders: [JSONValue],
+                         days: Int, unassigned: String) throws -> Capacity {
+        try runtime.call2(#"""
+        globalThis.KhaytCapacity.capacity({
+          machines: ARG0, orders: ARG1, days: ARG2, unassigned: ARG3,
+        }, {})
+        """#, [.array(machines), .array(orders), .number(Double(days)),
+               .string(unassigned)], as: Capacity.self)
     }
 
     // MARK: - Who the customers are worth

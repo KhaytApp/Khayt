@@ -3129,22 +3129,35 @@ function renderThroughputHeatmap() {
 }
 
 function computeCapacityForecast() {
-  const activeStatuses = ['pending','printing','post','on_hold'];
-  const rows = [];
-  let totalBooked = 0, totalAvail = 0;
-  for (const m of machines) {
-    const avail = +(m.targetHoursPerDay || 0);
-    if (avail <= 0) continue;
-    const availableHours = avail * 7;
-    const bookedHours = printLog
-      .filter(o => o.machineId === m.id && activeStatuses.includes(o.status))
-      .reduce((s, o) => s + (+o.printTime || 0), 0);
-    const pct = Math.min(100, Math.round(bookedHours / availableHours * 100));
-    rows.push({ machineName: m.name, color: m.color, bookedHours, availableHours, pct });
-    totalBooked += bookedHours;
-    totalAvail  += availableHours;
-  }
-  return { rows, totalBooked, totalAvail, totalPct: totalAvail > 0 ? Math.min(100, Math.round(totalBooked / totalAvail * 100)) : 0 };
+  // `lib/capacity.js`, not the arithmetic that used to be here.
+  //
+  // The clamp is gone, and that is the point: `pct` was `Math.min(100, …)`, so
+  // a machine booked three weeks over read as exactly full — identical to one
+  // with nothing left and nothing waiting. "Full" means take no more today;
+  // "300%" means the shop is three weeks behind. It also counted voided orders
+  // and dropped every machine with no target, so a queue could grow behind a
+  // panel reading 40%.
+  const report = KhaytCapacity.capacity({
+    machines: machines || [], orders: printLog || [], days: 7,
+    unassigned: t('dash.unassigned'),
+  });
+  const rows = report.rows
+    .filter((r) => r.hoursPerDay > 0)
+    .map((r) => ({
+      machineName: r.name, color: r.color,
+      bookedHours: r.bookedHours, availableHours: r.availableHours,
+      // Rounded but NOT capped — a caller drawing a bar must clamp the WIDTH,
+      // never the number it prints beside it.
+      pct: Math.round(r.loadPct),
+      overbooked: r.overbooked, daysToClear: r.daysToClear,
+    }));
+  return {
+    rows,
+    totalBooked: report.totals.bookedHours,
+    totalAvail: report.totals.availableHours,
+    totalPct: report.totals.loadPct == null ? 0 : Math.round(report.totals.loadPct),
+    untargeted: report.totals.untargeted,
+  };
 }
 
 function renderCapacityGauge() {
@@ -3169,7 +3182,7 @@ function renderCapacityGauge() {
         <span style="color:var(--text-muted);">${r.bookedHours.toFixed(1)}h / ${r.availableHours.toFixed(1)}h (${r.pct}%)</span>
       </div>
       <div style="background:var(--surface-2); border-radius:3px; height:6px; overflow:hidden;">
-        <div style="width:${r.pct}%; height:100%; background:${col}; transition:width 0.3s;"></div>
+        <div style="width:${Math.min(100, r.pct)}%; height:100%; background:${col}; transition:width 0.3s;"></div>
       </div>
     </div>`;
   }).join('');

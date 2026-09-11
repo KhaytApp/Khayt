@@ -2224,7 +2224,8 @@
         "gramsThreshold": 50000,
         "gramsAtInstall": 0
       },
-      "kind": "fdm"
+      "kind": "fdm",
+      "targetHoursPerDay": 14
     },
     {
       "id": "MACH-core-one",
@@ -2252,7 +2253,8 @@
         "gramsThreshold": 8000,
         "gramsAtInstall": 0
       },
-      "kind": "fdm"
+      "kind": "fdm",
+      "targetHoursPerDay": 10
     },
     {
       "id": "MACH-x1c",
@@ -2281,7 +2283,8 @@
         "gramsThreshold": 30000,
         "gramsAtInstall": 0
       },
-      "kind": "fdm"
+      "kind": "fdm",
+      "targetHoursPerDay": 16
     },
     {
       "id": "MACH-UVFLAT",
@@ -2296,7 +2299,8 @@
         "z": 100
       },
       "powerDraw": 210,
-      "createdAt": "2026-03-14"
+      "createdAt": "2026-03-14",
+      "targetHoursPerDay": 6
     },
     {
       "id": "MACH-LASER",
@@ -2311,7 +2315,8 @@
         "z": 200
       },
       "powerDraw": 1400,
-      "createdAt": "2026-05-02"
+      "createdAt": "2026-05-02",
+      "targetHoursPerDay": 6
     }
   ],
   "printFiles": [

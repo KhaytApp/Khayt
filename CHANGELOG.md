@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **"Can we take this job?" is now a date, on the machines screen.** Agreed,
+  unfinished work against the hours each machine is actually run — and instead
+  of a percentage you have to convert, it says *clear in 3 days* or *26 days
+  behind*, which is the thing you were going to work out anyway and the thing
+  you say on the phone. Work sitting on a machine with no daily target set, or
+  on no machine at all, is counted and named rather than quietly left out.
+
 - **Client lifetime value on the Mac — with the sentence the table could not
   say.** What each customer has been worth over its whole life with the shop,
   who has stopped coming back, and who has work in flight. Above it, the thing
@@ -100,6 +107,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **Overbooked looked exactly like full.** The capacity forecast capped the
+  load at 100%, so a machine with three weeks of work queued drew the same full
+  bar as one with nothing waiting — on the panel you check before saying yes to
+  a job. It reports the real figure now, and the bar is drawn past its end when
+  a machine is over. It was also counting voided orders, and dropping every
+  machine with no daily target, so a queue could grow behind a panel reading
+  40%.
 
 - **A quote counted as lifetime value.** The client value table counted every
   order carrying a customer's name, with no check on whether it was ever
