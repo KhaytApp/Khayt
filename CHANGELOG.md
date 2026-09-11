@@ -4,6 +4,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+### Fixed
+
+- **(Maintainers) A release whose notes were too long created the tag and
+  shipped nothing.** GitHub caps a release body at 125,000 characters and
+  rejects the whole request above it. The `v3.7.0` entry was 152,890 — a stable
+  promotion carries the entire line — so `gh release create` returned HTTP 422,
+  no release was made, every platform job was skipped, and the tag existed. From
+  the tag list the cut looked finished. The notes are now trimmed to fit, from
+  the END and at a section or bullet boundary, with a link to the full
+  changelog. From the end deliberately: the "Before you update" section that
+  gates an update sits at the top of an entry, and trimming the other way would
+  have quietly un-gated a release that moves a shop's data.
+
 ## [3.7.0] - 2026-09-11
 
 The 3.7.0 beta line, released as stable. Individual beta entries are kept below;
