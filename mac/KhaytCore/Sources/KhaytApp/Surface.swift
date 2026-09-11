@@ -44,20 +44,109 @@ extension View {
     ///
     /// `rail` is the colour of what the card is about, or nil for the ordinary
     /// case. See the note above on why most cards should pass nil.
-    func card(rail: Color? = nil, padding: CGFloat = 12) -> some View {
-        modifier(KhaytCard(rail: rail, padding: padding))
+    /// - Parameter fills: stretch to the height offered, instead of hugging the
+    ///   content. For a card in a grid row, where the row is already as tall as
+    ///   its tallest card and a short one would otherwise float in it — see
+    ///   `KhaytCard`.
+    func card(rail: Color? = nil, padding: CGFloat = 12, fills: Bool = false) -> some View {
+        modifier(KhaytCard(rail: rail, padding: padding, fills: fills))
+    }
+}
+
+/// The height of the tallest card in a grid.
+///
+/// ── WHY A PREFERENCE AND NOT JUST `maxHeight: .infinity` ──────────────────
+///
+/// `maxHeight: .infinity` makes a card fill its ROW, and a `LazyVGrid` sizes
+/// every row independently. So a shelf came out as two tidy rows of different
+/// heights — five tall boxes above four short ones — which is the same ragged
+/// look one row down, and reads as two grids rather than one.
+///
+/// A card cannot know what the tallest one is, so each reports its own natural
+/// height up and the grid hands the maximum back down. `reduce` takes the
+/// larger, which is what makes it a maximum rather than a last-one-wins.
+struct CardHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+extension View {
+    /// Make every card in a grid the height of the tallest one.
+    ///
+    /// Put this on the GRID and `fills: true` on the cards in it. Both are
+    /// needed and they do different things: this decides what the height is,
+    /// and `fills` is what makes a card's surface actually take it instead of
+    /// hugging its contents inside a taller cell.
+    func equalCardHeights(_ tallest: Binding<CGFloat>) -> some View {
+        onPreferenceChange(CardHeight.self) { height in
+            // Only upward, and only when it changes. `onPreferenceChange`
+            // already filters equal values; the guard is for the case where a
+            // measurement arrives as 0 during a pass in which no card has been
+            // laid out yet, which would otherwise drop every card to nothing
+            // for a frame.
+            guard height > 0, height != tallest.wrappedValue else { return }
+            tallest.wrappedValue = height
+        }
+    }
+
+    /// The height every card in this grid settled on, or nothing yet.
+    ///
+    /// Applied OUTSIDE the card, so the measurement inside it stays the card's
+    /// own natural height. A `.frame` does not stretch its child — it makes a
+    /// box of the given size and puts the child in at the alignment — which is
+    /// what stops this feeding back on itself: forcing the height does not
+    /// change the height that gets reported, so a shelf that later filters down
+    /// to shorter cards shrinks instead of staying stuck at the old tallest.
+    func atCardHeight(_ tallest: CGFloat) -> some View {
+        frame(height: tallest > 0 ? tallest : nil, alignment: .top)
     }
 }
 
 private struct KhaytCard: ViewModifier {
     let rail: Color?
     let padding: CGFloat
+    /// ── WHY A CARD WOULD WANT TO BE TALLER THAN ITS CONTENTS ──────────────
+    ///
+    /// A `LazyVGrid` row is as tall as its tallest cell, and a cell that hugs
+    /// its content leaves the rest of that height as a gap. So a row of machine
+    /// cards was a row of boxes of different heights: a laser cutter has no
+    /// nozzle, no colour count and no extruder, and drew a card a hundred and
+    /// eighty points shorter than the printer beside it.
+    ///
+    /// Top alignment on the `GridItem` fixed WHERE the short card sat — it used
+    /// to float in the middle of the row, which read as a card that had come
+    /// loose — but not that it was short. Four boxes of four heights is a shelf
+    /// that looks unfinished whatever they are aligned to.
+    ///
+    /// The content still starts at the top; it is the SURFACE that grows. That
+    /// is the whole difference between "these cards are the same size" and
+    /// "this card's contents are stretched apart", and only the first is wanted.
+    let fills: Bool
 
     func body(content: Content) -> some View {
         content
             .padding(padding)
             .padding(.leading, rail == nil ? 0 : 5)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // MEASURED HERE, which is before the frame below and therefore
+            // the card's own natural height — what it would be if nothing were
+            // imposed on it. That is the number the grid needs to work out
+            // which card is tallest, and measuring after the frame would
+            // report back whatever was just handed down.
+            .background {
+                if fills {
+                    GeometryReader { geo in
+                        Color.clear.preference(key: CardHeight.self, value: geo.size.height)
+                    }
+                }
+            }
+            // `maxHeight` BEFORE the background, so the surface, the rail and
+            // the border all take the full height rather than framing a short
+            // card inside a tall cell.
+            .frame(maxWidth: .infinity,
+                   maxHeight: fills ? .infinity : nil,
+                   alignment: fills ? .topLeading : .leading)
             .background(Khayt.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(alignment: .leading) {
                 // Clipped to the card's own shape so the bar takes the corner
