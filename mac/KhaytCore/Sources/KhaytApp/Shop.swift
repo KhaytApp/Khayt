@@ -3080,6 +3080,18 @@ final class Shop {
             unassigned: words.callIt("dash.unassigned"))
     }
 
+    /// Which machine scraps the most of what it prints.
+    ///
+    /// The whole book, no window. A scrap rate over one month of a small shop
+    /// is two or three failures, which is not a rate — and the question this
+    /// answers, whether a machine is worth keeping, is not a monthly one.
+    func machineReliability() async -> KhaytEngine.MachineReliability? {
+        guard let engine else { return nil }
+        return try? await engine.machineReliability(
+            machines: machineRows, orders: orderRows, waste: wasteRows,
+            from: "", to: "", unassigned: words.callIt("dash.unassigned"))
+    }
+
     /// Keep the shop's saved reports.
     ///
     /// The same narrowness as `saveSlicers` and for the same reason: one named

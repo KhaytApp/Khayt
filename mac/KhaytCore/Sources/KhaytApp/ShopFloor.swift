@@ -32,6 +32,10 @@ struct Machines: View {
     /// rather than buried in the reports because that is a decision made at the
     /// machines, usually with somebody on the phone.
     @State private var load: KhaytEngine.Capacity?
+    /// Which machine scraps the most of what it prints. Here rather than in the
+    /// reports because it is a fact about a machine, and this is the screen a
+    /// shop is on when it is deciding what to do about one.
+    @State private var scrap: KhaytEngine.MachineReliability?
     @State private var minute = 0
     /// The tallest card on the floor, which every other one is drawn to. See
     /// `CardHeight` — a `LazyVGrid` sizes each ROW on its own, so without this
@@ -57,6 +61,13 @@ struct Machines: View {
                     CapacityCard(shop: shop, report: load)
                         .card(rail: load?.totals.overbooked == true ? Khayt.late : Khayt.cyan,
                               padding: 14)
+                    // Capacity says whether a machine is busy; this says
+                    // whether being busy is worth it. The pair is the case for
+                    // servicing one printer and selling another.
+                    MachineReliabilityCard(shop: shop, report: scrap)
+                        .card(rail: (scrap?.totals.scrapRate ?? 0) >= 0.05
+                                    ? Khayt.attention : Khayt.cyan,
+                              padding: 14)
                 }
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(shop.machines) { machine in
@@ -71,6 +82,7 @@ struct Machines: View {
         .task(id: "\(shop.bandSignature)#\(minute)") {
             band = await shop.machineBand()
             load = await shop.capacity()
+            scrap = await shop.machineReliability()
         }
         .task {
             // Not a display timer: this drives an engine call, so it ticks at

@@ -451,6 +451,13 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // Which machine is costing the shop.
+        "mac.mr_title":      ["en": "What gets scrapped", "ar": "ما الذي يُهدر"],
+        "mac.mr_rate":       ["en": "{pct}% scrapped",  "ar": "{pct}% مهدر"],
+        "mac.mr_worst":      ["en": "{name} scraps the most of what it prints — mostly {fault}.",
+                              "ar": "{name} أكثر آلة تهدر مما تطبع — غالبًا بسبب {fault}."],
+        "mac.mr_clean":      ["en": "nothing scrapped", "ar": "لا هدر"],
+        "mac.mr_of":         ["en": "{scrap} of {out}", "ar": "{scrap} من {out}"],
         // Growing, or serving the same people?
         "mac.cm_title":      ["en": "Where the work comes from", "ar": "من أين يأتي العمل"],
         "mac.cm_new":        ["en": "New customers",  "ar": "عملاء جدد"],
