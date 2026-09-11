@@ -363,6 +363,8 @@ public actor KhaytEngine {
         // `order-payment` rather than deciding anything itself.
         // What a Bambu says it is doing. The MQTT under it is Swift's —
         // `lib/bambu.js` is Node-only from its first line.
+        // What a shop must bill to cover what it pays anyway.
+        "break-even",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1866,6 +1868,53 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - Break-even
+
+    /// What a shop has to bill in a month to cover the costs it pays anyway.
+    ///
+    /// `lib/break-even.js`, over the same money rules as everything else here:
+    /// `order-money` for what a job earned and `calculator-cost` for what it
+    /// took to make. Nulls where there is no answer rather than zeroes — a shop
+    /// with no finished work in the window has an UNKNOWN margin, and a zero
+    /// would render as "you can never break even".
+    public struct BreakEven: Decodable, Sendable {
+        public let totalFixed: Double
+        public let breakEvenRevenue: Double?
+        public let marginPct: Double?
+        public let avgRevenuePerJob: Double?
+        public let jobsCounted: Int
+        public let billedThisMonth: Double
+        public let surplus: Double?
+        public let progressPct: Double?
+        public let costs: [FixedCost]
+
+        public struct FixedCost: Decodable, Sendable, Identifiable, Hashable {
+            public let name: String
+            public let amount: Double
+            public var id: String { name + "\(amount)" }
+        }
+    }
+
+    public func breakEven(fixedCosts: [JSONValue], completed: [JSONValue],
+                          since: String, month: String,
+                          settings: [String: JSONValue], clients: [JSONValue])
+        throws -> BreakEven {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG4, clients: ARG5 };
+          return globalThis.KhaytBreakEven.breakEven({
+            fixedCosts: ARG0, completed: ARG1, since: ARG2, month: ARG3,
+          }, {
+            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            partCostOf: function (p) { return globalThis.KhaytCalculatorCost.partTotalCost(p, ctx); },
+          });
+        })()
+        """#,
+                          [.array(fixedCosts), .array(completed), .string(since),
+                           .string(month), .object(settings), .array(clients)],
+                          as: BreakEven.self)
     }
 
     /// Where this move would reach outside the shop's own book.

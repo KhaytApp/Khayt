@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Break-even, on the Mac, beside what you made.** What the shop has to bill
+  this month before any of it is profit — rent, the licence, the connection,
+  the accountant — drawn as a distance rather than a number, because what a
+  shop needs to know is how far off it is and whether it is the 3rd or the
+  27th. It sits directly under the quarter's net, since "I made 12,000" is only
+  good news measured against what had to be covered.
+
 - **The Mac app can watch an Elegoo resin printer, and that is all seven
   protocols.** Moonraker, OctoPrint, PrusaLink, Repetier, Duet, Bambu and now
   SDCP — there is no longer a kind of machine the Mac app cannot ask what it is
@@ -80,6 +87,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **Break-even was telling shops to bill LESS than they must.** It costed a job
+  by looking up each part's spool and pricing its grams, and skipped any part
+  that was not linked to one — so an unlinked part was treated as free, the
+  margin came out too high, and the target came out too low. On a figure whose
+  whole job is to be a floor, that is the wrong direction to be wrong in. It
+  now costs the work the same way the quote and the machine P&L do.
+  **Your break-even figure will go up**, and the new one is the right one.
+- **The break-even card spoke English in every language.** "Monthly Fixed
+  Costs", "Break-Even Revenue", "Above Break-Even" were written into the page
+  rather than translated. They are proper strings now, in all nine.
 
 - **Every stage chip in the report builder read `status.quote` instead of
   "Quote".** In all nine languages, in a released app. The chips asked for a

@@ -2175,7 +2175,25 @@
       "PLA Silk": [
         "Silk Gold"
       ]
-    }
+    },
+    "fixedCosts": [
+      {
+        "name": "Workshop rent",
+        "amount": 4500
+      },
+      {
+        "name": "Commercial registration",
+        "amount": 520
+      },
+      {
+        "name": "Internet and power",
+        "amount": 780
+      },
+      {
+        "name": "Accountant",
+        "amount": 600
+      }
+    ]
   },
   "machines": [
     {

@@ -18,6 +18,10 @@ struct Reports: View {
     @State private var owed: Receivables?
     @State private var best: KhaytEngine.TopLists?
     @State private var machinePL: KhaytEngine.MachineProfitReport?
+    /// What the shop must bill this month to cover what it pays anyway.
+    /// Beside the quarters rather than on a page of its own: a shop reading
+    /// what it made is the shop that wants to know whether it was enough.
+    @State private var floor: KhaytEngine.BreakEven?
     /// How far each machine runs from its quote, and the shop's own figure.
     /// Not filtered to the chosen period: a machine's calibration is not a
     /// property of this quarter, and the measured-only filter already thins the
@@ -74,7 +78,7 @@ struct Reports: View {
                         if let latest = rows.first { QuarterDrawn(shop: shop, row: latest) }
                         table
                     }
-                    Totals(shop: shop, rows: rows)
+                    Totals(shop: shop, rows: rows, floor: floor)
                         .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
                 }
             }
@@ -221,10 +225,42 @@ struct Reports: View {
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), now: Date())) ?? []
+        await recomputeBreakEven()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
         await recomputeBest()
+    }
+
+    private func recomputeBreakEven() async {
+        guard let engine = shop.engine else { return }
+        // NINETY DAYS, and the same window the other app uses. Long enough that
+        // one unusual job does not move the margin, short enough that last
+        // year's prices do not set this month's target.
+        let since = Calendar.current.date(byAdding: .day, value: -90, to: Date()) ?? Date()
+        let day = DateFormatter()
+        day.locale = Locale(identifier: "en_US_POSIX")
+        day.dateFormat = "yyyy-MM-dd"
+        let month = DateFormatter()
+        month.locale = Locale(identifier: "en_US_POSIX")
+        month.dateFormat = "yyyy-MM"
+
+        // Finished, unvoided, and business — the same set the quarters count,
+        // because a target derived from one set of jobs and drawn beside a
+        // figure derived from another is two answers pretending to be one.
+        let completed = shop.orderRows.filter { row in
+            guard case .object(let o) = row else { return false }
+            guard case .string(let status)? = o["status"], status == "completed" else { return false }
+            if case .string(let voided)? = o["voidedAt"], !voided.isEmpty { return false }
+            return true
+        }
+        var costs: [JSONValue] = []
+        if case .array(let stored)? = shop.settingsDict["fixedCosts"] { costs = stored }
+
+        floor = try? await engine.breakEven(
+            fixedCosts: costs, completed: completed,
+            since: day.string(from: since), month: month.string(from: Date()),
+            settings: shop.settingsDict, clients: shop.clientRows)
     }
 
     private func recomputeMachinePL() async {
@@ -558,6 +594,7 @@ struct Reports: View {
     private struct Totals: View {
         let shop: Shop
         let rows: [PnlPeriod]
+        let floor: KhaytEngine.BreakEven?
 
         var body: some View {
             let net = rows.reduce(0) { $0 + $1.net }
@@ -605,6 +642,16 @@ struct Reports: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .card(rail: net < 0 ? Khayt.late : Khayt.cyan, padding: 14)
+
+                    // ── AND WHETHER IT WAS ENOUGH ─────────────────────────
+                    //
+                    // Directly under the net, because the two answer halves of
+                    // one question. "I made 12,000" is only good news against
+                    // what the shop had to bill to cover the rent, and that
+                    // figure lived nowhere in this app at all.
+                    BreakEvenCard(shop: shop, report: floor)
+                        .card(rail: (floor?.surplus ?? 0) < 0 ? Khayt.late : Khayt.cyan,
+                              padding: 14)
 
                     // The components it is made of. Net is deliberately NOT
                     // repeated here — it is the card above, and one figure
