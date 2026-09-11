@@ -22,6 +22,111 @@ PKG="$REPO/mac/KhaytCore"
 DIST="$REPO/mac/dist"
 APP="$DIST/Khayt.app"
 
+# ── WHAT THE ARGUMENTS DO, BEFORE ANY WORK HAPPENS ───────────────────────
+#
+# `--notarize` operates on the bundle that is ALREADY in mac/dist. It used to
+# fall through the whole script first, which rebuilt the app — and the release
+# workflow runs it as a second step, without the environment the first step
+# had. So the rebuild replaced a bundle carrying SUFeedURL with one that did
+# not, and then notarised THAT. v4.0.0-alpha.1 shipped unable to check for
+# updates: signed, notarised, stapled, and with the updater switched off by a
+# missing key nobody looks at.
+#
+# Everything below this branch is the BUILD. Anything that must happen for a
+# notarise-only run belongs above it.
+
+
+# SIGN WITH A STABLE IDENTITY IF THIS MAC HAS ONE.
+#
+# An ad-hoc signature — `--sign -` — carries no identity: what macOS remembers
+# about the app is its own content hash, so every rebuild is a DIFFERENT
+# APPLICATION and everything granted to the last one is granted to nothing.
+#
+# The bill is the Keychain. Khayt keeps the cloud token and the printer API keys
+# there, and the first read by an unrecognised application raises a permission
+# dialog. Ad hoc means every single build raises it again — the app sat at 0%
+# CPU behind one for twenty minutes, twice in a day, before this was understood.
+#
+# A real certificate fixes the identity. Signed with a Developer ID the
+# requirement becomes the Team ID:
+#
+#   designated => identifier "Khayt" and anchor apple generic
+#                 and certificate leaf[subject.OU] = "<team>"
+#
+# — which is the same on the next build, and the next. A grant given once holds.
+#
+# Order: an explicit override, then Developer ID (also valid on other Macs, and
+# the identity a notarised build would use), then Apple Development, then ad hoc.
+# `find-identity -v` lists only identities whose certificate is valid and whose
+# private key is present, so anything it prints can actually sign.
+#
+# Matched by SHA-1, not by name: the names contain parentheses and a substring
+# match on two identities is an error rather than a choice.
+pick_identity() {
+  if [ -n "${KHAYT_SIGN_IDENTITY:-}" ]; then echo "$KHAYT_SIGN_IDENTITY"; return; fi
+  local list; list="$(security find-identity -v 2>/dev/null || true)"
+  local kind
+  for kind in "Developer ID Application:" "Apple Development:"; do
+    local line; line="$(printf '%s\n' "$list" | grep -F "$kind" | head -1)"
+    [ -n "$line" ] && { printf '%s\n' "$line" | awk '{print $2}'; return; }
+  done
+  echo "-"
+}
+
+notarize_app() {
+  local missing=""
+  [ -n "${APPLE_ID:-}" ]                    || missing="$missing APPLE_ID"
+  [ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] || missing="$missing APPLE_APP_SPECIFIC_PASSWORD"
+  [ -n "${APPLE_TEAM_ID:-}" ]               || missing="$missing APPLE_TEAM_ID"
+  if [ -n "$missing" ]; then
+    echo "cannot notarise — missing:$missing" >&2
+    echo "  These are the same credentials the Electron release uses." >&2
+    return 1
+  fi
+  if [ "$IDENTITY" = "-" ]; then
+    echo "cannot notarise an ad-hoc signed build — Apple requires a Developer ID." >&2
+    return 1
+  fi
+
+  local zip="$DIST/Khayt-notarize.zip"
+  rm -f "$zip"
+  # `ditto`, not `zip`: a zip built by the shell tool loses the symlinks a
+  # versioned framework is made of, and the notary service rejects what it is
+  # handed rather than what was built.
+  ditto -c -k --keepParent "$APP" "$zip"
+
+  echo "  notarising (this waits on Apple, usually a few minutes)…"
+  if ! xcrun notarytool submit "$zip" \
+        --apple-id "$APPLE_ID" \
+        --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+        --team-id "$APPLE_TEAM_ID" \
+        --wait --timeout 30m; then
+    echo "notarisation FAILED. The log above names the offending binary." >&2
+    echo "  xcrun notarytool log <submission-id> --apple-id … for the detail." >&2
+    rm -f "$zip"
+    return 1
+  fi
+  rm -f "$zip"
+
+  xcrun stapler staple "$APP" || { echo "stapling failed" >&2; return 1; }
+  # And prove it took, rather than trusting that stapler said nothing.
+  if ! xcrun stapler validate "$APP" >/dev/null 2>&1; then
+    echo "the ticket did not staple — the app would fail on an offline Mac." >&2
+    return 1
+  fi
+  # The real question, asked the way Gatekeeper asks it.
+  spctl --assess --type execute --verbose=2 "$APP" 2>&1 | sed 's/^/  /'
+  echo "  notarised and stapled"
+}
+
+if [ "${1:-}" = "--notarize" ]; then
+  [ -d "$APP" ] || { echo "no app at $APP — build it before notarising it." >&2; exit 1; }
+  IDENTITY="$(pick_identity)"
+  notarize_app
+  exit $?
+fi
+
+
 # ── THE MAC APP'S OWN VERSION, NOT ELECTRON'S ────────────────────────────
 #
 # This read `package.json`, which numbers the ELECTRON app. The two ship on
@@ -369,43 +474,6 @@ $SPARKLE_KEYS
 </dict>
 </plist>
 PLIST
-
-# SIGN WITH A STABLE IDENTITY IF THIS MAC HAS ONE.
-#
-# An ad-hoc signature — `--sign -` — carries no identity: what macOS remembers
-# about the app is its own content hash, so every rebuild is a DIFFERENT
-# APPLICATION and everything granted to the last one is granted to nothing.
-#
-# The bill is the Keychain. Khayt keeps the cloud token and the printer API keys
-# there, and the first read by an unrecognised application raises a permission
-# dialog. Ad hoc means every single build raises it again — the app sat at 0%
-# CPU behind one for twenty minutes, twice in a day, before this was understood.
-#
-# A real certificate fixes the identity. Signed with a Developer ID the
-# requirement becomes the Team ID:
-#
-#   designated => identifier "Khayt" and anchor apple generic
-#                 and certificate leaf[subject.OU] = "<team>"
-#
-# — which is the same on the next build, and the next. A grant given once holds.
-#
-# Order: an explicit override, then Developer ID (also valid on other Macs, and
-# the identity a notarised build would use), then Apple Development, then ad hoc.
-# `find-identity -v` lists only identities whose certificate is valid and whose
-# private key is present, so anything it prints can actually sign.
-#
-# Matched by SHA-1, not by name: the names contain parentheses and a substring
-# match on two identities is an error rather than a choice.
-pick_identity() {
-  if [ -n "${KHAYT_SIGN_IDENTITY:-}" ]; then echo "$KHAYT_SIGN_IDENTITY"; return; fi
-  local list; list="$(security find-identity -v 2>/dev/null || true)"
-  local kind
-  for kind in "Developer ID Application:" "Apple Development:"; do
-    local line; line="$(printf '%s\n' "$list" | grep -F "$kind" | head -1)"
-    [ -n "$line" ] && { printf '%s\n' "$line" | awk '{print $2}'; return; }
-  done
-  echo "-"
-}
 IDENTITY="$(pick_identity)"
 
 # INSIDE OUT: a bundle's signature covers what is within it, so the extension is
@@ -541,54 +609,9 @@ install_app() {
 #
 # Credentials are the same three the Electron lane already uses. They are read
 # from the environment, never written to disk, and never echoed.
-notarize_app() {
-  local missing=""
-  [ -n "${APPLE_ID:-}" ]                    || missing="$missing APPLE_ID"
-  [ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] || missing="$missing APPLE_APP_SPECIFIC_PASSWORD"
-  [ -n "${APPLE_TEAM_ID:-}" ]               || missing="$missing APPLE_TEAM_ID"
-  if [ -n "$missing" ]; then
-    echo "cannot notarise — missing:$missing" >&2
-    echo "  These are the same credentials the Electron release uses." >&2
-    return 1
-  fi
-  if [ "$IDENTITY" = "-" ]; then
-    echo "cannot notarise an ad-hoc signed build — Apple requires a Developer ID." >&2
-    return 1
-  fi
-
-  local zip="$DIST/Khayt-notarize.zip"
-  rm -f "$zip"
-  # `ditto`, not `zip`: a zip built by the shell tool loses the symlinks a
-  # versioned framework is made of, and the notary service rejects what it is
-  # handed rather than what was built.
-  ditto -c -k --keepParent "$APP" "$zip"
-
-  echo "  notarising (this waits on Apple, usually a few minutes)…"
-  if ! xcrun notarytool submit "$zip" \
-        --apple-id "$APPLE_ID" \
-        --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-        --team-id "$APPLE_TEAM_ID" \
-        --wait --timeout 30m; then
-    echo "notarisation FAILED. The log above names the offending binary." >&2
-    echo "  xcrun notarytool log <submission-id> --apple-id … for the detail." >&2
-    rm -f "$zip"
-    return 1
-  fi
-  rm -f "$zip"
-
-  xcrun stapler staple "$APP" || { echo "stapling failed" >&2; return 1; }
-  # And prove it took, rather than trusting that stapler said nothing.
-  if ! xcrun stapler validate "$APP" >/dev/null 2>&1; then
-    echo "the ticket did not staple — the app would fail on an offline Mac." >&2
-    return 1
-  fi
-  # The real question, asked the way Gatekeeper asks it.
-  spctl --assess --type execute --verbose=2 "$APP" 2>&1 | sed 's/^/  /'
-  echo "  notarised and stapled"
-}
 
 case "${1:-}" in
-  --open)     open "$APP" ;;
-  --install)  install_app "$@" ;;
-  --notarize) notarize_app ;;
+  --open)    open "$APP" ;;
+  --install) install_app "$@" ;;
+  # --notarize is handled at the TOP, before the build — see the note there.
 esac
