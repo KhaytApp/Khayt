@@ -961,6 +961,11 @@ final class Words {
         "mac.machines_count_two": ["en": "printers", "ar": "طابعتان"],
         // What the shop spent, and what it wasted
         "mac.search_expenses": ["en": "Note, category or job", "ar": "ملاحظة أو تصنيف أو عمل"],
+        // Two screens that filtered correctly and asked the wrong question:
+        // the prompt fell through to the jobs one, so the shelf and the
+        // catalogue both invited a "Job, customer or number".
+        "mac.search_filament": ["en": "Material or colour", "ar": "خامة أو لون"],
+        "mac.search_products": ["en": "Product, material or group", "ar": "منتج أو خامة أو مجموعة"],
         "mac.search_waste":  ["en": "Material, reason or failure", "ar": "خامة أو سبب أو نوع العطل"],
         "mac.of_which_fixed": ["en": "incl. overhead", "ar": "منها التكاليف الثابتة"],
         "mac.quarter_in_progress": ["en": "This quarter is still running, so its overhead is charged for the days elapsed.",

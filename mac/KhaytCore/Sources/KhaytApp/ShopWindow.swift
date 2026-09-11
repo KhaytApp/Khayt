@@ -173,8 +173,10 @@ struct ShopWindow: View {
             }
             .inspectorColumnWidth(min: 260, ideal: 310, max: 420)
         }
-        .searchable(text: $shop.search, placement: .toolbar,
-                    prompt: searchPrompt)
+        // ONLY WHERE IT NARROWS SOMETHING — see `Shop.canSearch`. This was
+        // unconditional, so the calculator and the reports carried a search
+        // field that could be typed into and did nothing.
+        .modifier(SearchWhereItWorks(shop: shop, prompt: searchPrompt))
         .modifier(Reachable(shop: shop, showInspector: $showInspector,
                             searchWanted: $searchWanted))
         // On the window rather than the board, because ⇧⌘H and the Job menu
@@ -322,6 +324,11 @@ struct ShopWindow: View {
         return provenance
     }
 
+    /// What this screen's search box looks for, in its own words.
+    ///
+    /// Three screens fell through to the jobs prompt and were asking for a
+    /// "Job, customer or number" while filtering spools, products and a board.
+    /// The board keeps the jobs prompt on purpose — it IS jobs.
     private var searchPrompt: String {
         if shop.shelf == .giftCards { return shop.words.callIt("giftCardCode") }
         if shop.shelf == .portfolio { return shop.words.callIt("pf.search_ph") }
@@ -329,7 +336,31 @@ struct ShopWindow: View {
         if shop.showingCustomers { return shop.words.callIt("mac.search_people") }
         if shop.showingExpenses { return shop.words.callIt("mac.search_expenses") }
         if shop.showingWaste { return shop.words.callIt("mac.search_waste") }
+        if shop.showingInventory { return shop.words.callIt("mac.search_filament") }
+        if shop.showingCatalogue { return shop.words.callIt("mac.search_products") }
         return shop.words.callIt("mac.search_jobs")
+    }
+}
+
+/// `.searchable`, but only on a screen that has something to search.
+///
+/// A modifier rather than an `if` around the window's body: the branch is kept
+/// as small as it can be, so moving to a screen without search rebuilds the
+/// search field and nothing else.
+private struct SearchWhereItWorks: ViewModifier {
+    @Bindable var shop: Shop
+    let prompt: String
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if shop.canSearch {
+            content
+                .searchable(text: $shop.search, placement: .toolbar, prompt: prompt)
+        } else {
+            // No field at all, and the term dropped on the way out — a search
+            // left running on the library must not silently narrow the jobs
+            // table when the shop comes back to it.
+            content.onAppear { shop.search = "" }
+        }
     }
 }
 

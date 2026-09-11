@@ -969,6 +969,56 @@ final class Shop {
         }
     }
 
+    /// Put rows on the catalogue without a book. FOR TESTS ONLY, and named so
+    /// it cannot be mistaken for a way to write products — it changes what is
+    /// on screen and nothing on disk.
+    func setCatalogueForTesting(_ rows: [KhaytEngine.CatalogueRow]) { catalogueRows = rows }
+
+    /// The catalogue, matching the search box.
+    ///
+    /// The rule `shownExpenses` states: a search field that does nothing on the
+    /// screen you are looking at is worse than no search field. Every other
+    /// list in this app had been held to it and the catalogue had not — the
+    /// field sat above the products prompting "Job, customer or number" and
+    /// narrowed nothing.
+    ///
+    /// Name, description, material and group: a shop hunting for "the palm one"
+    /// or "everything in resin" is asking one of those four.
+    var shownProducts: [KhaytEngine.CatalogueRow] {
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return catalogueRows }
+        return catalogueRows.filter {
+            $0.name.lowercased().contains(q)
+                || $0.description.lowercased().contains(q)
+                || $0.material.lowercased().contains(q)
+                || $0.group.lowercased().contains(q)
+        }
+    }
+
+    /// Whether the screen now showing has anything for the search box to narrow.
+    ///
+    /// ── A FIELD THAT DOES NOTHING IS WORSE THAN NO FIELD ──────────────────
+    ///
+    /// `.searchable` was on the window unconditionally, so every screen carried
+    /// a search field — including the four that are not lists at all. On the
+    /// calculator, the colour studio, the reports and the dashboard it was a
+    /// control that could be typed into and did nothing, labelled "Job,
+    /// customer or number" because the prompt fell through to the jobs one.
+    ///
+    /// Listed the positive way round, so a NEW screen gets no search box until
+    /// somebody says it has one. The other order — naming the screens without
+    /// search — hands every future screen a field that does nothing by default,
+    /// which is the state this is fixing.
+    var canSearch: Bool {
+        switch shelf {
+        case .jobs, .board, .library, .customers, .inventory,
+             .expenses, .waste, .portfolio, .giftCards, .catalogue:
+            return true
+        case .dashboard, .machines, .reports, .colour, .calculator:
+            return false
+        }
+    }
+
     // MARK: - Writing a product down
 
     /// The product being edited, or nil. Drives the sheet, as the customer's does.

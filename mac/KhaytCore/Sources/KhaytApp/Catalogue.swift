@@ -87,7 +87,7 @@ struct Catalogue: View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: Self.cellWidth), spacing: Self.spacing)],
                       spacing: Self.spacing) {
-                ForEach(shop.catalogueRows.sorted(using: order)) { row in
+                ForEach(shop.shownProducts.sorted(using: order)) { row in
                     ProductCell(row: row, shop: shop, selected: selection == row.id)
                         .onTapGesture(count: 2) { edit(row.id) }
                         .onTapGesture { selection = row.id }
@@ -105,17 +105,23 @@ struct Catalogue: View {
             .disabled(!shop.canMoveJobs)
     }
 
+    /// Nothing here, or nothing matching — two different things to say.
+    ///
+    /// A shop that has typed a search and sees "No catalogue yet" has been told
+    /// its products are gone.
     @ViewBuilder private var emptyState: some View {
         if shop.catalogueRows.isEmpty {
             EmptyHere(title: shop.words.callIt("mac.no_products"),
                       message: shop.words.callIt("mac.no_products_hint"), mark: .catalogue)
+        } else if shop.shownProducts.isEmpty {
+            NothingMatched(shop: shop, mark: .catalogue)
         }
     }
 
     // MARK: - The table
 
     private var table: some View {
-        Table(shop.catalogueRows.sorted(using: order), selection: $selection,
+        Table(shop.shownProducts.sorted(using: order), selection: $selection,
               sortOrder: $order, columnCustomization: $columns) {
             TableColumn(shop.words.callIt("cat.title"), value: \.name) { row in
                 VStack(alignment: .leading, spacing: 1) {
