@@ -4,6 +4,57 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-09-11
+
+The 3.7.0 beta line, released as stable. Individual beta entries are kept below;
+this is what changed for you since 3.6.0.
+
+**Khayt stops guessing what a print cost and starts reading it.** 3.6.0 taught
+the app to learn from finished jobs; this line closes the loop. A completed job
+is offered the time and filament the PRINTER measured rather than the estimate
+pre-filled under a second name, that figure is what comes off the shelf, and
+what a model really costs is reported against what you quote for it — per model
+and per machine. If your spools have been reading high, this is the release that
+stops the gap growing.
+
+**Your money figures move, and the old ones were wrong.** Revenue no longer
+counts the VAT you collect, because that money is not yours until you remit it —
+on the sample shop the Profit & Loss read 19% high in exactly the figure you
+would use to decide whether a quarter made money. You can now record the VAT you
+PAY on stock and expenses, so the quarterly report shows what you actually owe.
+Shops whose prices exclude VAT are untouched. **Read "Before you update" above
+before you install this one.**
+
+**Khayt works in nine languages, and for shops that are not filament printers.**
+Your own text — product names, notes, customer records — is written in the one or
+two languages you choose, and eighteen readers that had been treating it as an
+English-or-Arabic pair are fixed; two of them were putting a blank name into
+messages sent to customers and two were filing ZATCA e-invoices with no seller
+street. A machine can say what kind it is, so a laser cutter stops being asked
+for its nozzle diameter, and the shelf counts in the unit the thing is actually
+sold in — millilitres of resin, sheets of ply.
+
+**The print library can move its own weight off your disk.** Files you have not
+touched go to storage you own — Cloudflare R2, Backblaze, Wasabi and four others
+— and come back when you need them. This is the feature the line is named for
+and the only deliberately destructive thing in the library, which is why it is
+off until you set it up and why bringing everything back is one button.
+
+**Security.** A printer camera's `Content-Type` could escape the image tag and
+run script inside the app (fixed in beta.18). Three credentials and every
+order's access tokens were leaving in the exported copy of your book. A whole
+store going to the cloud now has its secrets masked first. And this release
+brings the Electron floor current — three patch releases of Chromium, V8, ANGLE
+and WebRTC fixes that had shipped and not been taken, plus two dependency
+advisories, one of which was held open by this repo's own version pin.
+
+**Where Khayt goes next.** Khayt for macOS is being rebuilt as a native Mac app —
+it shares this app's business rules exactly, runs them unchanged, and is proved
+against them test for test. It becomes the main Khayt on macOS, a native Windows
+app follows, and this Electron build continues as the third option for everyone
+else. Nothing you have to do, and nothing about this release depends on it.
+
+
 ### Before you update
 
 - **Finishing a job now takes off the shelf what the job actually used, not
