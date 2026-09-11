@@ -137,8 +137,17 @@ struct NotYetBuiltTests {
         let numbers = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight"]
         let written = numbers[min(missing.count, numbers.count - 1)]
         let total = numbers[min(all.count, numbers.count - 1)]
-        #expect(Self.theList.contains("\(written) of the \(total) printer protocols"),
-                "the app is missing \(missing.count) of \(all.count) — the README does not say “\(written) of the \(total) printer protocols”")
+        if missing.isEmpty {
+            // NOT "zero of the seven printer protocols". A list of things not
+            // yet built that names a category with nothing in it sends somebody
+            // to look for work that does not exist, which is the same fault as
+            // naming a finished feature — it is just written as a number.
+            #expect(!Self.theList.contains("printer protocol"),
+                    "every protocol is spoken and the README still lists some as missing")
+        } else {
+            #expect(Self.theList.contains("\(written) of the \(total) printer protocols"),
+                    "the app is missing \(missing.count) of \(all.count) — the README does not say “\(written) of the \(total) printer protocols”")
+        }
         for name in missing {
             #expect(Self.theList.contains(name),
                     "\(name) is not spoken and the README does not name it as missing")

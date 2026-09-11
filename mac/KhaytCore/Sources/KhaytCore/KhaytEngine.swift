@@ -364,6 +364,11 @@ public actor KhaytEngine {
         // What a Bambu says it is doing. The MQTT under it is Swift's —
         // `lib/bambu.js` is Node-only from its first line.
         "bambu-report",
+        // Elegoo resin. `sdcp` is pure — framing and status mapping;
+        // `sdcp-reply` decides which frame is the answer. The socket is
+        // Swift's, because `lib/sdcp-client.js` cannot leave Node.
+        "sdcp",
+        "sdcp-reply",
         "report-records",
         "report-builder",
         // A report a shop named, kept in one shape for both apps.
@@ -2742,6 +2747,65 @@ public actor KhaytEngine {
     public func bambuStatus(report payload: String) throws -> PrinterStatus? {
         try runtime.call2("globalThis.KhaytBambuReport.parseBambuReport(ARG0)",
                           [.string(payload)], as: PrinterStatus?.self)
+    }
+
+    // MARK: - SDCP (Elegoo resin)
+
+    /// The address and the question, from the modules that own both.
+    ///
+    /// `lib/sdcp.js` is pure and is loaded here directly — framing and status
+    /// mapping, no sockets. `lib/sdcp-client.js` above it speaks UDP and a
+    /// WebSocket and cannot leave Node, so the WebSocket here is Swift's and
+    /// the decision about WHICH frame is the answer is `lib/sdcp-reply.js`,
+    /// shared.
+    public func sdcpWebsocketUrl(_ host: String) throws -> String {
+        try runtime.call2("globalThis.KhaytSdcp.websocketUrl(ARG0)", [.string(host)], as: String.self)
+    }
+
+    /// A STATUS_REFRESH, addressed to one mainboard.
+    ///
+    /// Asked for rather than waiting for the printer's own push: the push
+    /// interval is the printer's business, and a poll that sometimes takes ten
+    /// seconds because nothing happened to be broadcast reads as a flapping
+    /// printer.
+    public func sdcpStatusRequest(mainboardId: String) throws -> String {
+        try runtime.call2(#"""
+        JSON.stringify(globalThis.KhaytSdcp.buildRequest(
+          globalThis.KhaytSdcp.CMD.STATUS_REFRESH, { mainboardId: ARG0 }))
+        """#, [.string(mainboardId)], as: String.self)
+    }
+
+    /// What one frame off the socket turns out to be.
+    ///
+    /// A mainboard pushes on its own schedule as well as answering, so most
+    /// frames are not the answer. Nil means keep listening.
+    public enum SdcpFrame: Sendable {
+        /// The printer answered, and it answered with a refusal. Distinct from
+        /// silence on purpose: letting it time out would report a printer that
+        /// DID reply as unreachable.
+        case refused(String)
+        case status(PrinterStatus)
+    }
+
+    public func sdcpRead(frame: String, mainboardId: String) throws -> SdcpFrame? {
+        struct Taken: Decodable {
+            let error: String?
+            let status: PrinterStatus?
+        }
+        let taken: Taken? = try runtime.call2(#"""
+        (function (raw, board) {
+          var msg;
+          // A frame that cannot be read is not a reason to fail the poll — the
+          // socket carries the printer's own chatter too.
+          try { msg = JSON.parse(raw); } catch (e) { return null; }
+          if (!msg) return null;
+          return globalThis.KhaytSdcpReply.takeStatus(msg, board) || null;
+        })(ARG0, ARG1)
+        """#, [.string(frame), .string(mainboardId)], as: Taken?.self)
+        guard let taken else { return nil }
+        if let error = taken.error { return .refused(error) }
+        if let status = taken.status { return .status(status) }
+        return nil
     }
 
     /// What a PrusaLink printer is doing.
