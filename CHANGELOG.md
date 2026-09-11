@@ -18,6 +18,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   skipped while it was dropped are not reprinted — so anything asking for this
   has to name the object and say so first.
 
+- **(Mac) Khayt has help, in your own language.** Sixteen articles — the book,
+  jobs, the board, customers, the library, the catalogue, the shelf, machines,
+  money, reports, cloud sync, backups, settings, the keyboard and what to do
+  when something is wrong — in English and Arabic, searchable, from the Help
+  menu or ⌘?. It opens in a window of its own so you can read it beside the
+  screen you are asking about, and it follows the language *Khayt* is set to
+  rather than the one the Mac is set to.
+
 - **(Mac) A product can be written down on the Mac.** The catalogue could be
   read here and not added to: making a product meant opening the Windows and
   Linux app. There is an editor now, with one tab per language your catalogue
@@ -206,6 +214,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **A printer was credited with colours it does not have.** Adding a Prusa CORE
+  One gave Khayt a machine it believed could print five colours. Five is what a
+  CORE One reaches with an MMU3 bolted on; the one on your bench prints one. The
+  same was true of every Bambu without an AMS, every MK4 without an MMU, a K2
+  Plus without its CFS and a Kobra 3 without an ACE — and capacity, colour
+  warnings and the converter all believed it.
+
+  A machine is now added with the colours it prints **as sold**. What it could
+  reach, and what that takes, is kept separately — so the ceiling is still there
+  to be told about, and owning the accessory is one field to change rather than
+  a claim Khayt makes on your behalf. Machines whose multi-material is built in
+  — a Snapmaker U1's toolchanger, a J1's IDEX, the dual-extruder UltiMakers —
+  are unchanged.
 
 - **(Mac) Four screens had a search box that did nothing.** The calculator, the
   colour studio, the reports and the dashboard are not lists, and the field on
