@@ -451,6 +451,14 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // What the shelf costs.
+        "mac.mc_title":      ["en": "What materials cost", "ar": "تكلفة المواد"],
+        "mac.mc_per":        ["en": "per {unit}",        "ar": "لكل {unit}"],
+        "mac.mc_risen":      ["en": "{name} has risen {pct}% since you first bought it.",
+                              "ar": "ارتفع {name} بنسبة {pct}% منذ أول شراء."],
+        "mac.mc_one_buy":    ["en": "bought once",       "ar": "شُري مرة واحدة"],
+        "mac.mc_none":       ["en": "Nothing has been bought twice yet, so no price change can be known.",
+                              "ar": "لم يُشترَ أي صنف مرتين بعد، لذا لا يمكن معرفة تغيّر السعر."],
         // When the shop finishes work.
         "mac.tp_title":      ["en": "When work finishes", "ar": "متى ينتهي العمل"],
         "mac.tp_busiest":    ["en": "Most work finishes {day} around {hour}.",

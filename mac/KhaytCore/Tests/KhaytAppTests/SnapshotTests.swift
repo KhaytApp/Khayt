@@ -834,4 +834,22 @@ import KhaytCore
                    "51-throughput", size: CGSize(width: 660, height: 520))
     }
 
+    /// What the shelf costs, and whether that has moved.
+    @Test("what materials cost, in their own units")
+    func materialCostCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let prices = try await engine.materialCost(inventory: shop.inventoryRows, minimum: 2)
+        #expect(prices.totals.anyChangeKnown, "no price change is drawn")
+
+        try render(VStack(spacing: 16) {
+            MaterialCostCard(shop: shop, report: prices)
+                .card(rail: Khayt.cyan, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 520).padding(Metric.screen).background(Khayt.ground),
+                   "52-material-cost", size: CGSize(width: 560, height: 620))
+    }
+
 }

@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **What your materials cost, on the Mac's inventory shelf.** A shop quoting
+  off last year's filament price is quoting at a loss, and nothing has answered
+  it: the supplier price history needs a suppliers list and purchase records
+  that no real book here has. The spools do — every one records what it cost
+  and what it held. Each material is priced in its own unit (a kilo, a litre,
+  one sheet) and says whether the price has moved since you first bought it.
+
+  Crucially, the rate is what the roll held when it **arrived**, not what is
+  left on it — dividing by the remainder makes a half-used roll look twice as
+  expensive as the identical new one beside it, and worst on exactly the thing
+  you are about to reorder.
+
 - **When work actually finishes, on the Mac — and how much of it on days you
   are closed.** The heatmap is there, but the two things you can act on are
   above it in words: the day and hour most work lands, and the share finishing
