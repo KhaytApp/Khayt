@@ -22,6 +22,10 @@ struct Reports: View {
     /// Beside the quarters rather than on a page of its own: a shop reading
     /// what it made is the shop that wants to know whether it was enough.
     @State private var floor: KhaytEngine.BreakEven?
+    /// What reached the bank rather than what was earned. Beside the quarters
+    /// because a shop can be profitable and unable to pay the rent, and the
+    /// P&L alone cannot say which it is.
+    @State private var flow: KhaytEngine.CashFlow?
     /// How far each machine runs from its quote, and the shop's own figure.
     /// Not filtered to the chosen period: a machine's calibration is not a
     /// property of this quarter, and the measured-only filter already thins the
@@ -77,6 +81,11 @@ struct Reports: View {
                     VStack(spacing: 0) {
                         if let latest = rows.first { QuarterDrawn(shop: shop, row: latest) }
                         table
+                        // Under the table rather than beside it: the quarters
+                        // are what the shop earned, and this is the follow-up
+                        // question — did any of it arrive.
+                        CashFlowChart(shop: shop, flow: flow)
+                            .padding(Metric.screen)
                     }
                     Totals(shop: shop, rows: rows, floor: floor)
                         .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
@@ -226,6 +235,7 @@ struct Reports: View {
             settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), now: Date())) ?? []
         await recomputeBreakEven()
+        await recomputeCashFlow()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
@@ -260,6 +270,25 @@ struct Reports: View {
         floor = try? await engine.breakEven(
             fixedCosts: costs, completed: completed,
             since: day.string(from: since), month: month.string(from: Date()),
+            settings: shop.settingsDict, clients: shop.clientRows)
+    }
+
+    private func recomputeCashFlow() async {
+        guard let engine = shop.engine else { return }
+        let month = DateFormatter()
+        month.locale = Locale(identifier: "en_US_POSIX")
+        month.dateFormat = "yyyy-MM"
+        // SIX MONTHS, the same window the other app draws. Long enough to show
+        // a season and short enough that each column is still readable at the
+        // width this panel gets.
+        //
+        // The orders are handed over WHOLE: which of them are cash — unvoided,
+        // in the shop's trade, and scaled by what was actually paid — is the
+        // module's rule and not a filter applied out here, because getting it
+        // wrong out here is precisely what the module was written to stop.
+        flow = try? await engine.cashFlow(
+            orders: shop.orderRows, expenses: shop.expenseRows,
+            endMonth: month.string(from: Date()), months: 6,
             settings: shop.settingsDict, clients: shop.clientRows)
     }
 

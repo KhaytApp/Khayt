@@ -365,6 +365,8 @@ public actor KhaytEngine {
         // `lib/bambu.js` is Node-only from its first line.
         // What a shop must bill to cover what it pays anyway.
         "break-even",
+        // What reached and left the bank, as opposed to what was earned.
+        "cash-flow",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1868,6 +1870,69 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - Cash flow
+
+    /// What actually came in and what actually went out, month by month.
+    ///
+    /// NOT the P&L. A quarter's net says what the shop EARNED; this says what
+    /// reached and left the bank, counted on the day money moved. A shop can be
+    /// profitable and unable to pay the rent, and that gap is why both exist.
+    ///
+    /// `lib/cash-flow.js` decides which orders are cash — unvoided, in the
+    /// shop's trade, and scaled by the share actually PAID, because `paidAt` is
+    /// set on a deposit too.
+    public struct CashFlow: Decodable, Sendable {
+        public let rows: [Month]
+        public let totals: Totals
+
+        public struct Month: Decodable, Sendable, Identifiable, Hashable {
+            public let month: String
+            public let collected: Double
+            public let paidOut: Double
+            public let net: Double
+            public var id: String { month }
+        }
+
+        public struct Totals: Decodable, Sendable {
+            public let collected: Double
+            public let paidOut: Double
+            public let net: Double
+            /// Six empty months and six months that genuinely netted nothing
+            /// read the same in the totals and are not the same thing.
+            public let anyMovement: Bool
+            /// Money collected on a day nobody recorded, so no month can hold
+            /// it. `paidAt` was added after Khayt had been in use, so a shop's
+            /// older orders carry an amount and no date. Deliberately NOT part
+            /// of `collected` or `net` — those are what the columns add up to,
+            /// and a total that included an unplaceable figure would disagree
+            /// with the chart printed above it.
+            public let undated: Double
+        }
+    }
+
+    public func cashFlow(orders: [JSONValue], expenses: [JSONValue],
+                         endMonth: String, months: Int,
+                         settings: [String: JSONValue], clients: [JSONValue])
+        throws -> CashFlow {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG4, clients: ARG5 };
+          return globalThis.KhaytCashFlow.cashFlow({
+            orders: ARG0, expenses: ARG1, endMonth: ARG2, months: ARG3,
+          }, {
+            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            countsForBusiness: function (o) {
+              return globalThis.KhaytBusinessScope
+                ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
+            },
+          });
+        })()
+        """#,
+                          [.array(orders), .array(expenses), .string(endMonth),
+                           .number(Double(months)), .object(settings), .array(clients)],
+                          as: CashFlow.self)
     }
 
     // MARK: - Break-even

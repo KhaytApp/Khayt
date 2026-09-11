@@ -3306,6 +3306,7 @@
   "an.waste_trend": "Déchets par type de défaillance",
   "an.cycle_time": "Délai de cycle moyen (jours)",
   "an.cash_flow": "Flux de trésorerie — Encaissé vs Dépenses",
+  "an.cf_undated": "{amount} ont été encaissés des jours qui n'ont jamais été enregistrés, donc absents du graphique.",
   "an.collected": "Encaissé",
   "an.expenses_paid": "Dépenses payées",
   "an.exp_by_cat": "Dépenses par catégorie",

@@ -3306,6 +3306,7 @@
   "an.waste_trend": "按故障类型统计废料",
   "an.cycle_time": "平均周期时间（天）",
   "an.cash_flow": "现金流 — 已收款与支出",
+  "an.cf_undated": "有 {amount} 是在未记录日期的情况下收到的，因此未显示在图表中。",
   "an.collected": "已收款",
   "an.expenses_paid": "已支付费用",
   "an.exp_by_cat": "按类别统计支出",

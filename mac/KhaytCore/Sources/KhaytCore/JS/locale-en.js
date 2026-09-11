@@ -3307,6 +3307,7 @@
   "an.waste_trend": "Waste by Failure Type",
   "an.cycle_time": "Avg Cycle Time (days)",
   "an.cash_flow": "Cash Flow",
+  "an.cf_undated": "{amount} was collected on days that were never recorded, so it is not on the chart.",
   "an.collected": "Collected",
   "an.expenses_paid": "Expenses",
   "an.exp_by_cat": "Expenses by Category",

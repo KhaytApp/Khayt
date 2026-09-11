@@ -3306,6 +3306,7 @@
   "an.waste_trend": "故障タイプ別廃棄",
   "an.cycle_time": "平均サイクルタイム（日）",
   "an.cash_flow": "キャッシュフロー",
+  "an.cf_undated": "記録のない日に {amount} を回収しているため、グラフには含まれていません。",
   "an.collected": "回収済み",
   "an.expenses_paid": "経費",
   "an.exp_by_cat": "カテゴリ別経費",

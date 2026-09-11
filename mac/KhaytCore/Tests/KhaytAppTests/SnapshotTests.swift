@@ -596,4 +596,31 @@ import KhaytCore
                    "43-break-even", size: CGSize(width: 940, height: 420))
     }
 
+    /// What reached the bank, against what was earned.
+    ///
+    /// In above the line and out below it, on one shared scale — the thing to
+    /// look at is whether a month with a tall green column also has a tall red
+    /// one, which is the month a shop was busy and no better off.
+    @Test("cash in and cash out, on one baseline")
+    func cashFlowChart() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let flow = try await engine.cashFlow(
+            orders: shop.orderRows, expenses: shop.expenseRows,
+            endMonth: "2026-09", months: 6,
+            settings: shop.settingsDict, clients: shop.clientRows)
+        #expect(flow.totals.anyMovement, "the sample cannot reach this chart")
+
+        try render(VStack(spacing: 16) {
+            CashFlowChart(shop: shop, flow: flow)
+                .card(rail: Khayt.cyan, padding: 14)
+            // And the state a quiet shop sees, which is the one it sees first.
+            CashFlowChart(shop: shop, flow: nil)
+                .card(rail: Khayt.cyan, padding: 14)
+        }
+        .frame(width: 620).padding(Metric.screen).background(Khayt.ground),
+                   "44-cash-flow", size: CGSize(width: 660, height: 480))
+    }
+
 }
