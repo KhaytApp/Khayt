@@ -1322,6 +1322,33 @@ final class Words {
                                    "ar": "أضف مجسمات من مجلد — أو اسحبها إلى المكتبة."],
         // Khayt's own help. macOS supplies an empty Help menu; an app that
         // leaves it empty has said it has none.
+        // ── WHAT TO RUN NEXT ─────────────────────────────────────────
+        //
+        // `lib/auto-dispatch.js` answers in KEYS, so the rule does not decide
+        // which language the shop reads. These are them. Kept here rather than
+        // in the shared catalogue because the dispatcher is this app's — see
+        // the note at the top of this file about nine languages.
+        "mac.dispatch_title": ["en": "Next up",      "ar": "التالي"],
+        "mac.dispatch_none":  ["en": "Nothing is waiting for a machine.",
+                               "ar": "لا شيء ينتظر آلة."],
+        "mac.dispatch_send":  ["en": "Send",         "ar": "أرسِل"],
+        "ad.next_in_queue":   ["en": "Next in the queue", "ar": "التالي في الطابور"],
+        "ad.same_material":   ["en": "Already loaded with this material",
+                               "ar": "محمّلة بهذه الخامة أصلاً"],
+        "ad.materials_unknown": ["en": "This machine lists no materials — check it can print this",
+                                 "ar": "لا تذكر هذه الآلة خامات — تأكّد أنها تطبع هذه"],
+        // The one that matters. An idle printer is very often an idle printer
+        // with yesterday's part still bolted to the plate.
+        "ad.bed_not_clear":   ["en": "Bed not cleared since its last print",
+                               "ar": "لم تُفرَّغ الطاولة منذ آخر طباعة"],
+        "ad.bed_unknown":     ["en": "Nobody has said the bed is clear",
+                               "ar": "لم يقل أحد إن الطاولة فارغة"],
+        "ad.busy":            ["en": "Printing",     "ar": "تطبع"],
+        "ad.printer_error":   ["en": "Reporting a fault", "ar": "تبلّغ عن عطل"],
+        "ad.no_reading":      ["en": "Not answering", "ar": "لا تجيب"],
+        "ad.no_printer":      ["en": "No printer linked", "ar": "لا طابعة مرتبطة"],
+        "ad.held":            ["en": "Held back",    "ar": "موقوفة"],
+        "mac.bed_cleared":    ["en": "Bed is clear", "ar": "الطاولة فارغة"],
         "mac.help_title":    ["en": "Khayt Help",   "ar": "مساعدة خيط"],
         "mac.help_search":   ["en": "Search help",  "ar": "ابحث في المساعدة"],
         "mac.help_none":     ["en": "No help article is selected",

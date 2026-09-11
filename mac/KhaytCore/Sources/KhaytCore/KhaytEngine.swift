@@ -385,6 +385,9 @@ public actor KhaytEngine {
         "material-cost",
         // How much passes inspection, and how much first time.
         "qc-metrics",
+        // Which job goes on which printer next. A rule, not a button: see
+        // `dispatchPlan` and `lib/auto-dispatch.js` for why it proposes.
+        "auto-dispatch",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1888,6 +1891,60 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - What to run next, and where
+
+    /// One machine offered a job, with the reason it was chosen.
+    public struct DispatchProposal: Decodable, Sendable, Hashable, Identifiable {
+        public let orderId: String
+        public let machineId: String
+        /// A LOCALE KEY — `ad.same_material`, `ad.next_in_queue`. The rule is
+        /// loaded by three hosts in nine languages, so it must not decide which
+        /// one the shop reads.
+        public let reason: String
+        /// Things true of this proposal that a person should see before
+        /// accepting it — a machine that lists no materials, for instance.
+        public let caveats: [String]
+        public var id: String { orderId + "→" + machineId }
+    }
+
+    /// A machine that was not offered work, and why.
+    public struct DispatchBlocked: Decodable, Sendable, Hashable, Identifiable {
+        public let machineId: String
+        /// Also a locale key. `ad.bed_not_clear` is the one that matters.
+        public let blocked: String
+        public var id: String { machineId }
+    }
+
+    public struct DispatchPlan: Decodable, Sendable {
+        public let proposals: [DispatchProposal]
+        /// Machines that could take work and were given none — the queue is
+        /// empty, or nothing in it fits them.
+        public let idle: [String]
+        public let waiting: [DispatchBlocked]
+    }
+
+    /// What to run next.
+    ///
+    /// PROPOSES. Does not start anything: no printer Khayt talks to can clear
+    /// its own bed, so an idle machine is very often one with yesterday's part
+    /// still on it. `lib/auto-dispatch.js` refuses any machine nobody has
+    /// marked clear since its last print, and this carries that refusal out as
+    /// a reason rather than a silence.
+    public func dispatchPlan(orders: [JSONValue], machines: [JSONValue],
+                             live: [String: JSONValue],
+                             lastMaterialByMachine: [String: JSONValue],
+                             paused: [String: JSONValue]) throws -> DispatchPlan {
+        try runtime.call2("""
+            KhaytAutoDispatch.plan({
+              orders: ARG0, machines: ARG1, live: ARG2,
+              lastMaterialByMachine: ARG3, paused: ARG4,
+            })
+            """,
+            [.array(orders), .array(machines), .object(live),
+             .object(lastMaterialByMachine), .object(paused)],
+            as: DispatchPlan.self)
     }
 
     // MARK: - How much passes inspection first time

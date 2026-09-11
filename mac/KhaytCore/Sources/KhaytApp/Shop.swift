@@ -1019,6 +1019,96 @@ final class Shop {
         }
     }
 
+    // MARK: - What to run next
+
+    /// The dispatcher's answer, recomputed when the book or the printers move.
+    private(set) var dispatch: KhaytEngine.DispatchPlan?
+
+    /// Machines the shop has held back from the dispatcher, this session.
+    ///
+    /// Not written to the book: "do not send this one work for the next hour"
+    /// is a fact about today, and a flag that outlived the reason for it is
+    /// worse than no flag.
+    var dispatchHeld: Set<String> = []
+
+    /// Accept one of the dispatcher's proposals.
+    ///
+    /// Sets `machineId` and NOTHING ELSE — not the status, not the queue
+    /// position. The same rule `applySchedule` follows, and for the same
+    /// reason: the rule proposes a printer, and moving the card is the
+    /// operator's. It also re-reads inside the write, so a job assigned by hand
+    /// since the panel was drawn is never overwritten by a stale suggestion.
+    func accept(_ proposal: KhaytEngine.DispatchProposal) async {
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        do {
+            try StoreWriter.updateRecord(build, collection: "printLog",
+                                         id: proposal.orderId) { record in
+                guard (Self.plainString(record["machineId"]) ?? "").isEmpty else { return }
+                record["machineId"] = .string(proposal.machineId)
+            }
+            await load(source)
+            await planDispatch()
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
+    /// Ask the rule what to run next.
+    ///
+    /// Cheap, and called whenever the fleet's readings change: the answer is a
+    /// function of the queue and what the printers just said, and one that is
+    /// several minutes old is an answer about a shop that has moved on.
+    func planDispatch() async {
+        guard let engine else { dispatch = nil; return }
+        let live = printers.statusCache
+        dispatch = try? await engine.dispatchPlan(
+            orders: orderRows, machines: machineRows, live: live,
+            lastMaterialByMachine: lastMaterialByMachine(),
+            paused: Dictionary(uniqueKeysWithValues: dispatchHeld.map { ($0, JSONValue.bool(true)) }))
+    }
+
+    /// What each machine printed last, so the rule can prefer the one that
+    /// needs no spool change.
+    ///
+    /// Khayt does not record what is LOADED in a machine — only what it has
+    /// printed — so the most recent finished job is the best signal there is,
+    /// and it is very often still in the machine.
+    private func lastMaterialByMachine() -> [String: JSONValue] {
+        var seen: [String: (day: String, material: String)] = [:]
+        for order in orders {
+            guard let id = order.machineId, !id.isEmpty else { continue }
+            guard let finished = order.completedAt ?? order.deliveredAt else { continue }
+            let material = order.parts.compactMap { $0.material.isEmpty ? nil : $0.material }.first
+            guard let material else { continue }
+            if let held = seen[id], held.day >= finished { continue }
+            seen[id] = (day: finished, material: material)
+        }
+        return seen.mapValues { JSONValue.string($0.material) }
+    }
+
+    /// Say a machine's plate is empty, so the dispatcher may offer it again.
+    ///
+    /// THE ONE THING A PRINTER CANNOT TELL US. None of them can clear their own
+    /// bed or see that it is clear, so this is a person's sentence and it is
+    /// written down as one — stamped on the machine, and compared against when
+    /// that machine last finished a print.
+    func markBedClear(_ machine: Machine) async {
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        do {
+            try StoreWriter.updateRecord(build, collection: "machines", id: machine.id) { record in
+                record["bedClearedAt"] = .string(StoreWriter.iso(Date()))
+            }
+            await load(source)
+            await planDispatch()
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
     // MARK: - Writing a product down
 
     /// The product being edited, or nil. Drives the sheet, as the customer's does.
