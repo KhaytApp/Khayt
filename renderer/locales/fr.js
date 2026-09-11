@@ -1921,6 +1921,7 @@
   "rb.export": "Exporter en CSV",
   "rb.save": "Enregistrer le rapport",
   "rb.saved": "Rapports enregistrés",
+  "rb.remove": "Supprimer ce rapport enregistré",
   "rb.saved_ok": "Rapport enregistré",
   "rb.exported": "Rapport exporté",
   "rb.name_prompt": "Nom du rapport :",

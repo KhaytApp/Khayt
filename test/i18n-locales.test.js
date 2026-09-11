@@ -247,6 +247,7 @@ test('every key the code asks for exists in en.js', () => {
     }
   })(path.join(root, 'renderer'));
 
+  const keys = Object.keys(en);
   const missing = new Map();
   for (const f of files) {
     const src = fs.readFileSync(f, 'utf8');
@@ -300,6 +301,26 @@ test('every key the code asks for exists in en.js', () => {
           else if (line[j] === ')') { depth--; if (depth === 0) { end = j; break; } }
         }
         const inner = line.slice(at + 2, end === -1 ? line.length : end);
+        /* A PREFIX ENDING IN A DOT, WHICH THIS GUARD USED TO SKIP ENTIRELY.
+         *
+         * `t('status.' + s)` carries no key-shaped literal — `'status.'` has
+         * nothing after the dot — so the scan below never looked at it, and the
+         * escape hatch two blocks down only forgives a trailing UNDERSCORE.
+         *
+         * There has never been a `status.*` key in any locale. So every status
+         * chip in the report builder read the literal "status.quote" in all
+         * nine languages, in a released app, with this guard green — the same
+         * failure it was written for, one character to the left.
+         *
+         * The concatenated key still cannot be read from the source. What CAN
+         * be checked is that the prefix names SOMETHING: if no key in en.js
+         * begins with it, the call cannot resolve for any value of `s`. */
+        for (const pre of inner.matchAll(/'([a-z0-9_]+(?:\.[a-z0-9_]+)*\.)'\s*\+/gi)) {
+          const prefix = pre[1];
+          if (!keys.some((k) => k.startsWith(prefix))) {
+            missing.set(prefix + '*', `${rel}:${i + 1}`);
+          }
+        }
         for (const lit of inner.matchAll(/'([a-z0-9_]+(?:\.[a-z0-9_]+)+)'/gi)) {
           const key = lit[1];
           // A trailing underscore is a PREFIX: t('audit.act_' + kind). The real

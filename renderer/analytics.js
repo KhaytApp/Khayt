@@ -2770,23 +2770,28 @@ function openExecutiveSummary() {
 function openReportBuilder() {
   if (typeof KhaytReportBuilder === 'undefined') { toast(t('common.feature_missing'), 'error'); return; }
   const STATUSES = ['quote', 'pending', 'printing', 'post', 'qc', 'completed', 'delivered', 'on_hold'];
-  const flatten = () => (printLog || []).filter((o) => !o.voidedAt).map((o) => {
-    const client = o.clientId ? clients.find((c) => c.id === o.clientId) : null;
-    const machine = o.machineId ? (machines || []).find((m) => m.id === o.machineId) : null;
-    return {
-      id: o.id, date: (o.date || '').slice(0, 10), project: o.project || '',
-      client: client ? (typeof localName === 'function' ? localName(client) : client.name) : '',
-      status: o.status, material: o.material || '', printTime: +o.printTime || 0,
-      machine: machine ? machine.name : '',
-      price: Math.round(orderRevenueBase(o)),
-      paidAmount: Math.round(convertToBase(+o.paidAmount || 0, orderCurrency(o))),
-      balance: Math.round(typeof orderOwedBase === 'function' ? orderOwedBase(o) : 0),
-      paymentStatus: typeof payStatus === 'function' ? payStatus(o) : (o.paymentStatus || ''),
-      dueDate: o.dueDate || '', tags: o.tags || [],
-    };
+  // The shape `report-builder.js` asks its caller for, built by
+  // `lib/report-records.js` rather than here. It was twenty lines inline, and
+  // they are not twenty lines of formatting: `price` is revenue in the shop's
+  // base currency, `balance` is what is owed after credits, `paymentStatus` is
+  // the rule that decides what "paid" means. The Mac app needs the same rows,
+  // and a second copy of those three is how two apps come to disagree about a
+  // shop's money.
+  const flatten = () => KhaytReportRecords.reportRecords(printLog, {
+    money: KhaytOrderMoney, payment: KhaytOrderPayment,
+    clients, machines, localName,
+    // order-money reads the base currency and the rates off the settings it is
+    // handed; the renderer's own helpers close over the same object.
+    ctx: { settings, clients },
   });
   const fieldLabel = (k) => t('rb.f_' + k) || (KhaytReportBuilder.FIELDS.find((f) => f.key === k) || {}).label || k;
-  const statusLabel = (s) => t('status.' + s) || s;
+  // `queue.`, not `status.` — there has never been a `status.*` key in any
+  // locale, and `t()` returns the KEY for one it does not have, so every one
+  // of these chips has read the literal "status.quote" in all nine languages
+  // since the report builder shipped. The `|| s` could not save it: a returned
+  // key is truthy. See the same trap in `lib/` — a fallback after `t()` is
+  // dead code by construction.
+  const statusLabel = (s) => t('queue.' + s);
   let sel = { fields: KhaytReportBuilder.DEFAULT_FIELDS.slice(), statusIn: [], from: '', to: '' };
 
   const render = (modal) => {
@@ -2794,11 +2799,11 @@ function openReportBuilder() {
     const rep = KhaytReportBuilder.buildReport(flatten(), { ...sel, labels });
     const fieldBoxes = KhaytReportBuilder.FIELDS.map((f) => `<label style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;margin:0 10px 6px 0;"><input type="checkbox" class="rbField" value="${f.key}" ${sel.fields.includes(f.key) ? 'checked' : ''} style="width:auto;margin:0;">${escapeHtml(fieldLabel(f.key))}</label>`).join('');
     const statusBoxes = STATUSES.map((s) => `<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:0 8px 6px 0;"><input type="checkbox" class="rbStatus" value="${s}" ${sel.statusIn.includes(s) ? 'checked' : ''} style="width:auto;margin:0;">${escapeHtml(statusLabel(s))}</label>`).join('');
-    const saved = (settings.savedReports || []);
+    const saved = KhaytSavedReports.savedReports(settings);
     const preview = rep.rows.slice(0, 8);
     modal.querySelector('#rbBody').innerHTML = `
       ${saved.length ? `<div style="margin-bottom:10px;"><label style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('rb.saved') || 'Saved reports')}</label>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">${saved.map((r) => `<button type="button" class="btn ghost small rbLoad" data-id="${escapeHtml(r.id)}">${escapeHtml(r.name)}</button>`).join('')}</div></div>` : ''}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">${saved.map((r) => `<span style="display:inline-flex;align-items:center;"><button type="button" class="btn ghost small rbLoad" data-id="${escapeHtml(r.id)}">${escapeHtml(r.name)}</button><button type="button" class="btn ghost small rbDrop" data-id="${escapeHtml(r.id)}" title="${escapeHtml(t('rb.remove'))}" aria-label="${escapeHtml(t('rb.remove'))}">\u00d7</button></span>`).join('')}</div></div>` : ''}
       <label style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('rb.fields') || 'Columns')}</label>
       <div style="margin:4px 0 10px;">${fieldBoxes}</div>
       <label style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('rb.statuses') || 'Statuses (none = all)')}</label>
@@ -2835,13 +2840,22 @@ function openReportBuilder() {
       sync();
       const name = (prompt(t('rb.name_prompt') || 'Report name:') || '').trim();
       if (!name) return;
-      settings.savedReports = [...(settings.savedReports || []), { id: uid('RPT'), name, fields: sel.fields, statusIn: sel.statusIn, from: sel.from, to: sel.to }];
+      // `addReport`, not a push: saving twice under one name used to append
+      // twice, so a shop correcting a report it had just run ended up with six
+      // entries of the same name and no way to remove any of them.
+      settings.savedReports = KhaytSavedReports.addReport(
+        settings.savedReports, { name, fields: sel.fields, statusIn: sel.statusIn, from: sel.from, to: sel.to },
+        uid('RPT'));
       saveAll(); render(modal);
       toast(t('rb.saved_ok') || 'Report saved', 'success');
     });
     modal.querySelectorAll('.rbLoad').forEach((b) => b.addEventListener('click', () => {
-      const r = (settings.savedReports || []).find((x) => x.id === b.dataset.id);
-      if (r) { sel = { fields: r.fields.slice(), statusIn: (r.statusIn || []).slice(), from: r.from || '', to: r.to || '' }; render(modal); }
+      const r = KhaytSavedReports.findReport(settings.savedReports, b.dataset.id);
+      if (r) { sel = { fields: r.fields.slice(), statusIn: r.statusIn.slice(), from: r.from, to: r.to }; render(modal); }
+    }));
+    modal.querySelectorAll('.rbDrop').forEach((b) => b.addEventListener('click', () => {
+      settings.savedReports = KhaytSavedReports.removeReport(settings.savedReports, b.dataset.id);
+      saveAll(); render(modal);
     }));
   };
 

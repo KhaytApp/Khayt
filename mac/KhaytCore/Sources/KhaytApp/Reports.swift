@@ -51,6 +51,8 @@ struct Reports: View {
             } else if shop.reportPage == .machines {
                 MachineProfitPage(shop: shop, report: machinePL,
                                   accuracy: accuracy, shopAccuracy: shopAccuracy)
+            } else if shop.reportPage == .custom {
+                CustomReportPage(shop: shop)
             } else if rows.isEmpty {
                 EmptyHere(title: shop.words.callIt("an.pnl_empty"), mark: .reports)
                     .frame(maxHeight: .infinity)

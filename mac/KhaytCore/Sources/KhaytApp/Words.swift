@@ -451,6 +451,14 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // Report builder — the shared catalogue has the screen's own words
+        // but not the sentence that says which knob to turn.
+        // The shape of a typed day. Translated rather than left as the ISO
+        // letters: "YYYY" is a hint only to someone who reads English, and the
+        // field it hints at is one a shop is expected to type into.
+        "mac.date_hint":     ["en": "YYYY-MM-DD",     "ar": "سنة-شهر-يوم"],
+        "mac.rb_empty_why":  ["en": "No job in the book matches. Tick more stages, or widen the dates.",
+                              "ar": "لا يوجد عمل مطابق في الدفتر. اختر مراحل أكثر، أو وسّع المدة."],
         // Columns
         "mac.job":           ["en": "Job",           "ar": "العمل"],
         "mac.stage":         ["en": "Stage",         "ar": "المرحلة"],
