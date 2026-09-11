@@ -134,7 +134,7 @@ enum ImportCommand {
         }
 
         let bytes = files.reduce(0) { total, file in
-            total + ((try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0)
+            total + ((try? FileManager.default.attributesOfItem(atPath: file.url.path)[.size] as? Int) ?? 0)
         }
         say("book:    \(build.storeURL.path)")
         say("library: \(roots.primary)")
@@ -147,7 +147,13 @@ enum ImportCommand {
             // printed rather than counted. A shop about to move three thousand
             // files is entitled to read them first.
             say("")
-            for file in files { say("  would import  \(file.path)") }
+            // The GROUP is printed too. A rehearsal that does not show where
+            // three thousand models are about to be filed is not a rehearsal of
+            // the thing that is about to happen.
+            for file in files {
+                let into = file.group.map { "  →  \($0)" } ?? ""
+                say("  would import  \(file.url.path)\(into)")
+            }
             say("")
             say("dry run: nothing was moved, copied or written.")
             return 0

@@ -533,7 +533,7 @@ struct ModelsUnderTests {
         _ = try Self.touch(dir, "kit/deeper/still/tiny.obj")
         _ = try Self.touch(dir, "kit/print.gcode")
 
-        let found = Shop.modelsUnder([dir], skipping: nil).map(\.lastPathComponent)
+        let found = Shop.modelsUnder([dir], skipping: nil).map(\.url.lastPathComponent)
         #expect(Set(found) == ["top.stl", "part.3mf", "tiny.obj", "print.gcode"])
     }
 
@@ -547,7 +547,7 @@ struct ModelsUnderTests {
         for noise in ["README.md", "notes.txt", "project.3mf.bak", "photo.jpg", "archive.zip"] {
             _ = try Self.touch(dir, noise)
         }
-        #expect(Shop.modelsUnder([dir], skipping: nil).map(\.lastPathComponent) == ["keep.stl"])
+        #expect(Shop.modelsUnder([dir], skipping: nil).map(\.url.lastPathComponent) == ["keep.stl"])
     }
 
     /// Importing the vault into itself refuses every file as a duplicate, which
@@ -561,7 +561,7 @@ struct ModelsUnderTests {
         _ = try Self.touch(vault, "PF-1/already.stl")
         _ = try Self.touch(dir, "new.stl")
 
-        let found = Shop.modelsUnder([dir], skipping: vault.path).map(\.lastPathComponent)
+        let found = Shop.modelsUnder([dir], skipping: vault.path).map(\.url.lastPathComponent)
         #expect(found == ["new.stl"], "walked the vault: \(found)")
         #expect(Shop.modelsUnder([vault], skipping: vault.path).isEmpty)
     }
@@ -575,7 +575,7 @@ struct ModelsUnderTests {
         _ = try Self.touch(dir, "box/a.stl")
 
         let found = Shop.modelsUnder([loose, dir.appending(path: "box")], skipping: nil)
-        #expect(found.map(\.lastPathComponent) == ["a.stl", "b.stl", "loose.stl"])
+        #expect(found.map(\.url.lastPathComponent) == ["a.stl", "b.stl", "loose.stl"])
         // Same answer twice: a run a person is watching should be repeatable.
         #expect(Shop.modelsUnder([loose, dir.appending(path: "box")], skipping: nil) == found)
     }

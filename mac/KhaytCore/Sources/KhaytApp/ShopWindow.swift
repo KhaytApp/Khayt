@@ -189,6 +189,7 @@ struct ShopWindow: View {
         .sheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }
         .sheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }
         .sheet(item: $shop.editingCustomer) { CustomerSheet(shop: shop, existing: $0) }
+        .sheet(item: $shop.editingProduct) { ProductSheet(shop: shop, existing: $0) }
         .sheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
         .sheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
         .sheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }
@@ -217,6 +218,23 @@ struct ShopWindow: View {
             }
             ToolbarItem(placement: .principal) {
                 if shop.showingLibrary { GroupMenu(shop: shop) } else { OwedSummary(shop: shop) }
+            }
+            // IMPORT, ON THE SCREEN IT IMPORTS INTO.
+            //
+            // It existed only as "Add model" in the Book menu — the wrong name
+            // in the wrong menu — and the library itself offered nothing, so a
+            // shop with a folder of models had no way in that it could see.
+            ToolbarItem {
+                if shop.showingLibrary {
+                    Button {
+                        Task { await shop.addModelToLibrary() }
+                    } label: {
+                        Label(shop.words.callIt("mac.import_models"),
+                              systemImage: "square.and.arrow.down")
+                    }
+                    .disabled(!shop.canMoveJobs || shop.importing)
+                    .help(shop.words.callIt("mac.import_models_hint"))
+                }
             }
             ToolbarItem {
                 Button {

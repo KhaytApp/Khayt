@@ -2715,6 +2715,17 @@ public actor KhaytEngine {
         try runtime.call2("KhaytContentLanguages.contentLangs(ARG0)", [.object(settings)], as: [String].self)
     }
 
+    /// EVERY language the catalogue format knows, not only the ones this shop
+    /// has switched on.
+    ///
+    /// A product written when the shop carried French still holds `name_fr`.
+    /// An editor that reads and writes only today's languages would drop that
+    /// text on the first save — so the full set is what a round trip is done
+    /// against, and `contentLanguages` is only what gets a field on screen.
+    public func supportedContentLanguages() throws -> [String] {
+        try runtime.value("KhaytContentLanguages", "SUPPORTED", as: [String].self)
+    }
+
     /// The store key for one of the shop's text fields in one language:
     /// `bizEn`, `bizAr`, `biz_fr`. Asked rather than assumed, because the
     /// suffix rule is the whole back-compatibility story of that module.
@@ -4045,7 +4056,14 @@ public actor KhaytEngine {
                   margin: p.defaultMargin == null ? null : +p.defaultMargin,
                   printHours: specs.printHours, weightGrams: specs.weightGrams,
                   material: specs.material,
-                  parts: (p.parts || []).length
+                  parts: (p.parts || []).length,
+                  // A data URI or nothing. Only `data:image/` is passed on: the
+                  // record is the shop's own, but a `thumbnail` holding a
+                  // `file:` or `http:` URL would make every catalogue cell a
+                  // request, and one of them a tracking pixel.
+                  thumbnail: (typeof p.thumbnail === 'string'
+                    && p.thumbnail.slice(0, 11) === 'data:image/') ? p.thumbnail : '',
+                  group: String(p.group || '')
                 };
               });
             })(ARG0, ARG1, ARG2)
@@ -4069,15 +4087,25 @@ public actor KhaytEngine {
         public let weightGrams: Double?
         public let material: String
         public let parts: Int
+        /// The shop's photo of the thing, as a data URI, or empty.
+        ///
+        /// Carried on the row rather than fetched per cell: it is already in
+        /// the record the catalogue was built from, and a grid that goes back
+        /// to the store once per product is a grid that stutters.
+        public let thumbnail: String
+        /// What the shop files this under. The grid groups by it.
+        public let group: String
 
         public init(id: String, name: String, description: String, base: Double, final: Double,
                     source: String, reason: String, margin: Double?, printHours: Double?,
-                    weightGrams: Double?, material: String, parts: Int) {
+                    weightGrams: Double?, material: String, parts: Int,
+                    thumbnail: String = "", group: String = "") {
             self.id = id; self.name = name; self.description = description
             self.base = base; self.final = final; self.source = source
             self.reason = reason
             self.margin = margin; self.printHours = printHours; self.weightGrams = weightGrams
             self.material = material; self.parts = parts
+            self.thumbnail = thumbnail; self.group = group
         }
     }
 
