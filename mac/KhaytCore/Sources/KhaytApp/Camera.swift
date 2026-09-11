@@ -115,26 +115,33 @@ final class Camera {
         }
 
         do {
-            let (data, response) = try await (get ?? { try await URLSession.shared.data(for: $0) })(request)
-
-            // ── WHERE THE ANSWER ACTUALLY CAME FROM ──────────────────────
+            // ── THE REDIRECT IS REFUSED BEFORE IT IS FOLLOWED ────────────
             //
-            // The host was checked before the request. `URLSession` follows
-            // redirects on its own, so a permitted address answering 302 with a
-            // `Location:` anywhere at all would have been fetched WITH THE
-            // PRINTER'S CREDENTIAL ATTACHED, and the check above would never
-            // have seen it.
+            // `URLSession` follows redirects on its own, so a permitted address
+            // answering 302 with a `Location:` anywhere at all was fetched WITH
+            // THE PRINTER'S CREDENTIAL ATTACHED — the `X-Api-Key` for OctoPrint
+            // and PrusaLink, the access code for Bambu. The host check happens
+            // before the request and never saw the second hop.
             //
-            // That mattered less while the only permitted host was the printer
-            // itself; now that a camera may be its own device on the network,
-            // the redirect is the way back out of the allow-list. Electron's
-            // proxy has always passed `redirect: 'manual'`; this is the same
-            // refusal, made after the fact because `URLSession` does not offer
-            // the before.
-            if let landed = response.url?.absoluteString, landed != still {
-                do { try await engine.assertWebcamHost(landed, printerApi: api) }
-                catch { return .failed("refused") }
-            }
+            // This used to be checked AFTER the response came back, and a
+            // comment here said `URLSession` "does not offer the before". It
+            // does: `willPerformHTTPRedirection` on a task delegate is asked
+            // before the second request is made, and returning nil stops it.
+            // Checking afterwards refuses the PICTURE, which was never the
+            // asset at risk — by then the key has already been handed to
+            // whoever answered.
+            //
+            // It matters more since a camera became allowed to be its own
+            // device: the printer's credential now travels to a host that is
+            // not the printer, and a redirect is the way back out of the
+            // allow-list from there. Electron's proxy has always passed
+            // `redirect: 'manual'` in all three of its fetches. This is that,
+            // and it makes `checkSnapshotHeaders`' own `redirect_refused` rule
+            // reachable for the first time on this app — it could not fire
+            // while the 3xx was being consumed by `URLSession`.
+            let (data, response) = try await (get ?? {
+                try await URLSession.shared.data(for: $0, delegate: RefuseRedirects.shared)
+            })(request)
 
             let http = response as? HTTPURLResponse
             let refusal = try? await engine.checkSnapshot(
@@ -223,5 +230,29 @@ struct CameraTile: View {
                 }
             }
         }
+    }
+}
+
+/// Refuses every HTTP redirect, so a request cannot be bounced somewhere the
+/// host check never saw.
+///
+/// `nil` from `willPerformHTTPRedirection` means "do not follow": the 3xx is
+/// delivered as the response, which is what `checkSnapshotHeaders` already
+/// knows to call `redirect_refused`. The alternative — re-checking the new
+/// host here and following when it passes — was rejected: this delegate would
+/// then hold the printer's credential and the allow-list rule, which are two
+/// things that live in the engine, and the value of a camera that redirects is
+/// not worth a second copy of that decision.
+///
+/// One shared instance. A `URLSessionTaskDelegate` is retained by the task for
+/// its lifetime and this one holds nothing, so making a new one per frame would
+/// allocate once a second per machine to no purpose.
+final class RefuseRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+    static let shared = RefuseRedirects()
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest) async -> URLRequest? {
+        nil
     }
 }

@@ -90,6 +90,47 @@ struct CameraFetchTests {
         #expect(frame == .picture(png))
     }
 
+    /// ── THE REDIRECT, AND THE KEY THAT USED TO GO WITH IT ───────────────
+    ///
+    /// A camera is allowed to be its own device now, and the request to it
+    /// carries the PRINTER's credential — `X-Api-Key` for OctoPrint and
+    /// PrusaLink, the access code for Bambu. `URLSession` follows redirects on
+    /// its own, so a permitted camera answering 302 handed that key to whoever
+    /// the `Location:` named, and the host check — which runs before the
+    /// request — never saw the second hop. It was re-checked afterwards, which
+    /// refuses the PICTURE long after the key has gone.
+    @Test("a redirect is refused, and reads as a refusal rather than a picture")
+    func aRedirectIsRefused() async throws {
+        let shop = await Self.shop()
+        let machine = try Self.machine(host: "192.168.1.50",
+                                       snapshot: "http://192.168.1.99/webcam/?action=snapshot")
+        // What the real delegate now delivers: the 3xx itself, unfollowed.
+        let frame = await Camera.fetch(machine, shop: shop) { request in
+            (Data(), HTTPURLResponse(url: request.url!, statusCode: 302,
+                                     httpVersion: nil,
+                                     headerFields: ["Location": "http://attacker.example/collect"])!)
+        }
+        // `checkSnapshotHeaders` has always had this rule and it could not fire
+        // while `URLSession` was consuming the 3xx on our behalf.
+        #expect(frame == .failed("redirect_refused"))
+    }
+
+    @Test("the delegate refuses to follow, rather than following and checking after")
+    func theDelegateRefusesToFollow() async throws {
+        // Returning nil from `willPerformHTTPRedirection` is what stops the
+        // second request being made at all. If this ever returns a request, the
+        // credential travels again and the test above starts passing for the
+        // wrong reason — it would see the REDIRECTED response, not the 3xx.
+        let followed = await RefuseRedirects.shared.urlSession(
+            URLSession.shared,
+            task: URLSession.shared.dataTask(with: URL(string: "http://192.168.1.99/")!),
+            willPerformHTTPRedirection: HTTPURLResponse(
+                url: URL(string: "http://192.168.1.99/")!, statusCode: 302,
+                httpVersion: nil, headerFields: ["Location": "http://attacker.example/"])!,
+            newRequest: URLRequest(url: URL(string: "http://attacker.example/")!))
+        #expect(followed == nil, "a redirect must not be followed")
+    }
+
     /// A CAMERA WITH NOTHING TO SHOW IS NOT A CAMERA THAT IS BROKEN, and the
     /// tile draws the two differently — so this is the mapping, not the rule.
     /// PrusaLink documents 204 as "No Content / No Error".

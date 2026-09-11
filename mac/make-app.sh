@@ -124,6 +124,34 @@ EXTPLIST
 # refuses the whole appex with "unsealed contents present in the bundle root",
 # because anything inside a bundle has to be part of what is sealed.
 EXT_ENTS="$PKG/.build/thumbnail.entitlements"
+
+# ── THE APP'S OWN ENTITLEMENTS, AND WHY THERE IS EXACTLY ONE ──────────────
+#
+# The app is NOT sandboxed — it reads a shop's print library from wherever the
+# shop keeps it, spawns the slicer the shop chose, and polls printers on the
+# LAN. Sandboxing it is a real piece of work (security-scoped bookmarks for
+# every library folder) and is not what this entitlement is for.
+#
+# `allow-jit` is, and it is not optional for this app. Apple's own
+# documentation for `com.apple.security.cs.allow-jit` lists, as its FIRST
+# example of something that needs it, "the fast-path of the JavaScriptCore
+# framework" — and says that without it "frameworks that rely on just-in-time
+# (JIT) compilation may fall back to an interpreter".
+#
+# Khayt's Mac app runs 29,000 lines of tax, pricing, payment-plan and estimator
+# rules in JavaScriptCore, unchanged, because reimplementing them in Swift
+# would earn the right to be wrong a second way. Dropping all of that to the
+# interpreter to save one line is not a trade worth making.
+APP_ENTS="$PKG/.build/khayt.entitlements"
+cat > "$APP_ENTS" <<'APPENTS'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key><true/>
+</dict>
+</plist>
+APPENTS
 # ── THE QUICK LOOK PREVIEW ────────────────────────────────────────────────
 #
 # What the SPACE BAR shows, as opposed to what the icon shows. Assembled exactly
@@ -320,8 +348,30 @@ IDENTITY="$(pick_identity)"
 # are specific and the reason is the whole message: an entitlements file written
 # INSIDE the bundle gets "unsealed contents present in the bundle root", which
 # says exactly what is wrong and says nothing at all down /dev/null.
+# ── HARDENED RUNTIME, AND A REAL TIMESTAMP ───────────────────────────────
+#
+# Both are REQUIRED for notarisation, and notarisation is what lets this app
+# open on a Mac that did not build it. Without them the notary service refuses
+# the submission outright, so an unnotarised build is not "a build that warns
+# on first launch" — on any other Mac it is a build Gatekeeper will not run.
+#
+# It was `--timestamp=none` and no `--options runtime`, and the signature said
+# so: `codesign -dvvv` printed `flags=0x0(none)` where a hardened build prints
+# `flags=0x10000(runtime)`. That was correct while this was a local build
+# nobody else ran; it is the first thing in the way of shipping one.
+#
+# A timestamp needs the network (Apple's TSA). `KHAYT_NO_TIMESTAMP=1` drops it
+# for an offline build — which then cannot be notarised, and says so below
+# rather than failing three steps later at `notarytool`.
+STAMP="--timestamp"
+[ -n "${KHAYT_NO_TIMESTAMP:-}" ] && STAMP="--timestamp=none"
+# Ad-hoc signing and the hardened runtime do not go together: an ad-hoc
+# signature cannot carry restricted entitlements, and `allow-jit` is one.
+RUNTIME="--options runtime"
+if [ "$IDENTITY" = "-" ]; then RUNTIME=""; fi
+
 for BUNDLE in "$EXT" "$PRV"; do
-  if ! EXT_SIGN_ERR="$(codesign --force --sign "$IDENTITY" --timestamp=none \
+  if ! EXT_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
         --entitlements "$EXT_ENTS" "$BUNDLE" 2>&1)"; then
     echo "codesign failed for $(basename "$BUNDLE"):"
     echo "$EXT_SIGN_ERR" | sed 's/^/  /'
@@ -329,8 +379,14 @@ for BUNDLE in "$EXT" "$PRV"; do
   fi
 done
 
-codesign --force --sign "$IDENTITY" --timestamp=none "$APP" >/dev/null 2>&1 \
-  || { echo "codesign failed (identity: $IDENTITY)"; exit 1; }
+# The app LAST and with its own entitlements — `--entitlements` was missing
+# here entirely, so whatever the app needed it did not get.
+if ! APP_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
+      --entitlements "$APP_ENTS" "$APP" 2>&1)"; then
+  echo "codesign failed (identity: $IDENTITY):"
+  echo "$APP_SIGN_ERR" | sed 's/^/  /'
+  exit 1
+fi
 codesign --verify --deep --strict "$APP" 2>&1 | sed 's/^/  /' || true
 
 # Print what it was signed as, because the difference is invisible in the bundle
