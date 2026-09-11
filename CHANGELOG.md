@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Maintainers) Electron moves to 44.** The 42 line falls out of Electron's
+  three-major support window when 45 ships — due around late October on the
+  current cadence — and an unsupported Electron stops receiving Chromium
+  security fixes. Nothing in Khayt needed changing for it: `clipboard`, which
+  v44 removes from renderer processes, has always been reached through IPC from
+  the main process here, and the six other APIs the release notes flag are not
+  used at all. v44 requires macOS 13 or later, which is far below Khayt's own
+  floor of macOS 26.
 - **Khayt for macOS updates itself.** The native Mac app had no way to: a shop
   that installed it stayed on that build until somebody noticed and downloaded
   another by hand. It now checks for updates through Sparkle, with a *Check for
