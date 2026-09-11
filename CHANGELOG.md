@@ -1380,6 +1380,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **The Mac shelf drew a reel of filament for everything on it.** A bottle of
+  resin was a spool, a stack of plywood was a spool, and the only thing saying
+  otherwise was the unit after the number — "340 ml" under a picture of a reel.
+  Each kind is now drawn as what it is: filament wound on a spool, a bottle
+  filled to what is left in it, and sheet goods as a stack with one line per
+  sheet, so two left looks like two. Khayt has known which is which since it
+  learned to count things that are not filament; the picture was the last part
+  still assuming grams.
+- **Mac cards on the machines and shelf screens were all different heights.** A
+  laser cutter has no nozzle, no extruder and no colour count, so its card came
+  out a good deal shorter than the printer beside it, and a spool carrying
+  "needs drying" was two lines taller than a full one — which made a tidy grid
+  look like a page that had failed to finish loading. Every card in a grid is
+  now the height of the tallest, with its contents still at the top. Nothing is
+  padded out or invented to fill the space: a machine with less to say still
+  says less, inside a box the same size as its neighbours.
 - **"Estimate accuracy" was blank for every shop whose jobs come from its
   printer.** Both accuracy panels worked out what a print took by subtracting
   two timestamps, and the first of those is only written when somebody drags a

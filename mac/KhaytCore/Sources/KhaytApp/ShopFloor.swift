@@ -9,14 +9,19 @@ import KhaytCore
 struct Machines: View {
     let shop: Shop
 
-    // `alignment: .top`, and it is not decoration. A `GridItem` with no
-    // alignment CENTRES its cell in the row, and these cards are not the same
-    // height — a machine with a longer materials list, or a spool carrying
-    // "needs drying", is taller than the ones beside it. So every shorter card
-    // floated: the shelf drew five spools in one row with THREE different top
-    // edges, and the machines screen put the Roland a hundred and eighty points
-    // below its neighbours, which reads as a card that has come loose rather
-    // than as a short card.
+    // `alignment: .top` AND `fills: true` on the card, and they are two halves
+    // of one thing. A `GridItem` with no alignment centres its cell in the row,
+    // so a short card floated in the middle of the gap — the Roland sat a
+    // hundred and eighty points below its neighbours and read as a card that
+    // had come loose. Top alignment moved it up; it was still short.
+    //
+    // These cards are not naturally the same height and cannot be made so: a
+    // laser cutter has no nozzle, no extruder and no colour count, so its card
+    // has three fewer lines in it and nothing should be invented to pad them
+    // out. What is wrong is not that one machine has less to say — it is that
+    // the BOX around it was drawn to fit. So the surface fills the row and the
+    // contents stay at the top, which is four boxes of one size holding four
+    // different amounts of information.
     private let columns = [GridItem(.adaptive(minimum: 280, maximum: 420), spacing: 16, alignment: .top)]
 
     /// Recomputed when the printers say something new, and once a minute
@@ -24,6 +29,10 @@ struct Machines: View {
     /// five minutes stale is wrong in the one place it must not be.
     @State private var band: KhaytEngine.MachineBand?
     @State private var minute = 0
+    /// The tallest card on the floor, which every other one is drawn to. See
+    /// `CardHeight` — a `LazyVGrid` sizes each ROW on its own, so without this
+    /// five printers came out as two tidy rows of two different heights.
+    @State private var tallest: CGFloat = 0
 
     var body: some View {
         ScrollView {
@@ -37,8 +46,10 @@ struct Machines: View {
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(shop.machines) { machine in
                         Card(machine: machine, wear: shop.wear[machine.id], shop: shop)
+                            .atCardHeight(tallest)
                     }
                 }
+                .equalCardHeights($tallest)
             }
             .padding(Metric.screen)
         }
@@ -280,7 +291,7 @@ private struct Card: View {
                 }
             }
         }
-        .card(rail: running ? Khayt.hot : nil, padding: 14)
+        .card(rail: running ? Khayt.hot : nil, padding: 14, fills: true)
     }
 
     private var hasSpecs: Bool {
@@ -320,6 +331,10 @@ private struct Card: View {
 struct Inventory: View {
     @Bindable var shop: Shop
     @State private var selection: Spool.ID?
+    /// The tallest card on the shelf — see `CardHeight`. A spool carrying
+    /// "needs drying" and "empty in 14 days" is two lines taller than one that
+    /// is simply full, and nine of them came out as two rows of two heights.
+    @State private var tallest: CGFloat = 0
 
     /// Top-aligned for the reason `MachineFloor` gives: an unaligned `GridItem` centres.
     private let columns = [GridItem(.adaptive(minimum: 210, maximum: 280), spacing: 14, alignment: .top)]
@@ -348,6 +363,7 @@ struct Inventory: View {
                                       runway: shop.spoolRunway[spool.id],
                                       dryness: shop.spoolDryness[spool.id],
                                       selected: selection == spool.id)
+                                .atCardHeight(tallest)
                                 .onTapGesture { selection = spool.id }
                                 .onTapGesture(count: 2) {
                                     if shop.canMoveJobs { shop.editingSpool = spool }
@@ -372,6 +388,7 @@ struct Inventory: View {
                                 }
                         }
                     }
+                    .equalCardHeights($tallest)
                     .padding(Metric.screen)
                 }
                 .background(Khayt.ground)
@@ -495,6 +512,21 @@ struct SpoolCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
+        // Measured before the frame below, so this is the card's own natural
+        // height — the number the shelf needs to find its tallest. This card
+        // builds its own surface rather than going through `.card()`, so it
+        // carries the probe itself; see `CardHeight`.
+        .background {
+            GeometryReader { geo in
+                Color.clear.preference(key: CardHeight.self, value: geo.size.height)
+            }
+        }
+        // Same as the machine cards: the shelf drew five spools in one row with
+        // three different bottom edges, because a spool carrying "needs drying"
+        // and "empty in 14 days" is two lines taller than one that is simply
+        // full. The surface fills the height it is given; the contents stay at
+        // the top.
+        .frame(maxHeight: .infinity, alignment: .top)
         // The app's card rather than `.quinary`, which is a translucent grey:
         // over the new ground it read as a recess punched into the screen, so
         // six spools looked like six holes. A low one keeps its amber ring
@@ -506,6 +538,115 @@ struct SpoolCard: View {
             .strokeBorder(low ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(Khayt.hairline),
                           lineWidth: low ? 1.5 : 1))
         .help(spool.material)
+    }
+
+    /// WHAT THIS ITEM IS, drawn as the thing it is.
+    ///
+    /// Every item on the shelf was a spool. A 500 ml bottle of resin was a
+    /// spool, a stack of plywood was a spool, and the only thing that said
+    /// otherwise was the unit after the number — "340 ml" under a picture of a
+    /// reel of filament. The shelf is read by SHAPE and COLOUR before anything
+    /// is read as words, which is the whole argument for drawing these at all,
+    /// and it was telling the eye the wrong thing about a third of the sample.
+    ///
+    /// `lib/inventory-units.js` already knows: `mass` is filament, `volume` is
+    /// a liquid, `count` is sheet goods. That judgement is not repeated here —
+    /// it is asked, and `ItemFace` fails a test if a measure is ever added
+    /// without a shape to draw it as.
+    ///
+    /// All three carry the same two facts the spool always did: what colour it
+    /// is, and how much is left. A bottle fills from the bottom, a stack has
+    /// fewer sheets in it. Drawing the object but not its state would have been
+    /// half the job — that was the bug the wound spool fixed, and it would have
+    /// come straight back for the other two.
+    @ViewBuilder private var face: some View {
+        switch ItemFace.of(measure: unit?.measure) {
+        case .bottle: bottle
+        case .sheets: sheets
+        case .spool:  spoolFace
+        // A unit a NEWER Khayt wrote and this build has not learned. No
+        // picture, rather than a spool that would state something false about
+        // it — the row keeps its name, its quantity and its colour, and a shelf
+        // that hides stock it cannot illustrate is worse than one that
+        // illustrates only what it understands.
+        case nil:     Color.clear.frame(width: 72, height: 72)
+        }
+    }
+
+    /// A bottle of resin, seen face on and filled to what is left.
+    ///
+    /// The neck and cap are what make it a bottle rather than a rounded
+    /// rectangle — a plain block filled to 68% is a battery meter, and the
+    /// shape has to be recognisable before the level means anything.
+    private var bottle: some View {
+        let bodyW = 40.0, bodyH = 48.0
+        let level = spool.fill ?? 1
+        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        return VStack(spacing: 0) {
+            // The cap, then the neck. Bare, never coloured: the resin is in the
+            // bottle, and colouring the cap would put it outside.
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Khayt.bareSpool)
+                .frame(width: 19, height: 6)
+                .overlay(RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .strokeBorder(Khayt.drawnEdge, lineWidth: 1))
+            Rectangle()
+                .fill(Khayt.bareSpool)
+                .frame(width: 13, height: 8)
+                .overlay(Rectangle().strokeBorder(Khayt.drawnEdge, lineWidth: 1))
+            shape
+                .fill(Khayt.bareSpool)
+                .frame(width: bodyW, height: bodyH)
+                // FROM THE BOTTOM, which is where a liquid sits. Clipped to the
+                // bottle's own shape afterwards so the fill takes the rounded
+                // corners rather than squaring them off.
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(colour ?? Color(nsColor: .quaternaryLabelColor))
+                        .frame(height: bodyH * level)
+                }
+                .clipShape(shape)
+                .overlay(shape.strokeBorder(Khayt.drawnEdge, lineWidth: 1))
+                // A colour nobody recorded is a dashed outline, never a grey
+                // that could be mistaken for grey resin. Same rule as the spool.
+                .overlay(alignment: .bottom) {
+                    if colour == nil {
+                        Rectangle()
+                            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                            .foregroundStyle(.tertiary)
+                            .frame(height: bodyH * level)
+                    }
+                }
+        }
+        .frame(width: 72, height: 72)
+    }
+
+    /// Sheet goods, seen edge on: one drawn sheet per sheet on the rack.
+    ///
+    /// COUNTED RATHER THAN SCALED, because this is the one unit whose measure
+    /// is literally `count` — six sheets of ply is six things you can see from
+    /// across the room, and a bar filled to 60% would be a worse picture of it
+    /// than the thing itself. Two sheets left is two lines, and that is the
+    /// moment `inventory-units.js` calls low.
+    ///
+    /// Capped at eight, above which the stack stops growing and the figure
+    /// underneath carries the number. A rack of forty sheets drawn to scale is
+    /// a solid block, which says less than eight lines do.
+    private var sheets: some View {
+        let count = min(8, max(1, Int((spool.weight ?? 1).rounded())))
+        let sheetH = 5.0, gap = 2.0, width = 52.0
+        return VStack(spacing: gap) {
+            ForEach(0..<count, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    .fill(colour ?? Color(nsColor: .quaternaryLabelColor))
+                    .frame(width: width, height: sheetH)
+                    .overlay(RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                        .strokeBorder(colour == nil ? AnyShapeStyle(.tertiary)
+                                                    : AnyShapeStyle(Khayt.drawnEdge),
+                                      lineWidth: 1))
+            }
+        }
+        .frame(width: 72, height: 72, alignment: .bottom)
     }
 
     /// A spool seen face on: the filament, and the hole through the middle.
@@ -530,7 +671,7 @@ struct SpoolCard: View {
     /// A spool with no record of what it weighed new keeps the old full ring —
     /// see `Spool.fill`. Drawing a guess would put a wrong picture at the top of
     /// the card, which is worse than the honest one that only says what colour.
-    private var face: some View {
+    private var spoolFace: some View {
         // Hub 22pt across on a 72pt face, so the filament winds between r=11 and
         // r=36. An empty spool is bare flange with the hub's ring on it.
         let outer = 36.0, hub = 11.0
