@@ -77,6 +77,16 @@ struct KhaytApp: App {
         Settings {
             SettingsWindow(shop: shop)
         }
+
+        // ⌘? — Khayt's own help, in a window BESIDE the app rather than on top
+        // of it: somebody reading "how do I file a download into groups" wants
+        // the library on screen while they read. See `HelpBook` for why this is
+        // not an Apple Help Book.
+        Window(Text(Words.upfront("mac.help_title")), id: HelpWindow.id) {
+            HelpWindow(shop: shop)
+        }
+        .defaultSize(width: 940, height: 640)
+        .keyboardShortcut("?", modifiers: .command)
     }
 }
 

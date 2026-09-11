@@ -51,6 +51,14 @@ struct Machines: View {
                 if let band, !shop.machines.isEmpty {
                     MachineBandView(shop: shop, band: band)
                 }
+                // ── AND WHAT TO PUT ON THE IDLE ONES ──────────────────────
+                //
+                // FIRST, above the band. The band says what is running; this
+                // says what should be. A shop standing here with a machine
+                // finishing is asking this question and nothing answered it.
+                if !shop.machines.isEmpty {
+                    NextUp(shop: shop)
+                }
                 // ── AND WHETHER THERE IS ROOM FOR ANOTHER ─────────────────
                 //
                 // The band says what is running now; this says what is queued
@@ -83,6 +91,10 @@ struct Machines: View {
             band = await shop.machineBand()
             load = await shop.capacity()
             scrap = await shop.machineReliability()
+            // Same signature: the dispatcher's answer is a function of the
+            // queue and what the printers just said, so it goes stale at
+            // exactly the moment the band does.
+            await shop.planDispatch()
         }
         .task {
             // Not a display timer: this drives an engine call, so it ticks at

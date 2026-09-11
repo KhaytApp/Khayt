@@ -63,6 +63,11 @@ struct KhaytCommands: Commands {
         // `Words.upfront`, not `shop.words`: these titles are built with the
         // scene, before a book is open, and a menu title is never rewritten
         // afterwards. The catalogue is already warm — see `Words.preload`.
+        // THE HELP MENU, which macOS supplies empty and which stays empty
+        // unless something is put in it. An app whose Help menu holds nothing
+        // is an app that has told you it has no help.
+        CommandGroup(replacing: .help) { HelpCommand() }
+
         CommandMenu(Text(Words.upfront("mac.menu_book"))) { BookMenu().environment(shop) }
         CommandMenu(Text(Words.upfront("mac.menu_go"))) { GoMenu().environment(shop) }
         CommandMenu(Text(Words.upfront("mac.menu_job"))) { JobMenu().environment(shop) }
@@ -435,5 +440,19 @@ private struct ModelMenu: View {
             .init(rawValue: "Copyright"): "Khayt — the native Mac app",
         ])
         NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+}
+
+/// The one item in the Help menu.
+///
+/// `openWindow` rather than a sheet: the help is a window of its own so it can
+/// sit beside the screen it is describing. Opening it twice raises the one that
+/// is already there, which is what `openWindow` does for a `Window` scene.
+private struct HelpCommand: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button(Words.upfront("mac.help_title")) { openWindow(id: HelpWindow.id) }
+            .keyboardShortcut("?", modifiers: .command)
     }
 }

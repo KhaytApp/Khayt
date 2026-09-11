@@ -41,7 +41,11 @@ try {
   ok(m.name === 'Bambu Lab X1 Carbon', 'machine: name from catalog');
   ok(m.nozzleDiameter === 0.4, 'machine: nozzle auto-filled');
   ok(m.powerDraw === 120, 'machine: power draw auto-filled');
-  ok(m.maxColors === 4, 'machine: colour slots auto-filled');
+  // ONE, not four. An X1 Carbon prints one colour; four is what it reaches with
+  // an AMS, and the catalog used to auto-fill that ceiling onto a machine the
+  // shop had just said it owns. This is the end-to-end half of that fix — the
+  // unit is in test/printer-catalog.test.js.
+  ok(m.maxColors === 1, 'machine: colour slots auto-filled as sold, not as upgradable');
   ok(m.bed && m.bed.x === 256, 'machine: build volume auto-filled');
 
   // 2) Calculator: assign the machine, assert printer name + power auto-fill.
