@@ -162,6 +162,16 @@ public actor KhaytEngine {
         "order-file-link",
         "printer-actuals",
         "estimate-variance",
+        // …and the same question asked of the MACHINE rather than the model.
+        // `machine-accuracy` shares `printer-actuals`' comparison and
+        // `estimate-variance`' median and confidence thresholds, injected, so
+        // the two panels cannot disagree about what counts as enough evidence
+        // or about how a percentage is rounded. It exists because analytics
+        // answered this from `completedAt - printingStartedAt` — a field only
+        // written when somebody drags a job into the printing stage by hand —
+        // and so showed nothing at all to a shop whose jobs are logged from the
+        // printer's own history, which is every shop this app was built for.
+        "machine-accuracy",
         // …and the cache those measurements are frozen into. A printer's
         // filament and duration counters are per-JOB and reset when the next
         // print starts, so "read them when the shop marks the order done" is
@@ -1472,6 +1482,84 @@ public actor KhaytEngine {
             "gramsDeltaPct": r.gramsDeltaPct.map { JSONValue.number($0) } ?? .null,
             "hoursDeltaPct": r.hoursDeltaPct.map { JSONValue.number($0) } ?? .null,
         ])
+    }
+
+
+    // MARK: - How far each machine runs from its quote
+
+    /// One machine's prints, measured against what they were quoted at.
+    ///
+    /// The unit is the MACHINE, which is the one `estimate-variance` cannot
+    /// answer: it groups by model, so a shop with one slow printer sees every
+    /// model on it read long and has no way to tell the printer from the prices.
+    ///
+    /// `hoursDeltaPct` is the MEDIAN of the per-job percentages, not the ratio
+    /// of the totals. A ratio lets one forty-hour print outvote a dozen short
+    /// ones, so a machine's verdict could be decided by the job least like the
+    /// rest of its work.
+    public struct MachineAccuracy: Decodable, Sendable, Identifiable, Equatable {
+        public let machineId: String
+        /// How many finished prints this is drawn from. Never rounded away: the
+        /// measured-only filter excludes jobs, and a figure from two prints must
+        /// not look like a figure from twenty.
+        public let sampled: Int
+        /// `good`, `fair` or `thin` — `estimate-variance.js` owns where the
+        /// lines are, so this panel and the model panel agree about what counts
+        /// as enough evidence.
+        public let confidence: String
+        public let estHours: Double?
+        public let actHours: Double?
+        /// Positive means the machine runs LONGER than quoted. Null, never zero,
+        /// when a side is unknown.
+        public let hoursDeltaPct: Double?
+        public let lastAt: String?
+        public var id: String { machineId }
+    }
+
+    /// Every machine that has measured itself, the one running furthest over
+    /// its quote first.
+    ///
+    /// MEASURED ONLY. A printer has to have reported the duration: the
+    /// completion dialog pre-fills the ESTIMATE, so counting typed actuals would
+    /// compare an estimate to itself and report a machine as perfectly
+    /// calibrated. That is why a busy shop can still see an empty panel, and why
+    /// the screen says so in those words.
+    public func machineAccuracy(orders: [JSONValue],
+                                minSamples: Int = 1) throws -> [MachineAccuracy] {
+        try runtime.call2(#"""
+        globalThis.KhaytMachineAccuracy.accuracyByMachine(ARG0, {
+          compare: globalThis.KhaytPrinterActuals.compareToEstimate,
+          median: globalThis.KhaytEstimateVariance.median,
+          confidence: globalThis.KhaytEstimateVariance.confidenceFor,
+        }, { minSamples: ARG1 })
+        """#, [.array(orders), .number(Double(minSamples))], as: [MachineAccuracy].self)
+    }
+
+    /// The whole shop in one figure, or nil when no printer has ever reported a
+    /// duration.
+    ///
+    /// Nil and not zero — "every print landed on its estimate" and "nothing has
+    /// ever been measured" are opposite states, and a headline of +0% for the
+    /// second is the failure the module exists to end.
+    ///
+    /// It comes off the same readings as the breakdown, so the two cannot
+    /// disagree. Jobs on no machine count here and not there: which machine to
+    /// trust cannot be answered by a bucket holding all of them, and "how good
+    /// are our estimates" does not need to know which one ran the job.
+    public func shopAccuracy(orders: [JSONValue],
+                             minSamples: Int = 1) throws -> MachineAccuracy? {
+        try runtime.call2(#"""
+        (() => {
+          const r = globalThis.KhaytMachineAccuracy.accuracyOverall(ARG0, {
+            compare: globalThis.KhaytPrinterActuals.compareToEstimate,
+            median: globalThis.KhaytEstimateVariance.median,
+            confidence: globalThis.KhaytEstimateVariance.confidenceFor,
+          }, { minSamples: ARG1 });
+          // The shop is not a machine and has no id; the shape is shared so one
+          // view can draw either.
+          return r ? { machineId: '', ...r } : null;
+        })()
+        """#, [.array(orders), .number(Double(minSamples))], as: MachineAccuracy?.self)
     }
 
 

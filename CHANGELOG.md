@@ -45,6 +45,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   until you enter one.
 
 ### Added
+- **The Mac app shows how far each machine runs from the time you quote for
+  it.** On the By machine report, under what each one earned: quoted hours,
+  measured hours, and the gap, worst first — with the shop's own figure beside
+  the heading. Only prints a printer timed itself are counted, because a time
+  typed in when you mark a job complete is usually the estimate confirmed, and
+  counting those would report every machine as perfect. Each row says how many
+  prints it is drawn from, so a figure from two is not mistaken for a figure
+  from twenty.
 - **Finishing a job on the Mac asks what it actually took.** Print time and
   grams, pre-filled with what you quoted, so a job that ran as expected is one
   Return away and one that did not can be corrected on the spot. Before, the
@@ -1372,7 +1380,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
-- **A printer's "time left" could be wildly wrong for the first few minutes of a
+- **"Estimate accuracy" was blank for every shop whose jobs come from its
+  printer.** Both accuracy panels worked out what a print took by subtracting
+  two timestamps, and the first of those is only written when somebody drags a
+  job into the printing stage by hand. A shop that logs its work from the
+  machine's own history never had it, so the panels filtered out every job and
+  drew nothing — on one real book, nineteen finished prints, every one of them
+  carrying a duration the printer had measured and handed over. The figures
+  now come from that measurement, and the per-machine panel tells you which
+  printer runs long. Even where both timestamps exist they were the wrong
+  numbers: the gap between them is the print PLUS however long it sat finished
+  on the bed before anyone marked it done, which could only ever make a machine
+  look slower than it is.
+- **One long print could decide a machine's whole verdict.** The percentage was
+  the total hours actually taken over the total quoted, so a single forty-hour
+  job outweighed a dozen short ones and a machine could be judged on the work
+  least like the rest of its week. It is now the middle value across its prints.
+- **A printer's time left could be wildly wrong for the first few minutes of a
   print.** On a Klipper machine Khayt worked the figure out from how much of the
   job had finished so far, which early on is guesswork: two percent into a
   four-and-a-half-hour job it read **twenty-two and a half hours**, on the

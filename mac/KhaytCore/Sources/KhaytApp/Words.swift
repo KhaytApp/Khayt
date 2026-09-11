@@ -605,6 +605,19 @@ final class Words {
         "mac.mpl_all_machines": ["en": "All machines", "ar": "كل الآلات"],
         "mac.mpl_not_net":      ["en": "What each job consumed — its filament, expenses filed against it, and the machine's servicing. Your labour, power and rent are in the Profit & Loss, not here.",
                                  "ar": "ما استهلكه كل عمل — خيطه، والمصروفات المسجّلة عليه، وصيانة الآلة. أما العمالة والكهرباء والإيجار فهي في الأرباح والخسائر، لا هنا."],
+        // Counted, because "From 1 measured prints" is what a {n} placeholder
+        // gives you. `counting` also knows Arabic's dual, which is a form of its
+        // own and carries no numeral — "2 طبعات" reads the way "2 printses"
+        // does.
+        "mac.acc_prints":     ["en": "measured prints", "ar": "طبعات مقيسة"],
+        "mac.acc_prints_one": ["en": "measured print",  "ar": "طبعة مقيسة"],
+        "mac.acc_prints_two": ["en": "measured prints", "ar": "طبعتان مقيستان"],
+        // Only this app draws the accuracy panel, so the sentence explaining
+        // what it leaves out lives here rather than in the nine renderer
+        // locales — a key no JavaScript can reach is one the reachability
+        // guard is right to call dead.
+        "mac.acc_measured_only": ["en": "Only prints a printer timed itself. A time typed on completion is usually the estimate confirmed, which would report every machine as perfect.",
+                                  "ar": "الطبعات التي قاست الطابعة زمنها فقط. الزمن المكتوب عند الإكمال هو غالبًا التقدير نفسه، وهو ما يجعل كل آلة تبدو مضبوطة تمامًا."],
         "mac.mpl_empty":        ["en": "No machine finished anything in this period",
                                  "ar": "لم تُنهِ أي آلة عملاً في هذه الفترة"],
         // NOT "no data". A shop reaches this by looking at a period it did no

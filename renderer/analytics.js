@@ -504,36 +504,15 @@ function renderAnalytics() {
     }
   }
 
-  // --- Feature 2: Estimation accuracy from printingStartedAt / completedAt timestamps ---
-  (function renderTimestampAccuracy() {
-    const el = $('#timestampAccuracySection');
-    if (!el) return;
-    const ordersWithBoth = printLog.filter(o =>
-      o.status === 'completed' && o.printingStartedAt && o.completedAt && o.printTime > 0
-    );
-    if (ordersWithBoth.length < 2) { el.innerHTML = ''; return; }
-    let totalActual = 0, totalEst = 0;
-    for (const o of ordersWithBoth) {
-      const actualH = (new Date(o.completedAt) - new Date(o.printingStartedAt)) / 3600000;
-      totalActual += actualH;
-      totalEst    += +o.printTime;
-    }
-    const avgActual = totalActual / ordersWithBoth.length;
-    const avgEst    = totalEst    / ordersWithBoth.length;
-    const diffPct   = avgEst > 0 ? Math.round((avgActual - avgEst) / avgEst * 100) : 0;
-    const sign      = diffPct >= 0 ? `+${diffPct}` : `${diffPct}`;
-    const col       = diffPct > 15 ? 'var(--danger)' : diffPct < -5 ? 'var(--warning)' : 'var(--success)';
-    el.innerHTML = `
-      <div class="accuracy-stat">
-        <div class="v" style="color:${col};">${sign}%</div>
-        <div class="l">${escapeHtml(t('an.est_accuracy'))}</div>
-        <div class="hint">${escapeHtml(t('an.actual_vs_est', {
-          actual: avgActual.toFixed(1),
-          est:    avgEst.toFixed(1),
-          diff:   sign,
-        }))}</div>
-      </div>`;
-  })();
+  // The second headline that used to stand here is gone.
+  //
+  // `renderTimestampAccuracy` answered the same question as #accuracySection
+  // above — how far the shop's prints run from their estimates — and answered it
+  // from `completedAt - printingStartedAt`. That field is written in one place,
+  // `order-status.js`, when a job is dragged into the printing stage BY HAND, so
+  // a shop whose jobs are logged from the printer's own history never had it and
+  // the panel rendered an empty string every time. Two answers to one question,
+  // one of them structurally blank, is not something to fix twice over.
 
   renderRevenueChart();
   renderMaterialUsageChart();
@@ -1502,55 +1481,60 @@ function renderMaintenanceCostChart() {
 function renderMachineAccuracy() {
   const el = $('#machineAccuracySection');
   if (!el) return;
+  if (typeof KhaytMachineAccuracy === 'undefined'
+      || typeof KhaytPrinterActuals === 'undefined'
+      || typeof KhaytEstimateVariance === 'undefined') { el.innerHTML = ''; return; }
 
-  // Only use orders with both timestamps and a machineId
-  const withData = printLog.filter(o =>
-    o.status === 'completed' &&
-    o.printingStartedAt && o.completedAt &&
-    o.printTime > 0 && o.machineId
-  );
+  // The rule, not a fourth copy of the arithmetic. It reads the duration the
+  // PRINTER reported and refuses a typed one — see lib/machine-accuracy.js for
+  // why the wall clock cannot answer this and why the median is taken rather
+  // than the ratio of totals.
+  const deps = {
+    compare: KhaytPrinterActuals.compareToEstimate,
+    median: KhaytEstimateVariance.median,
+    confidence: KhaytEstimateVariance.confidenceFor,
+  };
+  const rows = KhaytMachineAccuracy.accuracyByMachine(printLog, deps);
+  const all  = KhaytMachineAccuracy.accuracyOverall(printLog, deps);
 
-  if (withData.length < 3) { el.innerHTML = ''; return; }
-
-  // Group by machine
-  const byMachine = {};
-  for (const o of withData) {
-    const mid = o.machineId;
-    if (!byMachine[mid]) byMachine[mid] = { totalActual: 0, totalEst: 0, count: 0 };
-    const actualH = (new Date(o.completedAt) - new Date(o.printingStartedAt)) / 3600000;
-    byMachine[mid].totalActual += actualH;
-    byMachine[mid].totalEst    += +o.printTime;
-    byMachine[mid].count++;
+  if (!rows.length) {
+    // Said, not left blank. A shop with a rack of finished prints and an empty
+    // panel deserves to know the figures are waiting on a MEASURED time.
+    el.innerHTML = `<div style="margin-top:12px;"><p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.accuracy_none'))}</p></div>`;
+    return;
   }
 
-  const rows = Object.entries(byMachine)
-    .map(([mid, d]) => {
-      const machine = machines.find(m => m.id === mid);
-      const name = machine ? machine.name : t('dash.unassigned');
-      const color = machine?.color || '#888';
-      const avgActual = d.totalActual / d.count;
-      const avgEst    = d.totalEst    / d.count;
-      const diffPct   = avgEst > 0 ? Math.round((avgActual - avgEst) / avgEst * 100) : 0;
-      const sign      = diffPct > 0 ? `+${diffPct}` : `${diffPct}`;
-      const col       = Math.abs(diffPct) <= 10 ? 'var(--success)' : Math.abs(diffPct) <= 25 ? 'var(--warning)' : 'var(--danger)';
-      return { name, color, count: d.count, avgActual, avgEst, diffPct, sign, col };
-    })
-    .sort((a, b) => Math.abs(a.diffPct) - Math.abs(b.diffPct)); // most accurate first
+  const pct = (v) => (v === null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%');
+  // Over is what costs a shop money; under is worth knowing and is not a fault.
+  const col = (v) => (v === null ? 'var(--text-muted)'
+    : v >= 25 ? 'var(--danger)' : v >= 10 ? 'var(--warning)' : 'var(--success)');
 
   el.innerHTML = `
     <div style="margin-top:12px;">
-      <div style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:8px;">${escapeHtml(t('an.machine_accuracy') || 'Per-Machine Time Accuracy')}</div>
+      <div style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:8px;">${escapeHtml(t('an.machine_accuracy'))}</div>
+      ${all ? `<div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">
+        ${escapeHtml(t('an.actual_vs_est', {
+          actual: all.actHours === null ? '—' : all.actHours.toFixed(1),
+          est: all.estHours === null ? '—' : all.estHours.toFixed(1),
+          diff: all.hoursDeltaPct === null ? '—' : pct(all.hoursDeltaPct).replace('%', ''),
+        }))} · ${escapeHtml(t('an.accuracy_measured', { n: all.sampled }))}
+      </div>` : ''}
       <div style="display:flex; flex-direction:column; gap:5px;">
-        ${rows.map(r => `
+        ${rows.map((r) => {
+          const machine = machines.find((m) => m.id === r.machineId);
+          const name = machine ? machine.name : t('dash.unassigned');
+          const colour = machine?.color || '#888';
+          return `
           <div style="display:flex; align-items:center; gap:10px; font-size:12.5px;">
-            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${safeCssColor(r.color)}; flex-shrink:0;"></span>
-            <span style="flex:1; font-weight:500;">${escapeHtml(r.name)}</span>
-            <span style="color:var(--text-muted); font-size:11px;">${r.count} jobs</span>
-            <span style="color:var(--text-muted); font-size:11px;">${r.avgEst.toFixed(1)}h est</span>
-            <span style="color:var(--text-muted); font-size:11px;">→</span>
-            <span style="color:var(--text-muted); font-size:11px;">${r.avgActual.toFixed(1)}h actual</span>
-            <span style="font-weight:700; min-width:42px; text-align:end; color:${r.col};">${r.sign}%</span>
-          </div>`).join('')}
+            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${safeCssColor(colour)}; flex-shrink:0;"></span>
+            <span style="flex:1; font-weight:500;">${escapeHtml(name)}</span>
+            <span style="color:var(--text-muted); font-size:11px;">${escapeHtml(t('an.accuracy_measured', { n: r.sampled }))}</span>
+            <span style="color:var(--text-muted); font-size:11px;">${r.estHours === null ? '—' : r.estHours.toFixed(1)}h est</span>
+            <span style="color:var(--text-muted); font-size:11px;">&rarr;</span>
+            <span style="color:var(--text-muted); font-size:11px;">${r.actHours === null ? '—' : r.actHours.toFixed(1)}h actual</span>
+            <span style="font-weight:700; min-width:52px; text-align:end; color:${col(r.hoursDeltaPct)};">${escapeHtml(pct(r.hoursDeltaPct))}</span>
+          </div>`;
+        }).join('')}
       </div>
     </div>`;
 }
@@ -2916,7 +2900,6 @@ async function exportAnalyticsReport() {
     'topClientsList',
     'activityList',
     'accuracySection',
-    'timestampAccuracySection',
     'quoteFunnelChart',
     'monthlyTrendChart',
     'machineRevenueChart',
