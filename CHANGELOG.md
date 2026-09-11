@@ -22,6 +22,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Maintainers) The first Mac alpha shipped unable to check for updates.**
+  It was signed, notarised, stapled and correct in everything anything reported
+  on — and `SUFeedURL` was missing from the bundle, so the app never started
+  its updater and *Check for Updates* was greyed out. The release runs
+  `make-app.sh` and then `make-app.sh --notarize`, and `--notarize` fell
+  through the whole script first, rebuilding the app; that rebuild ran without
+  the feed URL in its environment, replaced the good bundle with a silent one,
+  and that is what got notarised. `--notarize` now works on the app already
+  built, and the release refuses to publish a bundle with no feed, no public
+  key, no embedded Sparkle or no stapled ticket.
 - **Security (Mac): a printer camera that answered with a redirect was handed
   the printer's own credential.** A camera is allowed to be a separate device
   from the printer it belongs to, and the request to it carries the printer's

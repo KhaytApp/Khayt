@@ -100,3 +100,42 @@ test('the app and the workflow agree about where the feed lives', () => {
   assert.match(script, /SUFeedURL<\/key><string>\$\{KHAYT_APPCAST\}/,
     'make-app.sh should take the feed URL from KHAYT_APPCAST');
 });
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * v4.0.0-alpha.1 shipped signed, notarised, stapled — and unable to check for
+ * updates. `SUFeedURL` was missing from the bundle, so the app never started
+ * its updater and Check for Updates was greyed out.
+ *
+ * The cause was two steps deep: the release runs `make-app.sh` and then
+ * `make-app.sh --notarize`, and `--notarize` used to fall through the whole
+ * script first — rebuilding the app. That rebuild ran without KHAYT_APPCAST,
+ * so it replaced a bundle carrying the feed URL with one that did not, and
+ * notarised that one. Every step reported success.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+test('--notarize works on the built app instead of rebuilding it', () => {
+  const script = fs.readFileSync(path.join(__dirname, '..', 'mac', 'make-app.sh'), 'utf8');
+  const branch = script.indexOf('if [ "${1:-}" = "--notarize" ]');
+  assert.ok(branch > 0, 'no early --notarize branch');
+  // Before the build: the branch has to come before anything that would
+  // overwrite the bundle. `swift build` is the first such thing.
+  const build = script.indexOf('swift build');
+  assert.ok(build > 0, 'expected a swift build in make-app.sh');
+  assert.ok(branch < build,
+    '--notarize is handled after the build starts, so it rebuilds the app again');
+  assert.match(script.slice(branch, branch + 400), /exit \$\?/,
+    'the --notarize branch must exit rather than fall through into the build');
+});
+
+test('the lane refuses a bundle that cannot update itself', () => {
+  // The only check that would have caught it: ask the BUILT bundle what it
+  // says about itself, rather than trusting the steps that made it.
+  assert.match(yaml, /plutil -extract SUFeedURL raw/);
+  assert.match(yaml, /plutil -extract SUPublicEDKey raw/);
+  assert.match(yaml, /stapler validate/);
+  // And it must gate before the archive is packed, not after.
+  const check = yaml.indexOf('The bundle must be able to update itself');
+  const pack = yaml.indexOf('- name: Pack and sign the archive');
+  assert.ok(check > 0 && pack > 0 && check < pack,
+    'the bundle check must run before the archive is packed');
+});

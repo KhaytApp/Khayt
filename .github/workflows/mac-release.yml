@@ -92,12 +92,36 @@ jobs:
           KHAYT_APPCAST: https://khaytapp.com/mac/appcast.xml
         run: ./mac/make-app.sh
 
+      # KHAYT_APPCAST is here too, and it should not matter: `--notarize` works
+      # on the bundle already built and does not rebuild. It is passed anyway
+      # because the version that DID rebuild shipped an app with the updater
+      # switched off by a missing key, and this step is where that happened.
       - name: Notarise and staple
         env:
+          KHAYT_APPCAST:               https://khaytapp.com/mac/appcast.xml
           APPLE_ID:                    ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
         run: ./mac/make-app.sh --notarize
+
+      # ── THE CHECK THAT WOULD HAVE CAUGHT IT ─────────────────────────────
+      #
+      # v4.0.0-alpha.1 shipped signed, notarised, stapled and unable to check
+      # for updates: `SUFeedURL` was missing, so the app never started its
+      # updater. Everything reported success. The only thing that would have
+      # noticed is asking the built bundle what it says about itself.
+      - name: The bundle must be able to update itself
+        run: |
+          set -euo pipefail
+          A=mac/dist/Khayt.app
+          FEED="$(plutil -extract SUFeedURL raw "$A/Contents/Info.plist" 2>/dev/null || true)"
+          KEY="$(plutil -extract SUPublicEDKey raw "$A/Contents/Info.plist" 2>/dev/null || true)"
+          [ -n "$FEED" ] || { echo "::error::the built app has no SUFeedURL — it would ship unable to update itself"; exit 1; }
+          [ -n "$KEY" ]  || { echo "::error::the built app has no SUPublicEDKey — it would accept an unsigned update, or none"; exit 1; }
+          [ -d "$A/Contents/Frameworks/Sparkle.framework" ] || { echo "::error::Sparkle is not embedded"; exit 1; }
+          xcrun stapler validate "$A" >/dev/null 2>&1 || { echo "::error::the notarisation ticket is not stapled"; exit 1; }
+          echo "feed: $FEED"
+          echo "key:  ${KEY:0:12}… · Sparkle embedded · ticket stapled"
 
       # ── THE ARCHIVE, AND ITS SIGNATURE ──────────────────────────────────
       #
