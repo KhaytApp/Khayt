@@ -22,11 +22,32 @@ PKG="$REPO/mac/KhaytCore"
 DIST="$REPO/mac/dist"
 APP="$DIST/Khayt.app"
 
-VERSION="$(node -p "require('$REPO/package.json').version" 2>/dev/null || echo "0.0.0")"
-# CFBundleVersion must be digits and dots only — "3.7.0-beta.25" is rejected and
-# the app silently refuses to launch. The marketing string keeps the real name.
-BUILD_VERSION="$(printf '%s' "$VERSION" | sed 's/[^0-9.].*$//' | sed 's/\.$//')"
-[ -n "$BUILD_VERSION" ] || BUILD_VERSION="0.0.0"
+# ── THE MAC APP'S OWN VERSION, NOT ELECTRON'S ────────────────────────────
+#
+# This read `package.json`, which numbers the ELECTRON app. The two ship on
+# their own schedules now, and a Mac build calling itself `3.7.0` because that
+# is where Electron happened to be was lying about which app it is.
+# `mac/version.json` is the one source; see mac/VERSION.md.
+VERSION="$(node -p "require('$REPO/mac/version.json').version" 2>/dev/null || echo "")"
+BUILD_VERSION="$(node -p "require('$REPO/mac/version.json').build" 2>/dev/null || echo "")"
+if [ -z "$VERSION" ] || [ -z "$BUILD_VERSION" ]; then
+  echo "cannot read mac/version.json — refusing to build an app with no version." >&2
+  exit 1
+fi
+
+# ── CFBundleVersion IS AN INTEGER THAT ONLY GOES UP ──────────────────────
+#
+# It used to be the marketing string with the suffix stripped, which is fine
+# until two releases share a prefix:
+#
+#     4.0.0-alpha.1 → 4.0.0
+#     4.0.0-alpha.2 → 4.0.0     ← the same number
+#
+# SPARKLE COMPARES THIS FIELD. Two consecutive alphas carrying the same
+# CFBundleVersion means every tester is told they are up to date, and nothing
+# anywhere reports an error — the build is fine and the feed is fine. So the
+# build number is its own integer, bumped by scripts/bump-mac-version.js, and
+# a release that forgot to move it fails test/mac-version.test.js.
 
 # ── APP INTENTS ───────────────────────────────────────────────────────────
 #
@@ -241,6 +262,50 @@ else
   echo "  app intents: no Xcode toolchain — skipped"
 fi
 
+# ── SPARKLE, EMBEDDED AND POINTED AT ──────────────────────────────────────
+#
+# SwiftPM links `@rpath/Sparkle.framework/Versions/B/Sparkle` and gives the
+# binary one rpath: `@loader_path`. Inside a bundle the executable is at
+# `Contents/MacOS/Khayt` and the framework at `Contents/Frameworks/`, so
+# without the rpath below the app links fine, builds fine, and dies at launch
+# with "Library not loaded" — the failure arrives at the one moment nothing is
+# watching.
+SPARKLE_FW="$(find "$PKG/.build/artifacts/sparkle" -maxdepth 5 -name Sparkle.framework -path '*macos*' 2>/dev/null | head -1)"
+if [ -n "$SPARKLE_FW" ] && [ -d "$SPARKLE_FW" ]; then
+  mkdir -p "$APP/Contents/Frameworks"
+  # -R keeps the symlink farm a versioned framework is made of. Flattening it
+  # gives a bundle codesign rejects.
+  rm -rf "$APP/Contents/Frameworks/Sparkle.framework"
+  cp -R "$SPARKLE_FW" "$APP/Contents/Frameworks/"
+  install_name_tool -add_rpath "@executable_path/../Frameworks" \
+    "$APP/Contents/MacOS/Khayt" 2>/dev/null || true
+  SPARKLE_EMBEDDED=1
+else
+  # Not fatal: the app checks for a feed before starting the updater, so a
+  # build without Sparkle is one whose Check for Updates is greyed out.
+  echo "  sparkle: framework not found — this build cannot update itself"
+  SPARKLE_EMBEDDED=0
+fi
+
+# ── THE FEED, AND WHY IT IS NOT ALWAYS WRITTEN ────────────────────────────
+#
+# `SUFeedURL` only goes in when this build is one that will actually be
+# published — `KHAYT_APPCAST` is set by the release workflow. A local build
+# with a feed URL would check for updates against releases it is not, and
+# offer to "update" a developer's working copy to the last published alpha.
+#
+# `SUPublicEDKey` is the PUBLIC half of the EdDSA key pair. Public: it is in
+# every shipped copy of the app by design. The private half signs the archive
+# and lives in a Keychain and in one CI secret; an attacker who replaces the
+# download cannot produce a signature this key accepts.
+SPARKLE_KEYS=""
+if [ -n "${KHAYT_APPCAST:-}" ] && [ "$SPARKLE_EMBEDDED" = "1" ]; then
+  SPARKLE_KEYS="  <key>SUFeedURL</key><string>${KHAYT_APPCAST}</string>
+  <key>SUPublicEDKey</key><string>iXX6JdzKwbQCUdCd2kLwvUUVHNIE51LR01dYZa1uA6c=</string>
+  <!-- Sparkle asks on first launch rather than deciding for the shop. -->
+  <key>SUEnableAutomaticChecks</key><false/>"
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -261,6 +326,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>Khayt</string>
   <key>NSSupportsAutomaticTermination</key><false/>
+$SPARKLE_KEYS
   <!-- A job being dragged across the board. Declared so the drag is this app's
        own: a board that accepted any dragged text would move a job because
        someone dropped a word on it. -->
@@ -370,6 +436,33 @@ STAMP="--timestamp"
 RUNTIME="--options runtime"
 if [ "$IDENTITY" = "-" ]; then RUNTIME=""; fi
 
+# ── SPARKLE'S OWN BINARIES, EACH ONE SIGNED ──────────────────────────────
+#
+# A framework is not one binary. Sparkle ships an updater app, a background
+# installer and two XPC services inside itself, and every one is code that has
+# to carry a signature — `codesign --deep` on the app does NOT reach them in a
+# way notarisation accepts, which is why they are listed rather than swept.
+#
+# INNERMOST FIRST, for the reason the extensions are signed before the app: a
+# signature covers what is inside it, so anything signed afterwards invalidates
+# the thing that sealed it.
+if [ "$SPARKLE_EMBEDDED" = "1" ]; then
+  SPARKLE_IN_APP="$APP/Contents/Frameworks/Sparkle.framework"
+  for PART in \
+    "$SPARKLE_IN_APP/Versions/B/XPCServices/Downloader.xpc" \
+    "$SPARKLE_IN_APP/Versions/B/XPCServices/Installer.xpc" \
+    "$SPARKLE_IN_APP/Versions/B/Updater.app" \
+    "$SPARKLE_IN_APP/Versions/B/Autoupdate" \
+    "$SPARKLE_IN_APP"; do
+    [ -e "$PART" ] || continue
+    if ! SP_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME "$PART" 2>&1)"; then
+      echo "codesign failed for $(basename "$PART"):"
+      echo "$SP_ERR" | sed 's/^/  /'
+      exit 1
+    fi
+  done
+fi
+
 for BUNDLE in "$EXT" "$PRV"; do
   if ! EXT_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
         --entitlements "$EXT_ENTS" "$BUNDLE" 2>&1)"; then
@@ -435,7 +528,67 @@ install_app() {
   echo "If it was open, quit and reopen it — a running app keeps the build it started with."
 }
 
+# ── NOTARISATION ──────────────────────────────────────────────────────────
+#
+# The step between "signed" and "a shop can open it". Gatekeeper on any Mac
+# that did not build this app asks Apple whether Apple has seen it; without a
+# notarisation ticket the answer is no and the app does not run.
+#
+# THE TICKET IS STAPLED INTO THE BUNDLE, which is what makes it work on a Mac
+# that is offline or behind a filter that blocks Apple's check. Submitting and
+# not stapling passes here and fails at a customer's desk, which is the worst
+# place to find out.
+#
+# Credentials are the same three the Electron lane already uses. They are read
+# from the environment, never written to disk, and never echoed.
+notarize_app() {
+  local missing=""
+  [ -n "${APPLE_ID:-}" ]                    || missing="$missing APPLE_ID"
+  [ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] || missing="$missing APPLE_APP_SPECIFIC_PASSWORD"
+  [ -n "${APPLE_TEAM_ID:-}" ]               || missing="$missing APPLE_TEAM_ID"
+  if [ -n "$missing" ]; then
+    echo "cannot notarise — missing:$missing" >&2
+    echo "  These are the same credentials the Electron release uses." >&2
+    return 1
+  fi
+  if [ "$IDENTITY" = "-" ]; then
+    echo "cannot notarise an ad-hoc signed build — Apple requires a Developer ID." >&2
+    return 1
+  fi
+
+  local zip="$DIST/Khayt-notarize.zip"
+  rm -f "$zip"
+  # `ditto`, not `zip`: a zip built by the shell tool loses the symlinks a
+  # versioned framework is made of, and the notary service rejects what it is
+  # handed rather than what was built.
+  ditto -c -k --keepParent "$APP" "$zip"
+
+  echo "  notarising (this waits on Apple, usually a few minutes)…"
+  if ! xcrun notarytool submit "$zip" \
+        --apple-id "$APPLE_ID" \
+        --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+        --team-id "$APPLE_TEAM_ID" \
+        --wait --timeout 30m; then
+    echo "notarisation FAILED. The log above names the offending binary." >&2
+    echo "  xcrun notarytool log <submission-id> --apple-id … for the detail." >&2
+    rm -f "$zip"
+    return 1
+  fi
+  rm -f "$zip"
+
+  xcrun stapler staple "$APP" || { echo "stapling failed" >&2; return 1; }
+  # And prove it took, rather than trusting that stapler said nothing.
+  if ! xcrun stapler validate "$APP" >/dev/null 2>&1; then
+    echo "the ticket did not staple — the app would fail on an offline Mac." >&2
+    return 1
+  fi
+  # The real question, asked the way Gatekeeper asks it.
+  spctl --assess --type execute --verbose=2 "$APP" 2>&1 | sed 's/^/  /'
+  echo "  notarised and stapled"
+}
+
 case "${1:-}" in
-  --open)    open "$APP" ;;
-  --install) install_app "$@" ;;
+  --open)     open "$APP" ;;
+  --install)  install_app "$@" ;;
+  --notarize) notarize_app ;;
 esac

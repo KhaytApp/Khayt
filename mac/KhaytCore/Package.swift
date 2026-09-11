@@ -45,13 +45,31 @@ let package = Package(
         // thumbnail is — one extension point per .appex.
         .executable(name: "KhaytPreview", targets: ["KhaytPreview"]),
     ],
+    // ── SPARKLE, AND WHY A DEPENDENCY AT ALL ─────────────────────────────
+    //
+    // This package has had no dependencies, deliberately: the business rules
+    // run in JavaScriptCore, which is a system framework, and everything else
+    // is Swift and AppKit. Sparkle is the first, and it is here because the
+    // alternative is worse — an app that cannot update itself is an app whose
+    // shops stay on whatever build they first installed, and the Electron app
+    // they are moving from has had auto-update since it shipped.
+    //
+    // Pinned to a minor range rather than `branch:` or `exact:`. Sparkle's
+    // update path runs privileged code on a shop's Mac; a floating branch is
+    // not something to take on trust, and an exact pin means never taking its
+    // security fixes either.
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.0"),
+    ],
     targets: [
         .target(name: "KhaytCore", resources: [.copy("JS")]),
         // The interface. It writes now — jobs, customers, payments, moves —
         // through `StoreWriter`, which reads the book from disk inside every
         // write and swaps the file atomically. `Resources` carries the sample
         // shop and the invoice's stylesheet, synced from the renderer.
-        .executableTarget(name: "KhaytApp", dependencies: ["KhaytCore"],
+        .executableTarget(name: "KhaytApp",
+                          dependencies: ["KhaytCore",
+                                         .product(name: "Sparkle", package: "Sparkle")],
                           resources: [.process("Resources")]),
         // What Finder shows for a .3mf. Depends on KhaytCore for the zip
         // reader and the rule about which member of a 3MF is the picture —

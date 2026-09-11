@@ -37,6 +37,10 @@ struct KhaytCommands: Commands {
 
         CommandGroup(replacing: .appInfo) {
             Button(shop.words.callIt("mac.about_khayt")) { About.show() }
+            // Under About, above Settings — where macOS puts it in every app
+            // that has one, so nobody has to look for it.
+            Divider()
+            CheckForUpdatesCommand(shop: shop)
         }
 
         // Into the View menu AppKit already puts there, beside Show Sidebar,

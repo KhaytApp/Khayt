@@ -605,6 +605,7 @@ final class Words {
         "mac.mpl_all_machines": ["en": "All machines", "ar": "كل الآلات"],
         "mac.mpl_not_net":      ["en": "What each job consumed — its filament, expenses filed against it, and the machine's servicing. Your labour, power and rent are in the Profit & Loss, not here.",
                                  "ar": "ما استهلكه كل عمل — خيطه، والمصروفات المسجّلة عليه، وصيانة الآلة. أما العمالة والكهرباء والإيجار فهي في الأرباح والخسائر، لا هنا."],
+        "mac.check_updates": ["en": "Check for Updates…", "ar": "التحقق من التحديثات…"],
         // Counted, because "From 1 measured prints" is what a {n} placeholder
         // gives you. `counting` also knows Arabic's dual, which is a form of its
         // own and carries no numeral — "2 طبعات" reads the way "2 printses"
