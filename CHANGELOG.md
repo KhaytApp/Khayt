@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Maintainers) The macOS release build stopped signing when the runner image
+  moved.** `v3.7.0` built Windows and Linux and failed macOS in 26 seconds:
+  electron-builder could not unlock the temporary keychain it had itself just
+  created, with the password it had itself just generated. Nothing in this repo
+  had changed — `v3.7.0-beta.25` signed with the same certificate and the same
+  electron-builder eight days earlier, on the previous runner image. The
+  signing keychain is now created by the workflow, where the password is ours
+  and the steps are visible, and electron-builder is handed one that is already
+  unlocked and already holds the identity. It also refuses to continue if the
+  Developer ID is not in it, rather than quietly producing an unsigned app.
+
 - **(Maintainers) A release whose notes were too long created the tag and
   shipped nothing.** GitHub caps a release body at 125,000 characters and
   rejects the whole request above it. The `v3.7.0` entry was 152,890 — a stable
