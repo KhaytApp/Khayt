@@ -2,9 +2,19 @@
 
 Living priorities for maintainers. Not a public commitment calendar — reorder as the product needs.
 
-## Now (post-3.6.0, 3.7.0-beta.25 published — on `main`)
+## Now (post-3.7.0, the Electron line closed — on `main`)
 
-**Stable is v3.6.0** (2026-08-21) — the 3.6.0 line, promoted from
+**Stable is v3.7.0** (2026-09-11) — the 3.7.0 line, cut from `main` rather than
+promoted from `v3.7.0-beta.25` unchanged, because 225 commits had landed since
+that cut: the money corrections, the measured-actuals chain and three dependency
+security fixes. The promotion gate and the one condition WAIVED are recorded in
+[docs/RELEASE-HOLD.md](./docs/RELEASE-HOLD.md).
+
+**Khayt for macOS is being rebuilt native**, sharing this app's business rules
+unchanged rather than reimplementing them. It becomes the main Khayt on macOS, a
+native Windows app follows, and the Electron build continues as the third option.
+
+**Previously: v3.6.0** (2026-08-21) — the 3.6.0 line, promoted from
 `v3.6.0-rc.4` unchanged after a seven-day soak. rc.4 was the first candidate on
 this line that `main` did not overtake, so for once replace-vs-promote resolved
 to *promote*; rc.1, rc.2 and rc.3 were each replaced instead.
