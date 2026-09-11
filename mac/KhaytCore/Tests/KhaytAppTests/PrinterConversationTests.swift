@@ -227,3 +227,102 @@ struct PrinterConversationTests {
         #expect(PrinterWatch.defaultPort("prusalink") == 80)
     }
 }
+
+// MARK: - Repetier
+
+extension PrinterConversationTests {
+
+    /// Repetier's two calls share a path and differ only in the query, which
+    /// the `server` helper above cannot tell apart — it routes on path alone.
+    /// So this one routes on the whole thing, which is also what makes it able
+    /// to prove WHICH call the job came from.
+    static func repetierServer(state: String, listing: String?,
+                               asked: @escaping (String) -> Void = { _ in })
+        -> (URLRequest) async throws -> (Data, URLResponse) {
+        { request in
+            let q = request.url?.query ?? ""
+            asked((request.url?.path ?? "") + "?" + q)
+            if q.contains("a=stateList") {
+                return (Data(state.utf8), HTTPURLResponse(url: request.url!, statusCode: 200,
+                                                          httpVersion: nil, headerFields: nil)!)
+            }
+            guard let listing else {
+                return (Data(), HTTPURLResponse(url: request.url!, statusCode: 500,
+                                                httpVersion: nil, headerFields: nil)!)
+            }
+            return (Data(listing.utf8), HTTPURLResponse(url: request.url!, statusCode: 200,
+                                                        httpVersion: nil, headerFields: nil)!)
+        }
+    }
+
+    /// THE BUG THIS PROTOCOL IS FAMOUS FOR HERE.
+    ///
+    /// The other app read `done` and `job` off `stateList`, where Repetier's
+    /// own API reference lists neither — so progress was always 0, the filename
+    /// always empty, and every Repetier machine read Idle while it printed.
+    /// `lib/repetier.js` holds the correction. This proves the Mac app calls
+    /// it rather than repeating the mistake in Swift.
+    @Test("a printing Repetier takes its job from listPrinter, not stateList")
+    func repetierPrinting() async throws {
+        var paths: [String] = []
+        let status = try await PrinterWatch.read(
+            Self.machine("repetier"), engine: try KhaytEngine(), base: Self.base, key: "k",
+            fetch: Self.repetierServer(
+                // The MACHINE. Note it carries no `done` and no `job` — which
+                // is exactly the point: a reader looking here finds nothing.
+                // KEYED BY SLUG. `stateList` returns an object whose keys are
+                // printer slugs, not the machine's fields at the top level —
+                // and it carries no `done` and no `job`, which is the point.
+                state: #"{"data":{"default":{"extruder":[{"tempRead":211.4}],"heatedBeds":[{"tempRead":60.2}],"layer":37}}}"#,
+                listing: #"{"data":[{"slug":"default","online":1,"job":"hinge.gcode","done":61.5,"paused":false}]}"#,
+                asked: { paths.append($0) }))
+
+        #expect(status.filename == "hinge.gcode", "the job name was not read from listPrinter")
+        #expect(status.progress == 62, "progress came back \(String(describing: status.progress))")
+        #expect(status.tempNozzle == 211.4)
+        #expect(status.tempBed == 60.2)
+        // Both calls were made, and against the slug.
+        #expect(paths.contains { $0.contains("a=stateList") })
+        #expect(paths.contains { $0.contains("a=listPrinter") })
+    }
+
+    @Test("the listing failing costs the job and not the temperatures")
+    func repetierListingFails() async throws {
+        // The same rule PrusaLink follows: a second request that fails must not
+        // take the first one's answer with it.
+        let status = try await PrinterWatch.read(
+            Self.machine("repetier"), engine: try KhaytEngine(), base: Self.base, key: "k",
+            fetch: Self.repetierServer(
+                state: #"{"data":{"default":{"extruder":[{"tempRead":205.0}],"heatedBeds":[{"tempRead":58.0}]}}}"#,
+                listing: nil))
+        #expect(status.tempNozzle == 205.0, "a failed listing cost the temperatures")
+        #expect(status.tempBed == 58.0)
+    }
+
+    @Test("the slug is in the path, and an unset one is Repetier's own default")
+    func repetierSlug() async throws {
+        // Repetier-Server runs several printers behind one address and names
+        // them in the PATH, not a header. `machine-edit.js` stores an empty
+        // string when the shop has not said, and the adapter reads that as
+        // `default` — which is the name Repetier itself uses.
+        var paths: [String] = []
+        _ = try? await PrinterWatch.read(
+            Self.machine("repetier"), engine: try KhaytEngine(), base: Self.base, key: "k",
+            fetch: Self.repetierServer(state: #"{"data":{}}"#, listing: #"{"data":[]}"#,
+                                       asked: { paths.append($0) }))
+        #expect(paths.allSatisfy { $0.contains("/printer/api/default") },
+                "asked \(paths)")
+    }
+
+    @Test("Repetier is a protocol this app says it speaks")
+    func repetierIsSpoken() {
+        // The set is what the machines screen reads to decide whether to say
+        // "Khayt cannot ask this kind of machine what it is doing". Wiring the
+        // branch and forgetting this leaves a poller nothing ever calls.
+        #expect(PrinterWatch.spoken.contains("repetier"))
+        #expect(PrinterWatch.notWatched(Self.machine("repetier")) == nil)
+        #expect(PrinterWatch.defaultPort("repetier") == 3344)
+        // And the one still genuinely missing stays missing, honestly.
+        #expect(PrinterWatch.notWatched(Self.machine("bambu")) != nil)
+    }
+}

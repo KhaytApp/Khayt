@@ -1033,10 +1033,10 @@ failed.
 
 ## Not yet built
 
-The rest of analytics, the cloud portal, the LAN server, and three of the six
-printer protocols — `bambu`, `duet` and `repetier`. `KhaytCore` came first
-because the alternative, screens against a half-trusted engine, is how the two
-apps come to disagree about a shop's money.
+The rest of analytics, the cloud portal, the LAN server, and two of the six
+printer protocols — `bambu` and `duet`. `KhaytCore` came first because the
+alternative, screens against a half-trusted engine, is how the two apps come to
+disagree about a shop's money.
 
 THE PARAGRAPH ABOVE IS THE LIST, and `NotYetBuiltTests` reads exactly it — the
 first paragraph of this section and nothing after it. That is the guard, and it
@@ -1054,7 +1054,15 @@ the ways of looking at it.
 
 **The protocols are counted against the six a machine can actually be set to** —
 `renderer/machines.js` offers seven options and one of them is `none`.
-`PrinterWatch.spoken` is the Mac's three: Moonraker, OctoPrint, PrusaLink.
+`PrinterWatch.spoken` is the Mac's four: Moonraker, OctoPrint, PrusaLink and
+Repetier.
+
+The two left are left for different reasons. **Duet** needs a session
+handshake — `rr_connect` before any read, and every other request answers 401
+without one — so it is a conversation rather than two GETs. **Bambu** is not
+HTTP at all: MQTT over TLS, which means a client this app does not have. A note
+that once grouped Duet and Repetier as "both need a handshake" was wrong about
+Repetier, which needs an `x-api-key` header and nothing else.
 
 Six things this list used to name are done. **Gift cards**, **the portfolio**
 and **the colour studio** are shelves in the sidebar. **The converter** is

@@ -83,19 +83,30 @@ struct NotYetBuiltTests {
     /// nobody edits a README on a good day.
     @Test("the protocol count in the README is the one the app speaks")
     func protocolCountIsRight() {
-        // Six a machine can be set to; `renderer/machines.js` offers a seventh
-        // and it is `none`.
-        let total = 6
-        let missing = total - PrinterWatch.spoken.count
-        #expect(PrinterWatch.spoken.count == 3,
-                "the app speaks \(PrinterWatch.spoken.count) protocols — the README says three")
-        let written = ["zero", "one", "two", "three", "four", "five", "six"][missing]
+        // ── DERIVED FROM THE APP, NOT WRITTEN DOWN TWICE ──────────────────
+        //
+        // This used to assert `spoken.count == 3` and name bambu, duet and
+        // repetier in a literal. Teaching the app a fourth protocol then failed
+        // this test for being right — the guard against a stale README had
+        // itself gone stale, which is the same failure one level up.
+        //
+        // The six a machine can actually be set to; `renderer/machines.js`
+        // offers a seventh and it is `none`.
+        let all: Set<String> = ["moonraker", "octoprint", "prusalink", "repetier", "duet", "bambu"]
+        #expect(PrinterWatch.spoken.isSubset(of: all),
+                "the app speaks something this list does not know: \(PrinterWatch.spoken.subtracting(all))")
+        let missing = all.subtracting(PrinterWatch.spoken).sorted()
+
+        let written = ["zero", "one", "two", "three", "four", "five", "six"][missing.count]
         #expect(Self.theList.contains("\(written) of the six printer protocols"),
-                "the README does not say “\(written) of the six printer protocols”")
-        for name in ["bambu", "duet", "repetier"] {
-            #expect(!PrinterWatch.spoken.contains(name),
+                "the app is missing \(missing.count) — the README does not say “\(written) of the six printer protocols”")
+        for name in missing {
+            #expect(Self.theList.contains(name),
+                    "\(name) is not spoken and the README does not name it as missing")
+        }
+        for name in PrinterWatch.spoken {
+            #expect(!Self.theList.contains(name),
                     "\(name) is spoken now, and the README still names it as missing")
-            #expect(Self.theList.contains(name), "the README does not name \(name)")
         }
     }
 }

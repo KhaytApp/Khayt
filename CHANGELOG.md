@@ -6,6 +6,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac app can watch a Repetier-Server printer.** It speaks four of the
+  six protocols now rather than three, and the machines screen stops saying it
+  cannot ask this kind of machine what it is doing. It also gets the fix the
+  other app needed: the job is read from `listPrinter`, not `stateList` — which
+  lists neither the progress nor the filename, and is why a printing Repetier
+  used to show as Idle at 0% with no file name.
 - **(Maintainers) Electron moves to 44.** The 42 line falls out of Electron's
   three-major support window when 45 ships — due around late October on the
   current cadence — and an unsupported Electron stops receiving Chromium
