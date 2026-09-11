@@ -451,6 +451,14 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // When the shop finishes work.
+        "mac.tp_title":      ["en": "When work finishes", "ar": "متى ينتهي العمل"],
+        "mac.tp_busiest":    ["en": "Most work finishes {day} around {hour}.",
+                              "ar": "معظم العمل ينتهي يوم {day} قرابة {hour}."],
+        "mac.tp_closed":     ["en": "{pct}% of it finishes on a day the shop is closed.",
+                              "ar": "{pct}% منه ينتهي في يوم يكون المحل مغلقًا فيه."],
+        "mac.tp_thin":       ["en": "Not enough finished work yet to read a pattern — {n} so far.",
+                              "ar": "لا يوجد عمل منجز كافٍ لقراءة نمط بعد — {n} حتى الآن."],
         // Which machine is costing the shop.
         "mac.mr_title":      ["en": "What gets scrapped", "ar": "ما الذي يُهدر"],
         "mac.mr_rate":       ["en": "{pct}% scrapped",  "ar": "{pct}% مهدر"],

@@ -379,6 +379,8 @@ public actor KhaytEngine {
         "customer-mix",
         // Which machine is costing the shop, and what it keeps doing wrong.
         "machine-reliability",
+        // When the shop actually finishes work.
+        "throughput",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1882,6 +1884,71 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - When the shop finishes work
+
+    /// Seven days by twenty-four hours, from when each job was marked done.
+    ///
+    /// `lib/throughput.js`. The grid is the shape of the data; the findings are
+    /// in `totals` — which day carries the most, which hour, and how much of
+    /// the week's work is finishing on a day the shop is CLOSED. That last one
+    /// is printers running unattended or somebody in on their day off, and
+    /// neither app has said it.
+    public struct Throughput: Decodable, Sendable {
+        /// `[day][hour]`, day 0 = Sunday, in the shop's own zone.
+        public let matrix: [[Int]]
+        public let byDay: [Day]
+        public let byHour: [Hour]
+        public let totals: Totals
+
+        public struct Day: Decodable, Sendable, Identifiable, Hashable {
+            public let day: Int
+            public let jobs: Int
+            public let open: Bool
+            public var id: Int { day }
+        }
+
+        public struct Hour: Decodable, Sendable, Identifiable, Hashable {
+            public let hour: Int
+            public let jobs: Int
+            public var id: Int { hour }
+        }
+
+        public struct Totals: Decodable, Sendable {
+            public let jobs: Int
+            /// Ten finished jobs spread over 168 cells is noise, and a grid of
+            /// noise looks exactly like a finding.
+            public let enough: Bool
+            public let busiestDay: Int?
+            public let busiestHour: Int?
+            public let onClosedDays: Int
+            public let closedDayShare: Double?
+            public let peak: Int
+        }
+    }
+
+    public func throughput(orders: [JSONValue], openDays: [Bool],
+                           minimum: Int) throws -> Throughput {
+        try runtime.call2(#"""
+        globalThis.KhaytThroughput.throughput({
+          orders: ARG0, openDays: ARG1, minimum: ARG2,
+        }, {})
+        """#, [.array(orders), .array(openDays.map { .bool($0) }),
+               .number(Double(minimum))], as: Throughput.self)
+    }
+
+    /// Which days the shop works, by `getDay()` index — `working-week` reading
+    /// the settings, so the two apps agree about the weekend.
+    public func openDays(settings: [String: JSONValue]) throws -> [Bool] {
+        try runtime.call2(#"""
+        (function (s) {
+          var wh = globalThis.KhaytWorkingWeek.workingHours(s);
+          return ['sun','mon','tue','wed','thu','fri','sat'].map(function (k) {
+            return (wh[k] || 0) > 0;
+          });
+        })(ARG0)
+        """#, [.object(settings)], as: [Bool].self)
     }
 
     // MARK: - Which machine is costing the shop

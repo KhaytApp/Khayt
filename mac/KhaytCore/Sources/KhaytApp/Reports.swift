@@ -36,6 +36,9 @@ struct Reports: View {
     @State private var earns: KhaytEngine.ProductProfit?
     /// Whether the shop is growing or serving the same people.
     @State private var mix: KhaytEngine.CustomerMix?
+    /// When work actually finishes — which day, which hour, and how much of it
+    /// on days the shop is shut.
+    @State private var when: KhaytEngine.Throughput?
     /// How far each machine runs from its quote, and the shop's own figure.
     /// Not filtered to the chosen period: a machine's calibration is not a
     /// property of this quarter, and the measured-only filter already thins the
@@ -63,7 +66,7 @@ struct Reports: View {
             if shop.reportPage == .owing {
                 Owing(shop: shop, owed: owed)
             } else if shop.reportPage == .best {
-                Best(shop: shop, best: best, worth: worth, earns: earns, mix: mix)
+                Best(shop: shop, best: best, worth: worth, earns: earns, mix: mix, when: when)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice, funnel: funnel)
             } else if shop.reportPage == .machines {
@@ -250,6 +253,7 @@ struct Reports: View {
         await recomputeFunnel()
         await recomputeProductProfit()
         await recomputeCustomerMix()
+        await recomputeThroughput()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
@@ -347,6 +351,14 @@ struct Reports: View {
             settings: shop.settingsDict, clients: shop.clientRows)
     }
 
+    private func recomputeThroughput() async {
+        guard let engine = shop.engine else { return }
+        let open = (try? await engine.openDays(settings: shop.settingsDict))
+            ?? Array(repeating: true, count: 7)
+        when = try? await engine.throughput(
+            orders: shop.orderRows, openDays: open, minimum: 10)
+    }
+
     private func recomputeMachinePL() async {
         guard let engine = shop.engine else { return }
         // ── ALL FOUR FILTERED THE SAME WAY ────────────────────────────────
@@ -412,6 +424,7 @@ struct Reports: View {
         let worth: KhaytEngine.ClientValue?
         let earns: KhaytEngine.ProductProfit?
         let mix: KhaytEngine.CustomerMix?
+        let when: KhaytEngine.Throughput?
 
         var body: some View {
             // Two cards rather than two halves of one pane divided by a rule.
@@ -448,6 +461,8 @@ struct Reports: View {
                     // money, and the two are routinely in a different order —
                     // which is the finding, and why they sit on one screen.
                     ProductProfitTable(shop: shop, report: earns)
+                        .card(rail: Khayt.cyan, padding: 14)
+                    ThroughputCard(shop: shop, report: when)
                         .card(rail: Khayt.cyan, padding: 14)
                 }
                 .padding(Metric.screen)
