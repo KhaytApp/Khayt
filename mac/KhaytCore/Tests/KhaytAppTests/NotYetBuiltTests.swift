@@ -17,6 +17,31 @@ import Testing
 @MainActor
 struct NotYetBuiltTests {
 
+    /// Every protocol a machine can be set to.
+    ///
+    /// From `main.js`'s default-port table, which is the canonical list: a
+    /// protocol the app knows is one it has a port for. The machine form's
+    /// `<option>` list would be the other candidate and is a worse one — it
+    /// carries `none` and sits among other pickers, so it would have to be
+    /// filtered by a rule that is itself a second list.
+    static var offeredProtocols: Set<String> {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "main.js")
+        guard let source = try? String(contentsOf: url, encoding: .utf8),
+              let at = source.range(of: "const ports = {"),
+              let end = source[at.upperBound...].firstIndex(of: "}") else { return [] }
+        var found: Set<String> = []
+        for pair in source[at.upperBound..<end].split(separator: ",") {
+            let name = pair.split(separator: ":").first?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !name.isEmpty, name != "none" { found.insert(name) }
+        }
+        return found
+    }
+
     static var readme: String {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -90,16 +115,30 @@ struct NotYetBuiltTests {
         // this test for being right — the guard against a stale README had
         // itself gone stale, which is the same failure one level up.
         //
-        // The six a machine can actually be set to; `renderer/machines.js`
-        // offers a seventh and it is `none`.
-        let all: Set<String> = ["moonraker", "octoprint", "prusalink", "repetier", "duet", "bambu"]
+        // ── AND THE LIST OF ALL OF THEM IS DERIVED TOO ────────────────────
+        //
+        // This line WAS the literal `["moonraker", "octoprint", "prusalink",
+        // "repetier", "duet", "bambu"]`, described as "the six a machine can
+        // actually be set to" — and by then a machine could be set to seven.
+        // `sdcp` had been added to the menu and to `main.js` and this set had
+        // not moved, so the guard written to stop the README undercounting the
+        // protocols was undercounting them itself, one level up, exactly as the
+        // comment above describes happening the time before.
+        //
+        // So it is read from the menu a shop actually chooses from. A protocol
+        // added there now fails this test until the README and the app agree
+        // about it, which is the whole point of the test.
+        let all = Self.offeredProtocols
+        #expect(all.count > 1, "could not read the protocol menu from renderer/machines.js")
         #expect(PrinterWatch.spoken.isSubset(of: all),
                 "the app speaks something this list does not know: \(PrinterWatch.spoken.subtracting(all))")
         let missing = all.subtracting(PrinterWatch.spoken).sorted()
 
-        let written = ["zero", "one", "two", "three", "four", "five", "six"][missing.count]
-        #expect(Self.theList.contains("\(written) of the six printer protocols"),
-                "the app is missing \(missing.count) — the README does not say “\(written) of the six printer protocols”")
+        let numbers = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight"]
+        let written = numbers[min(missing.count, numbers.count - 1)]
+        let total = numbers[min(all.count, numbers.count - 1)]
+        #expect(Self.theList.contains("\(written) of the \(total) printer protocols"),
+                "the app is missing \(missing.count) of \(all.count) — the README does not say “\(written) of the \(total) printer protocols”")
         for name in missing {
             #expect(Self.theList.contains(name),
                     "\(name) is not spoken and the README does not name it as missing")

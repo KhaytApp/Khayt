@@ -361,6 +361,9 @@ public actor KhaytEngine {
         // in the other without a second opinion about what a shop is owed.
         // `report-records` is that flattening, assembling `order-money` and
         // `order-payment` rather than deciding anything itself.
+        // What a Bambu says it is doing. The MQTT under it is Swift's —
+        // `lib/bambu.js` is Node-only from its first line.
+        "bambu-report",
         "report-records",
         "report-builder",
         // A report a shop named, kept in one shape for both apps.
@@ -2721,6 +2724,24 @@ public actor KhaytEngine {
         })
         """#, [.object(state), listing.map { JSONValue.object($0) } ?? .null, .string(slug)],
               as: PrinterStatus.self)
+    }
+
+    /// What a Bambu printer is doing.
+    ///
+    /// The payload is a `device/{serial}/report` message, straight off MQTT.
+    /// `lib/bambu-report.js` — shared, because whether a printer is printing is
+    /// not a thing two apps may have separate opinions about. The transport
+    /// underneath is NOT shared and cannot be: `lib/bambu.js` is Node's
+    /// `Buffer` from its first line, so `BambuMqtt` speaks the same MQTT in
+    /// Swift and `BambuCodecParityTests` holds the two to the same bytes.
+    ///
+    /// Nil for a delta. A Bambu pushes small partial messages continuously and
+    /// a full state only when asked; a caller that took the first message
+    /// regardless would report a printer as Idle on the strength of a message
+    /// that said nothing about what it was doing.
+    public func bambuStatus(report payload: String) throws -> PrinterStatus? {
+        try runtime.call2("globalThis.KhaytBambuReport.parseBambuReport(ARG0)",
+                          [.string(payload)], as: PrinterStatus?.self)
     }
 
     /// What a PrusaLink printer is doing.

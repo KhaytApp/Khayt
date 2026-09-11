@@ -1033,8 +1033,8 @@ failed.
 
 ## Not yet built
 
-The rest of analytics, the cloud portal, the LAN server, and one of the six
-printer protocols — `bambu`. `KhaytCore` came first because the alternative,
+The rest of analytics, the cloud portal, the LAN server, and one of the seven
+printer protocols — `sdcp`. `KhaytCore` came first because the alternative,
 screens against a half-trusted engine, is how the two apps come to disagree
 about a shop's money.
 
@@ -1052,10 +1052,15 @@ receivables. `Reports.swift` draws the quarters, the best sellers, what is owed
 and the totals. What is here is the money itself; what is missing is most of
 the ways of looking at it.
 
-**The protocols are counted against the six a machine can actually be set to** —
-`renderer/machines.js` offers seven options and one of them is `none`.
-`PrinterWatch.spoken` is the Mac's five: Moonraker, OctoPrint, PrusaLink,
-Repetier and Duet.
+**The protocols are counted against the seven a machine can actually be set
+to** — `main.js`'s default-port table is the canonical list, and
+`NotYetBuiltTests` reads it rather than keeping a copy. It kept a copy until
+2026-09-11, and the copy said six: `sdcp` had been added to the menu and to
+`main.js` and this list had not moved, so the guard written to stop the README
+undercounting the protocols was undercounting them itself.
+
+`PrinterWatch.spoken` is the Mac's six: Moonraker, OctoPrint, PrusaLink,
+Repetier, Duet and Bambu.
 
 **Duet is two protocols behind one name.** RepRapFirmware standalone and
 DuetSoftwareFramework on an SBC: different endpoints, a different shape of
@@ -1065,8 +1070,30 @@ tried first; trying the wrong one costs a failed request every few seconds
 forever. The handshake is paid for only when a request is refused, so a
 standalone Duet with no password — most of them — costs two requests a poll.
 
-**Bambu is the one left, and it is not a longer version of this.** MQTT over
-TLS rather than HTTP, so it needs a client this app does not have.
+**Bambu was not a longer version of this and is now done.** MQTT over TLS on
+8883 rather than HTTP, so `BambuMqtt.swift` is a hand-rolled slice of MQTT
+3.1.1 over `NWConnection` — the other app hand-rolls the same slice over Node's
+`Buffer` in `lib/bambu.js`, which is why that file cannot be loaded here at
+all: `Buffer` is in its module scope from the first line, so it throws before
+anything in it is reachable.
+
+What a report MEANS was lifted out to `lib/bambu-report.js` and both apps run
+it, because whether a printer is printing is not a thing two apps may have
+separate opinions about. The two codecs are held to the same bytes from both
+sides — `BambuCodecParityTests` in Swift and one test in `test/bambu.test.js`,
+each naming the other, because two hand-written codecs that agree by inspection
+are two codecs that will diverge.
+
+Two switches on the printer, and the second is usually off: LAN-only Mode is
+what the guides name, and Bambu gates MQTT behind a separate **Developer Mode**
+in the same menu. With LAN on and Developer off the printer accepts the
+connection AND the CONNACK and then says nothing — nothing is refused, so the
+attempt just runs out its clock. That is why the timeout names Developer Mode
+first; a message naming address, access code and LAN mode would be listing
+three things that are all correct.
+
+**`sdcp` is the one left** — Elegoo's resin machines, over a WebSocket rather
+than either of the shapes above.
 
 Six things this list used to name are done. **Gift cards**, **the portfolio**
 and **the colour studio** are shelves in the sidebar. **The converter** is

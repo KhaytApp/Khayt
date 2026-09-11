@@ -145,9 +145,25 @@ final class PrinterWatch {
     /// without it. Repetier needs nothing of the kind: an `x-api-key` header
     /// and two GETs, which is the same shape as OctoPrint.
     ///
-    /// Bambu and Elegoo are not HTTP at all — Bambu is MQTT over TLS — so they
-    /// are a different piece of work rather than a longer version of this one.
-    static let spoken: Set<String> = ["moonraker", "octoprint", "prusalink", "repetier", "duet"]
+    /// Bambu is not HTTP at all — MQTT over TLS on 8883, and nothing else on
+    /// the LAN — so it is a different piece of work rather than a longer
+    /// version of this one. `BambuMqtt` is that work. Elegoo's `sdcp` is the
+    /// one left.
+    static let spoken: Set<String> = ["moonraker", "octoprint", "prusalink",
+                                      "repetier", "duet", "bambu"]
+
+    /// The protocols that do not go through `read` at all, because they are not
+    /// HTTP and there is no request to make.
+    static let notHttp: Set<String> = ["bambu"]
+
+    /// Every protocol a machine can be set to — spoken or not.
+    ///
+    /// Here so a test can ask "what is NOT spoken" instead of naming one.
+    /// Every version of those tests that named a protocol failed the day that
+    /// protocol was taught: repetier, then duet, then bambu, three times in a
+    /// row, each time for being right.
+    static let everyProtocol: Set<String> = ["moonraker", "octoprint", "prusalink",
+                                             "repetier", "duet", "bambu", "sdcp"]
 
     /// Which Duet surface an address answered on last time.
     ///
@@ -173,6 +189,9 @@ final class PrinterWatch {
         case "prusalink": return 80
         case "repetier": return 3344
         case "duet": return 80
+        // MQTT over TLS. The FTPS the other app uploads over is 990 and is not
+        // this — nothing here uploads.
+        case "bambu": return 8883
         default: return 7125          // Moonraker
         }
     }
@@ -344,8 +363,20 @@ final class PrinterWatch {
             if let sealed = machine.printerApi?.apiKey, !sealed.isEmpty, let build = source {
                 key = (try? await Secrets.open(sealed, for: build)) ?? ""
             }
-            let status = try await Self.read(machine, engine: engine, base: base, key: key) { request in
-                try await Self.session.data(for: request)
+            let status: KhaytEngine.PrinterStatus
+            if machine.printerApi?.type == "bambu" {
+                // Not `read`: there is no request and no response, so the seam
+                // that every other protocol shares has nothing to stand in for.
+                var accessCode = ""
+                if let sealed = machine.printerApi?.accessCode, !sealed.isEmpty, let build = source {
+                    accessCode = (try? await Secrets.open(sealed, for: build)) ?? ""
+                }
+                status = try await Self.askBambu(machine, engine: engine,
+                                                 base: base, accessCode: accessCode)
+            } else {
+                status = try await Self.read(machine, engine: engine, base: base, key: key) { request in
+                    try await Self.session.data(for: request)
+                }
             }
             readings[machine.id] = Reading(status: status, problem: nil, at: Date(),
                                            consecutiveFailures: 0)
@@ -376,6 +407,32 @@ final class PrinterWatch {
     /// below. Held rather than re-asked because Moonraker's file metadata is
     /// static for a given file and a poll runs every few seconds.
     private static var fileMeta: [String: (path: String, meta: [String: JSONValue]?)] = [:]
+
+    /// A Bambu's whole exchange. MQTT, so nothing above applies.
+    ///
+    /// The serial is required and is NOT a credential — it is printed on the
+    /// machine — but every topic is scoped by it, so without one there is
+    /// nothing to subscribe to and the attempt would time out on the message
+    /// about Developer Mode, which would be a lie.
+    static func askBambu(_ machine: Machine, engine: KhaytEngine,
+                         base: URL, accessCode: String) async throws -> KhaytEngine.PrinterStatus {
+        let serial = (machine.printerApi?.serial ?? "").trimmingCharacters(in: .whitespaces)
+        guard !serial.isEmpty else { throw Refusal.needsSerial }
+        guard let host = base.host() else { throw Refusal.noHost }
+        let port = UInt16(machine.printerApi?.port ?? Int(BambuMqtt.defaultPort))
+
+        let conversation = BambuConversation(host: host, port: port,
+                                             accessCode: accessCode, serial: serial)
+        let report = try await conversation.status()
+        // The shared module decides what the report MEANS, and returns nothing
+        // for a delta — which `status()` has already filtered for, so a nil
+        // here is a full message this app could not read rather than a partial
+        // one it should have ignored.
+        guard let status = try await engine.bambuStatus(report: report) else {
+            throw Refusal.unreadable("bambu")
+        }
+        return status
+    }
 
     static func read(_ machine: Machine, engine: KhaytEngine, base: URL, key: String,
                      fetch: @escaping (URLRequest) async throws -> (Data, URLResponse))
@@ -543,7 +600,7 @@ final class PrinterWatch {
 
     // MARK: - The socket
 
-    enum Refusal: Error, CustomStringConvertible {
+    enum Refusal: Error, CustomStringConvertible, Equatable {
         case noHost
         case notALanAddress(String)
         case badPort(Int)
@@ -555,10 +612,21 @@ final class PrinterWatch {
         /// most often. Its own case because "the printer said no" and "the
         /// request failed" are different things to a shop staring at a card.
         case handshakeRefused(String)
+        /// A Bambu with no serial. Every MQTT topic is scoped by it, so there
+        /// is nothing to subscribe to — and the attempt would otherwise run out
+        /// its clock and blame Developer Mode, which would be untrue.
+        case needsSerial
+        /// A full message that could not be read into a status.
+        case unreadable(String)
 
         var description: String {
             switch self {
             case .handshakeRefused(let why): return "the printer refused the connection: \(why)"
+            case .needsSerial:
+                return "This Bambu has no serial number yet. It is printed on the machine, and "
+                     + "every message to it is addressed by it, so there is nothing to ask without one."
+            case .unreadable(let type):
+                return "The \(type) printer answered with something this app could not read."
             case .noHost:
                 return "This machine has no address yet."
             case .notALanAddress(let host):
@@ -731,6 +799,7 @@ final class PrinterWatch {
     /// A failure in the vocabulary of the person who has to fix it.
     static func say(_ error: any Error) -> String {
         if let refusal = error as? Refusal { return refusal.description }
+        if let trouble = error as? BambuMqtt.Trouble { return say(trouble) }
         let ns = error as NSError
         switch ns.code {
         case NSURLErrorTimedOut:
@@ -741,6 +810,43 @@ final class PrinterWatch {
             return "That name did not resolve to anything on this network."
         default:
             return ns.localizedDescription
+        }
+    }
+
+    /// What went wrong with a Bambu, in words.
+    ///
+    /// Here rather than on `BambuMqtt.Trouble` so every printer diagnostic is
+    /// in one file — including the untranslated-English gap this file carries
+    /// and documents. A transport that owned its own copy would be a second
+    /// place to look, and the Developer Mode sentence is the one somebody will
+    /// want to reword.
+    static func say(_ trouble: BambuMqtt.Trouble) -> String {
+        switch trouble {
+        case .malformed:
+            return "The printer sent something this app could not read."
+        case .refused(let code):
+            return "The printer refused the access code (CONNACK \(code)). It is shown on the "
+                 + "printer's own screen, in the LAN-only Mode area."
+        case .silent:
+            // NAMING DEVELOPER MODE FIRST IS THE POINT OF THIS MESSAGE.
+            //
+            // Reaching here means the socket opened and the printer said
+            // nothing, which is what Developer Mode being off looks like and
+            // only that: a wrong access code is refused with a CONNACK and a
+            // wrong address never connects, so neither lands on this line. A
+            // message naming address, access code and LAN mode would be listing
+            // three things that are all correct — which is the worst kind of
+            // diagnostic, because it sends a shop to check what is already
+            // right.
+            return "The printer accepted the connection and then said nothing. That is what happens "
+                 + "when Developer Mode is off — LAN-only Mode alone does not open MQTT. Both are in "
+                 + "the same menu on the printer (Settings → LAN Mode, or WLAN/Network on P1 and A1)."
+        case .closed("hungUp"):
+            return "The printer closed the connection before answering."
+        case .closed("cancelled"):
+            return "The connection to the printer was closed."
+        case .closed(let why):
+            return "Could not reach the printer: \(why)"
         }
     }
 }

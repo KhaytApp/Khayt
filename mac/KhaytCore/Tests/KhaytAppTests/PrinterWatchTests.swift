@@ -39,15 +39,16 @@ struct PrinterWatchTests {
         // Klipper, so it is the one that could be verified against a machine
         // rather than a document. A card that silently shows nothing looks
         // broken, and a shop would go back to the other app not knowing why.
-        // Bambu is MQTT over TLS and Elegoo is a WebSocket — neither is HTTP,
-        // so neither is a longer version of this poller.
+        // NOT A NAMED PROTOCOL, because every version of this test that named
+        // one has failed the day that protocol was taught. Repetier, then Duet,
+        // then Bambu have each left this list, and each time this line failed
+        // for being right.
         //
-        // Repetier and then Duet have both left this list. Duet's absence was
-        // real — it needs `rr_connect` before any read — and was worth the
-        // conversation rather than the exclusion. Repetier's was a mistake: a
-        // note grouped it with Duet as "both need a handshake" and it needs an
-        // `x-api-key` header and nothing else.
-        #expect(PrinterWatch.notWatched(Self.machine("bambu")) == .otherProtocol("bambu"))
+        // `sdcp` is the one unspoken today, and when it is taught this asserts
+        // nothing rather than asserting something false.
+        for unspoken in PrinterWatch.everyProtocol.subtracting(PrinterWatch.spoken) {
+            #expect(PrinterWatch.notWatched(Self.machine(unspoken)) == .otherProtocol(unspoken))
+        }
         for spoken in PrinterWatch.spoken {
             #expect(PrinterWatch.notWatched(Self.machine(spoken)) == nil, "\(spoken) is not asked")
         }
