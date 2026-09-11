@@ -6,6 +6,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac app can watch an Elegoo resin printer, and that is all seven
+  protocols.** Moonraker, OctoPrint, PrusaLink, Repetier, Duet, Bambu and now
+  SDCP — there is no longer a kind of machine the Mac app cannot ask what it is
+  doing.
+
+  A printer with no mainboard ID is told so. It is the address on this protocol
+  rather than a password, every message is addressed by it, and it is not
+  printed on the machine — so Khayt says to scan for it rather than letting the
+  connection time out and look like a printer that is switched off.
+
 - **The Mac app can watch a Bambu Lab printer.** Six of the seven protocols
   now, and the one that is not a longer version of the others: a Bambu has no
   HTTP on the network at all, so this is MQTT over TLS, written natively. What

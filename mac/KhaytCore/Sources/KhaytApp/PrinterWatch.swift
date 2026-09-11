@@ -150,11 +150,11 @@ final class PrinterWatch {
     /// version of this one. `BambuMqtt` is that work. Elegoo's `sdcp` is the
     /// one left.
     static let spoken: Set<String> = ["moonraker", "octoprint", "prusalink",
-                                      "repetier", "duet", "bambu"]
+                                      "repetier", "duet", "bambu", "sdcp"]
 
     /// The protocols that do not go through `read` at all, because they are not
     /// HTTP and there is no request to make.
-    static let notHttp: Set<String> = ["bambu"]
+    static let notHttp: Set<String> = ["bambu", "sdcp"]
 
     /// Every protocol a machine can be set to — spoken or not.
     ///
@@ -192,6 +192,9 @@ final class PrinterWatch {
         // MQTT over TLS. The FTPS the other app uploads over is 990 and is not
         // this — nothing here uploads.
         case "bambu": return 8883
+        // A WebSocket. `lib/sdcp.js` owns the address, and this is only here so
+        // the machine form and the port check agree with it.
+        case "sdcp": return 3030
         default: return 7125          // Moonraker
         }
     }
@@ -364,7 +367,9 @@ final class PrinterWatch {
                 key = (try? await Secrets.open(sealed, for: build)) ?? ""
             }
             let status: KhaytEngine.PrinterStatus
-            if machine.printerApi?.type == "bambu" {
+            if machine.printerApi?.type == "sdcp" {
+                status = try await Self.askSdcp(machine, engine: engine, base: base)
+            } else if machine.printerApi?.type == "bambu" {
                 // Not `read`: there is no request and no response, so the seam
                 // that every other protocol shares has nothing to stand in for.
                 var accessCode = ""
@@ -407,6 +412,31 @@ final class PrinterWatch {
     /// below. Held rather than re-asked because Moonraker's file metadata is
     /// static for a given file and a poll runs every few seconds.
     private static var fileMeta: [String: (path: String, meta: [String: JSONValue]?)] = [:]
+
+    /// An Elegoo resin printer's whole exchange. A WebSocket, so nothing that
+    /// follows applies either.
+    ///
+    /// The mainboard id is the ADDRESS on this protocol — every frame is
+    /// topic-addressed by it — and it is not printed on the machine, so a shop
+    /// gets one by scanning the network. Without it there is nothing to ask and
+    /// nothing would answer, which would read as a printer that is switched off.
+    ///
+    /// No credential: SDCP has none. The machine is reached by address alone,
+    /// which is why the LAN check on `base` is the only guard there is and why
+    /// it matters more here than anywhere else.
+    static func askSdcp(_ machine: Machine, engine: KhaytEngine,
+                        base: URL) async throws -> KhaytEngine.PrinterStatus {
+        let board = (machine.printerApi?.serial ?? machine.printerApi?.printerSlug ?? "")
+            .trimmingCharacters(in: .whitespaces)
+        guard !board.isEmpty else { throw Refusal.needsMainboardId }
+        guard let host = base.host() else { throw Refusal.noHost }
+        // The address comes from the shared module rather than being written
+        // here, so the two apps cannot knock on different doors.
+        guard let url = URL(string: try await engine.sdcpWebsocketUrl(host)) else {
+            throw Refusal.noHost
+        }
+        return try await SdcpSocket(url: url, mainboardId: board).status(engine: engine)
+    }
 
     /// A Bambu's whole exchange. MQTT, so nothing above applies.
     ///
@@ -618,6 +648,10 @@ final class PrinterWatch {
         case needsSerial
         /// A full message that could not be read into a status.
         case unreadable(String)
+        /// An Elegoo with no mainboard id. It is the address on that protocol,
+        /// not a credential, and it is not printed on the machine — a scan is
+        /// how a shop gets one.
+        case needsMainboardId
 
         var description: String {
             switch self {
@@ -627,6 +661,9 @@ final class PrinterWatch {
                      + "every message to it is addressed by it, so there is nothing to ask without one."
             case .unreadable(let type):
                 return "The \(type) printer answered with something this app could not read."
+            case .needsMainboardId:
+                return "This printer has no mainboard ID yet. It is how every message reaches it, "
+                     + "and it is not printed on the machine — scan the network to find it."
             case .noHost:
                 return "This machine has no address yet."
             case .notALanAddress(let host):
@@ -800,6 +837,7 @@ final class PrinterWatch {
     static func say(_ error: any Error) -> String {
         if let refusal = error as? Refusal { return refusal.description }
         if let trouble = error as? BambuMqtt.Trouble { return say(trouble) }
+        if let trouble = error as? SdcpSocket.Trouble { return say(trouble) }
         let ns = error as NSError
         switch ns.code {
         case NSURLErrorTimedOut:
@@ -810,6 +848,27 @@ final class PrinterWatch {
             return "That name did not resolve to anything on this network."
         default:
             return ns.localizedDescription
+        }
+    }
+
+    /// What went wrong with an Elegoo, in words.
+    ///
+    /// A refusal, silence and a hang-up are three different situations and read
+    /// as three different sentences. Collapsing them into "could not reach the
+    /// printer" is what makes a diagnostic useless: the shop cannot tell
+    /// whether to look at the network, the machine, or the print it just sent.
+    static func say(_ trouble: SdcpSocket.Trouble) -> String {
+        switch trouble {
+        case .refused(let why):
+            // The printer ANSWERED. Its own words, not ours.
+            return "The printer refused: \(why)"
+        case .silent:
+            return "The printer did not answer in time. Check it is on, and that the mainboard ID "
+                 + "is the one this machine actually has."
+        case .closed:
+            return "The printer closed the connection before answering."
+        case .socket(let why):
+            return "Could not reach the printer: \(why)"
         }
     }
 

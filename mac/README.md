@@ -1033,10 +1033,9 @@ failed.
 
 ## Not yet built
 
-The rest of analytics, the cloud portal, the LAN server, and one of the seven
-printer protocols — `sdcp`. `KhaytCore` came first because the alternative,
-screens against a half-trusted engine, is how the two apps come to disagree
-about a shop's money.
+The rest of analytics, the cloud portal, and the LAN server. `KhaytCore` came
+first because the alternative, screens against a half-trusted engine, is how the
+two apps come to disagree about a shop's money.
 
 THE PARAGRAPH ABOVE IS THE LIST, and `NotYetBuiltTests` reads exactly it — the
 first paragraph of this section and nothing after it. That is the guard, and it
@@ -1059,8 +1058,11 @@ to** — `main.js`'s default-port table is the canonical list, and
 `main.js` and this list had not moved, so the guard written to stop the README
 undercounting the protocols was undercounting them itself.
 
-`PrinterWatch.spoken` is the Mac's six: Moonraker, OctoPrint, PrusaLink,
-Repetier, Duet and Bambu.
+`PrinterWatch.spoken` is all seven: Moonraker, OctoPrint, PrusaLink, Repetier,
+Duet, Bambu and SDCP. The tests that used to name "the one still missing" now
+derive it from `PrinterWatch.everyProtocol` and assert nothing, because there is
+nothing left to name — three of them had to be edited for the app being further
+along, once per protocol taught.
 
 **Duet is two protocols behind one name.** RepRapFirmware standalone and
 DuetSoftwareFramework on an SBC: different endpoints, a different shape of
@@ -1092,8 +1094,25 @@ attempt just runs out its clock. That is why the timeout names Developer Mode
 first; a message naming address, access code and LAN mode would be listing
 three things that are all correct.
 
-**`sdcp` is the one left** — Elegoo's resin machines, over a WebSocket rather
-than either of the shapes above.
+**SDCP was the easy one, because somebody had already done the hard part.**
+Elegoo's resin machines speak a WebSocket on 3030, and `lib/sdcp.js` was
+written pure on purpose — framing and status mapping, no sockets — so the Mac
+app loads it unchanged and only had to open the socket. `lib/sdcp-reply.js` was
+lifted out of `lib/sdcp-client.js` the same way `bambu-report` was: a mainboard
+pushes on its own schedule as well as answering, and deciding which frame is
+the reply is worth exactly one implementation.
+
+Two things that only showed up when something other than Node loaded it:
+`lib/sdcp.js` assigned `module.exports` unguarded, which throws on its last
+line in JavaScriptCore and takes the whole module with it; and it published no
+global, so there was nothing to reach it by. Both fixed there rather than
+worked around here.
+
+**The mainboard id is the address, not a credential.** Every frame is
+topic-addressed by it, it is not printed on the machine, and a scan is how a
+shop gets one — so a machine without one is refused for that, by name, rather
+than left to time out and read as switched off. SDCP has no credential at all,
+which makes the LAN check on the address the only guard there is.
 
 Six things this list used to name are done. **Gift cards**, **the portfolio**
 and **the colour studio** are shelves in the sidebar. **The converter** is
