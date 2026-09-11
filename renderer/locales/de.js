@@ -1921,6 +1921,7 @@
   "rb.export": "CSV exportieren",
   "rb.save": "Bericht speichern",
   "rb.saved": "Gespeicherte Berichte",
+  "rb.remove": "Diesen gespeicherten Bericht entfernen",
   "rb.saved_ok": "Bericht gespeichert",
   "rb.exported": "Bericht exportiert",
   "rb.name_prompt": "Berichtsname:",

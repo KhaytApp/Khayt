@@ -1921,6 +1921,7 @@
   "rb.export": "Exportar CSV",
   "rb.save": "Guardar informe",
   "rb.saved": "Informes guardados",
+  "rb.remove": "Eliminar este informe guardado",
   "rb.saved_ok": "Informe guardado",
   "rb.exported": "Informe exportado",
   "rb.name_prompt": "Nombre del informe:",

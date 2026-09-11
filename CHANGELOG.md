@@ -6,6 +6,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac app can build a report a shop asked for.** Pick the columns, narrow
+  by stage and by date, read the table, take the CSV. Every other report in the
+  app answers a question somebody chose in advance — what a quarter made, who
+  owes, which machine earns — and this is the one that answers a question
+  nobody anticipated. It is a screen rather than a small modal with an
+  eight-row preview, the money reads as money, and the stages and payment
+  states read in your own language instead of as the values they are stored as.
+- **A report can be kept and reopened, and now thrown away.** Name it and it
+  comes back the next time. Saving twice under one name *replaces* it rather
+  than filing a second copy, so correcting a report you have just run leaves
+  one entry and not six; and a saved report can now be removed, which was
+  simply not possible before. The rule lives in `lib/saved-reports.js` and both
+  apps obey it, so a report saved in one opens in the other.
+
 - **The Mac app can watch a Duet printer.** Five of the six protocols now.
   Duet is really two — RepRapFirmware on its own and DuetSoftwareFramework on
   an attached Pi — and the app finds which one your machine answers on, then
@@ -42,6 +56,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **Every stage chip in the report builder read `status.quote` instead of
+  "Quote".** In all nine languages, in a released app. The chips asked for a
+  `status.*` key and no locale has ever had one, and the translator returns the
+  key it was given when it has no string — so the `|| s` fallback next to it
+  was dead code, because a returned key is truthy. The guard that exists for
+  exactly this failure could not see it either: it reads key-shaped literals,
+  and `'status.'` on its own is not one. It now checks that a prefix names
+  something.
 
 - **(Maintainers) The first Mac alpha shipped unable to check for updates.**
   It was signed, notarised, stapled and correct in everything anything reported

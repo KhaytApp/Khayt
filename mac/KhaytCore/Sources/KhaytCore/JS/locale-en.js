@@ -1922,6 +1922,7 @@
   "rb.export": "Export CSV",
   "rb.save": "Save report",
   "rb.saved": "Saved reports",
+  "rb.remove": "Remove this saved report",
   "rb.saved_ok": "Report saved",
   "rb.exported": "Report exported",
   "rb.name_prompt": "Report name:",

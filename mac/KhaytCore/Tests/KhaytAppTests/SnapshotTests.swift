@@ -495,4 +495,58 @@ import KhaytCore
         }.frame(width: 380), "31-provenance", size: CGSize(width: 380, height: 300))
     }
 
+    /// The report builder, in the two pieces that can be laid out wrongly.
+    ///
+    /// The chips wrap through a `Layout` written for this screen, and the
+    /// alternative — an adaptive `LazyVGrid` — is one of the two shapes that
+    /// has hung this app. A hang does not show up in a passing test; it shows
+    /// up here, as a render that never returns.
+    @Test("a report a shop asked for, and the chips it asked with")
+    func reportBuilder() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let fields = try await engine.reportFields()
+        var chosen: Set<String> = ["id", "date", "client", "status", "price", "paymentStatus"]
+        // Through the screen's own label rule, not `field.label` — the module's
+        // English headers would render in every language and the Arabic picture
+        // would be a picture of an app that does not exist.
+        var labels: [String: JSONValue] = [:]
+        for f in fields { labels[f.key] = .string(CustomReportPage.label(for: f, shop.words)) }
+        let report = try await engine.buildReport(
+            orders: shop.orderRows, clients: shop.clientRows, machines: shop.machineRows,
+            settings: shop.settingsDict, language: shop.words.language,
+            fields: fields.map(\.key).filter { chosen.contains($0) },
+            statusIn: [], from: "", to: "", labels: labels)
+        #expect(!report.rows.isEmpty, "the sample cannot reach this page")
+
+        let saved = try await engine.addSavedReport(
+            [], name: "August, finished", fields: ["id", "price"],
+            statusIn: ["completed"], from: "", to: "", id: "RPT-1")
+
+        try render(VStack(alignment: .leading, spacing: 16) {
+            // A saved report, which is the row that carries a second control
+            // inside the chip — the one place the shape can go wrong.
+            FlowChips(items: saved.map { ($0.id, $0.name) },
+                      isOn: { _ in false }, toggle: { _ in },
+                      remove: { _ in }, removeHelp: "Remove")
+            // Every column on offer, which is the widest the chips ever get —
+            // the row that wraps is the one worth photographing.
+            FlowChips(items: fields.map { ($0.key, CustomReportPage.label(for: $0, shop.words)) },
+                      isOn: { chosen.contains($0) }, toggle: { _ in })
+            // The first rows only. The sample's book is longer than any frame
+            // this can be rendered at, and a `VStack` taller than its frame
+            // CENTRES — so photographing the whole table photographs its
+            // middle, with the controls above it cropped off the top.
+            ReportTable(report: KhaytEngine.Report(
+                headers: report.headers, keys: report.keys,
+                rows: Array(report.rows.prefix(8)), total: report.total),
+                        currency: shop.currency, words: shop.words)
+            Spacer(minLength: 0)
+        }
+        .padding(Metric.screen)
+        .frame(width: 900).background(Khayt.ground),
+                   "42-report-builder", size: CGSize(width: 900, height: 620))
+    }
+
 }

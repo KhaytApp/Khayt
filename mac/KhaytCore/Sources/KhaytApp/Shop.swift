@@ -3068,6 +3068,43 @@ final class Shop {
         }
     }
 
+    /// Keep the shop's saved reports.
+    ///
+    /// The same narrowness as `saveSlicers` and for the same reason: one named
+    /// key, written explicitly, rather than through `settings-edit` — which
+    /// keeps every key no form field carries, so a list would be kept rather
+    /// than replaced and Save would do nothing.
+    ///
+    /// The LIST is computed by `lib/saved-reports.js` before it gets here. This
+    /// only writes it, so the rule about what a re-save under one name does
+    /// lives in one place and both apps obey it.
+    func saveReports(_ list: [KhaytEngine.SavedReport]) async {
+        settingsProblem = nil
+        settingsNote = nil
+        guard let build = source.build else {
+            settingsProblem = words.callIt("mac.settings_sample"); return
+        }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var settings = Self.settings(root)
+                settings["savedReports"] = .array(list.map { r in
+                    .object(["id": .string(r.id), "name": .string(r.name),
+                             "fields": .array(r.fields.map { .string($0) }),
+                             "statusIn": .array(r.statusIn.map { .string($0) }),
+                             "from": .string(r.from), "to": .string(r.to)])
+                })
+                root["settings"] = .object(settings)
+            }
+            await load(source)
+        } catch {
+            settingsProblem = String(describing: error)
+        }
+    }
+
     /// Open a model in a named slicer.
     func openInSlicer(_ url: URL, slicer: KhaytEngine.Slicer) async {
         slicerProblem = nil

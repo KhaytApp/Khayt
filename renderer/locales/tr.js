@@ -1921,6 +1921,7 @@
   "rb.export": "CSV dışa aktar",
   "rb.save": "Raporu kaydet",
   "rb.saved": "Kayıtlı raporlar",
+  "rb.remove": "Bu kayıtlı raporu kaldır",
   "rb.saved_ok": "Rapor kaydedildi",
   "rb.exported": "Rapor dışa aktarıldı",
   "rb.name_prompt": "Rapor adı:",

@@ -1921,6 +1921,7 @@
   "rb.export": "CSVをエクスポート",
   "rb.save": "レポートを保存",
   "rb.saved": "保存済みレポート",
+  "rb.remove": "この保存済みレポートを削除",
   "rb.saved_ok": "レポートを保存しました",
   "rb.exported": "レポートをエクスポートしました",
   "rb.name_prompt": "レポート名：",

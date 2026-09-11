@@ -352,6 +352,19 @@ public actor KhaytEngine {
         // endpoints, a different unauthorized status and a different shape of
         // connect. `duet.js` is where that is decided, once, for both apps.
         "duet",
+        // ── A SHOP'S OWN QUESTIONS ────────────────────────────────────────
+        //
+        // `report-builder` selects columns, filters and renders a table; it
+        // says of itself that the caller flattens the orders. That flattening
+        // used to be inline in the renderer — twenty lines, three of which are
+        // money rules — so the feature existed in one app and could not exist
+        // in the other without a second opinion about what a shop is owed.
+        // `report-records` is that flattening, assembling `order-money` and
+        // `order-payment` rather than deciding anything itself.
+        "report-records",
+        "report-builder",
+        // A report a shop named, kept in one shape for both apps.
+        "saved-reports",
         // What the machine itself remembers. The nozzle-wear counter reads
         // completed ORDERS, so a machine that has extruded twelve kilos while
         // nineteen of its jobs were customer orders reports a fraction of its
@@ -2470,6 +2483,138 @@ public actor KhaytEngine {
         """#,
                           [printer.map(JSONValue.object) ?? .null, .object(job)],
                           as: PrinterStatus.self)
+    }
+
+    // MARK: - A shop's own reports
+
+    /// A column a report can carry. `key` matches the record field.
+    public struct ReportField: Decodable, Sendable, Hashable, Identifiable {
+        public let key: String
+        public let label: String
+        public var id: String { key }
+    }
+
+    /// The columns on offer, and the ones a report starts with.
+    public func reportFields() throws -> [ReportField] {
+        try runtime.call2("globalThis.KhaytReportBuilder.FIELDS", [], as: [ReportField].self)
+    }
+
+    public func reportDefaultFields() throws -> [String] {
+        try runtime.call2("globalThis.KhaytReportBuilder.DEFAULT_FIELDS", [], as: [String].self)
+    }
+
+    /// The table a shop asked for.
+    ///
+    /// Two shared modules, in order: `report-records` turns orders into rows —
+    /// resolving the client and machine names, and the three money figures,
+    /// from the modules that own them — and `report-builder` selects, filters
+    /// and orders. Neither is reimplemented here, which is what makes a report
+    /// built on the Mac the same report built in the other app.
+    public struct Report: Decodable, Sendable {
+        public let headers: [String]
+        /// The field each column IS, in the same order. A table that knows a
+        /// column holds money can print it as money; one that only has the
+        /// header has to guess from a translated word, which is not a thing to
+        /// build on.
+        public let keys: [String]
+        public let rows: [[String]]
+        public let total: Int
+
+        public init(headers: [String], keys: [String], rows: [[String]], total: Int) {
+            self.headers = headers
+            self.keys = keys
+            self.rows = rows
+            self.total = total
+        }
+    }
+
+    public func buildReport(orders: [JSONValue], clients: [JSONValue], machines: [JSONValue],
+                            settings: [String: JSONValue], language: String,
+                            fields: [String], statusIn: [String],
+                            from: String, to: String,
+                            labels: [String: JSONValue]) throws -> Report {
+        try runtime.call2(#"""
+        (function (orders, clients, machines, settings, lang, fields, statusIn, from, to, labels) {
+          var records = globalThis.KhaytReportRecords.reportRecords(orders, {
+            money: globalThis.KhaytOrderMoney,
+            payment: globalThis.KhaytOrderPayment,
+            clients: clients, machines: machines,
+            ctx: { settings: settings, clients: clients },
+            // The shop's own text may be written in more than one language;
+            // `content-languages` is what decides which one this reader gets.
+            localName: function (row) {
+              return globalThis.KhaytContentLanguages.read(row, 'name', lang, settings)
+                || (row && row.name) || '';
+            },
+          });
+          var r = globalThis.KhaytReportBuilder.buildReport(records, {
+            fields: fields, statusIn: statusIn, from: from, to: to, labels: labels,
+          });
+          return { headers: r.headers || [], keys: r.keys || [], rows: (r.rows || []).map(function (row) {
+            return row.map(function (cell) { return cell == null ? '' : String(cell); });
+          }), total: (r.rows || []).length };
+        })(ARG0, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7, ARG8, ARG9)
+        """#, [.array(orders), .array(clients), .array(machines), .object(settings),
+               .string(language), .array(fields.map { .string($0) }),
+               .array(statusIn.map { .string($0) }), .string(from), .string(to),
+               .object(labels)], as: Report.self)
+    }
+
+    // MARK: - Saved reports
+
+    /// A report a shop named and wants back.
+    public struct SavedReport: Codable, Sendable, Identifiable, Hashable {
+        public let id: String
+        public let name: String
+        public let fields: [String]
+        public let statusIn: [String]
+        public let from: String
+        public let to: String
+    }
+
+    /// What is really on the settings, with the junk dropped. `lib/saved-reports.js`
+    /// owns the shape so a report saved in one app loads in the other.
+    public func savedReports(settings: [String: JSONValue]) throws -> [SavedReport] {
+        try runtime.call2("globalThis.KhaytSavedReports.savedReports(ARG0)",
+                          [.object(settings)], as: [SavedReport].self)
+    }
+
+    /// Keep one under a name — replacing, not appending, when the name is reused.
+    public func addSavedReport(_ list: [SavedReport], name: String, fields: [String],
+                               statusIn: [String], from: String, to: String,
+                               id: String) throws -> [SavedReport] {
+        try runtime.call2(#"""
+        globalThis.KhaytSavedReports.addReport(ARG0, {
+          name: ARG1, fields: ARG2, statusIn: ARG3, from: ARG4, to: ARG5,
+        }, ARG6)
+        """#, [.array(list.map(Self.encode)), .string(name),
+               .array(fields.map { .string($0) }), .array(statusIn.map { .string($0) }),
+               .string(from), .string(to), .string(id)], as: [SavedReport].self)
+    }
+
+    public func removeSavedReport(_ list: [SavedReport], id: String) throws -> [SavedReport] {
+        try runtime.call2("globalThis.KhaytSavedReports.removeReport(ARG0, ARG1)",
+                          [.array(list.map(Self.encode)), .string(id)], as: [SavedReport].self)
+    }
+
+    private static func encode(_ r: SavedReport) -> JSONValue {
+        .object(["id": .string(r.id), "name": .string(r.name),
+                 "fields": .array(r.fields.map { .string($0) }),
+                 "statusIn": .array(r.statusIn.map { .string($0) }),
+                 "from": .string(r.from), "to": .string(r.to)])
+    }
+
+    /// The same table as a CSV, from the module that already escapes it.
+    ///
+    /// NOT a Swift join. A cell beginning `=` is a formula to a spreadsheet,
+    /// and a shop's project names are exactly the sort of free text that
+    /// contains a comma, a quote or a newline. `reportToCsv` handles all of it
+    /// and is tested for it.
+    public func reportToCsv(headers: [String], rows: [[String]]) throws -> String {
+        try runtime.call2(#"""
+        globalThis.KhaytReportBuilder.reportToCsv({ headers: ARG0, rows: ARG1 })
+        """#, [.array(headers.map { .string($0) }),
+               .array(rows.map { .array($0.map { .string($0) }) })], as: String.self)
     }
 
     // MARK: - Duet

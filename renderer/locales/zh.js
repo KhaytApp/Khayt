@@ -1921,6 +1921,7 @@
   "rb.export": "导出 CSV",
   "rb.save": "保存报表",
   "rb.saved": "已保存的报表",
+  "rb.remove": "删除此保存的报表",
   "rb.saved_ok": "报表已保存",
   "rb.exported": "报表已导出",
   "rb.name_prompt": "报表名称：",
