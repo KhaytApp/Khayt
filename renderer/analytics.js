@@ -1322,23 +1322,21 @@ function renderClientLtvTable() {
     return;
   }
 
-  const now = Date.now();
-  const CHURN_MS = 90 * 86400000;
-
-  const ltvData = (clients || []).map(c => {
-    const cOrders = (printLog || []).filter(o => o.clientId === c.id);
-    const ltv = cOrders.reduce((s, o) => s + orderNetRevenueBase(o), 0);
-    const lastOrder = cOrders.reduce((latest, o) => {
-      const d = o.completedAt || o.date;
-      if (!d) return latest;
-      if (!latest) return d;
-      // Compare by actual time — completedAt is an ISO timestamp and date is a
-      // plain YYYY-MM-DD, so a raw string compare mis-ranks same-day records.
-      return new Date(d).getTime() > new Date(latest).getTime() ? d : latest;
-    }, null);
-    const churnRisk = !lastOrder || (now - new Date(lastOrder).getTime()) > CHURN_MS;
-    return { name: c.name || c.company || '—', ltv, count: cOrders.length, avgVal: cOrders.length ? ltv / cOrders.length : 0, lastOrder, churnRisk };
-  }).sort((a, b) => b.ltv - a.ltv).slice(0, 10);
+  // `lib/client-value.js`, not the arithmetic that used to be here — which
+  // counted EVERY order carrying the client's id, with no status check at all.
+  // So a customer who asked for ten quotes and bought nothing sat at the top of
+  // "lifetime value", which is the one place on this screen that must not
+  // reward asking. Voided orders and work outside the shop's trade counted too.
+  const report = KhaytClientValue.clientValue({
+    clients: clients || [], orders: printLog || [], now: Date.now(), limit: 10,
+  }, {
+    revenueOf: orderNetRevenueBase,
+    countsForBusiness: _countsForBusiness,
+  });
+  const ltvData = report.rows.map((r) => ({
+    name: r.name || '—', ltv: r.value, count: r.jobs, avgVal: r.averageJob,
+    lastOrder: r.lastSeen == null ? null : new Date(r.lastSeen), churnRisk: r.quiet,
+  }));
 
   if (!ltvData.some(d => d.ltv > 0)) {
     el.innerHTML = `<div class="card" style="margin-bottom:16px;"><h3 class="card-head"><span class="swatch"></span>${escapeHtml(t('an.client_ltv') || 'Client Lifetime Value')}</h3><p style="color:var(--text-muted);padding:12px 0;font-size:13px;">${escapeHtml(t('an.no_data') || 'No data yet')}</p></div>`;
@@ -1351,7 +1349,7 @@ function renderClientLtvTable() {
     <td style="padding:6px 8px;font-size:12px;text-align:end;font-weight:600;">${escapeHtml(fmtPrice(d.ltv))}</td>
     <td style="padding:6px 8px;font-size:12px;text-align:end;">${d.count}</td>
     <td style="padding:6px 8px;font-size:12px;text-align:end;">${escapeHtml(fmtPrice(d.avgVal))}</td>
-    <td style="padding:6px 8px;font-size:12px;text-align:end;color:var(--text-muted);">${d.lastOrder ? escapeHtml(localDateStr(new Date(d.lastOrder))) : '—'}</td>
+    <td style="padding:6px 8px;font-size:12px;text-align:end;color:var(--text-muted);">${d.lastOrder ? escapeHtml(localDateStr(d.lastOrder)) : '—'}</td>
   </tr>`).join('');
 
   el.innerHTML = `

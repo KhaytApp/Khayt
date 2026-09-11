@@ -451,6 +451,12 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // Who the customers are worth.
+        "mac.cv_share":      ["en": "{pct}% of everything the shop has earned is this one customer.",
+                              "ar": "{pct}% من كل ما كسبه المحل يأتي من هذا العميل وحده."],
+        "mac.cv_in_flight":  ["en": "in flight",       "ar": "قيد التنفيذ"],
+        "mac.cv_quiet_for":  ["en": "quiet {n} days",  "ar": "صامت {n} يومًا"],
+        "mac.cv_never":      ["en": "no finished work","ar": "لا عمل منجز"],
         // Cash flow — money paid on a day nobody wrote down.
         "mac.cf_undated":    ["en": "{amount} was collected on days that were never recorded, so it is not on the chart.",
                               "ar": "حُصِّل {amount} في أيام لم تُسجَّل، لذا لا يظهر في الرسم."],
