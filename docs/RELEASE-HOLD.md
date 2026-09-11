@@ -26,7 +26,35 @@ A hold is still a decision recorded here, not something that workflow enforces.
 | **Beta / RC** | **The 3.7.0 line is CLOSED** — promoted to stable as `v3.7.0` on 2026-09-11. Newest published pre-release remains **v3.7.0-beta.25** (2026-09-03, all three platforms), which was the promotion candidate and is superseded by the stable tag rather than withdrawn. `beta.25` is the review cut: twenty-two passes over the app and the cloud, and the money and data-safety fixes they turned up — a payment plan that billed a deposit twice, a VAT return declaring no VAT, two tablets overwriting each other, and an invoice QR that scanned and was invalid. It carries a `### Before you update` section for the Folder-to-Group rename. `beta.24` was the first release to carry one: it MOVES DATA — model previews leave the store for the folders beside the models — so the update asks the shop to accept that before it will download. `beta.23` is the cut a shop with large models needs: a print file over about 50 MB used to join the library holding no print time, no weight, no material and no picture, and say nothing about it. `beta.18` carries a security fix — a printer camera's content-type header could escape the image tag and run script in the app. It is named `-beta.N` rather than `-rc` because an `-rc` is invisible to existing beta installs (see VERSIONING.md). The line carries the content-language work — a shop writes in one or two of nine languages — and the eighteen readers that had been treating a shop's own text as an English-or-Arabic pair: two put a blank name into messages sent to customers, two submitted ZATCA e-invoices with no seller street, and one (the server's catalogue whitelist, silently dropping every field the app sent) made the storefront feature inert in production. `beta.17` adds the storefront syncing the catalogue's own prices and photos, a print markable as not business, live printer state on the machines page, and hover descriptions that actually appear. **Do not recommend anything before `beta.17` to a shop that does not write English or Arabic**: its own name, its clients' names and the seller address on its ZATCA e-invoices all came out blank. |
 
 
-Last verified 2026-09-11 (after the v3.7.0 publish; the beta.25 verification it replaces was 2026-09-03) against `gh release list`, `git ls-remote --tags origin`, and a fetch of every published manifest and every asset it names: all three manifests fetch 200 and all three read `version: 3.7.0-beta.25` — `latest-mac.yml` is a REAL manifest this time, not a carry-forward, because `BUILD_MAC` was set for this cut — and the five binaries they name (the Windows setup, the mac zip and dmg, the AppImage and the deb) each serve 200. These rot fast — confirm with
+Last verified 2026-09-11 08:10 UTC, AFTER the v3.7.0 publish (the beta.25
+verification it replaces was 2026-09-03), against `gh release list`,
+`git ls-remote --tags upstream`, and a fetch of every published manifest and
+every asset each names. All three manifests serve 200 and read
+`version: 3.7.0`; **`latest-mac.yml` is a REAL manifest, not a carry-forward**
+— `BUILD_MAC` was set for this run and the mac job built in 4m43s — so it names
+`Khayt-3.7.0-arm64-mac.zip` and `Khayt-3.7.0-arm64.dmg` rather than a
+`../v3.7.0-beta.25/` carry. All five binaries (the Windows setup, the mac zip
+and dmg, the AppImage and the deb) serve 200. The PUBLISHED body — not the
+local file — parses to `needsConsent: true` with the same four
+`### Before you update` items, so the update gates. `BUILD_MAC` is back to
+`false`.
+
+It took three tags to get there and both failures are worth knowing about:
+
+1. **The first tag shipped nothing.** `gh release create` returned
+   `HTTP 422: body is too long`; the notes were 152,890 characters against a
+   125,000 limit, because a stable promotion carries the whole line. No release
+   object, every platform job skipped, and a tag sitting on the remote looking
+   finished. Fixed in `scripts/changelog-section.js`, which now trims to fit
+   from the END so the consent section at the top survives.
+2. **The second tag built Windows and Linux and failed macOS in 26 seconds** —
+   electron-builder could not unlock a temporary keychain it had just created.
+   Nothing in the repo had changed; the GitHub runner image had moved from
+   `macos-26-arm64/20260728.0273` to `/20260907.0351`. The workflow builds the
+   signing keychain itself now.
+
+Both are the same lesson in different clothes: **a tag on the remote is not a
+release.** Check `gh release view <tag>` and fetch the manifests. against `gh release list`, `git ls-remote --tags origin`, and a fetch of every published manifest and every asset it names: all three manifests fetch 200 and all three read `version: 3.7.0-beta.25` — `latest-mac.yml` is a REAL manifest this time, not a carry-forward, because `BUILD_MAC` was set for this cut — and the five binaries they name (the Windows setup, the mac zip and dmg, the AppImage and the deb) each serve 200. These rot fast — confirm with
 `gh release list --repo KhaytApp/Khayt` rather than trusting the table.
 
 ## The 3.7.0 promotion gate — how it was settled (2026-09-11)
