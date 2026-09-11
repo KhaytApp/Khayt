@@ -123,7 +123,7 @@
     "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@fontsource/space-grotesk": "^5.2.10",
     "@fontsource/spline-sans-mono": "^5.2.8",
-    "electron": "^42.8.1",
+    "electron": "^42.11.3",
     "electron-builder": "^26.15.3",
     "jsdom": "^29.1.1",
     "playwright-core": "^1.60.0"
@@ -141,7 +141,8 @@
     },
     "tmp": "0.2.7",
     "form-data": "^4.0.6",
-    "js-yaml": "4.3.1"
+    "js-yaml": "4.3.2",
+    "fast-uri": "^3.1.7"
   },
   "build": {
     "appId": "app.khayt.hub",

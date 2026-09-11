@@ -1380,6 +1380,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   volume to within a thousandth of a percent.
 
 ### Fixed
+- **Security: Khayt was three Electron patch releases behind, and shipped two
+  packages with known advisories.** Electron moves to 42.11.3, which carries
+  Chromium, V8, ANGLE and WebRTC security backports plus hardening Khayt
+  benefits from directly — internal window and `executeJavaScript` replies are
+  now validated against the frame that sent them, and File System Access grants
+  are scoped to the requesting document and reset when its last page closes.
+  Two dependency advisories are closed with it: `js-yaml`, which the updater
+  reads release manifests with, and `fast-uri`. Nothing about the app's own
+  behaviour changes. There is no evidence any of this was exploited, and none
+  of it was reachable without first getting code into the app — this is keeping
+  the floor current, which for an Electron app is most of the work.
 - **The Mac shelf drew a reel of filament for everything on it.** A bottle of
   resin was a spool, a stack of plywood was a spool, and the only thing saying
   otherwise was the unit after the number — "340 ml" under a picture of a reel.
