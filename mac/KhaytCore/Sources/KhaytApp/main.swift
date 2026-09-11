@@ -10,6 +10,16 @@ LastWords.listen()
 // Nothing unless `KHAYT_TEST_ABORT` is set, and the whole point of the line
 // above when it is.
 LastWords.abortIfAsked()
+
+// `--check-resources`: can this bundle find what is inside it?
+//
+// BEFORE `Words.preload`, which is where the answer used to be a crash rather
+// than an answer. See `ResourceCheck` — it exists because two notarised alphas
+// shipped unable to launch anywhere but the Mac that built them, and nothing in
+// the release ever asked the built app a single question.
+if CommandLine.arguments.contains("--check-resources") {
+    exit(ResourceCheck.run())
+}
 Direction.settle()
 // The menu bar is built as the scene is created and its item titles are never
 // rewritten, so the shop's own words for the stages have to be in hand BEFORE

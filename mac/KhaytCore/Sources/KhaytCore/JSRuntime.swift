@@ -30,11 +30,16 @@ public final class JSRuntime {
     private let context: JSContext
     private var lastException: String?
 
-    /// Load `modules` in order, from `bundle`'s `JS` resource directory.
+    /// Load `modules` in order, then `locales`, from `bundle`'s `JS` resource
+    /// directory.
     ///
     /// `bundle` is optional rather than defaulted to `.module`: SPM generates
     /// that accessor as internal, so it cannot appear in a public signature.
-    /// Load `modules`, then `locales`, from `bundle`'s `JS` resource directory.
+    /// Nil means `BundledResources.javaScript`, which is a LOOKUP — where an
+    /// assembled app actually keeps its resources — rather than the two
+    /// hard-coded paths `Bundle.module` compiles down to. One of those is the
+    /// build directory of the machine that compiled it, which is how both
+    /// shipped 4.0 alphas crashed on launch everywhere but here.
     ///
     /// Locale files are loaded separately because they break the naming rule
     /// every other module follows: nine files all assign onto one global,
@@ -43,7 +48,7 @@ public final class JSRuntime {
     /// same name — an app that invents its own word for "Owed" has invented a
     /// second vocabulary for one shop.
     public init(modules: [String], locales: [String] = [], bundle: Bundle? = nil) throws {
-        let bundle = bundle ?? .module
+        let bundle = bundle ?? BundledResources.javaScript
         guard let context = JSContext() else {
             throw KhaytJSError.evaluationFailed("could not create a JavaScript context")
         }

@@ -253,7 +253,7 @@ final class Shop {
             let root: [String: JSONValue]
             switch next {
             case .sample:
-                guard let url = Bundle.module.url(forResource: "sample-shop", withExtension: "json"),
+                guard let url = AppResources.bundle.url(forResource: "sample-shop", withExtension: "json"),
                       let data = try? Data(contentsOf: url) else {
                     throw Failure.missingSample
                 }

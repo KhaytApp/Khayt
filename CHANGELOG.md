@@ -293,6 +293,54 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.3] - 2026-09-11
+
+*Khayt for macOS only. The Windows and Linux app is unaffected and is on its own
+version — see [VERSIONING.md](./VERSIONING.md).*
+
+### Before you update
+
+**If you have `4.0.0-alpha.1` or `4.0.0-alpha.2`, download this one by hand.**
+Those builds cannot launch, which means they cannot check for updates either —
+Sparkle runs inside the app, and the app stopped before it started. Nothing will
+arrive on its own. Drag the new Khayt into Applications over the old one.
+
+### Fixed
+
+- **The Mac app could not launch on any Mac that had not built it.** Both
+  published alphas were signed, notarised, stapled — and dead on their first
+  line:
+
+      Fatal error: could not load resource bundle: from
+      /Applications/Khayt.app/KhaytCore_KhaytCore.bundle or
+      /Users/runner/work/Khayt/Khayt/mac/KhaytCore/.build/…
+
+  Khayt's business rules are JavaScript the app loads from inside its own
+  bundle, and it asked SwiftPM's `Bundle.module` where that was. That is not a
+  search: it compiles down to two fixed paths — the app bundle's root, where
+  nothing may be put because codesign seals only what is inside `Contents/`,
+  and the *absolute path of the build directory on the machine that compiled
+  the app*. On a developer's Mac that directory is right there, so every build
+  made here ran perfectly, by reaching outside the app into it. On the release
+  runner that path is `/Users/runner/work/…`, which exists on no shop's Mac.
+
+  The app finds its own resources now, in `Contents/Resources`, where they have
+  always been.
+
+- **An invoice would have printed with no styling at all**, and the sample book
+  would not have opened — the same cause, one layer quieter. Neither crashes,
+  so neither would have been reported as this: a shop would simply have sent a
+  customer a document that looked like raw HTML.
+
+### Added
+
+- **(Maintainers) `Khayt --check-resources`, and the release runs it.** The
+  reason this shipped twice is that nothing in the release ever asked the built
+  app a question. Launching it would not have helped — CI is a build machine
+  too, so a broken app starts there. The app is asked *where* it found each of
+  its resources, and the answer has to be inside itself. `Bundle.module` is
+  banned in this package's own sources, with a test that says so.
+
 ## [3.7.0] - 2026-09-11
 
 The 3.7.0 beta line, released as stable. Individual beta entries are kept below;

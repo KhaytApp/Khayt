@@ -188,10 +188,18 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Khayt"
 
-# SwiftPM's resource bundles. `Bundle.module` looks in Bundle.main.resourceURL
-# first, so Contents/Resources is where they have to be — left beside the binary
-# they are found in a `swift run` and not in the app, which fails as a missing
-# module at the first call into the engine.
+# SwiftPM's resource bundles, into Contents/Resources, which is the only place
+# they may go: codesign seals what is inside Contents/ and refuses a bundle with
+# anything loose at its root.
+#
+# THE COMMENT THAT USED TO BE HERE SAID `Bundle.module` LOOKS IN
+# Bundle.main.resourceURL FIRST. IT DOES NOT, AND BELIEVING IT SHIPPED TWO
+# ALPHAS THAT COULD NOT LAUNCH. SwiftPM compiles that accessor down to exactly
+# two paths — the app bundle's ROOT, and the absolute path of the .build
+# directory on the machine that compiled it. Locally the second one is sitting
+# right there, so every build made here ran; on CI it is /Users/runner/work/…,
+# so every build a shop downloaded died on its first line. See
+# `KhaytCore/BundledResources.swift`, which is what the code asks now.
 for b in "$PKG"/.build/release/*.bundle; do
   [ -e "$b" ] && cp -R "$b" "$APP/Contents/Resources/"
 done
@@ -289,8 +297,9 @@ mkdir -p "$PRV/Contents/MacOS" "$PRV/Contents/Resources"
 cp "$PKG/.build/release/KhaytPreview" "$PRV/Contents/MacOS/KhaytPreview"
 
 # IT NEEDS ITS OWN COPY OF THE RULES. This extension reads the print settings
-# through the shared engine, and `Bundle.module` resolves against the bundle it
-# is running in — which for an extension is the .appex, not the app around it.
+# through the shared engine, and an extension is its own bundle — the .appex,
+# not the app around it — so `Bundle.main` here is the .appex and the resources
+# have to be inside it.
 # Without this it launches, finds its extension point, and dies on
 # `Fatal error: could not load resource bundle` the moment a preview is asked
 # for; Quick Look then falls back to scaling the thumbnail, so what a person

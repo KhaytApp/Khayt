@@ -23,16 +23,14 @@ enum Rules {
 
     /// An engine reading this extension's own copy of the JavaScript.
     static func engine() throws -> KhaytEngine {
-        try KhaytEngine(bundle: resources ?? .main)
+        try KhaytEngine(bundle: resources)
     }
 
-    /// SwiftPM's resource bundle inside this extension, if it is there.
+    /// SwiftPM's resource bundle inside this extension.
     ///
-    /// Named the way SwiftPM names it — `<Package>_<Target>.bundle` — and looked
-    /// for beside the other resources. `nil` falls back to the main bundle,
-    /// which is what a `swift run` wants and what the tests get.
-    static var resources: Bundle? {
-        guard let dir = Bundle.main.resourceURL else { return nil }
-        return Bundle(url: dir.appending(path: "KhaytCore_KhaytCore.bundle"))
-    }
+    /// This extension found the problem first and solved it for itself. The
+    /// lookup lives in `KhaytCore.BundledResources` now, because solving it in
+    /// one target left the app and the other extension still holding it — and
+    /// the app is where it went on to ship, twice.
+    static var resources: Bundle { BundledResources.javaScript }
 }

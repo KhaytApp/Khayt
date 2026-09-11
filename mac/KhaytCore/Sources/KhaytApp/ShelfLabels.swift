@@ -100,7 +100,7 @@ final class LabelPaper: NSObject, ObservableObject, WKNavigationDelegate {
     /// styled by the same file that styles them in the other app. A second
     /// stylesheet here would drift within a release.
     static func page(_ inner: String) -> String {
-        let css = Bundle.module.url(forResource: "invoice", withExtension: "css")
+        let css = AppResources.bundle.url(forResource: "invoice", withExtension: "css")
             .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
         return """
         <!doctype html><html><head><meta charset="utf-8"><style>
