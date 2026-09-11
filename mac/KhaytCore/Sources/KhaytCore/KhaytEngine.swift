@@ -340,6 +340,13 @@ public actor KhaytEngine {
         // once been answered.
         "octoprint",
         "prusalink",
+        // Two more of the six a machine can be set to. Both are pure readers of
+        // a payload this app already knows how to fetch, so speaking them is
+        // wiring rather than a second implementation — which is the whole
+        // argument for the JS being shared in the first place. Bambu is the
+        // one still missing and it is not wiring: it is MQTT over TLS, not
+        // HTTP, so it needs a client this app does not have.
+        "repetier",
         // What the machine itself remembers. The nozzle-wear counter reads
         // completed ORDERS, so a machine that has extruded twelve kilos while
         // nineteen of its jobs were customer orders reports a fraction of its
@@ -2458,6 +2465,33 @@ public actor KhaytEngine {
         """#,
                           [printer.map(JSONValue.object) ?? .null, .object(job)],
                           as: PrinterStatus.self)
+    }
+
+    /// What a Repetier-Server printer is doing.
+    ///
+    /// TWO CALLS, AND THE JOB IS NOT ON THE ONE YOU WOULD ASK.
+    ///
+    /// `stateList` is the state of the MACHINE — temperatures, active extruder,
+    /// layer. `listPrinter` is the state of the JOB — `done`, `job`, `paused`,
+    /// `online`. The Electron adapter read `done` and `job` off `stateList`,
+    /// where Repetier's own API reference lists neither, so progress was always
+    /// 0, the filename always empty, and every Repetier machine looked Idle.
+    /// That is fixed in `lib/repetier.js`, and calling it here is how this app
+    /// gets the fix rather than the bug.
+    ///
+    /// `listing` is optional and is allowed to have failed: losing the job must
+    /// not cost the temperatures the first call returned — the same rule the
+    /// PrusaLink branch follows.
+    public func repetierStatus(state: [String: JSONValue],
+                               listing: [String: JSONValue]?,
+                               slug: String) throws -> PrinterStatus {
+        try runtime.call2(#"""
+        globalThis.KhaytRepetier.repetierStatus({
+          stateData: ARG0, listData: ARG1, slug: ARG2,
+          normalizeProgress: globalThis.KhaytPrinterStatus.normalizeProgress,
+        })
+        """#, [.object(state), listing.map { JSONValue.object($0) } ?? .null, .string(slug)],
+              as: PrinterStatus.self)
     }
 
     /// What a PrusaLink printer is doing.

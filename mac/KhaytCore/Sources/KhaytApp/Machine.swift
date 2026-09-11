@@ -75,9 +75,14 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
         let host: String?
         let port: Int?
         /// STILL SEALED. Carried so the poller can open it at the moment it
-        /// sends one — OctoPrint and PrusaLink always need a key — and opened
-        /// nowhere else. No screen displays it and none ever should.
+        /// sends one — OctoPrint, PrusaLink and Repetier always need a key —
+        /// and opened nowhere else. No screen displays it and none ever should.
         let apiKey: String?
+        /// Which printer, on a Repetier-Server that runs several. It is in
+        /// every request path rather than a header, and `machine-edit.js`
+        /// stores an empty string when the shop has not said — which the
+        /// adapter reads as `default`, the name Repetier itself uses.
+        let printerSlug: String?
     }
 
     /// Has the machine's own job history been read into the book?

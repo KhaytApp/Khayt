@@ -139,11 +139,15 @@ final class PrinterWatch {
     /// with its own tests, and once opening an API key was settled — both send
     /// one, and it is `__enc__` on disk.
     ///
-    /// Duet and Repetier are deliberately absent although they have modules
-    /// too: both need a session handshake before the first read, and building a
-    /// handshake against a machine nobody can point at is how a poller ships
-    /// that has never once been answered. Bambu and Elegoo are not HTTP at all.
-    static let spoken: Set<String> = ["moonraker", "octoprint", "prusalink"]
+    /// Duet is still absent and REPETIER IS NOT, and the note that grouped them
+    /// was wrong about one of them. Duet does need a session handshake —
+    /// `rr_connect` before any read, and every other request answers 401
+    /// without it. Repetier needs nothing of the kind: an `x-api-key` header
+    /// and two GETs, which is the same shape as OctoPrint.
+    ///
+    /// Bambu and Elegoo are not HTTP at all — Bambu is MQTT over TLS — so they
+    /// are a different piece of work rather than a longer version of this one.
+    static let spoken: Set<String> = ["moonraker", "octoprint", "prusalink", "repetier"]
 
     /// Is this a machine this app can ask? Nil when it can.
     static func notWatched(_ machine: Machine) -> NotWatched? {
@@ -157,6 +161,7 @@ final class PrinterWatch {
         switch type {
         case "octoprint": return 80
         case "prusalink": return 80
+        case "repetier": return 3344
         default: return 7125          // Moonraker
         }
     }
@@ -384,6 +389,25 @@ final class PrinterWatch {
             catch Refusal.http(409, _) { printer = nil }
             return try await engine.octoprintStatus(printer: printer, job: job)
 
+        case "repetier":
+            // TWO CALLS, AND THE JOB IS NOT ON THE ONE YOU WOULD ASK.
+            //
+            // `stateList` is the MACHINE — temperatures, extruder, layer.
+            // `listPrinter` is the JOB — `done`, `job`, `paused`, `online`.
+            // Reading the job off `stateList`, where Repetier's own reference
+            // lists neither field, is what made every Repetier machine read
+            // Idle at 0% with no filename in the other app. `lib/repetier.js`
+            // holds that correction; this calls it rather than repeating it.
+            //
+            // The listing may fail on its own: losing the job must not cost the
+            // temperatures the first call returned — the rule the PrusaLink
+            // branch below follows, for the same reason.
+            let slug = machine.printerApi?.printerSlug.flatMap { $0.isEmpty ? nil : $0 } ?? "default"
+            let escaped = slug.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? slug
+            let state = try await get("/printer/api/\(escaped)?a=stateList")
+            let listing = try? await get("/printer/api/\(escaped)?a=listPrinter")
+            return try await engine.repetierStatus(state: state, listing: listing, slug: slug)
+
         case "prusalink":
             // `/api/v1/status` carries no file information at any firmware
             // version, so the name comes from `/api/v1/job` — which answers 204
@@ -509,7 +533,7 @@ final class PrinterWatch {
         // string "undefined" as the header value in the Electron app, and
         // Moonraker in trusted-client mode needs no key at all — so sending a
         // junk one is worse than sending none.
-        if !key.isEmpty, ["octoprint", "prusalink", "moonraker"].contains(type) {
+        if !key.isEmpty, ["octoprint", "prusalink", "moonraker", "repetier"].contains(type) {
             request.setValue(key, forHTTPHeaderField: "X-Api-Key")
         }
         let (data, response) = try await (fetch ?? { try await Self.session.data(for: $0) })(request)
