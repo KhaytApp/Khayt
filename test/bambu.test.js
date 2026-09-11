@@ -168,3 +168,46 @@ test('a well-formed PUBLISH still decodes correctly', () => {
   assert.equal(d.topic, topic);
   assert.equal(d.payload, payload);
 });
+
+/**
+ * The other side of a two-sided pin.
+ *
+ * Bambu is the one protocol with no shared transport: this file hand-rolls MQTT
+ * over `Buffer`, which cannot be loaded in JavaScriptCore, so the Mac app
+ * hand-rolls it again in Swift — `mac/KhaytCore/Sources/KhaytApp/BambuMqtt.swift`.
+ *
+ * `BambuCodecParityTests` asserts these exact hex strings from that side. This
+ * asserts them from here. Change either codec and BOTH fail, and each names the
+ * other — which is the only way two hand-written codecs stay one protocol.
+ */
+test('the wire bytes are the ones the Mac app also writes', () => {
+  const hex = (b) => Buffer.from(b).toString('hex');
+
+  assert.equal(hex(b.encodeConnect('khayt-abc123', 'bblp', '12345678')),
+    '102800044d51545404c2003c000c6b686179742d616263313233000462626c7000083132333435363738');
+  assert.equal(hex(b.encodeSubscribe(1, 'device/01P00A000000000/report')),
+    '82220001001d6465766963652f3031503030413030303030303030302f7265706f727400');
+  assert.equal(hex(b.encodePublish('device/01P00A000000000/request',
+    JSON.stringify({ pushing: { sequence_id: '0', command: 'pushall' } }))),
+    '3053001e6465766963652f3031503030413030303030303030302f726571756573747b2270757368696e67223a7b2273657175656e63655f6964223a2230222c22636f6d6d616e64223a2270757368616c6c227d7d');
+
+  // Each boundary where the variable-byte integer grows a byte.
+  assert.equal(hex(b.encodeRemainingLength(0)), '00');
+  assert.equal(hex(b.encodeRemainingLength(127)), '7f');
+  assert.equal(hex(b.encodeRemainingLength(128)), '8001');
+  assert.equal(hex(b.encodeRemainingLength(16383)), 'ff7f');
+  assert.equal(hex(b.encodeRemainingLength(2097152)), '80808001');
+
+  assert.equal(hex(b.PINGREQ), 'c000');
+  assert.equal(hex(b.DISCONNECT), 'e000');
+});
+
+test('reading a report is the shared module, not a copy in here', () => {
+  // `lib/bambu-report.js` is what the Mac app runs; this file must not have
+  // its own opinion about what a printer is doing.
+  const src = require('node:fs').readFileSync(require.resolve('../lib/bambu.js'), 'utf8');
+  assert.match(src, /require\('\.\/bambu-report'\)/,
+    'lib/bambu.js grew its own report parser again — the Mac app reads lib/bambu-report.js');
+  assert.doesNotMatch(src, /function parseBambuReport/,
+    'a second parseBambuReport is a second opinion about whether a printer is printing');
+});

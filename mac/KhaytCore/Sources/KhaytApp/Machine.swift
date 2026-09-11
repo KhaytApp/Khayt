@@ -78,6 +78,15 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
         /// sends one — OctoPrint, PrusaLink and Repetier always need a key —
         /// and opened nowhere else. No screen displays it and none ever should.
         let apiKey: String?
+        /// ALSO STILL SEALED — `store-secret-paths.js` registers
+        /// `machines[].printerApi.accessCode` alongside the key. A Bambu's LAN
+        /// access code is the MQTT password; it is opened at the moment the
+        /// connection is made and held nowhere.
+        let accessCode: String?
+        /// Which Bambu. Every MQTT topic is scoped by it —
+        /// `device/{serial}/report` — so without it there is nothing to
+        /// subscribe to. Not a secret: it is printed on the machine.
+        let serial: String?
         /// Which printer, on a Repetier-Server that runs several. It is in
         /// every request path rather than a header, and `machine-edit.js`
         /// stores an empty string when the shop has not said — which the

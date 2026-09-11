@@ -6,6 +6,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac app can watch a Bambu Lab printer.** Six of the seven protocols
+  now, and the one that is not a longer version of the others: a Bambu has no
+  HTTP on the network at all, so this is MQTT over TLS, written natively. What
+  a report *means* is the module the other app already uses, so the two cannot
+  disagree about whether a printer is printing — and the two hand-written MQTT
+  codecs are held to the same bytes from both sides.
+
+  If it goes quiet, it says why. With LAN-only Mode on and **Developer Mode**
+  off — a separate switch in the same menu that most guides do not mention —
+  the printer accepts the connection and then never speaks, so there is nothing
+  to refuse and nothing to report. That is the one thing it can be, so that is
+  what Khayt says; it does not send you off to re-check the address and the
+  access code, which in that state are both already right.
+
 - **The Mac app can build a report a shop asked for.** Pick the columns, narrow
   by stage and by date, read the table, take the CSV. Every other report in the
   app answers a question somebody chose in advance — what a quarter made, who

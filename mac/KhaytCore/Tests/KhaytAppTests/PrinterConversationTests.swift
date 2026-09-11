@@ -322,8 +322,6 @@ extension PrinterConversationTests {
         #expect(PrinterWatch.spoken.contains("repetier"))
         #expect(PrinterWatch.notWatched(Self.machine("repetier")) == nil)
         #expect(PrinterWatch.defaultPort("repetier") == 3344)
-        // And the one still genuinely missing stays missing, honestly.
-        #expect(PrinterWatch.notWatched(Self.machine("bambu")) != nil)
     }
 }
 
@@ -420,14 +418,24 @@ extension PrinterConversationTests {
                 "it asked for the file separately on a surface that had already sent it")
     }
 
-    @Test("Duet is a protocol this app says it speaks; Bambu still is not")
+    @Test("Duet is a protocol this app says it speaks")
     func duetIsSpoken() {
         #expect(PrinterWatch.spoken.contains("duet"))
         #expect(PrinterWatch.notWatched(Self.machine("duet")) == nil)
         #expect(PrinterWatch.defaultPort("duet") == 80)
-        // Five of six. Bambu is MQTT over TLS and is not a longer version of
-        // this — it needs a client this app does not have.
-        #expect(PrinterWatch.spoken.count == 5)
-        #expect(PrinterWatch.notWatched(Self.machine("bambu")) == .otherProtocol("bambu"))
+    }
+
+    /// NOT `spoken.count == 5`, which is what this was and which failed the day
+    /// Bambu was taught — the third time a count written down here has had to
+    /// be edited for the app being further along.
+    @Test("every protocol is either spoken or honestly refused")
+    func nothingIsSilentlySkipped() {
+        #expect(PrinterWatch.spoken.isSubset(of: PrinterWatch.everyProtocol),
+                "the app claims a protocol a machine cannot be set to: \(PrinterWatch.spoken.subtracting(PrinterWatch.everyProtocol))")
+        for name in PrinterWatch.everyProtocol {
+            let verdict = PrinterWatch.notWatched(Self.machine(name))
+            #expect(PrinterWatch.spoken.contains(name) ? verdict == nil
+                                                       : verdict == .otherProtocol(name))
+        }
     }
 }
