@@ -1,0 +1,242 @@
+# ── Khayt for macOS — the NATIVE app ──────────────────────────────────────
+#
+# Separate from `release.yml`, which builds the Electron app, and dispatched
+# rather than tagged.
+#
+# NOTHING HERE PUSHES A TAG TO THIS REPOSITORY, and that is the whole design.
+# electron-updater picks a release by walking this repo's `releases.atom`, and
+# that feed lists TAGS whether or not a release exists for them. A
+# `bedready-v*` tag once appeared in Khayt's own update feed and, whenever it
+# was the newest entry, a Khayt user with beta updates on resolved it and then
+# asked for a `latest-mac.yml` that was a 404 — their update check simply
+# failed. A `mac-v4.0.0-alpha.1` tag here would be worse: it parses as NEWER
+# than 3.7.0, so every beta install would try to move to it.
+#
+# So the release, and its tag, are created in KhaytApp/khayt-mac.
+name: Mac app — Build & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Mark the release as a pre-release (alphas and betas: yes)'
+        type: boolean
+        default: true
+      publish_appcast:
+        description: 'Publish the Sparkle feed so existing installs see this build'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, sign, notarise
+    runs-on: macos-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      build:   ${{ steps.v.outputs.build }}
+      tag:     ${{ steps.v.outputs.tag }}
+      archive: ${{ steps.pack.outputs.archive }}
+      bytes:   ${{ steps.pack.outputs.bytes }}
+      sig:     ${{ steps.pack.outputs.sig }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+
+      - name: Read the Mac app's own version
+        id: v
+        run: |
+          set -euo pipefail
+          V="$(node -p "require('./mac/version.json').version")"
+          B="$(node -p "require('./mac/version.json').build")"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "build=$B"   >> "$GITHUB_OUTPUT"
+          echo "tag=v$V"    >> "$GITHUB_OUTPUT"
+          echo "Khayt for macOS $V (build $B)"
+
+      # The same keychain the Electron lane builds, and for the same reason —
+      # electron-builder is not involved here, but `codesign` is, and the
+      # runner image moving broke that lane in exactly this step.
+      - name: Prepare the signing keychain
+        env:
+          CSC_LINK:         ${{ secrets.APPLE_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CSC_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/khayt-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          P12="$RUNNER_TEMP/khayt-cert.p12"
+          echo "$CSC_LINK" | base64 --decode > "$P12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$P12" -k "$KEYCHAIN" -P "$CSC_KEY_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$P12"
+          if ! security find-identity -v -p codesigning "$KEYCHAIN" | grep -q "Developer ID Application"; then
+            echo "::error::No Developer ID in the signing keychain — refusing to build an app that would ship unsigned."
+            exit 1
+          fi
+
+      # KHAYT_APPCAST is what puts `SUFeedURL` in the Info.plist. A build
+      # without it is one whose Check for Updates is greyed out — which is
+      # right for a local build and wrong for this one.
+      - name: Build the app
+        env:
+          KHAYT_APPCAST: https://khaytapp.com/mac/appcast.xml
+        run: ./mac/make-app.sh
+
+      - name: Notarise and staple
+        env:
+          APPLE_ID:                    ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
+        run: ./mac/make-app.sh --notarize
+
+      # ── THE ARCHIVE, AND ITS SIGNATURE ──────────────────────────────────
+      #
+      # `ditto`, not `zip`: a versioned framework is a farm of symlinks and the
+      # shell tool flattens them, which produces an archive that unpacks into
+      # an app macOS will not run.
+      #
+      # The EdDSA key is piped to `sign_update` on stdin (`-f -`) so it never
+      # touches the runner's disk. `-p` prints the signature alone.
+      - name: Pack and sign the archive
+        id: pack
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          V="${{ steps.v.outputs.version }}"
+          ARCHIVE="mac/dist/Khayt-$V.zip"
+          ditto -c -k --keepParent mac/dist/Khayt.app "$ARCHIVE"
+
+          if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
+            echo "::error::SPARKLE_PRIVATE_KEY is not set. Without it the feed carries no"
+            echo "signature, and Sparkle refuses an unsigned update AFTER downloading it —"
+            echo "which reads to a shop as a broken app rather than a broken release."
+            exit 1
+          fi
+          SIGN="$(find mac/KhaytCore/.build/artifacts/sparkle -name sign_update -type f | head -1)"
+          [ -x "$SIGN" ] || { echo "::error::sign_update not found in the Sparkle artifacts"; exit 1; }
+          SIG="$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN" -f - -p "$ARCHIVE")"
+          [ -n "$SIG" ] || { echo "::error::sign_update produced no signature"; exit 1; }
+
+          echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+          echo "bytes=$(stat -f%z "$ARCHIVE")" >> "$GITHUB_OUTPUT"
+          echo "sig=$SIG" >> "$GITHUB_OUTPUT"
+          echo "packed $ARCHIVE ($(stat -f%z "$ARCHIVE") bytes), signed"
+
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/khayt-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/khayt-cert.p12"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: khayt-mac
+          path: ${{ steps.pack.outputs.archive }}
+          retention-days: 7
+
+  publish:
+    name: Publish to KhaytApp/khayt-mac
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+      - uses: actions/download-artifact@v4
+        with: { name: khayt-mac, path: dist }
+
+      - name: Require a cross-repo token
+        env:
+          TOKEN: ${{ secrets.KHAYT_MAC_RELEASE_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::KHAYT_MAC_RELEASE_TOKEN is not set."
+            echo "The Mac app publishes to KhaytApp/khayt-mac, a DIFFERENT repository —"
+            echo "deliberately, so no tag enters this repo's namespace and appears in"
+            echo "Khayt's own update feed. The automatic GITHUB_TOKEN cannot reach it."
+            echo "Add a repo secret KHAYT_MAC_RELEASE_TOKEN holding a PAT with"
+            echo "contents:write on KhaytApp/khayt-mac."
+            exit 1
+          fi
+
+      # The release FIRST, the feed after. A feed that advertises an asset
+      # which is not uploaded yet sends every install that checks in between
+      # to a 404, and Sparkle reports that as a failed update.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.KHAYT_MAC_RELEASE_TOKEN }}
+          TAG: ${{ needs.build.outputs.tag }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          NOTES="$RUNNER_TEMP/notes.md"
+          node scripts/changelog-section.js "$VERSION" > "$NOTES" 2>/dev/null \
+            || printf 'Khayt for macOS %s — the native Mac app.\n' "$VERSION" > "$NOTES"
+          FLAGS=""
+          [ "${{ inputs.prerelease }}" = "true" ] && FLAGS="--prerelease"
+          gh release create "$TAG" dist/*.zip \
+            --repo KhaytApp/khayt-mac \
+            --title "Khayt for macOS $VERSION" \
+            --notes-file "$NOTES" \
+            $FLAGS
+
+      # ── THE FEED, ONTO A DOMAIN WE OWN ──────────────────────────────────
+      #
+      # khaytapp.com rather than a github.io URL: `SUFeedURL` is baked into
+      # every copy of the app that ships and cannot be changed on an install
+      # that already exists, so it has to be an address we can still point
+      # somewhere else in five years.
+      - name: Publish the Sparkle feed
+        if: ${{ inputs.publish_appcast }}
+        env:
+          GH_TOKEN: ${{ secrets.WEBSITE_SYNC_TOKEN }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::WEBSITE_SYNC_TOKEN is not set — the release is published but"
+            echo "no existing install will be told about it. Add the secret and re-run,"
+            echo "or publish mac/appcast.xml to khayt-website by hand."
+            exit 1
+          fi
+          ARCHIVE="$(ls dist/*.zip | head -1)"
+          URL="https://github.com/KhaytApp/khayt-mac/releases/download/$TAG/$(basename "$ARCHIVE")"
+          node scripts/mac-appcast.js \
+            --archive "$ARCHIVE" \
+            --signature "${{ needs.build.outputs.sig }}" \
+            --url "$URL" \
+            --notes-url "https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG" \
+            --out "$RUNNER_TEMP/appcast.xml"
+
+          # Committed to the website repo, which is GitHub Pages on khaytapp.com.
+          git clone --depth 1 "https://x-access-token:$GH_TOKEN@github.com/KhaytApp/khayt-website.git" site
+          mkdir -p site/mac
+          cp "$RUNNER_TEMP/appcast.xml" site/mac/appcast.xml
+          cd site
+          git config user.name  "khayt-release"
+          git config user.email "release@khaytapp.com"
+          git add mac/appcast.xml
+          git commit -m "Khayt for macOS ${{ needs.build.outputs.version }}: the Sparkle feed" || {
+            echo "nothing to commit — the feed already names this build"; exit 0; }
+          git push
+
+      - name: Say where it went
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          echo "### Khayt for macOS ${{ needs.build.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Release: https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Feed: https://khaytapp.com/mac/appcast.xml" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Build number: ${{ needs.build.outputs.build }} (what Sparkle compares)" >> "$GITHUB_STEP_SUMMARY"
