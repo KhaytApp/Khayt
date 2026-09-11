@@ -4705,16 +4705,11 @@ async function fetchPrinterStatus(machine) {
     // Both surfaces refused. The pre-RRF-3 status endpoint is the last thing to
     // try — it predates the object model entirely and only exists standalone.
     try {
+      // The shape is `lib/duet.js`'s now, not this function's — the Mac app
+      // needs the same one, and an inline object needed in two places is two
+      // objects that drift. See `legacyStatus` there.
       const data = await get(KhaytDuet.ENDPOINTS.standalone.legacy);
-      return {
-        state: data.status || 'Unknown',
-        progress: normalizeProgress(KhaytDuet.legacyProgressPercent(data.fractionPrinted)),
-        filename: '',
-        timeRemaining: null,
-        tempNozzle: data.temps?.heads?.current?.[0] || null,
-        tempBed: data.temps?.bed?.current || null,
-        type: 'duet'
-      };
+      return KhaytDuet.legacyStatus(data, normalizeProgress);
     } catch (e) { throw lastErr || e; }
   }
   if (type === 'repetier') {

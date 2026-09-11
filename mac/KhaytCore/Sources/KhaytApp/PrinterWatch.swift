@@ -147,7 +147,17 @@ final class PrinterWatch {
     ///
     /// Bambu and Elegoo are not HTTP at all — Bambu is MQTT over TLS — so they
     /// are a different piece of work rather than a longer version of this one.
-    static let spoken: Set<String> = ["moonraker", "octoprint", "prusalink", "repetier"]
+    static let spoken: Set<String> = ["moonraker", "octoprint", "prusalink", "repetier", "duet"]
+
+    /// Which Duet surface an address answered on last time.
+    ///
+    /// A Duet is two protocols behind one name and only one of them answers.
+    /// Trying the wrong one first costs a failed request on every poll, every
+    /// few seconds, forever — so the one that worked is remembered and tried
+    /// first. Nothing is persisted: a wrong guess costs one extra request once
+    /// per launch, and a machine that is re-flashed between launches is then
+    /// found rather than remembered wrongly.
+    private static var duetFlavours: [String: String] = [:]
 
     /// Is this a machine this app can ask? Nil when it can.
     static func notWatched(_ machine: Machine) -> NotWatched? {
@@ -162,6 +172,7 @@ final class PrinterWatch {
         case "octoprint": return 80
         case "prusalink": return 80
         case "repetier": return 3344
+        case "duet": return 80
         default: return 7125          // Moonraker
         }
     }
@@ -389,6 +400,73 @@ final class PrinterWatch {
             catch Refusal.http(409, _) { printer = nil }
             return try await engine.octoprintStatus(printer: printer, job: job)
 
+        case "duet":
+            // ── TWO PROTOCOLS BEHIND ONE NAME ────────────────────────────
+            //
+            // RepRapFirmware standalone and DuetSoftwareFramework on an SBC.
+            // Different endpoints, a different shape of connect, and a
+            // different status for "you have no session" — 401 and 403. Only
+            // one of them answers for a given machine, so the one that did is
+            // remembered and tried first; trying the wrong surface first costs
+            // a failed request every few seconds, forever.
+            //
+            // UNAUTHENTICATED FIRST, and a handshake only when refused. A
+            // standalone Duet with no password — which is most of them — then
+            // costs exactly two requests, the same as before this existed.
+            let base64 = base.absoluteString
+            let remembered = Self.duetFlavours[base64]
+            let order = remembered.map { [$0, $0 == "standalone" ? "sbc" : "standalone"] }
+                ?? ["standalone", "sbc"]
+            var lastError: Error?
+
+            for flavour in order {
+                do {
+                    let ep = try await engine.duetEndpoints(flavour: flavour, password: key)
+                    var extra: [String: String] = [:]
+
+                    func model() async throws -> ([String: JSONValue], [String: JSONValue]?) {
+                        let live = try await Self.get(base, path: ep.live, key: key, type: type,
+                                                      headers: extra, fetch: fetch)
+                        // Nil on SBC, which returns the whole model in one
+                        // call; and allowed to fail standalone, because losing
+                        // the file name must not cost the numbers.
+                        guard let filePath = ep.file else { return (live, nil) }
+                        let file = try? await Self.get(base, path: filePath, key: key, type: type,
+                                                       headers: extra, fetch: fetch)
+                        return (live, file)
+                    }
+
+                    var got: ([String: JSONValue], [String: JSONValue]?)
+                    do {
+                        got = try await model()
+                    } catch Refusal.http(ep.unauthorized, _) {
+                        let raw = try await Self.get(base, path: ep.connect, key: key, type: type,
+                                                     fetch: fetch)
+                        let answer = try await engine.duetConnect(flavour: flavour, raw: raw)
+                        guard answer.ok else { throw Refusal.handshakeRefused(answer.error ?? "no reason given") }
+                        if let session = answer.sessionKey { extra["X-Session-Key"] = session }
+                        got = try await model()
+                    }
+
+                    Self.duetFlavours[base64] = flavour
+                    return try await engine.duetStatus(live: got.0, file: got.1)
+                } catch {
+                    lastError = error
+                }
+            }
+
+            // Both object-model surfaces refused. `rr_status` predates the
+            // object model entirely and exists only standalone — the last
+            // thing to try, not the first.
+            do {
+                let ep = try await engine.duetEndpoints(flavour: "standalone", password: key)
+                guard let legacy = ep.legacy else { throw lastError ?? Refusal.noHost }
+                let data = try await Self.get(base, path: legacy, key: key, type: type, fetch: fetch)
+                return try await engine.duetLegacyStatus(data)
+            } catch {
+                throw lastError ?? error
+            }
+
         case "repetier":
             // TWO CALLS, AND THE JOB IS NOT ON THE ONE YOU WOULD ASK.
             //
@@ -473,9 +551,14 @@ final class PrinterWatch {
         case http(Int, String)
         case notJSON
         case noHistoryKept(String)
+        /// A handshake the machine itself turned down — a wrong Duet password,
+        /// most often. Its own case because "the printer said no" and "the
+        /// request failed" are different things to a shop staring at a card.
+        case handshakeRefused(String)
 
         var description: String {
             switch self {
+            case .handshakeRefused(let why): return "the printer refused the connection: \(why)"
             case .noHost:
                 return "This machine has no address yet."
             case .notALanAddress(let host):
@@ -522,6 +605,7 @@ final class PrinterWatch {
     /// off the address that was checked and onto loopback or a metadata
     /// endpoint — the check above would then have guarded nothing.
     static func get(_ base: URL, path: String, key: String = "", type: String = "",
+                    headers: [String: String] = [:],
                     timeout seconds: TimeInterval = timeout,
                     fetch: ((URLRequest) async throws -> (Data, URLResponse))? = nil)
         async throws -> [String: JSONValue] {
@@ -536,6 +620,10 @@ final class PrinterWatch {
         if !key.isEmpty, ["octoprint", "prusalink", "moonraker", "repetier"].contains(type) {
             request.setValue(key, forHTTPHeaderField: "X-Api-Key")
         }
+        // Duet's session key, and anything else a protocol earns mid-poll. Set
+        // AFTER the api-key rule above so a protocol that uses both is not
+        // fighting itself over one header.
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         let (data, response) = try await (fetch ?? { try await Self.session.data(for: $0) })(request)
         if let http = response as? HTTPURLResponse {
             if (300..<400).contains(http.statusCode) { throw Refusal.redirected }

@@ -347,6 +347,11 @@ public actor KhaytEngine {
         // one still missing and it is not wiring: it is MQTT over TLS, not
         // HTTP, so it needs a client this app does not have.
         "repetier",
+        // The fifth. Duet is two protocols wearing one name — RepRapFirmware
+        // standalone and DuetSoftwareFramework on an SBC — with different
+        // endpoints, a different unauthorized status and a different shape of
+        // connect. `duet.js` is where that is decided, once, for both apps.
+        "duet",
         // What the machine itself remembers. The nozzle-wear counter reads
         // completed ORDERS, so a machine that has extruded twelve kilos while
         // nineteen of its jobs were customer orders reports a fraction of its
@@ -2465,6 +2470,85 @@ public actor KhaytEngine {
         """#,
                           [printer.map(JSONValue.object) ?? .null, .object(job)],
                           as: PrinterStatus.self)
+    }
+
+    // MARK: - Duet
+
+    /// The endpoints for one Duet surface, with the password already folded in.
+    ///
+    /// Read from `lib/duet.js` rather than written here. A Duet is two
+    /// protocols behind one name and the difference is not cosmetic: the SBC
+    /// surface returns the whole object model in one call and answers 403 for a
+    /// missing session, standalone splits the file off and answers 401.
+    public struct DuetEndpoints: Decodable, Sendable {
+        public let connect: String
+        public let live: String
+        /// Nil on SBC, which returns the full model from `live`.
+        public let file: String?
+        /// Nil on SBC. The pre-RRF-3 status endpoint exists only standalone.
+        public let legacy: String?
+        /// 401 standalone, 403 SBC — the status that means "handshake first".
+        public let unauthorized: Int
+    }
+
+    public func duetEndpoints(flavour: String, password: String) throws -> DuetEndpoints {
+        try runtime.call2(#"""
+        (function (f, pw) {
+          var ep = globalThis.KhaytDuet.ENDPOINTS[f];
+          if (!ep) throw new Error('unknown Duet transport: ' + f);
+          return { connect: ep.connect(pw), live: ep.live, file: ep.file || null,
+                   legacy: ep.legacy || null, unauthorized: ep.unauthorized };
+        })(ARG0, ARG1)
+        """#, [.string(flavour), .string(password)], as: DuetEndpoints.self)
+    }
+
+    /// What the handshake said. `sessionKey` is nil when the surface grants one
+    /// implicitly — a standalone Duet with no password, which is most of them.
+    public struct DuetConnect: Decodable, Sendable {
+        public let ok: Bool
+        public let error: String?
+        public let sessionKey: String?
+    }
+
+    public func duetConnect(flavour: String, raw: [String: JSONValue]) throws -> DuetConnect {
+        try runtime.call2(#"""
+        (ARG0 === 'standalone'
+          ? globalThis.KhaytDuet.rrConnectResult(ARG1)
+          : globalThis.KhaytDuet.dsfConnectResult(ARG1))
+        """#, [.string(flavour), .object(raw)], as: DuetConnect.self)
+    }
+
+    /// What a Duet is doing, from its object model.
+    ///
+    /// `file` is nil on SBC — which returns everything in one call — and may
+    /// also be nil standalone when that second request failed, which must not
+    /// cost the numbers the first one returned.
+    public func duetStatus(live: [String: JSONValue],
+                           file: [String: JSONValue]?) throws -> PrinterStatus {
+        try runtime.call2(#"""
+        (function () {
+          var s = globalThis.KhaytDuet.statusFromObjectModel(
+            ARG0, globalThis.KhaytDuet.objectModel(ARG1), {
+              fileProgressPct: globalThis.KhaytPrinterStatus.fileProgressPct,
+              extractActuals: globalThis.KhaytPrinterActuals.extractActuals,
+              // No stock figures, as with Moonraker here: this app does not
+              // carry the shop's filament diameter and density yet, so the
+              // documented defaults apply rather than a guess dressed as a
+              // measurement.
+              stockOpts: {},
+            });
+          return s;
+        })()
+        """#, [.object(live), file.map { JSONValue.object($0) } ?? .null], as: PrinterStatus.self)
+    }
+
+    /// The pre-RRF-3 `rr_status` shape, for a Duet that refused both object
+    /// models. Shared with the Electron app — see `legacyStatus` in duet.js,
+    /// which was lifted out of `main.js` when this app needed it too.
+    public func duetLegacyStatus(_ data: [String: JSONValue]) throws -> PrinterStatus {
+        try runtime.call2(#"""
+        globalThis.KhaytDuet.legacyStatus(ARG0, globalThis.KhaytPrinterStatus.normalizeProgress)
+        """#, [.object(data)], as: PrinterStatus.self)
     }
 
     /// What a Repetier-Server printer is doing.

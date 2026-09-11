@@ -40,15 +40,14 @@ struct PrinterWatchTests {
         // rather than a document. A card that silently shows nothing looks
         // broken, and a shop would go back to the other app not knowing why.
         // Bambu is MQTT over TLS and Elegoo is a WebSocket — neither is HTTP,
-        // so neither is a longer version of this poller. Duet IS HTTP but needs
-        // a session handshake first: `rr_connect` before any read, and every
-        // other request answers 401 without one.
+        // so neither is a longer version of this poller.
         //
-        // Repetier was in this list and is not any more. The note that put it
-        // here said it needed a handshake too, and it does not — an
-        // `x-api-key` header and two GETs, the same shape as OctoPrint.
+        // Repetier and then Duet have both left this list. Duet's absence was
+        // real — it needs `rr_connect` before any read — and was worth the
+        // conversation rather than the exclusion. Repetier's was a mistake: a
+        // note grouped it with Duet as "both need a handshake" and it needs an
+        // `x-api-key` header and nothing else.
         #expect(PrinterWatch.notWatched(Self.machine("bambu")) == .otherProtocol("bambu"))
-        #expect(PrinterWatch.notWatched(Self.machine("duet")) == .otherProtocol("duet"))
         for spoken in PrinterWatch.spoken {
             #expect(PrinterWatch.notWatched(Self.machine(spoken)) == nil, "\(spoken) is not asked")
         }

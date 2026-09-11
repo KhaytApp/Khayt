@@ -6,6 +6,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The Mac app can watch a Duet printer.** Five of the six protocols now.
+  Duet is really two — RepRapFirmware on its own and DuetSoftwareFramework on
+  an attached Pi — and the app finds which one your machine answers on, then
+  remembers it. A Duet with a password is asked for one; a Duet without, which
+  is most of them, is never made to shake hands it did not ask for.
 - **The Mac app can watch a Repetier-Server printer.** It speaks four of the
   six protocols now rather than three, and the machines screen stops saying it
   cannot ask this kind of machine what it is doing. It also gets the fix the

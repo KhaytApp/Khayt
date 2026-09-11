@@ -79,20 +79,52 @@ test('an over-range value is still clamped by the caller', () => {
   assert.equal(shown(250), 100);
 });
 
-test('main.js uses it, and still clamps', () => {
-  // The RAW source, not the comment-stripped one. The stripper used elsewhere in
-  // this suite removes the wrong region of main.js — some construct in a string
-  // or regex looks enough like a block comment to start one — and it silently
-  // ate this line, so the first version of this test failed against correct
-  // code. main.js mentions fractionPrinted exactly once, so there is no comment
-  // for either assertion to match by accident.
-  const main = fs.readFileSync(path.join(ROOT, 'main.js'), 'utf8');
-  assert.equal((main.match(/fractionPrinted/g) || []).length, 1,
-    'fractionPrinted appears more than once — these assertions can no longer be trusted');
-  assert.match(main, /normalizeProgress\(KhaytDuet\.legacyProgressPercent\(data\.fractionPrinted\)\)/,
+test('the shared legacy shape clamps, and both apps go through it', () => {
+  // ── THIS GUARD MOVED WITH THE CODE ──────────────────────────────────────
+  //
+  // It used to read `main.js` for
+  // `normalizeProgress(legacyProgressPercent(data.fractionPrinted))`. That
+  // expression is now in `lib/duet.js` as `legacyStatus`, because the Mac app
+  // needed the same shape and an inline object needed twice is two objects
+  // that drift. So `main.js` no longer mentions `fractionPrinted` at all — and
+  // the two properties this test exists for are unchanged: the clamp is
+  // applied, and the unconditional multiplication has not come back.
+  const duet = fs.readFileSync(path.join(ROOT, 'lib/duet.js'), 'utf8');
+  assert.match(duet, /clamp\(legacyProgressPercent\(d\.fractionPrinted\)\)/,
     'the legacy Duet path multiplies by 100 again, or stopped clamping');
-  assert.ok(!/\(data\.fractionPrinted \|\| 0\) \* 100/.test(main),
+  assert.ok(!/fractionPrinted \|\| 0\) \* 100/.test(duet),
     'the unconditional multiplication is back');
+
+  // And BOTH hosts reach it, which is the point of it being shared. A rule
+  // with one caller is the shape this repo keeps finding.
+  const main = fs.readFileSync(path.join(ROOT, 'main.js'), 'utf8');
+  assert.match(main, /KhaytDuet\.legacyStatus\(data, normalizeProgress\)/,
+    'main.js builds the legacy shape itself again');
+  const engine = fs.readFileSync(
+    path.join(ROOT, 'mac/KhaytCore/Sources/KhaytCore/KhaytEngine.swift'), 'utf8');
+  assert.match(engine, /KhaytDuet\.legacyStatus\(ARG0/,
+    'the Mac app does not call the shared legacy shape');
+});
+
+test('legacyStatus is the whole shape, not only the number', () => {
+  // The endpoint carries no filename, and inventing one would be worse than
+  // the empty string a caller can see is empty.
+  const Duet = require('../lib/duet.js');
+  const s = Duet.legacyStatus(
+    { status: 'P', fractionPrinted: 0.42, temps: { heads: { current: [211] }, bed: { current: 60 } } },
+    shown);
+  assert.equal(s.progress, 42);
+  assert.equal(s.filename, '');
+  assert.equal(s.timeRemaining, null);
+  assert.equal(s.tempNozzle, 211);
+  assert.equal(s.tempBed, 60);
+  assert.equal(s.type, 'duet');
+  // A payload with nothing in it is nulls, never zeros — "we do not know" and
+  // "it is cold" must not look the same on a card.
+  const empty = Duet.legacyStatus({}, shown);
+  assert.equal(empty.tempNozzle, null);
+  assert.equal(empty.tempBed, null);
+  assert.equal(empty.state, 'Unknown');
 });
 
 test('the audit records the source, per its own rule', () => {
