@@ -549,4 +549,51 @@ import KhaytCore
                    "42-report-builder", size: CGSize(width: 900, height: 620))
     }
 
+    /// What the shop must bill before any of it is profit.
+    ///
+    /// Rendered in both states the sample can reach — a month still short of
+    /// the line and a month past it — because the card changes colour, wording
+    /// and direction between them, and a screen only reviewed on one side of a
+    /// threshold has only half been reviewed.
+    @Test("the break-even card, short of the line and past it")
+    func breakEvenCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let completed = shop.orderRows.filter {
+            if case .object(let o) = $0, case .string(let s)? = o["status"] { return s == "completed" }
+            return false
+        }
+        var costs: [JSONValue] = []
+        if case .array(let stored)? = shop.settingsDict["fixedCosts"] { costs = stored }
+        #expect(!costs.isEmpty, "the sample shop cannot reach this card")
+
+        // The sample's own book has a month on each side of the line, so both
+        // are drawn from real arithmetic rather than from a doctored figure:
+        // September billed 1,081 against a target near 7,100, and June billed
+        // 10,191. The first draft of this used August and September — two quiet
+        // months — and drew the same red card twice while claiming to show both
+        // states.
+        let short = try await engine.breakEven(
+            fixedCosts: costs, completed: completed, since: "2026-01-01",
+            month: "2026-09", settings: shop.settingsDict, clients: shop.clientRows)
+        let ahead = try await engine.breakEven(
+            fixedCosts: costs, completed: completed, since: "2026-01-01",
+            month: "2026-06", settings: shop.settingsDict, clients: shop.clientRows)
+        #expect((short.surplus ?? 0) < 0 && (ahead.surplus ?? 0) > 0,
+                "both cards are the same state, so only one has been reviewed")
+
+        try render(HStack(alignment: .top, spacing: 16) {
+            BreakEvenCard(shop: shop, report: short)
+                .card(rail: (short.surplus ?? 0) < 0 ? Khayt.late : Khayt.cyan, padding: 14)
+            BreakEvenCard(shop: shop, report: ahead)
+                .card(rail: (ahead.surplus ?? 0) < 0 ? Khayt.late : Khayt.cyan, padding: 14)
+            // And the state a shop starts in, which is the one it sees first.
+            BreakEvenCard(shop: shop, report: nil)
+                .card(rail: Khayt.cyan, padding: 14)
+        }
+        .frame(width: 900).padding(Metric.screen).background(Khayt.ground),
+                   "43-break-even", size: CGSize(width: 940, height: 420))
+    }
+
 }

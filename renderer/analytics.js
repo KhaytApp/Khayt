@@ -3297,26 +3297,38 @@ function renderSurveyAnalytics() {
    Round 12 — Feature 4: Break-Even & Overhead Allocation
    ============================================================ */
 function computeBreakEven() {
-  const fixedCosts = settings.fixedCosts || [];
-  const totalFixed = fixedCosts.reduce((s, c) => s + (+c.amount || 0), 0);
-  if (totalFixed === 0) return null;
+  // `lib/break-even.js`, not the arithmetic that used to be here.
+  //
+  // THE FIGURE MOVES, UPWARD, AND THAT IS THE POINT. This costed a job by
+  // looking up each part's spool and pricing its grams, and SKIPPED any part
+  // with no `filamentId` — so an unlinked part cost nothing, the margin came
+  // out too high, and the break-even target came out too LOW. A shop was told
+  // it needed to bill less than it does, on a figure whose whole job is to be
+  // a floor.
+  //
+  // `partTotalCost` is what the quote and the machine P&L already use: resin,
+  // blended multicolour, per-unit cost and quantity, one opinion.
+  // BEFORE the book is touched, as this has always done. `null` is this
+  // function's way of saying "no fixed costs are set", every caller reads it
+  // that way, and reaching past it to filter the whole print log first would
+  // be work done to produce an answer that is thrown away.
+  const fixed = settings.fixedCosts || [];
+  if (fixed.reduce((s, c) => s + (+(c && c.amount) || 0), 0) === 0) return null;
 
-  // Avg contribution margin per order (last 90 days)
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
-  const recent = printLog.filter(o => o.status === 'completed' && !o.voidedAt && _countsForBusiness(o) && o.date && new Date(o.date + 'T00:00:00') >= cutoff);
-  const avgRevPerOrder = recent.length > 0 ? recent.reduce((s, o) => s + orderNetRevenueBase(o), 0) / recent.length : 0;
-  const avgMaterialCost = recent.length > 0 ? recent.reduce((s, o) => {
-    const mc = (o.parts || []).reduce((ps, p) => {
-      if (!p.filamentId) return ps;
-      const sp = inventory.find(i => i.id === p.filamentId);
-      return ps + ((+p.printWeight || 0) / 1000 * ((sp ? (+sp.cost / +sp.weight) * 1000 : 0)));
-    }, 0);
-    return s + mc;
-  }, 0) / recent.length : 0;
-  const avgMarginPct = avgRevPerOrder > 0 ? Math.max(0, (avgRevPerOrder - avgMaterialCost) / avgRevPerOrder) : 0;
-
-  const breakEvenRevenue = avgMarginPct > 0 ? totalFixed / avgMarginPct : null;
-  return { totalFixed, breakEvenRevenue, avgMarginPct, avgRevPerOrder };
+  const r = KhaytBreakEven.breakEven({
+    fixedCosts: fixed,
+    completed: printLog.filter(o => o.status === 'completed' && !o.voidedAt && _countsForBusiness(o)),
+    since: localDateStr(cutoff),
+    month: localMonthStr(new Date()),
+  }, { revenueOf: orderNetRevenueBase, partCostOf: partTotalCost });
+  // The callers below have always read `null` as "no fixed costs at all".
+  return r.totalFixed === 0 ? null : {
+    totalFixed: r.totalFixed,
+    breakEvenRevenue: r.breakEvenRevenue,
+    avgMarginPct: r.marginPct,
+    avgRevPerOrder: r.avgRevenuePerJob,
+  };
 }
 
 function renderBreakEvenCard() {
