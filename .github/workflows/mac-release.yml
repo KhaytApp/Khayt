@@ -247,10 +247,18 @@ jobs:
           git clone --depth 1 "https://x-access-token:$GH_TOKEN@github.com/KhaytApp/khayt-website.git" site
           mkdir -p site/mac
           cp "$RUNNER_TEMP/appcast.xml" site/mac/appcast.xml
+          # The version named under the download button, from the release that
+          # is publishing it. The button itself links /releases/latest and
+          # resolves on its own; the LINE is a claim, and claims on this
+          # project's pages have a habit of outliving their truth.
+          node scripts/mac-site-version.js site/index.html || {
+            echo "::warning::could not update the Mac version on the site — the"
+            echo "download link still resolves, but the version beside it is stale."
+          }
           cd site
           git config user.name  "khayt-release"
           git config user.email "release@khaytapp.com"
-          git add mac/appcast.xml
+          git add mac/appcast.xml index.html
           git commit -m "Khayt for macOS ${{ needs.build.outputs.version }}: the Sparkle feed" || {
             echo "nothing to commit — the feed already names this build"; exit 0; }
           git push
