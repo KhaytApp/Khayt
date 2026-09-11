@@ -322,6 +322,7 @@ final class Shop {
             if case .array(let catalog)? = root["products"] { productRows = catalog } else { productRows = [] }
             catalogueRows = (try? await engine?.catalogue(
                 productRows, language: words.language, settings: Self.settings(root))) ?? []
+            catalogueLanguages = await Self.catalogueLanguages(Self.settings(root), engine: engine)
             if case .array(let fleet)? = root["machines"] { machineRows = fleet } else { machineRows = [] }
             // The finished jobs the printers still remember. Written by Khayt
             // on a timer; read here, never written — this app does not poll
@@ -962,6 +963,162 @@ final class Shop {
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("mac.edit_customer")) }
             editingCustomer = nil
+            await load(source)
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
+    /// Put rows on the catalogue without a book. FOR TESTS ONLY, and named so
+    /// it cannot be mistaken for a way to write products — it changes what is
+    /// on screen and nothing on disk.
+    func setCatalogueForTesting(_ rows: [KhaytEngine.CatalogueRow]) { catalogueRows = rows }
+
+    /// The catalogue, matching the search box.
+    ///
+    /// The rule `shownExpenses` states: a search field that does nothing on the
+    /// screen you are looking at is worse than no search field. Every other
+    /// list in this app had been held to it and the catalogue had not — the
+    /// field sat above the products prompting "Job, customer or number" and
+    /// narrowed nothing.
+    ///
+    /// Name, description, material and group: a shop hunting for "the palm one"
+    /// or "everything in resin" is asking one of those four.
+    var shownProducts: [KhaytEngine.CatalogueRow] {
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return catalogueRows }
+        return catalogueRows.filter {
+            $0.name.lowercased().contains(q)
+                || $0.description.lowercased().contains(q)
+                || $0.material.lowercased().contains(q)
+                || $0.group.lowercased().contains(q)
+        }
+    }
+
+    /// Whether the screen now showing has anything for the search box to narrow.
+    ///
+    /// ── A FIELD THAT DOES NOTHING IS WORSE THAN NO FIELD ──────────────────
+    ///
+    /// `.searchable` was on the window unconditionally, so every screen carried
+    /// a search field — including the four that are not lists at all. On the
+    /// calculator, the colour studio, the reports and the dashboard it was a
+    /// control that could be typed into and did nothing, labelled "Job,
+    /// customer or number" because the prompt fell through to the jobs one.
+    ///
+    /// Listed the positive way round, so a NEW screen gets no search box until
+    /// somebody says it has one. The other order — naming the screens without
+    /// search — hands every future screen a field that does nothing by default,
+    /// which is the state this is fixing.
+    var canSearch: Bool {
+        switch shelf {
+        case .jobs, .board, .library, .customers, .inventory,
+             .expenses, .waste, .portfolio, .giftCards, .catalogue:
+            return true
+        case .dashboard, .machines, .reports, .colour, .calculator:
+            return false
+        }
+    }
+
+    // MARK: - Writing a product down
+
+    /// The product being edited, or nil. Drives the sheet, as the customer's does.
+    var editingProduct: Product?
+
+    /// Every product id in the book — how the sheet tells a new one from an edit.
+    var productIds: Set<String> {
+        Set(productRows.compactMap { Self.recordId($0) })
+    }
+
+    /// One entry per language the shop's catalogue carries: the code, its name
+    /// in its own script, and the two record keys it owns.
+    ///
+    /// Asked of the engine rather than assumed, because `fieldKey` is the rule
+    /// that decides `nameEn` vs `name_de` and there must not be a second copy
+    /// of it in Swift. Resolved once per book — every field in the sheet asks.
+    private(set) var catalogueLanguages: [Product.LanguageKey] = []
+
+    static func catalogueLanguages(_ settings: [String: JSONValue],
+                                   engine: KhaytEngine?) async -> [Product.LanguageKey] {
+        guard let engine, let codes = try? await engine.contentLanguages(settings: settings) else { return [] }
+        var out: [Product.LanguageKey] = []
+        for code in codes {
+            guard let name = try? await engine.fieldKey("name", language: code),
+                  let description = try? await engine.fieldKey("description", language: code)
+            else { continue }
+            let title = (try? await engine.languageName(code)) ?? code
+            out.append(Product.LanguageKey(language: code, title: title, name: name, description: description))
+        }
+        return out
+    }
+
+    /// EVERY key a product could hold, not only the shop's current languages.
+    ///
+    /// A shop that carried French last year still has `name_fr` on its older
+    /// products. Reading and writing only today's languages would drop that
+    /// text on the first save — deleting the shop's own words as a side effect
+    /// of editing the margin.
+    private func allLanguageKeys() async -> [Product.LanguageKey] {
+        var keys = catalogueLanguages
+        let known = Set(keys.map(\.language))
+        guard let engine, let supported = try? await engine.supportedContentLanguages() else { return keys }
+        for code in supported where !known.contains(code) {
+            guard let name = try? await engine.fieldKey("name", language: code),
+                  let description = try? await engine.fieldKey("description", language: code)
+            else { continue }
+            keys.append(Product.LanguageKey(language: code, title: code, name: name, description: description))
+        }
+        return keys
+    }
+
+    /// Read one product for editing, with every language key it might carry.
+    func productForEditing(_ id: String) async -> Product? {
+        guard case .object(let record)? = productRows.first(where: { Self.recordId($0) == id })
+        else { return nil }
+        return Product.from(record, keys: await allLanguageKeys())
+    }
+
+    /// A blank product with an id in Khayt's own shape — `uid('PROD')`, as the
+    /// Electron editor mints it, so one written here is indistinguishable.
+    func newProduct() -> Product {
+        Product(id: Self.uid("PROD"), names: [:], descriptions: [:],
+                margin: nil, group: "", category: "",
+                createdAt: Self.localDay(), rest: [:])
+    }
+
+    /// Write it down. Follows `saveCustomer` exactly, including the undo.
+    func saveProduct(_ product: Product) async {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        guard product.hasAName else {
+            moveProblem = words.callIt("mac.product_need_name"); return
+        }
+        let keys = await allLanguageKeys()
+
+        var undo: [ChangedRecord] = []
+        do {
+            try StoreWriter.update(build) { root in
+                var rows = Self.rows(root, "products")
+                var record = product.record(keys: keys)
+                if let at = rows.firstIndex(where: { Self.recordId($0) == product.id }) {
+                    guard case .object(let was) = rows[at] else { return }
+                    undo.append(ChangedRecord(collection: "products", id: product.id, was: was))
+                    // The parts, the price tiers, the photo, the documents: the
+                    // shop's, and none of this app's business to drop.
+                    for (key, value) in was where record[key] == nil {
+                        record[key] = value
+                    }
+                    StoreWriter.stamp(&record)
+                    rows[at] = .object(record)
+                } else {
+                    StoreWriter.stamp(&record)
+                    rows.append(.object(record))
+                }
+                root["products"] = .array(rows)
+            }
+            if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("mac.edit_product")) }
+            editingProduct = nil
             await load(source)
         } catch {
             moveProblem = String(describing: error)
@@ -2740,9 +2897,9 @@ final class Shop {
     /// The library's own root is skipped. Importing the vault into itself would
     /// refuse every file as a duplicate, which is harmless, and take a very long
     /// time to do it.
-    static func modelsUnder(_ chosen: [URL], skipping root: String?) -> [URL] {
+    static func modelsUnder(_ chosen: [URL], skipping root: String?) -> [LibraryImport.Incoming] {
         let fm = FileManager.default
-        var found: [URL] = []
+        var found: [LibraryImport.Incoming] = []
         let vault = root.map { URL(fileURLWithPath: $0).standardizedFileURL.path }
         func isInVault(_ u: URL) -> Bool {
             guard let vault else { return false }
@@ -2756,14 +2913,20 @@ final class Shop {
                                            options: [.skipsHiddenFiles, .skipsPackageDescendants])
                 while let next = walker?.nextObject() as? URL {
                     if LibraryImport.kinds.contains(next.pathExtension.lowercased()),
-                       !isInVault(next) { found.append(next) }
+                       !isInVault(next) {
+                        // Where it sat on disk IS the shop's grouping — see
+                        // `ImportGrouping` for why it is not just the parent.
+                        found.append(LibraryImport.Incoming(
+                            url: next, group: ImportGrouping.group(for: next, chosen: url)))
+                    }
                 }
             } else if LibraryImport.kinds.contains(url.pathExtension.lowercased()) {
-                found.append(url)
+                // Picked on its own: no group. The shop chose one file, not a set.
+                found.append(LibraryImport.Incoming(url: url, group: nil))
             }
         }
         // Sorted so a run is repeatable and a person watching can follow it.
-        return found.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        return found.sorted { $0.url.path.localizedStandardCompare($1.url.path) == .orderedAscending }
     }
 
     /// Import everything under what was chosen.

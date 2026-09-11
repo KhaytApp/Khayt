@@ -85,7 +85,7 @@ struct AddManyTests {
 
     static func run(_ files: [URL], _ bench: LibraryImportEndToEndTests.Bench,
                     stop: @escaping () -> Bool = { false }) async throws -> LibraryImport.Report {
-        await LibraryImport.addMany(files, storeURL: bench.store, libraryRoot: bench.library,
+        await LibraryImport.addMany(LibraryImport.Incoming.ungrouped(files), storeURL: bench.store, libraryRoot: bench.library,
                                     knownHashes: [], nameOfExisting: { _ in "one you have" },
                                     engine: try KhaytEngine(),
                                     owns: { true }, whoHasIt: { nil }, shouldStop: stop)
@@ -133,7 +133,7 @@ struct AddManyTests {
 
         var seen = 0
         let report = await LibraryImport.addMany(
-            files, storeURL: bench.store, libraryRoot: bench.library,
+            LibraryImport.Incoming.ungrouped(files), storeURL: bench.store, libraryRoot: bench.library,
             knownHashes: [], nameOfExisting: { _ in nil }, engine: try KhaytEngine(),
             owns: { true }, whoHasIt: { nil },
             shouldStop: { seen >= 2 },
@@ -155,7 +155,7 @@ struct AddManyTests {
         var reported: [String] = []
         var totals: Set<Int> = []
         _ = await LibraryImport.addMany(
-            files, storeURL: bench.store, libraryRoot: bench.library,
+            LibraryImport.Incoming.ungrouped(files), storeURL: bench.store, libraryRoot: bench.library,
             knownHashes: [], nameOfExisting: { _ in nil }, engine: try KhaytEngine(),
             owns: { true }, whoHasIt: { nil },
             progress: { _, total, file in

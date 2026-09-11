@@ -10,6 +10,9 @@ import AppKit
 struct LibraryGrid: View {
     @Bindable var shop: Shop
     @FocusState private var focused: Bool
+    /// True while a drag is over the library, so the drop target is visible
+    /// BEFORE the mouse is released rather than after.
+    @State private var dropping = false
     /// Which way "next" is. In a mirrored window the next model is to the left,
     /// and a grid whose right arrow walks backwards is worse than one with no
     /// arrow keys at all.
@@ -38,6 +41,32 @@ struct LibraryGrid: View {
                 .onChange(of: shop.focusedFile) { _, id in
                     guard let id else { return }
                     withAnimation(.easeOut(duration: 0.12)) { scroller.scrollTo(id, anchor: .center) }
+                }
+            }
+            // DRAGGING A MODEL ONTO THE LIBRARY IMPORTS IT.
+            //
+            // The only way in was a menu item called "Add model" in the Book
+            // menu — not "Import", and not in File, where somebody looking for
+            // an import goes. The screen itself had nothing: dropping a folder
+            // of models on the library did nothing at all, which reads as the
+            // app refusing rather than as the app not offering.
+            //
+            // The same entry point, so a drop and the menu cannot diverge:
+            // folders are walked, the group comes from the folder, duplicates
+            // are refused by hash.
+            .dropDestination(for: URL.self) { urls, _ in
+                guard shop.canMoveJobs, !shop.importing, !urls.isEmpty else { return false }
+                Task { await shop.addModelsToLibrary(urls) }
+                return true
+            } isTargeted: { targeted in
+                dropping = targeted
+            }
+            .overlay {
+                if dropping {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [6]))
+                        .padding(6)
+                        .allowsHitTesting(false)
                 }
             }
             .focusable()

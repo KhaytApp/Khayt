@@ -258,6 +258,11 @@ private struct NewJobCommand: View {
             .keyboardShortcut("n")
             .disabled(!shop.canMoveJobs)
         Button(Words.upfront("mac.new_customer")) { shop.editingCustomer = Shop.newCustomer() }
+        // The catalogue could be read on this Mac and not added to.
+        Button(Words.upfront("mac.new_product") + "\u{2026}") {
+            shop.editingProduct = shop.newProduct()
+        }
+        .disabled(!shop.canMoveJobs)
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .disabled(!shop.canMoveJobs)
     }

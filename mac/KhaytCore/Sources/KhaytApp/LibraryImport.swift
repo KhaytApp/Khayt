@@ -160,6 +160,7 @@ enum LibraryImport {
                     nameOfExisting: (String) -> String?,
                     engine: KhaytEngine,
                     keepOriginal: Bool = false,
+                    group: String? = nil,
                     owns: @escaping () -> Bool,
                     whoHasIt: @escaping () -> String?) async throws -> Added {
         let ext = source.pathExtension.lowercased()
@@ -261,7 +262,7 @@ enum LibraryImport {
         let record = self.record(id: id, name: name, originalName: originalName,
                                  filename: filename, ext: ext, size: size,
                                  hash: hash, key: key, colours: colours,
-                                 swapCount: swapCount, thumbFile: thumbFile)
+                                 swapCount: swapCount, thumbFile: thumbFile, group: group)
         do {
             try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
                 var rows: [JSONValue] = []
@@ -326,7 +327,25 @@ enum LibraryImport {
     /// One unreadable file does not end a run of three thousand. It is named in
     /// `failures` and the batch carries on; a refusal leaves its original
     /// exactly where it was, so nothing has to be undone to retry it.
-    static func addMany(_ files: [URL],
+    /// A file to import, with the group its folder says it belongs to.
+    ///
+    /// A pair rather than two parallel arrays: the group has to survive the
+    /// sort, and a `[URL]` sorted beside a `[String?]` is one edit away from
+    /// filing every model under its neighbour's name.
+    struct Incoming: Sendable, Equatable {
+        let url: URL
+        /// Nil for ungrouped — see `ImportGrouping`.
+        let group: String?
+
+        /// Files with no grouping — what `--import` of a bare list means, and
+        /// what most tests want. Spelled out at the call site so a caller that
+        /// SHOULD have carried a group cannot lose it to a quiet conversion.
+        static func ungrouped(_ urls: [URL]) -> [Incoming] {
+            urls.map { Incoming(url: $0, group: nil) }
+        }
+    }
+
+    static func addMany(_ files: [Incoming],
                         storeURL: URL, libraryRoot: URL,
                         knownHashes: Set<String>,
                         nameOfExisting: @escaping (String) -> String?,
@@ -340,18 +359,19 @@ enum LibraryImport {
         var known = knownHashes
         for (i, file) in files.enumerated() {
             if shouldStop() { report.stopped = true; break }
-            progress(i, files.count, file)
+            progress(i, files.count, file.url)
             do {
-                let added = try await add(file, storeURL: storeURL, libraryRoot: libraryRoot,
+                let added = try await add(file.url, storeURL: storeURL, libraryRoot: libraryRoot,
                                           knownHashes: known, nameOfExisting: nameOfExisting,
                                           engine: engine, keepOriginal: keepOriginal,
+                                          group: file.group,
                                           owns: owns, whoHasIt: whoHasIt)
                 report.moved += 1
                 if let hash = added.contentHash { known.insert(hash) }
             } catch Failure.alreadyHere {
                 report.duplicates += 1
             } catch {
-                report.failures.append("\(file.lastPathComponent): \(error)")
+                report.failures.append("\(file.url.lastPathComponent): \(error)")
             }
         }
         return report
@@ -372,6 +392,7 @@ enum LibraryImport {
                        filename: String, ext: String, size: Int,
                        hash: String?, key: String?, colours: [JSONValue],
                        swapCount: Int, thumbFile: String?,
+                       group: String? = nil,
                        now: Double = Date().timeIntervalSince1970 * 1000)
         -> [String: JSONValue] {
         [
@@ -399,7 +420,14 @@ enum LibraryImport {
             "thumbSource": thumbFile == nil ? .null : .string("embedded"),
             "userPhoto": .null,
             "slicerProfileId": .null, "testedNotes": .string(""),
-            "tags": .array([]), "folder": .string(""), "material": .string(""),
+            "tags": .array([]), "material": .string(""),
+            // BOTH KEYS, and that is not belt and braces. `group` is the name
+            // the field has had since 3.7.0-beta.25 and `folder` is what it was
+            // called before; nothing was migrated, so a build older than that
+            // reads only `folder` and a record written with one of them is
+            // ungrouped in whichever app the shop opens next. `LibraryFile`
+            // reads both for the same reason.
+            "group": .string(group ?? ""), "folder": .string(group ?? ""),
             "favorite": .bool(false),
             "contentHash": hash.map(JSONValue.string) ?? .null,
             "geometryKey": key.map(JSONValue.string) ?? .null,

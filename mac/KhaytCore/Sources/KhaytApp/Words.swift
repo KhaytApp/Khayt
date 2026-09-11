@@ -961,6 +961,11 @@ final class Words {
         "mac.machines_count_two": ["en": "printers", "ar": "طابعتان"],
         // What the shop spent, and what it wasted
         "mac.search_expenses": ["en": "Note, category or job", "ar": "ملاحظة أو تصنيف أو عمل"],
+        // Two screens that filtered correctly and asked the wrong question:
+        // the prompt fell through to the jobs one, so the shelf and the
+        // catalogue both invited a "Job, customer or number".
+        "mac.search_filament": ["en": "Material or colour", "ar": "خامة أو لون"],
+        "mac.search_products": ["en": "Product, material or group", "ar": "منتج أو خامة أو مجموعة"],
         "mac.search_waste":  ["en": "Material, reason or failure", "ar": "خامة أو سبب أو نوع العطل"],
         "mac.of_which_fixed": ["en": "incl. overhead", "ar": "منها التكاليف الثابتة"],
         "mac.quarter_in_progress": ["en": "This quarter is still running, so its overhead is charged for the days elapsed.",
@@ -1303,6 +1308,29 @@ final class Words {
                                 "ar": "إعدادات المحل التجريبي للعرض فقط."],
         "mac.preferences":   ["en": "Preferences",  "ar": "التفضيلات"],
         "mac.tax_none":      ["en": "No tax is charged.", "ar": "لا تُحتسب ضريبة."],
+        // Writing a product down. The catalogue could be read on this Mac and
+        // not added to, so a shop wanting a new product had to go to the other
+        // app for it.
+        "mac.new_product":   ["en": "New product",  "ar": "منتج جديد"],
+        // The catalogue's two layouts. Said as tooltips on the toggle, so they
+        // are the only words a shop ever reads for them.
+        // IMPORT, said as a shop would look for it. The menu item is called
+        // "Add model" and is in the Book menu; somebody with a folder of
+        // downloads searches for "import", so the toolbar button says that.
+        "mac.import_models": ["en": "Import models", "ar": "استيراد مجسمات"],
+        "mac.import_models_hint": ["en": "Add models from a folder — or drag them onto the library.",
+                                   "ar": "أضف مجسمات من مجلد — أو اسحبها إلى المكتبة."],
+        "mac.view_list":     ["en": "List",         "ar": "قائمة"],
+        "mac.view_grid":     ["en": "Grid",         "ar": "شبكة"],
+        "mac.edit_product":  ["en": "Edit product", "ar": "تعديل المنتج"],
+        "mac.product_need_name": ["en": "A product needs a name in at least one language.",
+                                  "ar": "يحتاج المنتج إلى اسم بلغة واحدة على الأقل."],
+        // Said on the sheet, because the alternative is a shop assuming the
+        // parts and the photo were dropped when it saved.
+        "mac.product_kept":  ["en": "Parts, prices per quantity, photos and documents "
+                              + "stay as they are — edit those in Khayt.",
+                              "ar": "تبقى القطع وأسعار الكميات والصور والمستندات كما هي — عدّلها في خيط."],
+        "mac.delete_product": ["en": "Delete product", "ar": "حذف المنتج"],
         // The document a customer is handed
         "mac.save_pdf":      ["en": "Save PDF",     "ar": "حفظ PDF"],
         "mac.saved_to":      ["en": "Saved as",     "ar": "حُفظ باسم"],
@@ -1317,6 +1345,12 @@ final class Words {
     /// The shared keys this app uses. `PrintFactLines` declares its own, so a
     /// key added to that panel cannot be forgotten here.
     static let borrowed = PrintFactLines.borrowedKeys + [
+        // The product editor. Khayt's own words for the same two fields on its
+        // product form — borrowed rather than re-supplied, so the two editors
+        // cannot come to call one thing by two names. The group's key is
+        // `plib.group`, not `pe.group`: it is the print library's word, and the
+        // Electron form borrows it too.
+        "pe.description", "plib.group",
         // The tax on a purchase. BORROWED, not supplied: Electron's expense
         // form needs the same words, so they went into the shared catalogue in
         // all nine languages — and a key this app also supplied would shadow

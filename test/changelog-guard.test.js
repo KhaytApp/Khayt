@@ -79,3 +79,29 @@ test('paths are matched at the root, not anywhere in the string', () => {
   assert.equal(isWatched('docs/renderer/notes.md'), false);
   assert.equal(isWatched('scripts/main.js'), false);
 });
+
+/// The Mac app is a second shipping product and this list did not know.
+///
+/// Written when Khayt was one product, so `mac/` was watched by nothing: every
+/// user-visible Mac change passed without a changelog line, and the
+/// 4.0.0-alpha.3 notes were written by hand at cut time — the exact
+/// reconstruction-after-the-fact the guard exists to end.
+test('the Mac app counts as shipped code', () => {
+  assert.equal(isWatched('mac/KhaytCore/Sources/KhaytApp/Catalogue.swift'), true);
+  assert.equal(isWatched('mac/KhaytCore/Sources/KhaytCore/KhaytEngine.swift'), true);
+
+  const v = verdict(['mac/KhaytCore/Sources/KhaytApp/Catalogue.swift'], 'a new screen');
+  assert.equal(v.ok, false, 'a Mac change with no changelog line passed');
+});
+
+/// Exempt for the same reason `test/` is: they ship nothing a shop sees.
+test('the Mac tests, build script and manifest are not shipped code', () => {
+  for (const file of [
+    'mac/KhaytCore/Tests/KhaytAppTests/SearchReachTests.swift',
+    'mac/make-app.sh',
+    'mac/KhaytCore/Package.swift',
+    'mac/version.json',
+  ]) {
+    assert.equal(isWatched(file), false, `${file} should not demand a changelog line`);
+  }
+});
