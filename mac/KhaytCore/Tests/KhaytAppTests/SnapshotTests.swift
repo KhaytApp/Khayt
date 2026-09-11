@@ -728,4 +728,36 @@ import KhaytCore
                    "47-quote-funnel", size: CGSize(width: 600, height: 540))
     }
 
+    /// Which of the things the shop sells actually earns.
+    ///
+    /// The sentence at the top is the point: the best use of a machine hour is
+    /// usually NOT the top row, and a reader scanning down the table will not
+    /// find it.
+    @Test("what earns, ranked by profit rather than by revenue")
+    func productProfitTable() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let earns = try await engine.productProfit(
+            orders: shop.orderRows, products: shop.productRows,
+            expenses: shop.expenseRows, untagged: shop.words.callIt("an.untagged"),
+            settings: shop.settingsDict, clients: shop.clientRows,
+            language: shop.words.language)
+        #expect(earns.rows.count > 1, "the sample cannot reach this table")
+
+        // The first rows only. The sample sells twenty things and a `VStack`
+        // taller than its frame CENTRES — so photographing all of them
+        // photographs the middle, with the heading cropped off the top, which
+        // is exactly what the first version of this did.
+        let top = KhaytEngine.ProductProfit(rows: Array(earns.rows.prefix(7)),
+                                            totals: earns.totals)
+        try render(VStack {
+            ProductProfitTable(shop: shop, report: top)
+                .card(rail: Khayt.cyan, padding: 14)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "48-product-profit", size: CGSize(width: 600, height: 520))
+    }
+
 }

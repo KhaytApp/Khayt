@@ -373,6 +373,8 @@ public actor KhaytEngine {
         "capacity",
         // How many quotes turn into work, and how much of the money does.
         "quote-funnel",
+        // Which products actually earn, and which earn per machine hour.
+        "product-profit",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1876,6 +1878,86 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - Which products actually earn
+
+    /// Which of the things the shop sells makes money — and per machine hour.
+    ///
+    /// `lib/product-profit.js`. Ranked by PROFIT, not revenue: the row a shop
+    /// opens this for is the big seller that earns nothing, and ranking by
+    /// revenue puts it at the top looking like the best thing in the shop.
+    ///
+    /// `profitPerHour` is the figure a print shop should actually optimise —
+    /// its constraint is the hours its printers can run, so two products at the
+    /// same margin are not equal if one takes two hours and the other twenty.
+    public struct ProductProfit: Decodable, Sendable {
+        public let rows: [Row]
+        public let totals: Totals
+
+        /// Public so a caller can narrow the rows without re-running the
+        /// arithmetic — the snapshot harness photographs the first few, and a
+        /// stack taller than its frame CENTRES, cropping the heading off.
+        public init(rows: [Row], totals: Totals) {
+            self.rows = rows
+            self.totals = totals
+        }
+
+        public struct Row: Decodable, Sendable, Identifiable, Hashable {
+            public let productId: String
+            public let name: String
+            public let jobs: Int
+            public let revenue: Double
+            public let cost: Double
+            public let hours: Double
+            public let profit: Double
+            /// Nil with no revenue: 0% would read as "it breaks even" rather
+            /// than "nothing is known".
+            public let marginPct: Double?
+            /// Nil when nobody recorded the hours, rather than dividing by zero
+            /// into an infinity that sorts first and is not an answer.
+            public let profitPerHour: Double?
+            public var id: String { productId }
+        }
+
+        public struct Totals: Decodable, Sendable {
+            public let revenue: Double
+            public let cost: Double
+            public let hours: Double
+            public let profit: Double
+            public let jobs: Int
+            public let marginPct: Double?
+            public let profitPerHour: Double?
+            /// The best earner per machine hour — very often not the top row.
+            public let bestPerHour: Row?
+        }
+    }
+
+    public func productProfit(orders: [JSONValue], products: [JSONValue],
+                              expenses: [JSONValue], untagged: String,
+                              settings: [String: JSONValue], clients: [JSONValue],
+                              language: String) throws -> ProductProfit {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG4, clients: ARG5 };
+          return globalThis.KhaytProductProfit.productProfit({
+            orders: ARG0, products: ARG1, expenses: ARG2, untagged: ARG3,
+          }, {
+            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            partCostOf: function (p) { return globalThis.KhaytCalculatorCost.partTotalCost(p, ctx); },
+            nameOf: function (p) {
+              return globalThis.KhaytContentLanguages.read(p, 'name', ARG6, ARG4)
+                || (p && p.name) || '';
+            },
+            countsForBusiness: function (o) {
+              return globalThis.KhaytBusinessScope
+                ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
+            },
+          });
+        })()
+        """#, [.array(orders), .array(products), .array(expenses), .string(untagged),
+               .object(settings), .array(clients), .string(language)],
+              as: ProductProfit.self)
     }
 
     // MARK: - How many quotes turn into work

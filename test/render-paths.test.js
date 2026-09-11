@@ -71,6 +71,8 @@ function loadAnalyticsStack() {
   require('../lib/client-value.js'); // globalThis.KhaytClientValue
   require('../lib/capacity.js');     // globalThis.KhaytCapacity
   require('../lib/quote-funnel.js'); // globalThis.KhaytQuoteFunnel
+  require('../lib/product-profit.js'); // globalThis.KhaytProductProfit
+  require('../lib/calculator-cost.js'); // partTotalCost, which product profit costs with
   require('../renderer/dashboard.js'); // renderMaterialUsageChart / renderFilamentAnalytics
   require('../renderer/analytics.js');
 }

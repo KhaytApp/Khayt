@@ -31,6 +31,9 @@ struct Reports: View {
     @State private var worth: KhaytEngine.ClientValue?
     /// How many quotes turn into work, beside how accurate they are.
     @State private var funnel: KhaytEngine.QuoteFunnel?
+    /// Which products actually earn — beside the list of what sells most,
+    /// which is a different question and often a different order.
+    @State private var earns: KhaytEngine.ProductProfit?
     /// How far each machine runs from its quote, and the shop's own figure.
     /// Not filtered to the chosen period: a machine's calibration is not a
     /// property of this quarter, and the measured-only filter already thins the
@@ -58,7 +61,7 @@ struct Reports: View {
             if shop.reportPage == .owing {
                 Owing(shop: shop, owed: owed)
             } else if shop.reportPage == .best {
-                Best(shop: shop, best: best, worth: worth)
+                Best(shop: shop, best: best, worth: worth, earns: earns)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice, funnel: funnel)
             } else if shop.reportPage == .machines {
@@ -243,6 +246,7 @@ struct Reports: View {
         await recomputeCashFlow()
         await recomputeClientValue()
         await recomputeFunnel()
+        await recomputeProductProfit()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
@@ -321,6 +325,15 @@ struct Reports: View {
             settings: shop.settingsDict, clients: shop.clientRows)
     }
 
+    private func recomputeProductProfit() async {
+        guard let engine = shop.engine else { return }
+        earns = try? await engine.productProfit(
+            orders: shop.orderRows, products: shop.productRows,
+            expenses: shop.expenseRows, untagged: shop.words.callIt("an.untagged"),
+            settings: shop.settingsDict, clients: shop.clientRows,
+            language: shop.words.language)
+    }
+
     private func recomputeMachinePL() async {
         guard let engine = shop.engine else { return }
         // ── ALL FOUR FILTERED THE SAME WAY ────────────────────────────────
@@ -384,6 +397,7 @@ struct Reports: View {
         let shop: Shop
         let best: KhaytEngine.TopLists?
         let worth: KhaytEngine.ClientValue?
+        let earns: KhaytEngine.ProductProfit?
 
         var body: some View {
             // Two cards rather than two halves of one pane divided by a rule.
@@ -408,6 +422,13 @@ struct Reports: View {
                     // coming back" — the question it should ask before it
                     // decides who to chase.
                     ClientValueTable(shop: shop, report: worth)
+                        .card(rail: Khayt.cyan, padding: 14)
+                    // ── AND WHICH OF THEM EARNS ───────────────────────────
+                    //
+                    // The list above is what sells MOST. This is what makes
+                    // money, and the two are routinely in a different order —
+                    // which is the finding, and why they sit on one screen.
+                    ProductProfitTable(shop: shop, report: earns)
                         .card(rail: Khayt.cyan, padding: 14)
                 }
                 .padding(Metric.screen)

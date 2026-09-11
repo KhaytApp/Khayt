@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **What actually earns, on the Mac — including per machine hour.** Which of
+  the things you sell makes money, ranked by profit rather than by revenue,
+  because the big seller that earns nothing is exactly the row you opened the
+  table to find. And the figure a print shop should really be steering by: a
+  printer hour is the thing you run out of, so two products at the same margin
+  are not equal if one takes two hours and the other twenty. It says which one
+  earns most per hour, because that is usually not the top row.
+
 - **How many quotes turn into work — and how much of the money does.** Two win
   rates side by side on the Mac's quoting screen, because they disagree and the
   gap is the finding: winning most of your quotes and a minority of the money
@@ -115,6 +123,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **Products vanished from the profitability table once they shipped.** It
+  counted orders at *completed* only, and *delivered* comes after it — so the
+  work that actually reached a customer was missing from its own product's row.
+  The same fault the quote funnel had, in a second place.
+- **The profitability table was sorted by revenue**, which put the biggest
+  seller at the top regardless of whether it earned anything — hiding the row
+  the table exists to show. It is sorted by profit now.
 
 - **The quote conversion rate was too low for every shop that marks work
   delivered.** The funnel's last step counted only orders at *completed* —
