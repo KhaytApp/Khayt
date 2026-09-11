@@ -649,4 +649,57 @@ import KhaytCore
                    "45-client-value", size: CGSize(width: 600, height: 560))
     }
 
+    /// Can the shop take this job, and when would it start?
+    ///
+    /// Drawn in the two states that matter and are easy to confuse: a machine
+    /// with room, and a machine three weeks behind. The other app drew those
+    /// identically, because it clamped the load at 100%.
+    @Test("capacity, with room and overbooked")
+    func capacityCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+
+        let real = try await engine.capacity(
+            machines: shop.machineRows, orders: shop.orderRows, days: 7,
+            unassigned: shop.words.callIt("dash.unassigned"))
+        #expect(!real.rows.isEmpty, "the sample cannot reach this card")
+        #expect(!real.totals.noTargets,
+                "no sample machine has a daily target, so only the empty state is ever drawn")
+
+        // And the state the sample cannot reach on its own. Built from the
+        // sample's OWN machines rather than invented ones, so the row still
+        // carries a real name and colour.
+        let piled = shop.machineRows.enumerated().map { index, row -> JSONValue in
+            guard case .object(var m) = row else { return row }
+            // A short day on every machine, so the SHOP is behind and not just
+            // one printer — the card colours its rail off the total, and a
+            // first draft that only overbooked one machine drew a calm rail
+            // above a red row.
+            m["targetHoursPerDay"] = .number(index == 0 ? 4 : 2)
+            return .object(m)
+        }
+        let heavy = try await engine.capacity(
+            machines: piled,
+            orders: piled.prefix(1).flatMap { row -> [JSONValue] in
+                guard case .object(let m) = row, case .string(let id)? = m["id"] else { return [] }
+                return (1...6).map { n in
+                    .object(["id": .string("Q\(n)"), "machineId": .string(id),
+                             "status": .string("pending"), "printTime": .number(22)])
+                }
+            },
+            days: 7, unassigned: shop.words.callIt("dash.unassigned"))
+        #expect(heavy.totals.overbooked, "the overbooked state is undrawn")
+        #expect(heavy.rows.contains { $0.overbooked }, "no row is drawn overbooked")
+
+        try render(VStack(spacing: 16) {
+            CapacityCard(shop: shop, report: real)
+                .card(rail: Khayt.cyan, padding: 14)
+            CapacityCard(shop: shop, report: heavy)
+                .card(rail: Khayt.late, padding: 14)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "46-capacity", size: CGSize(width: 600, height: 620))
+    }
+
 }

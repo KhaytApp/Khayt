@@ -28,6 +28,10 @@ struct Machines: View {
     /// regardless — the now-line and every gap move with the clock, and a band
     /// five minutes stale is wrong in the one place it must not be.
     @State private var band: KhaytEngine.MachineBand?
+    /// Whether the shop can take another job, and when it would start. Here
+    /// rather than buried in the reports because that is a decision made at the
+    /// machines, usually with somebody on the phone.
+    @State private var load: KhaytEngine.Capacity?
     @State private var minute = 0
     /// The tallest card on the floor, which every other one is drawn to. See
     /// `CardHeight` — a `LazyVGrid` sizes each ROW on its own, so without this
@@ -43,6 +47,17 @@ struct Machines: View {
                 if let band, !shop.machines.isEmpty {
                     MachineBandView(shop: shop, band: band)
                 }
+                // ── AND WHETHER THERE IS ROOM FOR ANOTHER ─────────────────
+                //
+                // The band says what is running now; this says what is queued
+                // behind it and when it clears. A shop asked "can you do this
+                // by Thursday" is asking exactly this, and the answer lived
+                // nowhere in this app.
+                if !shop.machines.isEmpty {
+                    CapacityCard(shop: shop, report: load)
+                        .card(rail: load?.totals.overbooked == true ? Khayt.late : Khayt.cyan,
+                              padding: 14)
+                }
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(shop.machines) { machine in
                         Card(machine: machine, wear: shop.wear[machine.id], shop: shop)
@@ -55,6 +70,7 @@ struct Machines: View {
         }
         .task(id: "\(shop.bandSignature)#\(minute)") {
             band = await shop.machineBand()
+            load = await shop.capacity()
         }
         .task {
             // Not a display timer: this drives an engine call, so it ticks at

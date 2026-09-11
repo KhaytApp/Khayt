@@ -3068,6 +3068,18 @@ final class Shop {
         }
     }
 
+    /// Whether the shop can take another job, and when it would start.
+    ///
+    /// SEVEN DAYS, the same window the other app uses. The load is not clamped
+    /// at 100 — a machine three weeks behind is a different answer from one
+    /// exactly full, and that difference is the whole point of the card.
+    func capacity() async -> KhaytEngine.Capacity? {
+        guard let engine else { return nil }
+        return try? await engine.capacity(
+            machines: machineRows, orders: orderRows, days: 7,
+            unassigned: words.callIt("dash.unassigned"))
+    }
+
     /// Keep the shop's saved reports.
     ///
     /// The same narrowness as `saveSlicers` and for the same reason: one named

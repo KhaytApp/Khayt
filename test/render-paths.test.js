@@ -69,6 +69,7 @@ function loadAnalyticsStack() {
   require('../lib/break-even.js');   // globalThis.KhaytBreakEven
   require('../lib/cash-flow.js');    // globalThis.KhaytCashFlow
   require('../lib/client-value.js'); // globalThis.KhaytClientValue
+  require('../lib/capacity.js');     // globalThis.KhaytCapacity
   require('../renderer/dashboard.js'); // renderMaterialUsageChart / renderFilamentAnalytics
   require('../renderer/analytics.js');
 }
