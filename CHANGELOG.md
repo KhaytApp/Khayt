@@ -373,6 +373,68 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.4] - 2026-09-11
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Khayt says what to run next.** It knew the queue and it knew which printers
+  were idle; putting the two together was a person doing it in their head. The
+  machines screen now proposes a job for each free printer — urgent first, then
+  due date, then longest waiting, and preferring the machine already loaded with
+  the right material so there is one fewer spool change.
+
+  **It proposes; you press Send.** No printer Khayt talks to can clear its own
+  plate, so an idle printer is very often an idle printer with yesterday's part
+  still on it. A machine is only offered once somebody has said its bed is clear
+  since its last print — and a machine waiting on that says so, with the button
+  to say it, rather than quietly disappearing from the list.
+
+- **Help, in your own language.** Sixteen articles — the book, jobs, the board,
+  customers, the library, the catalogue, the shelf, machines, money, reports,
+  cloud sync, backups, settings, the keyboard, and what to do when something is
+  wrong — in English and Arabic, searchable, from the Help menu or ⌘?. It opens
+  in a window of its own so you can read it beside the screen you are asking
+  about, and it follows the language *Khayt* is set to rather than the Mac.
+
+- **A product can be written down here.** The catalogue could be read on this
+  Mac and not added to. There is an editor now, with one tab per language your
+  catalogue carries rather than a fixed English and Arabic. Everything the sheet
+  does not show is left exactly as it was: parts, prices per quantity, photos
+  and documents.
+
+- **The catalogue can be looked at, not only read.** A grid of photographs
+  beside the existing table, which stays the default because it is the only view
+  that puts margin next to weight.
+
+- **Importing models is on the library, and keeps your folders.** An *Import
+  models* button, and you can drag files or whole folders straight onto the
+  library. **The folder a model came from becomes the group it is filed under** —
+  a download of seven models in seven folders arrives as seven groups. Packaging
+  folders are seen through: a model at `Kings/King Abdulaziz/STL/presupported/`
+  is filed under *King Abdulaziz*.
+
+### Fixed
+
+- **A printer was credited with colours it does not have.** Adding a Prusa CORE
+  One gave Khayt a machine it believed could print five colours. Five is what a
+  CORE One reaches with an MMU3 bolted on; the one on your bench prints one. The
+  same was true of every Bambu without an AMS, every MK4 without an MMU, a K2
+  Plus without its CFS and a Kobra 3 without an ACE — and capacity, colour
+  warnings and the converter all believed it.
+
+  A machine is now added with the colours it prints **as sold**. Machines whose
+  multi-material is built in — a Snapmaker U1's toolchanger, a J1's IDEX, the
+  dual-extruder UltiMakers — are unchanged.
+
+- **Four screens had a search box that did nothing.** The calculator, the colour
+  studio, the reports and the dashboard are not lists, and the field on them
+  could be typed into to no effect — while saying "Job, customer or number". It
+  is gone from those. The catalogue, which *is* a list, now searches by name,
+  description, material and group.
+
 ## [4.0.0-alpha.3] - 2026-09-11
 
 *Khayt for macOS only. The Windows and Linux app is unaffected and is on its own
