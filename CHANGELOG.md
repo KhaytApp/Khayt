@@ -428,6 +428,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Developers) The Mac screenshot runner reported a window size it had not
+  got.** `KHAYT_SNAPSHOT_SIZE` exists so a layout can be reviewed at sizes other
+  than the one it was built at, and AppKit will not make a window taller than
+  the screen's visible area — so asking for 1500×1700 on a laptop produced
+  1500×995 shots while the run printed 1500×1700. A layout reviewed at the
+  wrong height by somebody told otherwise is worse than not having the flag. It
+  now reads the size back off the window and says what it actually got, and why,
+  when the two differ.
+
 - **(Maintainers) The snapshot watchdog names the screen that actually hung.**
   Its checkpoint was only updated by the two window captures, so the eleven
   sheets that follow the board never moved it — a run that hung later reported
