@@ -326,3 +326,108 @@ extension PrinterConversationTests {
         #expect(PrinterWatch.notWatched(Self.machine("bambu")) != nil)
     }
 }
+
+// MARK: - Duet
+
+extension PrinterConversationTests {
+
+    /// A Duet that answers on one surface and 404s the other, optionally
+    /// demanding a session first. Records every path asked, in order.
+    static func duetServer(surface: String, model: String,
+                           demandsSession: Bool = false, connect: String = #"{"err":0}"#,
+                           asked: @escaping (String) -> Void = { _ in })
+        -> (URLRequest) async throws -> (Data, URLResponse) {
+        { request in
+            let path = (request.url?.path ?? "") + (request.url?.query.map { "?" + $0 } ?? "")
+            asked(path)
+            let reply = { (code: Int, body: String) in
+                (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: code,
+                                                  httpVersion: nil, headerFields: nil)!)
+            }
+            let isStandalone = path.hasPrefix("/rr_")
+            guard (surface == "standalone") == isStandalone else { return reply(404, "") }
+            if path.hasPrefix("/rr_connect") || path.hasPrefix("/machine/connect") {
+                return reply(200, connect)
+            }
+            if demandsSession, request.value(forHTTPHeaderField: "X-Session-Key") == nil {
+                return reply(surface == "standalone" ? 401 : 403, "")
+            }
+            return reply(200, model)
+        }
+    }
+
+    /// The standalone object model, trimmed to what the reader uses.
+    static let duetModel = #"{"result":{"state":{"status":"processing"},"job":{"file":{"fileName":"clip.gcode"},"filePosition":4200,"timesLeft":{"file":1800}},"heat":{"heaters":[{"current":212.5,"active":215},{"current":60.4,"active":60}]},"tools":[{"heaters":[0]}]}}"#
+
+    @Test("a standalone Duet with no password costs two requests and no handshake")
+    func duetStandaloneOpen() async throws {
+        // The overwhelmingly common case, and the reason the handshake is paid
+        // for only when refused rather than on every poll.
+        var paths: [String] = []
+        let status = try await PrinterWatch.read(
+            Self.machine("duet"), engine: try KhaytEngine(), base: Self.base, key: "",
+            fetch: Self.duetServer(surface: "standalone", model: Self.duetModel,
+                                   asked: { paths.append($0) }))
+        #expect(status.filename == "clip.gcode")
+        #expect(status.tempNozzle == 212.5)
+        #expect(!paths.contains { $0.hasPrefix("/rr_connect") },
+                "it shook hands with a machine that never refused it: \(paths)")
+    }
+
+    @Test("a Duet that demands a session gets one, and only then")
+    func duetHandshake() async throws {
+        // "Every request except for rr_connect returns 401 if the client does
+        // not have a valid session." So: refused, handshake, retry — and the
+        // retry carries the key.
+        var paths: [String] = []
+        let status = try await PrinterWatch.read(
+            Self.machine("duet"), engine: try KhaytEngine(), base: Self.base, key: "hunter2",
+            fetch: Self.duetServer(surface: "standalone", model: Self.duetModel,
+                                   demandsSession: true,
+                                   connect: #"{"err":0,"sessionKey":"abc123"}"#,
+                                   asked: { paths.append($0) }))
+        #expect(status.filename == "clip.gcode", "the retry after the handshake did not land")
+        #expect(paths.contains { $0.hasPrefix("/rr_connect") })
+        // The password goes in the connect, not in a header.
+        #expect(paths.contains { $0.contains("password=hunter2") })
+    }
+
+    @Test("a refused handshake is said, not retried forever")
+    func duetHandshakeRefused() async throws {
+        // A wrong password. `rrConnectResult` turns Duet's own error number
+        // into a sentence; this proves it reaches the surface rather than
+        // becoming a generic failure.
+        await #expect(throws: (any Error).self) {
+            _ = try await PrinterWatch.read(
+                Self.machine("duet"), engine: try KhaytEngine(), base: Self.base, key: "wrong",
+                fetch: Self.duetServer(surface: "standalone", model: Self.duetModel,
+                                       demandsSession: true, connect: #"{"err":1}"#))
+        }
+    }
+
+    @Test("an SBC Duet is found on the other surface, and asks once")
+    func duetSbc() async throws {
+        // DuetSoftwareFramework returns the WHOLE model from one call — no
+        // separate file query, which is why `ep.file` is nil there.
+        var paths: [String] = []
+        let status = try await PrinterWatch.read(
+            Self.machine("duet"), engine: try KhaytEngine(), base: Self.base, key: "",
+            fetch: Self.duetServer(surface: "sbc", model: Self.duetModel,
+                                   asked: { paths.append($0) }))
+        #expect(status.filename == "clip.gcode")
+        #expect(paths.contains { $0.hasPrefix("/machine/model") })
+        #expect(!paths.contains { $0.contains("key=job.file") },
+                "it asked for the file separately on a surface that had already sent it")
+    }
+
+    @Test("Duet is a protocol this app says it speaks; Bambu still is not")
+    func duetIsSpoken() {
+        #expect(PrinterWatch.spoken.contains("duet"))
+        #expect(PrinterWatch.notWatched(Self.machine("duet")) == nil)
+        #expect(PrinterWatch.defaultPort("duet") == 80)
+        // Five of six. Bambu is MQTT over TLS and is not a longer version of
+        // this — it needs a client this app does not have.
+        #expect(PrinterWatch.spoken.count == 5)
+        #expect(PrinterWatch.notWatched(Self.machine("bambu")) == .otherProtocol("bambu"))
+    }
+}
