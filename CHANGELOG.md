@@ -428,6 +428,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Maintainers) The snapshot watchdog names the screen that actually hung.**
+  Its checkpoint was only updated by the two window captures, so the eleven
+  sheets that follow the board never moved it — a run that hung later reported
+  `STUCK at 09-board`, a screen it had already photographed successfully eleven
+  steps earlier. Every writer checks in now, and each settings pane is
+  photographed as a full scroll as well as a window: a settings window is 364
+  points tall and the Operations pane is 1823, so four fifths of it had never
+  been in a picture.
+
 - **(Mac) The Preferences pane no longer heads two sections "App Preferences".**
   The default language sat under one and the menu bar toggle under the other,
   two rows apart, with nothing to say that the first follows your book to your
