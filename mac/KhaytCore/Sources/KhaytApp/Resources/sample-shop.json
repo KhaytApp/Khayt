@@ -2912,7 +2912,32 @@
       "geometryKey": "384220:311218.2:188.4x188.4x96.2",
       "rev": 1,
       "timesPrinted": 4,
-      "lastPrinted": "2026-08-28"
+      "lastPrinted": "2026-08-28",
+      "setups": [
+        {
+          "id": "SU-06",
+          "name": "Glossy PLA",
+          "ok": 6,
+          "failed": 0,
+          "machineName": "Bambu X1C",
+          "material": "PLA",
+          "colour": "Black",
+          "layerHeightMm": 0.2,
+          "nozzleMm": 0.4,
+          "status": "failed"
+        },
+        {
+          "id": "SU-07",
+          "name": "Matte PETG",
+          "ok": 3,
+          "failed": 0,
+          "machineName": "Prusa CORE One",
+          "material": "PETG",
+          "colour": "Sand",
+          "layerHeightMm": 0.2,
+          "nozzleMm": 0.4
+        }
+      ]
     },
     {
       "id": "PF-sample-falcon",
@@ -3093,7 +3118,39 @@
       "geometryKey": "96500:78165.0:142.0x88.0x34.0",
       "rev": 1,
       "timesPrinted": 2,
-      "lastPrinted": "2026-08-28"
+      "lastPrinted": "2026-08-28",
+      "setups": [
+        {
+          "id": "SU-01",
+          "name": "Production on the CORE One",
+          "ok": 9,
+          "failed": 1,
+          "machineName": "Prusa CORE One",
+          "material": "PETG",
+          "layerHeightMm": 0.2,
+          "nozzleMm": 0.4
+        },
+        {
+          "id": "SU-02",
+          "name": "Fast draft",
+          "ok": 1,
+          "failed": 3,
+          "machineName": "Bambu X1C",
+          "material": "PLA",
+          "layerHeightMm": 0.28,
+          "nozzleMm": 0.4
+        },
+        {
+          "id": "SU-03",
+          "name": "Fine on the U1",
+          "ok": 0,
+          "failed": 0,
+          "machineName": "Snapmaker U1",
+          "material": "PLA",
+          "layerHeightMm": 0.12,
+          "nozzleMm": 0.4
+        }
+      ]
     },
     {
       "id": "PF-sample-lantern",
@@ -3151,7 +3208,44 @@
       "geometryKey": "512300:414963.0:120.0x120.0x240.0",
       "rev": 1,
       "timesPrinted": 6,
-      "lastPrinted": "2026-08-28"
+      "lastPrinted": "2026-08-28",
+      "versions": [
+        {
+          "id": "v1",
+          "name": "Small — 120mm",
+          "files": [
+            {
+              "filename": "model-lantern.3mf",
+              "originalName": "ramadan-lantern.3mf",
+              "size": 9800000,
+              "ext": "3mf",
+              "kind": "model"
+            }
+          ],
+          "parsed": {
+            "grams": 46,
+            "hours": 2.4
+          }
+        },
+        {
+          "id": "v2",
+          "name": "Large — 240mm",
+          "files": [
+            {
+              "filename": "model-lantern.3mf",
+              "originalName": "ramadan-lantern.3mf",
+              "size": 9800000,
+              "ext": "3mf",
+              "kind": "model"
+            }
+          ],
+          "parsed": {
+            "grams": 310,
+            "hours": 14.75
+          }
+        }
+      ],
+      "activeVersionId": "v2"
     },
     {
       "id": "PF-sample-gripper",
@@ -3192,7 +3286,29 @@
       "geometryKey": "44120:35737.2:62.0x24.0x18.5",
       "rev": 1,
       "timesPrinted": 0,
-      "lastPrinted": null
+      "lastPrinted": null,
+      "setups": [
+        {
+          "id": "SU-04",
+          "name": "TPU straight through",
+          "ok": 0,
+          "failed": 2,
+          "machineName": "Bambu X1C",
+          "material": "TPU",
+          "layerHeightMm": 0.2,
+          "nozzleMm": 0.4
+        },
+        {
+          "id": "SU-05",
+          "name": "TPU slow",
+          "ok": 0,
+          "failed": 1,
+          "machineName": "Prusa CORE One",
+          "material": "TPU",
+          "layerHeightMm": 0.15,
+          "nozzleMm": 0.4
+        }
+      ]
     }
   ],
   "inventory": [

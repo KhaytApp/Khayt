@@ -457,6 +457,56 @@ import KhaytCore
     /// below minimum, forecast to run out inside the lead time, and one the
     /// rule refuses to put a number against. What is being judged is whether
     /// those four read as different situations rather than one repeated.
+    /// What a print is known to work at, and what it exists as.
+    ///
+    /// Three verdicts on one file, and beside it a file where nothing has
+    /// worked — which is the case the panel exists for, because the answer
+    /// there is "change something" rather than the least broken setup. What is
+    /// being judged is whether an untried setup reads as untried rather than as
+    /// a score of nought.
+    @Test("what a print is known to work at")
+    func setupsPanel() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+
+        let bracket = try #require(shop.fileRows.first {
+            if case .object(let f) = $0, case .string(let n)? = f["name"] {
+                return n.contains("Turbine bracket")
+            }
+            return false
+        })
+        let gripper = try #require(shop.fileRows.first {
+            if case .object(let f) = $0, case .string(let n)? = f["name"] {
+                return n.contains("Robot gripper")
+            }
+            return false
+        })
+        let lantern = try #require(shop.fileRows.first {
+            if case .object(let f) = $0, case .string(let n)? = f["name"] {
+                return n.contains("Ramadan lantern")
+            }
+            return false
+        })
+
+        let works = try await engine.printSetups(bracket)
+        let broken = try await engine.printSetups(gripper)
+        let sizes = try await engine.printVersions(lantern)
+        #expect(works.recommendedId != nil)
+        #expect(broken.recommendedId == nil, "the nothing-works case must be in the picture")
+        #expect(sizes.many)
+
+        try render(
+            VStack(alignment: .leading, spacing: 18) {
+                SetupsSection(setups: works, shop: shop)
+                SetupsSection(setups: broken, shop: shop)
+                VersionsSection(versions: sizes, shop: shop)
+            }
+            .padding(16)
+            .frame(width: 460),
+            "43-setups", size: CGSize(width: 460, height: 430))
+    }
+
     @Test("what is about to run out that is not filament")
     func consumablesCard() async throws {
         let shop = Shop()

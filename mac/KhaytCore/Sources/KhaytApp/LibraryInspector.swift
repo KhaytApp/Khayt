@@ -7,6 +7,8 @@ import KhaytCore
 /// many colours, how many swaps, when did it last run, and where is the file.
 struct LibraryInspector: View {
     let shop: Shop
+    @State private var setups: KhaytEngine.PrintSetups?
+    @State private var versions: KhaytEngine.PrintVersions?
 
     var body: some View {
         if shop.fileSelection.count > 1 {
@@ -29,6 +31,18 @@ struct LibraryInspector: View {
                         LayerRule()
                         how
                     }
+                    // Only where there is more than one. A print always HAS a
+                    // version; almost every file has exactly one, and a section
+                    // headed "versions" over a list of one is a heading that
+                    // says nothing.
+                    if let versions, versions.many {
+                        LayerRule()
+                        VersionsSection(versions: versions, shop: shop)
+                    }
+                    if let setups, setups.total > 0 {
+                        LayerRule()
+                        SetupsSection(setups: setups, shop: shop)
+                    }
                     provenance(file)
                     actions(file)
             if let notes = file.testedNotes, !notes.isEmpty {
@@ -37,6 +51,12 @@ struct LibraryInspector: View {
                     }
                 }
                 .padding(16)
+            }
+            // Keyed on the file, not on the book: these are facts about one
+            // record and nothing else on this screen moves them.
+            .task(id: file.id) {
+                setups = await shop.setups(for: file.id)
+                versions = await shop.versions(for: file.id)
             }
         } else {
             EmptyHere(title: shop.words.callIt("mac.no_model"), message: shop.words.callIt("mac.no_model_hint"), mark: .library)
@@ -253,5 +273,167 @@ struct LibraryInspector: View {
         case "rotate": return shop.words.callIt("fit.rotate", ["machine": .string(machine)])
         default: return shop.words.callIt("fit.no")
         }
+    }
+}
+
+/// The settings this print is known to work at.
+///
+/// A file counted how many times it printed and how many times it failed, but
+/// not WITH WHAT — so a shop reprinting a bracket six months later knew it
+/// worked once and had no idea on which machine, in which material, at which
+/// layer height. Which is the same as not knowing.
+struct SetupsSection: View {
+    let setups: KhaytEngine.PrintSetups
+    let shop: Shop
+
+    var body: some View {
+        DetailSection(shop.words.callIt("setup.title")) {
+            VStack(alignment: .leading, spacing: 8) {
+                // What to reach for, said once and at the top. With every setup
+                // failing this says so instead: "change something" is the
+                // answer, and naming the least broken one wastes a spool.
+                if let best = setups.setups.first(where: { $0.id == setups.recommendedId }) {
+                    Row(setup: best, shop: shop, recommended: true)
+                } else {
+                    Text(shop.words.callIt("setup.none_good"))
+                        .font(.callout).foregroundStyle(Khayt.late)
+                }
+                ForEach(setups.setups.filter { $0.id != setups.recommendedId }) {
+                    Row(setup: $0, shop: shop, recommended: false)
+                }
+            }
+        }
+    }
+
+    // NO ACCENT ON THE HEADING. It was tinted red when nothing had worked, and
+    // `DetailSection` is explicit that a tinted header over an already-coloured
+    // line is one signal said twice. The red sentence is the signal; a red
+    // heading above it only costs the colour its meaning elsewhere.
+
+    private struct Row: View {
+        let setup: KhaytEngine.PrintSetups.Setup
+        let shop: Shop
+        let recommended: Bool
+
+        var body: some View {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 6) {
+                        Text(setup.name.isEmpty ? shop.words.callIt("mac.unnamed") : setup.name)
+                            .font(.callout)
+                            .foregroundStyle(setup.name.isEmpty ? AnyShapeStyle(.secondary)
+                                                                : AnyShapeStyle(.primary))
+                            .lineLimit(1)
+                        if recommended {
+                            Image(systemName: "star.fill")
+                                .font(.caption2).foregroundStyle(Khayt.done)
+                        }
+                    }
+                    if let line { Text(line).font(.caption2).foregroundStyle(.tertiary) }
+                }
+                Spacer(minLength: 6)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(shop.words.callIt(Self.word(setup.status)))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Self.colour(setup.status))
+                    Text(tally).font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                }
+            }
+        }
+
+        /// The module composes this sentence in English. This app is read in
+        /// Arabic too, so the line is built here from the fields against the
+        /// locale — the VERDICT still comes from the rule, because that is a
+        /// rule and this is only a caption.
+        private var line: String? {
+            var bits: [String] = []
+            // Label first, so the line reads the same way round in Arabic as
+            // in English. There is no short unit word for either in the
+            // locales, and inventing two would mean nine translations.
+            if let mm = setup.layerHeightMm {
+                bits.append("\(shop.words.callIt("conv.src_layer")) \(mm.formatted(.number.precision(.fractionLength(0...2))))")
+            }
+            if let mm = setup.nozzleMm {
+                bits.append("\(shop.words.callIt("conv.src_nozzle")) \(mm.formatted(.number.precision(.fractionLength(0...2))))")
+            }
+            let stuff = [setup.material, setup.colour].compactMap { $0 }.joined(separator: " ")
+            if !stuff.isEmpty { bits.append(stuff) }
+            if let machine = setup.machineName, !machine.isEmpty { bits.append(machine) }
+            return bits.isEmpty ? nil : bits.joined(separator: " · ")
+        }
+
+        /// Never printed is not a score of nought. It is "nobody has tried
+        /// this", and drawing it as 0/0 reads as a failure.
+        private var tally: String {
+            setup.ok == 0 && setup.failed == 0
+                ? shop.words.callIt("setup.untried")
+                : "\(setup.ok) / \(setup.ok + setup.failed)"
+        }
+
+        static func word(_ status: String) -> String {
+            switch status {
+            case "known-good": "setup.known_good"
+            case "failed":     "setup.failed"
+            default:           "setup.needs_test"
+            }
+        }
+
+        static func colour(_ status: String) -> Color {
+            switch status {
+            case "known-good": Khayt.done
+            case "failed":     Khayt.late
+            default:           .secondary
+            }
+        }
+    }
+}
+
+/// The alternatives this print exists as — big, small, coloured.
+///
+/// Not parts and not a group: parts print TOGETHER, a group is kept WITH each
+/// other, and versions print INSTEAD OF each other. What makes one worth
+/// listing is that it has its own time and weight, so a shop quoting off the
+/// wrong one is wrong about the price.
+struct VersionsSection: View {
+    let versions: KhaytEngine.PrintVersions
+    let shop: Shop
+
+    var body: some View {
+        DetailSection(shop.words.callIt("plib.versions")) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(versions.versions) { version in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        if version.id == versions.activeId {
+                            Image(systemName: "largecircle.fill.circle")
+                                .font(.caption2).foregroundStyle(Khayt.cyan)
+                        } else {
+                            Image(systemName: "circle")
+                                .font(.caption2).foregroundStyle(.quaternary)
+                        }
+                        Text(version.name.isEmpty ? shop.words.callIt("mac.unnamed") : version.name)
+                            .font(.callout).lineLimit(1)
+                            .foregroundStyle(version.name.isEmpty ? AnyShapeStyle(.secondary)
+                                                                  : AnyShapeStyle(.primary))
+                        Spacer(minLength: 6)
+                        // Its own weight and time, which is the whole reason a
+                        // version is modelled rather than filed as a second print.
+                        if let text = size(version) {
+                            Text(text).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func size(_ v: KhaytEngine.PrintVersions.Version) -> String? {
+        var bits: [String] = []
+        if let g = v.grams {
+            bits.append("\(g.formatted(.number.precision(.fractionLength(0)))) \(shop.words.callIt("common.grams"))")
+        }
+        if let h = v.hours {
+            bits.append("\(h.formatted(.number.precision(.fractionLength(1)))) \(shop.words.callIt("common.hours_short"))")
+        }
+        return bits.isEmpty ? nil : bits.joined(separator: " · ")
     }
 }

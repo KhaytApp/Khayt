@@ -29,6 +29,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Khayt remembers what a print actually worked at.** A file counted how
+  many times it printed and how many times it failed, but not *with what* — so
+  reprinting a bracket six months later you knew it had worked once and had no
+  idea on which printer, in which material, at which layer height. The model's
+  panel now lists the settings it has been printed at, marks the one to reach
+  for, and says plainly when nothing has worked yet rather than naming the least
+  broken option.
+
+  One bad print does not condemn a setup: filament runs out, a spool tangles,
+  somebody knocks the machine. Nine of ten is still a setup to reach for, and
+  one of four is not, however recently that one worked. A setup nobody has run
+  reads as untried rather than as a score of nought — and your own verdict
+  overrides the tally, because "it printed, but I did not like the finish" is a
+  judgement no counter can reach.
+
+- **(Mac) A print that exists at more than one size says so.** Big and small
+  carry their own weight and time, so the panel shows each with its own figures
+  and marks the one the estimate is about. Files that have only ever been one
+  thing — nearly all of them — are unchanged.
+
 - **(Mac) Khayt says what is about to run out that is not filament.** Glue, IPA,
   mailing bags, spare nozzles — running out of one of those stops a job exactly
   the way running out of filament does, and only filament reached the Mac app's

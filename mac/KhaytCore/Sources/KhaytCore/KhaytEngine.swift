@@ -335,6 +335,13 @@ public actor KhaytEngine {
         // shelf reads as "not low" and never appears).
         "consumable-reorder",
         "consumable-categories",
+        // What a print file has been printed WITH, and what it has been
+        // printed AS. Two different relationships and the library needs both:
+        // a setup is one combination of machine, material and layer height
+        // with its record, and a version is an alternative print of the same
+        // thing with its own time and weight.
+        "print-setups",
+        "print-versions",
         "printer-status",
         // Before `moonraker`, which reaches its runout rule through a global
         // the same way it reaches `printer-status`. Without it a Klipper
@@ -852,6 +859,138 @@ public actor KhaytEngine {
             """,
             [.array(spools), .array(orders), .number(now.timeIntervalSince1970 * 1000)],
             as: [String: Runway].self)
+    }
+
+    // MARK: - What a print has been printed with, and printed as
+
+    /// The settings a print file is known to work at.
+    ///
+    /// `lib/print-setups.js`. A file already counted how many times it printed
+    /// and how many times it failed, but not WITH WHAT — so a shop reprinting a
+    /// bracket six months later knew it worked once and had no idea on which
+    /// machine, in which material, at which layer height, which is the same as
+    /// not knowing.
+    ///
+    /// The human line is NOT taken from the module. `describeSetup` composes an
+    /// English sentence — "0.2mm layers · PLA on Prusa MK4" — and this app is
+    /// read in Arabic too. The fields cross instead and the line is built from
+    /// them here against the locale. The STATUS does not: that is a rule, and a
+    /// second implementation of when a setup counts as known-good is a second
+    /// answer to what to reach for.
+    public struct PrintSetups: Decodable, Sendable, Hashable {
+        public let setups: [Setup]
+        /// Which one to reach for, or nil when nothing has worked yet. Nil is
+        /// an answer: with every setup failing, "change something" is right and
+        /// "try the least broken one again" wastes a spool and a night.
+        public let recommendedId: String?
+        public let total: Int
+        public let knownGood: Int
+        public let needsTest: Int
+        public let failed: Int
+        /// Prints and failures summed across every setup.
+        public let prints: Int
+        public let failures: Int
+
+        public struct Setup: Decodable, Sendable, Hashable, Identifiable {
+            public let id: String
+            public let name: String
+            /// `known-good`, `needs-test` or `failed`, as the rule names them —
+            /// including the shop's own override where they gave one.
+            public let status: String
+            public let ok: Int
+            public let failed: Int
+            public let machineId: String?
+            public let machineName: String?
+            public let material: String?
+            public let colour: String?
+            public let layerHeightMm: Double?
+            public let nozzleMm: Double?
+            public let notes: String?
+        }
+    }
+
+    public func printSetups(_ file: JSONValue) throws -> PrintSetups {
+        try runtime.call2("""
+            (function (rec) {
+              var S = KhaytPrintSetups;
+              var list = (rec && Array.isArray(rec.setups)) ? rec.setups : [];
+              var best = S.recommendSetup(list);
+              var sum = S.summarize(list);
+              var txt = function (v) { return v == null || v === '' ? null : String(v); };
+              var n = function (v) { return v > 0 ? Number(v) : null; };
+              return {
+                setups: list.filter(Boolean).map(function (s) {
+                  return {
+                    id: String(s.id == null ? '' : s.id),
+                    name: String(s.name == null ? '' : s.name),
+                    status: String(S.statusOf(s)),
+                    ok: Math.max(0, Math.trunc(Number(s.ok) || 0)),
+                    failed: Math.max(0, Math.trunc(Number(s.failed) || 0)),
+                    machineId: txt(s.machineId), machineName: txt(s.machineName),
+                    material: txt(s.material), colour: txt(s.colour),
+                    layerHeightMm: n(s.layerHeightMm), nozzleMm: n(s.nozzleMm),
+                    notes: txt(s.notes),
+                  };
+                }),
+                recommendedId: best ? String(best.id) : null,
+                total: sum.total, knownGood: sum.knownGood,
+                needsTest: sum.needsTest, failed: sum.failed,
+                prints: sum.prints, failures: sum.failures,
+              };
+            })(ARG0)
+            """, [file], as: PrintSetups.self)
+    }
+
+    /// The alternatives a print exists as — big, small, coloured.
+    ///
+    /// `lib/print-versions.js`. A version is not a part and not a group member:
+    /// parts print TOGETHER, group members are kept WITH each other, and
+    /// versions print INSTEAD OF each other. What makes one worth modelling is
+    /// that it has its own time and weight, so a shop quoting from the wrong
+    /// one is wrong about the price.
+    public struct PrintVersions: Decodable, Sendable, Hashable {
+        /// Always at least one for a file that has any geometry: a print always
+        /// HAS a version, it just usually has exactly one. `many` is what a
+        /// card should key an offer of choice off, not `versions.count > 0`.
+        public let versions: [Version]
+        public let activeId: String?
+        public let many: Bool
+
+        public struct Version: Decodable, Sendable, Hashable, Identifiable {
+            public let id: String
+            public let name: String
+            /// True for the stand-in a record with no versions list reports for
+            /// itself, so a screen can tell "one real version" from "this file,
+            /// which has never been given versions".
+            public let implicit: Bool
+            public let grams: Double?
+            public let hours: Double?
+        }
+    }
+
+    public func printVersions(_ file: JSONValue) throws -> PrintVersions {
+        try runtime.call2("""
+            (function (rec) {
+              var V = KhaytPrintVersions;
+              var all = V.versionsOf(rec) || [];
+              var active = V.activeVersion(rec);
+              var n = function (v) { return v > 0 ? Number(v) : null; };
+              return {
+                versions: all.map(function (v) {
+                  var p = v.parsed || {};
+                  return {
+                    id: String(v.id == null ? '' : v.id),
+                    name: String(v.name == null ? '' : v.name),
+                    implicit: !!v.implicit,
+                    grams: n(p.grams != null ? p.grams : p.weight),
+                    hours: n(p.hours != null ? p.hours : p.printTime),
+                  };
+                }),
+                activeId: active ? String(active.id) : null,
+                many: !!V.hasVersions(rec),
+              };
+            })(ARG0)
+            """, [file], as: PrintVersions.self)
     }
 
     // MARK: - The other shelf
