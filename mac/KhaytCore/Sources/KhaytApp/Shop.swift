@@ -658,7 +658,47 @@ final class Shop {
     /// shows the file's own icon and details rather than failing.
     func quickLookSelection() {
         guard let one = selectedFile, let url = modelFile(for: one) else { return }
-        previewing = url
+        quickLook(url)
+    }
+
+    /// Show one file in Quick Look.
+    ///
+    /// ── A SECOND QUICK LOOK USED TO TAKE THE APP WITH IT ──────────────────
+    ///
+    /// Silently: no crash report from macOS, no `last-crash.txt`, nothing on
+    /// stderr, and not even an orderly `terminate:` in the log. The app was
+    /// simply gone, which reads to the person using it as a crash and leaves
+    /// nothing at all to look at.
+    ///
+    /// What the log shows, three reproductions running:
+    ///
+    ///     [PlugInKit:lifecycle] all extension sessions ended     <- dismissed
+    ///     (AppKit) perform action for menu item                  <- second ⌘Y
+    ///     [quicklook] QLPreviewPanel called while the panel has no controller
+    ///
+    /// `.quickLookPreview` does NOT put its binding back to nil when the panel
+    /// is dismissed. So `previewing` still held the first file, and the next
+    /// selection was a url → url change rather than a fresh one.
+    ///
+    /// THAT TRANSITION IS THE FATAL PART, not the warning above it. The
+    /// "no controller" line is still logged after this fix — nineteen times
+    /// across fifteen Quick Looks in the run that proved it, with the app
+    /// staying up throughout. So it is a symptom that appears either way, and
+    /// a comment blaming it would send the next person after the wrong thing.
+    /// What changed is only the shape of the binding change.
+    ///
+    /// Clearing it first makes every Quick Look a fresh nil → url, which is
+    /// the only transition the modifier is reliable for. The set is deferred to
+    /// the next turn of the main loop because both halves inside one update are
+    /// coalesced into no change at all.
+    ///
+    /// BOTH CALLERS COME THROUGH HERE. The menu's ⌘Y and the file row's
+    /// context menu each used to assign `previewing` themselves, so a fix in
+    /// one would have left the other still doing it.
+    func quickLook(_ url: URL) {
+        guard previewing != nil else { previewing = url; return }
+        previewing = nil
+        Task { @MainActor in self.previewing = url }
     }
 
     /// Mark a model a favourite, or stop. The first thing this app ever wrote.
