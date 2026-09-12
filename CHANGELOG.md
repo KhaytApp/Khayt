@@ -29,6 +29,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Khayt's AI features work with the AI you already pay for.** They were
+  Anthropic and nothing else. You can now choose OpenAI or Google Gemini
+  instead — or point Khayt at any OpenAI-compatible address, which covers
+  OpenRouter, Groq, Azure, and a model running on your own machine through
+  Ollama or vLLM. That last one is the option for a shop whose data must not
+  leave the building at all.
+
+  Every feature still asks for its own consent, and the list of what each one
+  sends now names the provider you actually chose rather than saying Anthropic
+  regardless. Changing provider clears the model, because a model name does not
+  carry across — asking OpenAI for `claude-opus-5` produces an error that reads
+  like a bad key.
+
 - **(Maintainers) The filament catalogue refreshes itself.** A monthly job
   rebuilds the snapshot from upstream and opens a pull request with a readable
   summary of what changed — the file is 0.78 MB on one line, so the diff alone

@@ -24,6 +24,10 @@ const ROOT = path.join(__dirname, '..');
 /** Every file that hardcodes a default model. NOT ai-usage.js — that one is the
  *  price list, so naming many models is its job rather than a disagreement. */
 const FILES = [
+  // The default now lives in the provider registry, which is the shared
+  // constant this file's header was asking for. `main.js` names no model at
+  // all any more — it asks the provider for one.
+  'lib/ai-providers.js',
   'main.js',
   'lib/ai-quote.js',
   'renderer/app-state.js',
@@ -52,9 +56,12 @@ test('every hardcoded default AI model is the same string', () => {
 });
 
 test('the default AI model has a price, so the cost ledger is not guessing', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'main.js'), 'utf8');
-  const model = (src.match(MODEL_RE) || [])[0];
-  assert.ok(model, 'main.js no longer names a default model');
+  // Read from the registry rather than regexed out of a call site: that is
+  // where the default is chosen now, and a guard that reads it from anywhere
+  // else is pinning a copy.
+  const providers = require('../lib/ai-providers.js');
+  const model = providers.PROVIDERS.anthropic.defaultModel;
+  assert.ok(model, 'the Anthropic provider no longer names a default model');
   assert.equal(
     usage.isEstimatedModel(model), false,
     `${model} is the default but lib/ai-usage.js has no price for it — `
