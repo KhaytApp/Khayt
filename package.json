@@ -207,7 +207,7 @@
           ]
         }
       ],
-      "icon": "assets/khayt.iconset/icon_256x256.png"
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,

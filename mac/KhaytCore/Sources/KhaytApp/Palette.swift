@@ -55,6 +55,12 @@ import AppKit
 /// screen in bright workshop light, or reading it colour-blind, gets the same
 /// answer either way.
 enum Khayt {
+///
+/// The icon this describes was replaced: it is now orange `#E06010` on navy
+/// `#0A2A51`. The palette below deliberately did not move with it. Every
+/// ratio in `mac/README.md` was measured against the cyan, and the light
+/// variant exists because `#2BCDE4` is 1.9:1 on white — so re-accenting is
+/// a measured pass, not a substitution.
 
     /// A colour that is one thing in light appearance and another in dark.
     ///
