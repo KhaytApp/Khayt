@@ -46,6 +46,14 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
         let enabled: Bool?
         let snapshotUrl: String?
         let streamUrl: String?
+        /// `mjpeg`, `hls` or `rtsp` — the shared module's `STREAM_TYPES`.
+        ///
+        /// Only `rtsp` changes what this app does: it is the one that is not a
+        /// URL something can simply GET, so `Camera.fetch` opens a session and
+        /// decodes a keyframe instead. Optional because books written before
+        /// the field existed do not carry it, and a missing value means the old
+        /// behaviour — fetch `snapshotUrl` over HTTP.
+        let streamType: String?
         /// 0, 90, 180 or 270. A camera zip-tied to a gantry is rarely the right
         /// way up.
         let rotate: Int?

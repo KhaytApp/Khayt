@@ -370,7 +370,8 @@ import KhaytCore
         let shop = Shop()
         await shop.load(.sample)
         let cam = Machine.Webcam(enabled: true, snapshotUrl: "http://x/1.jpg",
-                                 streamUrl: "", rotate: 0, flipH: false, flipV: false)
+                                 streamUrl: "", streamType: "mjpeg",
+                                 rotate: 0, flipH: false, flipV: false)
         // A plate-ish rectangle, so the tile has something with edges in it.
         let drawn = NSImage(size: NSSize(width: 320, height: 180), flipped: false) { rect in
             NSColor(red: 0.24, green: 0.35, blue: 0.44, alpha: 1).setFill(); rect.fill()

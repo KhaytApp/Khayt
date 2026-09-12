@@ -1136,6 +1136,14 @@ else. Nothing you have to do, and nothing about this release depends on it.
   counting those would report every machine as perfect. Each row says how many
   prints it is drawn from, so a figure from two is not mistaken for a figure
   from twenty.
+
+- **Khayt can show a camera that only speaks RTSP** — which includes the Buddy3D
+  that sits beside a Prusa CORE One. Give the machine the camera's address as
+  `rtsp://…` and set its type to RTSP; Khayt opens the stream, takes one frame,
+  and hangs up, the same way it takes a still from any other camera. **The
+  camera has to be publishing locally first**: switch on "RTSP stream on local
+  network" in the Prusa app, or the camera answers "no stream" and the tile says
+  it is waiting. Mac only for now — the Windows and Linux app has no decoder.
 - **Finishing a job on the Mac asks what it actually took.** Print time and
   grams, pre-filled with what you quoted, so a job that ran as expected is one
   Return away and one that did not can be corrected on the spot. Before, the
