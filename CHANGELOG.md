@@ -421,6 +421,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **Changing the AI provider no longer undoes a consent box you just ticked.**
+  The provider chooser redraws the feature list — every row says which provider
+  it sends to — and the redraw was reading the boxes from what was saved rather
+  than from what was on screen. So ticking a feature and then changing provider
+  silently put the tick back, and, the way that matters, so did *un*ticking the
+  one that sends a customer's name.
+
 - **The iOS companion icon can be submitted again.** It carried an alpha
   channel, which App Store Connect rejects outright.
 

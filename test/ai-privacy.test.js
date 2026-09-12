@@ -179,3 +179,54 @@ test('every renderer AI entry point gates on its own feature', () => {
   }
   assert.equal(gates, 4, `expected 4 per-feature gates, found ${gates}`);
 });
+
+/* ============================================================
+   Changing provider must not change consent
+   ============================================================ */
+
+test('the provider dropdown carries the consent boxes across its own redraw', () => {
+  /*
+   * `renderAiSettings()` derives the checkboxes from SAVED settings via
+   * `migrateConsent`, not from the DOM. Changing provider has to redraw the
+   * whole panel — every feature row states which provider it sends to — so the
+   * handler must fold what is on screen back into `settings.ai` first.
+   *
+   * Without that, touching the dropdown silently reverted an unsaved tick. The
+   * dangerous direction is the other one: a shop that UNTICKED `reply`, which
+   * sends a customer's name, then changed provider, had that consent restored
+   * and no way to know.
+   *
+   * Read out of the source rather than by driving a DOM: the whole panel is one
+   * innerHTML string and standing up enough of a document to render it would
+   * prove less than reading the four lines that matter.
+   */
+  const src = fs.readFileSync(path.join(ROOT, 'renderer/settings.js'), 'utf8');
+  const at = src.indexOf("#aiProviderSetting')?.addEventListener('change'");
+  assert.notEqual(at, -1, 'the provider change handler is gone');
+  const handler = src.slice(at, src.indexOf('\n  });', at));
+
+  assert.match(handler, /\.ai-feat-toggle/,
+    'the provider handler redraws without reading the consent boxes — an unsaved tick is lost');
+  assert.match(handler, /features: Object\.assign\(/,
+    'the consent boxes are read but not carried into settings.ai');
+  // The model is cleared on purpose; nothing else should be.
+  assert.match(handler, /model: ''/, 'the model is no longer cleared when the provider changes');
+  assert.match(handler, /enabled:/, 'the master toggle is dropped by the redraw');
+  assert.match(handler, /baseUrl:/, 'a typed address is dropped by the redraw');
+  assert.match(handler, /secretInputSave\(/,
+    'the key is carried without the mask helper, so the literal mask can be written back');
+});
+
+test('every feature the consent list draws is one the gate actually checks', () => {
+  // A row for a feature `isFeatureEnabled` does not know about is a switch
+  // wired to nothing; a feature with no row is one that sends data with no
+  // disclosure. Both have happened in this file's history.
+  for (const id of Object.keys(P.AI_FEATURES)) {
+    assert.equal(P.isFeatureEnabled({ enabled: true, features: { [id]: true } }, id), true,
+      `${id} has a consent row the gate refuses to honour`);
+    assert.equal(P.isFeatureEnabled({ enabled: true, features: { [id]: false } }, id), false,
+      `${id} cannot be turned off`);
+  }
+  // And the gate refuses anything it has no row for, rather than defaulting on.
+  assert.equal(P.isFeatureEnabled({ enabled: true, features: { invented: true } }, 'invented'), false);
+});
