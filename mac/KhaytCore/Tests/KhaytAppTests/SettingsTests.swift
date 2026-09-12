@@ -325,4 +325,55 @@ struct SettingsTests {
         #expect(fields.map(\.language) == shop.contentLanguages)
         #expect(fields.allSatisfy { $0.label.contains(" · ") }, "labelled with the language's own name")
     }
+
+    /// No pane may head two sections with the same words.
+    ///
+    /// The Preferences pane printed "App Preferences" twice, two rows apart —
+    /// the language picker under one and the Mac-local menu bar toggle under
+    /// the other, with nothing to say which of them follows the book to the
+    /// shop's other devices. Two sections with one name read as one section
+    /// with a gap in it.
+    ///
+    /// It survived because the settings window had never been photographed:
+    /// the snapshot runner looks for it among `NSApp.windows` and an orphaned
+    /// Khayt holding the status bar made it give up. Source, not a picture,
+    /// because the picture is not something CI can take.
+    @Test("no settings pane heads two sections with the same words")
+    func sectionHeadingsAreDistinct() throws {
+        let src = try Self.settingsSource()
+        // Sliced per pane, because two PANES may of course share a heading —
+        // it is two sections within one that read as a mistake.
+        for pane in ["BusinessPane", "InvoicePane", "PaymentsPane",
+                     "OperationsPane", "SlicersPane", "PreferencesPane"] {
+            guard let at = src.range(of: "struct \(pane): View") else {
+                Issue.record(Comment(rawValue: "\(pane) is gone — this guard is stale"))
+                continue
+            }
+            let rest = src[at.upperBound...]
+            let end = rest.range(of: "\nstruct ")?.lowerBound ?? rest.endIndex
+            let body = rest[..<end]
+
+            var seen: [String: Int] = [:]
+            var from = body.startIndex
+            while let open = body.range(of: "Section(shop.words.callIt(\"", range: from..<body.endIndex) {
+                guard let close = body.range(of: "\")", range: open.upperBound..<body.endIndex) else { break }
+                seen[String(body[open.upperBound..<close.lowerBound]), default: 0] += 1
+                from = close.upperBound
+            }
+            for (key, n) in seen where n > 1 {
+                Issue.record(Comment(rawValue:
+                    "\(pane) heads \(n) sections with \(key) — give each its own words"))
+            }
+        }
+    }
+
+    static func settingsSource() throws -> String {
+        // Walked up from this file rather than taken from Bundle.module: under
+        // the test runner that bundle is the runner's, not the app's.
+        var dir = URL(fileURLWithPath: #filePath)
+        // SettingsTests.swift -> KhaytAppTests -> Tests -> KhaytCore
+        for _ in 0..<3 { dir = dir.deletingLastPathComponent() }
+        let url = dir.appending(path: "Sources/KhaytApp/SettingsWindow.swift")
+        return try String(contentsOf: url, encoding: .utf8)
+    }
 }

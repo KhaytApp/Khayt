@@ -514,8 +514,27 @@ holds the book, `64` the arguments did not parse.
 Judging a design by reading its source is guessing.
 
 ```bash
+pkill -f "\.build/debug/Khayt"                    # FIRST — see below
 KHAYT_SNAPSHOT_DIR=/tmp/shots swift run Khayt     # writes 01-shop.png, then quits
 ```
+
+**Kill orphans first, and count the PNGs afterwards.** A run that was
+interrupted leaves the process alive holding its `NSStatusItem`, and the next
+run looks for the settings window among `NSApp.windows` and finds somebody
+else's status bar instead. It then prints
+
+```
+no settings window to capture — open: AppKitWindow 1600×900, NSStatusBarWindow 48×34, …
+```
+
+and **exits 0**. Nothing was skipped, so nothing says a section was skipped —
+it simply could not find the window, and a short run looks exactly like a
+complete one.
+
+This is not hypothetical: all six settings panes went unphotographed for the
+whole life of this harness, and the Preferences pane was heading two different
+sections "App Preferences" the entire time. `SettingsTests` guards that
+particular mistake now, but the general lesson is the count.
 
 It photographs the window's *theme frame* rather than its content view, because
 a unified toolbar lives in the title bar — a sibling of the content, not a child

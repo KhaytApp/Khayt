@@ -428,6 +428,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) The Preferences pane no longer heads two sections "App Preferences".**
+  The default language sat under one and the menu bar toggle under the other,
+  two rows apart, with nothing to say that the first follows your book to your
+  other Macs and the second does not. The second is headed "On this Mac" now.
+
 - **Changing the AI provider no longer undoes a consent box you just ticked.**
   The provider chooser redraws the feature list — every row says which provider
   it sends to — and the redraw was reading the boxes from what was saved rather
