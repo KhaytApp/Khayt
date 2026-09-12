@@ -662,11 +662,37 @@ function renderAiSettings() {
   // still showing Anthropic's hints after picking Ollama is a form that will
   // be filled in wrong.
   el.querySelector('#aiProviderSetting')?.addEventListener('change', (e) => {
+    // KEEP WHAT IS ON SCREEN BEFORE REDRAWING IT.
+    //
+    // Changing provider has to redraw the whole panel — every feature row says
+    // "Sends to Anthropic:" and has to start saying "Sends to OpenAI:" — but
+    // the redraw reads the checkboxes from SAVED settings, not from the DOM.
+    // So an unsaved tick was silently reverted by touching the dropdown.
+    //
+    // Which is a consent bug on the screen whose whole job is consent, and the
+    // dangerous direction is the second one: a shop that UNTICKED the feature
+    // sending a customer's name, then changed provider, had that consent
+    // quietly restored and would have had no way to know.
+    const kept = {};
+    el.querySelectorAll('.ai-feat-toggle').forEach((c) => { kept[c.dataset.feature] = c.checked; });
+    const baseField = el.querySelector('#aiBaseUrlSetting');
+    const keyField = el.querySelector('#aiKeySetting');
     settings.ai = Object.assign({}, settings.ai, {
       provider: e.target.value,
       // The model belongs to the provider. Carrying `claude-opus-5` across to
       // OpenAI produces a 404 that reads as a broken key.
       model: '',
+      features: Object.assign({}, settings.ai && settings.ai.features, kept),
+      // The master toggle and a half-typed key and address, for the same
+      // reason. Losing those is only annoying rather than unsafe, but it is
+      // the same redraw throwing them away.
+      enabled: el.querySelector('#aiEnabled')?.checked ?? (settings.ai || {}).enabled,
+      baseUrl: baseField ? baseField.value.trim() : (settings.ai || {}).baseUrl,
+      // Through the same helper the Save button uses, so a masked key stays
+      // masked and is never written back as the literal mask string.
+      apiKey: keyField
+        ? secretInputSave((settings.ai || {}).apiKey, keyField.value.trim())
+        : (settings.ai || {}).apiKey,
     });
     renderAiSettings();
   });
