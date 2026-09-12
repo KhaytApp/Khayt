@@ -1707,6 +1707,101 @@ final class Shop {
         }
     }
 
+    /// Change one part of a job, and re-cost it.
+    ///
+    /// ── WHY THE RATES ARE WRITTEN BACK, NOT JUST THE COST ──────────────────
+    ///
+    /// The Electron calculator stores all seven rates on every part it saves and
+    /// its editor reads them straight back into the form. A part saved without
+    /// them opens there with every rate field blank and the next save re-costs
+    /// it at nothing — so a part edited here and then opened in Khayt would lose
+    /// its price, quietly, on somebody else's machine. `costPart` returns the
+    /// rates for exactly this reason and they go back on the record.
+    ///
+    /// The cost is NOT taken from whatever was on the part before. A shop that
+    /// corrects a weight has corrected the price of the job, and leaving the old
+    /// figure there would be a job whose parts no longer add up to its total.
+    func editPart(_ orderId: Order.ID, partId: String, name: String,
+                  spoolId: String?, grams: Double, hours: Double, qty: Int) async {
+        let costed = await costedPart(spoolId: spoolId, grams: grams, hours: hours, qty: qty)
+        let spool = spoolId.flatMap { id in spools.first { $0.id == id } }
+
+        await writeToOneOrder(orderId, named: words.callIt("mac.edit_part")) { order, _, _ in
+            OneOrderEdit(order: Self.orderWithPartEdited(
+                order, partId: partId, name: name, spool: spool,
+                grams: grams, hours: hours, qty: qty, costed: costed))
+        }
+    }
+
+    /// The patch itself, with no store and no clock in it.
+    ///
+    /// Pulled out of `editPart` so it can be tested: a Shop write needs a real
+    /// store on disk and an ownership record, and nothing in this suite has
+    /// ever built one — which would have left the two things that lose money
+    /// here (re-costing, and writing the rates back) with no test at all.
+    static func orderWithPartEdited(_ order: JSONValue, partId: String, name: String,
+                                    spool: Spool?, grams: Double, hours: Double, qty: Int,
+                                    costed: KhaytEngine.CostedPart?) -> JSONValue {
+        guard case .object(var record) = order,
+              case .array(var rows)? = record["parts"] else { return order }
+
+        for i in rows.indices {
+            guard case .object(var part) = rows[i],
+                  case .string(let id)? = part["id"], id == partId else { continue }
+
+            part["name"] = .string(name)
+            part["printWeight"] = .number(max(0, grams))
+            part["printTime"] = .number(max(0, hours))
+            part["qty"] = .number(Double(max(1, qty)))
+
+            if let spool {
+                part["filamentId"] = .string(spool.id)
+                part["material"] = .string(spool.material)
+                part["spoolCost"] = .number(spool.cost ?? 0)
+                // At least one gram: the cost model divides by this.
+                part["spoolWeight"] = .number(max(1, spool.weight ?? 1000))
+            }
+            if let costed {
+                part["unitCost"] = .number(costed.cost)
+                part["baseCost"] = .number(costed.cost)
+                for (key, value) in costed.rates.fields { part[key] = value }
+            }
+            rows[i] = .object(part)
+        }
+        record["parts"] = .array(rows)
+        return .object(record)
+    }
+
+    /// How long one part took, from the record rather than the decoded model.
+    ///
+    /// `Order.Part` does not carry `printTime` — nothing on screen needed it
+    /// until a part could be edited, and adding it to the model would change
+    /// what every other reader of that type decodes. The record has always had
+    /// it.
+    func partHours(_ orderId: Order.ID, partId: String) async -> Double? {
+        guard case .object(let order)? = orderRows.first(where: {
+            if case .object(let o) = $0, case .string(let id)? = o["id"] { return id == orderId }
+            return false
+        }), case .array(let rows)? = order["parts"] else { return nil }
+
+        for row in rows {
+            guard case .object(let part) = row,
+                  case .string(let id)? = part["id"], id == partId else { continue }
+            if case .number(let hours)? = part["printTime"] { return hours }
+            return nil
+        }
+        return nil
+    }
+
+    /// What the library file this part was printed from says it weighs and takes.
+    ///
+    /// Nil when the part was never linked to one — a job auto-logged from a
+    /// printer's own history knows a filename and nothing about the library.
+    func partSuggestion(fileId: String?) async -> KhaytEngine.PartFromFile? {
+        guard let engine, let fileId, let rec = row(for: fileId) else { return nil }
+        return try? await engine.partFromFile(rec)
+    }
+
     /// Hand a finished job over.
     ///
     /// Not a status change: a delivered job stays `completed` and carries a

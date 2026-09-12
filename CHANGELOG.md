@@ -29,6 +29,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A job's parts can be corrected.** They were read-only: a weight typed
+  wrong when the job was taken stayed wrong, and the only way to fix it was to
+  open the job in the other Khayt. Double-click a part to change its name,
+  filament, weight, hours or quantity.
+
+  **The price is not a field you type.** A part that weighs 40 g rather than
+  30 g costs more to make, so the figures you know are asked for and the price
+  follows from the same cost model the calculator uses. Correcting a weight
+  corrects the job.
+
+  Where the part came from a model in your library, *Fill from file* takes the
+  weight and time the slicer measured. It shows you both figures first rather
+  than overwriting quietly — a part may have been corrected on purpose — and it
+  says which fields the file could not answer for instead of leaving zeros that
+  look typed.
+
 - **(Mac) A print made of several files says so.** A head, two arms and a torso
   are one thing you print, not four — but the Mac app showed a kit as a single
   entry with the rest of its files invisible. The model's panel now lists every
