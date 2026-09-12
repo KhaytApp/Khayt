@@ -514,27 +514,40 @@ holds the book, `64` the arguments did not parse.
 Judging a design by reading its source is guessing.
 
 ```bash
-pkill -f "\.build/debug/Khayt"                    # FIRST — see below
-KHAYT_SNAPSHOT_DIR=/tmp/shots swift run Khayt     # writes 01-shop.png, then quits
+pkill -f "\.build/debug/Khayt"                                 # orphans, see below
+KHAYT_SNAPSHOT_SKIP=spending KHAYT_SNAPSHOT_DIR=/tmp/shots swift run Khayt
 ```
 
-**Kill orphans first, and count the PNGs afterwards.** A run that was
-interrupted leaves the process alive holding its `NSStatusItem`, and the next
-run looks for the settings window among `NSApp.windows` and finds somebody
-else's status bar instead. It then prints
+**The skip is not optional if you want everything.**
 
-```
-no settings window to capture — open: AppKitWindow 1600×900, NSStatusBarWindow 48×34, …
-```
+The expenses screen puts AppKit into a runaway constraint pass — documented at
+its own call site — and takes the rest of the run with it. The settings window
+is photographed *after* it, so all six panes were lost to it for the whole life
+of this harness. That is how the Preferences pane came to head two different
+sections "App Preferences" without anyone seeing.
 
-and **exits 0**. Nothing was skipped, so nothing says a section was skipped —
-it simply could not find the window, and a short run looks exactly like a
-complete one.
+Two things made it hard to find, and both are fixed:
 
-This is not hypothetical: all six settings panes went unphotographed for the
-whole life of this harness, and the Preferences pane was heading two different
-sections "App Preferences" the entire time. `SettingsTests` guards that
-particular mistake now, but the general lesson is the count.
+* **The watchdog named the wrong screen.** `doing()` — the checkpoint the
+  "STUCK at …" message reads — was called only by the two window captures, so
+  the eleven SHEETS after the board never moved the marker. A run that hung
+  later reported `STUCK at 09-board`, naming a screen it had already
+  photographed successfully. Every writer checks in now.
+* **A skipped run looks like a complete one.** The skip prints to stderr and
+  nothing else does, so **count the PNGs**: 88 with the skip, against 50 for a
+  run the expenses screen kills.
+
+**Orphans are a separate failure.** An interrupted run leaves Khayt alive
+holding its `NSStatusItem`; the next run then looks for the settings window
+among `NSApp.windows`, finds somebody else's status bar, prints `no settings
+window to capture — open: …, NSStatusBarWindow 48×34, …` and **exits 0**. Hence
+the `pkill` above. Same family as the Playwright orphan-browser trap.
+
+**Each pane is photographed twice**, and the second one is the point: a settings
+window is 364 points tall and the Operations pane is 1823, so `17-settings-
+operations.png` shows a fifth of it. `17-settings-operations-pane0.png` is the
+whole scroll — the WIP limits, the monthly budgets, the reminders and the QC
+block all live below that fold.
 
 It photographs the window's *theme frame* rather than its content view, because
 a unified toolbar lives in the title bar — a sibling of the content, not a child

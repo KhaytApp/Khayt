@@ -750,6 +750,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             await settle()
 
             // The menu bar's panel, which no window shot can reach.
+            doing("27-menu-bar")
             captureView(named: "27-menu-bar",
                         FloorPanel(shop: shop).background(Khayt.ground), into: dir)
 
@@ -1052,6 +1053,10 @@ final class Activator: NSObject, NSApplicationDelegate {
             // Added while bisecting a hang, and kept because iterating on one
             // screen should not cost a full run of sixty captures. The value is
             // a comma-separated list matched against the names below.
+            // Named before the attempt, not after it: opening this window is
+            // itself what hangs, intermittently, and a step that only reports
+            // once it has finished cannot report the thing that never does.
+            doing("settings-window")
             if skipped("settings") {
                 // Say so, so a short run is never mistaken for a complete one.
                 FileHandle.standardError.write(Data("skipping settings\n".utf8))
@@ -1060,6 +1065,11 @@ final class Activator: NSObject, NSApplicationDelegate {
                     shop.settingsPane = pane
                     await settle()
                     capture(named: "17-settings-\(pane.rawValue)", window: settings, into: dir)
+                    // AND THE SCROLL, because the window is 728 points tall and
+                    // three of these panes are longer. Everything below the
+                    // fold — the WIP limits, the QC block, the expense budgets
+                    // — was outside every picture ever taken of this window.
+                    capturePanes(named: "17-settings-\(pane.rawValue)", window: settings, into: dir)
                 }
                 settings.close()
                 await settle()
@@ -1201,7 +1211,20 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// whether the pane is empty or merely unphotographed, which is the
     /// difference between a bug and a picture of one.
     static func capturePanes(named name: String, into dir: URL) {
-        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }),
+        capturePanes(named: name, window: nil, into: dir)
+    }
+
+    /// The same, for a window that is not the first visible one.
+    ///
+    /// The settings window needs this. `capturePanes` took whichever window
+    /// came first out of `NSApp.windows`, which is the main one — so the
+    /// settings panes only ever got the WINDOW shot, and a settings window is
+    /// 728 points tall while the Operations pane is far longer than that. Its
+    /// WIP limits and its QC block sit below the fold and had never been seen
+    /// at all, on top of the six panes that had never been photographed.
+    static func capturePanes(named name: String, window: NSWindow?, into dir: URL) {
+        guard let window = window
+                ?? NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }),
               let root = window.contentView else { return }
         var found: [NSScrollView] = []
         func walk(_ v: NSView) {
@@ -1263,6 +1286,16 @@ final class Activator: NSObject, NSApplicationDelegate {
     }
 
     static func captureSheet(named name: String, into dir: URL) {
+        // CHECK IN, like the window captures do.
+        //
+        // `doing()` used to be called only from `capture()`, so the eleven
+        // sheets that follow the board never moved the marker — and a run that
+        // hung after the last of them was reported as "STUCK at 09-board",
+        // which is a screen it had already photographed successfully. Every
+        // investigation this message ever sent anybody on went to the wrong
+        // screen; the real hang was opening the settings window, eleven steps
+        // later, which is why those six panes stayed unphotographed.
+        doing(name)
         guard let host = NSApp.windows.first(where: { $0.isVisible && $0.attachedSheet != nil }),
               let sheet = host.attachedSheet,
               let view = sheet.contentView,
