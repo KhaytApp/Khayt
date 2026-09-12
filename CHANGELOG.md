@@ -4,6 +4,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+### Changed
+
+- **Khayt has a new icon.** A chrome nozzle extruding a single thick loop of
+  orange filament in the shape of a khaa, on deep navy — one mark at every size,
+  from the 1024px Dock icon down to the 16px favicon, instead of a detailed
+  drawing that dissolved into a smudge when it got small. The mark is drawn once
+  and all 72 shipped assets are derived from it, so the 32px and the 512px can
+  no longer disagree.
+
+  Three things this fixes on the way through. The marketing site's two favicons
+  were declared 16 and 32 and were both actually 64. Its apple-touch-icon was
+  256 with transparency, which iOS composites onto black. And the AppX badge was
+  a colour downscale where Windows wants a monochrome glyph it can tint per
+  theme.
+
+- **(Maintainers) The Mac app has a macOS 26 layered icon.** It shipped a flat
+  legacy `.icns`, so it got none of Tahoe's Liquid Glass, dark or tinted icon
+  treatment. Background and foreground are separate layers now.
+
+  The UI accent has deliberately not moved with it. Every contrast ratio in
+  `mac/README.md` was measured against the old cyan, so re-accenting is a
+  measured pass rather than a substitution.
+
 ### Added
 
 - **(Mac) Khayt finds printers on your network.** Adding a machine meant knowing
@@ -257,6 +280,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **The iOS companion icon can be submitted again.** It carried an alpha
+  channel, which App Store Connect rejects outright.
+
+- **Invoices print the Khayt mark again.** The Electron invoice header drew a
+  different product's logo entirely, and the shared copy of the same constant
+  was an empty string — so an invoice printed from the Mac app carried no mark
+  at all. Both draw the same mark now, in the document's own ink.
+
+- **(LAN companion) Adding Khayt to a phone's home screen stopped downloading a
+  megabyte to draw a small tile.** Every icon route served the same 1024px file
+  whatever size the manifest asked for. There is a maskable icon now too, so
+  Android stops letterboxing the tile inside its adaptive shell.
+
 
 - **A printer was credited with colours it does not have.** Adding a Prusa CORE
   One gave Khayt a machine it believed could print five colours. Five is what a

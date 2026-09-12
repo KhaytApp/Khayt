@@ -434,15 +434,22 @@ wearing one colour, which is the first thing the HIG's colour guidance says not
 to do. They were also not Khayt's colours, and not contrast-checked; SwiftUI's
 `.green` is 2.4:1 on white.
 
-**Nothing in the palette was invented.** The app icon is a printed Arabic khaa
-on a near-black ground: the letter and the diamond above it are cyan `#2BCDE4`,
-and the one warm thing in the whole mark is the drop of filament leaving the
-nozzle. So the app's colour is that cyan, and amber means exactly one thing —
+**Nothing in the palette was invented.** It was taken from the app icon: a
+printed Arabic khaa whose letter and diamond were cyan `#2BCDE4`. So the app's
+colour is that cyan, and amber means exactly one thing —
 something is being made right now. The status hues are
 `renderer/themes/command/tokens.css` for light and `renderer/styles.css` for
 dark, unchanged, so "done" is the same green in both of a shop's apps. Khayt's
 light themes already darken those to clear WCAG AA on white and `styles.css`
 says so in as many words; that work is taken rather than redone.
+
+> **The icon has moved on and this palette has not.** Khayt's icon is now
+> orange `#E06010` on navy `#0A2A51`. Re-accenting the app to match is a
+> separate change, not a find-and-replace: every contrast ratio recorded in
+> this file was measured against the cyan, and `Palette.swift` darkens it to
+> `#0A6E81` for light appearance precisely because `#2BCDE4` is 1.9:1 on
+> white. Until that pass is done, the icon and the UI accent differ on
+> purpose.
 
 `PaletteTests` measures all of it — every colour, both appearances, against the
 surface it actually sits on, at 4.5:1. `marked` (the favourite star) is the one
