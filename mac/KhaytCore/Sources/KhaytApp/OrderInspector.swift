@@ -29,6 +29,7 @@ private struct Detail: View {
     let shop: Shop
     let split: TaxSplit?
     @State private var zatca: KhaytEngine.ZatcaReporting.Invoice?
+    @State private var editing: Order.Part?
 
     var body: some View {
         ScrollView {
@@ -58,6 +59,9 @@ private struct Detail: View {
         }
         .task(id: job.id) {
             zatca = await shop.zatcaReporting()?.invoices.first { $0.id == job.id }
+        }
+        .sheet(item: $editing) { part in
+            EditPartSheet(shop: shop, orderId: job.id, part: part)
         }
     }
 
@@ -150,6 +154,15 @@ private struct Detail: View {
                     }
                 }
                 .padding(.vertical, 2)
+                // Double-click opens it, the way a job, a spool and a model all
+                // open. A context menu as well, because a double-click you have
+                // to know about is a feature for the person who wrote it.
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) { if shop.canMoveJobs { editing = part } }
+                .contextMenu {
+                    Button(shop.words.callIt("mac.edit_part") + "\u{2026}") { editing = part }
+                        .disabled(!shop.canMoveJobs)
+                }
             }
             DetailLine(shop.words.callIt("mac.machine_time"), String(format: "%.1f h", job.printTime), dim: true)
         }

@@ -971,6 +971,10 @@ final class Words {
         "mac.quarter_in_progress": ["en": "This quarter is still running, so its overhead is charged for the days elapsed.",
                                     "ar": "هذا الربع لم ينتهِ، فتُحتسب تكاليفه الثابتة بحسب الأيام المنقضية."],
         "mac.edit_spool":    ["en": "Edit spool",   "ar": "تعديل البكرة"],
+        "mac.edit_part":     ["en": "Edit part",    "ar": "تعديل الجزء"],
+        // "Take the figures from the file this part was printed from." Short,
+        // because it sits on a button beside the weight and the hours it fills.
+        "mac.fill_from_file": ["en": "Fill from file", "ar": "تعبئة من الملف"],
         "mac.new_spool":     ["en": "New Spool",    "ar": "بكرة جديدة"],
         "mac.swatch":        ["en": "Swatch",       "ar": "اللون"],
         "mac.telegram_sent":   ["en": "Telegram message sent.", "ar": "أُرسلت رسالة تيليجرام."],

@@ -356,6 +356,11 @@ public actor KhaytEngine {
         // records last-writer-wins, and a record can travel between machines
         // disagreeing with itself. Preferring either list blindly loses data.
         "print-file-parts",
+        // What a part SHOULD say, according to the file it was printed from.
+        // A part typed by hand keeps the figure it was typed with; the model
+        // beside it holds what the slicer actually measured, and nothing ever
+        // compared the two.
+        "part-from-print-file",
         "printer-status",
         // Before `moonraker`, which reaches its runout rule through a global
         // the same way it reaches `printer-status`. Without it a Klipper
@@ -1026,6 +1031,63 @@ public actor KhaytEngine {
               };
             })(ARG0)
             """, [file], as: PrintSetups.self)
+    }
+
+    /// What the file a part was printed from actually says it weighs and takes.
+    ///
+    /// `lib/part-from-print-file.js`. A part created by the calculator keeps
+    /// whatever was typed into it; the library record beside it holds what the
+    /// slicer measured, and the two were never compared. A shop repeating a job
+    /// off a hand-typed weight is wrong about the price of every repeat.
+    ///
+    /// NO THRESHOLD IS APPLIED HERE. Both figures cross and the screen shows
+    /// them side by side, the way the estimator and the risk module do — a
+    /// tolerance invented in Swift would be a rule nobody wrote down, and the
+    /// reader can see 40 against 52 perfectly well.
+    ///
+    /// `describe` is not used: it composes an English sentence, and this app is
+    /// read in Arabic. The provenance crosses as the rule's own words —
+    /// `slicer` or `setup` — and the line is built against the locale.
+    public struct PartFromFile: Decodable, Sendable, Hashable {
+        /// What the slicer measured, where it measured anything.
+        public let printWeight: Double?
+        /// HOURS. `parsed` keeps minutes and a part keeps hours; the rule does
+        /// that conversion once, next to the field it feeds, because being
+        /// wrong by sixty would not look like an error — it would look like a
+        /// very fast printer.
+        public let printTime: Double?
+        public let material: String?
+        public let layerHeight: Double?
+        public let colour: String?
+        /// Where each figure came from: `slicer` or `setup`, keyed by field.
+        public let from: [String: String]
+        /// Fields the file could not answer for. Named because a silent partial
+        /// fill leaves zeros that look typed.
+        public let missing: [String]
+        /// The setup the figures were taken from, when one was used.
+        public let setupName: String?
+    }
+
+    public func partFromFile(_ record: JSONValue, setupId: String? = nil) throws -> PartFromFile {
+        try runtime.call2("""
+            (function (a) {
+              var p = KhaytPartFromPrintFile.partPatch(a.rec, a.setupId) || {};
+              var f = p.fields || {};
+              var n = function (v) { return v > 0 ? Number(v) : null; };
+              var t = function (v) { return v == null || v === '' ? null : String(v); };
+              return {
+                printWeight: n(f.printWeight), printTime: n(f.printTime),
+                material: t(f.material), layerHeight: n(f.layerHeight),
+                colour: t(f.colour),
+                from: p.from || {},
+                missing: Array.isArray(p.missing) ? p.missing : [],
+                setupName: p.setup && p.setup.name ? String(p.setup.name) : null,
+              };
+            })(ARG0)
+            """,
+            [.object(["rec": record,
+                      "setupId": setupId.map { JSONValue.string($0) } ?? .null])],
+            as: PartFromFile.self)
     }
 
     /// The files one print is made of.
