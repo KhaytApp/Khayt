@@ -29,6 +29,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Maintainers) The filament catalogue refreshes itself.** A monthly job
+  rebuilds the snapshot from upstream and opens a pull request with a readable
+  summary of what changed — the file is 0.78 MB on one line, so the diff alone
+  tells a reviewer nothing.
+
 - **(Mac) Adding a spool can be a lookup instead of typing.** Start typing a
   brand or a product — "bambu matte", "esun petg" — and Khayt offers the
   filament and its colours from a bundled catalogue of 1,945 products, filling

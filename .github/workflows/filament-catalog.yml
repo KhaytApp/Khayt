@@ -1,0 +1,110 @@
+# Keep the bundled filament catalogue from going stale.
+#
+# `assets/filament-catalog.json` is a snapshot of the Open Filament Database,
+# taken by hand when the lookup shipped. A snapshot ages: a shop that buys a
+# filament released last month searches for it, finds nothing, and concludes
+# Khayt does not have it. The app can say how old the list is, which is honest
+# but does not fix anything.
+#
+# So this refreshes it monthly and opens a PR. NOT a push to `main`: `main` is
+# protected, the required checks have to run, and a data file that changes what
+# the app offers a shop should be looked at by somebody — even when the change
+# is only "nine new colours".
+#
+# Deliberately NOT a required check and not on `pull_request`. It touches the
+# network, and a third party's availability must never be the thing standing
+# between a fix and `main` — the same reasoning `clock-drift.yml` sets out.
+name: Filament catalogue
+
+on:
+  schedule:
+    # 05:00 UTC on the 2nd. A day after clock-drift so two scheduled jobs are
+    # not competing for a runner, and monthly because the upstream rebuilds
+    # daily but gains a handful of products a week — weekly would be noise
+    # carrying no more signal.
+    - cron: '0 5 2 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    name: Refresh the snapshot
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch the catalogue
+        run: python3 scripts/fetch-filament-catalog.py
+
+      # The Mac app carries its own copy and a guard in the suite fails if the
+      # two drift, so syncing here is what makes the PR able to pass its own
+      # checks rather than one somebody has to finish by hand.
+      - name: Sync the Mac app's copy
+        run: ./mac/sync-js.sh
+
+      # A truncated or reshaped download must not become a PR. The rule's own
+      # tests run against a fixture and would pass on an empty catalogue — this
+      # is the only thing checking the DATA is usable.
+      - name: Check the snapshot is usable
+        run: python3 scripts/filament-catalog-diff.py --check
+
+      - name: Run the suites that read it
+        run: |
+          node --test test/filament-catalog.test.js
+          node --test test/mac-core-is-not-a-fork.test.js
+
+      - name: What changed
+        id: diff
+        run: |
+          if git diff --quiet -- assets/filament-catalog.json; then
+            echo "changed=no" >> "$GITHUB_OUTPUT"
+            echo "The catalogue is unchanged since the last refresh."
+          else
+            echo "changed=yes" >> "$GITHUB_OUTPUT"
+            # A 0.78 MB single-line JSON diff renders as one changed line, so
+            # the summary is the only thing a reviewer can actually read.
+            {
+              echo 'summary<<KHAYT_EOF'
+              python3 scripts/filament-catalog-diff.py
+              echo 'KHAYT_EOF'
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      # No third-party action for this. Nothing in this repository's workflows
+      # uses one, and moving a data file is not the place to start.
+      - name: Open a pull request
+        if: steps.diff.outputs.changed == 'yes'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUMMARY: ${{ steps.diff.outputs.summary }}
+        run: |
+          # BEFORE the commit. The summary is a diff against HEAD, and once the
+          # new file is committed HEAD is the new file — so running this later
+          # reports every refresh as "0 added, 0 removed".
+          python3 scripts/filament-catalog-diff.py --pr-body > /tmp/body.md
+
+          BRANCH="filament-catalog/$(date -u +%Y-%m-%d)"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add assets/filament-catalog.json \
+                  mac/KhaytCore/Sources/KhaytApp/Resources/filament-catalog.json
+
+          # `-s`, because `DCO sign-off` is a required check and refuses any
+          # commit whose trailer does not match its own author.
+          git commit -s -m "Refresh the filament catalogue" -m "$SUMMARY"
+          git push -u origin "$BRANCH"
+
+          gh pr create --title "Refresh the filament catalogue" --body-file /tmp/body.md
