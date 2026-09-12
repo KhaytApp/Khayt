@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Maintainers) The mDNS codec runs on the Mac now.** `lib/mdns.js` was built
+  on Node's `Buffer`, which JavaScriptCore does not have — so the one piece of
+  wire-format code both apps need could be loaded by only one of them, and
+  finding a printer on the Mac would have meant a second implementation of DNS
+  name compression. Two codecs is two chances to mis-read a packet arriving
+  unauthenticated from the workshop network. It is `Uint8Array` throughout now;
+  `Buffer` *is* a `Uint8Array`, so nothing in the Windows and Linux app changed.
+
 - **(Mac) Khayt can tell a printer what to do.** The Mac app could watch seven
   protocols and touch none of them: it knew a print was failing, it knew which
   machine, and stopping it meant walking to the printer or opening the other
