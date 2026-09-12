@@ -76,17 +76,38 @@ public final class JSRuntime {
         // exposes `URLComponents` and the JS side only reads fields off it.
         let hostOf: @convention(block) (String) -> [String: Any]? = { raw in
             guard let parts = URLComponents(string: raw), let scheme = parts.scheme else { return nil }
-            return ["hostname": (parts.host ?? "").lowercased(),
-                    "protocol": scheme.lowercased() + ":",
-                    "port": parts.port.map(String.init) ?? "",
-                    "pathname": parts.path]
+            let host = (parts.host ?? "").lowercased()
+            let proto = scheme.lowercased() + ":"
+            let port = parts.port.map(String.init) ?? ""
+            return ["hostname": host,
+                    "protocol": proto,
+                    "port": port,
+                    "pathname": parts.path,
+                    // CREDENTIALS, because `lib/base-url.js` refuses an address
+                    // carrying them — they would be sent to, and logged by, the
+                    // far end. Without these the check read `undefined ||
+                    // undefined`, was always false, and silently passed every
+                    // `https://user:pass@host` a shop could type.
+                    "username": parts.user ?? "",
+                    "password": parts.password ?? "",
+                    // And `origin`, which the same module RETURNS as the
+                    // normalised address. Absent, it returned the literal
+                    // string "undefined" with the path glued to it, so a shop
+                    // with its own endpoint would have had every request sent
+                    // to a nonsense URL.
+                    "origin": proto + "//" + host + (port.isEmpty ? "" : ":" + port)]
         }
         context.setObject(hostOf, forKeyedSubscript: "__khaytParseURL" as NSString)
         context.evaluateScript(#"""
         (function () {
           if (typeof globalThis.URL !== 'undefined') return;
           // Enough of the interface for what the shared modules read, and no
-          // more. A field nobody uses is a field nobody has checked.
+          // more. A field nobody uses is a field nobody has checked — and the
+          // converse bit: bundling `base-url.js` added three readers
+          // (`username`, `password`, `origin`) that were not here, so its
+          // credentials check passed everything and its return value was the
+          // string "undefined" with a path on the end. Add the field when the
+          // reader arrives.
           function KhaytURL(input) {
             if (!(this instanceof KhaytURL)) return new KhaytURL(input);
             var parts = globalThis.__khaytParseURL(String(input));
@@ -97,6 +118,9 @@ public final class JSRuntime {
             this.pathname = parts.pathname;
             this.host = parts.port ? parts.hostname + ':' + parts.port : parts.hostname;
             this.href = String(input);
+            this.username = parts.username || '';
+            this.password = parts.password || '';
+            this.origin = parts.origin || '';
           }
           KhaytURL.prototype.toString = function () { return this.href; };
           globalThis.URL = KhaytURL;

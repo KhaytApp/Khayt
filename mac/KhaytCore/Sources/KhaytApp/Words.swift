@@ -945,6 +945,14 @@ final class Words {
         // FINDINGS themselves are `risk.*` in the shared catalogue, written
         // once by `lib/intake-view.js` and rendered by both.
         "risk.title": ["en": "Before you quote", "ar": "قبل أن تُسعّر"],
+        // The assistant pane's own chrome. Mac-only: the other app's AI screen
+        // is one long panel rather than a tab, so it has no heading of its own
+        // and no way to forget a key.
+        "set.ai_feats": ["en": "What it may do", "ar": "ما يُسمح له بفعله"],
+        "mac.ai_forget_key": ["en": "Forget the stored key",
+                              "ar": "حذف المفتاح المحفوظ"],
+        "mac.ai_key_unsealed": ["en": "That key could not be encrypted, so it was not saved. The book syncs and is backed up, and a key in the clear would go with it.",
+                                "ar": "لم يتمكّن خيط من تشفير المفتاح، فلم يُحفظ. الدفتر يُزامن ويُنسخ احتياطيًا، والمفتاح غير المشفّر سينتقل معه."],
         "risk.looking": ["en": "Reading the mesh…", "ar": "جارٍ قراءة المجسّم…"],
         "risk.clear": ["en": "Nothing to flag on this one.", "ar": "لا ملاحظات على هذا الملف."],
         "risk.not_looked": ["en": "Khayt has not looked at this mesh yet. Reading it takes a few seconds on a large model.",

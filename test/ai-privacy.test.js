@@ -132,7 +132,10 @@ test('every disclosure locale key exists in every shipped bundle', () => {
   }
   const L = ctx.globalThis.KhaytLocales || {};
   const needed = [
-    'set.ai_master', 'set.ai_sends', 'set.ai_pii_badge', 'set.ai_reconsent',
+    // `set.ai_sends_to`, not `set.ai_sends`. The old key hard-coded
+    // "Sends to Anthropic:" and became a lie the moment a shop could choose a
+    // provider; the live one takes {provider} and both apps render it.
+    'set.ai_master', 'set.ai_sends_to', 'set.ai_pii_badge', 'set.ai_reconsent',
     'priv.ai_active', 'priv.ai_review',
     ...Object.values(P.AI_FEATURES).flatMap((f) => [f.labelKey, f.sendsKey]),
   ];

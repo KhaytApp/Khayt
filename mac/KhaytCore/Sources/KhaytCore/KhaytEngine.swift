@@ -371,6 +371,18 @@ public actor KhaytEngine {
         // rule — a shop typing "bambu pla matte black" has to get the same
         // answer in both apps.
         "filament-catalog",
+        // ── THE ASSISTANT, AND WHAT IT IS ALLOWED TO SEND ─────────────────
+        //
+        // `base-url` FIRST: `ai-providers` asks it whether a key may travel to
+        // the address a shop typed, and reaches it through the global.
+        "base-url",
+        // Which AI, and its wire format. Four providers spell structured
+        // output three different ways and none of that belongs in Swift.
+        "ai-providers",
+        // And WHETHER each feature may run at all. This is the half that must
+        // never be skipped: the consent is per feature because the four send
+        // very different things, and one of them sends a customer's name.
+        "ai-privacy",
         // What is likely to go wrong with a print before anyone quotes it.
         // Only the JUDGING is here: the triangle walk that feeds it is
         // `Mesh.Overhangs`, because this shop's models are millions of facets
@@ -898,6 +910,122 @@ public actor KhaytEngine {
             """,
             [.array(spools), .array(orders), .number(now.timeIntervalSince1970 * 1000)],
             as: [String: Runway].self)
+    }
+
+    /// One field of `new URL(input)`, as a bundled rule would read it.
+    ///
+    /// For `UrlPolyfillTests` and nothing else. JavaScriptCore has no `URL`, so
+    /// `JSRuntime` installs a shim exposing only the fields something reads —
+    /// and a field it does NOT have reads as `undefined` rather than failing,
+    /// which is how a credentials check came to accept everything. This lets a
+    /// test assert the shim's surface on the real runtime.
+    public func urlField(_ input: String, _ name: String) throws -> String {
+        try runtime.call2("""
+            (function (a) {
+              var u = new URL(a.input);          // throws for anything unparseable
+              return String(u[a.name]);
+            })(ARG0)
+            """,
+            [.object(["input": .string(input), "name": .string(name)])], as: String.self)
+    }
+
+    // MARK: - The assistant, and what each feature is allowed to send
+
+    /// One AI feature, its disclosure, and whether the shop has said yes.
+    ///
+    /// The DISCLOSURE travels with the switch on purpose. Four features send
+    /// very different things — one of them sends a customer's name, their order
+    /// reference and their outstanding balance — and a single "AI assist"
+    /// toggle over the lot of them is what `lib/ai-privacy.js` exists to undo.
+    public struct AiFeature: Decodable, Sendable, Equatable, Identifiable {
+        public let id: String
+        /// Locale key for the feature's name.
+        public let labelKey: String
+        /// Locale key for the sentence listing what it transmits.
+        public let sendsKey: String
+        /// `own`, `business` or `customer`. Only the last is another person's
+        /// personal data, and only it gets a badge.
+        public let dataClass: String
+        /// The shop's answer for this feature.
+        public let enabled: Bool
+        /// True when consent was reset by the migration and has to be given
+        /// again — a feature that used to run under the old single toggle and
+        /// sends customer data.
+        public let needsConsent: Bool
+
+        public var sendsCustomerData: Bool { dataClass == "customer" }
+    }
+
+    /// Every feature, in a fixed order, with this shop's consent applied.
+    public func aiFeatures(settings: [String: JSONValue]) throws -> [AiFeature] {
+        try runtime.call2("""
+            (function (s) {
+              var ai = (s && s.ai) || {};
+              var m = KhaytAiPrivacy.migrateConsent(ai);
+              return Object.keys(KhaytAiPrivacy.AI_FEATURES).map(function (id) {
+                var f = KhaytAiPrivacy.AI_FEATURES[id];
+                return {
+                  id: id, labelKey: f.labelKey, sendsKey: f.sendsKey,
+                  dataClass: f.dataClass,
+                  // The master switch AND the feature's own answer, which is
+                  // what `isFeatureEnabled` requires — asked rather than
+                  // recomputed here, so the screen cannot disagree with the gate.
+                  enabled: KhaytAiPrivacy.isFeatureEnabled(ai, id),
+                  needsConsent: m.reconsentRequired.indexOf(id) !== -1,
+                };
+              });
+            })(ARG0)
+            """,
+            [.object(settings)], as: [AiFeature].self)
+    }
+
+    /// True when something switched on right now sends another person's data.
+    public func aiSendsCustomerData(settings: [String: JSONValue]) throws -> Bool {
+        try runtime.call2("KhaytAiPrivacy.transmitsCustomerData((ARG0 && ARG0.ai) || {})",
+                          [.object(settings)], as: Bool.self)
+    }
+
+    /// One AI vendor a shop may choose.
+    public struct AiProvider: Decodable, Sendable, Equatable, Identifiable {
+        public let id: String
+        public let label: String
+        public let defaultModel: String
+        /// Where to get a key, or empty for a self-hosted endpoint.
+        public let keysAt: String
+        /// True for the OpenAI-compatible entry, which has no address of its own.
+        public let needsBaseUrl: Bool
+    }
+
+    public func aiProviders() throws -> [AiProvider] {
+        try runtime.call2("KhaytAiProviders.providers()", [], as: [AiProvider].self)
+    }
+
+    /// The provider a shop has chosen, falling back the way the rule does.
+    public func aiProviderOf(settings: [String: JSONValue]) throws -> AiProvider {
+        try runtime.call2("""
+            (function (s) {
+              var p = KhaytAiProviders.providerOf(s || {});
+              return { id: p.id, label: p.label, defaultModel: p.defaultModel,
+                       keysAt: p.keysAt, needsBaseUrl: !!p.needsBaseUrl };
+            })(ARG0)
+            """,
+            [.object(settings)], as: AiProvider.self)
+    }
+
+    /// Check an address before a key is allowed to travel to it.
+    ///
+    /// Returns nil when it is acceptable, or the reason to put on screen. A
+    /// shop's own endpoint is the point of the compatible provider; plain http
+    /// to a public host is not, because the key rides in a header.
+    public func aiAddressProblem(_ raw: String) throws -> String? {
+        try runtime.call2("""
+            (function (a) {
+              if (!String(a || '').trim()) return null;   // blank means the vendor's own
+              try { KhaytBaseUrl.validateBaseUrl(a, { what: 'address', secret: 'API key' }); return null; }
+              catch (e) { return e.message; }
+            })(ARG0)
+            """,
+            [.string(raw)], as: String?.self)
     }
 
     // MARK: - What is likely to go wrong with this print

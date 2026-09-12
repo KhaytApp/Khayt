@@ -4,7 +4,7 @@ import KhaytCore
 
 /// The panes of the Settings window, in the order Khayt's own page has them.
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case business, invoice, payments, operations, slicers, preferences
+    case business, invoice, payments, operations, slicers, assistant, preferences
     var id: String { rawValue }
 }
 
@@ -39,6 +39,9 @@ struct SettingsWindow: View {
             SlicersPane(shop: shop)
                 .tabItem { Label(shop.words.callIt("mac.nav_slicers"), systemImage: "cube.transparent") }
                 .tag(SettingsPane.slicers)
+            AssistantPane(shop: shop)
+                .tabItem { Label(shop.words.callIt("set.ai_master"), systemImage: "sparkles") }
+                .tag(SettingsPane.assistant)
             PreferencesPane(shop: shop)
                 .tabItem { Label(shop.words.callIt("mac.preferences"), systemImage: "slider.horizontal.3") }
                 .tag(SettingsPane.preferences)
@@ -750,6 +753,226 @@ struct PreferencesPane: View {
     }
 
     private func reset() { original = .read(shop.settingsDict, shop: shop); draft = original }
+}
+
+// MARK: - The assistant
+
+/// Which AI, and what each feature is allowed to send.
+///
+/// THE TWO HALVES SHIP TOGETHER, and that is the whole design of this screen.
+/// A provider chooser on its own would let a shop point Khayt at a vendor
+/// without ever being told that drafting a reply sends a customer's name, their
+/// order reference and their outstanding balance. A consent list on its own
+/// would name a vendor the shop had not chosen. `lib/ai-privacy.js` exists
+/// because the first version of this was one toggle called "AI quote" over four
+/// features that transmit very different things.
+///
+/// Nothing here decides anything. The features, their disclosures, whether each
+/// is on, which providers exist and whether an address may receive a key all
+/// come from the shared rules — the screen must never be able to show a feature
+/// as off while the gate runs it.
+struct AssistantPane: View {
+    let shop: Shop
+
+    struct Draft: Equatable {
+        var enabled = false
+        var provider = "anthropic"
+        var baseUrl = ""
+        var model = ""
+        /// Typed, not stored. Empty means "keep the sealed one".
+        var key = ""
+        /// True when the shop has asked to remove the stored key.
+        var clearKey = false
+        var features: [String: Bool] = [:]
+    }
+
+    @State private var draft = Draft()
+    @State private var original = Draft()
+    @State private var features: [KhaytEngine.AiFeature] = []
+    @State private var providers: [KhaytEngine.AiProvider] = []
+    @State private var chosen: KhaytEngine.AiProvider?
+    @State private var addressProblem: String?
+    @State private var hasStoredKey = false
+
+    private var providerLabel: String {
+        chosen?.label ?? providers.first { $0.id == draft.provider }?.label ?? draft.provider
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    Toggle(shop.words.callIt("set.ai_master"), isOn: $draft.enabled)
+                    Text(shop.words.callIt("set.ai_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                // EVERY ROW STATES WHAT IT SENDS, and names the provider it
+                // sends to — a disclosure that says "Anthropic" to a shop on
+                // OpenAI is worse than none.
+                Section(shop.words.callIt("set.ai_feats")) {
+                    ForEach(features) { f in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Toggle(shop.words.callIt(f.labelKey),
+                                       isOn: binding(for: f.id))
+                                    .disabled(!draft.enabled)
+                                if f.sendsCustomerData {
+                                    Text(shop.words.callIt("set.ai_pii_badge"))
+                                        .font(.caption2).padding(.horizontal, 5).padding(.vertical, 1)
+                                        .background(Khayt.attention.opacity(0.16), in: Capsule())
+                                        .foregroundStyle(Khayt.attention)
+                                }
+                            }
+                            Text(shop.words.callIt("set.ai_sends_to",
+                                                   ["provider": .string(providerLabel)])
+                                 + " " + shop.words.callIt(f.sendsKey))
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if f.needsConsent {
+                                Text(shop.words.callIt("set.ai_reconsent"))
+                                    .font(.caption).foregroundStyle(Khayt.attention)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+
+                Section(shop.words.callIt("set.ai_provider")) {
+                    row(shop.words.callIt("set.ai_provider")) {
+                        Picker("", selection: $draft.provider) {
+                            ForEach(providers) { p in Text(p.label).tag(p.id) }
+                        }
+                        .labelsHidden().frame(width: 220)
+                        .onChange(of: draft.provider) { _, id in
+                            // The model belongs to the provider: asking OpenAI
+                            // for `claude-opus-5` is a 404 that reads as a bad
+                            // key. Cleared so the new default shows through.
+                            draft.model = ""
+                            Task { await pickProvider(id) }
+                        }
+                    }
+                    if chosen?.needsBaseUrl == true || !draft.baseUrl.isEmpty {
+                        row(shop.words.callIt("set.ai_base_url")) {
+                            TextField("http://localhost:11434", text: $draft.baseUrl)
+                                .frame(width: 240)
+                                .onChange(of: draft.baseUrl) { _, v in Task { await checkAddress(v) } }
+                        }
+                        if let addressProblem {
+                            Text(addressProblem)
+                                .font(.caption).foregroundStyle(Khayt.attention)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    row(shop.words.callIt("calc.ai_key")) {
+                        SecureField(hasStoredKey ? "••••••••" : "", text: $draft.key)
+                            .frame(width: 240)
+                    }
+                    if hasStoredKey && draft.key.isEmpty {
+                        Toggle(shop.words.callIt("mac.ai_forget_key"), isOn: $draft.clearKey)
+                            .font(.caption)
+                    }
+                    row(shop.words.callIt("set.ai_model")) {
+                        TextField(chosen?.defaultModel ?? "", text: $draft.model)
+                            .frame(width: 240)
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            SaveBar(shop: shop, dirty: draft != original && addressProblem == nil,
+                    save: { Task { await save() } },
+                    revert: { draft = original; addressProblem = nil })
+        }
+        .task(id: shop.settingsValue) { await reload() }
+    }
+
+    private func binding(for id: String) -> Binding<Bool> {
+        Binding(get: { draft.features[id] ?? false },
+                set: { draft.features[id] = $0 })
+    }
+
+    private func reload() async {
+        guard let engine = shop.engine else { return }
+        let settings = shop.settingsDict
+        features = (try? await engine.aiFeatures(settings: settings)) ?? []
+        providers = (try? await engine.aiProviders()) ?? []
+        chosen = try? await engine.aiProviderOf(settings: settings)
+
+        let ai: [String: JSONValue] = {
+            if case .object(let o)? = settings["ai"] { return o } else { return [:] }
+        }()
+        let text = { (k: String) -> String in
+            if case .string(let v)? = ai[k] { return v } else { return "" }
+        }
+        hasStoredKey = !text("apiKey").isEmpty
+        var d = Draft()
+        d.enabled = { if case .bool(let b)? = ai["enabled"] { return b } else { return false } }()
+        d.provider = chosen?.id ?? "anthropic"
+        d.baseUrl = text("baseUrl")
+        d.model = text("model")
+        // Read through `aiFeatures`, which applies the consent migration — so a
+        // book from before per-feature consent shows the same answers the gate
+        // would give rather than four blanks.
+        for f in features { d.features[f.id] = f.enabled }
+        draft = d
+        original = d
+        addressProblem = nil
+    }
+
+    private func pickProvider(_ id: String) async {
+        guard let engine = shop.engine else { return }
+        var ai: [String: JSONValue] = [:]
+        if case .object(let o)? = shop.settingsDict["ai"] { ai = o }
+        ai["provider"] = .string(id)
+        chosen = try? await engine.aiProviderOf(settings: ["ai": .object(ai)])
+    }
+
+    private func checkAddress(_ raw: String) async {
+        guard let engine = shop.engine else { return }
+        addressProblem = (try? await engine.aiAddressProblem(raw)) ?? nil
+    }
+
+    private func save() async {
+        // The address is checked before anything is written, and a bad one stops
+        // the save rather than being stored for the next request to use.
+        if let engine = shop.engine,
+           let problem = try? await engine.aiAddressProblem(draft.baseUrl), problem != nil {
+            addressProblem = problem
+            return
+        }
+        var ai: [String: JSONValue] = [
+            "enabled": .bool(draft.enabled),
+            "provider": .string(draft.provider),
+            "baseUrl": .string(draft.baseUrl.trimmingCharacters(in: .whitespaces)),
+            "model": .string(draft.model.trimmingCharacters(in: .whitespaces)),
+            "features": .object(draft.features.mapValues(JSONValue.bool)),
+        ]
+        // ── THE KEY IS SEALED HERE OR NOT WRITTEN AT ALL ──────────────────
+        //
+        // `settings.ai.apiKey` is a registered secret path, so what belongs in
+        // the book is `__enc__` + OSCrypt under the book's own Keychain key —
+        // the same bytes Electron writes and reads. A key that cannot be sealed
+        // is REFUSED rather than written in the clear: this file syncs, backs
+        // up and exports.
+        let typed = draft.key.trimmingCharacters(in: .whitespaces)
+        if draft.clearKey && typed.isEmpty {
+            ai["apiKey"] = .string("")
+        } else if !typed.isEmpty {
+            guard let build = shop.source.build else {
+                shop.settingsProblem = shop.words.callIt("mac.move_sample"); return
+            }
+            do { ai["apiKey"] = .string(try await Secrets.seal(typed, for: build)) }
+            catch {
+                shop.settingsProblem = shop.words.callIt("mac.ai_key_unsealed"); return
+            }
+        }
+        // Absent `apiKey` means the shared rule carries the stored one through.
+        await shop.saveSettings(["ai": .object(ai)])
+        draft.key = ""
+        draft.clearKey = false
+        await reload()
+    }
 }
 
 // MARK: - The shop's text fields, per language
