@@ -420,9 +420,24 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// and abandoned at another.
     ///
     /// The size is set in POINTS on the content view, so it is independent of
-    /// how the display is scaled, and it may exceed the physical screen: an
-    /// off-screen window still lays out and still draws into a bitmap, which
-    /// is the whole reason a 6K layout can be checked on a laptop.
+    /// how the display is scaled.
+    ///
+    /// ── IT CANNOT EXCEED THE SCREEN, WHATEVER THIS USED TO CLAIM ──────────
+    ///
+    /// The comment here said an off-screen window still lays out, "which is the
+    /// whole reason a 6K layout can be checked on a laptop". It does — but the
+    /// window never gets off-screen to begin with: AppKit constrains a titled
+    /// window to its screen's VISIBLE frame, the screen less the menu bar and
+    /// the Dock. On the 16-inch this is written on that is 1710x995 pt, so
+    /// `KHAYT_SNAPSHOT_SIZE=1500x1700` produced a 1500x995 window and a run
+    /// that reported 1500x1700 on stderr.
+    ///
+    /// Bypassing it means overriding `constrainFrameRect(_:to:)`, which needs
+    /// an `NSWindow` subclass, and SwiftUI owns this window. So the flag is
+    /// honest about what it got rather than pretending: WIDTH is genuinely
+    /// reviewable up to the screen's width and height is not, and a run says so
+    /// when it has been cut down. Checking a layout taller than this Mac needs a
+    /// taller Mac.
     private static func resizeIfAsked() {
         guard let spec = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SIZE"] else { return }
         let parts = spec.lowercased().split(separator: "x")
@@ -431,14 +446,39 @@ final class Activator: NSObject, NSApplicationDelegate {
             FileHandle.standardError.write(Data("bad KHAYT_SNAPSHOT_SIZE \(spec)\n".utf8))
             return
         }
+        // ── AND SAY WHAT WAS ACTUALLY GOT, WHICH IS NOT ALWAYS WHAT WAS ASKED ─
+        //
+        // AppKit constrains a titled window to its screen's VISIBLE frame — the
+        // screen less the menu bar and the Dock. Ask for 1500x1700 on a 16-inch
+        // MacBook Pro and the window becomes 1500x995, because 995 is all the
+        // height there is. `contentMaxSize` is not the limiter and never was:
+        // it reads as unbounded before the call and the clamp happens anyway.
+        //
+        // This used to print the size it had ASKED for, unconditionally, so a
+        // review of a tall layout was carried out at the wrong height by
+        // somebody who had been told otherwise — which is worse than not having
+        // the flag, because the screenshot looks deliberate. The number below
+        // is read back off the window.
+        var reports: [String] = []
         for window in NSApp.windows where window.isVisible && window.contentView != nil {
-            // `setContentSize` rather than `setFrame`, so the number asked for
-            // is the number the app gets to lay out in — a frame includes the
-            // title bar and would quietly give back a shorter window than the
-            // one being tested.
             window.setContentSize(NSSize(width: w, height: h))
+            let got = window.contentView?.frame.size ?? .zero
+            guard got.width > 0, got.height > 0 else { continue }
+            if abs(got.width - w) > 1 || abs(got.height - h) > 1 {
+                let room = window.screen?.visibleFrame.size ?? .zero
+                reports.append("""
+                    KHAYT_SNAPSHOT_SIZE asked for \(Int(w))x\(Int(h)) pt and the window is \
+                    \(Int(got.width))x\(Int(got.height)) — a window cannot be larger than its \
+                    screen's visible frame, which here is \(Int(room.width))x\(Int(room.height)) pt. \
+                    The shots are at the size above, NOT the one asked for.
+                    """)
+            } else {
+                reports.append("window set to \(Int(got.width))x\(Int(got.height)) pt")
+            }
         }
-        FileHandle.standardError.write(Data("window set to \(Int(w))x\(Int(h)) pt\n".utf8))
+        for line in Set(reports).sorted() {
+            FileHandle.standardError.write(Data((line + "\n").utf8))
+        }
     }
 
     /// Which parts of the run KHAYT_SNAPSHOT_SKIP asks to leave out.
