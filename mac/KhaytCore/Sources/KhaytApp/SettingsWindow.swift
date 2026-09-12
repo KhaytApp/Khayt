@@ -698,7 +698,15 @@ struct PreferencesPane: View {
                 // on this pane is written into the shop's settings and reaches
                 // every device; whether this Mac shows a menu bar icon is not
                 // the shop's business and must not follow the book around.
-                Section(shop.words.callIt("set.prefs_section")) {
+                //
+                // HEADED "On this Mac" for that reason, and it used to repeat
+                // `set.prefs_section` — so the pane printed "App Preferences"
+                // twice, two rows apart, and nothing said which of them syncs.
+                // Two sections with one name read as one section with a gap in
+                // it. Found by photographing the pane, which had never been
+                // done: the snapshot runner could not open the settings window
+                // while an orphaned Khayt held the status bar.
+                Section(shop.words.callIt("mac.on_this_mac")) {
                     Toggle(shop.words.callIt("mac.menu_bar"), isOn: $menuBar)
                         .onChange(of: menuBar) { _, on in
                             // AppKit, so nothing redraws itself: say so plainly.
