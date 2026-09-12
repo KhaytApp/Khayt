@@ -62,8 +62,12 @@ enum PrinterControl {
         if try await engine.printerCommandNeedsJobId(type: type) {
             let reply = try await PrinterWatch.get(base, path: "/api/v1/job",
                                                    key: key, type: type)
-            guard case .number(let id)? = reply["id"] else { throw Failure.noJob }
-            jobId = String(Int(id))
+            // `Int(someDouble)` traps on an infinity or a NaN, and JSON will
+            // happily carry 1e30 — so a printer, or anything else answering on
+            // that port, could crash the app by reporting a silly job id.
+            guard case .number(let id)? = reply["id"],
+                  let whole = Int(exactly: id.rounded(.towardZero)) else { throw Failure.noJob }
+            jobId = String(whole)
         }
 
         let request = try await engine.printerCommand(

@@ -190,3 +190,65 @@ test('the chosen model is reported back with the request', () => {
   assert.equal(ask('openai').model, PROVIDERS.openai.defaultModel);
   assert.equal(ask('openai', { model: 'gpt-5-mini' }).model, 'gpt-5-mini');
 });
+
+/* ============================================================
+   The address a key travels to
+   ============================================================ */
+
+const withBase = (baseUrl) => buildRequest(
+  { ai: { provider: 'anthropic', apiKey: 'k', baseUrl } },
+  { prompt: 'p', tool: TOOL, maxTokens: 10 });
+
+test('a shop can point Khayt at its own address', () => {
+  // The whole point of the compatible provider, and of a gateway inside the
+  // Kingdom in front of the others.
+  assert.equal(withBase('https://gw.example.sa').url, 'https://gw.example.sa/v1/messages');
+  assert.match(withBase('').url, /^https:\/\/api\.anthropic\.com/, 'a blank address uses the vendor');
+});
+
+test('a model on this machine still works over plain http', () => {
+  // Ollama and vLLM on the bench, and the only option for a shop whose book
+  // must not leave the building. Nothing crosses a wire, so nothing is exposed.
+  assert.match(withBase('http://localhost:11434').url, /^http:\/\/localhost:11434/);
+  assert.match(withBase('http://127.0.0.1:8080').url, /^http:\/\/127\.0\.0\.1:8080/);
+  // And a server on the shop's own LAN.
+  assert.match(withBase('http://192.168.1.9:11434').url, /^http:\/\/192\.168\.1\.9/);
+  assert.match(withBase('http://10.0.0.5:8000').url, /^http:\/\/10\.0\.0\.5/);
+});
+
+test('plain http to a public host is refused, and says why', () => {
+  // THE FINDING THIS GUARDS. The key rides in an `authorization` header, and
+  // `base()` used to concatenate whatever was typed straight into the fetch
+  // with no check of any kind — so a shop that typed http:// put its key on the
+  // wire in clear text and nothing said so.
+  assert.throws(() => withBase('http://gw.example.sa'),
+    /plain http address would send your API key unencrypted/);
+});
+
+test('an address that is not one is refused before a key moves', () => {
+  assert.throws(() => withBase('ftp://x.example'), /must start with https/);
+  assert.throws(() => withBase('not a url'), /Not a valid address/);
+  // Credentials in the URL would be sent to, and logged by, the far end.
+  assert.throws(() => withBase('https://user:pass@x.example'), /username or password/);
+  // The cloud metadata endpoint is never a model server.
+  assert.throws(() => withBase('http://169.254.169.254'), /not allowed/);
+});
+
+test('the AI field and the cloud field agree on every address', () => {
+  // They are the same question — may a secret travel here — and they used to be
+  // answered by two different amounts of code: one careful function and no
+  // check at all. `lib/base-url.js` is the one rule; this asserts neither
+  // caller has drifted from it.
+  const { validateCloudBaseUrl } = require('../lib/cloud-client.js');
+  const addresses = [
+    'https://example.com', 'http://localhost:1', 'http://127.0.0.1:1',
+    'http://192.168.0.2', 'http://10.1.2.3', 'http://172.16.0.9',
+    'http://172.32.0.9', 'http://example.com', 'http://169.254.169.254',
+    'ftp://example.com', 'https://u:p@example.com', 'rubbish',
+  ];
+  for (const a of addresses) {
+    const cloudOk = (() => { try { validateCloudBaseUrl(a); return true; } catch { return false; } })();
+    const aiOk = (() => { try { withBase(a); return true; } catch { return false; } })();
+    assert.equal(aiOk, cloudOk, `${a}: cloud says ${cloudOk}, AI says ${aiOk}`);
+  }
+});

@@ -540,8 +540,9 @@ enum Mesh {
                     }
                 } else if starts(tag, with: "<triangle") {
                     if let a = attribute("v1", in: tag), let b = attribute("v2", in: tag),
-                       let c = attribute("v3", in: tag) {
-                        let ia = Int(a) * 3, ib = Int(b) * 3, ic = Int(c) * 3
+                       let c = attribute("v3", in: tag),
+                       let ia = vertexOffset(a), let ib = vertexOffset(b),
+                       let ic = vertexOffset(c) {
                         // An index past the table is a malformed part, not a
                         // crash: the triangle is dropped and the rest is read.
                         if ia >= 0, ic >= 0, ib >= 0,
@@ -614,6 +615,23 @@ enum Mesh {
     /// Hand-rolled rather than an XML parser because this runs tens of millions
     /// of times: `XMLParser` on 436 MB of `<vertex>` elements is minutes, and
     /// the shape here is fixed by the 3MF spec.
+    /// A `<triangle>` index, as an offset into the flat vertex table.
+    ///
+    /// `Int(someDouble)` TRAPS — "Double value cannot be converted to Int
+    /// because it is either infinite or NaN" — and `attribute` hands back
+    /// whatever `Double(String)` made of the file, which for `v1="nan"` is a
+    /// NaN and for `v1="1e400"` is an infinity. Three characters in a 3MF
+    /// crashed the app outright; measured, not reasoned about.
+    ///
+    /// Nil rather than a clamp: an index this cannot read means that triangle
+    /// is not a triangle, and the branch below already drops one whose index
+    /// runs past the table. A clamped index would quietly attach the facet to
+    /// the wrong point and change the measurement.
+    private static func vertexOffset(_ v: Double) -> Int? {
+        guard v.isFinite, v >= 0, v <= 1_000_000_000 else { return nil }
+        return Int(v) * 3
+    }
+
     private static func attribute(_ name: String, in tag: ArraySlice<UInt8>) -> Double? {
         let want = Array((name + "=\"").utf8)
         var i = tag.startIndex
