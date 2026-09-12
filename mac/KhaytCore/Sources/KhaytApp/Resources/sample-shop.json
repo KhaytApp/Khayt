@@ -4518,5 +4518,43 @@
       "expiresAt": "2026-06-30",
       "redeemedOrders": []
     }
+  ],
+  "machMaintTasks": [
+    {
+      "id": "MT-01",
+      "machineId": "MACH-x1c",
+      "name": "Replace nozzle",
+      "intervalHours": 100,
+      "lastDoneHours": 0
+    },
+    {
+      "id": "MT-02",
+      "machineId": "MACH-x1c",
+      "name": "Clean build plate",
+      "intervalHours": 50,
+      "lastDoneHours": 0
+    },
+    {
+      "id": "MT-03",
+      "machineId": "MACH-core-one",
+      "name": "Lubricate linear rails",
+      "intervalHours": 40,
+      "lastDoneHours": 0
+    },
+    {
+      "id": "MT-04",
+      "machineId": "MACH-core-one",
+      "name": "Check belt tension",
+      "intervalHours": 30,
+      "lastDoneHours": 0
+    },
+    {
+      "id": "MT-05",
+      "machineId": "MACH-u1",
+      "name": "Replace PTFE tube",
+      "intervalDays": 180,
+      "lastDoneHours": 0,
+      "lastDoneAt": "2025-01-06T09:00:00.000Z"
+    }
   ]
 }

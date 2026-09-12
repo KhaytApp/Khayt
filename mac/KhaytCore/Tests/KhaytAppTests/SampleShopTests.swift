@@ -241,6 +241,64 @@ extension SampleShopTests {
         #expect(lowNonGram, "nothing exercises a threshold that is not the gram one")
     }
 
+    /// The maintenance card draws four statuses and two clocks. Until this
+    /// file carried any tasks at all, none of those branches had ever been
+    /// drawn, let alone looked at.
+    @Test("the sample shop reaches all four maintenance statuses")
+    func maintenanceSpread() async throws {
+        let tasks = try Self.rows("machMaintTasks")
+        #expect(!tasks.isEmpty, "no maintenance tasks — the card is never drawn")
+
+        let jobs = try Self.rows("printLog").map { JSONValue.object($0) }
+        let taskValues = tasks.map { JSONValue.object($0) }
+        var seen: Set<String> = []
+        var machinesWithTasks: Set<String> = []
+        let engine = try KhaytEngine()
+
+        for machine in try Self.rows("machines") {
+            guard case .string(let id)? = machine["id"] else { continue }
+            let card = try await engine.maintenance(
+                machineId: id, tasks: taskValues, jobs: jobs,
+                machine: .object(machine), now: Date())
+            if !card.tasks.isEmpty { machinesWithTasks.insert(id) }
+            for task in card.tasks { seen.insert(task.status) }
+        }
+
+        // A status the card can draw but the sample cannot reach is a status
+        // nobody has looked at.
+        #expect(seen == ["ok", "warning", "due", "overdue"],
+                Comment(rawValue: "the sample reaches only \(seen.sorted())"))
+
+        // And a machine with none, so the card's other branch — leaving the
+        // section out entirely rather than drawing an empty heading — is drawn
+        // too. Most shops have set no tasks up at all.
+        let machineIds = try Self.rows("machines")
+        let all = Set(machineIds.compactMap { row -> String? in
+            if case .string(let id)? = row["id"] { return id } else { return nil }
+        })
+        #expect(!all.subtracting(machinesWithTasks).isEmpty,
+                "every sample machine has tasks, so the no-tasks card is never drawn")
+    }
+
+    /// A task whose status depends on the wall clock drifts: one set to be
+    /// "due" when this file was written reads "overdue" a month later, and the
+    /// case it was added to cover stops being covered.
+    @Test("a date-driven sample task cannot drift out of the case it covers")
+    func dateTasksAreStable() throws {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        for task in try Self.rows("machMaintTasks") {
+            guard let days = Self.number(task, "intervalDays"), days > 0,
+                  case .string(let last)? = task["lastDoneAt"],
+                  let done = iso.date(from: last) else { continue }
+            // Already past 1.5x the interval, so it stays overdue however long
+            // after this file was written the app is opened.
+            let elapsed = Date().timeIntervalSince(done) / 86_400
+            #expect(elapsed > days * 1.5,
+                    "a date-driven sample task must be far enough past due to stay overdue")
+        }
+    }
+
     @Test("every machine in the sample shop says which kind it is")
     func everyMachineSaysSo() throws {
         for m in try Self.rows("machines") {

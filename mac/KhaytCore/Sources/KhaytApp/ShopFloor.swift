@@ -149,6 +149,7 @@ private struct Card: View {
     let machine: Machine
     let wear: NozzleWear?
     let shop: Shop
+    @State private var upkeep: KhaytEngine.MaintenanceCard?
 
     var body: some View {
         card
@@ -343,8 +344,35 @@ private struct Card: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+
+            // What this machine is due for. Only where the shop has set tasks
+            // up: a permanent "no tasks" heading on every printer would be
+            // noise on the screen a shop looks at most.
+            if let upkeep, !upkeep.tasks.isEmpty {
+                DetailSection(shop.words.callIt("maint.recurring"),
+                              accent: Self.worst(upkeep.tasks)) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        ForEach(upkeep.tasks) { task in
+                            Upkeep(task: task, machine: machine, shop: shop)
+                        }
+                    }
+                }
+            }
         }
+        .task(id: upkeepInputs) { upkeep = await shop.maintenance(for: machine) }
         .card(rail: running ? Khayt.hot : nil, padding: 14, fills: true)
+    }
+
+    private var upkeepInputs: String { shop.maintenanceSignature(for: machine) }
+
+    /// The most urgent status among the tasks, as a colour — or nil when
+    /// nothing is asking for attention, so an up-to-date machine is not tinted
+    /// for being fine.
+    static func worst(_ tasks: [KhaytEngine.MaintenanceCard.Task]) -> Color? {
+        if tasks.contains(where: { $0.status == "overdue" }) { return Khayt.late }
+        if tasks.contains(where: { $0.status == "due" }) { return Khayt.attention }
+        if tasks.contains(where: { $0.status == "warning" }) { return Khayt.note }
+        return nil
     }
 
     private var hasSpecs: Bool {
@@ -361,6 +389,94 @@ private struct Card: View {
         return Color(red: Double((v >> 16) & 0xFF) / 255,
                      green: Double((v >> 8) & 0xFF) / 255,
                      blue: Double(v & 0xFF) / 255)
+    }
+}
+
+/// One recurring maintenance task, on a machine card.
+///
+/// The status word and the remaining figure say different things and both
+/// earn their place: "due" is what to act on, and "60h ago" is what ranks
+/// three overdue printers against each other when there is time to service
+/// only one of them.
+struct Upkeep: View {
+    let task: KhaytEngine.MaintenanceCard.Task
+    let machine: Machine
+    let shop: Shop
+    @State private var working = false
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(task.name.isEmpty ? shop.words.callIt("mac.unnamed") : task.name)
+                    .font(.callout)
+                    .foregroundStyle(task.name.isEmpty ? AnyShapeStyle(.secondary)
+                                                       : AnyShapeStyle(.primary))
+                    .lineLimit(1)
+                if let every {
+                    Text("\(shop.words.callIt("maint.every")) \(every)")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+            Spacer(minLength: 6)
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(shop.words.callIt("maint.status_" + task.status))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(colour)
+                if let left {
+                    Text(left).font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                }
+            }
+            Button(shop.words.callIt("maint.mark_done")) {
+                working = true
+                Task {
+                    await shop.markMaintenanceDone(task.id, on: machine)
+                    working = false
+                }
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
+            // A sample book is not the shop's to write to.
+            .disabled(working || !shop.canMoveJobs)
+        }
+    }
+
+    /// Amber and red mean the same here as everywhere else in Khayt, and an
+    /// up-to-date task is not coloured for being fine.
+    private var colour: Color {
+        switch task.status {
+        case "overdue": Khayt.late
+        case "due":     Khayt.attention
+        case "warning": Khayt.note
+        default:        .secondary
+        }
+    }
+
+    /// The interval, in whichever clock drives the task. Both when both do —
+    /// a task set to "every 100 hours or 30 days" is due on whichever comes
+    /// first, and showing one of them would misstate when that is.
+    private var every: String? {
+        var parts: [String] = []
+        if let h = task.intervalHours { parts.append(Self.amount(h, shop, "common.hours_short")) }
+        if let d = task.intervalDays { parts.append(Self.amount(d, shop, "common.days")) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// How long is left — negative once it is overdue, which is the figure
+    /// that ranks three late printers against each other.
+    ///
+    /// The sign is left on rather than turned into a word. There is no locale
+    /// key for "ago", and inventing one would mean nine translations to say
+    /// what a minus sign already says; `formatted` places the sign correctly in
+    /// Arabic, which a hand-built "-" prefix would not.
+    private var left: String? {
+        if let h = task.hoursRemaining { return Self.amount(h, shop, "common.hours_short") }
+        if let d = task.daysRemaining { return Self.amount(d, shop, "common.days") }
+        return nil
+    }
+
+    private static func amount(_ v: Double, _ shop: Shop, _ unit: String) -> String {
+        let n = v.rounded().formatted(.number.precision(.fractionLength(0)))
+        return "\(n) \(shop.words.callIt(unit))"
     }
 }
 

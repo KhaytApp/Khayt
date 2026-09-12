@@ -438,6 +438,62 @@ import KhaytCore
                    "40-band-downtime", size: CGSize(width: 820, height: 260))
     }
 
+    /// What a machine is due for, in all four states at once.
+    ///
+    /// The sample book reaches every one of them (see `SampleShopTests`), which
+    /// is the only reason there is anything to look at. What is being judged
+    /// here is whether the row can be READ at a glance: whether "overdue" is
+    /// distinguishable from "due" without reading the word, and whether the
+    /// remaining figure — negative once it is late — says which of two late
+    /// machines to service first.
+    ///
+    /// THE "DONE" BUTTON DOES NOT PHOTOGRAPH, and that is the renderer rather
+    /// than the row: `ImageRenderer` draws a yellow prohibition sign for any
+    /// `Button` at all, verified with a bare `Button("Done") {}` beside this
+    /// one. What the picture is for is the four rows either side of it.
+    @Test("what each machine is due for")
+    func maintenanceRows() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let machine = try #require(shop.machines.first { $0.id == "MACH-x1c" })
+
+        // Every status on one card, so they are compared rather than described.
+        // The intervals are chosen against the sample's own meter.
+        let hours = 96.5
+        let tasks: [JSONValue] = [
+            .object(["id": .string("A"), "machineId": .string(machine.id),
+                     "name": .string("Lubricate linear rails"),
+                     "intervalHours": .number(400), "lastDoneHours": .number(0)]),
+            .object(["id": .string("B"), "machineId": .string(machine.id),
+                     "name": .string("Replace nozzle"),
+                     "intervalHours": .number(100), "lastDoneHours": .number(0)]),
+            .object(["id": .string("C"), "machineId": .string(machine.id),
+                     "name": .string("Check belt tension"),
+                     "intervalHours": .number(90), "lastDoneHours": .number(0)]),
+            .object(["id": .string("D"), "machineId": .string(machine.id),
+                     "name": .string("Clean build plate"),
+                     "intervalHours": .number(50), "lastDoneHours": .number(0)]),
+        ]
+        let jobs: [JSONValue] = [.object([
+            "id": .string("J"), "machineId": .string(machine.id),
+            "status": .string("completed"), "printTime": .number(hours),
+        ])]
+        let card = try await engine.maintenance(
+            machineId: machine.id, tasks: tasks, jobs: jobs,
+            machine: .object(["id": .string(machine.id)]), now: Date())
+        #expect(Set(card.tasks.map(\.status)) == ["ok", "warning", "due", "overdue"],
+                "the four states have to be side by side or there is nothing to compare")
+
+        try render(
+            VStack(alignment: .leading, spacing: 7) {
+                ForEach(card.tasks) { Upkeep(task: $0, machine: machine, shop: shop) }
+            }
+            .padding(14)
+            .frame(width: 420),
+            "41-maintenance", size: CGSize(width: 420, height: 190))
+    }
+
     /// What each machine earned, from the sample book.
     ///
     /// The arithmetic has its own tests. What is being looked at here is
