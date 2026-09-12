@@ -347,7 +347,12 @@ final class PrinterWatch {
         // second look at the app to mean anything.
         var parts: [String] = []
         if !alert.filename.isEmpty { parts.append(alert.filename) }
-        if alert.progress > 0 { parts.append("\(Int(alert.progress))%") }
+        // Clamped, for two reasons: `Int(someDouble)` traps on an infinity or a
+        // NaN, and a percentage outside 0-100 is not one — a printer reporting
+        // 5000 would have printed "5000%" on the shop floor.
+        if alert.progress > 0 {
+            parts.append("\(Int(min(100, max(0, alert.progress.isFinite ? alert.progress : 0))))%")
+        }
         if parts.isEmpty { parts.append(alert.state) }
         return parts.joined(separator: " · ")
     }

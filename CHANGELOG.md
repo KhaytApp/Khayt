@@ -428,6 +428,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **A model file could crash Khayt outright, and `v1="nan"` was enough.** Three
+  characters where a 3MF names one of a triangle's corners. Swift refuses to
+  turn a "not a number" into a whole number and stops the program rather than
+  guess, so one malformed or corrupt file took the app down — and because an
+  import reads a whole folder, it took the other three hundred models with it.
+  Unreadable corners are now dropped the way an out-of-range one already was.
+
+- **A printer could crash Khayt by reporting a silly number.** The same fault
+  in two more places: a job id and a progress percentage read straight off the
+  network. Progress is also clamped to 0–100 now, so a printer claiming 5,000%
+  no longer says so on the shop floor.
+
+- **Security: the AI address field accepted `http://` to anywhere.** Khayt lets
+  you point its AI features at your own endpoint — a model on your own machine,
+  or a gateway inside the Kingdom — and sends your API key in a header. Typed
+  as `http://` to an address out on the internet, that key crossed the network
+  in clear text with nothing said about it. A model on this machine or a server
+  on your own network still works over plain http, because nothing leaves the
+  building; anywhere else now requires `https://`. It is the same rule the
+  cloud server field has always had, and both now read it from one place.
+
 - **(Developers) The Mac screenshot runner reported a window size it had not
   got.** `KHAYT_SNAPSHOT_SIZE` exists so a layout can be reviewed at sizes other
   than the one it was built at, and AppKit will not make a window taller than

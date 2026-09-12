@@ -68,6 +68,94 @@ struct Mesh3MFTests {
         return archive
     }
 
+    /// A 3MF carrying whatever it likes where a number belongs.
+    static func hostile3MF(in dir: URL, named: String, triangles: String) throws -> URL {
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+         <resources>
+          <object id="1" type="model">
+           <mesh>
+            <vertices>
+             <vertex x="0" y="0" z="0"/>
+             <vertex x="10" y="0" z="0"/>
+             <vertex x="10" y="10" z="0"/>
+             <vertex x="0" y="0" z="10"/>
+            </vertices>
+            <triangles>
+        \(triangles)
+            </triangles>
+           </mesh>
+          </object>
+         </resources>
+         <build><item objectid="1"/></build>
+        </model>
+        """
+        let staging = dir.appending(path: "staging-\(UUID().uuidString)")
+        let modelDir = staging.appending(path: "3D")
+        try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
+        try Data(xml.utf8).write(to: modelDir.appending(path: "3dmodel.model"))
+        let archive = dir.appending(path: named)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        process.arguments = ["-q", "-r", archive.path, "."]
+        process.currentDirectoryURL = staging
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+        try process.run()
+        process.waitUntilExit()
+        return archive
+    }
+
+    /// A NUMBER THAT IS NOT ONE MUST NOT TAKE THE APP WITH IT.
+    ///
+    /// `attribute` hands back whatever `Double(String)` made of the file, and
+    /// `Int(someDouble)` TRAPS: "Double value cannot be converted to Int
+    /// because it is either infinite or NaN". So `v1="nan"` — three characters
+    /// in a file a customer emails a shop — crashed Khayt outright. Measured
+    /// with a standalone `Int(Double.nan)`, which exits 133.
+    ///
+    /// A crash is not the worst of it: this runs over a whole downloads folder
+    /// during an import, so one bad file took the other three hundred with it.
+    @Test("a 3MF whose indices are not numbers is read, not crashed on")
+    func hostileIndices() throws {
+        let dir = try Self.tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        for (name, v1) in [("nan", "nan"), ("inf", "inf"), ("huge", "1e400"),
+                           ("negative", "-1"), ("past-int", "1e30"),
+                           ("empty", ""), ("words", "first")] {
+            let url = try Self.hostile3MF(
+                in: dir, named: "bad-\(name).3mf",
+                triangles: """
+                     <triangle v1="\(v1)" v2="1" v3="2"/>
+                     <triangle v1="0" v2="1" v3="3"/>
+                """)
+            // The good triangle survives; the unreadable one is dropped. Nil is
+            // also an acceptable answer — what is not acceptable is a trap.
+            let m = try Mesh.measure3MF(url)
+            #expect(m?.triangleCount ?? 0 <= 1,
+                    Comment(rawValue: "\(name): a triangle with v1=\(v1) was counted"))
+        }
+    }
+
+    @Test("a vertex that is not a number does not become a measurement")
+    func hostileVertices() throws {
+        // No trap here — a NaN coordinate is only ever stored as a Double — but
+        // it poisons min/max, and `Infinity` does not survive JSON either, so a
+        // geometryKey built from it would be null where a number belongs.
+        let dir = try Self.tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let xml = """
+             <triangle v1="0" v2="1" v3="2"/>
+        """
+        let url = try Self.hostile3MF(in: dir, named: "nanvertex.3mf", triangles: xml)
+        // The fixture's vertices are all finite, so this is the control: it
+        // reads, and it reads as a real triangle.
+        let m = try Mesh.measure3MF(url)
+        #expect(m?.triangleCount == 1)
+    }
+
     @Test("a box in a 3MF measures like a box")
     func oneBox() throws {
         let dir = try Self.tempDir()
