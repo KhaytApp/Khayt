@@ -16,6 +16,48 @@ security fixes. The promotion gate and the one condition WAIVED are recorded in
 unchanged rather than reimplementing them. It becomes the main Khayt on macOS, a
 native Windows app follows, and the Electron build continues as the third option.
 
+### Mac parity — where it actually stands (2026-09-12)
+
+The Mac app is the product now, so a renderer-only feature is a gap to close,
+not a difference to document. The measurable form of that: **129 of `lib/`'s 244
+modules are bundled into the Mac app. 115 are not**, and 35 of those cannot be —
+they need Node's `fs`, `crypto`, `zlib` or `http`. **80 are pure and could be
+bundled today.**
+
+Seven landed on 2026-09-12: `maintenance`, `consumable-reorder`,
+`consumable-categories`, `print-setups`, `print-versions`, `print-file-parts`,
+`zatca-submit`.
+
+Three things that recur and are worth knowing before picking the next one:
+
+- **The sample book cannot reach a new feature.** Four in a row arrived with
+  `sample-shop.json` at zero for them, so every branch of every new panel would
+  have shipped never having been drawn. Adding the sample data is part of the
+  feature. `mac/KhaytCore/Tests/KhaytAppTests/SampleShopTests.swift` guards the
+  spread, and two of those guards pin `now` — a rate measured over a trailing
+  window, and a date-driven interval, both decay out of the case they were
+  written for if the guard reads the wall clock.
+- **A module named for what it produces fails the bundle check.** The global is
+  derived from the filename; `print-file-parts.js` publishes `KhaytPrintParts`
+  and every engine refused to start until it was in the exceptions map. That is
+  the check working.
+- **A rule that composes an English sentence cannot cross.** `describeSetup` and
+  `describe` both do. The FIELDS cross and the line is built against the locale;
+  the VERDICT stays in the rule.
+
+**What is left, in the order it is worth doing:**
+
+| | What | Why it is not done |
+|---|---|---|
+| 1 | **Depreciation in the cost model** (R8, §6 of the competitive roadmap) | Not a parity item at all — a correctness gap in both apps |
+| 2 | **A job part editor** | Parts are read-only on the Mac. Unblocks `part-from-print-file.js`, which is otherwise a module with no caller |
+| 3 | **`print-risk.js`** | Needs a decision: `analyzeTriangles` is two-pass over the mesh, and the Mac's reader streams and never holds triangles. On demand (second read of the file) or at import (every import pays)? Also the only item needing a Swift duplicate of an accumulator |
+| 4 | **`rbac.js`, `subscriptions.js`, `feature-tiers.js`** | Pure and unbundled. Tier and permission rules the Mac currently has no opinion about |
+| 5 | **`stl-parse`, `obj-parse`, `gcode-parse`, `gcode-geometry`** | The Mac parses meshes in Swift on purpose (licence — `Mesh.swift` explains). These are for the formats it cannot yet read, not a lift |
+| 6 | **The seven `ai-*` modules** | Needs a product decision about what leaves the shop and an API-key path, not an engineering one |
+| 7 | **`lan-server.js`** | Node `http`. Wants `LanServer.swift`, which compiles and nothing constructs |
+
+
 **Previously: v3.6.0** (2026-08-21) — the 3.6.0 line, promoted from
 `v3.6.0-rc.4` unchanged after a seven-day soak. rc.4 was the first candidate on
 this line that `main` did not overtake, so for once replace-vs-promote resolved

@@ -295,3 +295,89 @@ Stated so it can be checked rather than assumed:
   *Caveat on all of the above:* these are vendor marketing pages read once, not
   hands-on evaluations. They are enough to place a product, not to trust a
   feature matrix.
+
+---
+
+## 6. Second reading — September 2026
+
+Twenty products Turki collected on 2026-09-12, mostly print-farm tools rather
+than the calculators and libraries of §0. Four were read properly; the rest
+repeat their categories. **Every claim about Khayt below was checked against the
+code, not assumed** — two apparent gaps turned out not to be.
+
+| Product | Category | Model | Read? |
+|---|---|---|---|
+| [SimplyPrint](https://simplyprint.io/print-farms) | **Fleet automation** — 130+ brands, AI failure detection, usage-based maintenance | SaaS, LAN-only mode available | ✅ |
+| [Printago](https://printago.io) | **Farm automation + commerce** — Shopify/Etsy → queue, "Gutenbed" routing, cloud slicing | Freemium, unlimited printers | ✅ (also §0) |
+| [Stimalo](https://stimalo.com) | **Shop management** — costing, quoting, orders, FIFO batches | Free / €5.99 mo | ✅ |
+| [3D Filament Profiles](https://3dfilamentprofiles.com/) | **Community filament database** — ~24k filaments, 900+ providers | Free, community-edited | ✅ |
+| OctoFarm, Repetier-Server, Prusa Connect, 3DPrinterOS, OctoPrint | Fleet control, one of them vendor-locked | mixed | category only |
+| Printventory, 3dprintmanager.eu, PrintFarmManager, 3DQue, BuildBee, Printandgo, 3diwell, LutraCAD | Farm / inventory management | mixed | category only |
+
+### The field splits, and the split is the finding
+
+**Fleet-automation-first** (SimplyPrint, Printago, OctoFarm, Repetier,
+3DPrinterOS): bulk start, smart routing, cloud slicing, lights-out production,
+failure detection. SimplyPrint's and Printago's own pages mention **costing,
+invoicing and tax nowhere at all**.
+
+**Books-first** (Stimalo, FoxTrack, Layers from §5, Khayt): what a job cost,
+what it earned, who owes what.
+
+Khayt is in the second bucket and should stay there. The first bucket will
+out-automate it indefinitely — SimplyPrint claims 130+ printer brands against
+Khayt's seven protocols — and competing there is a race Khayt loses while
+neglecting the ground it holds.
+
+### Stimalo is the closest competitor yet found
+
+Closer than Layers. Materials, energy, **depreciation**, labour and packaging in
+the cost model; four pricing strategies; quote-to-delivery tracking; FIFO
+material batches at purchase price; G-code/3MF import auto-filling weight and
+time. €5.99/month, with a free tier billed as having no hidden limits.
+
+### One confirmed gap, two false alarms
+
+- **GAP — machine depreciation.** `lib/calculator-cost.js` costs labour,
+  packaging, failure rate, power draw and electricity. It has no depreciation or
+  amortisation term at all. A shop pricing without one is eating its printers
+  quietly, and Stimalo names it on the front page. Small and well defined.
+- **NOT a gap — FIFO material batches.** Khayt costs material per spool at that
+  spool's own purchase price (`cost / weight * 1000`, see
+  `lib/material-cost.js`). Each spool *is* its batch, which is more precise than
+  pooling, not less.
+- **NOT a gap — e-commerce.** `lib/integrations-registry.js` already carries
+  Shopify, Etsy, WooCommerce, Salla, Zid and Medusa.
+
+### The one genuinely new idea
+
+**A community filament database.** ~24,000 filaments from 900+ providers, with
+nozzle and plate temperatures, pressure-advance K-values and **HueForge
+transmission distances**. Two separate uses: adding a spool becomes a lookup
+rather than typing, and the TD data feeds the HueForge work directly. Nothing
+else read this round was an idea Khayt did not already have.
+
+### What none of them touch
+
+ZATCA Phase 1 and 2, VAT, Arabic and RTL throughout, Salla and Zid, SAR. §2 said
+this and it still holds — but it is worth restating that this is not a feature
+list, it is a category the entire field above would have to enter deliberately.
+Everything in this section is worth learning from; none of it is worth chasing
+at the expense of that.
+
+### Roadmap from this reading
+
+**R8 — depreciation in the cost model.** The only confirmed correctness gap.
+Pricing that omits it is wrong rather than merely thin.
+
+**R9 — filament lookup instead of filament typing.** Populate a spool from the
+community database. Wants a decision first on whether Khayt queries it live,
+ships a snapshot, or contributes back.
+
+**R10 — decide the automation line, in writing.** Khayt now finds printers,
+controls them and proposes dispatch. It is not going to do cloud slicing or
+lights-out production. Saying where the line falls stops it being redecided one
+feature at a time.
+
+*Caveat, as §5: vendor marketing pages read once, not hands-on evaluations.
+Enough to place a product, not to trust a feature matrix.*
