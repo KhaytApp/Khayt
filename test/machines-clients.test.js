@@ -6,6 +6,10 @@ test('machineServiceStatus marks service due when interval exceeded', () => {
     { machineId: 'M1', status: 'completed', printTime: 100 },
   ];
   global.machines = [{ id: 'M1', name: 'Test', serviceInterval: 50, lastServiceHours: 0 }];
+  // index.html loads this as a <script>, which is what defines the global the
+  // hour meter reads. Requiring it here does the same thing, so the test
+  // exercises the shared rule rather than a stand-in for it.
+  require('../lib/maintenance.js');
   const { machineServiceStatus } = require('../renderer/machines.js');
   const svc = machineServiceStatus(global.machines[0]);
   assert.equal(svc.due, true);

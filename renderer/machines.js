@@ -1249,9 +1249,10 @@ function openMaintLog(machineId) {
    Machine hour meter + service status (Feature 1)
    ============================================================ */
 function machineHoursMeter(machineId) {
-  return printLog
-    .filter(o => o.machineId === machineId && o.status === 'completed')
-    .reduce((s, o) => s + (+o.printTime || 0), 0);
+  // The rule itself lives in lib/maintenance.js, because the Mac app measures
+  // every maintenance interval against this same number and two definitions of
+  // "which jobs count" is two answers to when a nozzle is due.
+  return KhaytMaintenance.hoursMeter(printLog, machineId);
 }
 
 function machineServiceStatus(machine) {

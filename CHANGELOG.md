@@ -29,6 +29,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Khayt tells you what each printer is due for.** A machine card now
+  lists the recurring jobs set against that printer — replace the nozzle, clean
+  the plate, check the belts — with how far off each one is and a button to mark
+  it done. Amber when it is close, red when it is past, and nothing at all on a
+  printer nobody has set tasks up for.
+
+  The hours are the hours Khayt has logged, counting finished prints only. A
+  cancelled print used some of the machine's life in reality, but the log has no
+  honest figure for how many, and counting the whole estimate would bring
+  services forward on exactly the printers that fail most.
+
 - **(Mac) Khayt finds printers on your network.** Adding a machine meant knowing
   its address and typing it — and a shop that has just plugged a printer in does
   not know it, so the number gets copied by hand off the printer's own screen

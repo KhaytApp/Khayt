@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { taskStatus, dueTasks, markDone, WARN_FRACTION } = require('../lib/maintenance');
+const { taskStatus, dueTasks, markDone, hoursMeter, WARN_FRACTION } = require('../lib/maintenance');
 
 const NOW = '2026-06-18T00:00:00.000Z';
 // Build an ISO timestamp `days` before NOW.
@@ -272,4 +272,59 @@ test('missing and junk input is zero, not NaN', () => {
   assert.equal(hoursSinceService({ totalHours: 'x', lastServiceHours: 'y' }), 0);
   const jobs = [{ printTime: 'nope', completedAt: '2026-06-11T00:00:00.000Z' }, null];
   assert.equal(hoursSinceService({ lastServiceAt: '2026-06-10T00:00:00.000Z', jobs }), 0);
+});
+
+/* ============================================================
+   hoursMeter — the number every figure above is measured against
+   ============================================================ */
+
+test('hoursMeter counts this machine\'s completed jobs and nothing else', () => {
+  const jobs = [
+    { machineId: 'M1', status: 'completed', printTime: 12 },
+    { machineId: 'M1', status: 'completed', printTime: 8 },
+    // A different machine's hours are not this machine's.
+    { machineId: 'M2', status: 'completed', printTime: 100 },
+  ];
+  assert.equal(hoursMeter(jobs, 'M1'), 20);
+  assert.equal(hoursMeter(jobs, 'M2'), 100);
+  assert.equal(hoursMeter(jobs, 'M3'), 0);
+});
+
+test('an unfinished job has not put hours on the machine', () => {
+  // A cancelled print used some hours in reality, but the log has no honest
+  // figure for how many — and counting its full estimate would bring services
+  // forward on exactly the machines that fail most.
+  const jobs = [
+    { machineId: 'M1', status: 'completed', printTime: 5 },
+    { machineId: 'M1', status: 'cancelled', printTime: 50 },
+    { machineId: 'M1', status: 'printing', printTime: 50 },
+    { machineId: 'M1', status: 'pending', printTime: 50 },
+  ];
+  assert.equal(hoursMeter(jobs, 'M1'), 5);
+});
+
+test('hoursMeter never returns a negative meter', () => {
+  // Nothing should write a negative printTime, but a meter that can run
+  // backwards makes a task show as perpetually due and the reminder useless.
+  assert.equal(hoursMeter([{ machineId: 'M1', status: 'completed', printTime: -9 }], 'M1'), 0);
+});
+
+test('rubbish in the log is skipped, not thrown on', () => {
+  const jobs = [null, undefined, {}, { machineId: 'M1', status: 'completed' },
+                { machineId: 'M1', status: 'completed', printTime: 'x' },
+                { machineId: 'M1', status: 'completed', printTime: 3 }];
+  assert.equal(hoursMeter(jobs, 'M1'), 3);
+  assert.equal(hoursMeter(null, 'M1'), 0);
+  assert.equal(hoursMeter(undefined, 'M1'), 0);
+  assert.equal(hoursMeter('not a list', 'M1'), 0);
+});
+
+test('the meter is what taskStatus measures against', () => {
+  // The two are used together everywhere and the pairing is the contract:
+  // 100 logged hours against a 40-hour interval is overdue, and the figure
+  // the card shows is how far past.
+  const jobs = [{ machineId: 'M1', status: 'completed', printTime: 100 }];
+  const st = taskStatus({ intervalHours: 40, lastDoneHours: 0 }, hoursMeter(jobs, 'M1'), NOW);
+  assert.equal(st.status, 'overdue');
+  assert.equal(st.hoursRemaining, -60);
 });

@@ -379,6 +379,11 @@ public actor KhaytEngine {
         "customer-mix",
         // Which machine is costing the shop, and what it keeps doing wrong.
         "machine-reliability",
+        // When each machine is next due a service, and how many hours it has
+        // run. The hour meter is the input to every figure on the maintenance
+        // card, so it is shared rather than recomputed here — a second answer
+        // to "which jobs count" is a second answer to when a nozzle is due.
+        "maintenance",
         // When the shop actually finishes work.
         "throughput",
         // What the shelf costs, and whether that has moved.
@@ -2116,6 +2121,104 @@ public actor KhaytEngine {
             [.array(orders), .array(machines), .object(live),
              .object(lastMaterialByMachine), .object(paused)],
             as: DispatchPlan.self)
+    }
+
+    // MARK: - When a machine is next due a service
+
+    /// What each recurring maintenance task on a machine is asking for.
+    ///
+    /// `lib/maintenance.js`. The whole calculation crosses in one call — the
+    /// meter, the elapsed hours and the status per task — because the three are
+    /// one answer and computing any of them here would make this a second
+    /// opinion about when a nozzle is due.
+    ///
+    /// `now` is passed in rather than read inside the module, as `machineBand`
+    /// and `scheduling` do: a status computed from a hidden clock cannot be
+    /// tested and cannot be reproduced from a screenshot.
+    public struct MaintenanceCard: Decodable, Sendable, Hashable {
+        /// Hours this app has logged on the machine. Completed jobs only — a
+        /// cancelled print used some hours in reality, but the log has no
+        /// honest figure for how many.
+        public let hours: Double
+        public let tasks: [Task]
+
+        public struct Task: Decodable, Sendable, Hashable, Identifiable {
+            public let id: String
+            public let name: String
+            /// `ok`, `warning`, `due` or `overdue`, as the shared rule names
+            /// them. Kept as the module's own string: mapping it to a Swift
+            /// enum here and back for display is one more place the two apps
+            /// can come to disagree about what "due" means.
+            public let status: String
+            /// Hours left before this is due, and days left, each nil when that
+            /// clock does not drive the task. GOES NEGATIVE once due, and that
+            /// is the point: a shop with three overdue machines needs to know
+            /// which is worst, and a status alone cannot rank them.
+            public let hoursRemaining: Double?
+            public let daysRemaining: Double?
+            /// Whichever interval drives this task.
+            public let intervalHours: Double?
+            public let intervalDays: Double?
+        }
+    }
+
+    /// Every task on one machine, with the hour meter it is measured against.
+    ///
+    /// `jobs` is the whole print log rather than the machine's slice of it:
+    /// the meter decides for itself which jobs count, and filtering first here
+    /// would quietly move that decision into Swift.
+    public func maintenance(machineId: String, tasks: [JSONValue],
+                            jobs: [JSONValue], machine: JSONValue,
+                            now: Date) throws -> MaintenanceCard {
+        try runtime.call2("""
+            (function (a) {
+              var M = KhaytMaintenance;
+              var hours = M.hoursMeter(a.jobs, a.machineId);
+              var mine = (a.tasks || []).filter(function (t) {
+                return t && t.machineId === a.machineId;
+              });
+              return {
+                hours: hours,
+                tasks: mine.map(function (t) {
+                  var st = M.taskStatus(t, hours, a.now) || {};
+                  return {
+                    id: String(t.id == null ? '' : t.id),
+                    name: String(t.name == null ? '' : t.name),
+                    status: String(st.status || 'ok'),
+                    // Passed through as the rule returns them, null included:
+                    // null means "this clock does not drive the task", which is
+                    // a different thing from zero remaining.
+                    hoursRemaining: st.hoursRemaining == null ? null : Number(st.hoursRemaining),
+                    daysRemaining: st.daysRemaining == null ? null : Number(st.daysRemaining),
+                    intervalHours: t.intervalHours > 0 ? Number(t.intervalHours) : null,
+                    intervalDays: t.intervalDays > 0 ? Number(t.intervalDays) : null,
+                  };
+                }),
+              };
+            })(ARG0)
+            """,
+            [.object([
+                "machineId": .string(machineId),
+                "tasks": .array(tasks),
+                "jobs": .array(jobs),
+                "machine": machine,
+                "now": .number(now.timeIntervalSince1970 * 1000),
+            ])],
+            as: MaintenanceCard.self)
+    }
+
+    /// Record that a task was just done, and hand back the fields to store.
+    ///
+    /// The patch comes from the shared rule rather than being assembled here:
+    /// which fields a completion writes is part of the maintenance contract,
+    /// and the Electron app reads the same records back.
+    public func markMaintenanceDone(task: JSONValue, hours: Double,
+                                    at when: Date) throws -> [String: JSONValue] {
+        try runtime.call2("""
+            KhaytMaintenance.markDone(ARG0, ARG1, ARG2)
+            """,
+            [task, .number(hours), .string(ISO8601DateFormatter().string(from: when))],
+            as: [String: JSONValue].self)
     }
 
     // MARK: - How much passes inspection first time
