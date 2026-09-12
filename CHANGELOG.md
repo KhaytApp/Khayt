@@ -436,14 +436,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
-- **A model file could crash Khayt outright, and `v1="nan"` was enough.** Three
+- **(Mac) A model file could crash Khayt outright, and `v1="nan"` was enough.** Three
   characters where a 3MF names one of a triangle's corners. Swift refuses to
   turn a "not a number" into a whole number and stops the program rather than
   guess, so one malformed or corrupt file took the app down — and because an
   import reads a whole folder, it took the other three hundred models with it.
   Unreadable corners are now dropped the way an out-of-range one already was.
 
-- **A printer could crash Khayt by reporting a silly number.** The same fault
+- **(Mac) A printer could crash Khayt by reporting a silly number.** The same fault
   in two more places: a job id and a progress percentage read straight off the
   network. Progress is also clamped to 0–100 now, so a printer claiming 5,000%
   no longer says so on the shop floor.
@@ -646,6 +646,217 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   changelog. From the end deliberately: the "Before you update" section that
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
+
+## [4.0.0-alpha.5] - 2026-09-12
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Changed
+
+- **Khayt has a new icon.** A chrome nozzle extruding a single thick loop of
+  orange filament in the shape of a khaa, on deep navy — one mark at every size,
+  from the 1024px Dock icon down to the 16px favicon, instead of a detailed
+  drawing that dissolved into a smudge when it got small. The mark is drawn once
+  and all 72 shipped assets are derived from it, so the 32px and the 512px can
+  no longer disagree.
+
+  Three things this fixes on the way through. The marketing site's two favicons
+  were declared 16 and 32 and were both actually 64. Its apple-touch-icon was
+  256 with transparency, which iOS composites onto black. And the AppX badge was
+  a colour downscale where Windows wants a monochrome glyph it can tint per
+  theme.
+
+- **(Maintainers) The Mac app has a macOS 26 layered icon.** It shipped a flat
+  legacy `.icns`, so it got none of Tahoe's Liquid Glass, dark or tinted icon
+  treatment. Background and foreground are separate layers now.
+
+  The UI accent has deliberately not moved with it. Every contrast ratio in
+  `mac/README.md` was measured against the old cyan, so re-accenting is a
+  measured pass rather than a substitution.
+
+### Added
+
+- **Khayt can tell you what is likely to go wrong before you quote.**
+  Select a model and the inspector says what a slicer would find: how much of
+  the surface overhangs past 45° and will need supports, how much is
+  near-horizontal underside that sags rather than merely printing rough, and
+  whether the walls average thinner than the nozzle can lay down.
+
+  Every line carries the measurement it is based on, so you can disagree with
+  it. A shop that supports everything by default can see at a glance which
+  line to scroll past, and a part with nothing wrong says so — "nothing to
+  flag on this one" is a different answer from not having looked.
+
+  **It works on the files you actually own.** The other Khayt computes the same
+  findings for a quote, but it has to build the whole triangle list to do it
+  and gives up past four million facets. Two models in this library are past
+  that. The Mac reads the mesh as a stream and keeps ninety-one numbers, so the
+  size of the file stops being the question.
+
+  Under Settings → Preferences you can choose *when* Khayt looks: **when you
+  ask**, which is the default, or **as each file is imported**. Reading a mesh
+  is a few seconds on a large model — paying that during an import answers
+  instantly forever after, and leaving it until you ask keeps imports fast.
+  Either way the answer is kept, so the same model is never read twice, and it
+  is thrown away if the file behind it is replaced.
+
+- **Adding a spool can be a lookup instead of typing.** Start typing a
+  brand or a product — "bambu matte", "esun petg" — and Khayt offers the
+  filament and its colours from a bundled catalogue of 1,945 products, filling
+  in the name, the colour, its hex and the spool weight.
+
+  It fills in what a manufacturer can know and nothing else. Your cost, what the
+  roll weighs today, when you opened it and whether you have dried it are facts
+  about the spool in your hand, and nothing here invents them — and editing a
+  half-used roll never overwrites what is on it.
+
+  The list ships with the app, so it works with no connection and Khayt does not
+  tell anybody what you buy. It says how old it is rather than pretending to be
+  current. From the Open Filament Database, MIT-licensed — see
+  [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md).
+
+- **A job's parts can be corrected.** They were read-only: a weight typed
+  wrong when the job was taken stayed wrong, and the only way to fix it was to
+  open the job in the other Khayt. Double-click a part to change its name,
+  filament, weight, hours or quantity.
+
+  **The price is not a field you type.** A part that weighs 40 g rather than
+  30 g costs more to make, so the figures you know are asked for and the price
+  follows from the same cost model the calculator uses. Correcting a weight
+  corrects the job.
+
+  Where the part came from a model in your library, *Fill from file* takes the
+  weight and time the slicer measured. It shows you both figures first rather
+  than overwriting quietly — a part may have been corrected on purpose — and it
+  says which fields the file could not answer for instead of leaving zeros that
+  look typed.
+
+- **A print made of several files says so.** A head, two arms and a torso
+  are one thing you print, not four — but the Mac app showed a kit as a single
+  entry with the rest of its files invisible. The model's panel now lists every
+  file in the print, marks the one the card speaks for, and adds up what the
+  whole thing weighs on disk.
+
+  Where a file could not be measured it says so, and the total is left off
+  rather than quietly adding up the parts it could measure and presenting that
+  as the size of the print.
+
+- **An invoice says whether it has actually been reported to ZATCA.**
+  Khayt already put the Phase 1 QR on the document. What the Mac app could not
+  tell you was whether an invoice you had handed a customer had been reported to
+  the tax authority at all — which is the part a Saudi shop can be penalised
+  for, and it was invisible on this side. A completed invoice now says
+  submitted, not submitted, rejected or errored, with the counter value and, if
+  it was refused, the reason it was refused.
+
+  It does not offer to submit. Signing the document needs code that only runs in
+  the Electron app, and a button here that could not finish the job would be
+  worse than a plain statement. Nothing appears at all on a shop that has not
+  switched Phase 2 on, because none of this applies to it.
+
+- **Khayt remembers what a print actually worked at.** A file counted how
+  many times it printed and how many times it failed, but not *with what* — so
+  reprinting a bracket six months later you knew it had worked once and had no
+  idea on which printer, in which material, at which layer height. The model's
+  panel now lists the settings it has been printed at, marks the one to reach
+  for, and says plainly when nothing has worked yet rather than naming the least
+  broken option.
+
+  One bad print does not condemn a setup: filament runs out, a spool tangles,
+  somebody knocks the machine. Nine of ten is still a setup to reach for, and
+  one of four is not, however recently that one worked. A setup nobody has run
+  reads as untried rather than as a score of nought — and your own verdict
+  overrides the tally, because "it printed, but I did not like the finish" is a
+  judgement no counter can reach.
+
+- **A print that exists at more than one size says so.** Big and small
+  carry their own weight and time, so the panel shows each with its own figures
+  and marks the one the estimate is about. Files that have only ever been one
+  thing — nearly all of them — are unchanged.
+
+- **Khayt says what is about to run out that is not filament.** Glue, IPA,
+  mailing bags, spare nozzles — running out of one of those stops a job exactly
+  the way running out of filament does, and only filament reached the Mac app's
+  shelf. The inventory screen now leads with what needs ordering, in each item's
+  own unit.
+
+  Three different reasons put something on that list and they read differently:
+  it has run out, it is below the minimum you set, or nothing is wrong yet and
+  the rate you are getting through it says otherwise. The last is the one you
+  cannot see by looking at the rack. Where Khayt has no usage figure and you
+  have set no minimum, it says the item is low and stops there rather than
+  inventing a quantity to put on a supplier's order.
+
+- **Khayt tells you what each printer is due for.** A machine card now
+  lists the recurring jobs set against that printer — replace the nozzle, clean
+  the plate, check the belts — with how far off each one is and a button to mark
+  it done. Amber when it is close, red when it is past, and nothing at all on a
+  printer nobody has set tasks up for.
+
+  The hours are the hours Khayt has logged, counting finished prints only. A
+  cancelled print used some of the machine's life in reality, but the log has no
+  honest figure for how many, and counting the whole estimate would bring
+  services forward on exactly the printers that fail most.
+
+- **Khayt finds printers on your network.** Adding a machine meant knowing
+  its address and typing it — and a shop that has just plugged a printer in does
+  not know it, so the number gets copied by hand off the printer's own screen
+  across the room. *Find printers* on the machines screen asks the network
+  instead, and adding one fills in its address, its connection type and — when
+  Khayt recognises the model — its bed, nozzle and running cost.
+
+  The scan is owner-initiated and time-boxed, never on a timer, and macOS asks
+  your permission the first time. A printer Khayt can see but cannot yet speak
+  to says so rather than being added as though it were ready.
+
+- **(Maintainers) The mDNS codec runs on the Mac now.** `lib/mdns.js` was built
+  on Node's `Buffer`, which JavaScriptCore does not have — so the one piece of
+  wire-format code both apps need could be loaded by only one of them, and
+  finding a printer on the Mac would have meant a second implementation of DNS
+  name compression. Two codecs is two chances to mis-read a packet arriving
+  unauthenticated from the workshop network. It is `Uint8Array` throughout now;
+  `Buffer` *is* a `Uint8Array`, so nothing in the Windows and Linux app changed.
+
+- **Khayt can tell a printer what to do.** The Mac app could watch seven
+  protocols and touch none of them: it knew a print was failing, it knew which
+  machine, and stopping it meant walking to the printer or opening the other
+  app. Pause, resume and cancel are on the machine card now, while something is
+  running. Cancelling asks first — it throws away every hour already in the
+  plate, and no printer asks twice.
+
+  **And on a Klipper or Moonraker printer, one object can be dropped from a
+  plate that is still printing.** For the single part that has come loose, while
+  the rest of the plate carries on. It cannot be undone, so the sheet names the
+  object and says so.
+
+### Fixed
+
+- **A model file could crash Khayt outright, and `v1="nan"` was enough.** Three
+  characters where a 3MF names one of a triangle's corners. Swift refuses to
+  turn a "not a number" into a whole number and stops the program rather than
+  guess, so one malformed or corrupt file took the app down — and because an
+  import reads a whole folder, it took the other three hundred models with it.
+  Unreadable corners are now dropped the way an out-of-range one already was.
+
+- **A printer could crash Khayt by reporting a silly number.** The same fault
+  in two more places: a job id and a progress percentage read straight off the
+  network. Progress is also clamped to 0–100 now, so a printer claiming 5,000%
+  no longer says so on the shop floor.
+
+- **(Maintainers) The snapshot watchdog names the screen that actually hung.**
+  Its checkpoint was only updated by the two window captures, so the eleven
+  sheets that follow the board never moved it — a run that hung later reported
+  `STUCK at 09-board`, a screen it had already photographed successfully eleven
+  steps earlier. Every writer checks in now, and each settings pane is
+  photographed as a full scroll as well as a window: a settings window is 364
+  points tall and the Operations pane is 1823, so four fifths of it had never
+  been in a picture.
+
+- **The Preferences pane no longer heads two sections "App Preferences".**
+  The default language sat under one and the menu bar toggle under the other,
+  two rows apart, with nothing to say that the first follows your book to your
+  other Macs and the second does not. The second is headed "On this Mac" now.
 
 ## [4.0.0-alpha.4] - 2026-09-11
 
