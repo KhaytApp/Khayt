@@ -75,6 +75,134 @@ enum Mesh {
         }
     }
 
+    // MARK: - Which way the surfaces face
+
+    /// The overhang histogram `lib/print-risk.js` judges a model from.
+    ///
+    /// ── WHY THIS IS HERE AND NOT IN THE SHARED RULE ────────────────────────
+    ///
+    /// `analyzeTriangles` takes the triangle list, and this shop's files are
+    /// eight to sixteen million facets — there is no crossing them into
+    /// JavaScriptCore. What DOES cross is this summary: ninety-one buckets and
+    /// a handful of scalars. So the counting is here and the JUDGEMENT stays in
+    /// `assessModel`, which is the part with the thresholds in it and the part
+    /// two implementations could disagree about.
+    ///
+    /// `PrintRiskParityTests` runs both on the same triangles and fails if they
+    /// differ, because this is a transcription and transcriptions drift.
+    ///
+    /// ── IT IS NOT FREE, WHICH IS WHY IT IS A SECOND PASS ───────────────────
+    ///
+    /// `Measurement.add` computes the scalar triple product for volume. That is
+    /// NOT the facet normal — this needs `(b-a)×(c-a)` and its length, which is
+    /// six more multiplies and a square root per triangle. On six million
+    /// facets that is real work, so it is not folded into the import: the shop
+    /// asks for it.
+    ///
+    /// Two passes, because the bed is the model's lowest point and no triangle
+    /// can be judged against it until every triangle has been seen. `minZ`
+    /// comes from the measurement that already happened.
+    struct Overhangs {
+        /// Downward area by angle from vertical, 0…90°, one bucket per degree.
+        /// Both windings are accumulated because the correct one is not known
+        /// until the volume's sign settles.
+        private var negHist = [Double](repeating: 0, count: 91)
+        private var posHist = [Double](repeating: 0, count: 91)
+        private var negArea = 0.0, posArea = 0.0
+        private var negBed = 0.0, posBed = 0.0
+        private var vol6 = 0.0
+        private(set) var totalAreaMm2 = 0.0
+        private(set) var degenerate = 0
+        private(set) var triangleCount = 0
+
+        /// The model's floor, and a first layer's worth above it.
+        let minZ: Double
+        let bedEps: Double
+
+        init(minZ: Double, layerHeight: Double = 0.2) {
+            self.minZ = minZ
+            // A first layer's worth. Anything within it is sitting on the
+            // plate, which is the one downward surface that is never a problem
+            // — and usually the largest, so counting it would drown every real
+            // overhang.
+            self.bedEps = max(layerHeight, 0.05)
+        }
+
+        /// A face this close to vertical belongs to neither side. A box's four
+        /// walls have nz of exactly 0, and putting them on the positive side
+        /// would make a reversed box report all four as downward-facing.
+        private static let verticalEps = 1e-9
+
+        @inline(__always)
+        mutating func add(_ ax: Double, _ ay: Double, _ az: Double,
+                          _ bx: Double, _ by: Double, _ bz: Double,
+                          _ cx: Double, _ cy: Double, _ cz: Double) {
+            triangleCount += 1
+            vol6 += ax * (by * cz - bz * cy)
+                  - ay * (bx * cz - bz * cx)
+                  + az * (bx * cy - by * cx)
+
+            let ux = bx - ax, uy = by - ay, uz = bz - az
+            let vx = cx - ax, vy = cy - ay, vz = cz - az
+            let nx = uy * vz - uz * vy
+            let ny = uz * vx - ux * vz
+            let nz = ux * vy - uy * vx
+            let len = (nx * nx + ny * ny + nz * nz).squareRoot()
+            // A zero-area sliver has no normal to speak of.
+            guard len > 0 else { degenerate += 1; return }
+
+            let area = len / 2
+            totalAreaMm2 += area
+            let unit = nz / len
+            guard unit <= -Self.verticalEps || unit >= Self.verticalEps else { return }
+
+            let down = unit < 0
+            let topZ = max(az, bz, cz)
+            if topZ <= minZ + bedEps {
+                if down { negArea += area; negBed += area } else { posArea += area; posBed += area }
+                return
+            }
+            if down { negArea += area } else { posArea += area }
+
+            // `-n.z` is the sine of the angle the SURFACE makes with vertical:
+            // a wall is 0°, a 45° underside is 45°, a flat ceiling is 90°.
+            let sine = min(1, down ? -unit : unit)
+            let deg = Int((asin(sine) * 180 / .pi).rounded())
+            let bucket = min(90, max(0, deg))
+            if down { negHist[bucket] += area } else { posHist[bucket] += area }
+        }
+
+        /// The summary, in the shape `assessModel` reads.
+        ///
+        /// Which orientation is "down" is decided by the volume's sign where
+        /// there is one, and by which side has more bed contact where there is
+        /// not — a mesh wound inside out is still a mesh a slicer will print.
+        func analysis() -> [String: JSONValue] {
+            let volume = abs(vol6) / 6
+            let trustworthy = volume > 1e-6
+            let flipped = trustworthy ? vol6 < 0 : posBed > negBed
+            let hist = flipped ? posHist : negHist
+            let area = flipped ? posArea : negArea
+            let bed = flipped ? posBed : negBed
+            // The field names are `analyzeTriangles`' own. `assessModel` and
+            // `overhangAreaAbove` read them by name, so a near-miss here —
+            // `hist` for `histogram` — is a risk report of zero overhang on a
+            // model covered in them, with nothing to say anything was wrong.
+            return [
+                "triangleCount": .number(Double(triangleCount)),
+                "degenerateTriangles": .number(Double(degenerate)),
+                "totalAreaMm2": .number(totalAreaMm2),
+                "downwardAreaMm2": .number(area),
+                "bedContactAreaMm2": .number(bed),
+                "histogram": .array(hist.map { JSONValue.number($0) }),
+                "bedZ": .number(minZ),
+                "windingFlipped": .bool(flipped),
+                "windingFromVolume": .bool(trustworthy),
+                "volumeMm3": .number(volume),
+            ]
+        }
+    }
+
     /// English, like `Zip.Failure` and `StoreWriter.Refusal` beside it.
     ///
     /// These describe a FILE — a header that does not add up, an archive with no
@@ -166,11 +294,37 @@ enum Mesh {
     }
 
     static func measure3MF(_ url: URL) throws -> Measurement? {
+        var m = Measurement()
+        try each3MFTriangle(url) { ax, ay, az, bx, by, bz, cx, cy, cz in
+            m.add(ax, ay, az, bx, by, bz, cx, cy, cz)
+        }
+        return m.finished()
+    }
+
+    /// Every triangle of a 3MF, placed where the build puts it.
+    ///
+    /// Factored out of `measure3MF` rather than written beside it. The overhang
+    /// pass needs the same triangles at the same coordinates, and a second
+    /// traversal that read `<build>` even slightly differently would report
+    /// overhangs for a model in a position Khayt never measured — the quiet
+    /// kind of wrong, since both answers would look plausible.
+    ///
+    /// Returns how many triangles it emitted.
+    @discardableResult
+    static func each3MFTriangle(_ url: URL,
+                                _ body: (Double, Double, Double, Double, Double,
+                                         Double, Double, Double, Double) -> Void) throws -> Int {
         let entries = try Zip.entries(of: url)
         let models = entries.filter { $0.name.lowercased().hasSuffix(".model") }
         guard !models.isEmpty else { throw Failure.notAMesh("no model part in the archive") }
 
-        var m = Measurement()
+        var emitted = 0
+        func sink(_ ax: Double, _ ay: Double, _ az: Double,
+                  _ bx: Double, _ by: Double, _ bz: Double,
+                  _ cx: Double, _ cy: Double, _ cz: Double) {
+            emitted += 1
+            body(ax, ay, az, bx, by, bz, cx, cy, cz)
+        }
 
         // THE BUILD PLACES THE OBJECTS, and where they are placed is part of
         // what Khayt measures.
@@ -188,17 +342,93 @@ enum Mesh {
         if let plan = try buildPlan(entries, in: url), !plan.isEmpty {
             for (path, placement) in plan {
                 guard let entry = entries.first(where: { equalPath($0.name, path) }) else { continue }
-                try measureModelPart(entry, in: url, placement: placement, into: &m)
+                try streamModelPart(entry, in: url, placement: placement, body: sink)
             }
-            if m.triangleCount > 0 { return m.finished() }
+            if emitted > 0 { return emitted }
             // A build that named nothing this could find. Fall through and
-            // measure the parts rather than report an empty model.
+            // read the parts rather than report an empty model.
         }
 
         for entry in models.sorted(by: { $0.name < $1.name }) {
-            try measureModelPart(entry, in: url, placement: Placement(), into: &m)
+            try streamModelPart(entry, in: url, placement: Placement(), body: sink)
         }
-        return m.finished()
+        return emitted
+    }
+
+    // MARK: - The second pass
+
+    /// The overhang summary for a file on disk, in the four formats Khayt reads.
+    ///
+    /// TWO PASSES OVER THE SAME FILE, and the second cannot be folded into the
+    /// first: the bed is the model's own lowest point, so no triangle can be
+    /// judged against it until every triangle has been seen. `minZ` therefore
+    /// has to come from a measurement that already finished.
+    ///
+    /// Reusing the same `each*Triangle` readers the measurement uses, rather
+    /// than its own parsers, is the point — a file measured one way and judged
+    /// another is the bug this shop already had when the preview renderer knew
+    /// only binary STL and sixteen CAD exports came back as grey cubes.
+    ///
+    /// Returns nil when nothing could be read, which is the same answer
+    /// `measure*` gives for the same file.
+    ///
+    /// There is no facet ceiling here, and the Electron path has two. `main.js`
+    /// caps the analysis at 150 MB and `lib/model-intake.js` at four million
+    /// facets, because that one has to BUILD the triangle list — about 810
+    /// bytes a facet, so four million is already some three gigabytes.
+    ///
+    /// Measured against this shop's library: 83 readable meshes, of which two
+    /// are past that ceiling — a 6.6M-facet multi-colour poster and a 4.3M-facet
+    /// model — and get no report at all from the other app. This streams and
+    /// holds ninety-one buckets, so the size of the file stops being the
+    /// question.
+    static func overhangs(of url: URL, layerHeight: Double = 0.2) throws -> [String: JSONValue]? {
+        let ext = url.pathExtension.lowercased()
+        guard let measured = try readGeometry(url, ext: ext) else { return nil }
+
+        var acc = Overhangs(minZ: measured.minZ, layerHeight: layerHeight)
+        let walked = try eachTriangle(url, ext: ext) { ax, ay, az, bx, by, bz, cx, cy, cz in
+            acc.add(ax, ay, az, bx, by, bz, cx, cy, cz)
+        }
+        guard walked else { return nil }
+        return acc.analysis()
+    }
+
+    /// The measurement for a file, dispatched by extension. Nil for a format
+    /// that carries no mesh — a gcode is a list of moves, not a model.
+    static func readGeometry(_ url: URL, ext: String? = nil) throws -> Measurement? {
+        switch ext ?? url.pathExtension.lowercased() {
+        case "3mf": return try measure3MF(url)
+        case "stl": return try measureSTL(url)
+        case "obj": return try measureOBJ(url)
+        default: return nil
+        }
+    }
+
+    /// Every triangle of a file, whichever of the four readers understands it.
+    /// False when none of them does, so a caller can tell "no triangles" from
+    /// "not a mesh".
+    static func eachTriangle(_ url: URL, ext: String? = nil,
+                             _ body: (Double, Double, Double, Double, Double,
+                                      Double, Double, Double, Double) -> Void) throws -> Bool {
+        switch ext ?? url.pathExtension.lowercased() {
+        case "3mf":
+            return try each3MFTriangle(url, body) > 0
+        case "obj":
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { return false }
+            eachOBJTriangle(text, body)
+            return true
+        case "stl":
+            // Binary first, then the text form — the same order and the same
+            // arithmetic test `measureSTL` uses, because a file it measures as
+            // binary and this reads as text would be judged on nothing.
+            if try eachSTLTriangle(url, body) { return true }
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { return false }
+            eachAsciiSTLTriangle(text, body)
+            return true
+        default:
+            return false
+        }
     }
 
     /// `[(part path, placement)]` from the root part's `<build>`, or nil when
@@ -267,9 +497,10 @@ enum Mesh {
     }
 
     /// One `.model` part, streamed.
-    private static func measureModelPart(_ entry: Zip.Entry, in url: URL,
-                                         placement: Placement,
-                                         into m: inout Measurement) throws {
+    private static func streamModelPart(_ entry: Zip.Entry, in url: URL,
+                                        placement: Placement,
+                                        body: (Double, Double, Double, Double, Double,
+                                               Double, Double, Double, Double) -> Void) throws {
         // Vertices, flat: x,y,z,x,y,z… Reserved generously because growing a
         // 30-million-element array by doubling is most of the cost otherwise.
         var vertices: [Double] = []
@@ -277,7 +508,6 @@ enum Mesh {
         // A tag can land across a chunk boundary, so the tail after the last
         // complete `>` is carried into the next chunk.
         var carry = [UInt8]()
-        var triangles = m
 
         func consume(_ bytes: UnsafeRawBufferPointer) -> Bool {
             var buffer = carry
@@ -317,14 +547,14 @@ enum Mesh {
                         if ia >= 0, ic >= 0, ib >= 0,
                            ia + 2 < vertices.count, ib + 2 < vertices.count, ic + 2 < vertices.count {
                             if placement.isIdentity {
-                                triangles.add(vertices[ia], vertices[ia + 1], vertices[ia + 2],
-                                              vertices[ib], vertices[ib + 1], vertices[ib + 2],
-                                              vertices[ic], vertices[ic + 1], vertices[ic + 2])
+                                body(vertices[ia], vertices[ia + 1], vertices[ia + 2],
+                                     vertices[ib], vertices[ib + 1], vertices[ib + 2],
+                                     vertices[ic], vertices[ic + 1], vertices[ic + 2])
                             } else {
                                 let p = placement.apply(vertices[ia], vertices[ia + 1], vertices[ia + 2])
                                 let q = placement.apply(vertices[ib], vertices[ib + 1], vertices[ib + 2])
                                 let r = placement.apply(vertices[ic], vertices[ic + 1], vertices[ic + 2])
-                                triangles.add(p.0, p.1, p.2, q.0, q.1, q.2, r.0, r.1, r.2)
+                                body(p.0, p.1, p.2, q.0, q.1, q.2, r.0, r.1, r.2)
                             }
                         }
                     }
@@ -337,7 +567,6 @@ enum Mesh {
         }
 
         try Zip.stream(entry, in: url, onChunk: consume)
-        m = triangles
     }
 
     // MARK: - Reading a tag

@@ -141,6 +141,7 @@ enum LibraryImport {
                                   },
                                   engine: engine,
                                   keepOriginal: keepOriginal,
+                                  analyseRisk: shop.analysesRiskAtImport,
                                   owns: { StoreLock.weOwnIt(build) },
                                   whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) })
         await shop.load(shop.source)
@@ -161,6 +162,7 @@ enum LibraryImport {
                     engine: KhaytEngine,
                     keepOriginal: Bool = false,
                     group: String? = nil,
+                    analyseRisk: Bool = false,
                     owns: @escaping () -> Bool,
                     whoHasIt: @escaping () -> String?) async throws -> Added {
         let ext = source.pathExtension.lowercased()
@@ -225,6 +227,21 @@ enum LibraryImport {
         default: geometry = nil          // gcode carries no mesh this reads
         }
 
+        // THE OVERHANG WALK, when the shop has asked for it at import.
+        //
+        // A SECOND pass over the file, which cannot be folded into the first:
+        // the bed is the model's own lowest point, so no triangle can be judged
+        // against it until every triangle has been seen.
+        //
+        // Here rather than at the end because this is the moment the shop is
+        // already waiting and the file is already warm in the cache — and it is
+        // best-effort, because a mesh this cannot walk is still a model. An
+        // import must not fail over a warning.
+        var riskAnalysis: [String: JSONValue]?
+        if analyseRisk, geometry != nil {
+            riskAnalysis = try? Mesh.overhangs(of: destination)
+        }
+
         var key: String?
         if let g = geometry {
             key = try? await engine.geometryKey(triangleCount: g.triangleCount,
@@ -262,7 +279,8 @@ enum LibraryImport {
         let record = self.record(id: id, name: name, originalName: originalName,
                                  filename: filename, ext: ext, size: size,
                                  hash: hash, key: key, colours: colours,
-                                 swapCount: swapCount, thumbFile: thumbFile, group: group)
+                                 swapCount: swapCount, thumbFile: thumbFile, group: group,
+                                 riskAnalysis: riskAnalysis)
         do {
             try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
                 var rows: [JSONValue] = []
@@ -351,6 +369,7 @@ enum LibraryImport {
                         nameOfExisting: @escaping (String) -> String?,
                         engine: KhaytEngine,
                         keepOriginal: Bool = false,
+                        analyseRisk: Bool = false,
                         owns: @escaping () -> Bool,
                         whoHasIt: @escaping () -> String?,
                         shouldStop: () -> Bool = { false },
@@ -364,7 +383,7 @@ enum LibraryImport {
                 let added = try await add(file.url, storeURL: storeURL, libraryRoot: libraryRoot,
                                           knownHashes: known, nameOfExisting: nameOfExisting,
                                           engine: engine, keepOriginal: keepOriginal,
-                                          group: file.group,
+                                          group: file.group, analyseRisk: analyseRisk,
                                           owns: owns, whoHasIt: whoHasIt)
                 report.moved += 1
                 if let hash = added.contentHash { known.insert(hash) }
@@ -393,9 +412,10 @@ enum LibraryImport {
                        hash: String?, key: String?, colours: [JSONValue],
                        swapCount: Int, thumbFile: String?,
                        group: String? = nil,
+                       riskAnalysis: [String: JSONValue]? = nil,
                        now: Double = Date().timeIntervalSince1970 * 1000)
         -> [String: JSONValue] {
-        [
+        var out: [String: JSONValue] = [
             "id": .string(id),
             "name": .string(name.isEmpty ? "Untitled" : name),
             "originalName": .string(originalName),
@@ -432,6 +452,20 @@ enum LibraryImport {
             "contentHash": hash.map(JSONValue.string) ?? .null,
             "geometryKey": key.map(JSONValue.string) ?? .null,
         ]
+        // Absent rather than null when the walk did not happen. A null here
+        // would be indistinguishable from a walk that found nothing, and the
+        // inspector has to be able to offer the button for the first and not
+        // for the second.
+        if let riskAnalysis, !riskAnalysis.isEmpty {
+            out["printRisk"] = .object([
+                "analysis": .object(riskAnalysis),
+                // The bytes it was measured from: a model replaced later keeps
+                // its id, and a summary of the old mesh must not read as current.
+                "contentHash": hash.map(JSONValue.string) ?? .null,
+                "at": .number(now),
+            ])
+        }
+        return out
     }
 
     /// Epoch milliseconds as the store writes a timestamp: ISO-8601 in UTC, to

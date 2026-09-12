@@ -29,6 +29,30 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Khayt can tell you what is likely to go wrong before you quote.**
+  Select a model and the inspector says what a slicer would find: how much of
+  the surface overhangs past 45° and will need supports, how much is
+  near-horizontal underside that sags rather than merely printing rough, and
+  whether the walls average thinner than the nozzle can lay down.
+
+  Every line carries the measurement it is based on, so you can disagree with
+  it. A shop that supports everything by default can see at a glance which
+  line to scroll past, and a part with nothing wrong says so — "nothing to
+  flag on this one" is a different answer from not having looked.
+
+  **It works on the files you actually own.** The other Khayt computes the same
+  findings for a quote, but it has to build the whole triangle list to do it
+  and gives up past four million facets. Two models in this library are past
+  that. The Mac reads the mesh as a stream and keeps ninety-one numbers, so the
+  size of the file stops being the question.
+
+  Under Settings → Preferences you can choose *when* Khayt looks: **when you
+  ask**, which is the default, or **as each file is imported**. Reading a mesh
+  is a few seconds on a large model — paying that during an import answers
+  instantly forever after, and leaving it until you ask keeps imports fast.
+  Either way the answer is kept, so the same model is never read twice, and it
+  is thrown away if the file behind it is replaced.
+
 - **Khayt's AI features work with the AI you already pay for.** They were
   Anthropic and nothing else. You can now choose OpenAI or Google Gemini
   instead — or point Khayt at any OpenAI-compatible address, which covers

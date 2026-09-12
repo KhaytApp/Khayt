@@ -366,6 +366,11 @@ final class Shop {
             expenses = Self.decode(root, "expenses", as: Expense.self)
             giftCards = Self.decode(root, "giftCards", as: GiftCard.self)
             fits = await Self.measureFit(files, machines: machineRows, engine: engine)
+            // The setting first, then the summaries it governs. Re-judged on
+            // every load rather than cached with the verdict, because the
+            // nozzle and the plate come from the machines and those change.
+            riskWhen = try? await engine?.riskWhen(settings: Self.settings(root))
+            await rejudgeStoredRisks()
             lowSpools = (try? await engine?.lowStock(inventoryRows, settings: settingsDict)) ?? [:]
             spoolRunway = (try? await engine?.runway(spools: inventoryRows, orders: orderRows,
                                                      now: Date())) ?? [:]
@@ -3312,6 +3317,7 @@ final class Shop {
             knownHashes: Set(self.files.compactMap(\.contentHash)),
             nameOfExisting: { titles[$0] },
             engine: engine,
+            analyseRisk: analysesRiskAtImport,
             owns: { StoreLock.weOwnIt(build) },
             whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
             shouldStop: { [weak self] in self?.importCancelled ?? false },
@@ -4996,6 +5002,139 @@ final class Shop {
             Task { await load(source) }
         } catch {
             writeProblem = String(describing: error)
+        }
+    }
+
+    // MARK: - What is likely to go wrong with this print
+
+    /// The overhang report for each model, keyed by the model's id.
+    ///
+    /// Loaded from the record where one has been stored, so a shop that turned
+    /// the walk on at import sees every answer immediately and one that did not
+    /// sees the ones it has asked for.
+    private(set) var risks: [String: KhaytEngine.PrintRiskReport] = [:]
+    /// The models whose mesh is being walked right now.
+    private(set) var riskRunning: Set<String> = []
+    var riskProblem: String?
+
+    /// `demand` or `import`, from the shared rule — nil until it has answered.
+    ///
+    /// NOT defaulted to a literal here. The shared rule owns that default, and
+    /// a second copy of it in Swift is a second thing to get wrong when it
+    /// changes. Nil reads as "not at import", which is the same conservative
+    /// direction `lib/print-risk.js` takes for a value it does not recognise:
+    /// the cost of being wrong is one click, not an hour added to an import.
+    private(set) var riskWhen: String?
+
+    /// True when an import should walk the mesh as each file lands.
+    var analysesRiskAtImport: Bool { riskWhen == "import" }
+
+    /// Look at one model's mesh and keep the answer.
+    ///
+    /// STORES THE MEASUREMENT AND NOT THE VERDICT, which is the whole reason
+    /// this is worth storing at all. `assessModel`'s thresholds are applied to
+    /// the shop's own nozzle and support angle, and a shop changes those — a
+    /// stored verdict would go stale silently and be read as current. Ninety-one
+    /// buckets and a handful of scalars re-judge in microseconds; re-reading a
+    /// hundred-megabyte mesh is the part that takes seconds.
+    func analyseRisk(_ file: LibraryFile) async {
+        guard let engine, !riskRunning.contains(file.id) else { return }
+        guard let url = modelFile(for: file) else {
+            riskProblem = words.callIt("mac.not_found"); return
+        }
+        riskRunning.insert(file.id)
+        riskProblem = nil
+        defer { riskRunning.remove(file.id) }
+
+        // OFF THE MAIN ACTOR. This is seconds of arithmetic on a real file and
+        // it is the thread drawing the app — the same mistake that made the
+        // library screen hang while it measured.
+        let walked = await Task.detached(priority: .userInitiated) {
+            try? Mesh.overhangs(of: url)
+        }.value
+        guard let analysis = walked else {
+            riskProblem = words.callIt("risk.unreadable")
+            return
+        }
+
+        await judge(analysis, for: file, engine: engine)
+        store(analysis, for: file.id, hash: file.contentHash)
+    }
+
+    /// Turn a stored or fresh summary into findings, using this shop's numbers.
+    private func judge(_ analysis: [String: JSONValue], for file: LibraryFile,
+                       engine: KhaytEngine) async {
+        let mesh = file.mesh
+        // NO BED, deliberately, and it is not an omission.
+        //
+        // `shop.fits` already answers "does it go on a plate you own" properly
+        // — per machine, through `lib/print-fit.js` — and the inspector prints
+        // that answer three lines above this section. Passing a bed here made
+        // the risk report say it a second time in different words: the Mesh
+        // section read "Too big for every machine you have" and this one read
+        // "It does not fit: 1435×1057×185 mm against …". One fact, two
+        // sentences, and a reader left wondering whether they are the same one.
+        //
+        // The engine still takes a bed, and `PrintRiskTests` covers it, for a
+        // caller with no fit line of its own.
+        let report = try? await engine.assessModel(
+            analysis: analysis,
+            nozzleDiameter: nozzleForRisk,
+            bbox: mesh.map { (x: $0.x, y: $0.y, z: $0.z) })
+        if let report { risks[file.id] = report }
+    }
+
+    /// Judge every model that already has a stored summary.
+    ///
+    /// Runs on load and after a settings change, because both move the answer:
+    /// a shop that fits a 0.6 mm nozzle stops having thin-wall warnings on half
+    /// its library, and it should not have to re-read a single file to find out.
+    func rejudgeStoredRisks() async {
+        guard let engine else { return }
+        for file in files {
+            guard let analysis = file.riskAnalysis else { continue }
+            await judge(analysis, for: file, engine: engine)
+        }
+    }
+
+    /// The nozzle to judge against: the widest any machine has, or nil.
+    ///
+    /// The WIDEST rather than an average, because a thin wall is only a problem
+    /// on a nozzle too fat to lay it — reporting against the finest nozzle in
+    /// the shop would warn about walls the shop can print. Nil when no machine
+    /// records one, and the shared rule's own 0.4 default then applies.
+    private var nozzleForRisk: Double? {
+        var widest: Double?
+        for row in machineRows {
+            guard case .object(let m) = row, case .number(let d)? = m["nozzleDiameter"], d > 0
+            else { continue }
+            widest = max(widest ?? 0, d)
+        }
+        return widest
+    }
+
+    /// Keep the summary on the record so the mesh is walked once, not once a look.
+    private func store(_ analysis: [String: JSONValue], for id: String, hash: String?) {
+        guard let build = source.build else { return }
+        do {
+            try StoreWriter.update(build) { root in
+                Self.edit(&root, ids: [id]) { record in
+                    var held: [String: JSONValue] = ["analysis": .object(analysis)]
+                    // The hash it was measured from. A record whose file has
+                    // been replaced has a summary describing the OLD mesh, and
+                    // a stale answer presented as current is worse than none.
+                    if let hash { held["contentHash"] = .string(hash) }
+                    held["at"] = .number(Date().timeIntervalSince1970 * 1000)
+                    record["printRisk"] = .object(held)
+                }
+            }
+            // NOT an undoable edit. A measurement is not a change the shop
+            // made, and putting it on the undo stack would mean Cmd-Z after
+            // asking a question un-asks it and leaves the shop's own last edit
+            // one step further away.
+            Task { await load(source) }
+        } catch {
+            riskProblem = String(describing: error)
         }
     }
 

@@ -651,16 +651,30 @@ struct PreferencesPane: View {
         var lang = "en"
         var useHijri = true, useArabicNumerals = false
         var autoDeduct = true, lowStock = 200.0
+        /// `demand` or `import`. Read as text with no default asserted here —
+        /// `lib/print-risk.js` owns the default, and the save path normalises
+        /// whatever this holds through the same reader.
+        var riskWhen = ""
 
         @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
             let r = SettingsReader(settings: settings)
+            let risk = SettingsReader(settings: r.object("printRisk"))
             return Draft(lang: r.text("lang", "en"), useHijri: r.onUnlessOff("useHijri"),
                          useArabicNumerals: r.flag("useArabicNumerals"),
-                         autoDeduct: r.onUnlessOff("autoDeduct"), lowStock: r.number("lowStockThreshold", 200))
+                         autoDeduct: r.onUnlessOff("autoDeduct"), lowStock: r.number("lowStockThreshold", 200),
+                         // The shop's answer if it has given one, and otherwise
+                         // whatever the shared rule says the default is — asked
+                         // for rather than repeated, so the picker cannot show
+                         // one thing while an import does another.
+                         riskWhen: {
+                             let stored = risk.text("when", "")
+                             return stored.isEmpty ? (shop.riskWhen ?? "demand") : stored
+                         }())
         }
         func form() -> [String: JSONValue] {
             ["lang": .string(lang), "useHijri": .bool(useHijri), "useArabicNumerals": .bool(useArabicNumerals),
-             "autoDeduct": .bool(autoDeduct), "lowStock": .number(lowStock)]
+             "autoDeduct": .bool(autoDeduct), "lowStock": .number(lowStock),
+             "printRisk": .object(["when": .string(riskWhen)])]
         }
     }
 
@@ -702,6 +716,21 @@ struct PreferencesPane: View {
                         TextField("", value: $draft.lowStock, format: .number.precision(.fractionLength(0)))
                             .multilineTextAlignment(.trailing).frame(width: 90)
                     }
+                }
+                Section(shop.words.callIt("mac.library")) {
+                    row(shop.words.callIt("set.risk_when")) {
+                        Picker("", selection: $draft.riskWhen) {
+                            Text(shop.words.callIt("set.risk_demand")).tag("demand")
+                            Text(shop.words.callIt("set.risk_import")).tag("import")
+                        }.labelsHidden().frame(width: 220)
+                    }
+                    // The cost, said plainly and next to the choice. Reading a
+                    // mesh is seconds on a real file, and a shop that turns
+                    // this on without being told that finds out during its next
+                    // four-hundred-file import.
+                    Text(shop.words.callIt("set.risk_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .formStyle(.grouped)

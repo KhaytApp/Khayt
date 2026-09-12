@@ -434,6 +434,56 @@ extension SampleShopTests {
         }
     }
 
+    @Test("the sample library reaches every print-risk state the inspector draws")
+    func riskStatesAreReachable() async throws {
+        // FOUR STATES, and three of them are invisible without a summary on a
+        // record: findings, nothing-to-flag, and not-looked-yet. An inspector
+        // section whose only reachable state is "not looked yet" has never been
+        // seen doing its job.
+        let files = try Self.rows("printFiles")
+        let engine = try KhaytEngine()
+
+        var withFindings = 0, clear = 0, notLooked = 0
+        var ids = Set<String>()
+        for f in files {
+            guard case .object(let held)? = f["printRisk"],
+                  case .object(let analysis)? = held["analysis"] else { notLooked += 1; continue }
+
+            let report = try await engine.assessModel(analysis: analysis, nozzleDiameter: 0.4)
+            if report.note.isEmpty { clear += 1 } else { withFindings += 1 }
+            for r in report.risks { ids.insert(r.id) }
+        }
+
+        #expect(withFindings > 0, "no sample model has anything to report, so the list never draws")
+        #expect(clear > 0, "no sample model is clean, so the reassuring state never draws")
+        #expect(notLooked > 0, "every sample model is walked, so the ASK state never draws")
+
+        // And more than one KIND of finding. A library where the only answer is
+        // "overhang" leaves the thin-wall and bed lines unseen, and they are
+        // the two that read differently — one is critical, one is a question
+        // about the plate.
+        #expect(ids.count >= 2,
+                Comment(rawValue: "the sample library only ever reports \(ids.sorted())"))
+        #expect(ids.contains("thin"),
+                "nothing in the sample library has a wall worth mentioning")
+    }
+
+    @Test("a seeded summary describes the mesh its record points at")
+    func seededSummariesAreNotStale() throws {
+        // A summary carries the `contentHash` it was measured from, and a
+        // mismatch makes `LibraryFile.riskAnalysis` refuse it — correctly. A
+        // sample record whose hashes disagree would seed a state that reads as
+        // "not looked yet" while looking, in the file, exactly like an answer.
+        for f in try Self.rows("printFiles") {
+            guard case .object(let held)? = f["printRisk"] else { continue }
+            guard case .string(let id)? = f["id"] else { continue }
+            let measured: String? = { if case .string(let h)? = held["contentHash"] { return h } else { return nil } }()
+            let current: String? = { if case .string(let h)? = f["contentHash"] { return h } else { return nil } }()
+            #expect(measured == current,
+                    Comment(rawValue: "\(id): the summary says \(measured ?? "nil") and the record says \(current ?? "nil")"))
+        }
+    }
+
     @Test("every machine in the sample shop says which kind it is")
     func everyMachineSaysSo() throws {
         for m in try Self.rows("machines") {

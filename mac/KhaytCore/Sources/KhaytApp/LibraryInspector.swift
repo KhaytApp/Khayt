@@ -28,6 +28,12 @@ struct LibraryInspector: View {
                         LayerRule()
                         geometry(mesh, file.id)
                     }
+                    // Only for something with a mesh to walk. A gcode is a list
+                    // of moves and there is no geometry in it to judge.
+                    if file.sourceFile?.kind == "model" {
+                        LayerRule()
+                        risk(file)
+                    }
                     if let how = howItPrints(file) {
                         LayerRule()
                         how
@@ -268,6 +274,73 @@ struct LibraryInspector: View {
             if let fit = shop.fits[id], fit.checked > 0 {
                 DetailLine(shop.words.callIt("fit.title"), fitWords(fit),
                            warn: fit.verdict == "none")
+            }
+        }
+    }
+
+    /// What is likely to go wrong with this print.
+    ///
+    /// THREE STATES, and the third one is the reason this is not just a list.
+    /// A shop on the default setting has not walked this mesh, so there is
+    /// nothing to show and a button to ask — and an empty section headed
+    /// "before you quote this" would read as "nothing to worry about", which is
+    /// a different and much worse answer than "not looked yet".
+    @ViewBuilder private func risk(_ file: LibraryFile) -> some View {
+        DetailSection(shop.words.callIt("risk.title")) {
+            if shop.riskRunning.contains(file.id) {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(shop.words.callIt("risk.looking")).foregroundStyle(.secondary)
+                }
+            } else if let report = shop.risks[file.id] {
+                if report.note.isEmpty {
+                    // The answer for most functional parts, and worth saying
+                    // out loud: a section that only ever speaks up when
+                    // something is wrong leaves the shop unable to tell
+                    // "checked, fine" from "not checked".
+                    //
+                    // Quiet, though. It read louder than the warnings in the
+                    // first photograph of it, which is the wrong way round.
+                    Text(shop.words.callIt("risk.clear"))
+                        .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        // `risk.head` IS the section's own title — "Before you
+                        // quote this:" — written for the other app's quote
+                        // screen, which has no heading above these lines. Here
+                        // it printed the same sentence twice, once in small
+                        // caps and once in prose.
+                        ForEach(Array(report.note.enumerated()), id: \.offset) { _, line in
+                            if line.key != "risk.head" {
+                                Text(shop.words.callIt(line.key, line.vars ?? [:]))
+                                    .font(line.strong == true ? .callout.weight(.medium) : .callout)
+                                    .foregroundStyle(line.strong == true ? .primary : .secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+            } else if shop.modelFile(for: file) == nil {
+                // The record is here and the file is not — an external library
+                // that is not mounted. Nothing to walk, and offering a button
+                // that cannot work is worse than saying so.
+                Text(shop.words.callIt("mac.not_found")).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(shop.words.callIt("risk.not_looked"))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        Task { await shop.analyseRisk(file) }
+                    } label: {
+                        Label(shop.words.callIt("risk.look"), systemImage: "eye")
+                    }
+                    .controlSize(.small)
+                }
+            }
+            if let problem = shop.riskProblem {
+                Text(problem).font(.caption).foregroundStyle(Khayt.attention)
             }
         }
     }

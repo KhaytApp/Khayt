@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 
 /// One model in the shop's print library.
 ///
@@ -56,6 +57,35 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
         let size: Double?
         let ext: String?
         let kind: String?
+    }
+
+    /// The overhang summary, when the mesh has been walked for this model.
+    ///
+    /// The MEASUREMENT, not the verdict — see `Shop.analyseRisk`. Held as
+    /// JSON rather than decoded into fields because it is handed straight back
+    /// to `assessModel`, and a struct in the middle would be a second place the
+    /// ninety-one buckets are described.
+    let printRisk: StoredRisk?
+
+    struct StoredRisk: Decodable, Hashable, Sendable {
+        let analysis: JSONValue?
+        /// The `contentHash` the walk was done from, when it was known.
+        let contentHash: String?
+        /// Milliseconds since the epoch.
+        let at: Double?
+
+        // Hashed on WHAT IT WAS MEASURED FROM and WHEN, not on the buckets.
+        // `JSONValue` is not Hashable, and the identity is honest either way:
+        // two walks of the same bytes at the same instant are the same walk.
+        // `LibraryFile` is Hashable because SwiftUI selects on it, and this is
+        // what that costs.
+        static func == (a: Self, b: Self) -> Bool {
+            a.contentHash == b.contentHash && a.at == b.at
+        }
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(contentHash)
+            hasher.combine(at)
+        }
     }
 
     struct Parsed: Decodable, Hashable, Sendable {
@@ -158,6 +188,24 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
         guard dims.count == 3 else { return nil }
         return Mesh(triangles: tris, volumeMm3: volume, x: dims[0], y: dims[1], z: dims[2])
     }
+
+    /// The stored summary, or nil when there is none or it describes a file
+    /// this record no longer points at.
+    ///
+    /// The staleness check is the point: a model re-uploaded as a new version
+    /// keeps its id and its record, so a summary left from the previous mesh
+    /// would be read as current and would describe overhangs that are not
+    /// there any more.
+    var riskAnalysis: [String: JSONValue]? {
+        guard let held = printRisk, case .object(let a)? = held.analysis, !a.isEmpty else { return nil }
+        if let measuredFrom = held.contentHash, let now = contentHash, measuredFrom != now {
+            return nil
+        }
+        return a
+    }
+
+    /// True when the mesh has been walked and the answer still applies.
+    var hasRiskAnalysis: Bool { riskAnalysis != nil }
 
     struct Mesh: Hashable, Sendable {
         let triangles: Int
