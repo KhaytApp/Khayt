@@ -2991,9 +2991,9 @@
       "originalName": "dental-upper.3mf",
       "updatedAt": "2026-08-22T14:00:00.000Z",
       "sourceFile": {
-        "filename": "model-dental-a.3mf",
-        "originalName": "dental-upper.3mf",
-        "size": 21900000,
+        "filename": "dental-upper-retargeted.3mf",
+        "originalName": "upper-arch-MK4.3mf",
+        "size": 6400000,
         "ext": "3mf",
         "kind": "model"
       },
@@ -3029,7 +3029,23 @@
       "geometryKey": "902440:730976.4:78.2x62.0x41.9",
       "rev": 1,
       "timesPrinted": 9,
-      "lastPrinted": "2026-08-28"
+      "lastPrinted": "2026-08-28",
+      "files": [
+        {
+          "filename": "dental-upper-arch.stl",
+          "originalName": "upper-arch.stl",
+          "size": 5200000,
+          "ext": "stl",
+          "kind": "model"
+        },
+        {
+          "filename": "dental-upper-base.stl",
+          "originalName": "upper-base.stl",
+          "size": 900000,
+          "ext": "stl",
+          "kind": "model"
+        }
+      ]
     },
     {
       "id": "PF-sample-dental-b",
@@ -3158,9 +3174,9 @@
       "originalName": "ramadan-lantern.3mf",
       "updatedAt": "2026-08-22T14:00:00.000Z",
       "sourceFile": {
-        "filename": "model-lantern.3mf",
-        "originalName": "ramadan-lantern.3mf",
-        "size": 9800000,
+        "filename": "lantern-body.3mf",
+        "originalName": "ramadan-lantern-body.3mf",
+        "size": 2800000,
         "ext": "3mf",
         "kind": "model"
       },
@@ -3245,7 +3261,22 @@
           }
         }
       ],
-      "activeVersionId": "v2"
+      "activeVersionId": "v2",
+      "files": [
+        {
+          "filename": "lantern-body.3mf",
+          "originalName": "ramadan-lantern-body.3mf",
+          "size": 2800000,
+          "ext": "3mf",
+          "kind": "model"
+        },
+        {
+          "filename": "lantern-finial.stl",
+          "originalName": "ramadan-lantern-finial.stl",
+          "ext": "stl",
+          "kind": "model"
+        }
+      ]
     },
     {
       "id": "PF-sample-gripper",
@@ -3253,10 +3284,10 @@
       "originalName": "gripper-fingers.3mf",
       "updatedAt": "2026-08-22T14:00:00.000Z",
       "sourceFile": {
-        "filename": "model-gripper.3mf",
-        "originalName": "gripper-fingers.3mf",
-        "size": 1450000,
-        "ext": "3mf",
+        "filename": "grip-base.stl",
+        "originalName": "gripper-base.stl",
+        "size": 3100000,
+        "ext": "stl",
         "kind": "model"
       },
       "parsed": {
@@ -3307,6 +3338,36 @@
           "material": "TPU",
           "layerHeightMm": 0.15,
           "nozzleMm": 0.4
+        }
+      ],
+      "files": [
+        {
+          "filename": "grip-base.stl",
+          "originalName": "gripper-base.stl",
+          "size": 3100000,
+          "ext": "stl",
+          "kind": "model"
+        },
+        {
+          "filename": "grip-finger-l.stl",
+          "originalName": "gripper-finger-left.stl",
+          "size": 1450000,
+          "ext": "stl",
+          "kind": "model"
+        },
+        {
+          "filename": "grip-finger-r.stl",
+          "originalName": "gripper-finger-right.stl",
+          "size": 1450000,
+          "ext": "stl",
+          "kind": "model"
+        },
+        {
+          "filename": "grip-pad.stl",
+          "originalName": "gripper-pad.stl",
+          "size": 260000,
+          "ext": "stl",
+          "kind": "model"
         }
       ]
     }

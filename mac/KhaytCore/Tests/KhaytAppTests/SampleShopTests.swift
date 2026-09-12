@@ -277,6 +277,41 @@ extension SampleShopTests {
                 "every file records its settings, which is not what a real library looks like")
     }
 
+    /// The parts list draws a kit, a record that disagrees with itself after a
+    /// sync, and a total that refuses to add up. No sample file was made of
+    /// more than one file at all, so none of those had ever been drawn.
+    @Test("the sample library has kits, one of them disagreeing with itself")
+    func partsSpread() async throws {
+        let files = try Self.rows("printFiles")
+        let engine = try KhaytEngine()
+        var kits = 0
+        var single = 0
+        var unknownTotal = 0
+        var reconciled = 0
+
+        for file in files {
+            let read = try await engine.printParts(.object(file))
+            if read.multi { kits += 1 } else { single += 1 }
+            if read.multi, read.totalSize == nil { unknownTotal += 1 }
+            // The awkward case: `sourceFile` names a file that is not in
+            // `files`, so the rule had to keep both rather than choose.
+            if case .array(let listed)? = file["files"],
+               case .object(let source)? = file["sourceFile"],
+               case .string(let primary)? = source["filename"] {
+                let names = listed.compactMap { row -> String? in
+                    if case .object(let f) = row, case .string(let n)? = f["filename"] { return n }
+                    return nil
+                }
+                if !names.contains(primary), read.parts.count == names.count + 1 { reconciled += 1 }
+            }
+        }
+
+        #expect(kits > 0, "no sample print is made of more than one file")
+        #expect(single > 0, "every sample print is a kit, which no real library is")
+        #expect(unknownTotal > 0, "no sample kit has an unmeasured part, so the refusal to total is never drawn")
+        #expect(reconciled > 0, "no sample record disagrees with itself, so the reconciliation is never exercised")
+    }
+
     @Test("exactly one kind of sample file offers a choice of version")
     func versionSpread() async throws {
         let files = try Self.rows("printFiles")

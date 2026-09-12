@@ -510,6 +510,46 @@ import KhaytCore
             "44-zatca", size: CGSize(width: 460, height: 300))
     }
 
+    /// The files one print is made of.
+    ///
+    /// Three kits side by side: an ordinary one, one whose total refuses to add
+    /// up because a part was never measured, and one that disagrees with itself
+    /// after a sync. What is being judged is whether the unmeasured part reads
+    /// as unmeasured rather than as zero, and whether the starred primary is
+    /// legible as meaning something.
+    @Test("the files one print is made of")
+    func partsPanel() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+
+        func row(_ name: String) throws -> JSONValue {
+            try #require(shop.fileRows.first {
+                if case .object(let f) = $0, case .string(let n)? = f["name"] {
+                    return n.contains(name)
+                }
+                return false
+            })
+        }
+
+        let kit = try await engine.printParts(try row("Robot gripper"))
+        let unmeasured = try await engine.printParts(try row("Ramadan lantern"))
+        let disagreeing = try await engine.printParts(try row("Dental model set — upper"))
+        #expect(kit.totalSize != nil)
+        #expect(unmeasured.totalSize == nil, "the unmeasured case must be in the picture")
+        #expect(disagreeing.parts.count == 3)
+
+        try render(
+            VStack(alignment: .leading, spacing: 18) {
+                PartsSection(parts: kit, shop: shop)
+                PartsSection(parts: unmeasured, shop: shop)
+                PartsSection(parts: disagreeing, shop: shop)
+            }
+            .padding(16)
+            .frame(width: 440),
+            "45-parts", size: CGSize(width: 440, height: 420))
+    }
+
     @Test("what a print is known to work at")
     func setupsPanel() async throws {
         let shop = Shop()
