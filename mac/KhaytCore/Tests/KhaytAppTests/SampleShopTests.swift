@@ -241,6 +241,51 @@ extension SampleShopTests {
         #expect(lowNonGram, "nothing exercises a threshold that is not the gram one")
     }
 
+    /// The consumables card draws three different reasons an item is on it,
+    /// and refuses to name a quantity for a fourth. Until this file carried any
+    /// consumables at all, none of that had ever been drawn.
+    ///
+    /// `now` is PINNED. The usage rate is measured over a trailing window, so
+    /// a guard run against `Date()` passes today and reports "no rate" in a
+    /// month when the sample's own jobs have aged out of it — which would make
+    /// this test quietly stop checking the thing it exists for.
+    @Test("the sample shelf reaches every reason a consumable is reordered")
+    func consumableSpread() async throws {
+        let shelf = try Self.rows("consumables")
+        #expect(!shelf.isEmpty, "no consumables — the card is never drawn")
+
+        let now = try #require(ISO8601DateFormatter().date(from: "2026-09-05T00:00:00Z"))
+        let needs = try await KhaytEngine().consumableNeeds(
+            consumables: shelf.map { JSONValue.object($0) },
+            orders: try Self.rows("printLog").map { JSONValue.object($0) },
+            now: now)
+
+        #expect(needs.contains { $0.low && $0.stock == 0 },
+                "nothing on the sample shelf has run out")
+        #expect(needs.contains { $0.low && $0.stock > 0 },
+                "nothing is below its minimum without being empty")
+        // The case a shop cannot see by looking at the rack: still above its
+        // minimum, but the rate eats it inside the lead time.
+        #expect(needs.contains { !$0.low && ($0.daysLeft ?? .infinity) > 0 },
+                "nothing is listed for its forecast alone")
+        // And one the rule will not put a number against, because no rate and
+        // no minimum is not a quantity — inventing one lands on a purchase order.
+        #expect(needs.contains { $0.suggestQty == 0 },
+                "every sample item gets a suggested quantity, so the refusal is never drawn")
+        // Something with a measurable rate, or every figure on the card is zero.
+        #expect(needs.contains { $0.perDay > 0 },
+                "no sample job consumes a consumable, so no rate is ever computed")
+
+        // Not everything is on the list: a well-stocked shelf must be able to
+        // stay off it, or the card is just a list of the consumables table.
+        let listed = Set(needs.map(\.id))
+        let all = Set(shelf.compactMap { row -> String? in
+            if case .string(let id)? = row["id"] { return id } else { return nil }
+        })
+        #expect(!all.subtracting(listed).isEmpty,
+                "every sample consumable is being reordered, which cannot be right")
+    }
+
     /// The maintenance card draws four statuses and two clocks. Until this
     /// file carried any tasks at all, none of those branches had ever been
     /// drawn, let alone looked at.

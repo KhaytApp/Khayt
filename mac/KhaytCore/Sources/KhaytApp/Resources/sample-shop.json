@@ -426,7 +426,8 @@
       "updatedAt": "2026-08-28T17:31:00Z",
       "productId": "PRD-68297E",
       "quoteSentAt": "2026-08-14",
-      "quoteAcceptedAt": "2026-08-15"
+      "quoteAcceptedAt": "2026-08-15",
+      "packagingDeducted": true
     },
     {
       "id": "ORD-01008",
@@ -543,7 +544,8 @@
       "updatedAt": "2026-08-03T13:42:00Z",
       "productId": "PRD-F68FC0",
       "quoteSentAt": "2026-07-20",
-      "quoteAcceptedAt": "2026-07-23"
+      "quoteAcceptedAt": "2026-07-23",
+      "packagingDeducted": true
     },
     {
       "id": "ORD-01010",
@@ -909,7 +911,8 @@
         {
           "type": "stringing"
         }
-      ]
+      ],
+      "packagingDeducted": true
     },
     {
       "id": "ORD-01017",
@@ -1459,7 +1462,8 @@
       "qcPassedAt": "2026-09-03T14:20:00Z",
       "reprintOf": "ORD-01000",
       "reprintChain": "ORD-01000",
-      "reprintReason": "rma"
+      "reprintReason": "rma",
+      "packagingDeducted": true
     },
     {
       "id": "ORD-01027",
@@ -4555,6 +4559,60 @@
       "intervalDays": 180,
       "lastDoneHours": 0,
       "lastDoneAt": "2025-01-06T09:00:00.000Z"
+    }
+  ],
+  "consumables": [
+    {
+      "id": "CONS-01",
+      "name": "Isopropyl alcohol 99%",
+      "stock": 0,
+      "unit": "L",
+      "minStock": 2,
+      "category": "Cleaning",
+      "unitCost": 18
+    },
+    {
+      "id": "CONS-02",
+      "name": "Mailing bags 250×350",
+      "stock": 6,
+      "unit": "each",
+      "minStock": 40,
+      "category": "Packaging",
+      "isPackaging": true,
+      "unitCost": 0.6
+    },
+    {
+      "id": "CONS-03",
+      "name": "Bubble wrap roll",
+      "stock": 1,
+      "unit": "roll",
+      "category": "Packaging",
+      "isPackaging": true,
+      "unitCost": 22
+    },
+    {
+      "id": "CONS-04",
+      "name": "Brass nozzles 0.4mm",
+      "stock": 24,
+      "unit": "each",
+      "minStock": 6,
+      "category": "Spares",
+      "unitCost": 9
+    },
+    {
+      "id": "CONS-05",
+      "name": "Kapton tape",
+      "stock": 0,
+      "unit": "roll",
+      "unitCost": 14
+    },
+    {
+      "id": "CONS-06",
+      "name": "Nitrile gloves (M)",
+      "stock": 400,
+      "unit": "each",
+      "minStock": 100,
+      "unitCost": 0.15
     }
   ]
 }

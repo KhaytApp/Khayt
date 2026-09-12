@@ -451,6 +451,31 @@ import KhaytCore
     /// than the row: `ImageRenderer` draws a yellow prohibition sign for any
     /// `Button` at all, verified with a bare `Button("Done") {}` beside this
     /// one. What the picture is for is the four rows either side of it.
+    /// The other shelf: what is about to run out that is not filament.
+    ///
+    /// Four rows, four different reasons to be on the list — out of stock,
+    /// below minimum, forecast to run out inside the lead time, and one the
+    /// rule refuses to put a number against. What is being judged is whether
+    /// those four read as different situations rather than one repeated.
+    @Test("what is about to run out that is not filament")
+    func consumablesCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        // Pinned for the same reason the sample guard pins it: the rate is
+        // measured over a trailing window.
+        let now = try #require(ISO8601DateFormatter().date(from: "2026-09-05T00:00:00Z"))
+        let needs = try await engine.consumableNeeds(
+            consumables: shop.consumableRows, orders: shop.orderRows, now: now)
+        #expect(needs.count >= 4, "not enough on the shelf to judge the card")
+
+        try render(
+            ConsumablesCard(needs: needs, shop: shop)
+                .padding(14)
+                .frame(width: 440),
+            "42-consumables", size: CGSize(width: 440, height: 210))
+    }
+
     @Test("what each machine is due for")
     func maintenanceRows() async throws {
         let shop = Shop()

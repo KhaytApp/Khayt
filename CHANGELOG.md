@@ -29,6 +29,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Khayt says what is about to run out that is not filament.** Glue, IPA,
+  mailing bags, spare nozzles — running out of one of those stops a job exactly
+  the way running out of filament does, and only filament reached the Mac app's
+  shelf. The inventory screen now leads with what needs ordering, in each item's
+  own unit.
+
+  Three different reasons put something on that list and they read differently:
+  it has run out, it is below the minimum you set, or nothing is wrong yet and
+  the rate you are getting through it says otherwise. The last is the one you
+  cannot see by looking at the rack. Where Khayt has no usage figure and you
+  have set no minimum, it says the item is low and stops there rather than
+  inventing a quantity to put on a supplier's order.
+
 - **(Mac) Khayt tells you what each printer is due for.** A machine card now
   lists the recurring jobs set against that printer — replace the nozzle, clean
   the plate, check the belts — with how far off each one is and a button to mark
