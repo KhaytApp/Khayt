@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) The print-risk import path is proven by importing, not by
+  reading the call site.** The wiring guard claimed a behaviour test needed a
+  real store, a real library root and a ten-million-facet file. It needs a temp
+  directory and a 24-triangle STL — `LibraryImport.add` takes the store and the
+  root as arguments. The guard keeps the job behaviour cannot do: there are
+  four call sites, and importing through one says nothing about the other three.
+
 - **Khayt has a new icon.** A chrome nozzle extruding a single thick loop of
   orange filament in the shape of a khaa, on deep navy — one mark at every size,
   from the 1024px Dock icon down to the 16px favicon, instead of a detailed

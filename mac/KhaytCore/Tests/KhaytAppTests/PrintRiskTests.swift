@@ -252,6 +252,110 @@ struct PrintRiskTests {
         #expect(report.worst == nil)
     }
 
+    // MARK: - The setting, exercised rather than inspected
+
+    /// A store and a library root in a temp directory, and one model imported
+    /// into them for real.
+    ///
+    /// `test/print-risk-wiring.test.js` reads the call sites out of the source,
+    /// because a caller that forgets `analyseRisk:` compiles clean. But it said
+    /// proving the behaviour needed "a real store, a real library root and a
+    /// real ten-million-facet file", and that was simply wrong:
+    /// `LibraryImport.add` takes the store and the root as arguments, so it
+    /// needs a temp directory and a 24-triangle STL.
+    static func emptyBook(in dir: URL) throws -> URL {
+        let url = dir.appending(path: "khayt-store.json")
+        let root: JSONValue = .object([
+            "printFiles": .array([]), "orders": .array([]),
+            "settings": .object([:]),
+        ])
+        try JSONEncoder().encode(root).write(to: url)
+        return url
+    }
+
+    static func importOne(_ model: URL, store: URL, root: URL,
+                          analyseRisk: Bool) async throws -> LibraryImport.Added {
+        try await LibraryImport.add(
+            model, storeURL: store, libraryRoot: root,
+            knownHashes: [], nameOfExisting: { _ in nil },
+            engine: try KhaytEngine(), keepOriginal: true,
+            analyseRisk: analyseRisk,
+            owns: { true }, whoHasIt: { nil })
+    }
+
+    static func onlyRecord(in store: URL) throws -> LibraryFile {
+        let raw = try JSONDecoder().decode([String: JSONValue].self,
+                                           from: try Data(contentsOf: store))
+        guard case .array(let rows)? = raw["printFiles"], let first = rows.first else {
+            throw Oops.noRecord
+        }
+        return try JSONDecoder().decode(LibraryFile.self,
+                                        from: try JSONEncoder().encode(first))
+    }
+
+    enum Oops: Error { case noRecord }
+
+    @Test("asked at import, the walk happens and the answer is on the record")
+    func walksAtImport() async throws {
+        let dir = try Self.tempDir()
+        let model = dir.appending(path: "table.stl")
+        try Self.writeSTL(Self.table, to: model)
+        let store = try Self.emptyBook(in: dir)
+        let root = dir.appending(path: "vault")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        _ = try await Self.importOne(model, store: store, root: root, analyseRisk: true)
+        let file = try Self.onlyRecord(in: store)
+
+        #expect(file.hasRiskAnalysis, "the import was asked to walk the mesh and did not")
+        #expect(Self.num(file.riskAnalysis?["volumeMm3"]) == 960)
+        #expect(Self.num(file.riskAnalysis?["bedContactAreaMm2"]) == 16)
+        // And it describes the bytes that landed, so it cannot be read as
+        // current after the file behind it is replaced.
+        #expect(file.printRisk?.contentHash == file.contentHash)
+
+        // Straight through to findings with no second read of the file.
+        let report = try await KhaytEngine().assessModel(
+            analysis: try #require(file.riskAnalysis), nozzleDiameter: 0.4)
+        #expect(report.risks.map(\.id).sorted() == ["bridge", "overhang"])
+    }
+
+    @Test("not asked, the import writes no summary and costs nothing")
+    func skipsWhenNotAsked() async throws {
+        let dir = try Self.tempDir()
+        let model = dir.appending(path: "table.stl")
+        try Self.writeSTL(Self.table, to: model)
+        let store = try Self.emptyBook(in: dir)
+        let root = dir.appending(path: "vault")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        _ = try await Self.importOne(model, store: store, root: root, analyseRisk: false)
+        let file = try Self.onlyRecord(in: store)
+
+        #expect(!file.hasRiskAnalysis, "the default walked the mesh anyway")
+        #expect(file.printRisk == nil, "a field was written to say nothing happened")
+        // The import itself still worked — the walk is the only difference.
+        #expect(file.geometryKey != nil, "the measurement was lost along with the walk")
+        #expect(file.contentHash != nil)
+    }
+
+    @Test("a gcode is imported without being asked for a mesh it has not got")
+    func gcodeAtImport() async throws {
+        // `analyseRisk` is true here and must still be a no-op: the guard is on
+        // there being geometry, not on the flag alone.
+        let dir = try Self.tempDir()
+        let job = dir.appending(path: "plate.gcode")
+        try "G1 X10 Y10 E1\n".write(to: job, atomically: true, encoding: .utf8)
+        let store = try Self.emptyBook(in: dir)
+        let root = dir.appending(path: "vault")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        _ = try await Self.importOne(job, store: store, root: root, analyseRisk: true)
+        let file = try Self.onlyRecord(in: store)
+        #expect(file.sourceFile?.kind == "gcode")
+        #expect(!file.hasRiskAnalysis)
+    }
+
     // MARK: - The shop's own library
 
     /// THE ONE THAT PROVES THE CLAIM.
