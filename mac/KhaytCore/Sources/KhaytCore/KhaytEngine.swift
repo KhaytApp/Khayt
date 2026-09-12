@@ -386,6 +386,16 @@ public actor KhaytEngine {
         // never be skipped: the consent is per feature because the four send
         // very different things, and one of them sends a customer's name.
         "ai-privacy",
+        // ── WHAT A MODEL WOULD COST BEFORE IT IS EVER SLICED ──────────────
+        //
+        // Geometry into a weight and a time. The Mac could MEASURE a mesh from
+        // the day it could read one and could never price one, so a shop
+        // looking at a model it had not printed got a size and a triangle count
+        // and no answer to the only question it had.
+        "stl-estimate",
+        // And the one constant nobody can guess, learned from the shop's own
+        // measured jobs. AFTER `stl-estimate`, whose defaults it replaces.
+        "estimate-calibration",
         // What is likely to go wrong with a print before anyone quotes it.
         // Only the JUDGING is here: the triangle walk that feeds it is
         // `Mesh.Overhangs`, because this shop's models are millions of facets
@@ -2860,6 +2870,98 @@ public actor KhaytEngine {
               return KhaytPrinterDiscovery.discoverFromRecords(records);
             })(ARG0)
             """, [payload], as: [FoundPrinter].self)
+    }
+
+    // MARK: - What a model would cost before it is sliced
+
+    /// A weight and a time for a mesh nobody has sliced.
+    public struct MeshEstimate: Decodable, Sendable, Hashable {
+        public let grams: Double
+        /// HOURS.
+        public let hours: Double
+        /// `shop` or a machine id when the rate was learned for one machine,
+        /// or nil when Khayt is using its own default rate.
+        public let scope: String?
+        /// How many measured jobs the rate came from. Nil when uncalibrated.
+        public let jobs: Int?
+        /// The rate actually used, grams per hour.
+        public let gramsPerHour: Double?
+        /// True when the rule does not stand behind these figures — either the
+        /// model could not be measured, or it is so nearly all wall that the
+        /// shell model stops describing it. Its own words: "Callers that show
+        /// this number to anyone must check `reliable` and say so."
+        public let shellUnreliable: Bool
+        /// `surface-area` when the shell came from the mesh, `assumed` when it
+        /// did not — "a number nobody can attribute is a number nobody can
+        /// check".
+        public let shellSource: String?
+
+        /// Learned from this shop's own printers rather than guessed.
+        public var isCalibrated: Bool { (jobs ?? 0) > 0 }
+    }
+
+    /// Estimate a mesh, using the shop's measured rate where it has one.
+    ///
+    /// ── WHY THE RATE IS LEARNED AND NOT ASKED FOR ──────────────────────────
+    ///
+    /// `stl-estimate.js` needs five constants. Four are the shop's own
+    /// settings; the fifth — effective volumetric throughput including travel
+    /// and acceleration — is not a number anybody knows about their own
+    /// printer, and it had been 8 mm³/s for everyone since the estimator was
+    /// written.
+    ///
+    /// It does not have to be guessed. Density and throughput only ever appear
+    /// multiplied together in the time calculation, and that product is GRAMS
+    /// PER HOUR — which every job that reported both its weight and its
+    /// duration has measured directly. So the two hardest constants collapse
+    /// into one number the shop's own history already contains.
+    ///
+    /// `orders` is the print log. The rule refuses to learn from a job nobody
+    /// measured, from an apportioned one, from a single sample, or from
+    /// machines whose rates disagree — so an uncalibrated answer is a real
+    /// answer and says so.
+    public func estimateMesh(volumeMm3: Double, areaMm2: Double,
+                             bbox: (x: Double, y: Double, z: Double),
+                             settings: [String: JSONValue],
+                             orders: [JSONValue]) throws -> MeshEstimate {
+        try runtime.call2("""
+            (function (a) {
+              var opts = KhaytStl.fromSettings(a.settings || {});
+              var cal = KhaytEstimateCalibration.calibrate(a.orders || [], {
+                allocate: KhaytOrderFileLink && KhaytOrderFileLink.allocateActuals,
+              }, {});
+              // The learned rate replaces the pair it is the product of; the
+              // rule owns how, so this asks rather than dividing it out here.
+              var used = cal ? KhaytEstimateCalibration.applyCalibration(opts, cal) : opts;
+              // THE BOX IS NOT OPTIONAL. `reliable` is false unless the
+              // volume AND all three dimensions are finite — because that flag
+              // guards a figure shown to CUSTOMERS, and "an unmeasurable model
+              // was quoted as free". Omitting it made every model report itself
+              // unreliable, and the screen explained that with the wrong reason.
+              var e = KhaytStl.estimateFromStl(
+                { volumeMm3: a.volumeMm3, areaMm2: a.areaMm2, bbox: a.bbox }, used) || {};
+              // The rule's own field names. My first version guessed `weightG`
+              // and `timeH` with `||` fallbacks, which would have returned a
+              // confident ZERO for every model rather than failing.
+              return {
+                grams: Number(e.estWeightG || 0),
+                hours: Number(e.estPrintTimeH || 0),
+                scope: cal ? String(cal.scope || 'shop') : null,
+                jobs: cal ? Number(cal.jobs || 0) : null,
+                gramsPerHour: cal ? Number(cal.gramsPerHour || 0) : null,
+                // `reliable` is the rule's word: false when the shell fraction
+                // is past what it trusts. "Callers that show this number to
+                // anyone must check `reliable` and say so."
+                shellUnreliable: e.reliable === false,
+                shellSource: e.shellSource ? String(e.shellSource) : null,
+              };
+            })(ARG0)
+            """,
+            [.object(["volumeMm3": .number(volumeMm3), "areaMm2": .number(areaMm2),
+                      "bbox": .object(["x": .number(bbox.x), "y": .number(bbox.y),
+                                       "z": .number(bbox.z)]),
+                      "settings": .object(settings), "orders": .array(orders)])],
+            as: MeshEstimate.self)
     }
 
     // MARK: - A printer that changed address

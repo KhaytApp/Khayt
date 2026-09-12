@@ -1359,6 +1359,38 @@ final class Words {
         // words this on its machines page and does not share the strings.
         "mac.moved_find": ["en": "Find it on the network",
                            "ar": "ابحث عنه في الشبكة"],
+        // What a model would take. Mac-only wording: the other app puts these
+        // on its estimator settings panel, worded for a form rather than for a
+        // model somebody is looking at.
+        "mac.est_title": ["en": "If you print this", "ar": "إذا طبعت هذا"],
+        // WHERE THE RATE CAME FROM, because a number a shop cannot attribute is
+        // a number it cannot check.
+        "mac.est_learned": ["en": "From your own printers — {rate} g/hour, measured across {jobs} jobs.",
+                            "ar": "من طابعاتك — {rate} غرام/ساعة، مقيسة على {jobs} أعمال."],
+        "mac.est_default": ["en": "Using Khayt's default rate. Record what a few prints actually took and this learns your own.",
+                            "ar": "باستخدام معدّل خيط الافتراضي. سجّل ما استغرقته بعض الطبعات فعليًا وسيتعلّم معدّلك."],
+        "mac.est_filament": ["en": "Filament", "ar": "الخيط"],
+        "mac.est_time": ["en": "Time", "ar": "الوقت"],
+        // WHAT THE FLAG ACTUALLY MEANS, arrived at the long way. It fired on
+        // every model at first because the bounding box was not being passed,
+        // so I reworded it to "Khayt does not stand behind these figures" —
+        // which was right about the flag and wrong about the cause. With the
+        // box passed and a measured area, the only way it fires is a model that
+        // is nearly all wall, where the shell term has swallowed the part and
+        // there is no infill headroom left. So the original wording was right
+        // for the fixed code.
+        "mac.est_thin_walled": ["en": "Mostly wall, so the weight is a rough guide — check it before you quote.",
+                                "ar": "معظمه جدار، فالوزن تقديري — راجعه قبل التسعير."],
+        // The estimator's own settings.
+        "mac.est_section": ["en": "Estimating from a model", "ar": "التقدير من مجسّم"],
+        "mac.est_density": ["en": "Filament density (g/cm³)", "ar": "كثافة الخيط (غرام/سم³)"],
+        "mac.est_infill": ["en": "Default infill (%)", "ar": "التعبئة الافتراضية (%)"],
+        "mac.est_wall": ["en": "Wall thickness (mm)", "ar": "سماكة الجدار (مم)"],
+        "mac.est_waste": ["en": "Waste (%)", "ar": "الهدر (%)"],
+        "mac.est_wall_hint": ["en": "Perimeters plus top and bottom skin. Khayt works out how much of a part is shell from this and its surface area.",
+                              "ar": "المحيطات مع الطبقة العلوية والسفلية. يحسب خيط من هذا ومن مساحة السطح كم من الجزء قشرة."],
+        "mac.est_rate_hint": ["en": "How fast your printers run is not asked for — Khayt learns it from jobs whose real weight and duration were recorded.",
+                              "ar": "لا نسأل عن سرعة طابعاتك — يتعلّمها خيط من الأعمال التي سُجّل وزنها ومدّتها الحقيقية."],
         "mac.moved_looking": ["en": "Looking…", "ar": "جارٍ البحث…"],
         "mac.moved_here": ["en": "It answers at {host} now",
                            "ar": "يستجيب الآن على {host}"],

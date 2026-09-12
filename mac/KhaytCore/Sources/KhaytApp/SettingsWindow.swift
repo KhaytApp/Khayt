@@ -654,6 +654,14 @@ struct PreferencesPane: View {
         var lang = "en"
         var useHijri = true, useArabicNumerals = false
         var autoDeduct = true, lowStock = 200.0
+        /// The four estimator constants a shop can actually answer for.
+        ///
+        /// THROUGHPUT IS DELIBERATELY NOT HERE. It is the one nobody knows
+        /// about their own printer, and Khayt learns it from jobs whose real
+        /// weight and duration were recorded. Offering a field for it would
+        /// invite guessing the very number the calibration exists to stop
+        /// anyone guessing.
+        var density = 1.24, infillPct = 20.0, wallMm = 1.2, wastePct = 5.0
         /// `demand` or `import`. Read as text with no default asserted here —
         /// `lib/print-risk.js` owns the default, and the save path normalises
         /// whatever this holds through the same reader.
@@ -662,9 +670,16 @@ struct PreferencesPane: View {
         @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
             let r = SettingsReader(settings: settings)
             let risk = SettingsReader(settings: r.object("printRisk"))
+            let est = SettingsReader(settings: r.object("estimator"))
             return Draft(lang: r.text("lang", "en"), useHijri: r.onUnlessOff("useHijri"),
                          useArabicNumerals: r.flag("useArabicNumerals"),
                          autoDeduct: r.onUnlessOff("autoDeduct"), lowStock: r.number("lowStockThreshold", 200),
+                         // The rule's own defaults, so an unset book shows what
+                         // it is actually estimating with rather than blanks.
+                         density: est.number("densityGPerCm3", 1.24),
+                         infillPct: est.number("infillPct", 0.2) * 100,
+                         wallMm: est.number("wallThicknessMm", 1.2),
+                         wastePct: est.number("wastePct", 0.05) * 100,
                          // The shop's answer if it has given one, and otherwise
                          // whatever the shared rule says the default is — asked
                          // for rather than repeated, so the picker cannot show
@@ -677,7 +692,13 @@ struct PreferencesPane: View {
         func form() -> [String: JSONValue] {
             ["lang": .string(lang), "useHijri": .bool(useHijri), "useArabicNumerals": .bool(useArabicNumerals),
              "autoDeduct": .bool(autoDeduct), "lowStock": .number(lowStock),
-             "printRisk": .object(["when": .string(riskWhen)])]
+             "printRisk": .object(["when": .string(riskWhen)]),
+             // Per cent on screen, fraction in the book — the rule reads 0..1
+             // and a 20 saved there would be 2,000% infill.
+             "estimator": .object(["densityGPerCm3": .number(density),
+                                   "infillPct": .number(infillPct / 100),
+                                   "wallThicknessMm": .number(wallMm),
+                                   "wastePct": .number(wastePct / 100)])]
         }
     }
 
@@ -727,6 +748,32 @@ struct PreferencesPane: View {
                         TextField("", value: $draft.lowStock, format: .number.precision(.fractionLength(0)))
                             .multilineTextAlignment(.trailing).frame(width: 90)
                     }
+                }
+                Section(shop.words.callIt("mac.est_section")) {
+                    row(shop.words.callIt("mac.est_density")) {
+                        TextField("", value: $draft.density, format: .number.precision(.fractionLength(2)))
+                            .multilineTextAlignment(.trailing).frame(width: 90)
+                    }
+                    row(shop.words.callIt("mac.est_infill")) {
+                        TextField("", value: $draft.infillPct, format: .number.precision(.fractionLength(0)))
+                            .multilineTextAlignment(.trailing).frame(width: 90)
+                    }
+                    row(shop.words.callIt("mac.est_wall")) {
+                        TextField("", value: $draft.wallMm, format: .number.precision(.fractionLength(1)))
+                            .multilineTextAlignment(.trailing).frame(width: 90)
+                    }
+                    Text(shop.words.callIt("mac.est_wall_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    row(shop.words.callIt("mac.est_waste")) {
+                        TextField("", value: $draft.wastePct, format: .number.precision(.fractionLength(0)))
+                            .multilineTextAlignment(.trailing).frame(width: 90)
+                    }
+                    // Said here rather than left to be wondered about: the
+                    // missing field is missing on purpose.
+                    Text(shop.words.callIt("mac.est_rate_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Section(shop.words.callIt("mac.library")) {
                     row(shop.words.callIt("set.risk_when")) {

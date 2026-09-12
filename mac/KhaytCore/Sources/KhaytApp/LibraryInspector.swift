@@ -30,6 +30,10 @@ struct LibraryInspector: View {
                     }
                     // Only for something with a mesh to walk. A gcode is a list
                     // of moves and there is no geometry in it to judge.
+                    if let estimate = shop.estimates[file.id] {
+                        LayerRule()
+                        priced(estimate)
+                    }
                     if file.sourceFile?.kind == "model" {
                         LayerRule()
                         risk(file)
@@ -274,6 +278,49 @@ struct LibraryInspector: View {
             if let fit = shop.fits[id], fit.checked > 0 {
                 DetailLine(shop.words.callIt("fit.title"), fitWords(fit),
                            warn: fit.verdict == "none")
+            }
+        }
+    }
+
+    /// What this model would take, before anybody slices it.
+    ///
+    /// The Mac could measure a mesh from the day it could read one and could
+    /// never price one, so a shop looking at a model it had not printed got a
+    /// size and a triangle count and no answer to the question it had.
+    ///
+    /// WHERE THE RATE CAME FROM IS PART OF THE ANSWER. The estimator's hardest
+    /// constant is effective volumetric throughput, which nobody knows about
+    /// their own printer and which was 8 mm³/s for everyone. Density and
+    /// throughput only appear multiplied together, and that product is grams
+    /// per hour — measured by every job that reported both. So the figure is
+    /// either learned from this shop's own jobs, and says how many, or it is
+    /// Khayt's own default, and says that instead. A number a shop cannot
+    /// attribute is a number it cannot check.
+    @ViewBuilder private func priced(_ e: KhaytEngine.MeshEstimate) -> some View {
+        DetailSection(shop.words.callIt("mac.est_title")) {
+            // `common.grams` is the UNIT, not a label — using it for both read
+            // "g   765.20 g" on screen.
+            DetailLine(shop.words.callIt("mac.est_filament"),
+                       Money.figure(e.grams) + " " + shop.words.callIt("common.grams"))
+            DetailLine(shop.words.callIt("mac.est_time"),
+                       Money.figure(e.hours) + " " + shop.words.callIt("common.hours"))
+            if e.isCalibrated, let n = e.jobs, let rate = e.gramsPerHour {
+                Text(shop.words.callIt("mac.est_learned",
+                                       ["jobs": .number(Double(n)),
+                                        "rate": .string(Money.figure(rate))]))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(shop.words.callIt("mac.est_default"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            // The rule is explicit that a caller showing this number must check
+            // `reliable` and say so.
+            if e.shellUnreliable {
+                Text(shop.words.callIt("mac.est_thin_walled"))
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

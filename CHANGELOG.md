@@ -36,6 +36,28 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) What a model would take, before anybody slices it.** Khayt could
+  measure a mesh from the day it could read one and could never price one — a
+  model you had not printed showed a size and a triangle count and no answer to
+  the question you actually had. The library inspector now says what it would
+  take in filament and in hours.
+
+  **It does not ask how fast your printers are, because nobody knows that about
+  their own printer.** The estimator's hardest number had been the same guess
+  for everyone since it was written. It turns out not to need guessing: it only
+  ever appears multiplied by density, and that product is grams per hour —
+  which every job whose real weight and duration were recorded has measured.
+  So Khayt learns it from your own work, says how many jobs it learned from,
+  and says plainly when it is still using its own default instead.
+
+  It will not learn from a job nobody measured, from one job, or from a figure
+  divided across several parts — calibrating an estimator against its own
+  estimates teaches it nothing.
+
+  Settings → Preferences carries the four numbers you can answer for: density,
+  infill, wall thickness and waste. There is deliberately no field for the
+  speed.
+
 - **(Mac) A printer that changed address can be found again.** A DHCP lease
   expires overnight, the router hands out a different address, and Khayt polls
   a host that answers nothing. It said *offline* — which is also what it says

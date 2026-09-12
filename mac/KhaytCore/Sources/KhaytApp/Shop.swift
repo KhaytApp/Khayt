@@ -369,6 +369,8 @@ final class Shop {
             // The setting first, then the summaries it governs. Re-judged on
             // every load rather than cached with the verdict, because the
             // nozzle and the plate come from the machines and those change.
+            estimates = await Self.priceMeshes(files, settings: Self.settings(root),
+                                               orders: orderRows, engine: engine)
             riskWhen = try? await engine?.riskWhen(settings: Self.settings(root))
             await rejudgeStoredRisks()
             lowSpools = (try? await engine?.lowStock(inventoryRows, settings: settingsDict)) ?? [:]
@@ -1099,6 +1101,47 @@ final class Shop {
     func findPrinters() async -> [KhaytEngine.FoundPrinter] {
         guard let engine else { return [] }
         return await finder.find(engine: engine)
+    }
+
+    // MARK: - What a model would cost
+
+    /// An estimate per model, worked out once when the book loads.
+    ///
+    /// Not per redraw: the calibration reads the whole print log, and a grid of
+    /// four hundred models asking for that on every frame is four hundred trips
+    /// through the runtime for one number that cannot have changed.
+    private(set) var estimates: [String: KhaytEngine.MeshEstimate] = [:]
+
+    static func priceMeshes(_ files: [LibraryFile], settings: [String: JSONValue],
+                            orders: [JSONValue], engine: KhaytEngine?) async
+        -> [String: KhaytEngine.MeshEstimate] {
+        guard let engine else { return [:] }
+        var out: [String: KhaytEngine.MeshEstimate] = [:]
+        for file in files {
+            guard let mesh = file.mesh, mesh.volumeMm3 > 0 else { continue }
+            // THE SURFACE AREA, WHERE THE SHOP HAS ALREADY PAID FOR IT.
+            //
+            // The shell fraction is `area x wallThickness / volume`, and with no
+            // area the estimator keeps a flat assumed constant — honest, and
+            // weaker. The geometry key holds triangles, volume and dimensions
+            // but no area, and measuring every file on every load would mean
+            // reading the whole library.
+            //
+            // But a model the shop has checked for print risks ALREADY has its
+            // area measured and stored. So a mesh that has been walked gets a
+            // real shell fraction, and one that has not keeps the assumption —
+            // and `shellSource` says which, because "a number nobody can
+            // attribute is a number nobody can check".
+            var area = 0.0
+            if case .number(let a)? = file.riskAnalysis?["totalAreaMm2"], a > 0 { area = a }
+            if let e = try? await engine.estimateMesh(
+                volumeMm3: mesh.volumeMm3, areaMm2: area,
+                bbox: (x: mesh.x, y: mesh.y, z: mesh.z),
+                settings: settings, orders: orders) {
+                out[file.id] = e
+            }
+        }
+        return out
     }
 
     // MARK: - A printer that changed address
