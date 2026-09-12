@@ -202,3 +202,65 @@ struct RtspTests {
         #expect(throws: Never.self) { try RtspSession(url: "rtsp://192.168.68.71:8554/live") }
     }
 }
+
+// MARK: - Who owns the bytes handed to VideoToolbox
+
+/// `picture(sps:pps:idr:)` cannot be unit-tested here: it wants VideoToolbox, a
+/// real H.264 access unit and a GPU, and a synthetic one proves nothing about
+/// memory ownership anyway. What CAN be pinned is the shape of the call, and
+/// the shape is where the bug was.
+///
+/// It passed `&bytes` — a Swift `[UInt8]` — with a NULL block allocator. That
+/// pair means the buffer neither copies the bytes nor takes ownership: it keeps
+/// the pointer. But `&` on an Array is guaranteed only for the duration of the
+/// one call it appears in, and everything that reads the memory
+/// (`CMSampleBufferCreateReady`, then the decode) runs afterwards.
+///
+/// It worked — the array was still in scope and its address happened to be
+/// stable — which is exactly why a test that runs the decode would have passed
+/// too. Undefined behaviour that works is the kind that stops working when an
+/// optimiser changes its mind, and this is the only place in the app parsing
+/// H.264 that arrived over a network.
+@Suite struct RtspOwnershipTests {
+
+    static func source() throws -> String {
+        var dir = URL(fileURLWithPath: #filePath)
+        for _ in 0..<3 { dir = dir.deletingLastPathComponent() }
+        return try String(contentsOf: dir.appending(path: "Sources/KhaytApp/Rtsp.swift"),
+                          encoding: .utf8)
+    }
+
+    @Test("the block buffer is never given memory it does not own")
+    func ownsItsBytes() throws {
+        let src = try Self.source()
+        // The dangerous pair, either way round on the line.
+        #expect(!src.contains("blockAllocator: kCFAllocatorNull"),
+                "a null block allocator is back: the buffer would keep a pointer it does not own")
+        #expect(src.contains("blockAllocator: kCFAllocatorMalloc"),
+                "the buffer no longer owns its bytes")
+    }
+
+    @Test("no Swift array is handed in by reference")
+    func noArrayByReference() throws {
+        // `&anything` as `memoryBlock:` is the failure, whatever the allocator:
+        // the pointer is only promised for that one call.
+        let src = try Self.source()
+        for line in src.split(separator: "\n") where line.contains("memoryBlock:") {
+            #expect(!line.contains("memoryBlock: &"),
+                    Comment(rawValue: "memory is passed by reference: \(line.trimmingCharacters(in: .whitespaces))"))
+        }
+    }
+
+    @Test("a failed create frees the bytes rather than leaking them")
+    func noLeakOnFailure() throws {
+        // With `kCFAllocatorMalloc` the buffer frees the block when IT is
+        // released — but a create that fails never took ownership, so that path
+        // has to free it. Read out of the source because the failure needs
+        // VideoToolbox to refuse a buffer, which a test cannot arrange.
+        let src = try Self.source()
+        let at = try #require(src.range(of: "CMBlockBufferCreateWithMemoryBlock"))
+        let after = src[at.upperBound...].prefix(600)
+        #expect(after.contains("free(owned)"),
+                "the failure path does not free the block it allocated")
+    }
+}

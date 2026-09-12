@@ -255,16 +255,41 @@ enum Rtsp {
             avcc.append(nal)
         }
 
+        // ── THE BLOCK BUFFER OWNS ITS BYTES, AND MUST ─────────────────────
+        //
+        // This used to hand `&bytes` — a Swift `[UInt8]` — straight in, with a
+        // null block allocator. That combination means the buffer neither
+        // COPIES the bytes nor takes ownership of them: it keeps the pointer.
+        // But `&` on an Array is only guaranteed for the duration of the one
+        // call it appears in; the compiler may pass a temporary and write it
+        // back afterwards. Everything that actually READS the memory —
+        // `CMSampleBufferCreateReady` and the decode below — runs after that
+        // guarantee has lapsed.
+        //
+        // It worked, which is the uncomfortable part: the array was still in
+        // scope and its storage address happened to be stable. Undefined
+        // behaviour that works is the kind that stops working when an optimiser
+        // changes its mind, and this is the one place in the app parsing H.264
+        // that arrived over the network.
+        //
+        // So the bytes are malloc'd and handed over with `kCFAllocatorMalloc`:
+        // the buffer owns them for as long as it lives and frees them with
+        // `free` when it is released. A failed create never took ownership, so
+        // that path frees them here.
+        let length = avcc.count
+        guard length > 0, let owned = malloc(length) else { return nil }
+        avcc.copyBytes(to: owned.assumingMemoryBound(to: UInt8.self), count: length)
+
         var block: CMBlockBuffer?
-        var bytes = [UInt8](avcc)
         guard CMBlockBufferCreateWithMemoryBlock(
-                allocator: kCFAllocatorDefault, memoryBlock: &bytes, blockLength: bytes.count,
-                blockAllocator: kCFAllocatorNull, customBlockSource: nil,
-                offsetToData: 0, dataLength: bytes.count, flags: 0,
-                blockBufferOut: &block) == noErr, let block else { return nil }
+                allocator: kCFAllocatorDefault, memoryBlock: owned, blockLength: length,
+                blockAllocator: kCFAllocatorMalloc, customBlockSource: nil,
+                offsetToData: 0, dataLength: length, flags: 0,
+                blockBufferOut: &block) == noErr, let block
+        else { free(owned); return nil }
 
         var sample: CMSampleBuffer?
-        var size = bytes.count
+        var size = length
         guard CMSampleBufferCreateReady(
                 allocator: kCFAllocatorDefault, dataBuffer: block, formatDescription: format,
                 sampleCount: 1, sampleTimingEntryCount: 0, sampleTimingArray: nil,
