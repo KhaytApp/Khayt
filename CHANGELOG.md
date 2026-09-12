@@ -29,6 +29,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Adding a spool can be a lookup instead of typing.** Start typing a
+  brand or a product — "bambu matte", "esun petg" — and Khayt offers the
+  filament and its colours from a bundled catalogue of 1,945 products, filling
+  in the name, the colour, its hex and the spool weight.
+
+  It fills in what a manufacturer can know and nothing else. Your cost, what the
+  roll weighs today, when you opened it and whether you have dried it are facts
+  about the spool in your hand, and nothing here invents them — and editing a
+  half-used roll never overwrites what is on it.
+
+  The list ships with the app, so it works with no connection and Khayt does not
+  tell anybody what you buy. It says how old it is rather than pretending to be
+  current. From the Open Filament Database, MIT-licensed — see
+  [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md).
+
 - **(Mac) A job's parts can be corrected.** They were read-only: a weight typed
   wrong when the job was taken stayed wrong, and the only way to fix it was to
   open the job in the other Khayt. Double-click a part to change its name,

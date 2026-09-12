@@ -975,6 +975,10 @@ final class Words {
         // "Take the figures from the file this part was printed from." Short,
         // because it sits on a button beside the weight and the hours it fills.
         "mac.fill_from_file": ["en": "Fill from file", "ar": "تعبئة من الملف"],
+        // The bundled list of filaments other people have already written down,
+        // as against `known` above, which is this shop's own materials.
+        "mac.filament_catalog": ["en": "Search the filament catalogue",
+                                 "ar": "البحث في دليل الخيوط"],
         "mac.new_spool":     ["en": "New Spool",    "ar": "بكرة جديدة"],
         "mac.swatch":        ["en": "Swatch",       "ar": "اللون"],
         "mac.telegram_sent":   ["en": "Telegram message sent.", "ar": "أُرسلت رسالة تيليجرام."],

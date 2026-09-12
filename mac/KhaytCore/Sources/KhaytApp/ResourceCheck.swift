@@ -63,7 +63,12 @@ enum ResourceCheck {
         }
 
         for (what, name, ext) in [("sample shop", "sample-shop", "json"),
-                                  ("invoice stylesheet", "invoice", "css")] {
+                                  ("invoice stylesheet", "invoice", "css"),
+                                  // Missing, the filament search silently finds
+                                  // nothing — which reads as "Khayt does not
+                                  // have your filament" rather than as a broken
+                                  // build.
+                                  ("filament catalogue", "filament-catalog", "json")] {
             if let url = AppResources.bundle.url(forResource: name, withExtension: ext),
                let size = try? Data(contentsOf: url).count, size > 0 {
                 say("  ok  \(what): \(size) bytes")

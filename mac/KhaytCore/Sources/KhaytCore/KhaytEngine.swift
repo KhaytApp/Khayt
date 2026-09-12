@@ -13,6 +13,11 @@ import Foundation
 public actor KhaytEngine {
     private let runtime: JSRuntime
 
+    /// The filament catalogue is 0.78 MB of JSON and a search runs on every
+    /// keystroke. It is read into the context once and kept — immutable data
+    /// from the app bundle, so there is nothing to invalidate.
+    private var filamentCatalogLoaded = false
+
     /// The modules this engine exposes, in dependency order.
     static let modules = [
         "tax",
@@ -361,6 +366,11 @@ public actor KhaytEngine {
         // beside it holds what the slicer actually measured, and nothing ever
         // compared the two.
         "part-from-print-file",
+        // Finding a filament somebody else already wrote down. The catalogue
+        // itself is a data file in Resources; this is the matching, which is a
+        // rule — a shop typing "bambu pla matte black" has to get the same
+        // answer in both apps.
+        "filament-catalog",
         "printer-status",
         // Before `moonraker`, which reaches its runout rule through a global
         // the same way it reaches `printer-status`. Without it a Klipper
@@ -878,6 +888,137 @@ public actor KhaytEngine {
             """,
             [.array(spools), .array(orders), .number(now.timeIntervalSince1970 * 1000)],
             as: [String: Runway].self)
+    }
+
+    // MARK: - Finding a filament somebody else wrote down
+
+    /// One filament from the catalogue, with the colours that matched.
+    public struct FilamentHit: Decodable, Sendable, Hashable, Identifiable {
+        public var id: String { "\(brand)|\(name)" }
+        public let brand: String
+        public let name: String
+        public let material: String
+        public let colours: [Colour]
+        /// Words in the query that matched nothing, so the screen can say which
+        /// rather than presenting a near-miss as an answer.
+        public let unmatched: [String]
+
+        public struct Colour: Decodable, Sendable, Hashable, Identifiable {
+            public var id: String { name }
+            public let name: String
+            /// `#RRGGBB`, or empty where the catalogue has none.
+            public let hex: String
+            /// The full-spool weights this colour is sold in, grams.
+            public let weights: [Double]
+            /// The spool with no filament on it. The figure a scale reading is
+            /// useless without, and the one thing here Khayt cannot get any
+            /// other way.
+            public let emptySpoolWeight: Double?
+            public let diameter: Double?
+        }
+    }
+
+    /// Search the bundled catalogue.
+    ///
+    /// THE CATALOGUE IS LOADED ONCE AND KEPT. It is 0.78 MB of JSON and a
+    /// search runs on every keystroke; parsing it per call would be a fifth of
+    /// a second of work repeated for no reason. It is immutable data read from
+    /// the app bundle, so there is nothing to invalidate.
+    public func filamentSearch(_ query: String, limit: Int = 12) throws -> [FilamentHit] {
+        try requireCatalog()
+        return try runtime.call2("""
+            (function (a) {
+              var C = KhaytFilamentCatalog;
+              return C.search(globalThis.__khaytFilamentCatalog, a.q, { limit: a.limit })
+                .map(function (r) {
+                  var f = r.filament;
+                  return {
+                    brand: String(f.b || ''), name: String(f.n || ''),
+                    material: String(f.m || ''),
+                    unmatched: r.unmatched || [],
+                    // Every colour, not only the ones that matched: a shop that
+                    // found the filament by brand still has to pick one, and
+                    // the matched ones are already first in the list.
+                    colours: C.coloursOf(f).map(function (c) {
+                      return {
+                        name: c.name, hex: c.hex,
+                        weights: c.weights || [],
+                        emptySpoolWeight: c.emptySpoolWeight,
+                        diameter: c.diameter,
+                      };
+                    }),
+                  };
+                });
+            })(ARG0)
+            """,
+            [.object(["q": .string(query), "limit": .number(Double(limit))])],
+            as: [FilamentHit].self)
+    }
+
+    /// The spool fields the catalogue can speak for — and only those.
+    ///
+    /// The caller merges this over a draft. A shop's own cost, what the roll
+    /// weighs today and when it was opened are facts the catalogue does not
+    /// know, and `toSpool` is written not to invent them.
+    public func filamentAsSpool(brand: String, name: String, colour: String,
+                                weight: Double?) throws -> [String: JSONValue] {
+        try requireCatalog()
+        return try runtime.call2("""
+            (function (a) {
+              var C = KhaytFilamentCatalog;
+              var cat = globalThis.__khaytFilamentCatalog;
+              var f = (cat.filaments || []).find(function (x) {
+                return x && x.b === a.brand && x.n === a.name;
+              });
+              if (!f) return {};
+              var col = C.coloursOf(f).find(function (c) { return c.name === a.colour; });
+              return C.toSpool(f, col || null, a.weight || 0);
+            })(ARG0)
+            """,
+            [.object(["brand": .string(brand), "name": .string(name),
+                      "colour": .string(colour),
+                      "weight": .number(weight ?? 0)])],
+            as: [String: JSONValue].self)
+    }
+
+    /// How old the bundled snapshot is, in days.
+    ///
+    /// Shown rather than hidden: a catalogue that quietly ages looks like a
+    /// catalogue missing the filament a shop has just bought.
+    public func filamentCatalogAge(now: Date = Date()) throws -> Double? {
+        try requireCatalog()
+        return try runtime.call2("""
+            KhaytFilamentCatalog.ageInDays(globalThis.__khaytFilamentCatalog, ARG0)
+            """, [.number(now.timeIntervalSince1970 * 1000)], as: Double?.self)
+    }
+
+    /// Hand the engine the catalogue to search.
+    ///
+    /// THE RESOURCE IS THE APP'S, NOT THIS LAYER'S. `filament-catalog.json`
+    /// lives in the KhaytApp target beside the sample book, and finding it is
+    /// `AppResources`' job — this tried to do it here and worked in the app but
+    /// not under test, where `Bundle.main` is the xctest runner. Taking the
+    /// text instead puts the lookup in the layer that owns the file and leaves
+    /// this one with the rule.
+    ///
+    /// Idempotent: the first call parses 0.78 MB, the rest return immediately.
+    public func useFilamentCatalog(_ json: String) throws {
+        guard !filamentCatalogLoaded else { return }
+        // An IIFE, not two statements: `call2` evaluates an EXPRESSION, so a
+        // semicolon at the top level is a syntax error rather than a sequence.
+        _ = try runtime.call2("""
+            (function (j) {
+              globalThis.__khaytFilamentCatalog = JSON.parse(j);
+              return true;
+            })(ARG0)
+            """, [.string(json)], as: Bool.self)
+        filamentCatalogLoaded = true
+    }
+
+    private func requireCatalog() throws {
+        guard filamentCatalogLoaded else {
+            throw KhaytJSError.moduleMissing("filament-catalog.json (call useFilamentCatalog first)")
+        }
     }
 
     // MARK: - Whether an invoice has been reported to ZATCA

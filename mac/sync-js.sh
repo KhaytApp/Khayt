@@ -56,4 +56,11 @@ done
 cp renderer/invoice.css "mac/KhaytCore/Sources/KhaytApp/Resources/invoice.css"
 echo "  synced invoice.css"
 
+# The filament catalogue. A data file rather than a rule, so it sits beside the
+# sample book in Resources rather than in JS/ — but it is synced here for the
+# same reason everything else is: one copy, and a drifted one is a Mac app
+# offering a shop filaments the other app does not have.
+cp assets/filament-catalog.json "mac/KhaytCore/Sources/KhaytApp/Resources/filament-catalog.json"
+echo "  synced filament-catalog.json"
+
 echo "$(echo "$MODULES" | wc -w | tr -d ' ') modules and $(echo "$LOCALES" | wc -w | tr -d ' ') locales synced"
