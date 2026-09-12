@@ -29,6 +29,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A print made of several files says so.** A head, two arms and a torso
+  are one thing you print, not four — but the Mac app showed a kit as a single
+  entry with the rest of its files invisible. The model's panel now lists every
+  file in the print, marks the one the card speaks for, and adds up what the
+  whole thing weighs on disk.
+
+  Where a file could not be measured it says so, and the total is left off
+  rather than quietly adding up the parts it could measure and presenting that
+  as the size of the print.
+
 - **(Mac) An invoice says whether it has actually been reported to ZATCA.**
   Khayt already put the Phase 1 QR on the document. What the Mac app could not
   tell you was whether an invoice you had handed a customer had been reported to

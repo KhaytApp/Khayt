@@ -349,6 +349,13 @@ public actor KhaytEngine {
         // thing with its own time and weight.
         "print-setups",
         "print-versions",
+        // A print made of several files — a head, two arms and a torso are ONE
+        // thing you print, not four. Shared rather than read off `sourceFile`
+        // here because the reconciliation is subtle: an older build's Identify
+        // writes `sourceFile` and never touches `files`, sync merges whole
+        // records last-writer-wins, and a record can travel between machines
+        // disagreeing with itself. Preferring either list blindly loses data.
+        "print-file-parts",
         "printer-status",
         // Before `moonraker`, which reaches its runout rule through a global
         // the same way it reaches `printer-status`. Without it a Klipper
@@ -1019,6 +1026,65 @@ public actor KhaytEngine {
               };
             })(ARG0)
             """, [file], as: PrintSetups.self)
+    }
+
+    /// The files one print is made of.
+    ///
+    /// `lib/print-file-parts.js`. Spiderman is a head, two arms and a torso and
+    /// it is ONE thing you print, not four — but the Mac app modelled a record
+    /// as exactly one file, so a kit downloaded as ten STLs looked like a
+    /// single entry with nine files missing.
+    ///
+    /// The reconciliation is the reason this is shared rather than read off
+    /// `sourceFile` here. An older build's Identify writes `sourceFile` and
+    /// never touches `files`; sync merges whole records last-writer-wins, so a
+    /// record travels between machines disagreeing with itself. Preferring
+    /// `files` drops the file somebody just chose, preferring `sourceFile`
+    /// drops every other part. The rule keeps both, primary first — and a
+    /// second implementation of that in Swift is a second way to lose a file.
+    public struct PrintParts: Decodable, Sendable, Hashable {
+        public let parts: [Part]
+        /// The file the card speaks for: what kind it is, what it opens in,
+        /// what its thumbnail shows.
+        public let primary: String?
+        /// More than one file. What a screen should branch on, rather than
+        /// `parts.count` — a record with none reports none, not one.
+        public let multi: Bool
+        /// Every part added up, in bytes. Nil when any part has no size: a
+        /// total that silently skips the parts it could not measure is a
+        /// smaller number presented as a complete one.
+        public let totalSize: Double?
+
+        public struct Part: Decodable, Sendable, Hashable, Identifiable {
+            public var id: String { filename }
+            public let filename: String
+            public let size: Double?
+        }
+    }
+
+    public func printParts(_ file: JSONValue) throws -> PrintParts {
+        try runtime.call2("""
+            (function (rec) {
+              var P = KhaytPrintParts;
+              var all = P.partsOf(rec) || [];
+              var primary = P.primaryOf(rec);
+              // `totalSize` sums what it can. Reporting that as the size of the
+              // print when a part was unmeasurable would understate it, so an
+              // unknown anywhere makes the total unknown.
+              var known = all.every(function (f) { return f && f.size > 0; });
+              return {
+                parts: all.map(function (f) {
+                  return {
+                    filename: String(f.filename == null ? '' : f.filename),
+                    size: f.size > 0 ? Number(f.size) : null,
+                  };
+                }),
+                primary: primary && primary.filename ? String(primary.filename) : null,
+                multi: !!P.isMultiPart(rec),
+                totalSize: (all.length && known) ? Number(P.totalSize(rec)) : null,
+              };
+            })(ARG0)
+            """, [file], as: PrintParts.self)
     }
 
     /// The alternatives a print exists as — big, small, coloured.

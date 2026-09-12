@@ -9,6 +9,7 @@ struct LibraryInspector: View {
     let shop: Shop
     @State private var setups: KhaytEngine.PrintSetups?
     @State private var versions: KhaytEngine.PrintVersions?
+    @State private var parts: KhaytEngine.PrintParts?
 
     var body: some View {
         if shop.fileSelection.count > 1 {
@@ -35,6 +36,13 @@ struct LibraryInspector: View {
                     // version; almost every file has exactly one, and a section
                     // headed "versions" over a list of one is a heading that
                     // says nothing.
+                    // Only for a print that IS several files. One file is
+                    // the ordinary case and a "parts" heading over a list of
+                    // one says nothing.
+                    if let parts, parts.multi {
+                        LayerRule()
+                        PartsSection(parts: parts, shop: shop)
+                    }
                     if let versions, versions.many {
                         LayerRule()
                         VersionsSection(versions: versions, shop: shop)
@@ -57,6 +65,7 @@ struct LibraryInspector: View {
             .task(id: file.id) {
                 setups = await shop.setups(for: file.id)
                 versions = await shop.versions(for: file.id)
+                parts = await shop.parts(for: file.id)
             }
         } else {
             EmptyHere(title: shop.words.callIt("mac.no_model"), message: shop.words.callIt("mac.no_model_hint"), mark: .library)
@@ -435,5 +444,63 @@ struct VersionsSection: View {
             bits.append("\(h.formatted(.number.precision(.fractionLength(1)))) \(shop.words.callIt("common.hours_short"))")
         }
         return bits.isEmpty ? nil : bits.joined(separator: " · ")
+    }
+}
+
+
+/// The files this print is made of.
+///
+/// A head, two arms and a torso are ONE thing you print, not four. The Mac app
+/// modelled a record as exactly one file, so a kit downloaded as ten STLs read
+/// as a single entry with nine files quietly missing from it.
+struct PartsSection: View {
+    let parts: KhaytEngine.PrintParts
+    let shop: Shop
+
+    var body: some View {
+        DetailSection(shop.words.callIt("mac.parts")) {
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(parts.parts) { part in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(part.filename).font(.callout).lineLimit(1).truncationMode(.middle)
+                        // The one the card speaks for: its icon, its thumbnail,
+                        // what "Open in slicer" resolves to.
+                        if part.filename == parts.primary {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 8)).foregroundStyle(Khayt.cyan)
+                                // A star with no explanation is decoration.
+                                .help(shop.words.callIt("plib.part_primary"))
+                        }
+                        Spacer(minLength: 6)
+                        // An unmeasured part says so. Left blank it reads as a
+                        // gap in the layout, and the missing Total below has no
+                        // visible cause — which is the one thing a reader has
+                        // to be able to work out from this list.
+                        Text(part.size.map(Self.bytes) ?? "—")
+                            .font(.caption)
+                            .foregroundStyle(part.size == nil ? AnyShapeStyle(.tertiary)
+                                                              : AnyShapeStyle(.secondary))
+                            .monospacedDigit()
+                    }
+                }
+                // Only where every part could be measured. A total that
+                // silently skips the parts it could not measure is a smaller
+                // number presented as a complete one.
+                if let total = parts.totalSize {
+                    Divider().padding(.vertical, 1)
+                    HStack {
+                        Text(shop.words.callIt("common.total")).font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(Self.bytes(total)).font(.caption.weight(.semibold))
+                            .monospacedDigit()
+                    }
+                }
+            }
+        }
+    }
+
+    static func bytes(_ v: Double) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(v), countStyle: .file)
     }
 }

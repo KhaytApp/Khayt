@@ -150,7 +150,12 @@ public final class JSRuntime {
         // the global it assigns. Both of these predate the convention; a NEW
         // module should be named for its global instead, because this check is
         // the only thing that catches a module that loads and defines nothing.
-        let exceptions = ["store-validate": "KhaytStoreValidate",
+        let exceptions = [// `print-file-parts.js` publishes `KhaytPrintParts` — the
+                          // file says which parts, the global does not. Caught
+                          // by this check the moment it was bundled, which is
+                          // what the check is for.
+                          "print-file-parts": "KhaytPrintParts",
+                          "store-validate": "KhaytStoreValidate",
                           "pnl-report": "KhaytPnl",
                           // `thumbnail-extract.js` publishes `KhaytThumb`. Same
                           // shape as the two above and caught the same way: the

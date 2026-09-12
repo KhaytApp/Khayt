@@ -5443,6 +5443,12 @@ final class Shop {
         }
     }
 
+    /// The files this print is made of.
+    func parts(for id: LibraryFile.ID) async -> KhaytEngine.PrintParts? {
+        guard let engine, let rec = row(for: id) else { return nil }
+        return try? await engine.printParts(rec)
+    }
+
     /// The settings this file is known to work at, and which to reach for.
     func setups(for id: LibraryFile.ID) async -> KhaytEngine.PrintSetups? {
         guard let engine, let rec = row(for: id) else { return nil }
