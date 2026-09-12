@@ -601,6 +601,15 @@ function renderAiSettings() {
   // things. Consent is now per feature, and each row states what it transmits.
   const { features, reconsentRequired } = P.migrateConsent(ai);
 
+  // WHICH AI. These features were Anthropic and nothing else, so a shop already
+  // paying OpenAI — or one that must keep its book on a machine inside the
+  // building — could use none of them. See lib/ai-providers.js.
+  const AP = window.KhaytAiProviders;
+  const all = AP ? AP.providers() : [];
+  const chosen = (AP ? AP.providerOf(settings) : { id: 'anthropic', defaultModel: '', needsBaseUrl: false });
+  const providerOptions = all.map((p) => `
+    <option value="${escapeHtml(p.id)}" ${p.id === chosen.id ? 'selected' : ''}>${escapeHtml(p.label)}</option>`).join('');
+
   const featureRows = Object.values(P.AI_FEATURES).map((f) => {
     const pii = f.dataClass === P.DATA_CLASS.CUSTOMER;
     const needsConsent = reconsentRequired.includes(f.id);
@@ -612,7 +621,7 @@ function renderAiSettings() {
           <span class="ai-feat-name">${escapeHtml(t(f.labelKey) || f.id)}</span>
           ${pii ? `<span class="ai-feat-badge">${escapeHtml(t('set.ai_pii_badge') || 'Customer data')}</span>` : ''}
         </label>
-        <p class="ai-feat-sends"><span class="ai-feat-sends-label">${escapeHtml(t('set.ai_sends') || 'Sends to Anthropic:')}</span> ${escapeHtml(t(f.sendsKey) || f.sends.join('; '))}</p>
+        <p class="ai-feat-sends"><span class="ai-feat-sends-label">${escapeHtml((t('set.ai_sends_to') || 'Sends to {provider}:').replace('{provider}', chosen.label || 'the provider'))}</span> ${escapeHtml(t(f.sendsKey) || f.sends.join('; '))}</p>
         ${needsConsent ? `<p class="ai-feat-reconsent">${escapeHtml(t('set.ai_reconsent') || 'Turned off in this update because it sends a customer’s personal data. Tick it to re-enable.')}</p>` : ''}
       </div>`;
   }).join('');
@@ -625,10 +634,16 @@ function renderAiSettings() {
     <p class="ai-master-hint">${escapeHtml(t('set.ai_hint') || '')}</p>
     <div class="ai-feats" id="aiFeatureList">${featureRows}</div>
     ${aiSpendHtml()}
-    <label style="margin-top:10px;">${escapeHtml(t('calc.ai_key') || 'Anthropic API key')}</label>
-    <input type="password" id="aiKeySetting" value="${escapeHtml(secretInputValue(ai.apiKey))}" placeholder="sk-ant-...">
+    <label style="margin-top:10px;">${escapeHtml(t('set.ai_provider') || 'Provider')}</label>
+    <select id="aiProviderSetting">${providerOptions}</select>
+    ${chosen.needsBaseUrl || ai.baseUrl ? `
+      <label style="margin-top:10px;">${escapeHtml(t('set.ai_base_url') || 'Address')}</label>
+      <input type="text" id="aiBaseUrlSetting" value="${escapeHtml(ai.baseUrl || '')}"
+             placeholder="http://localhost:11434">` : ''}
+    <label style="margin-top:10px;">${escapeHtml(t('calc.ai_key') || 'API key')}</label>
+    <input type="password" id="aiKeySetting" value="${escapeHtml(secretInputValue(ai.apiKey))}" placeholder="${escapeHtml(chosen.id === 'anthropic' ? 'sk-ant-...' : 'sk-...')}">
     <label style="margin-top:10px;">${escapeHtml(t('set.ai_model') || 'Model')}</label>
-    <input type="text" id="aiModelSetting" value="${escapeHtml(ai.model || 'claude-opus-5')}" placeholder="claude-opus-5">
+    <input type="text" id="aiModelSetting" value="${escapeHtml(ai.model || chosen.defaultModel)}" placeholder="${escapeHtml(chosen.defaultModel || 'llama3')}">
     <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
       <button id="btnSaveAiSettings" class="btn primary small">${escapeHtml(t('common.save') || 'Save')}</button>
       <button id="btnTestAiSettings" class="btn small">🔌 ${escapeHtml(t('calc.ai_test') || 'Test connection')}</button>
@@ -642,16 +657,34 @@ function renderAiSettings() {
     el.querySelectorAll('.ai-feat-toggle').forEach((c) => { c.disabled = !e.target.checked; });
   });
 
+  // Changing provider re-renders: the placeholder, the default model and
+  // whether an address is asked for all belong to the provider, and a form
+  // still showing Anthropic's hints after picking Ollama is a form that will
+  // be filled in wrong.
+  el.querySelector('#aiProviderSetting')?.addEventListener('change', (e) => {
+    settings.ai = Object.assign({}, settings.ai, {
+      provider: e.target.value,
+      // The model belongs to the provider. Carrying `claude-opus-5` across to
+      // OpenAI produces a 404 that reads as a broken key.
+      model: '',
+    });
+    renderAiSettings();
+  });
+
   el.querySelector('#btnSaveAiSettings')?.addEventListener('click', () => {
-    const chosen = {};
-    el.querySelectorAll('.ai-feat-toggle').forEach((c) => { chosen[c.dataset.feature] = c.checked; });
+    const picked = {};
+    el.querySelectorAll('.ai-feat-toggle').forEach((c) => { picked[c.dataset.feature] = c.checked; });
+    const provider = el.querySelector('#aiProviderSetting')?.value || chosen.id;
+    const baseField = el.querySelector('#aiBaseUrlSetting');
     settings.ai = {
       enabled: el.querySelector('#aiEnabled').checked,
-      model: el.querySelector('#aiModelSetting').value.trim() || 'claude-opus-5',
+      provider,
+      baseUrl: baseField ? baseField.value.trim() : (ai.baseUrl || ''),
+      model: el.querySelector('#aiModelSetting').value.trim() || chosen.defaultModel,
       apiKey: secretInputSave(ai.apiKey, el.querySelector('#aiKeySetting').value.trim()),
       // Persisting `features` is also what marks the consent migration as done,
       // so a saved choice is never re-migrated (migrateConsent is idempotent).
-      features: chosen,
+      features: picked,
     };
     saveAll();
     toast(t('common.save') || 'Saved', 'success');

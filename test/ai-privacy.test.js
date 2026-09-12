@@ -151,8 +151,15 @@ test('the main process enforces consent, not just the renderer', () => {
   const body = handler.slice(0, handler.indexOf('\n});'));
   assert.match(body, /aiPrivacy\.isFeatureEnabled/, 'hub:ai-extract does not check consent');
   // and it must do so before the network call, not after.
+  //
+  // This pinned `api.anthropic.com`, which was the only address the handler
+  // could reach. The provider is the shop's choice now and the hostname lives
+  // in lib/ai-providers.js, so what is pinned is the `fetch` itself — which is
+  // the invariant the test always meant and does not move with the vendor.
+  const sends = body.indexOf('await fetch(');
+  assert.ok(sends > 0, 'hub:ai-extract no longer makes the request here');
   assert.ok(
-    body.indexOf('aiPrivacy.isFeatureEnabled') < body.indexOf('api.anthropic.com'),
+    body.indexOf('aiPrivacy.isFeatureEnabled') < sends,
     'consent is checked after the request is already sent',
   );
 });

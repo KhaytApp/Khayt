@@ -117,6 +117,7 @@ const cloudClient = require('./lib/cloud-client');
 const { summarizeBranch, totalBranches } = require('./lib/branch-summary');
 const aiTools = require('./lib/ai-tools');
 const aiPrivacy = require('./lib/ai-privacy');
+const aiProviders = require('./lib/ai-providers');
 const makerrunLibrary = require('./lib/makerrun-library');
 const calibProfile = require('./lib/calibration-profile');
 const orcaFila = require('./lib/orca-filament-install');
@@ -4967,12 +4968,18 @@ ipcMain.handle('hub:webhook-post', async (_e, { url, secret, payload } = {}) => 
 });
 
 // ── Feature R12-1: Outbound Webhooks ────────────────────────────────────────
-// AI quote extraction (BYO Anthropic key) — opt-in; fails safe (renderer falls
+// AI quote extraction (bring your own key) — opt-in; fails safe (renderer falls
 // back to the manual quote form on any error). Key resolved from the encrypted
 // store so it never round-trips the renderer in plaintext after first save.
+//
+// The PROVIDER is the shop's choice. This handler used to be Anthropic and
+// nothing else — its URL, auth header, tool shape and reply parsing all written
+// inline — so a shop already paying OpenAI, or one that must keep its data on a
+// machine inside the building, could use none of these features. The wire
+// format lives in lib/ai-providers.js now; what stays here is the fetch, the
+// retry policy and the consent gate.
 ipcMain.handle('hub:ai-extract', async (_e, { apiKey, model, system, request, image, schema, task } = {}) => {
   apiKey = resolveStoreSecret(apiKey, d => d?.settings?.ai?.apiKey);
-  if (!apiKey) return { ok: false, error: 'No AI key configured' };
   if (!request || !String(request).trim()) return { ok: false, error: 'Empty request' };
 
   // The tool name/description must describe the CALLING feature — the model
@@ -4988,16 +4995,18 @@ ipcMain.handle('hub:ai-extract', async (_e, { apiKey, model, system, request, im
   if (!aiPrivacy.isFeatureEnabled(storeAi, resolvedTask)) {
     return { ok: false, error: 'AI_FEATURE_NOT_CONSENTED', feature: resolvedTask };
   }
-  const content = [{ type: 'text', text: String(request) }];
-  if (image) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: String(image) } });
-  const body = JSON.stringify({
-    model: model || 'claude-opus-5',
-    max_tokens: maxTokens,
-    system: String(system || ''),
-    tools: [tool],
-    tool_choice: { type: 'tool', name: tool.name },
-    messages: [{ role: 'user', content }],
-  });
+  // Shaped by the shop's chosen provider. `buildRequest` throws on a missing
+  // key or model — a configuration fault the owner has to see, not a network
+  // error worth retrying.
+  let shaped;
+  try {
+    shaped = aiProviders.buildRequest({ ai: Object.assign({}, storeAi, { apiKey }) }, {
+      apiKey, model, system, prompt: request, image, tool, maxTokens,
+    });
+  } catch (e) {
+    return { ok: false, error: String(e && e.message || e) };
+  }
+  const body = JSON.stringify(shaped.body);
 
   // Retry transient faults (429/529/5xx) with backoff. Raw fetch gives us none
   // of this for free, so a single rate-limit reply used to kill the feature.
@@ -5006,9 +5015,9 @@ ipcMain.handle('hub:ai-extract', async (_e, { apiKey, model, system, request, im
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     let res;
     try {
-      res = await fetch('https://api.anthropic.com/v1/messages', {
+      res = await fetch(shaped.url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        headers: shaped.headers,
         body,
         // 60s, not 30s: the default model thinks before it answers, and thinking
         // happens before the first byte of the reply. A 30s ceiling was set when
@@ -5033,16 +5042,18 @@ ipcMain.handle('hub:ai-extract', async (_e, { apiKey, model, system, request, im
     }
 
     const data = await res.json();
-    const toolUse = (data.content || []).find(c => c && c.type === 'tool_use');
-    // Hand back the usage block. It arrives on every response and used to be
-    // discarded, so a shop on its own key had no way to know what the AI
-    // features were costing them — see lib/ai-usage.js.
-    if (toolUse && toolUse.input) {
-      return { ok: true, draft: toolUse.input, usage: data.usage || null, model: data.model || null };
+    // Read by the same provider that shaped it. The usage block arrives on
+    // every response and used to be discarded, so a shop on its own key had no
+    // way to know what these features were costing — see lib/ai-usage.js. It is
+    // normalised, because no two providers count the same way.
+    const out = aiProviders.readResponse({ ai: storeAi }, data);
+    if (out.ok) {
+      return { ok: true, draft: out.draft, usage: out.usage, model: out.model, provider: out.provider };
     }
-    // A 200 with no tool call: stop_reason says whether the model refused, ran
-    // out of room, or paused — three different fixes, previously one message.
-    return { ok: false, error: aiTools.describeStop(data.stop_reason) || 'No structured output returned' };
+    // A 200 with no tool call: the stop reason says whether the model refused,
+    // ran out of room, or paused — three different fixes, previously one
+    // message.
+    return { ok: false, error: aiTools.describeStop(out.stop) || 'No structured output returned' };
   }
   return { ok: false, error: lastError };
 });
