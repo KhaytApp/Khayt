@@ -179,6 +179,12 @@ public final class JSRuntime {
                           // by this check the moment it was bundled, which is
                           // what the check is for.
                           "print-file-parts": "KhaytPrintParts",
+                          // `stl-estimate.js` publishes `KhaytStl` — the file
+                          // is named for the estimating, the global for the
+                          // format. Caught by this check the moment it was
+                          // bundled, which is what the check is for; the tests
+                          // that needed it all failed at once and said why.
+                          "stl-estimate": "KhaytStl",
                           "store-validate": "KhaytStoreValidate",
                           "pnl-report": "KhaytPnl",
                           // `thumbnail-extract.js` publishes `KhaytThumb`. Same
