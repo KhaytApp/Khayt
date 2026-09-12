@@ -5556,6 +5556,34 @@ final class Shop {
         return try? await engine.printVersions(rec)
     }
 
+    /// Filaments in the bundled catalogue matching what has been typed.
+    ///
+    /// The catalogue is handed to the engine on first use rather than found by
+    /// it: the file belongs to this target, and `AppResources` is what knows
+    /// where this target's resources are.
+    func filamentSearch(_ query: String, limit: Int = 8) async -> [KhaytEngine.FilamentHit] {
+        guard let engine, query.trimmingCharacters(in: .whitespaces).count >= 2 else { return [] }
+        guard let json = AppResources.filamentCatalogJSON else { return [] }
+        guard (try? await engine.useFilamentCatalog(json)) != nil else { return [] }
+        return (try? await engine.filamentSearch(query, limit: limit)) ?? []
+    }
+
+    /// The spool fields a catalogue entry can speak for — and only those.
+    func filamentFields(brand: String, name: String, colour: String,
+                        weight: Double?) async -> [String: JSONValue] {
+        guard let engine, let json = AppResources.filamentCatalogJSON else { return [:] }
+        guard (try? await engine.useFilamentCatalog(json)) != nil else { return [:] }
+        return (try? await engine.filamentAsSpool(brand: brand, name: name,
+                                                  colour: colour, weight: weight)) ?? [:]
+    }
+
+    /// How old the bundled catalogue is, in days.
+    func filamentCatalogAge() async -> Double? {
+        guard let engine, let json = AppResources.filamentCatalogJSON else { return nil }
+        guard (try? await engine.useFilamentCatalog(json)) != nil else { return nil }
+        return (try? await engine.filamentCatalogAge()) ?? nil
+    }
+
     /// The consumables worth ordering, most urgent first.
     ///
     /// Recomputed rather than cached: the rate is measured over a trailing

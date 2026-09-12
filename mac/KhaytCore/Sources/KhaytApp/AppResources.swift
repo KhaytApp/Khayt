@@ -17,4 +17,15 @@ import KhaytCore
 /// unstyled HTML.
 enum AppResources {
     static var bundle: Bundle { BundledResources.bundle("KhaytCore_KhaytApp", fallback: .module) }
+
+    /// The filament catalogue, as text for the engine to parse.
+    ///
+    /// Nil when the resource is missing, which is a build fault rather than a
+    /// shop's: `Khayt --check-resources` names it, and the search simply finds
+    /// nothing without it.
+    static var filamentCatalogJSON: String? {
+        guard let url = bundle.url(forResource: "filament-catalog", withExtension: "json")
+        else { return nil }
+        return try? String(contentsOf: url, encoding: .utf8)
+    }
 }

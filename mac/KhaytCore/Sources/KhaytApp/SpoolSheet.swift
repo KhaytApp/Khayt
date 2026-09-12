@@ -36,6 +36,8 @@ struct SpoolSheet: View {
     @State private var reorderPoint: Double = 200
     @State private var openedAt: Date?
     @State private var colours: [String] = []
+    /// Catalogue matches for whatever has been typed into the material field.
+    @State private var catalogue: [KhaytEngine.FilamentHit] = []
     @FocusState private var focused: Bool
 
     private var isNew: Bool { existing == nil }
@@ -64,6 +66,32 @@ struct SpoolSheet: View {
                                 }
                             } label: { Image(systemName: "list.bullet") }
                                 .menuStyle(.borderlessButton).fixedSize()
+                        }
+                        // The catalogue: 1,945 filaments somebody else already
+                        // wrote down. Separate from the menu above, which is
+                        // this shop's OWN materials — a shop reaching for what
+                        // it already stocks should not have to scroll past a
+                        // thousand it does not.
+                        if !catalogue.isEmpty {
+                            Menu {
+                                ForEach(catalogue) { hit in
+                                    Menu("\(hit.brand) \(hit.name)") {
+                                        ForEach(hit.colours) { colour in
+                                            Button(colour.name) {
+                                                Task { await take(hit, colour) }
+                                            }
+                                        }
+                                    }
+                                }
+                                if let missed = catalogue.first?.unmatched, !missed.isEmpty {
+                                    Divider()
+                                    // Say which word found nothing, rather than
+                                    // presenting a near-miss as the answer.
+                                    Text(missed.joined(separator: ", "))
+                                }
+                            } label: { Image(systemName: "magnifyingglass") }
+                                .menuStyle(.borderlessButton).fixedSize()
+                                .help(shop.words.callIt("mac.filament_catalog"))
                         }
                     }
                 }
@@ -209,6 +237,7 @@ struct SpoolSheet: View {
         .onAppear(perform: fill)
         .task { units = await shop.inventoryUnitChoices() }
         .task(id: material) { await loadColours() }
+        .task(id: material) { catalogue = await shop.filamentSearch(material) }
     }
 
     /// The word after the quantity field, in the unit being chosen. Falls back
@@ -231,6 +260,39 @@ struct SpoolSheet: View {
         reorderPoint = spool.reorderPoint ?? 200
         openedAt = Order.day(spool.openedAt)
         focused = true
+    }
+
+    /// Take a catalogue entry into the form.
+    ///
+    /// ── WHAT IT DOES NOT TOUCH ─────────────────────────────────────────────
+    ///
+    /// The cost, what the roll weighs today, when it was opened, whether it has
+    /// been dried, the lot number. A manufacturer's page does not know any of
+    /// them, and `toSpool` is written not to invent them — this only writes the
+    /// fields it is actually handed.
+    ///
+    /// The full-spool weight IS taken, and for a new spool so is the current
+    /// weight, because a new spool is a full one. Editing an existing spool
+    /// leaves what is on it alone: a shop correcting the brand of a half-used
+    /// roll has not just refilled it.
+    private func take(_ hit: KhaytEngine.FilamentHit,
+                      _ colour: KhaytEngine.FilamentHit.Colour) async {
+        let fields = await shop.filamentFields(brand: hit.brand, name: hit.name,
+                                               colour: colour.name,
+                                               weight: colour.weights.first)
+        if case .string(let m)? = fields["material"] { material = m }
+        if case .string(let v)? = fields["colourVariant"] { colourVariant = v }
+        if case .string(let hex)? = fields["color"], let c = NSColor(hex: hex) {
+            swatch = Color(nsColor: c)
+        }
+        // Only for a new spool. A shop correcting the brand of a half-used roll
+        // has not just refilled it, and overwriting what is on it would be the
+        // app claiming to know something only the scale does.
+        //
+        // This sheet has no field for the FULL-spool weight — the record keeps
+        // one and nothing here edits it — so the catalogue's figure lands on
+        // `weight`, which for a new spool is the same number.
+        if isNew, case .number(let full)? = fields["weight"] { weight = full }
     }
 
     private func loadColours() async {
