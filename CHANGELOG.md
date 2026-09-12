@@ -36,6 +36,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A model in your library can become a product.** The library knew what
+  each model weighs and how long it takes — parsed when you imported it — and
+  the catalogue asked you to type both in again. *Make a product from this* is
+  on the Model menu and on a model's right-click menu, and the product arrives
+  with its first part already filled: weight and time from what the slicer
+  measured, material and layer height from the setup you have had most success
+  with.
+
+  **It is joined to the model, not just named after it.** A part used to carry
+  the file's NAME — a filename somebody typed — so nothing else could follow
+  it. It carries the model's identity now, which is what makes "for this part,
+  at these settings, how far out is my estimate?" answerable later.
+
+  What the file cannot answer for is named on screen rather than left at zero,
+  because a zero that looks typed is worse than a blank you were told about.
+
 - **(Mac) The assistant has a screen of its own.** Khayt's AI features could be
   switched on in the other app and not this one, so a shop on a Mac could be
   told a feature was running and have no way to see — let alone refuse — what

@@ -394,6 +394,12 @@ private struct ModelMenu: View {
             .disabled(!canReach)
         Button(Words.upfront("mac.reveal_in_finder")) { shop.revealSelection() }
             .keyboardShortcut("r", modifiers: [.command, .shift])
+        Divider()
+        // The library knew what a model weighs and how long it takes; the
+        // catalogue asked a shop to type both in. This is the door between them.
+        Button(Words.upfront("mac.product_from_model") + "\u{2026}") {
+            Task { await shop.productFromSelection() }
+        }
             .disabled(!canReach)
         Button(Words.upfront("mac.open")) { shop.openSelection() }
             .keyboardShortcut("o")

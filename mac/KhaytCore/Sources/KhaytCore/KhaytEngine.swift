@@ -1493,6 +1493,38 @@ public actor KhaytEngine {
             as: PartFromFile.self)
     }
 
+    /// The whole patch, as fields to write onto a part record.
+    ///
+    /// `partFromFile` above returns only what the part SHEET shows, so it drops
+    /// `printFileId`, `setupId` and `fileRef`. Those three are the join —
+    /// `lib/order-file-link.js` opens by explaining that an order carried a
+    /// free-text `fileRef`, "a filename somebody typed", so nothing joined up —
+    /// and a caller writing a new part needs them on the record.
+    public struct PartFields: Decodable, Sendable {
+        /// Every field the rule filled, ready to merge onto a part.
+        public let fields: [String: JSONValue]
+        /// What the file could not answer for, so a caller can say so rather
+        /// than leave zeros that look typed.
+        public let missing: [String]
+        public let setupName: String?
+    }
+
+    public func partFieldsFromFile(_ record: JSONValue, setupId: String? = nil) throws -> PartFields {
+        try runtime.call2("""
+            (function (a) {
+              var p = KhaytPartFromPrintFile.partPatch(a.rec, a.setupId) || {};
+              return {
+                fields: p.fields || {},
+                missing: Array.isArray(p.missing) ? p.missing : [],
+                setupName: p.setup && p.setup.name ? String(p.setup.name) : null,
+              };
+            })(ARG0)
+            """,
+            [.object(["rec": record,
+                      "setupId": setupId.map { JSONValue.string($0) } ?? .null])],
+            as: PartFields.self)
+    }
+
     /// The files one print is made of.
     ///
     /// `lib/print-file-parts.js`. Spiderman is a head, two arms and a torso and

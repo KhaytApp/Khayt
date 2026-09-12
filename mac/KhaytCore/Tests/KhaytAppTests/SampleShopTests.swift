@@ -484,6 +484,52 @@ extension SampleShopTests {
         }
     }
 
+    @Test("a product made from a model is JOINED to it, not just named after it")
+    func productFromModel() async throws {
+        // THE POINT OF THE FEATURE. The library knew what each model weighs and
+        // how long it takes; the catalogue asked a shop to type both in. What
+        // makes the join worth anything is `printFileId` — `order-file-link.js`
+        // opens by explaining that an order carried a free-text `fileRef`, "a
+        // filename somebody typed", so none of it joined up.
+        let shop = Shop()
+        await shop.load(.sample)
+        let file = try #require(shop.files.first { $0.sourceFile?.kind == "model" },
+                                "the sample library has no model to sell")
+
+        let product = try #require(await shop.productFromFile(file),
+                                   Comment(rawValue: shop.productProblem ?? "no product came back"))
+
+        // Named after the model, in every language the catalogue carries.
+        #expect(product.names.values.allSatisfy { $0 == file.title })
+        #expect(product.hasAName)
+
+        guard case .array(let parts)? = product.rest["parts"], case .object(let part) = parts.first
+        else { Issue.record("the product has no first part"); return }
+
+        #expect(part["printFileId"] == JSONValue.string(file.id),
+                "the part is not joined to the model — only a filename would be left")
+        #expect(part["name"] == JSONValue.string(file.title))
+        #expect(part["quantity"] == JSONValue.number(1))
+        // And a filename too, because the other app reads that field.
+        if case .string(let ref)? = part["fileRef"] { #expect(!ref.isEmpty) }
+    }
+
+    @Test("what the file could not answer for is said, not left as zeros")
+    func productFromModelIsHonest() async throws {
+        // A gcode record has no mesh and often no setups, so some fields cannot
+        // be filled. A zero that looks typed is worse than a blank somebody was
+        // told about — `partPatch` returns `missing` and this must surface it.
+        let shop = Shop()
+        await shop.load(.sample)
+        var sawANote = false
+        for file in shop.files where file.sourceFile?.kind == "model" {
+            _ = await shop.productFromFile(file)
+            if shop.productNote != nil { sawANote = true; break }
+        }
+        #expect(sawANote,
+                "no sample model is missing a figure, so the honesty path never draws")
+    }
+
     @Test("every machine in the sample shop says which kind it is")
     func everyMachineSaysSo() throws {
         for m in try Self.rows("machines") {
