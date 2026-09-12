@@ -20,10 +20,17 @@
  * setting the shop just turned on does nothing at all. That is not a test
  * failure anywhere; it is a control that lies.
  *
- * This is a source-level guard for the same reason `update-consent-wiring` is:
- * proving it through behaviour needs a real store, a real library root and a
- * real ten-million-facet file, and the thing that actually breaks is a missing
- * argument at a call site.
+ * BEHAVIOUR IS PROVEN ELSEWHERE, and the first version of this file was wrong
+ * about that. It claimed proving it needed "a real store, a real library root
+ * and a real ten-million-facet file" — but `LibraryImport.add` takes the store
+ * and the root as arguments, so it needs a temp directory and a 24-triangle
+ * STL. `PrintRiskTests.walksAtImport` and `.skipsWhenNotAsked` do exactly that
+ * and assert on what lands in the book.
+ *
+ * What is left for this file is the part behaviour cannot reach: there are four
+ * call sites, and a test that imports through ONE of them says nothing about
+ * the other three. A caller that omits `analyseRisk:` compiles clean, so only
+ * reading the call sites catches it.
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
