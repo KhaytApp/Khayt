@@ -1019,6 +1019,69 @@ final class Shop {
         }
     }
 
+    // MARK: - Finding a printer
+
+    /// True while the find-printers sheet is up.
+    var findingPrinters = false
+
+    private let finder = PrinterFinder()
+
+    /// Ask the network what is on it. Owner-initiated, time-boxed, never a timer.
+    func findPrinters() async -> [KhaytEngine.FoundPrinter] {
+        guard let engine else { return [] }
+        return await finder.find(engine: engine)
+    }
+
+    /// Write a found printer down as a machine.
+    ///
+    /// Its name, address and port, and the connection type the shared rule
+    /// chose — and the catalog entry when it recognised the model, which is
+    /// what fills in the bed, the nozzle and what it costs to run.
+    func addFound(_ printer: KhaytEngine.FoundPrinter) async {
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        let id = Self.uid("MCH")
+        do {
+            var record: [String: JSONValue] = [
+                "id": .string(id),
+                "name": .string(printer.name),
+                "status": .string("idle"),
+                "createdAt": .string(Self.localDay()),
+                "printerApi": .object([
+                    "type": .string(printer.connection ?? "none"),
+                    "host": .string(printer.host),
+                    "port": .number(Double(printer.port ?? 0)),
+                ]),
+            ]
+            // What the catalog knows about this model, when it recognised one.
+            if let catalogId = printer.catalogId, !catalogId.isEmpty, let engine {
+                var settings: [String: JSONValue] = [:]
+                if case .object(let held) = settingsValue { settings = held }
+                let written = try? await engine.applyPrinterModel(
+                    .object(record), catalogId: catalogId, settings: settings)
+                if case .object(let filled)? = written?.machine { record = filled }
+            }
+            try StoreWriter.update(build) { root in
+                var fleet = Self.rows(root, "machines")
+                // A printer already written down at this address is the same
+                // printer. Adding it twice gives a shop two cards that disagree.
+                guard !fleet.contains(where: { row in
+                    guard case .object(let m) = row,
+                          case .object(let api)? = m["printerApi"],
+                          case .string(let host)? = api["host"] else { return false }
+                    return host == printer.host
+                }) else { return }
+                StoreWriter.stamp(&record)
+                fleet.append(.object(record))
+                root["machines"] = .array(fleet)
+            }
+            await load(source)
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
     // MARK: - Telling a printer what to do
 
     /// What went wrong the last time a machine was told something, by machine.

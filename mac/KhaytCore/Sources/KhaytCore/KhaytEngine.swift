@@ -1923,6 +1923,11 @@ public actor KhaytEngine {
         public var id: String { host + ":" + String(port ?? 0) + name }
     }
 
+    /// The service types worth asking about, from the shared list.
+    public func discoveryServices() throws -> [String] {
+        try runtime.value("KhaytPrinterDiscovery", "SERVICE_NAMES", as: [String].self)
+    }
+
     /// The query to put on the wire, as bytes.
     ///
     /// `unicast` sets the QU bit, asking responders to answer straight back to
@@ -1936,6 +1941,27 @@ public actor KhaytEngine {
                                              { unicast: ARG0 }))
             """, [.bool(unicast)], as: [Double].self)
         return numbers.map { UInt8(clamping: Int($0)) }
+    }
+
+    /// The same rule, from records the SYSTEM resolved rather than packets we
+    /// decoded ourselves.
+    ///
+    /// ── WHY THE MAC DOES NOT PUT ITS OWN QUERY ON THE WIRE ────────────────
+    ///
+    /// Raw multicast is unreliable on exactly the macOS this app requires.
+    /// Apple's own DTS describes local network privacy failing closed on an IPC
+    /// timing bug: multicast stops after a reboot, the denial is CACHED until
+    /// the Mac restarts or somebody toggles the switch in System Settings, and
+    /// several copies of the same app on one machine make it worse. It is fixed
+    /// in 26.5; this app's floor is 26.0.
+    ///
+    /// `NWBrowser` asks `mDNSResponder`, which already holds the multicast, so
+    /// none of that applies. What crosses here is the same PTR/SRV/TXT/A shape
+    /// the codec would have produced — so the part that decides what a device
+    /// IS stays shared with the other app, and only the transport differs.
+    public func printersFrom(records: [JSONValue]) throws -> [FoundPrinter] {
+        try runtime.call2("KhaytPrinterDiscovery.discoverFromRecords(ARG0)",
+                          [.array(records)], as: [FoundPrinter].self)
     }
 
     /// Turn whatever came back into printers worth offering.

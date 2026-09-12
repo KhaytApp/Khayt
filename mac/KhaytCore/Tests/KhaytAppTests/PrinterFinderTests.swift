@@ -91,3 +91,53 @@ struct PrinterFinderTests {
         #expect(try await engine.printersFound(in: []).isEmpty)
     }
 }
+
+extension PrinterFinderTests {
+
+    static var repoRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    /// A service type the app has not DECLARED is one the system will not
+    /// browse — and it fails by finding nothing, which looks exactly like a
+    /// network with no printers on it.
+    ///
+    /// So the list in `Info.plist` has to match `lib/printer-discovery.js`'s.
+    /// Adding a protocol to the shared list and not to the bundle would ship a
+    /// printer Khayt can talk to and will never see.
+    @Test("every service the rule asks about is declared in the bundle")
+    func bonjourServicesDeclared() async throws {
+        let engine = try KhaytEngine()
+        let services = try await engine.discoveryServices()
+        #expect(!services.isEmpty)
+
+        let script = try String(contentsOf: Self.repoRoot.appending(path: "mac/make-app.sh"),
+                                encoding: .utf8)
+        for service in services {
+            // `_moonraker._tcp.local` in the rule; `_moonraker._tcp` in the plist.
+            let declared = service.replacingOccurrences(of: ".local", with: "")
+            #expect(script.contains("<string>\(declared)</string>"),
+                    "\(declared) is browsed for but not declared in NSBonjourServices")
+        }
+        #expect(script.contains("NSLocalNetworkUsageDescription"),
+                "no usage description — macOS shows its own generic prompt")
+        #expect(script.contains("com.apple.security.network.client"),
+                "the app is not entitled to reach the local network")
+    }
+
+    /// The Electron app puts its own query on the wire. This one asks
+    /// `mDNSResponder`, because local network privacy on macOS fails closed on
+    /// an IPC bug that is only fixed in 26.5 — and this app runs on 26.0.
+    @Test("the Mac app does not open a multicast socket of its own")
+    func noRawMulticast() throws {
+        let finder = try String(contentsOf: Self.repoRoot.appending(
+            path: "mac/KhaytCore/Sources/KhaytApp/PrinterFinder.swift"), encoding: .utf8)
+        #expect(finder.contains("NWBrowser"), "discovery no longer goes through Bonjour")
+        for raw in ["224.0.0.251", "5353", "joinMulticast", "NWMulticastGroup"] {
+            #expect(!finder.contains(raw), "\(raw): a raw multicast socket is back")
+        }
+    }
+}

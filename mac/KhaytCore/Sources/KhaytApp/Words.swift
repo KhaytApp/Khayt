@@ -1330,6 +1330,19 @@ final class Words {
         // the note at the top of this file about nine languages.
         // Telling a printer what to do — which this app could not, on any of
         // the seven protocols it can watch.
+        // Finding a printer, so nobody types an address off the front of a
+        // machine across the room.
+        "mac.find_printers":  ["en": "Find printers", "ar": "ابحث عن طابعات"],
+        "mac.find_looking":   ["en": "Looking on this network…", "ar": "يبحث في هذه الشبكة…"],
+        // NOT "no printers on this network": this app cannot tell an empty
+        // network from a refused permission, and saying the first when it is
+        // the second sends somebody hunting for a fault in the printer.
+        "mac.find_none":      ["en": "Nothing answered. If the printer is on and on this network, check that Khayt is allowed Local Network access in System Settings › Privacy & Security.",
+                               "ar": "لم يُجب شيء. إن كانت الطابعة تعمل وعلى هذه الشبكة، فتحقّق من السماح لخيط بالوصول إلى الشبكة المحلية في إعدادات النظام ← الخصوصية والأمان."],
+        "mac.find_add":       ["en": "Add",           "ar": "أضف"],
+        "mac.find_again":     ["en": "Look again",    "ar": "ابحث مرة أخرى"],
+        "mac.find_unsupported": ["en": "Khayt cannot talk to this one yet",
+                                 "ar": "لا يستطيع خيط التحدث إلى هذه بعد"],
         "mac.printer_pause":  ["en": "Pause",        "ar": "إيقاف مؤقت"],
         "mac.printer_resume": ["en": "Resume",       "ar": "استئناف"],
         "mac.printer_cancel": ["en": "Cancel print", "ar": "إلغاء الطباعة"],
