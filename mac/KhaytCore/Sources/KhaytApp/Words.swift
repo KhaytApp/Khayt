@@ -1355,6 +1355,27 @@ final class Words {
         // types a filename into.
         "mac.product_from_model": ["en": "Make a product from this",
                                    "ar": "أنشئ منتجًا من هذا"],
+        // A printer that changed address. Mac-only wording: the other app
+        // words this on its machines page and does not share the strings.
+        "mac.moved_find": ["en": "Find it on the network",
+                           "ar": "ابحث عنه في الشبكة"],
+        "mac.moved_looking": ["en": "Looking…", "ar": "جارٍ البحث…"],
+        "mac.moved_here": ["en": "It answers at {host} now",
+                           "ar": "يستجيب الآن على {host}"],
+        // The two cases the rule separates, said differently on purpose: one is
+        // identity and one is a guess, and the button must not read the same.
+        "mac.moved_apply": ["en": "Point Khayt at it",
+                            "ar": "وجّه خيط إليه"],
+        "mac.moved_maybe": ["en": "This might be it — check before you apply",
+                            "ar": "قد يكون هذا — تحقّق قبل التطبيق"],
+        "mac.moved_done": ["en": "{name} is pointed at {host}.",
+                           "ar": "تم توجيه {name} إلى {host}."],
+        "mac.moved_failed": ["en": "Khayt could not repair that machine's address.",
+                             "ar": "لم يتمكّن خيط من إصلاح عنوان هذه الآلة."],
+        "mac.moved_none_on_network": ["en": "Nothing answered on the network.",
+                                      "ar": "لا شيء استجاب في الشبكة."],
+        "mac.moved_none_matched": ["en": "Printers answered, but none of them is this machine.",
+                                   "ar": "استجابت طابعات، لكن ليست أيٌّ منها هذه الآلة."],
         "mac.product_from_file_failed": ["en": "Khayt could not read that model's figures.",
                                          "ar": "لم يتمكّن خيط من قراءة أرقام هذا المجسّم."],
         // NAMED, not swallowed. A field the file could not answer for is left

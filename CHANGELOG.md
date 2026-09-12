@@ -36,6 +36,25 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A printer that changed address can be found again.** A DHCP lease
+  expires overnight, the router hands out a different address, and Khayt polls
+  a host that answers nothing. It said *offline* — which is also what it says
+  when a printer is switched off, and the two have completely different fixes.
+
+  A machine that has gone quiet now offers *Find it on the network*. Where the
+  printer announces the serial or the hardware address Khayt recorded — neither
+  of which moves with a lease — that is identity, and one click points Khayt at
+  it. Where the evidence is only that exactly one printer of the right model is
+  answering, it says so and asks you to check first, because pointing the app
+  at a machine is what it will later send commands through.
+
+  **What this was costing.** Khayt freezes a job's real filament and duration
+  on the edge out of printing, because the printer's counters reset when the
+  next job starts. Every print that finished while the address was stale is a
+  measurement that no longer exists — found exactly that way when a Snapmaker
+  U1 moved from .77 to .56 and the completion history came back empty rather
+  than short.
+
 - **(Mac) A model in your library can become a product.** The library knew what
   each model weighs and how long it takes — parsed when you imported it — and
   the catalogue asked you to type both in again. *Make a product from this* is

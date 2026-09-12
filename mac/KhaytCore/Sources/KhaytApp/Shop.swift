@@ -1101,6 +1101,103 @@ final class Shop {
         return await finder.find(engine: engine)
     }
 
+    // MARK: - A printer that changed address
+
+    /// Machines whose address appears to have moved, and where to.
+    private(set) var relocations: [KhaytEngine.Relocation] = []
+    var relocateProblem: String?
+    var relocateNote: String?
+    /// True while the network is being asked where a quiet machine went.
+    var lookingForMoved = false
+
+    /// True when this machine has gone quiet for long enough to be worth asking.
+    ///
+    /// The same three-strike rule the status badge uses, so the button appears
+    /// exactly when the screen already says something is wrong.
+    func looksUnreachable(_ machineId: String) -> Bool {
+        guard case .object(let entry)? = printers.statusCache[machineId],
+              case .string(let err)? = entry["error"], !err.isEmpty,
+              case .number(let n)? = entry["consecutiveFailures"] else { return false }
+        return n >= 3
+    }
+
+    /// Ask the network where the quiet machines went.
+    ///
+    /// Owner-initiated and time-boxed, like `findPrinters` — never a timer. A
+    /// shop whose router reboots should not have Khayt sweeping its LAN on a
+    /// schedule for the rest of the day.
+    func findMovedPrinters() async {
+        relocateProblem = nil
+        relocateNote = nil
+        guard let engine else { return }
+        lookingForMoved = true
+        defer { lookingForMoved = false }
+
+        let found = await findPrinters()
+        // Back through JSON rather than hand-copied: `planRelocations` reads
+        // `serial`, `model`, `firmware` and `port`, and a Swift struct that
+        // named only some of them is exactly how the serial went missing in the
+        // first place.
+        let discovered: [JSONValue] = found.compactMap { printer in
+            guard let data = try? JSONEncoder().encode(printer),
+                  let value = try? JSONDecoder().decode(JSONValue.self, from: data)
+            else { return nil }
+            return value
+        }
+        relocations = (try? await engine.planRelocations(
+            machines: machineRows,
+            discovered: discovered,
+            statusCache: printers.statusCache)) ?? []
+
+        if relocations.isEmpty {
+            relocateNote = words.callIt(found.isEmpty ? "mac.moved_none_on_network"
+                                                      : "mac.moved_none_matched")
+        }
+    }
+
+    /// Point a machine at the address the printer is actually on.
+    ///
+    /// A WRITE, and the write is what the app will later send commands through
+    /// — so an identity match (a MAC or a serial, neither of which moves with a
+    /// DHCP lease) is applied on one confirmation, and a guess is only ever
+    /// offered. `lib/printer-relocate.js` draws that line and this does not
+    /// redraw it.
+    func applyRelocation(_ move: KhaytEngine.Relocation) async {
+        relocateProblem = nil
+        guard let engine, let build = source.build else {
+            relocateProblem = words.callIt("mac.move_sample"); return
+        }
+        guard let row = machineRows.first(where: { row in
+            guard case .object(let m) = row, case .string(let id)? = m["id"] else { return false }
+            return id == move.machineId
+        }) else { relocateProblem = words.callIt("mac.not_found"); return }
+
+        guard let updated = try? await engine.applyRelocation(row, move),
+              case .object(let record) = updated else {
+            relocateProblem = words.callIt("mac.moved_failed"); return
+        }
+        do {
+            try StoreWriter.update(build) { root in
+                guard case .array(var rows)? = root["machines"] else { return }
+                for i in rows.indices {
+                    guard case .object(let m) = rows[i],
+                          case .string(let id)? = m["id"], id == move.machineId else { continue }
+                    var next = record
+                    StoreWriter.stamp(&next)
+                    rows[i] = .object(next)
+                }
+                root["machines"] = .array(rows)
+            }
+            relocations.removeAll { $0.machineId == move.machineId }
+            relocateNote = words.callIt("mac.moved_done",
+                                        ["name": .string(move.machineName),
+                                         "host": .string(move.to)])
+            await load(source)
+        } catch {
+            relocateProblem = String(describing: error)
+        }
+    }
+
     /// Write a found printer down as a machine.
     ///
     /// Its name, address and port, and the connection type the shared rule

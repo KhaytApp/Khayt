@@ -185,6 +185,9 @@ public actor KhaytEngine {
         // `printerCompletions`, which is how this app can offer a measured
         // figure without polling a printer itself.
         "printer-poll-cache",
+        // A printer that changed address is not a printer that went away. Reads
+        // the cache above to decide which machines have actually gone quiet.
+        "printer-relocate",
         // The camera half. Every decision about a webcam is in here — where a
         // printer of each family might serve one, what the owner typed
         // normalised against the printer's host, whether a response is an image
@@ -2775,11 +2778,20 @@ public actor KhaytEngine {
     // MARK: - Finding a printer
 
     /// A printer the network answered for.
-    public struct FoundPrinter: Decodable, Sendable, Hashable, Identifiable {
+    public struct FoundPrinter: Codable, Sendable, Hashable, Identifiable {
         public let name: String
         public let host: String
         public let port: Int?
         public let vendor: String?
+        /// The serial the printer announced, when it announced one.
+        ///
+        /// `printer-discovery.js` has always read this from the TXT record and
+        /// this struct has always dropped it, because Swift's `Decodable`
+        /// ignores a key nobody declared. It is the ONE thing about a printer a
+        /// DHCP lease cannot change, so `printer-relocate.js` cannot repair a
+        /// moved machine without it.
+        public let serial: String?
+        public let firmware: String?
         /// The Khayt `printerApi.type` to pre-select, or nil when Khayt can
         /// recognise the machine and cannot yet talk to it — which the screen
         /// says rather than pretending.
@@ -2848,6 +2860,82 @@ public actor KhaytEngine {
               return KhaytPrinterDiscovery.discoverFromRecords(records);
             })(ARG0)
             """, [payload], as: [FoundPrinter].self)
+    }
+
+    // MARK: - A printer that changed address
+
+    /// One machine whose address appears to have moved, and where to.
+    public struct Relocation: Decodable, Sendable, Hashable, Identifiable {
+        public let machineId: String
+        public let machineName: String
+        public let from: String
+        public let to: String
+        /// Only when it actually differs, so applying a move never silently
+        /// overrides a port the owner chose for a reason.
+        public let port: Int?
+        public let serial: String
+        /// `mac`, `serial`, `model` or `protocol`.
+        public let confidence: String
+        /// Why the rule thinks so, in words a shop can weigh.
+        public let why: String
+
+        public var id: String { machineId + "→" + to }
+
+        /// True when the match is IDENTITY rather than resemblance.
+        ///
+        /// `lib/printer-relocate.js` is explicit about the difference: a MAC or
+        /// a serial "does not move with a lease", so it is safe to apply. A
+        /// model match is "strong, and still a guess: PROPOSE it, never apply
+        /// it. Retargeting is a write, and the write points the app at a
+        /// machine it will later send commands to."
+        public var isIdentity: Bool { confidence == "mac" || confidence == "serial" }
+    }
+
+    /// What to do about machines that have gone quiet, given what is on the LAN.
+    ///
+    /// A DHCP lease expires overnight, the router hands out a different address,
+    /// and Khayt polls a host that answers nothing. It says "offline", which is
+    /// also what it says when a printer is switched off — and the two have
+    /// completely different fixes.
+    ///
+    /// The cost is worse than a wrong badge: `captureCompletion` freezes a job's
+    /// real filament and duration on the edge out of printing, and the counters
+    /// reset when the next job starts. Every print that finishes while the
+    /// address is stale is a measurement that no longer exists.
+    public func planRelocations(machines: [JSONValue],
+                                discovered: [JSONValue],
+                                statusCache: [String: JSONValue] = [:],
+                                requireOffline: Bool = true) throws -> [Relocation] {
+        try runtime.call2("""
+            (function (a) {
+              var plan = KhaytPrinterRelocate.planRelocations({
+                machines: a.machines, discovered: a.discovered,
+                statusCache: a.statusCache, requireOffline: a.requireOffline,
+              });
+              return (plan && plan.moves) || [];
+            })(ARG0)
+            """,
+            [.object(["machines": .array(machines),
+                      "discovered": .array(discovered),
+                      "statusCache": .object(statusCache),
+                      "requireOffline": .bool(requireOffline)])],
+            as: [Relocation].self)
+    }
+
+    /// The machine record with the move applied, for writing back.
+    ///
+    /// The rule composes it so the host, the port and the serial move together
+    /// and nothing else on the record is touched.
+    public func applyRelocation(_ machine: JSONValue, _ move: Relocation) throws -> JSONValue {
+        try runtime.call2("KhaytPrinterRelocate.applyRelocation(ARG0.machine, ARG0.move)",
+            [.object(["machine": machine,
+                      "move": .object([
+                          "machineId": .string(move.machineId),
+                          "to": .string(move.to),
+                          "port": move.port.map { JSONValue.number(Double($0)) } ?? .null,
+                          "serial": .string(move.serial),
+                      ])])],
+            as: JSONValue.self)
     }
 
     // MARK: - Telling a printer what to do
