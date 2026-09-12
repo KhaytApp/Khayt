@@ -266,6 +266,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Abdulaziz*, not under *presupported*.
 
 
+- **(Maintainers) The LAN server's gates are one implementation now.** The
+  brute-force lockout, both global throttles, the PIN-strength rule for tunnel
+  exposure and the client-IP choice behind a tunnel moved to
+  `lib/lan-auth.js` — groundwork for the Mac app growing a LAN server, and
+  worth doing on its own: two implementations of a lockout is two chances to
+  write the one that never locks, which is exactly what shipped once before.
+  The constant-time comparison deliberately did *not* move.
+
 - **Quality on the Mac: how much is right *first* time.** Pass rate is the easy
   number and the less useful one — a shop that reprints until it passes has a
   pass rate near 100% and a quality problem. First-pass yield collapses a
