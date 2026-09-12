@@ -6,6 +6,25 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Khayt finds printers on your network.** Adding a machine meant knowing
+  its address and typing it — and a shop that has just plugged a printer in does
+  not know it, so the number gets copied by hand off the printer's own screen
+  across the room. *Find printers* on the machines screen asks the network
+  instead, and adding one fills in its address, its connection type and — when
+  Khayt recognises the model — its bed, nozzle and running cost.
+
+  The scan is owner-initiated and time-boxed, never on a timer, and macOS asks
+  your permission the first time. A printer Khayt can see but cannot yet speak
+  to says so rather than being added as though it were ready.
+
+- **(Maintainers) The mDNS codec runs on the Mac now.** `lib/mdns.js` was built
+  on Node's `Buffer`, which JavaScriptCore does not have — so the one piece of
+  wire-format code both apps need could be loaded by only one of them, and
+  finding a printer on the Mac would have meant a second implementation of DNS
+  name compression. Two codecs is two chances to mis-read a packet arriving
+  unauthenticated from the workshop network. It is `Uint8Array` throughout now;
+  `Buffer` *is* a `Uint8Array`, so nothing in the Windows and Linux app changed.
+
 - **(Mac) Khayt can tell a printer what to do.** The Mac app could watch seven
   protocols and touch none of them: it knew a print was failing, it knew which
   machine, and stopping it meant walking to the printer or opening the other

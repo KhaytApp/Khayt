@@ -394,6 +394,13 @@ public actor KhaytEngine {
         // answer about what to send a printer that is mid-job.
         "printer-commands",
         "exclude-object",
+        // Finding a printer on the workshop network, and following one that
+        // moved. `mdns` is the wire codec — shared rather than rewritten in
+        // Swift, because two implementations of DNS name compression is two
+        // chances to get a packet from an unauthenticated device wrong.
+        "mdns",
+        "printer-discovery",
+        "printer-sweep",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1897,6 +1904,84 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - Finding a printer
+
+    /// A printer the network answered for.
+    public struct FoundPrinter: Decodable, Sendable, Hashable, Identifiable {
+        public let name: String
+        public let host: String
+        public let port: Int?
+        public let vendor: String?
+        /// The Khayt `printerApi.type` to pre-select, or nil when Khayt can
+        /// recognise the machine and cannot yet talk to it — which the screen
+        /// says rather than pretending.
+        public let connection: String?
+        public let catalogId: String?
+        public let service: String?
+        public var id: String { host + ":" + String(port ?? 0) + name }
+    }
+
+    /// The service types worth asking about, from the shared list.
+    public func discoveryServices() throws -> [String] {
+        try runtime.value("KhaytPrinterDiscovery", "SERVICE_NAMES", as: [String].self)
+    }
+
+    /// The query to put on the wire, as bytes.
+    ///
+    /// `unicast` sets the QU bit, asking responders to answer straight back to
+    /// our port. Some devices honour it and some only ever multicast — the
+    /// Prusa CORE One is in the second group — so a caller must ALSO join the
+    /// group to hear everyone. That was learned from real hardware: with QU
+    /// alone the Snapmaker answered and the Prusa did not.
+    public func mdnsQuery(unicast: Bool = false) throws -> [UInt8] {
+        let numbers: [Double] = try runtime.call2("""
+            Array.from(KhaytMdns.encodeQuery(KhaytPrinterDiscovery.SERVICE_NAMES,
+                                             { unicast: ARG0 }))
+            """, [.bool(unicast)], as: [Double].self)
+        return numbers.map { UInt8(clamping: Int($0)) }
+    }
+
+    /// The same rule, from records the SYSTEM resolved rather than packets we
+    /// decoded ourselves.
+    ///
+    /// ── WHY THE MAC DOES NOT PUT ITS OWN QUERY ON THE WIRE ────────────────
+    ///
+    /// Raw multicast is unreliable on exactly the macOS this app requires.
+    /// Apple's own DTS describes local network privacy failing closed on an IPC
+    /// timing bug: multicast stops after a reboot, the denial is CACHED until
+    /// the Mac restarts or somebody toggles the switch in System Settings, and
+    /// several copies of the same app on one machine make it worse. It is fixed
+    /// in 26.5; this app's floor is 26.0.
+    ///
+    /// `NWBrowser` asks `mDNSResponder`, which already holds the multicast, so
+    /// none of that applies. What crosses here is the same PTR/SRV/TXT/A shape
+    /// the codec would have produced — so the part that decides what a device
+    /// IS stays shared with the other app, and only the transport differs.
+    public func printersFrom(records: [JSONValue]) throws -> [FoundPrinter] {
+        try runtime.call2("KhaytPrinterDiscovery.discoverFromRecords(ARG0)",
+                          [.array(records)], as: [FoundPrinter].self)
+    }
+
+    /// Turn whatever came back into printers worth offering.
+    ///
+    /// Every packet is passed in at once rather than one at a time: a device's
+    /// address, port and TXT record routinely arrive in different datagrams,
+    /// and `collectDevices` is what stitches them together.
+    public func printersFound(in packets: [[UInt8]]) throws -> [FoundPrinter] {
+        let payload = JSONValue.array(packets.map { packet in
+            .array(packet.map { .number(Double($0)) })
+        })
+        return try runtime.call2("""
+            (function (packets) {
+              var records = [];
+              for (var i = 0; i < packets.length; i++) {
+                records = records.concat(KhaytMdns.decodeMessage(packets[i]));
+              }
+              return KhaytPrinterDiscovery.discoverFromRecords(records);
+            })(ARG0)
+            """, [payload], as: [FoundPrinter].self)
     }
 
     // MARK: - Telling a printer what to do

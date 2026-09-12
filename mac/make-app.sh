@@ -283,6 +283,9 @@ cat > "$APP_ENTS" <<'APPENTS'
 <plist version="1.0">
 <dict>
   <key>com.apple.security.cs.allow-jit</key><true/>
+  <!-- Reaching a printer on the LAN, and asking mDNSResponder what it has
+       seen. Required for local network access even unsandboxed. -->
+  <key>com.apple.security.network.client</key><true/>
 </dict>
 </plist>
 APPENTS
@@ -440,6 +443,27 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>Khayt</string>
   <key>NSSupportsAutomaticTermination</key><false/>
+  <!-- ── FINDING A PRINTER ON THE WORKSHOP NETWORK ────────────────────────
+       macOS asks the shop's permission the first time this app looks, and the
+       system shows this sentence in that prompt. Without the key the prompt is
+       Apple's own generic wording, which does not say why a bookkeeping app
+       wants the network — and a prompt somebody cannot make sense of is a
+       prompt they decline.
+
+       The Bonjour list is required too: the system only browses the service
+       types an app has declared, and an undeclared one silently finds nothing.
+       The five are `lib/printer-discovery.js`'s SERVICES, and adding a
+       protocol there means adding it here — `PrinterFinderTests` says so. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Khayt looks for 3D printers on this network so you do not have to type their addresses.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_prusalink._tcp</string>
+    <string>_octoprint._tcp</string>
+    <string>_moonraker._tcp</string>
+    <string>_snapmaker._tcp</string>
+    <string>_bambulab._tcp</string>
+  </array>
 $SPARKLE_KEYS
   <!-- A job being dragged across the board. Declared so the drag is this app's
        own: a board that accepted any dragged text would move a job because

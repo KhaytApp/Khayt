@@ -13,15 +13,35 @@ const replay = () => D.discoverFromRecords(PACKETS.flatMap(p => M.decodeMessage(
 
 /* ── codec ──────────────────────────────────────────────────────────────── */
 
+/// Read two big-endian bytes WITHOUT `Buffer.readUInt16BE`.
+///
+/// The codec returns a plain `Uint8Array` now, because the Mac app runs it in
+/// JavaScriptCore where `Buffer` does not exist. Asserting through Buffer's own
+/// accessor was testing Node's API as much as the wire format; this reads the
+/// bytes, which is the thing that actually has to be right.
+const be16 = (bytes, off) => (bytes[off] << 8) | bytes[off + 1];
+
 test('encodeQuery builds a well-formed PTR question', () => {
   const q = M.encodeQuery(['_prusalink._tcp.local']);
-  assert.equal(q.readUInt16BE(4), 1, 'QDCOUNT');
-  assert.equal(q.readUInt16BE(6), 0, 'no answers in a query');
-  assert.ok(q.includes(Buffer.from('_prusalink')), 'service name present');
+  assert.ok(q instanceof Uint8Array, 'the codec must not hand back a Node Buffer');
+  assert.equal(be16(q, 4), 1, 'QDCOUNT');
+  assert.equal(be16(q, 6), 0, 'no answers in a query');
+  assert.ok(Buffer.from(q).includes(Buffer.from('_prusalink')), 'service name present');
   assert.equal(q[q.length - 3], M.TYPE.PTR);
-  assert.equal(q.readUInt16BE(q.length - 2), 1, 'QCLASS IN, multicast response');
+  assert.equal(be16(q, q.length - 2), 1, 'QCLASS IN, multicast response');
   const qu = M.encodeQuery(['_x._tcp.local'], { unicast: true });
-  assert.equal(qu.readUInt16BE(qu.length - 2), 0x8001, 'QU bit set when asked');
+  assert.equal(be16(qu, qu.length - 2), 0x8001, 'QU bit set when asked');
+});
+
+/// A Node `Buffer` still has to decode, because `main.js` hands the socket's
+/// datagrams straight in — and a plain array has to work too, because that is
+/// what crosses from Swift.
+test('the decoder takes a Buffer, a Uint8Array or a plain array alike', () => {
+  const packet = PACKETS[0];
+  const fromBuffer = M.decodeMessage(packet);
+  assert.ok(fromBuffer.length > 0, 'the fixture decoded nothing');
+  assert.deepEqual(M.decodeMessage(Uint8Array.from(packet)), fromBuffer);
+  assert.deepEqual(M.decodeMessage(Array.from(packet)), fromBuffer);
 });
 
 test('decodeMessage never throws on malformed or hostile input', () => {

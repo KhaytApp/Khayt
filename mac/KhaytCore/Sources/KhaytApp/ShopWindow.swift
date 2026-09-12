@@ -193,6 +193,7 @@ struct ShopWindow: View {
         .sheet(item: $shop.editingCustomer) { CustomerSheet(shop: shop, existing: $0) }
         .sheet(item: $shop.editingProduct) { ProductSheet(shop: shop, existing: $0) }
         .sheet(item: $shop.droppingFrom) { DropObjectSheet(shop: shop, machine: $0) }
+        .sheet(isPresented: $shop.findingPrinters) { FindPrintersSheet(shop: shop) }
         // Cancelling throws away every hour already in the plate, and no
         // printer asks twice. Pause and resume are each other's undo and are
         // not confirmed.

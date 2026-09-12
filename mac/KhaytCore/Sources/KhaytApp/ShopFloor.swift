@@ -59,6 +59,19 @@ struct Machines: View {
                 if !shop.machines.isEmpty {
                     NextUp(shop: shop)
                 }
+                // A shop that has just plugged a printer in does not know its
+                // address, and the number on the printer's own screen is the
+                // one thing nobody wants to copy by hand across the room.
+                HStack {
+                    Button {
+                        shop.findingPrinters = true
+                    } label: {
+                        Label(shop.words.callIt("mac.find_printers"),
+                              systemImage: "antenna.radiowaves.left.and.right")
+                    }
+                    .disabled(!shop.canMoveJobs)
+                    Spacer()
+                }
                 // ── AND WHETHER THERE IS ROOM FOR ANOTHER ─────────────────
                 //
                 // The band says what is running now; this says what is queued
