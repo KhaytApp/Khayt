@@ -62,6 +62,43 @@ struct BundledLogicIsNotAForkTests {
             #expect(!stripped.contains("require('path')"), "\(module).js now requires path")
             #expect(!stripped.contains("require('crypto')"), "\(module).js now requires crypto")
             #expect(!stripped.contains("process."), "\(module).js now reads `process`, which does not exist here")
+
+            // ── AND `module` ITSELF ───────────────────────────────────────
+            //
+            // JavaScriptCore has no `module` either, and this guard did not
+            // look for it. `printer-commands.js` was written Node-only — bare
+            // top-level bindings and a closing `module.exports` — and the day
+            // it was bundled it failed on its first line with
+            // `Can't find variable: module`, leaving the Mac app unable to tell
+            // a printer anything.
+            //
+            // The GUARDED form is what every shared module ends with and is
+            // fine: `typeof module !== 'undefined' && module.exports`. What is
+            // refused is reaching for it bare.
+            // TWO guarded shapes, and both have to go before what is left can
+            // be called a bare reach.
+            //
+            // The export — removing only its `typeof` test leaves the
+            // assignment behind, and the check then fails on all 190 modules
+            // that do it correctly:
+            //
+            //     if (typeof module !== 'undefined' && module.exports) module.exports = api;
+            //
+            // And the IMPORT, which two modules use to pick between `require`
+            // and the global — also correct, and also caught by a first draft
+            // that only knew about exports:
+            //
+            //     const units = (typeof module !== 'undefined' && module.exports)
+            //       ? require('./inventory-units.js') : globalThis.KhaytInventoryUnits;
+            let guarded = stripped
+                .replacing(#/if\s*\(\s*typeof\s+module\s*!==\s*['"]undefined['"]\s*&&\s*module\.exports\s*\)\s*module\.exports\s*=\s*[A-Za-z_$][A-Za-z0-9_$]*\s*;?/#,
+                           with: "")
+                .replacing(#/typeof\s+module\s*!==\s*['"]undefined['"]\s*&&\s*module\.exports/#,
+                           with: "")
+            #expect(!guarded.contains("module.exports"), """
+                \(module).js assigns module.exports without guarding on `typeof module`.
+                JavaScriptCore has no `module`, so it throws on its first line.
+                """)
         }
     }
 

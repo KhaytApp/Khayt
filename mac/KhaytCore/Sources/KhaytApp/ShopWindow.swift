@@ -192,6 +192,28 @@ struct ShopWindow: View {
         .sheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }
         .sheet(item: $shop.editingCustomer) { CustomerSheet(shop: shop, existing: $0) }
         .sheet(item: $shop.editingProduct) { ProductSheet(shop: shop, existing: $0) }
+        .sheet(item: $shop.droppingFrom) { DropObjectSheet(shop: shop, machine: $0) }
+        // Cancelling throws away every hour already in the plate, and no
+        // printer asks twice. Pause and resume are each other's undo and are
+        // not confirmed.
+        .confirmationDialog(
+            shop.words.callIt("mac.cancel_ask",
+                              ["machine": .string(shop.confirmingCancel?.name ?? "")]),
+            isPresented: Binding(get: { shop.confirmingCancel != nil },
+                                 set: { if !$0 { shop.confirmingCancel = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.printer_cancel"), role: .destructive) {
+                guard let machine = shop.confirmingCancel else { return }
+                shop.confirmingCancel = nil
+                Task { await shop.tell(machine, .cancel) }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {
+                shop.confirmingCancel = nil
+            }
+        } message: {
+            Text(shop.words.callIt("mac.cancel_why"))
+        }
         .sheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
         .sheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
         .sheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }

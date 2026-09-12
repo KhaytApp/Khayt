@@ -807,6 +807,57 @@ private struct Live: View {
         }
     }
 
+    /// Pause, resume, cancel — and dropping one object from the plate.
+    ///
+    /// THE MAC APP COULD WATCH SEVEN PROTOCOLS AND TOUCH NONE OF THEM. It knew
+    /// a print was failing, it knew which machine, and stopping it meant
+    /// walking to the printer or opening the other app.
+    ///
+    /// Only while something is actually running: a row of dead buttons under an
+    /// idle printer is four things that cannot be pressed, every card, all day.
+    @ViewBuilder private func controls(_ status: KhaytEngine.PrinterStatus) -> some View {
+        let busy = shop.printerBusy.contains(machine.id)
+        HStack(spacing: 8) {
+            if isPaused(status.state) {
+                Button(shop.words.callIt("mac.printer_resume")) {
+                    Task { await shop.tell(machine, .resume) }
+                }
+            } else {
+                Button(shop.words.callIt("mac.printer_pause")) {
+                    Task { await shop.tell(machine, .pause) }
+                }
+            }
+            // ASKS FIRST. Cancelling throws away however many hours are already
+            // in the plate and no printer asks twice. Pause and resume are each
+            // other's undo and go straight through.
+            Button(shop.words.callIt("mac.printer_cancel")) { shop.confirmingCancel = machine }
+                .foregroundStyle(Khayt.late)
+            if machine.printerApi?.type == "moonraker" {
+                Spacer()
+                Button(shop.words.callIt("mac.drop_object") + "\u{2026}") {
+                    shop.droppingFrom = machine
+                }
+            }
+            Spacer()
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .disabled(busy || !shop.canMoveJobs)
+
+        if let problem = shop.printerProblem[machine.id] {
+            // The printer's refusal in the vocabulary of somebody who has to
+            // act on it — "Bambu requires Bambu Connect for remote job control"
+            // is a sentence, not a status code.
+            Text(problem)
+                .font(.caption).foregroundStyle(Khayt.attention)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func isPaused(_ state: String) -> Bool {
+        ["paused", "pausing"].contains(state.lowercased())
+    }
+
     @ViewBuilder private func printing(_ status: KhaytEngine.PrinterStatus) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -816,6 +867,9 @@ private struct Live: View {
                     Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left))
                         .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                 }
+            }
+            if isRunning(status.state) || isPaused(status.state) {
+                controls(status)
             }
             if isRunning(status.state) {
                 VStack(alignment: .leading, spacing: 5) {

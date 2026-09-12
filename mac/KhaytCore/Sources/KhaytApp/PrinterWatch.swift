@@ -352,6 +352,15 @@ final class PrinterWatch {
         return parts.joined(separator: " · ")
     }
 
+    /// Ask one machine now, out of turn.
+    ///
+    /// After a command: a button that appears to do nothing until the next poll
+    /// — ten seconds away — is a button somebody presses again, and pressing
+    /// `cancel` twice is harmless while pressing `pause` twice is not.
+    func refresh(_ machine: Machine, shop: Shop) async {
+        await poll(machine, shop: shop)
+    }
+
     private func poll(_ machine: Machine, shop: Shop) async {
         let engine = shop.engine
         guard let engine else { return }
@@ -500,8 +509,11 @@ final class PrinterWatch {
             // UNAUTHENTICATED FIRST, and a handshake only when refused. A
             // standalone Duet with no password — which is most of them — then
             // costs exactly two requests, the same as before this existed.
-            let base64 = base.absoluteString
-            let remembered = Self.duetFlavours[base64]
+            // Named `base64` until it was read by somebody writing a second
+            // caller: it is the ADDRESS, not an encoding of it, and a lookup
+            // that encoded it would look correct and match nothing.
+            let address = base.absoluteString
+            let remembered = Self.duetFlavours[address]
             let order = remembered.map { [$0, $0 == "standalone" ? "sbc" : "standalone"] }
                 ?? ["standalone", "sbc"]
             var lastError: Error?
@@ -535,7 +547,7 @@ final class PrinterWatch {
                         got = try await model()
                     }
 
-                    Self.duetFlavours[base64] = flavour
+                    Self.duetFlavours[address] = flavour
                     return try await engine.duetStatus(live: got.0, file: got.1)
                 } catch {
                     lastError = error
@@ -743,6 +755,55 @@ final class PrinterWatch {
             throw Refusal.notJSON
         }
         return decoded
+    }
+
+    /// One request that is NOT a GET, with the same refusals.
+    ///
+    /// Separate from `get` rather than a flag on it, because the two are read
+    /// in different frames of mind: `get` is the poller, running every few
+    /// seconds and allowed to fail quietly, and this changes what a machine is
+    /// doing right now. The guards are identical on purpose — a 302 must not be
+    /// able to move a `cancel` onto a different address any more than it can
+    /// move a poll.
+    @discardableResult
+    static func send(_ base: URL, path: String, method: String,
+                     body: JSONValue? = nil, contentType: String? = nil,
+                     key: String = "", type: String = "",
+                     timeout seconds: TimeInterval = timeout,
+                     fetch: ((URLRequest) async throws -> (Data, URLResponse))? = nil)
+        async throws -> [String: JSONValue] {
+        guard let url = URL(string: base.absoluteString + path) else { throw Refusal.noHost }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = seconds
+        request.httpMethod = method
+        if !key.isEmpty, ["octoprint", "prusalink", "moonraker", "repetier"].contains(type) {
+            request.setValue(key, forHTTPHeaderField: "X-Api-Key")
+        }
+        if let body, case .object = body {
+            request.httpBody = try? JSONEncoder().encode(body)
+            request.setValue(contentType ?? "application/json", forHTTPHeaderField: "Content-Type")
+        }
+        let (data, response) = try await (fetch ?? { try await Self.session.data(for: $0) })(request)
+        if let http = response as? HTTPURLResponse {
+            if (300..<400).contains(http.statusCode) { throw Refusal.redirected }
+            guard (200..<300).contains(http.statusCode) else {
+                throw Refusal.http(http.statusCode, String(decoding: data.prefix(200), as: UTF8.self))
+            }
+        }
+        // A command's answer is usually empty and always uninteresting — what
+        // matters is that it was accepted. An unparseable body is not a failure
+        // here, unlike in `get` where the body IS the answer.
+        return (try? JSONDecoder().decode([String: JSONValue].self, from: data)) ?? [:]
+    }
+
+    /// Which Duet firmware answered last at this address, if the poller has
+    /// learned it. Empty when it has not, which the shared module reads as
+    /// "try the usual one first".
+    /// KEYED ON THE ADDRESS ITSELF. The poller's local for this is called
+    /// `base64` and holds `base.absoluteString` — it is not encoded at all, and
+    /// encoding it here would look right and never match.
+    static func knownDuetFlavour(for base: URL) -> String {
+        duetFlavours[base.absoluteString] ?? ""
     }
 
     /// A session that does not follow redirects and keeps nothing.

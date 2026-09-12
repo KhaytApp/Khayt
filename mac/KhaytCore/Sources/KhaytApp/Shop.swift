@@ -1019,6 +1019,62 @@ final class Shop {
         }
     }
 
+    // MARK: - Telling a printer what to do
+
+    /// What went wrong the last time a machine was told something, by machine.
+    /// Per machine rather than one banner: a shop with eight printers needs to
+    /// know WHICH one refused.
+    private(set) var printerProblem: [String: String] = [:]
+    /// Machines with a command in flight, so the buttons can say so and cannot
+    /// be pressed twice.
+    private(set) var printerBusy: Set<String> = []
+
+    /// A job this app is about to cancel, held for the confirmation.
+    ///
+    /// Cancelling throws away however many hours are already in the plate, and
+    /// no printer asks twice. Pause and resume go straight through — they are
+    /// each other's undo.
+    var confirmingCancel: Machine?
+
+    /// The machine whose plate is being looked at, for dropping one object.
+    var droppingFrom: Machine?
+
+    func tell(_ machine: Machine, _ verb: PrinterControl.Verb) async {
+        guard let engine else { return }
+        printerProblem[machine.id] = nil
+        printerBusy.insert(machine.id)
+        defer { printerBusy.remove(machine.id) }
+        do {
+            try await PrinterControl.send(verb, to: machine, engine: engine, build: source.build)
+            // Ask straight away rather than waiting for the next poll: a button
+            // that appears to do nothing for ten seconds gets pressed again.
+            await printers.refresh(machine, shop: self)
+        } catch {
+            printerProblem[machine.id] = String(describing: error)
+        }
+    }
+
+    /// What is on a machine's plate, for the sheet that offers to drop one.
+    func plate(of machine: Machine) async -> KhaytEngine.Plate? {
+        guard let engine else { return nil }
+        do { return try await PrinterControl.plate(of: machine, engine: engine, build: source.build) }
+        catch { printerProblem[machine.id] = String(describing: error); return nil }
+    }
+
+    /// Drop one object from a running print. NOT UNDOABLE — the caller has
+    /// already asked; see `lib/exclude-object.js`.
+    func drop(_ object: String, on machine: Machine) async {
+        guard let engine else { return }
+        printerProblem[machine.id] = nil
+        printerBusy.insert(machine.id)
+        defer { printerBusy.remove(machine.id) }
+        do {
+            try await PrinterControl.drop(object, on: machine, engine: engine, build: source.build)
+        } catch {
+            printerProblem[machine.id] = String(describing: error)
+        }
+    }
+
     // MARK: - What to run next
 
     /// The dispatcher's answer, recomputed when the book or the printers move.

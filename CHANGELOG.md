@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Khayt can tell a printer what to do.** The Mac app could watch seven
+  protocols and touch none of them: it knew a print was failing, it knew which
+  machine, and stopping it meant walking to the printer or opening the other
+  app. Pause, resume and cancel are on the machine card now, while something is
+  running. Cancelling asks first — it throws away every hour already in the
+  plate, and no printer asks twice.
+
+  **And on a Klipper or Moonraker printer, one object can be dropped from a
+  plate that is still printing.** For the single part that has come loose, while
+  the rest of the plate carries on. It cannot be undone, so the sheet names the
+  object and says so.
+
 - **(Mac) Khayt says what to run next.** It knew the queue and it knew which
   printers were idle; putting the two together was a person doing it in their
   head. The machines screen now proposes a job for each free printer — urgent
