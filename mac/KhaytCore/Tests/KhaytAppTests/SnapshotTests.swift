@@ -464,6 +464,52 @@ import KhaytCore
     /// there is "change something" rather than the least broken setup. What is
     /// being judged is whether an untried setup reads as untried rather than as
     /// a score of nought.
+    /// Whether an invoice has been reported to the tax authority.
+    ///
+    /// Four states, drawn together so they read as four different situations.
+    /// The states are per-invoice records, so they are built here rather than
+    /// taken from the sample: the sample shop has not enabled ZATCA, which is
+    /// the honest default for a book with no VAT number on it, and turning it
+    /// on there would rewrite every invoice in the sample as well.
+    @Test("whether an invoice has been reported")
+    func zatcaLine() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let at = "2026-09-02T10:15:00.000Z"
+
+        let read = try await engine.zatcaReporting(
+            settings: ["enableZatca": .bool(true),
+                       "zatcaPhase2": .object(["enabled": .bool(true),
+                                               "pcsid": .string("cert")])],
+            orders: [
+                .object(["id": .string("ORD-1"), "status": .string("completed"),
+                         "zatcaSubmission": .object([
+                            "status": .string("accepted"), "icv": .number(41),
+                            "at": .string(at), "message": .string("OK")])]),
+                .object(["id": .string("ORD-2"), "status": .string("completed")]),
+                .object(["id": .string("ORD-3"), "status": .string("completed"),
+                         "zatcaSubmission": .object([
+                            "status": .string("rejected"), "icv": .number(42),
+                            "at": .string(at),
+                            "message": .string("BR-KSA-40: VAT category code does not match the rate")])]),
+                .object(["id": .string("ORD-4"), "status": .string("completed"),
+                         "zatcaSubmission": .object([
+                            "status": .string("error"), "icv": .number(43),
+                            "at": .string(at),
+                            "message": .string("Network unreachable")])]),
+            ])
+        #expect(read.unreported == 3, "only the accepted one is settled")
+
+        try render(
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(read.invoices) { ZatcaLine(state: $0, shop: shop) }
+            }
+            .padding(16)
+            .frame(width: 460),
+            "44-zatca", size: CGSize(width: 460, height: 300))
+    }
+
     @Test("what a print is known to work at")
     func setupsPanel() async throws {
         let shop = Shop()

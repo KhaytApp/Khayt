@@ -28,6 +28,7 @@ private struct Detail: View {
     let job: Order
     let shop: Shop
     let split: TaxSplit?
+    @State private var zatca: KhaytEngine.ZatcaReporting.Invoice?
 
     var body: some View {
         ScrollView {
@@ -39,12 +40,24 @@ private struct Detail: View {
                     Divider()
                     parts
                 }
+                // Only for an invoice that is actually owed a report. A job
+                // still on the bench is not late, and a shop that has not
+                // opted into Phase 2 is not subject to any of this — saying
+                // "not submitted" there would raise an alarm about a rule that
+                // does not apply to it.
+                if let zatca, zatca.eligible, zatca.status != "notConfigured" {
+                    Divider()
+                    ZatcaLine(state: zatca, shop: shop)
+                }
                 if !job.notes.isEmpty {
                     Divider()
                     DetailSection(shop.words.callIt("doc.notes")) { Text(job.notes).textSelection(.enabled) }
                 }
             }
             .padding(16)
+        }
+        .task(id: job.id) {
+            zatca = await shop.zatcaReporting()?.invoices.first { $0.id == job.id }
         }
     }
 
@@ -139,6 +152,79 @@ private struct Detail: View {
                 .padding(.vertical, 2)
             }
             DetailLine(shop.words.callIt("mac.machine_time"), String(format: "%.1f h", job.printTime), dim: true)
+        }
+    }
+}
+
+
+/// Whether this invoice has been reported to the tax authority.
+///
+/// Khayt already puts the Phase 1 QR on the document. What this says is the
+/// thing a Saudi shop can be penalised for and could not see on this app: that
+/// the invoice in the customer's hand has not been reported.
+///
+/// It does NOT offer to submit. Signing needs Node crypto and lives in the
+/// Electron app, and a button here that could not finish the job would be
+/// worse than the plain statement.
+struct ZatcaLine: View {
+    let state: KhaytEngine.ZatcaReporting.Invoice
+    let shop: Shop
+
+    var body: some View {
+        // NO HEADING. There is no plain "ZATCA" label in the locales, and the
+        // status strings are whole sentences already — "Submitted to ZATCA",
+        // "Not submitted". A heading above them would either repeat the word or
+        // mean inventing a key that needs nine translations to say it again.
+        VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: symbol).foregroundStyle(colour)
+                    Text(shop.words.callIt(key)).foregroundStyle(colour)
+                    if let icv = state.icv {
+                        Text("·").foregroundStyle(.tertiary)
+                        // The counter the authority requires to be unbroken, so
+                        // a gap in it is something a shop can be asked about.
+                        Text("ICV \(icv.formatted(.number.precision(.fractionLength(0))))")
+                            .monospacedDigit().foregroundStyle(.secondary)
+                    }
+                }
+                .font(.callout)
+                // Why it was refused. Without it "rejected" is a dead end.
+                if !state.message.isEmpty, state.status != "accepted" {
+                    Text(state.message).font(.caption).foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            if let at = state.at {
+                Text(Date(timeIntervalSince1970: at / 1000)
+                    .formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var key: String {
+        switch state.status {
+        case "accepted": "zatca2.status_accepted"
+        case "rejected": "zatca2.status_rejected"
+        case "error":    "zatca2.status_error"
+        default:         "zatca2.status_pending"
+        }
+    }
+
+    private var colour: Color {
+        switch state.status {
+        case "accepted": Khayt.done
+        case "rejected", "error": Khayt.late
+        default: Khayt.attention
+        }
+    }
+
+    private var symbol: String {
+        switch state.status {
+        case "accepted": "checkmark.seal.fill"
+        case "rejected", "error": "exclamationmark.triangle.fill"
+        default: "clock.badge.exclamationmark"
         }
     }
 }

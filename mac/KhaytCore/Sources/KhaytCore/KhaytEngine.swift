@@ -261,6 +261,13 @@ public actor KhaytEngine {
         // give every invoice the English-only answer.
         "invoice-language",
         "zatca-qr",
+        // Phase 2: whether an invoice has been REPORTED to the tax authority,
+        // as against merely carrying a QR. The decisions only — signing the
+        // document needs Node crypto and stays in the Electron app for now.
+        // What matters here is that a Mac shop can see an invoice it handed a
+        // customer has not been reported, which is a compliance problem and was
+        // invisible on this side.
+        "zatca-submit",
         // PRINT-DATE FIRST: the document's own date formatter reaches it
         // through a global, and without it every invoice this app printed
         // showed the raw ISO timestamp under DATE.
@@ -859,6 +866,79 @@ public actor KhaytEngine {
             """,
             [.array(spools), .array(orders), .number(now.timeIntervalSince1970 * 1000)],
             as: [String: Runway].self)
+    }
+
+    // MARK: - Whether an invoice has been reported to ZATCA
+
+    /// Phase 2 reporting state, per invoice and in total.
+    ///
+    /// `lib/zatca-submit.js`. The Mac app already draws the Phase 1 QR; what it
+    /// could not say was whether an invoice it had handed a customer had
+    /// actually been REPORTED to the tax authority. A Saudi shop running on
+    /// this app could not see its own compliance state at all.
+    ///
+    /// THIS DOES NOT SUBMIT. Signing the document needs Node crypto
+    /// (`lib/zatca-crypto.js`, `lib/zatca-asn1.js`), so submission stays in the
+    /// Electron app. Reporting a number a shop cannot act on would be worse
+    /// than saying nothing, so the unreported count is deliberately paired with
+    /// the fact that Phase 2 is configured at all — with it switched off,
+    /// nothing here is a problem.
+    public struct ZatcaReporting: Decodable, Sendable, Hashable {
+        /// Phase 2 switched on AND a certificate stored. With this false every
+        /// invoice below is `notConfigured` and none of them is overdue.
+        public let configured: Bool
+        public let invoices: [Invoice]
+        /// Eligible, configured, and not accepted. The figure a shop acts on.
+        public let unreported: Int
+
+        public struct Invoice: Decodable, Sendable, Hashable, Identifiable {
+            public let id: String
+            /// Completed or delivered, and not voided. A job still on the bench
+            /// is not late to be reported.
+            public let eligible: Bool
+            /// `accepted`, `rejected`, `error`, `pending`, or `notConfigured`.
+            public let status: String
+            /// The invoice counter value the authority requires to be unbroken.
+            public let icv: Double?
+            /// When it was last attempted, epoch milliseconds.
+            public let at: Double?
+            public let message: String
+        }
+    }
+
+    public func zatcaReporting(settings: [String: JSONValue],
+                               orders: [JSONValue]) throws -> ZatcaReporting {
+        try runtime.call2("""
+            (function (a) {
+              var Z = KhaytZatcaSubmit;
+              var ready = Z.zatcaPhase2Ready(a.settings);
+              var out = [];
+              var owed = 0;
+              for (var i = 0; i < a.orders.length; i++) {
+                var o = a.orders[i];
+                if (!o) continue;
+                var eligible = Z.orderEligibleForZatcaSubmit(o);
+                var sub = o.zatcaSubmission || null;
+                var status;
+                if (!ready) status = 'notConfigured';
+                else if (sub && sub.status) status = String(sub.status);
+                else status = 'pending';
+                if (ready && eligible && status !== 'accepted') owed += 1;
+                var when = sub && sub.at ? Date.parse(sub.at) : NaN;
+                out.push({
+                  id: String(o.id == null ? '' : o.id),
+                  eligible: !!eligible,
+                  status: status,
+                  icv: sub && sub.icv > 0 ? Number(sub.icv) : null,
+                  at: isFinite(when) ? when : null,
+                  message: String(sub && sub.message ? sub.message : ''),
+                });
+              }
+              return { configured: !!ready, invoices: out, unreported: owed };
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "orders": .array(orders)])],
+            as: ZatcaReporting.self)
     }
 
     // MARK: - What a print has been printed with, and printed as
