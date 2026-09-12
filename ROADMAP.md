@@ -49,7 +49,7 @@ Three things that recur and are worth knowing before picking the next one:
 
 | | What | Why it is not done |
 |---|---|---|
-| 1 | **Depreciation in the cost model** (R8, §6 of the competitive roadmap) | Not a parity item at all — a correctness gap in both apps |
+| 1 | **Derive the machine wear rate** (R8, §6 of the competitive roadmap) | Not a parity item and not a gap: `calculator-cost.js` has costed wear per print hour all along. What is worth changing is asking the shop for purchase price and expected life rather than for an hourly figure it has to work out itself |
 | 2 | **A job part editor** | Parts are read-only on the Mac. Unblocks `part-from-print-file.js`, which is otherwise a module with no caller |
 | 3 | **`print-risk.js`** | Needs a decision: `analyzeTriangles` is two-pass over the mesh, and the Mac's reader streams and never holds triangles. On demand (second read of the file) or at import (every import pays)? Also the only item needing a Swift duplicate of an accumulator |
 | 4 | **`rbac.js`, `subscriptions.js`, `feature-tiers.js`** | Pure and unbundled. Tier and permission rules the Mac currently has no opinion about |

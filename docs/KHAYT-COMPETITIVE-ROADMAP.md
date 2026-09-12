@@ -336,12 +336,22 @@ the cost model; four pricing strategies; quote-to-delivery tracking; FIFO
 material batches at purchase price; G-code/3MF import auto-filling weight and
 time. €5.99/month, with a free tier billed as having no hidden limits.
 
-### One confirmed gap, two false alarms
+### Three false alarms, and one difference worth acting on
 
-- **GAP — machine depreciation.** `lib/calculator-cost.js` costs labour,
-  packaging, failure rate, power draw and electricity. It has no depreciation or
-  amortisation term at all. A shop pricing without one is eating its printers
-  quietly, and Stimalo names it on the front page. Small and well defined.
+- **NOT a gap — machine depreciation.** *First written here as a confirmed gap;
+  it was not one, and the error is left visible because the way it was made is
+  instructive.* `lib/calculator-cost.js` line 52 is
+  `wearCost = printTime * part.wearRate` — an hourly machine-wear rate, which is
+  depreciation. It defaults to 0.75/hour in `lib/print-rates.js`, is overridden
+  per machine, and the Mac app already carries it. The grep that "confirmed" the
+  gap looked for `depreciation|amorti|machineWear|machineCost` and the code says
+  `wearRate`. **A search that finds nothing has not proved absence — it has
+  proved the vocabulary did not match.**
+- **A real but much smaller difference.** Khayt asks the shop for the hourly
+  figure; a shop that does not know what its printer costs per hour types
+  something. Deriving it — purchase price, expected life in hours, salvage —
+  would be a better question to ask. That is a usability improvement, not a
+  correctness gap, and it is R8 below.
 - **NOT a gap — FIFO material batches.** Khayt costs material per spool at that
   spool's own purchase price (`cost / weight * 1000`, see
   `lib/material-cost.js`). Each spool *is* its batch, which is more precise than
@@ -367,8 +377,12 @@ at the expense of that.
 
 ### Roadmap from this reading
 
-**R8 — depreciation in the cost model.** The only confirmed correctness gap.
-Pricing that omits it is wrong rather than merely thin.
+**R8 — derive the wear rate instead of asking for it.** Khayt already costs
+machine wear per print hour and has since long before this reading. What it asks
+for is the hourly figure itself, which a shop has to work out. Asking instead
+for purchase price, expected life and salvage — and computing the rate — is the
+same arithmetic moved to the side that has the numbers. Small, and not urgent:
+nothing is currently wrong.
 
 **R9 — filament lookup instead of filament typing.** Populate a spool from the
 community database. Wants a decision first on whether Khayt queries it live,
