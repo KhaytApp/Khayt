@@ -507,3 +507,85 @@ test('a book that never set a schedule gets no printRisk block', () => {
   // other app would sync it around.
   assert.equal(apply({}, {}).printRisk, undefined);
 });
+
+/* ============================================================
+   The assistant's settings
+   ============================================================ */
+
+const heldAi = () => ({
+  ai: {
+    enabled: true, provider: 'openai', apiKey: '__enc__sealed', model: 'gpt-5',
+    baseUrl: 'https://gw.example.sa',
+    features: { quote: true, price: true, reply: true, assistant: true },
+  },
+});
+
+test('a pane that does not show the assistant leaves it alone', () => {
+  // Every Mac pane saves only the keys it shows, and the API key and the
+  // consent choices are the last things that should move on a phone-number save.
+  const out = apply(heldAi(), { phone: '+966500000000' });
+  assert.deepEqual(out.ai, heldAi().ai);
+});
+
+test('switching a feature off saves only that', () => {
+  const out = apply(heldAi(), {
+    ai: { enabled: true, provider: 'openai', features: { quote: true, price: true, reply: false, assistant: true } },
+  });
+  assert.equal(out.ai.features.reply, false);
+  assert.equal(out.ai.features.quote, true);
+  // And nothing else moved.
+  assert.equal(out.ai.apiKey, '__enc__sealed');
+  assert.equal(out.ai.model, 'gpt-5');
+  assert.equal(out.ai.baseUrl, 'https://gw.example.sa');
+});
+
+test('consent is recorded for known features only', () => {
+  // A key nobody has a switch for is a permission nobody granted, and it would
+  // sit in the book looking granted.
+  const out = apply(heldAi(), { ai: { features: { quote: true, invented: true } } });
+  assert.equal(out.ai.features.invented, undefined);
+  assert.deepEqual(Object.keys(out.ai.features).sort(),
+    ['assistant', 'price', 'quote', 'reply']);
+});
+
+test('saving the assistant does not silently change the provider', () => {
+  // THE BUG THIS GUARDS, and it is the same shape as the one the provider
+  // chooser had: `providerOf` falls back to Anthropic for an absent value, so
+  // recomputing it unconditionally turned a shop on OpenAI into a shop on
+  // Anthropic the moment it saved anything else about the assistant.
+  assert.equal(apply(heldAi(), { ai: { baseUrl: '' } }).ai.provider, 'openai');
+  assert.equal(apply(heldAi(), { ai: { enabled: false } }).ai.provider, 'openai');
+  // An explicit choice is honoured, and a value the reader would reject falls back.
+  assert.equal(apply(heldAi(), { ai: { provider: 'google' } }).ai.provider, 'google');
+  assert.equal(apply(heldAi(), { ai: { provider: 'nonsense' } }).ai.provider, 'anthropic');
+});
+
+test('an address a key must not travel to is refused, and the stored one kept', () => {
+  // Refused rather than saved-and-warned: once it is in the book, the next
+  // request sends the key there.
+  assert.equal(apply(heldAi(), { ai: { baseUrl: 'http://evil.example' } }).ai.baseUrl,
+    'https://gw.example.sa');
+  assert.equal(apply(heldAi(), { ai: { baseUrl: 'https://u:p@x.example' } }).ai.baseUrl,
+    'https://gw.example.sa');
+  // A model on this machine is fine, and so is clearing it back to the vendor's own.
+  assert.equal(apply(heldAi(), { ai: { baseUrl: 'http://localhost:11434' } }).ai.baseUrl,
+    'http://localhost:11434');
+  assert.equal(apply(heldAi(), { ai: { baseUrl: '' } }).ai.baseUrl, '');
+});
+
+test('the sealed key is opaque and never re-encoded', () => {
+  // The host seals it before it arrives here. This must not inspect, trim or
+  // re-wrap it, and an absent field means "keep what is stored" — which is what
+  // a masked field on screen means.
+  assert.equal(apply(heldAi(), { ai: { enabled: true } }).ai.apiKey, '__enc__sealed');
+  assert.equal(apply(heldAi(), { ai: { apiKey: '' } }).ai.apiKey, '__enc__sealed');
+  assert.equal(apply(heldAi(), { ai: { apiKey: '__enc__new' } }).ai.apiKey, '__enc__new');
+});
+
+test('a field the form does not know about survives', () => {
+  // Spend tracking and anything a newer build adds under `ai`.
+  const held = heldAi();
+  held.ai.spend = { month: '2026-09', calls: 12 };
+  const out = apply(held, { ai: { enabled: false } });
+  assert.deepEqual(out.ai.spend, { month: '2026-09', calls: 12 });
+});

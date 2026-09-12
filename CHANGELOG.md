@@ -36,6 +36,25 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) The assistant has a screen of its own.** Khayt's AI features could be
+  switched on in the other app and not this one, so a shop on a Mac could be
+  told a feature was running and have no way to see — let alone refuse — what
+  it sends. Settings → AI assist now carries both halves together: which
+  provider you use, and a switch per feature with what each one transmits
+  written beside it.
+
+  **The two halves ship together deliberately.** A provider chooser on its own
+  would let you point Khayt at a vendor without being told that drafting a
+  customer reply sends their name, their order reference and their outstanding
+  balance. A list of switches on its own would name a vendor you had not
+  chosen. The one that sends a customer's data is badged as such, and nothing
+  on the screen works consent out for itself — it asks the same rule the gate
+  asks, so a feature can never read as off while it runs.
+
+  Your key is sealed with the book's own key before it is written, the same way
+  a printer's key is, because this file syncs, is backed up and is exported. A
+  key that cannot be sealed is refused rather than stored in the clear.
+
 - **(Mac) Khayt can tell you what is likely to go wrong before you quote.**
   Select a model and the inspector says what a slicer would find: how much of
   the surface overhangs past 45° and will need supports, how much is
@@ -435,6 +454,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **Khayt said "Anthropic" on five screens whatever provider you had chosen.**
+  Left behind when providers became selectable. The worst of them was on the
+  privacy screen, telling a shop its customer data went to Anthropic when it
+  was going wherever that shop had pointed Khayt.
+
+- **(Mac) An address a key must not travel to was accepted.** The Mac's own
+  `URL` is a small stand-in — JavaScriptCore has none — and it was missing the
+  three fields the address rule reads. So the check for credentials written
+  into an address never fired, and a self-hosted address came back as the
+  literal word "undefined" with the path stuck on the end.
 
 - **(Mac) Khayt no longer quits when you Quick Look a second model.** Going
   through the library pressing ⌘Y, the app disappeared on the second one —

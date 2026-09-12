@@ -36,6 +36,26 @@
     ? global.KhaytTax
     : (function () { try { return require('./tax.js'); } catch (e) { return null; } })();
 
+  const aiProviders = () => (typeof global.KhaytAiProviders !== 'undefined')
+    ? global.KhaytAiProviders
+    : (function () { try { return require('./ai-providers.js'); } catch (e) { return null; } })();
+
+  const aiPrivacy = () => (typeof global.KhaytAiPrivacy !== 'undefined')
+    ? global.KhaytAiPrivacy
+    : (function () { try { return require('./ai-privacy.js'); } catch (e) { return null; } })();
+
+  /** An address only if a key may travel to it; otherwise keep what was stored. */
+  function safeBaseUrl(raw, stored) {
+    const v = String(raw == null ? '' : raw).trim();
+    if (!v) return '';                       // the vendor's own address
+    const rules = (typeof global.KhaytBaseUrl !== 'undefined')
+      ? global.KhaytBaseUrl
+      : (function () { try { return require('./base-url.js'); } catch (e) { return null; } })();
+    if (!rules) return stored;
+    try { rules.validateBaseUrl(v, { what: 'address', secret: 'API key' }); return v; }
+    catch (e) { return stored; }
+  }
+
   // Same shape, same reason: `print-risk.js` owns which values are allowed and
   // what an unrecognised one means, so this does not keep a second list.
   const printRisk = () => (typeof global.KhaytPrintRisk !== 'undefined')
@@ -238,6 +258,47 @@
         requireInspector:   !!q.requireInspector,
         requirePhotoOnFail: !!q.requirePhotoOnFail,
         warrantyDays:       Math.max(0, num(q.warrantyDays, 30)),
+      };
+    }
+    if (has(f, 'ai')) {
+      const a = f.ai || {};
+      const held = s.ai || {};
+      const rules = aiProviders();
+      const privacy = aiPrivacy();
+      // The provider through the registry, so a value the reader would reject
+      // cannot be saved — `providerOf` falls back rather than throwing.
+      //
+      // ONLY WHEN THE FORM CARRIES ONE. `providerOf` falls back to Anthropic
+      // for an absent value, so recomputing it unconditionally turned a shop
+      // on OpenAI into a shop on Anthropic the moment it saved anything else
+      // about the assistant — the same silent-revert shape as the consent
+      // boxes the provider chooser used to discard.
+      const provider = has(a, 'provider')
+        ? (rules ? rules.providerOf({ ai: a }).id : String(a.provider || ''))
+        : (held.provider || '');
+      // Consent for KNOWN features only. A key nobody has a switch for is a
+      // permission nobody granted, and it would sit in the book looking granted.
+      const features = {};
+      if (privacy) {
+        for (const id of Object.keys(privacy.AI_FEATURES)) {
+          features[id] = has(a, 'features') ? !!(a.features || {})[id]
+                                            : !!((held.features || {})[id]);
+        }
+      }
+      out.ai = {
+        ...held,
+        enabled: has(a, 'enabled') ? !!a.enabled : !!held.enabled,
+        provider,
+        // A blank address means the vendor's own. A given one is CHECKED, and a
+        // bad one leaves the stored value alone rather than saving something a
+        // key would then travel to.
+        baseUrl: has(a, 'baseUrl') ? safeBaseUrl(a.baseUrl, held.baseUrl || '') : (held.baseUrl || ''),
+        model: has(a, 'model') ? String(a.model == null ? '' : a.model).trim() : (held.model || ''),
+        // The key is OPAQUE here — sealed by the host before it arrives, and
+        // never inspected or re-encoded. Absent keeps what is stored, which is
+        // what a masked field means.
+        apiKey: has(a, 'apiKey') && String(a.apiKey || '') ? a.apiKey : (held.apiKey || ''),
+        features,
       };
     }
     if (has(f, 'printRisk')) {
