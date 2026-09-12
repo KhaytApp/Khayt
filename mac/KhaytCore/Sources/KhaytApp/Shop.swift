@@ -325,6 +325,14 @@ final class Shop {
             } else {
                 consumableRows = []
             }
+            // The print files as written. `files` above is the decoded model;
+            // this is what the setups and versions rules read, which is a wider
+            // set of fields than the model carries.
+            if case .array(let library)? = root["printFiles"] {
+                fileRows = library
+            } else {
+                fileRows = []
+            }
             if case .array(let jobs)? = root["printLog"] { orderRows = jobs } else { orderRows = [] }
             if case .array(let people)? = root["clients"] { clientRows = people } else { clientRows = [] }
             if case .array(let catalog)? = root["products"] { productRows = catalog } else { productRows = [] }
@@ -1559,6 +1567,9 @@ final class Shop {
 
     /// `consumables` as written. See `consumableNeeds`.
     private(set) var consumableRows: [JSONValue] = []
+
+    /// `printFiles` as written. See `setups(for:)` and `versions(for:)`.
+    private(set) var fileRows: [JSONValue] = []
 
     var settingsDict: [String: JSONValue] {
         if case .object(let s) = settingsValue { return s }
@@ -5411,6 +5422,27 @@ final class Shop {
         } catch {
             writeProblem = String(describing: error)
         }
+    }
+
+    /// One print file's raw record, for the rules that read more of it than
+    /// `LibraryFile` models.
+    func row(for id: LibraryFile.ID) -> JSONValue? {
+        fileRows.first {
+            if case .object(let rec) = $0, case .string(let known)? = rec["id"] { return known == id }
+            return false
+        }
+    }
+
+    /// The settings this file is known to work at, and which to reach for.
+    func setups(for id: LibraryFile.ID) async -> KhaytEngine.PrintSetups? {
+        guard let engine, let rec = row(for: id) else { return nil }
+        return try? await engine.printSetups(rec)
+    }
+
+    /// The alternatives this file exists as.
+    func versions(for id: LibraryFile.ID) async -> KhaytEngine.PrintVersions? {
+        guard let engine, let rec = row(for: id) else { return nil }
+        return try? await engine.printVersions(rec)
     }
 
     /// The consumables worth ordering, most urgent first.

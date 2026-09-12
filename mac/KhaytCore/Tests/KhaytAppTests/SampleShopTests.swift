@@ -241,6 +241,61 @@ extension SampleShopTests {
         #expect(lowNonGram, "nothing exercises a threshold that is not the gram one")
     }
 
+    /// The setups panel draws three verdicts and one refusal, and the versions
+    /// panel only appears for a file that has more than one. Until this file
+    /// carried any setups at all, none of that had ever been drawn.
+    @Test("the sample library reaches every setup verdict, and a file nothing works on")
+    func setupSpread() async throws {
+        let files = try Self.rows("printFiles")
+        let engine = try KhaytEngine()
+        var verdicts: Set<String> = []
+        var sawNothingWorks = false
+        var sawUntried = false
+        var withSetups = 0
+
+        for file in files {
+            let read = try await engine.printSetups(.object(file))
+            guard read.total > 0 else { continue }
+            withSetups += 1
+            for setup in read.setups {
+                verdicts.insert(setup.status)
+                if setup.ok == 0 && setup.failed == 0 { sawUntried = true }
+            }
+            if read.recommendedId == nil { sawNothingWorks = true }
+        }
+
+        #expect(withSetups > 0, "no sample file records what it was printed with")
+        #expect(verdicts == ["known-good", "needs-test", "failed"],
+                Comment(rawValue: "the sample reaches only \(verdicts.sorted())"))
+        // The panel says "change something" rather than naming the least broken
+        // setup. That branch needs a file where everything has failed.
+        #expect(sawNothingWorks, "every sample file has something that works, so the no-good-setup line is never drawn")
+        // Never printed is not a score of nought, and the two are drawn
+        // differently.
+        #expect(sawUntried, "no sample setup is untried, so that caption is never drawn")
+        #expect(withSetups < files.count,
+                "every file records its settings, which is not what a real library looks like")
+    }
+
+    @Test("exactly one kind of sample file offers a choice of version")
+    func versionSpread() async throws {
+        let files = try Self.rows("printFiles")
+        let engine = try KhaytEngine()
+        var many = 0
+        var implicitOnly = 0
+
+        for file in files {
+            let read = try await engine.printVersions(.object(file))
+            if read.many { many += 1 }
+            if read.versions.count == 1, read.versions[0].implicit { implicitOnly += 1 }
+        }
+
+        #expect(many > 0, "no sample file has versions, so the panel is never drawn")
+        // And most do not, which is why the panel is hidden for a single
+        // version rather than drawn as a list of one.
+        #expect(implicitOnly > 0, "every sample file has versions, so a print that has only ever been one thing is never drawn")
+    }
+
     /// The consumables card draws three different reasons an item is on it,
     /// and refuses to name a quantity for a fourth. Until this file carried any
     /// consumables at all, none of that had ever been drawn.
