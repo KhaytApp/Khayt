@@ -1350,6 +1350,18 @@ final class Words {
         // not added to, so a shop wanting a new product had to go to the other
         // app for it.
         "mac.new_product":   ["en": "New product",  "ar": "منتج جديد"],
+        // Making a product FROM a model. Mac-only: the other app's catalogue
+        // has no route from the library at all, only a `fileRef` field a shop
+        // types a filename into.
+        "mac.product_from_model": ["en": "Make a product from this",
+                                   "ar": "أنشئ منتجًا من هذا"],
+        "mac.product_from_file_failed": ["en": "Khayt could not read that model's figures.",
+                                         "ar": "لم يتمكّن خيط من قراءة أرقام هذا المجسّم."],
+        // NAMED, not swallowed. A field the file could not answer for is left
+        // at zero, and a zero that looks typed is worse than a blank somebody
+        // was told about.
+        "mac.product_from_file_missing": ["en": "Filled in from the file. It could not answer for: {fields} — check those before you sell it.",
+                                          "ar": "تم التعبئة من الملف. ولم يُجب عن: {fields} — راجعها قبل البيع."],
         // The catalogue's two layouts. Said as tooltips on the toggle, so they
         // are the only words a shop ever reads for them.
         // IMPORT, said as a shop would look for it. The menu item is called

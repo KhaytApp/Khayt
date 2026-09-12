@@ -1301,6 +1301,10 @@ final class Shop {
 
     /// The product being edited, or nil. Drives the sheet, as the customer's does.
     var editingProduct: Product?
+    /// Why a product could not be made from a model, when it could not.
+    var productProblem: String?
+    /// What the file could not answer for — said rather than left as zeros.
+    var productNote: String?
 
     /// Every product id in the book — how the sheet tells a new one from an edit.
     var productIds: Set<String> {
@@ -1361,6 +1365,69 @@ final class Shop {
         Product(id: Self.uid("PROD"), names: [:], descriptions: [:],
                 margin: nil, group: "", category: "",
                 createdAt: Self.localDay(), rest: [:])
+    }
+
+    /// A product that sells this model, with its first part already filled in.
+    ///
+    /// ── THE TWO SCREENS DID NOT MEET ───────────────────────────────────────
+    ///
+    /// The library held 83 models with their weights and print times parsed at
+    /// import; the catalogue held products whose parts were typed in by hand.
+    /// Nothing joined them, in either direction — and the one product in this
+    /// shop's book shows what that costs:
+    ///
+    ///     "fileRef": "KING-Abdulaziz-ART-200mm-U1_PLA_4h32m.gcode"
+    ///
+    /// a filename, not a link. `lib/order-file-link.js` opens by naming exactly
+    /// that: "an order carried a free-text `fileRef` — a filename somebody
+    /// typed — so none of it joined up."
+    ///
+    /// So the part is filled by `lib/part-from-print-file.js`, which already
+    /// does all of it: weight and time from what the slicer measured, material
+    /// and layer height from the setup the shop has had most success with, and
+    /// `printFileId` — the real join, which is what makes "for THIS part, with
+    /// THESE settings, how far out is my estimate?" answerable later.
+    ///
+    /// `missing` is carried back rather than swallowed. A part the file could
+    /// not answer for leaves fields at zero, and a zero that looks typed is
+    /// worse than a blank somebody was told about.
+    func productFromFile(_ file: LibraryFile) async -> Product? {
+        productProblem = nil
+        guard let engine, let rec = row(for: file.id) else {
+            productProblem = words.callIt("mac.not_found"); return nil
+        }
+        guard let patch = try? await engine.partFieldsFromFile(rec) else {
+            productProblem = words.callIt("mac.product_from_file_failed"); return nil
+        }
+
+        var part = patch.fields
+        // The part's name is the model's, which is what a shop would have
+        // typed. Everything else on it came from the file.
+        part["name"] = .string(file.title)
+        part["quantity"] = .number(1)
+
+        var product = newProduct()
+        // The model's name in every language the catalogue carries — the same
+        // name, because a model has one and a shop can correct it on the sheet.
+        for key in await allLanguageKeys() {
+            product.names[key.language] = file.title
+        }
+        product.rest["parts"] = .array([.object(part)])
+
+        // Said plainly, and only when there is something to say.
+        if !patch.missing.isEmpty {
+            productNote = words.callIt("mac.product_from_file_missing",
+                                       ["fields": .string(patch.missing.joined(separator: ", "))])
+        } else {
+            productNote = nil
+        }
+        return product
+    }
+
+    /// Open the product sheet on a product made from the selected model.
+    func productFromSelection() async {
+        guard let one = selectedFile else { return }
+        if let product = await productFromFile(one) { editingProduct = product }
     }
 
     /// Write it down. Follows `saveCustomer` exactly, including the undo.

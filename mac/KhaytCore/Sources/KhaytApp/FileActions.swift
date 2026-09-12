@@ -146,6 +146,10 @@ struct ModelActions: View {
             Button(shop.words.callIt("mac.reveal_folder")) { FileActions.reveal(dir) }
             Divider()
         }
+        Button(shop.words.callIt("mac.product_from_model") + "\u{2026}") {
+            Task { await shop.editingProduct = shop.productFromFile(file) }
+        }
+        Divider()
         Button(shop.words.callIt("mac.copy_name")) { FileActions.copy(file.title) }
         if let original = file.sourceFile?.originalName ?? file.originalName {
             Button(shop.words.callIt("mac.copy_file_name")) { FileActions.copy(original) }
