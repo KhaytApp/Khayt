@@ -152,8 +152,18 @@ private struct Card: View {
     @State private var upkeep: KhaytEngine.MaintenanceCard?
 
     var body: some View {
-        card
-            .contextMenu {
+        VStack(alignment: .leading, spacing: 8) {
+            card
+            // ── A PRINTER THAT CHANGED ADDRESS ────────────────────────────
+            //
+            // Only for a machine that has actually gone quiet — the same three
+            // failed polls the badge above already calls offline. "Offline" is
+            // also what Khayt says when a printer is switched off, and the two
+            // have completely different fixes, so this offers the one that
+            // applies to a moved lease.
+            if shop.looksUnreachable(machine.id) { relocateRow }
+        }
+        .contextMenu {
                 if shop.canMoveJobs {
                     Button(shop.words.callIt("mach.edit")) { shop.editingMachine = machine }
                     // Only where there is a history to read. Klipper keeps one;
@@ -193,6 +203,43 @@ private struct Card: View {
     /// machine in every book written before this existed genuinely is.
     private var kind: KhaytEngine.MachineKind? { shop.kind(of: machine) }
     private func shows(_ field: String) -> Bool { kind?.shows(field) ?? true }
+
+    /// The repair, offered only when this machine has gone quiet.
+    ///
+    /// Two shapes, because the rule draws a line the screen must not blur: a
+    /// MAC or a serial is identity — neither moves with a DHCP lease — and may
+    /// be applied on one confirmation. A model match is "strong, and still a
+    /// guess", so it is proposed and says so.
+    @ViewBuilder private var relocateRow: some View {
+        let move = shop.relocations.first { $0.machineId == machine.id }
+        VStack(alignment: .leading, spacing: 6) {
+            if let move {
+                Text(shop.words.callIt("mac.moved_here", ["host": .string(move.to)]))
+                    .font(.callout).foregroundStyle(.primary)
+                Text(move.why)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !move.isIdentity {
+                    Text(shop.words.callIt("mac.moved_maybe"))
+                        .font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button(shop.words.callIt("mac.moved_apply")) {
+                    Task { await shop.applyRelocation(move) }
+                }
+                .controlSize(.small)
+                .disabled(!shop.canMoveJobs)
+            } else {
+                Button(shop.words.callIt(shop.lookingForMoved ? "mac.moved_looking"
+                                                              : "mac.moved_find")) {
+                    Task { await shop.findMovedPrinters() }
+                }
+                .controlSize(.small)
+                .disabled(shop.lookingForMoved)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
