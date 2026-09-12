@@ -317,6 +317,14 @@ final class Shop {
             shopName = await Self.shopName(from: Self.settings(root), engine: engine,
                                            language: words.language) ?? next.title(words)
             if case .array(let shelf)? = root["inventory"] { inventoryRows = shelf } else { inventoryRows = [] }
+            // The other shelf: glue, IPA, bags, nozzles. Read raw — the reorder
+            // rule reads fields this app has no model for, and picking which of
+            // them matter is a decision that belongs in the rule.
+            if case .array(let bits)? = root["consumables"] {
+                consumableRows = bits
+            } else {
+                consumableRows = []
+            }
             if case .array(let jobs)? = root["printLog"] { orderRows = jobs } else { orderRows = [] }
             if case .array(let people)? = root["clients"] { clientRows = people } else { clientRows = [] }
             if case .array(let catalog)? = root["products"] { productRows = catalog } else { productRows = [] }
@@ -1548,6 +1556,9 @@ final class Shop {
     /// carry it. Re-encoding would silently cost every resin part as if it were
     /// filament.
     private(set) var inventoryRows: [JSONValue] = []
+
+    /// `consumables` as written. See `consumableNeeds`.
+    private(set) var consumableRows: [JSONValue] = []
 
     var settingsDict: [String: JSONValue] {
         if case .object(let s) = settingsValue { return s }
@@ -5400,6 +5411,36 @@ final class Shop {
         } catch {
             writeProblem = String(describing: error)
         }
+    }
+
+    /// The consumables worth ordering, most urgent first.
+    ///
+    /// Recomputed rather than cached: the rate is measured over a trailing
+    /// window, so what is urgent changes as jobs finish even when nobody has
+    /// touched the shelf.
+    func consumableNeeds() async -> [KhaytEngine.ConsumableNeed] {
+        guard let engine, !consumableRows.isEmpty else { return [] }
+        return (try? await engine.consumableNeeds(
+            consumables: consumableRows, orders: orderRows, now: Date())) ?? []
+    }
+
+    /// What that list was computed FROM.
+    ///
+    /// The shelf changes when stock moves; the rate changes when a job
+    /// finishes. Counting the finished jobs is enough for the second — the
+    /// window is trailing, so the answer moves when the set of jobs in it does.
+    var consumableSignature: String {
+        let shelf = consumableRows.compactMap { row -> String? in
+            guard case .object(let c) = row, case .string(let id)? = c["id"] else { return nil }
+            var have = "-"
+            if case .number(let n)? = c["stock"] { have = String(n) }
+            return id + ":" + have
+        }
+        let done = orderRows.reduce(into: 0) { total, row in
+            if case .object(let job) = row, case .string(let state)? = job["status"],
+               state == "completed" { total += 1 }
+        }
+        return "\(done)|" + shelf.sorted().joined(separator: ",")
     }
 
     /// What one machine's maintenance card was computed FROM.

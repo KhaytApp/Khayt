@@ -326,6 +326,15 @@ public actor KhaytEngine {
         // contained — it reaches for no other module — and the shelf and the
         // reorder list share its arithmetic so the two cannot disagree.
         "reorder",
+        // The other shelf. Glue, IPA, bags, nozzles — running out of one stops
+        // production the way running out of filament does, and only filament
+        // reached the reorder list. A sibling of `reorder`, deliberately not a
+        // widening of it: the two collections agree on almost nothing, and the
+        // failure when a per-collection branch is missed is silent (`weight` on
+        // a consumable is undefined, and NaN <= threshold is false, so an empty
+        // shelf reads as "not low" and never appears).
+        "consumable-reorder",
+        "consumable-categories",
         "printer-status",
         // Before `moonraker`, which reaches its runout rule through a global
         // the same way it reaches `printer-status`. Without it a Klipper
@@ -843,6 +852,76 @@ public actor KhaytEngine {
             """,
             [.array(spools), .array(orders), .number(now.timeIntervalSince1970 * 1000)],
             as: [String: Runway].self)
+    }
+
+    // MARK: - The other shelf
+
+    /// A consumable that is low, or forecast to run out inside the lead time.
+    ///
+    /// `lib/consumable-reorder.js`. Deliberately NOT the spool `Runway` type:
+    /// every quantity here is in the item's own unit, and there is no grams
+    /// figure at all. Naming one grams is how "4 boxes" becomes "4 g" on a
+    /// supplier's order form.
+    public struct ConsumableNeed: Decodable, Sendable, Hashable, Identifiable {
+        public let id: String
+        public let label: String
+        /// The shop's own unit — boxes, litres, each. Never assumed.
+        public let unit: String
+        public let stock: Double
+        public let minStock: Double?
+        /// Used per day over the trailing window, 0 when nothing has consumed it.
+        public let perDay: Double
+        /// Days of cover left.
+        ///
+        /// NIL WHEN THERE IS NO FORECAST, and that is a crossing detail rather
+        /// than a choice: the rule returns `Infinity` for an item with stock and
+        /// no measurable rate, `Infinity` is not representable in JSON, and it
+        /// arrives here as null. Nil therefore means "nothing is consuming
+        /// this", which is a different thing from zero days left — an empty
+        /// shelf reports 0 and must sort above, not below, a full one.
+        public let daysLeft: Double?
+        public let low: Bool
+        /// How much to buy, in `unit`. Zero when the rule will not commit to a
+        /// figure — no rate and no minimum is not a number, and inventing one
+        /// puts a guess on a purchase order.
+        public let suggestQty: Double
+    }
+
+    /// The consumables worth ordering, most urgent first.
+    ///
+    /// `orders` is the whole print log: the rule works out for itself which
+    /// jobs consumed what, across three unrelated deduction paths, and doing
+    /// any of that filtering here would move the decision into Swift.
+    public func consumableNeeds(consumables: [JSONValue], orders: [JSONValue],
+                                now: Date, windowDays: Double = 30,
+                                leadDays: Double = 14) throws -> [ConsumableNeed] {
+        try runtime.call2("""
+            (function (a) {
+              return KhaytConsumableReorder.consumableSuggestions(a.consumables, a.orders, {
+                now: a.now, windowDays: a.windowDays, leadDays: a.leadDays,
+              }).map(function (s) {
+                return {
+                  id: String(s.id == null ? '' : s.id),
+                  label: String(s.label == null ? '' : s.label),
+                  unit: String(s.unit == null ? '' : s.unit),
+                  stock: Number(s.stock || 0),
+                  minStock: s.minStock == null ? null : Number(s.minStock),
+                  perDay: Number(s.perDay || 0),
+                  // Infinity does not survive JSON; send null for "no forecast"
+                  // rather than letting it arrive as one silently.
+                  daysLeft: isFinite(s.daysLeft) ? Number(s.daysLeft) : null,
+                  low: !!s.low,
+                  suggestQty: Number(s.suggestQty || 0),
+                };
+              });
+            })(ARG0)
+            """,
+            [.object([
+                "consumables": .array(consumables), "orders": .array(orders),
+                "now": .number(now.timeIntervalSince1970 * 1000),
+                "windowDays": .number(windowDays), "leadDays": .number(leadDays),
+            ])],
+            as: [ConsumableNeed].self)
     }
 
     /// Whether a spool has gone damp, and how far past its interval it is.

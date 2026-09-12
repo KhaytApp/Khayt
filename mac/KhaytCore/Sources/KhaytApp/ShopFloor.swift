@@ -500,6 +500,7 @@ struct Upkeep: View {
 struct Inventory: View {
     @Bindable var shop: Shop
     @State private var selection: Spool.ID?
+    @State private var needs: [KhaytEngine.ConsumableNeed] = []
     /// The tallest card on the shelf — see `CardHeight`. A spool carrying
     /// "needs drying" and "empty in 14 days" is two lines taller than one that
     /// is simply full, and nine of them came out as two rows of two heights.
@@ -523,12 +524,27 @@ struct Inventory: View {
 
     var body: some View {
         Group {
-            if shop.spools.isEmpty {
+            // The empty states are about the WHOLE shelf, not the filament on
+            // it. Gating them on spools alone hid the consumables list entirely
+            // from a shop that keeps glue and bags but buys filament as it goes.
+            if shop.spools.isEmpty && needs.isEmpty {
                 EmptyHere(title: shop.words.callIt("mac.no_filament"), mark: .filament)
-            } else if shown.isEmpty {
+            } else if shown.isEmpty && needs.isEmpty {
                 NothingMatched(shop: shop, mark: .filament)
             } else {
                 ScrollView {
+                    // What is about to run out that is NOT filament. Above the
+                    // spools because it is the thing a shop cannot see by
+                    // looking at the rack, and only when nothing is being
+                    // searched for — the search box filters spools, so a full
+                    // consumables list beside three filtered cards describes a
+                    // different set from the one on screen.
+                    if !needs.isEmpty, shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        ConsumablesCard(needs: needs, shop: shop)
+                            .card(rail: needs.contains(where: \.low) ? Khayt.attention : nil,
+                                  padding: 14)
+                            .padding(.bottom, 14)
+                    }
                     // ── WHAT IT COSTS, ABOVE WHAT IS ON IT ────────────────
                     //
                     // The cards below say what the shop HAS. This says what it
@@ -537,7 +553,8 @@ struct Inventory: View {
                     // to reorder from. Only when nothing is being searched for:
                     // a price summary of the whole shelf above three filtered
                     // cards describes a different set from the one on screen.
-                    if shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                    if !shop.spools.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         MaterialCostCard(shop: shop, report: prices)
                             .card(rail: Khayt.cyan, padding: 14)
                             .padding(.bottom, 14)
@@ -584,6 +601,103 @@ struct Inventory: View {
         // bought, so it moves only when a spool is added or edited.
         .task(id: shop.spools.count) {
             prices = await shop.materialCost()
+        }
+        // The other shelf moves for a second reason: the usage rate is measured
+        // over a trailing window, so what is about to run out changes as jobs
+        // finish even when nobody has touched the stock.
+        .task(id: shop.consumableSignature) {
+            needs = await shop.consumableNeeds()
+        }
+    }
+}
+
+/// What is about to run out that is not filament.
+///
+/// Glue, IPA, bags, nozzles. A shop can see its filament by looking at the
+/// rack; it cannot see that it is two days off running out of mailing bags,
+/// and that stops production exactly the same way.
+///
+/// Every quantity is in the item's own unit. There is no grams figure here on
+/// purpose — naming one grams is how "4 boxes" becomes "4 g" on a supplier's
+/// order form.
+struct ConsumablesCard: View {
+    let needs: [KhaytEngine.ConsumableNeed]
+    let shop: Shop
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(shop.words.callIt("cons.title")).font(.headline)
+                Spacer()
+                // How many of them are already out or below their minimum, as
+                // against merely forecast to be. The two are different jobs:
+                // one is a trip to the shop today.
+                let low = needs.filter(\.low).count
+                if low > 0 {
+                    Text("\(low) \(shop.words.callIt("cons.low"))")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Khayt.attention)
+                }
+            }
+            VStack(alignment: .leading, spacing: 7) {
+                ForEach(needs) { Need(need: $0, shop: shop) }
+            }
+        }
+    }
+
+    private struct Need: View {
+        let need: KhaytEngine.ConsumableNeed
+        let shop: Shop
+
+        var body: some View {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(need.label.isEmpty ? shop.words.callIt("mac.unnamed") : need.label)
+                        .font(.callout)
+                        .foregroundStyle(need.label.isEmpty ? AnyShapeStyle(.secondary)
+                                                            : AnyShapeStyle(.primary))
+                        .lineLimit(1)
+                    Text(stockLine).font(.caption2).foregroundStyle(.tertiary)
+                }
+                Spacer(minLength: 6)
+                VStack(alignment: .trailing, spacing: 1) {
+                    if need.low {
+                        Text(shop.words.callIt("cons.low"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Khayt.attention)
+                    } else if let cover {
+                        Text(cover).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    }
+                    // What to buy, where the rule was willing to commit to a
+                    // figure. It refuses when there is no rate and no minimum,
+                    // and an invented number there lands on a purchase order.
+                    if need.suggestQty > 0 {
+                        Text("\(shop.words.callIt("reorder.suggest")) \(Self.qty(need.suggestQty)) \(need.unit)")
+                            .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                    }
+                }
+            }
+        }
+
+        private var stockLine: String {
+            "\(shop.words.callIt("reorder.in_stock")): \(Self.qty(need.stock)) \(need.unit)"
+        }
+
+        /// Days of cover, where there is a forecast at all. Nil means nothing is
+        /// consuming this — which is not the same as none left, and must not be
+        /// drawn as "0 days".
+        private var cover: String? {
+            guard let days = need.daysLeft else { return nil }
+            return "\(Self.qty(days)) \(shop.words.callIt("common.days"))"
+        }
+
+        /// Whole units where they are whole. A shop counts bags and gloves, and
+        /// "6.0 each" reads like a measurement of something that is not.
+        static func qty(_ v: Double) -> String {
+            let whole = v.rounded()
+            return abs(v - whole) < 0.05
+                ? whole.formatted(.number.precision(.fractionLength(0)))
+                : v.formatted(.number.precision(.fractionLength(1)))
         }
     }
 }
