@@ -939,6 +939,28 @@ final class Words {
         "mac.no_job": ["en": "No job selected", "ar": "لم يُختر عمل"],
         "mac.no_job_hint": ["en": "Pick a row to see its parts and its money.", "ar": "اختر صفاً لعرض أجزائه وحسابه."],
         "mac.no_model": ["en": "No model selected", "ar": "لم يُختر مجسم"],
+        // The print-risk section's own chrome. HERE rather than in the nine
+        // shared locales because only this app draws it: the other app computes
+        // the same findings on its quote screen and throws them away. The
+        // FINDINGS themselves are `risk.*` in the shared catalogue, written
+        // once by `lib/intake-view.js` and rendered by both.
+        "risk.title": ["en": "Before you quote", "ar": "قبل أن تُسعّر"],
+        "risk.looking": ["en": "Reading the mesh…", "ar": "جارٍ قراءة المجسّم…"],
+        "risk.clear": ["en": "Nothing to flag on this one.", "ar": "لا ملاحظات على هذا الملف."],
+        "risk.not_looked": ["en": "Khayt has not looked at this mesh yet. Reading it takes a few seconds on a large model.",
+                            "ar": "لم يفحص خيط هذا المجسّم بعد. قراءته تستغرق ثوانٍ في الموديلات الكبيرة."],
+        "risk.look": ["en": "Check the mesh", "ar": "افحص المجسّم"],
+        // The setting, and it is THIS app's setting: the other one computes
+        // these findings for a quote and never stores them, so it has no import
+        // to do the work at. `lib/print-risk.js` holds the rule so that when it
+        // does, the two cannot disagree about what the default is.
+        "set.risk_when": ["en": "Check models for print risks", "ar": "فحص الموديلات لمخاطر الطباعة"],
+        "set.risk_demand": ["en": "When I ask", "ar": "عند الطلب"],
+        "set.risk_import": ["en": "As each file is imported", "ar": "عند استيراد كل ملف"],
+        "set.risk_hint": ["en": "Reading a mesh takes a few seconds on a large model. Checking at import pays that once per file and answers instantly afterwards; checking when you ask keeps imports fast.",
+                          "ar": "قراءة المجسّم تستغرق ثوانٍ في الموديلات الكبيرة. الفحص عند الاستيراد يدفع هذه الثواني مرّة واحدة لكل ملف ثم يجيب فورًا؛ والفحص عند الطلب يُبقي الاستيراد سريعًا."],
+        "risk.unreadable": ["en": "Khayt could not read the mesh in that file.",
+                            "ar": "لم يتمكّن خيط من قراءة المجسّم في هذا الملف."],
         "mac.no_model_hint": ["en": "Pick a model to see its file and its filament.", "ar": "اختر مجسماً لعرض ملفه وخيطه."],
         "mac.no_customer": ["en": "No customer selected", "ar": "لم يُختر عميل"],
         "mac.no_customer_hint": ["en": "Pick a row to see their jobs and their balance.", "ar": "اختر صفاً لعرض أعماله ورصيده."],

@@ -615,6 +615,35 @@ final class Activator: NSObject, NSApplicationDelegate {
             capture(named: "02b-job-selected-sample", into: dir)
             shop.selection = nil
 
+            // ── AND THE PRINT-RISK SECTION, FOR THE SAME REASON ───────────
+            //
+            // Exactly the case the note above describes. The library screen is
+            // photographed against the real book, and no record in it carries
+            // an overhang summary — so the only state ever captured is "not
+            // looked yet", and the three that matter had never been seen.
+            //
+            // The sample book seeds three on purpose: a falcon hood that needs
+            // supports, a vase-mode vase whose walls are thinner than the
+            // nozzle, and a bracket with nothing to report — because a section
+            // that only speaks up when something is wrong leaves a shop unable
+            // to tell "checked, fine" from "not checked".
+            shop.shelf = .library(nil)
+            await settle()
+            for (name, id) in [("03c-library-risk", "PF-sample-falcon"),
+                               ("03d-library-risk-thin", "PF-sample-vase"),
+                               ("03e-library-risk-clear", "PF-sample-bracket")]
+                where shop.files.contains(where: { $0.id == id }) {
+                shop.fileSelection = [id]
+                await settle()
+                // The findings are judged by the runtime after the screen
+                // appears, like the colour matches and the P&L.
+                try? await Task.sleep(for: .milliseconds(700))
+                capture(named: name, into: dir)
+                capturePanes(named: name, into: dir)
+            }
+            shop.fileSelection = []
+            await settle()
+
             await shop.load(Shop.available.first(where: \.isReal) ?? .sample)
             await settle()
             shop.shelf = .jobs(nil)

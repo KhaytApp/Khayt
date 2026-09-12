@@ -180,6 +180,10 @@ enum ImportCommand {
             nameOfExisting: { titles[$0] },
             engine: engine,
             keepOriginal: options.keepOriginals,
+            // The same setting the window obeys. `--import` skipping it would
+            // mean a shop that asked for the walk at import gets it from the
+            // File menu and not from the command line, for the same files.
+            analyseRisk: shop.analysesRiskAtImport,
             owns: { StoreLock.weOwnIt(build) },
             whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
             progress: { done, total, file in

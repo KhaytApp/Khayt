@@ -196,6 +196,83 @@ struct LibraryImportTests {
         #expect(file.colors?.isEmpty == true)
     }
 
+    // MARK: - The overhang summary on the record
+
+    /// The setting has to change what the record HOLDS, or it is a control that
+    /// does nothing. This is the shape of that bug: a walk that runs, an answer
+    /// that is never written down, and a library that asks again every time.
+    @Test("the summary reaches the record, and only when it was asked for")
+    func riskOnRecord() throws {
+        let analysis: [String: JSONValue] = [
+            "triangleCount": .number(24), "volumeMm3": .number(960),
+            "totalAreaMm2": .number(1152), "downwardAreaMm2": .number(416),
+            "bedContactAreaMm2": .number(16),
+            "histogram": .array(Array(repeating: .number(0), count: 91)),
+        ]
+        let walked = LibraryImport.record(
+            id: "PF-r1", name: "table", originalName: "table.stl", filename: "table.stl",
+            ext: "stl", size: 1_284, hash: "aaa", key: "24:960:20x20x12",
+            colours: [], swapCount: 0, thumbFile: nil,
+            riskAnalysis: analysis, now: 1_788_000_000_000)
+
+        let file = try JSONDecoder().decode(
+            LibraryFile.self, from: try JSONEncoder().encode(JSONValue.object(walked)))
+        #expect(file.hasRiskAnalysis, "the summary did not survive the round trip")
+        #expect(file.riskAnalysis?["volumeMm3"] == .number(960))
+        #expect(file.printRisk?.contentHash == "aaa",
+                "the bytes it was measured from were not recorded")
+
+        // Not asked for: ABSENT, not null. A null would be indistinguishable
+        // from a walk that found nothing, and the inspector has to offer the
+        // button for one and not the other.
+        let unwalked = LibraryImport.record(
+            id: "PF-r2", name: "table", originalName: "table.stl", filename: "table.stl",
+            ext: "stl", size: 1_284, hash: "aaa", key: "24:960:20x20x12",
+            colours: [], swapCount: 0, thumbFile: nil, now: 1_788_000_000_000)
+        #expect(unwalked["printRisk"] == nil, "an unasked walk still wrote a field")
+        let plain = try JSONDecoder().decode(
+            LibraryFile.self, from: try JSONEncoder().encode(JSONValue.object(unwalked)))
+        #expect(!plain.hasRiskAnalysis)
+        #expect(plain.riskAnalysis == nil)
+    }
+
+    /// A model replaced with a new version keeps its id and its record. A
+    /// summary left from the previous mesh would be read as current and would
+    /// describe overhangs that are not there any more.
+    @Test("a summary measured from other bytes is not used")
+    func staleSummary() throws {
+        var record = LibraryImport.record(
+            id: "PF-r3", name: "v1", originalName: "v1.stl", filename: "v1.stl",
+            ext: "stl", size: 10, hash: "NEW-BYTES", key: nil,
+            colours: [], swapCount: 0, thumbFile: nil,
+            riskAnalysis: ["volumeMm3": .number(1)], now: 1_788_000_000_000)
+        // The file was replaced: the record's hash moved on, the summary's did not.
+        record["printRisk"] = .object([
+            "analysis": .object(["volumeMm3": .number(1)]),
+            "contentHash": .string("OLD-BYTES"),
+            "at": .number(1_788_000_000_000),
+        ])
+        let file = try JSONDecoder().decode(
+            LibraryFile.self, from: try JSONEncoder().encode(JSONValue.object(record)))
+        #expect(file.printRisk != nil, "the block is still on the record")
+        #expect(file.riskAnalysis == nil, "a summary of the old mesh was read as current")
+        #expect(!file.hasRiskAnalysis)
+    }
+
+    /// A summary written before the hash was recorded at all. It is not proven
+    /// stale, and refusing it would throw away every answer a shop already had.
+    @Test("a summary with no hash is used rather than discarded")
+    func summaryWithoutHash() throws {
+        var record = LibraryImport.record(
+            id: "PF-r4", name: "v", originalName: "v.stl", filename: "v.stl",
+            ext: "stl", size: 10, hash: "aaa", key: nil,
+            colours: [], swapCount: 0, thumbFile: nil, now: 1_788_000_000_000)
+        record["printRisk"] = .object(["analysis": .object(["volumeMm3": .number(7)])])
+        let file = try JSONDecoder().decode(
+            LibraryFile.self, from: try JSONEncoder().encode(JSONValue.object(record)))
+        #expect(file.riskAnalysis?["volumeMm3"] == .number(7))
+    }
+
     /// Khayt names these fields in American spelling and the app is written in
     /// British. A record that reads well and stores wrong is the failure this
     /// pins.

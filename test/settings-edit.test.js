@@ -472,3 +472,38 @@ test('a chosen country survives the save that follows it, as it does in the rend
   assert.deepEqual(saved.tax.rates, [{ id: 'vat', label: 'USt.', percent: 19 }]);
   assert.equal(saved.tax.country, 'DE');
 });
+
+/* ============================================================
+   When models get checked for print risks
+   ============================================================ */
+
+test('the print-risk schedule saves, and only the values the reader accepts', () => {
+  const base = { printRisk: { when: 'demand', keepMe: 1 } };
+  assert.equal(apply(base, { printRisk: { when: 'import' } }).printRisk.when, 'import');
+  // Validated through the reader that reads it back rather than against a
+  // second list here: a screen that can save a value its own reader rejects is
+  // a screen with a dead option in it.
+  assert.equal(apply(base, { printRisk: { when: 'whenever' } }).printRisk.when, 'demand');
+  assert.equal(apply(base, { printRisk: { when: 'IMPORT' } }).printRisk.when, 'import');
+});
+
+test('saving the schedule leaves anything else under printRisk alone', () => {
+  // The same rule as everywhere else here: a save must not destroy a setting
+  // the form does not show. `cloud` was lost that way once, with a shop's sync
+  // keyset in it.
+  const out = apply({ printRisk: { when: 'demand', keepMe: 1 } }, { printRisk: { when: 'import' } });
+  assert.equal(out.printRisk.keepMe, 1);
+});
+
+test('a form that does not carry the schedule keeps the stored one', () => {
+  // The Mac's panes each save only the keys they show.
+  const out = apply({ printRisk: { when: 'import' } }, { minMarginPct: 5 });
+  assert.equal(out.printRisk.when, 'import');
+});
+
+test('a book that never set a schedule gets no printRisk block', () => {
+  // Absent, not `{when:'demand'}`: writing the default in would put a field on
+  // every shop's book to say what the absence of it already says, and the
+  // other app would sync it around.
+  assert.equal(apply({}, {}).printRisk, undefined);
+});

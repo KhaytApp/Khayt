@@ -36,6 +36,12 @@
     ? global.KhaytTax
     : (function () { try { return require('./tax.js'); } catch (e) { return null; } })();
 
+  // Same shape, same reason: `print-risk.js` owns which values are allowed and
+  // what an unrecognised one means, so this does not keep a second list.
+  const printRisk = () => (typeof global.KhaytPrintRisk !== 'undefined')
+    ? global.KhaytPrintRisk
+    : (function () { try { return require('./print-risk.js'); } catch (e) { return null; } })();
+
   const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const WIP_COLUMNS = ['pending', 'printing', 'post', 'qc'];
   const DEFAULT_EXPENSE_CATEGORIES = ['filament', 'electricity', 'maintenance', 'tools', 'shipping', 'other'];
@@ -232,6 +238,20 @@
         requireInspector:   !!q.requireInspector,
         requirePhotoOnFail: !!q.requirePhotoOnFail,
         warrantyDays:       Math.max(0, num(q.warrantyDays, 30)),
+      };
+    }
+    if (has(f, 'printRisk')) {
+      const pr = f.printRisk || {};
+      // Validated THROUGH the reader that will read it back, not with a
+      // second list of allowed values here. A settings screen that could save
+      // a value its own reader rejects is a screen with a dead option in it.
+      const rules = printRisk();
+      out.printRisk = {
+        ...(s.printRisk || {}),
+        // No fallback list if the module is missing: `when` is then left as it
+        // was rather than replaced with a guess, because a wrong value here
+        // decides whether every import walks its mesh.
+        when: rules ? rules.riskWhen({ printRisk: pr }) : ((s.printRisk || {}).when ?? 'demand'),
       };
     }
     // Preserved, in the shape their readers expect.

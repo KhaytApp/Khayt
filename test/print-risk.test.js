@@ -298,3 +298,50 @@ test('an open mesh falls back to the plate rather than to a meaningless volume',
   assert.equal(flipped.bedContactAreaMm2, 100);
   assert.equal(R.overhangAreaAbove(flipped, 45), 0);
 });
+
+/* ============================================================
+   WHEN the mesh gets walked
+   ============================================================ */
+
+test('a shop that has chosen nothing gets the walk on demand', () => {
+  // The walk is seconds on a real file. Defaulting to `import` would add an
+  // hour to a four-hundred-model import to answer a question nobody asked
+  // about 399 of them.
+  assert.equal(R.riskWhen({}), 'demand');
+  assert.equal(R.riskWhen(null), 'demand');
+  assert.equal(R.riskWhen({ printRisk: {} }), 'demand');
+  assert.equal(R.analyseAtImport({}), false);
+});
+
+test('a shop can ask for it at import', () => {
+  assert.equal(R.riskWhen({ printRisk: { when: 'import' } }), 'import');
+  assert.equal(R.analyseAtImport({ printRisk: { when: 'import' } }), true);
+});
+
+test('the settings object can be handed over whole or unwrapped', () => {
+  // One host holds `settings`, the other holds the root that contains it.
+  // Reading it two different ways is how the two of them come to disagree.
+  assert.equal(R.riskWhen({ settings: { printRisk: { when: 'import' } } }), 'import');
+});
+
+test('an unrecognised value is on demand, not at import', () => {
+  // A field synced down from a build that spells it differently, or a typo in
+  // a hand-edited store. Failing towards `import` would silently add an hour
+  // to the next import; failing towards `demand` costs one click.
+  for (const v of ['later', 'always', 'IMPORTS', '', null, 0, true, {}]) {
+    assert.equal(R.riskWhen({ printRisk: { when: v } }), 'demand',
+      `${JSON.stringify(v)} was not treated as on demand`);
+  }
+});
+
+test('the value is read the way a person would type it', () => {
+  assert.equal(R.riskWhen({ printRisk: { when: '  IMPORT ' } }), 'import');
+  assert.equal(R.riskWhen({ printRisk: { when: 'Demand' } }), 'demand');
+});
+
+test('every allowed value is one the reader accepts', () => {
+  // A list a settings screen renders from, and a reader that rejects one of its
+  // own entries, is a chooser with a dead option in it.
+  for (const v of R.RISK_WHEN) assert.equal(R.riskWhen({ printRisk: { when: v } }), v);
+  assert.ok(R.RISK_WHEN.includes(R.DEFAULT_RISK_WHEN));
+});

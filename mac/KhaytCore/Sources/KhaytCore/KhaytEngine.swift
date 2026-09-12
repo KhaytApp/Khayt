@@ -371,6 +371,16 @@ public actor KhaytEngine {
         // rule — a shop typing "bambu pla matte black" has to get the same
         // answer in both apps.
         "filament-catalog",
+        // What is likely to go wrong with a print before anyone quotes it.
+        // Only the JUDGING is here: the triangle walk that feeds it is
+        // `Mesh.Overhangs`, because this shop's models are millions of facets
+        // and there is no crossing those into JavaScriptCore.
+        "print-risk",
+        // And the SENTENCES for it. `riskNote` already turns findings into
+        // localised lines for the other app's quote screen, each carrying its
+        // own measurement; writing those again in Swift would be two sets of
+        // words for one set of findings.
+        "intake-view",
         "printer-status",
         // Before `moonraker`, which reaches its runout rule through a global
         // the same way it reaches `printer-status`. Without it a Klipper
@@ -888,6 +898,130 @@ public actor KhaytEngine {
             """,
             [.array(spools), .array(orders), .number(now.timeIntervalSince1970 * 1000)],
             as: [String: Runway].self)
+    }
+
+    // MARK: - What is likely to go wrong with this print
+
+    /// `analyzeTriangles`, for the parity test and nothing else.
+    ///
+    /// The app never calls this: passing triangles into JavaScriptCore is the
+    /// thing `Mesh.Overhangs` exists to avoid. It is exposed so
+    /// `PrintRiskParityTests` can run both implementations on the same input
+    /// and fail when the transcription drifts.
+    public func analyzeTriangles(_ triangles: JSONValue,
+                                 layerHeight: Double = 0.2) throws -> [String: JSONValue] {
+        try runtime.call2("""
+            (function (a) {
+              var r = KhaytPrintRisk.analyzeTriangles(a.tris, { layerHeight: a.layerHeight });
+              // `histogram` is a Float64Array, and a typed array does not
+              // serialise as an array — it crosses as {"0":…,"1":…} and reads
+              // as having no buckets at all.
+              return Object.assign({}, r, { histogram: Array.prototype.slice.call(r.histogram) });
+            })(ARG0)
+            """,
+            [.object(["tris": triangles, "layerHeight": .number(layerHeight)])],
+            as: [String: JSONValue].self)
+    }
+
+    /// One finding, as `lib/print-risk.js` reports it.
+    ///
+    /// Every field but `id` and `severity` is optional because a finding
+    /// carries ITS OWN measurement and no two carry the same one — an overhang
+    /// reports a fraction and an angle, a thin wall reports millimetres and a
+    /// nozzle bore, a model too big for the plate reports two boxes. That is
+    /// the module's discipline, not an accident: a warning the shop cannot
+    /// check is a warning it has to either trust or ignore.
+    public struct PrintRisk: Decodable, Sendable, Equatable {
+        public let id: String
+        /// `info`, `warn` or `crit`.
+        public let severity: String
+        /// Fraction of total surface area, for `overhang` and `bridge`.
+        public let fraction: Double?
+        public let areaMm2: Double?
+        public let thresholdDeg: Double?
+        public let meanThicknessMm: Double?
+        public let nozzleDiameter: Double?
+        /// Mean wall thickness in multiples of the nozzle bore.
+        public let bores: Double?
+        public let tooTall: Bool?
+    }
+
+    /// One line of the report, as a key and its numbers.
+    ///
+    /// Structured rather than a finished sentence, the same way every other
+    /// note in Khayt is: the caller renders it through the shop's own language,
+    /// and a test asserting on English would prove nothing about what an Arabic
+    /// shop was told.
+    public struct RiskLine: Decodable, Sendable, Equatable {
+        public let key: String
+        public let vars: [String: JSONValue]?
+        /// Worth saying firmly — a part that does not fit, a wall that cannot
+        /// be laid down.
+        public let strong: Bool?
+    }
+
+    public struct PrintRiskReport: Decodable, Sendable, Equatable {
+        public let risks: [PrintRisk]
+        /// The worst severity present, or nil when there is nothing to say.
+        public let worst: String?
+        public let supportThresholdDeg: Double
+        /// The same findings as sentences to render, from `lib/intake-view.js`.
+        /// Empty when there is nothing to report; it carries its own heading
+        /// when there is.
+        public let note: [RiskLine]
+    }
+
+    /// WHEN the mesh gets walked: `demand` or `import`.
+    ///
+    /// Read through the shared rule rather than off the dictionary, because the
+    /// defaulting is the part worth getting the same in both apps: anything
+    /// unrecognised has to read as `demand`, so a value synced down from a
+    /// build that spells it differently cannot silently add an hour to an
+    /// import.
+    public func riskWhen(settings: [String: JSONValue]) throws -> String {
+        try runtime.call2("KhaytPrintRisk.riskWhen(ARG0)", [.object(settings)], as: String.self)
+    }
+
+    /// Judge a model from the summary `Mesh.Overhangs` produced.
+    ///
+    /// The thresholds live in the shared rule and nowhere else. This app counts
+    /// the triangles itself — it has to, they are in the millions — but it does
+    /// not get to decide what counts as too much overhang, because that is the
+    /// number the two apps would come to disagree about.
+    ///
+    /// `analysis` is `Mesh.Overhangs.analysis()` verbatim.
+    public func assessModel(analysis: [String: JSONValue],
+                            nozzleDiameter: Double? = nil,
+                            supportThresholdDeg: Double? = nil,
+                            bed: (x: Double, y: Double, z: Double)? = nil,
+                            bbox: (x: Double, y: Double, z: Double)? = nil)
+        throws -> PrintRiskReport {
+        var input: [String: JSONValue] = ["analysis": .object(analysis)]
+        if let n = nozzleDiameter, n > 0 { input["nozzleDiameter"] = .number(n) }
+        if let d = supportThresholdDeg, d > 0 { input["supportThresholdDeg"] = .number(d) }
+        if let b = bed, b.x > 0, b.y > 0 {
+            input["bed"] = .object(["x": .number(b.x), "y": .number(b.y), "z": .number(b.z)])
+        }
+        // The box comes from the MEASUREMENT, not from the overhang pass — the
+        // accumulator tracks which way surfaces face and never the extent.
+        // Without it the "does it fit the plate" check has nothing to compare
+        // and silently reports nothing, which reads as "it fits".
+        if let g = bbox {
+            input["geometry"] = .object([
+                "bbox": .object(["x": .number(g.x), "y": .number(g.y), "z": .number(g.z)]),
+                "volumeMm3": analysis["volumeMm3"] ?? .number(0),
+                "areaMm2": analysis["totalAreaMm2"] ?? .number(0),
+            ])
+        }
+        return try runtime.call2("""
+            (function (input) {
+              var r = KhaytPrintRisk.assessModel(input);
+              // The SAME findings turned into lines by the same rule the other
+              // app's quote screen uses. `riskNote` wants them under `risk`.
+              return Object.assign({}, r, { note: KhaytIntakeView.riskNote({ risk: r }) });
+            })(ARG0)
+            """,
+            [.object(input)], as: PrintRiskReport.self)
     }
 
     // MARK: - Finding a filament somebody else wrote down
