@@ -436,6 +436,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) Khayt no longer quits when you Quick Look a second model.** Going
+  through the library pressing ⌘Y, the app disappeared on the second one —
+  with no error, no crash report and nothing to look at afterwards. It is the
+  screen the Mac app is for, so this is worth a release of its own.
+
 - **(Mac) A model file could crash Khayt outright, and `v1="nan"` was enough.** Three
   characters where a 3MF names one of a triangle's corners. Swift refuses to
   turn a "not a number" into a whole number and stops the program rather than
@@ -646,6 +651,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   changelog. From the end deliberately: the "Before you update" section that
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
+
+## [4.0.0-alpha.6] - 2026-09-12
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Fixed
+
+- **Khayt no longer quits when you Quick Look a second model.** Going through
+  the library pressing ⌘Y, the app disappeared on the second one — with no
+  error, no crash report and nothing to look at afterwards.
+
+  The preview panel's binding was never cleared when a panel was dismissed, so
+  the second look handed it one file where another already sat. Every look is a
+  fresh one now, and both ways in — ⌘Y and the model's own menu — go through
+  the same door, which is what stopped one of them being fixed and the other
+  not.
 
 ## [4.0.0-alpha.5] - 2026-09-12
 
