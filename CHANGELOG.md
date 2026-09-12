@@ -29,6 +29,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) An invoice says whether it has actually been reported to ZATCA.**
+  Khayt already put the Phase 1 QR on the document. What the Mac app could not
+  tell you was whether an invoice you had handed a customer had been reported to
+  the tax authority at all — which is the part a Saudi shop can be penalised
+  for, and it was invisible on this side. A completed invoice now says
+  submitted, not submitted, rejected or errored, with the counter value and, if
+  it was refused, the reason it was refused.
+
+  It does not offer to submit. Signing the document needs code that only runs in
+  the Electron app, and a button here that could not finish the job would be
+  worse than a plain statement. Nothing appears at all on a shop that has not
+  switched Phase 2 on, because none of this applies to it.
+
 - **(Mac) Khayt remembers what a print actually worked at.** A file counted how
   many times it printed and how many times it failed, but not *with what* — so
   reprinting a bracket six months later you knew it had worked once and had no

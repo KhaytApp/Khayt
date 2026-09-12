@@ -56,8 +56,12 @@ struct WordsAreTranslatedTests {
     /// filename. `— .3mf` is what is left of a suggested save name once its
     /// interpolations are removed, and a file extension is not translated —
     /// a converted model is `.3mf` on an Arabic Mac too.
+    /// `ICV` is not an English word that wants translating. It is the literal
+    /// identifier ZATCA's own specification gives the invoice counter — it is
+    /// what the tag is called in the XML a Saudi shop files — so translating it
+    /// would make the app disagree with the document it produced.
     static let noWordForIt: Set<String> = ["mm", "W", "h m", "m", "kB", "MB", "GB", "ΔE",
-                                           "— .3mf", ".3mf"]
+                                           "— .3mf", ".3mf", "ICV"]
 
     /// A literal with its `\(…)` taken out, brackets BALANCED.
     ///

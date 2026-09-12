@@ -5424,6 +5424,16 @@ final class Shop {
         }
     }
 
+    /// Whether the shop's invoices have been reported to ZATCA.
+    ///
+    /// Recomputed rather than cached: it moves when a job completes and when
+    /// the Electron app submits one, and a stale "not submitted" against an
+    /// invoice that has been reported is worse than no answer at all.
+    func zatcaReporting() async -> KhaytEngine.ZatcaReporting? {
+        guard let engine else { return nil }
+        return try? await engine.zatcaReporting(settings: settingsDict, orders: orderRows)
+    }
+
     /// One print file's raw record, for the rules that read more of it than
     /// `LibraryFile` models.
     func row(for id: LibraryFile.ID) -> JSONValue? {
