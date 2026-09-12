@@ -1328,6 +1328,25 @@ final class Words {
         // which language the shop reads. These are them. Kept here rather than
         // in the shared catalogue because the dispatcher is this app's — see
         // the note at the top of this file about nine languages.
+        // Telling a printer what to do — which this app could not, on any of
+        // the seven protocols it can watch.
+        "mac.printer_pause":  ["en": "Pause",        "ar": "إيقاف مؤقت"],
+        "mac.printer_resume": ["en": "Resume",       "ar": "استئناف"],
+        "mac.printer_cancel": ["en": "Cancel print", "ar": "إلغاء الطباعة"],
+        "mac.cancel_ask":     ["en": "Cancel the print on {machine}?",
+                               "ar": "إلغاء الطباعة على {machine}؟"],
+        "mac.cancel_why":     ["en": "Everything printed so far is scrap. The printer will not ask again.",
+                               "ar": "كل ما طُبع حتى الآن خردة. ولن تسأل الطابعة مرة أخرى."],
+        // Dropping one object from a plate.
+        "mac.drop_object":    ["en": "Drop one object", "ar": "إسقاط مجسم"],
+        "mac.drop_it":        ["en": "Drop it",       "ar": "أسقِطه"],
+        "mac.drop_printing_now": ["en": "printing now", "ar": "تُطبع الآن"],
+        "mac.drop_forever":   ["en": "This cannot be undone. What has already printed of it stays on the plate, and the rest is never printed.",
+                               "ar": "لا يمكن التراجع عن هذا. يبقى ما طُبع منه على الطاولة، ولا يُطبع الباقي أبداً."],
+        "mac.drop_unsupported": ["en": "This printer does not report the objects on its plate. Klipper needs its exclude_object module, and the file must have been sliced with object markers.",
+                                 "ar": "لا تبلّغ هذه الطابعة عن المجسمات على طاولتها. يحتاج Klipper إلى وحدة exclude_object، ويجب أن يكون الملف مقطّعاً بعلامات المجسمات."],
+        "mac.drop_nothing":   ["en": "Nothing is printing on this machine.",
+                               "ar": "لا شيء يُطبع على هذه الآلة."],
         "mac.dispatch_title": ["en": "Next up",      "ar": "التالي"],
         "mac.dispatch_none":  ["en": "Nothing is waiting for a machine.",
                                "ar": "لا شيء ينتظر آلة."],

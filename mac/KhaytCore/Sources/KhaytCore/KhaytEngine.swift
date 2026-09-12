@@ -388,6 +388,12 @@ public actor KhaytEngine {
         // Which job goes on which printer next. A rule, not a button: see
         // `dispatchPlan` and `lib/auto-dispatch.js` for why it proposes.
         "auto-dispatch",
+        // Pausing, resuming and cancelling, and dropping one object from a
+        // plate. The SHAPES of those requests — which verb, which path, which
+        // body — per protocol. A second copy of them in Swift would be a second
+        // answer about what to send a printer that is mid-job.
+        "printer-commands",
+        "exclude-object",
         "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
@@ -1891,6 +1897,86 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - Telling a printer what to do
+
+    /// One request to a printer, as `lib/printer-commands.js` shapes it.
+    ///
+    /// `unsupported` is an answer, not an error: Bambu requires their own
+    /// connector for remote control now, and a shop is owed that sentence
+    /// rather than a request that fails for reasons nobody can act on.
+    public struct PrinterRequest: Decodable, Sendable {
+        public let method: String?
+        public let path: String?
+        public let body: JSONValue?
+        public let contentType: String?
+        public let needsJobId: Bool?
+        public let unsupported: String?
+    }
+
+    /// What to send a printer for `pause`, `resume` or `cancel`.
+    ///
+    /// Every protocol spells it differently — OctoPrint takes an action in a
+    /// body and TOGGLES if you omit it, PrusaLink keys the endpoint by the
+    /// running job's id, Duet changes shape between its two firmware lines.
+    /// All of that is in the shared module and none of it is repeated here.
+    public func printerCommand(type: String, command: String, jobId: String? = nil,
+                               duetFlavour: String = "", printerSlug: String = "")
+        throws -> PrinterRequest {
+        try runtime.call2("""
+            KhaytPrinterCommands.buildCommand(ARG0, ARG1, ARG2,
+              { duetFlavour: ARG3 || undefined, printerSlug: ARG4 || undefined })
+            """,
+            [.string(type), .string(command), jobId.map(JSONValue.string) ?? .null,
+             .string(duetFlavour), .string(printerSlug)],
+            as: PrinterRequest.self)
+    }
+
+    /// Does this protocol need the running job's id before it can be told
+    /// anything? PrusaLink does, and a stale id answers 404.
+    public func printerCommandNeedsJobId(type: String) throws -> Bool {
+        try runtime.call2("KhaytPrinterCommands.requiresJobId(ARG0)",
+                          [.string(type)], as: Bool.self)
+    }
+
+    /// What is on a Klipper printer's plate.
+    public struct Plate: Decodable, Sendable {
+        /// False when the printer does not report objects at all — a setting to
+        /// change, which is a different sentence from "nothing is printing".
+        public let supported: Bool
+        public let objects: [String]
+        public let excluded: [String]
+        public let current: String?
+        public let remaining: [String]
+    }
+
+    public func plate(_ reply: [String: JSONValue]) throws -> Plate {
+        try runtime.call2("""
+            (function (data) {
+              var p = KhaytExcludeObject.plate(data);
+              p.remaining = KhaytExcludeObject.remaining(data);
+              return p;
+            })(ARG0)
+            """, [.object(reply)], as: Plate.self)
+    }
+
+    /// The request that drops one object, or a refusal.
+    ///
+    /// The name is checked against the plate reply passed in — see
+    /// `lib/exclude-object.js` for why that check, rather than escaping, is
+    /// what makes the name safe to put inside a G-code script.
+    public func excludeObject(_ name: String, plate reply: [String: JSONValue])
+        throws -> PrinterRequest {
+        try runtime.call2("KhaytExcludeObject.excludeRequest(ARG0, ARG1)",
+                          [.string(name), .object(reply)], as: PrinterRequest.self)
+    }
+
+    /// `EXCLUDE_OBJECT` cannot be undone — Klipper does not reprint the layers
+    /// skipped while an object was dropped. Read from the module rather than
+    /// written here, so the sentence a screen says and the rule agree.
+    public func excludeIsReversible() throws -> Bool {
+        try runtime.value("KhaytExcludeObject", "reversible", as: Bool.self)
     }
 
     // MARK: - What to run next, and where
