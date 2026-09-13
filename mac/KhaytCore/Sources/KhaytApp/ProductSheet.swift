@@ -30,6 +30,11 @@ struct ProductSheet: View {
     @State private var draft: Product
     @State private var language: String = "en"
     @State private var started = false
+    /// The pictures as the sheet has them — loaded from the record on open and
+    /// only written back on save. See `StagedPicture`.
+    @State private var pictures: [StagedPicture] = []
+    /// Files to unlink, acted on only if this sheet is saved.
+    @State private var removedPictures: [String] = []
     @FocusState private var focused: Bool
 
     init(shop: Shop, existing: Product) {
@@ -97,8 +102,12 @@ struct ProductSheet: View {
                 }
             }
 
+            Divider()
+            ProductPictureStrip(shop: shop, productId: draft.id,
+                                pictures: $pictures, removed: $removedPictures)
+
             // What this app is NOT editing, said plainly. The alternative is a
-            // shop assuming the parts and the photo were dropped on save.
+            // shop assuming the parts were dropped on save.
             if !isNew {
                 Text(shop.words.callIt("mac.product_kept"))
                     .font(.caption).foregroundStyle(.secondary)
@@ -115,7 +124,9 @@ struct ProductSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save")) {
                     let saving = draft
-                    Task { await shop.saveProduct(saving) }
+                    let staged = pictures
+                    let unlink = removedPictures
+                    Task { await shop.saveProduct(saving, pictures: staged, unlinking: unlink) }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!draft.hasAName)
@@ -131,6 +142,12 @@ struct ProductSheet: View {
             language = shop.catalogueLanguages.first?.language ?? "en"
             focused = true
         }
+        // THROUGH THE SHARED RULE, not by reading `images` off the record. A
+        // product can arrive carrying the legacy `imagePath`/`thumbnail` pair,
+        // the array, or both because an older build edited it after a newer one
+        // saved it — and "the array wins except when it is empty" is the
+        // migration this sheet must not have its own opinion about.
+        .task(id: existing.id) { pictures = await shop.pictures(of: existing.id) }
     }
 
     private func written(_ code: String) -> Bool {
