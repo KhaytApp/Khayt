@@ -822,6 +822,16 @@ final class Activator: NSObject, NSApplicationDelegate {
             shop.editingCustomer = nil
             await settle()
 
+            // The assistant's screen, in its EMPTY state — which is the state
+            // that has to work hardest. A blank box with a cursor in it is a
+            // test a shop can fail, so what is drawn before the first question
+            // is the suggestions and the sentence saying what leaves the Mac.
+            shop.askingTheBook = true
+            await settle()
+            captureSheet(named: "31-ask-the-book", into: dir)
+            shop.askingTheBook = false
+            await settle()
+
             // THE PRODUCT SHEET WAS PHOTOGRAPHED BY NOTHING.
             //
             // It has been editable on this app for months and no shot in this

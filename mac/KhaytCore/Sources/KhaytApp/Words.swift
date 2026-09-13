@@ -1647,6 +1647,31 @@ final class Words {
                                           "ar": "تحقق عادةً {pct}% على {material} — "
                                           + "وسيط {n} عملًا منتهيًا."],
         "mac.use_it":        ["en": "Use it",          "ar": "استخدمه"],
+        // ── ASKING ABOUT THE BOOK ─────────────────────────────────────────
+        "mac.ask_the_book":  ["en": "Ask about your book", "ar": "اسأل عن دفترك"],
+        "mac.ask_a_question": ["en": "Ask a question",     "ar": "اطرح سؤالًا"],
+        "mac.ask_it":        ["en": "Ask",                 "ar": "اسأل"],
+        "mac.thinking":      ["en": "Thinking…",           "ar": "يفكّر…"],
+        "mac.start_over":    ["en": "Start over",          "ar": "ابدأ من جديد"],
+        // What it is given, said before the first question rather than after a
+        // shop wonders. The payload is a SUMMARY — no customer name, address or
+        // order reference is in it — and that is worth saying plainly.
+        "mac.ask_what_it_sees": ["en": "It is given a summary of your book — totals, counts and "
+                                 + "what is outstanding. No customer names or order details "
+                                 + "leave your Mac. Try:",
+                                 "ar": "يُعطى ملخصًا لدفترك — إجماليات وأعداد وما هو مستحق. "
+                                 + "لا تغادر أسماء العملاء ولا تفاصيل الطلبات ماكك. جرّب:"],
+        // Questions the summary genuinely contains an answer to. A blank box is
+        // a test a shop can fail; these are the ones that work.
+        "mac.ask_eg_month":  ["en": "How did this month compare with last?",
+                              "ar": "كيف كان هذا الشهر مقارنةً بالماضي؟"],
+        "mac.ask_eg_owing":  ["en": "How much is still owed to me?",
+                              "ar": "كم المبلغ المستحق لي؟"],
+        "mac.ask_eg_busy":   ["en": "What is sitting in the queue right now?",
+                              "ar": "ما الذي ينتظر في الطابور الآن؟"],
+        "mac.ai_assistant_not_consented": ["en": "Switch on \"Ask about your book\" in "
+                                           + "Settings → AI assist first.",
+                                           "ar": "فعّل «اسأل عن دفترك» في الإعدادات ← مساعد الذكاء أولًا."],
         "mac.no_parts_no_price": ["en": "Add a part to give this product a price — "
                                   + "it is worked out from what the parts cost.",
                                   "ar": "أضف قطعة ليكون للمنتج سعر — يُحسب من تكلفة القطع."],

@@ -6,6 +6,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **You can ask the Mac about your own book.** *"How did this month compare with
+  last?"*, *"How much is still owed to me?"* — in the Book menu, when you have
+  switched the assistant on.
+
+  **It is given a summary, not your book**, and the screen says so before you
+  ask anything: totals, counts and what is outstanding. No customer name, email,
+  phone number, order reference or project title is in what leaves your Mac —
+  and that is a test, not a promise, because it is exactly the sentence that
+  would quietly stop being true when the summary gains a field.
+
+  The suggested questions are the ones the summary can actually answer. A blank
+  box with a cursor in it is a test a shop can fail.
+
 - **A product made from an unsliced model now has a weight, a time and a
   price.** Most of a shop's library is models nothing has sliced yet, and those
   files record no weight and no time — so the product arrived with neither,
