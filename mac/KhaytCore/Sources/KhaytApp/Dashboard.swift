@@ -272,7 +272,7 @@ private struct FloorStrip: View {
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 } else {
                     LayerProgress(progress: printing ? Double(status?.progress ?? 0) / 100 : 0,
-                                  tint: printing ? Khayt.hot : Khayt.cyan,
+                                  tint: printing ? Khayt.hot : Khayt.brand,
                                   height: 34)
                     if printing {
                         HStack(spacing: 5) {
@@ -539,7 +539,7 @@ private struct Goal: View {
                                                           : AnyShapeStyle(.secondary))
                     }
                     ProgressView(value: min(1, done / goal))
-                        .tint(done >= goal ? Khayt.done : Khayt.cyan)
+                        .tint(done >= goal ? Khayt.done : Khayt.brand)
                 }
                 .card(padding: 12)
             }
@@ -691,7 +691,7 @@ private struct NeedsAttention: View {
                 // `.borderless`, not `.link`: a link button paints itself
                 // `NSColor.linkColor` and ignores the environment tint, so
                 // every one of these came out system blue in an app whose own
-                // colour is cyan — and would have stayed blue for someone who
+                // colour is its own — and would have stayed blue for someone who
                 // had chosen a different accent in System Settings, which is
                 // the one case the tint exists to honour.
                 Button(shop.words.callIt(NeedsAttentionAction.forKind(item.kind))) { go() }
@@ -748,7 +748,7 @@ private struct Work: View {
 
     var body: some View {
         DetailSection(shop.words.callIt("mac.the_floor"),
-                      accent: leads ? Khayt.cyan : nil,
+                      accent: leads ? Khayt.brand : nil,
                       symbol: leads ? "printer.fill" : nil,
                       lead: leads) {
             // ONE CARD, RULED — not four. These four figures are one thing: the
@@ -910,7 +910,7 @@ private struct MoneyTiles: View {
     @Bindable var shop: Shop
 
     var body: some View {
-        DetailSection(shop.words.callIt("mac.money"), accent: Khayt.cyan, symbol: "banknote.fill") {
+        DetailSection(shop.words.callIt("mac.money"), accent: Khayt.brand, symbol: "banknote.fill") {
             // Which period, said next to the figures rather than assumed. An
             // owner reading "revenue" needs to know whether that is this month
             // or all time before the number means anything.
@@ -966,7 +966,7 @@ private struct MoneyTiles: View {
                     Text(shop.words.callIt("mac.revenue"))
                         .font(.system(size: 10, weight: .semibold))
                         .textCase(.uppercase).tracking(0.6)
-                        .foregroundStyle(Khayt.cyan)
+                        .foregroundStyle(Khayt.brand)
                     BigFigure(value: Money.figure(k.revenue), unit: Money.mark(shop.currency))
                     HStack(spacing: 5) {
                         Text(Money.short(k.grossProfit, shop.currency))
@@ -996,7 +996,7 @@ private struct MoneyTiles: View {
                     .font(.callout)
                     .lineLimit(1)
                 }
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
 
                 // ONE CARD, RULED. Five separate cards for five figures is
                 // five borders, five corner radii and five paddings carrying
@@ -1193,7 +1193,7 @@ private struct Takings: View {
                 VStack(spacing: 5) {
                     Spacer(minLength: 0)
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(Khayt.cyan.opacity(strength))
+                        .fill(Khayt.brand.opacity(strength))
                         .frame(height: height)
                     Text(Self.monthName(month.key))
                         .font(.caption2)

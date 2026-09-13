@@ -23,7 +23,7 @@ struct MaterialCostCard: View {
             Text(words.callIt("mac.mc_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.cyan)
+                .foregroundStyle(Khayt.brand)
 
             if let report, !report.rows.isEmpty {
                 // The one finding on the card. A shop scanning a column of

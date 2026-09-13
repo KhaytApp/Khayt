@@ -29,7 +29,7 @@ struct CapacityCard: View {
                 Text(words.callIt("dash.capacity_title"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
-                    .foregroundStyle(Khayt.cyan)
+                    .foregroundStyle(Khayt.brand)
                 Spacer()
                 if let pct = report?.totals.loadPct {
                     Text(words.callIt("dash.capacity_booked", ["pct": .number(pct.rounded())]))
@@ -117,7 +117,7 @@ struct CapacityCard: View {
                     ZStack(alignment: .leading) {
                         Capsule().fill(Khayt.recessed)
                         Capsule()
-                            .fill(over ? Khayt.late : Khayt.cyan)
+                            .fill(over ? Khayt.late : Khayt.brand)
                             .frame(width: max(0, min(1, fraction)) * geometry.size.width)
                         if over {
                             // The overflow, striped against the end of the bar

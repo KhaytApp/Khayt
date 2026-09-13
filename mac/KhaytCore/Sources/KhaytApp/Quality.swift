@@ -20,7 +20,7 @@ struct QualityCard: View {
             Text(words.callIt("mac.qc_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.cyan)
+                .foregroundStyle(Khayt.brand)
 
             if let report, let pass = report.passRate {
                 HStack(alignment: .top, spacing: 22) {

@@ -26,7 +26,7 @@ struct MachineReliabilityCard: View {
                 Text(words.callIt("mac.mr_title"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
-                    .foregroundStyle(Khayt.cyan)
+                    .foregroundStyle(Khayt.brand)
                 Spacer()
                 if let rate = report?.totals.scrapRate {
                     Text(words.callIt("mac.mr_rate",
@@ -90,7 +90,7 @@ struct MachineReliabilityCard: View {
                     // looks bad next to a good one rather than each row being
                     // drawn to its own maximum.
                     Capsule()
-                        .fill((tint ?? Khayt.cyan).opacity(0.55))
+                        .fill((tint ?? Khayt.brand).opacity(0.55))
                         .frame(width: max(2, min(1, (row.scrapRate ?? 0) / 0.2) * 70), height: 3)
                 }
             }

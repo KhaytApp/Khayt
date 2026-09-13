@@ -36,7 +36,7 @@ struct QuoteFunnelCard: View {
             Text(words.callIt("an.funnel_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.cyan)
+                .foregroundStyle(Khayt.brand)
 
             if let report, let byCount = report.totals.winRateByCount {
                 HStack(alignment: .top, spacing: 22) {
@@ -103,7 +103,7 @@ struct QuoteFunnelCard: View {
                         GeometryReader { geometry in
                             ZStack(alignment: .leading) {
                                 Capsule().fill(Khayt.recessed)
-                                Capsule().fill(Khayt.cyan.opacity(0.75))
+                                Capsule().fill(Khayt.brand.opacity(0.75))
                                     .frame(width: (Double(step.count) / top) * geometry.size.width)
                             }
                         }

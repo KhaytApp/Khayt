@@ -130,7 +130,7 @@ struct LayerLinesShape: Shape {
 /// A nozzle laying a first layer — the app's own drawing, for the screens that
 /// have nothing on them yet.
 struct CraftArt: View {
-    var tint: Color = Khayt.cyan
+    var tint: Color = Khayt.brand
     var size: CGFloat = 76
 
     var body: some View {
@@ -194,10 +194,10 @@ struct EmptyHere<Actions: View>: View {
             if let symbol {
                 Image(systemName: symbol)
                     .font(.system(size: 40, weight: .light))
-                    .foregroundStyle(Khayt.cyan.opacity(0.55))
+                    .foregroundStyle(Khayt.brand.opacity(0.55))
             } else if let mark {
                 Drawn(mark: mark, size: 44)
-                    .foregroundStyle(Khayt.cyan.opacity(0.5))
+                    .foregroundStyle(Khayt.brand.opacity(0.5))
             } else {
                 CraftArt()
             }
@@ -323,7 +323,7 @@ struct NothingMatched: View {
     var body: some View {
         let words = shop.words
         VStack(spacing: 14) {
-            // The screen's own mark, in grey rather than the cyan an ordinary
+            // The screen's own mark, in grey rather than the accent an ordinary
             // empty screen uses. Solid: see `Drawn` for the dashed variant that
             // was drawn, photographed and thrown away.
             Drawn(mark: mark, size: 44)

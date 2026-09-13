@@ -26,7 +26,7 @@ struct BreakEvenCard: View {
             Text(words.callIt("an.be_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.cyan)
+                .foregroundStyle(Khayt.brand)
 
             if let report, !report.costs.isEmpty {
                 body(for: report, words)
@@ -127,7 +127,7 @@ struct BreakEvenCard: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(Khayt.recessed)
                     Capsule()
-                        .fill(over ? Khayt.cyan : Khayt.late)
+                        .fill(over ? Khayt.brand : Khayt.late)
                         .frame(width: max(0, min(1, fraction)) * geometry.size.width)
                 }
             }

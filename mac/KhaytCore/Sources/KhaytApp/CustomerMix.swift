@@ -23,11 +23,11 @@ struct CustomerMixCard: View {
             Text(words.callIt("mac.cm_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.cyan)
+                .foregroundStyle(Khayt.brand)
 
             if let report, let share = report.fresh.shareOfRevenue {
                 HStack(alignment: .top, spacing: 22) {
-                    Side(words.callIt("mac.cm_new"), report.fresh, Khayt.cyan)
+                    Side(words.callIt("mac.cm_new"), report.fresh, Khayt.brand)
                     Side(words.callIt("mac.cm_returning"), report.returning, Khayt.done)
                     Spacer(minLength: 0)
                 }
@@ -73,7 +73,7 @@ struct CustomerMixCard: View {
         var body: some View {
             GeometryReader { geometry in
                 HStack(spacing: 2) {
-                    Capsule().fill(Khayt.cyan)
+                    Capsule().fill(Khayt.brand)
                         .frame(width: max(0, min(1, fresh)) * (geometry.size.width - 2))
                     Capsule().fill(Khayt.done)
                 }

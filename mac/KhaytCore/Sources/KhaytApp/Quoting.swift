@@ -42,7 +42,7 @@ struct Quoting: View {
                 // Hiding the first behind the second is why this screen was
                 // blank for a shop that had never measured anything.
                 QuoteFunnelCard(shop: shop, report: funnel)
-                    .card(rail: Khayt.cyan, padding: 14)
+                    .card(rail: Khayt.brand, padding: 14)
 
                 if rows.isEmpty {
                     EmptyHere(title: shop.words.callIt("mac.quoting_empty"),

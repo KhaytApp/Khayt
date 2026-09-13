@@ -36,7 +36,7 @@ struct ThroughputCard: View {
             Text(words.callIt("mac.tp_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.cyan)
+                .foregroundStyle(Khayt.brand)
 
             if let report, report.totals.jobs > 0 {
                 if let day = report.totals.busiestDay, let hour = report.totals.busiestHour {
@@ -100,7 +100,7 @@ struct ThroughputCard: View {
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(count == 0
                                       ? Khayt.recessed
-                                      : Khayt.cyan.opacity(0.25 + 0.75 * (Double(count) / peak)))
+                                      : Khayt.brand.opacity(0.25 + 0.75 * (Double(count) / peak)))
                                 .frame(height: 13)
                                 .help("\(ThroughputCard.oclock(hour)) · \(count)")
                         }

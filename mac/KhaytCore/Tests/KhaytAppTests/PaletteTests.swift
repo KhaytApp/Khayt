@@ -62,7 +62,7 @@ struct PaletteTests {
             ("a recessed strip", Khayt.recessed),
         ]
         let text: [(String, Color)] = [
-            ("cyan", Khayt.cyan), ("hot", Khayt.hot), ("done", Khayt.done),
+            ("cyan", Khayt.brand), ("hot", Khayt.hot), ("done", Khayt.done),
             ("attention", Khayt.attention), ("late", Khayt.late), ("note", Khayt.note),
         ]
 
@@ -139,7 +139,7 @@ struct PaletteTests {
     /// somebody switches appearance.
     @Test("each colour is lighter in dark appearance than in light")
     func theyActuallyAdapt() {
-        for (name, color) in [("cyan", Khayt.cyan), ("hot", Khayt.hot), ("done", Khayt.done),
+        for (name, color) in [("brand", Khayt.brand), ("hot", Khayt.hot), ("done", Khayt.done),
                               ("attention", Khayt.attention), ("late", Khayt.late),
                               ("note", Khayt.note), ("marked", Khayt.marked)] {
             let light = Self.luminance(Self.resolved(color, dark: false))
@@ -148,18 +148,75 @@ struct PaletteTests {
         }
     }
 
-    /// The cyan IS the icon's cyan, in dark appearance where it is used unaltered.
+    /// The hue of a colour, 0–360, or nil for a grey.
+    static func hue(_ color: NSColor) -> Double? {
+        guard let c = color.usingColorSpace(.sRGB) else { return nil }
+        let r = Double(c.redComponent), g = Double(c.greenComponent), b = Double(c.blueComponent)
+        let hi = max(r, g, b), lo = min(r, g, b), d = hi - lo
+        guard d > 0.001 else { return nil }
+        let h: Double
+        switch hi {
+        case r: h = 60 * (((g - b) / d).truncatingRemainder(dividingBy: 6))
+        case g: h = 60 * ((b - r) / d + 2)
+        default: h = 60 * ((r - g) / d + 4)
+        }
+        return h < 0 ? h + 360 : h
+    }
+
+    /// How far apart two hues are on the wheel, which wraps.
+    static func hueGap(_ a: Double, _ b: Double) -> Double {
+        let d = abs(a - b).truncatingRemainder(dividingBy: 360)
+        return min(d, 360 - d)
+    }
+
+    /// The accent is the icon's NAVY, and `hot` is the icon's FILAMENT.
     ///
-    /// Pinned because the whole argument for this colour is that it came from
-    /// the app's own mark rather than from taste, and a value nudged later
-    /// quietly breaks that.
-    @Test("the brand cyan is the colour of the letter in the icon")
-    func cyanMatchesTheIcon() {
-        let cyan = Self.resolved(Khayt.cyan, dark: true)
-        let icon = NSColor(hex: 0x2BCDE4)
-        #expect(abs(cyan.redComponent - icon.redComponent) < 0.005)
-        #expect(abs(cyan.greenComponent - icon.greenComponent) < 0.005)
-        #expect(abs(cyan.blueComponent - icon.blueComponent) < 0.005)
+    /// ── WHY THIS PINS A HUE AND NOT A VALUE ───────────────────────────────
+    ///
+    /// It used to pin the accent to `#2BCDE4` exactly, because the old icon's
+    /// letter was a colour a label could be read in. The new icon's are not:
+    /// the navy `#0A2A50` is a GROUND at 14.4:1 on white, and the filament
+    /// `#DF6011` is 3.61:1 — one is a hole in a sentence and the other fails
+    /// AA for body text. Pinning either value would pin something illegible.
+    ///
+    /// What actually has to hold is that the palette came from the mark rather
+    /// than from taste, and that survives a lightness change. The HUE is the
+    /// part that carries the identity, so the hue is what is pinned — and the
+    /// legibility is `contrastHolds` above, which is the other half of the
+    /// same claim.
+    @Test("the accent is the icon's navy and the heat colour is its filament")
+    func paletteCameFromTheIcon() {
+        let navy = Self.hue(NSColor(hex: 0x0A2A50))!      // the icon's ground
+        let filament = Self.hue(NSColor(hex: 0xDF6011))!  // the loop leaving the nozzle
+
+        for dark in [false, true] {
+            let where_ = dark ? "dark" : "light"
+            let brand = try! #require(Self.hue(Self.resolved(Khayt.brand, dark: dark)))
+            #expect(Self.hueGap(brand, navy) <= 6,
+                    "the accent is \(Int(brand))° and the icon's navy is \(Int(navy))°, \(where_)")
+            let hot = try! #require(Self.hue(Self.resolved(Khayt.hot, dark: dark)))
+            #expect(Self.hueGap(hot, filament) <= 8,
+                    "the heat colour is \(Int(hot))° and the icon's filament is \(Int(filament))°, \(where_)")
+        }
+    }
+
+    /// `note` must not read as a second accent.
+    ///
+    /// THE BUG THIS GUARDS. `note` was hue 206 and the accent moved to 213 —
+    /// seven degrees — so two colours that mean completely different things
+    /// became a pair nobody could tell apart. The fix was saturation, not hue,
+    /// and only a test that measures saturation will notice it being undone.
+    @Test("the informational colour does not compete with the app's own")
+    func noteIsASlate() {
+        for dark in [false, true] {
+            let note = Self.resolved(Khayt.note, dark: dark).usingColorSpace(.sRGB)!
+            let brand = Self.resolved(Khayt.brand, dark: dark).usingColorSpace(.sRGB)!
+            // Saturation is what the eye reads as "the app is talking".
+            #expect(note.saturationComponent < 0.25,
+                    "note is \(String(format: "%.2f", note.saturationComponent)) saturated, \(dark ? "dark" : "light") — that is an accent")
+            #expect(brand.saturationComponent - note.saturationComponent > 0.4,
+                    "note and the accent are too close in saturation to tell apart")
+        }
     }
 
     // MARK: - The system's accent wins

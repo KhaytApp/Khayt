@@ -48,7 +48,7 @@ struct WearGauge: View {
     @State private var shown: Double = 0
 
     private var over: Bool { pct >= 100 }
-    private var tint: Color { over ? Khayt.attention : Khayt.cyan }
+    private var tint: Color { over ? Khayt.attention : Khayt.brand }
     /// The ring's own stroke, and the radius its centreline sits on.
     private var stroke: CGFloat { size * 0.108 }
     private var radius: CGFloat { size / 2 - stroke / 2 - 1 }
@@ -170,7 +170,7 @@ struct WaterfallStep: Identifiable {
 /// ── COLOUR CARRIES ROLE, NOT DIRECTION ────────────────────────────────────
 ///
 /// Direction is already in the geometry: a bar hanging below the one before it
-/// went out. So money in is the deep step of the cyan ramp and money out the
+/// went out. So money in is the deep step of the brand ramp and money out the
 /// light one, and only the closing bar takes a status colour — `done` when the
 /// quarter made money and `late` when it did not.
 ///
@@ -184,11 +184,18 @@ struct Waterfall: View {
     let currency: String
     var height: CGFloat = 260
 
-    /// The light step of the cyan ramp — validated against this app's surface
-    /// as an ordinal ramp, and at 2.43:1 it is legal only because every bar
-    /// carries its own figure in writing.
-    private static let out = Color(nsColor: NSColor(hex: 0x63ADBC))
-    private static let inward = Khayt.cyan
+    /// The light step of the brand ramp — validated against this app's surface
+    /// as an ordinal ramp, and legal at 3.36:1 partly because every bar carries
+    /// its own figure in writing.
+    ///
+    /// Moved with the accent, and it had to: this is a fixed hex rather than a
+    /// palette entry, so it does not follow `Khayt.brand` on its own. Left at
+    /// the old cyan it would have been a ramp whose two steps were different
+    /// HUES, which is not a ramp. Same saturation and lightness as before, on
+    /// the new hue — which incidentally reads better than it did, 3.36:1
+    /// against 2.43:1, because 213° is darker than 190° at equal lightness.
+    private static let out = Color(nsColor: NSColor(hex: 0x638BBC))
+    private static let inward = Khayt.brand
 
     /// Where one bar starts and stops on the running total.
     ///

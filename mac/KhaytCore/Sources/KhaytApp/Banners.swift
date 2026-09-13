@@ -37,7 +37,7 @@ struct MoveBanners: View {
                             "total": .number(Double(p.total)),
                             "name": .string(p.name)]),
                        symbol: "gearshape.arrow.trianglehead.2.clockwise.rotate.90",
-                       tint: Khayt.cyan) {
+                       tint: Khayt.brand) {
                     // A BAR AS WELL AS THE NUMBERS. Five hundred models is
                     // minutes, and "137 of 490" has to be read and divided
                     // before it means anything; a bar is understood without
@@ -52,7 +52,7 @@ struct MoveBanners: View {
             } else {
                 Banner(text: shop.words.callIt("mac.adding_model"),
                        symbol: "gearshape.arrow.trianglehead.2.clockwise.rotate.90",
-                       tint: Khayt.cyan)
+                       tint: Khayt.brand)
             }
         }
         // A conversion: what it saved, or why it would not. Beside the slicer
@@ -67,7 +67,7 @@ struct MoveBanners: View {
         if shop.converting {
             Banner(text: shop.words.callIt("mac.converting"),
                    symbol: "gearshape.arrow.trianglehead.2.clockwise.rotate.90",
-                   tint: Khayt.cyan)
+                   tint: Khayt.brand)
         }
         // A slicer that would not open. It belongs here for the same reason a
         // refused move does: the gesture was a menu item on a model, and there

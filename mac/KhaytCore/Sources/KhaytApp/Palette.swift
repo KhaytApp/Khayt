@@ -20,11 +20,38 @@ import AppKit
 ///
 /// The app icon, and Khayt's own theme tokens. Nothing here was invented.
 ///
-/// The icon is a printed Arabic khaa on a near-black ground: the letter and the
-/// diamond above it are **cyan `#2BCDE4`**, and the one warm thing in the whole
-/// mark is the **drop of filament** leaving the nozzle. That is the identity —
-/// cyan, with amber reserved for the moment something is actually being made —
-/// and it is the identity this app should wear rather than the system's blue.
+/// The icon is a chrome nozzle extruding one thick loop of filament in the
+/// shape of an Arabic khaa: **orange `#DF6011` on navy `#0A2A50`**. Two
+/// colours, and the palette takes both — but not in the order anyone expects.
+///
+/// ── THE LOGO'S ORANGE WAS ALREADY HERE ────────────────────────────────────
+///
+/// The obvious move on a re-brand is to make the app's accent the logo's
+/// strongest colour, and it is the wrong one. Measured: the filament in the
+/// mark is hue 23°, and `hot` below — the palette's "something is being made
+/// right now" — is hue 19°. **Four degrees.** The new icon did not introduce
+/// an orange to this app; it agreed with the one already in it, and it did so
+/// for the same reason `hot` was picked in the first place. The filament IS
+/// the warm thing in both marks.
+///
+/// So making the accent orange would not have made the app look like its icon.
+/// It would have spent the one colour that means "printing" on selection,
+/// links and section rails — and `Dashboard.swift` draws the distinction on a
+/// single control, `tint: printing ? Khayt.hot : Khayt.brand`, where the two
+/// being one colour says nothing at all.
+///
+/// The accent is therefore the icon's OTHER colour, the navy ground, at hue
+/// 213 lifted to a lightness a label can be read at. That leaves every meaning
+/// in the palette distinct and puts both halves of the mark on the screen.
+///
+/// ── AND WHY `note` MOVED WITH IT ─────────────────────────────────────────
+///
+/// `note` was hue 206 — seven degrees off the new accent, and a desaturated
+/// blue beside a saturated one of the same hue is a colour nobody can name.
+/// Its saturation is dropped to a true slate instead: still the calm,
+/// unactionable thing it always was, no longer competing with the app's own
+/// colour. The hue is kept, because it is the *saturation* that made it read
+/// as an accent.
 ///
 /// The status hues are `renderer/themes/command/tokens.css` for light and
 /// `renderer/styles.css` for dark, unchanged, so "done" is the same green in
@@ -37,8 +64,8 @@ import AppKit
 /// own, because the surface is half of every one of these figures and changing
 /// it silently moved them all:
 ///
-///     done  5.35   attention 5.29   late 5.50   note 5.54   cyan 4.88   (light)
-///     done  6.31   attention 8.13   late 4.63   note 4.92   cyan 8.60   (dark)
+///     done  5.35   attention 5.29   late 5.50   note 5.32   brand 5.60  (light)
+///     done  6.31   attention 8.13   late 4.63   note 6.96   brand 5.26  (dark)
 ///
 /// The dark column is the tight one and `late` is the tightest thing in it, so
 /// **`late` on `Khayt.surface` is the number to re-check** after any change to
@@ -56,12 +83,6 @@ import AppKit
 /// answer either way.
 enum Khayt {
 ///
-/// The icon this describes was replaced: it is now orange `#E06010` on navy
-/// `#0A2A51`. The palette below deliberately did not move with it. Every
-/// ratio in `mac/README.md` was measured against the cyan, and the light
-/// variant exists because `#2BCDE4` is 1.9:1 on white — so re-accenting is
-/// a measured pass, not a substitution.
-
     /// A colour that is one thing in light appearance and another in dark.
     ///
     /// `NSColor(name:dynamicProvider:)` rather than two static colours picked by
@@ -98,18 +119,30 @@ enum Khayt {
             || appearance.name == .accessibilityHighContrastVibrantDark
     }
 
-    /// The app's own colour: the letter in the icon.
+    /// The app's own colour: the navy the icon's filament is laid on.
     ///
-    /// Darkened for light appearance — `#2BCDE4` is 1.9:1 on white, which is
-    /// fine for a large filled shape and unreadable as a label.
-    static let cyan = adaptive(light: 0x0A6E81, dark: 0x2BCDE4, name: "khaytCyan")
+    /// NOT the raw `#0A2A50`. That is a GROUND — 14.4:1 on white, which is a
+    /// fine thing to print a logo on and a hole in the middle of a sentence.
+    /// The hue is kept and the lightness lifted to where a caption can be read
+    /// on every surface this app draws: 5.60:1 at worst in light, 5.26:1 in
+    /// dark, both measured against `Khayt.recessed` and `Khayt.surface` rather
+    /// than against white.
+    ///
+    /// Named for its ROLE and not its hue, which the previous name was. An
+    /// accent called `cyan` that stops being cyan is a lie in 59 files, and
+    /// renaming it was most of what made this change reviewable.
+    static let brand = adaptive(light: 0x0B54AD, dark: 0x4591ED, name: "khaytBrand")
 
-    /// The drop of filament, and the ONE thing it is allowed to mean: something
+    /// The filament itself, and the ONE thing it is allowed to mean: something
     /// is being made right now.
     ///
     /// Not "warning" — that is `attention` below and it is a different idea. A
     /// printer mid-job is not a problem, it is the good state, and it is the
     /// one thing on any of these screens worth looking up at.
+    ///
+    /// **Unchanged by the re-brand, and that is the finding rather than an
+    /// omission.** This is hue 19°; the loop of filament in the new icon is
+    /// hue 23°. The palette had the mark's orange before the mark did.
     static let hot = adaptive(light: 0xAF3E18, dark: 0xF0763D, name: "khaytHot")
 
     /// Finished, paid, sent, agreed. `--cmd-ok` / `--success`.
@@ -123,7 +156,14 @@ enum Khayt {
     static let late = adaptive(light: 0xBB2D44, dark: 0xF2564A, name: "khaytLate")
 
     /// Worth reading, not worth acting on. `--info`.
-    static let note = adaptive(light: 0x3E5A70, dark: 0x7FA6C4, name: "khaytNote")
+    ///
+    /// A SLATE, not a blue. It was hue 206 at 29% saturation, which was a
+    /// perfectly good informational colour right up until the accent moved to
+    /// hue 213 — seven degrees away — and the two became a pair nobody could
+    /// tell apart. The hue is kept and the saturation dropped to 12–14%: the
+    /// eye reads saturation as "this is the app talking", and `note` is
+    /// precisely the colour that should not be.
+    static let note = adaptive(light: 0x4F5B69, dark: 0x9EA7B3, name: "khaytNote")
 
     /// A model the shop has starred.
     ///
@@ -155,7 +195,7 @@ enum Khayt {
     }
 
     /// The tint to apply to the whole app, or nil to leave the system's alone.
-    static var appTint: Color? { systemAccentIsChosen ? nil : cyan }
+    static var appTint: Color? { systemAccentIsChosen ? nil : brand }
 }
 
 extension NSColor {

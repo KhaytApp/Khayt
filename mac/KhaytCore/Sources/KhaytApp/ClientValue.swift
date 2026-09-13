@@ -25,7 +25,7 @@ struct ClientValueTable: View {
             Text(words.callIt("an.client_ltv"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.cyan)
+                .foregroundStyle(Khayt.brand)
 
             if let report, !report.rows.isEmpty {
                 // Stated, not inferred. And coloured only past the point where
@@ -67,7 +67,7 @@ struct ClientValueTable: View {
                             // makes a reader measure the gap between the first
                             // and the fourth; a bar has already done it.
                             Capsule()
-                                .fill(Khayt.cyan.opacity(0.55))
+                                .fill(Khayt.brand.opacity(0.55))
                                 .frame(width: max(4, (row.value / widest) * 90), height: 3)
                         }
                         Text("\(row.jobs)")
