@@ -100,7 +100,7 @@ private struct KitChip: View {
         let r = kit.rollup
         HStack(spacing: 8) {
             Image(systemName: "puzzlepiece.extension")
-                .foregroundStyle(narrowed ? AnyShapeStyle(Khayt.cyan) : AnyShapeStyle(.secondary))
+                .foregroundStyle(narrowed ? AnyShapeStyle(Khayt.brand) : AnyShapeStyle(.secondary))
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(kit.name).font(.callout.weight(.medium)).lineLimit(1)
@@ -145,11 +145,11 @@ private struct KitChip: View {
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 7)
-                .fill(narrowed ? AnyShapeStyle(Khayt.cyan.opacity(0.14)) : AnyShapeStyle(.background))
+                .fill(narrowed ? AnyShapeStyle(Khayt.brand.opacity(0.14)) : AnyShapeStyle(.background))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 7)
-                .strokeBorder(narrowed ? Khayt.cyan.opacity(0.55) : Color.secondary.opacity(0.22))
+                .strokeBorder(narrowed ? Khayt.brand.opacity(0.55) : Color.secondary.opacity(0.22))
         )
         .contentShape(RoundedRectangle(cornerRadius: 7))
         .help(kit.complete

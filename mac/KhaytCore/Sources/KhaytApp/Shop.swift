@@ -2334,12 +2334,30 @@ final class Shop {
 
     /// A kit id from the name the shop typed, salted so two kits called the
     /// same thing on two machines do not collide into one after a sync.
+    ///
+    /// ── AND IT IS `uid`, NOT A STRING BUILT HERE ──────────────────────────
+    ///
+    /// Twice now this was written inline and twice `WordsAreTranslatedTests`
+    /// refused it. That guard flags any short literal carrying an
+    /// interpolation, because that is the shape of a unit written in Swift
+    /// where the catalogue has a word for it — `"\(n) kg"` — and it cannot
+    /// tell one from an id prefix. First it caught the English fallback "kit";
+    /// with that gone it caught "KIT-" itself.
+    ///
+    /// The guard is not wrong either time, and the answer was already in this
+    /// file: every other id in the app comes from `uid(_:)`, which takes the
+    /// prefix as an ARGUMENT so no literal ever sits next to an interpolation.
+    /// A kit id is an id like any other and had no business being special.
+    ///
+    /// The slug is still worth having — `KIT-dragon-…` is readable in a store
+    /// somebody is debugging — and is dropped when the name leaves nothing,
+    /// which is most Arabic names, since it keeps only ASCII.
     private static func mintKitId(_ name: String) -> String {
         let slug = name.lowercased()
-            .map { $0.isLetter || $0.isNumber ? $0 : "-" }
+            .map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "-" }
             .reduce(into: "") { $0.append($1) }
         let trimmed = slug.split(separator: "-").prefix(4).joined(separator: "-")
-        return "KIT-\(trimmed.isEmpty ? "kit" : trimmed)-\(UUID().uuidString.prefix(8).lowercased())"
+        return trimmed.isEmpty ? uid("KIT") : uid("KIT-" + trimmed)
     }
 
     private static func kitName(_ value: JSONValue) -> String? {
