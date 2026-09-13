@@ -259,6 +259,30 @@ public struct JobMove: Decodable, Sendable {
     public let cosmetic: [String]?
     public let outbound: [String]?
     public let unhandled: [String]?
+    /// The outbound effects that are WEBHOOKS, with their arguments.
+    ///
+    /// `outbound` above is type names only, which is enough to refuse a move
+    /// and not enough to send one: two webhook effects on the same move differ
+    /// only in their `event`. So they come back whole.
+    public let webhookEffects: [WebhookEffect]?
+}
+
+/// One webhook a move asked for.
+///
+/// `kind` is the effect type — `webhook` is the subscription bus, whose events
+/// are named `status_changed`; `order_webhook` is the single configured URL,
+/// whose events are named `status`. They are two different systems with two
+/// different event vocabularies, and a shop can have both.
+public struct WebhookEffect: Decodable, Sendable {
+    public let kind: String
+    public let event: String
+    public let newStatus: String?
+
+    public init(kind: String, event: String, newStatus: String?) {
+        self.kind = kind
+        self.event = event
+        self.newStatus = newStatus
+    }
 }
 
 /// An order after money was recorded against it, and what that asked for.

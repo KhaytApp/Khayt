@@ -73,6 +73,7 @@ const KhaytDuet = require('./lib/duet');
 const KhaytRepetier = require('./lib/repetier');
 const printerCommands = require('./lib/printer-commands');
 const excludeObject = require('./lib/exclude-object');
+const webhookBus = require('./lib/webhook-bus');
 const { normalizeStoreSnapshot, STORE_VERSION } = require('./lib/store-validate');
 const upgradeBackup = require('./lib/upgrade-backup');
 const { createStoreIo, MAX_STORE_BYTES } = require('./lib/store-io');
@@ -5706,7 +5707,7 @@ ipcMain.handle('hub:fire-webhook', async (event, { url, event: webhookEvent, pay
     return { ok: false, error: 'Blocked URL — hostname resolves to a private/loopback address' };
   }
   try {
-    const body = JSON.stringify({ event: webhookEvent, payload, timestamp: Date.now() });
+    const body = JSON.stringify(webhookBus.buildWireBody(webhookEvent, payload));
     const headers = { 'Content-Type': 'application/json', 'X-Khayt-Event': webhookEvent };
     if (secret) headers['X-Khayt-Signature'] = require('crypto')
       .createHmac('sha256', secret).update(body).digest('hex');

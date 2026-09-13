@@ -17,6 +17,49 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   If the answer is unusable, your own median is what comes back — it was worked
   out on your Mac before anything was sent, so a refusal is not a failure.
 
+- **Finishing a job on the Mac now tells the systems you have connected.** A
+  shop with webhooks configured could not move a job on the Mac at all: the app
+  refused the move rather than make it with a piece missing. It sends them now,
+  so that refusal is gone — and both webhook systems are covered, the
+  subscription list and the single order webhook, because a shop can have both
+  and Khayt sends to both.
+
+  The message goes out **after** the job is saved and only if it was, and a
+  delivery that fails is said out loud rather than swallowed — the whole point
+  of refusing these moves before was that a piece of the move would silently not
+  happen.
+
+- **(Maintainers) The webhook payload and its envelope are shared rules now.**
+  Two apps sign the same bytes, so the field names, their ORDER, and the
+  `{ event, payload, timestamp }` envelope `main.js` has posted since webhooks
+  shipped are all in `lib/webhook-bus.js` and used from both sides. A literal in
+  one app would have meant deliveries that verify from Khayt and fail from the
+  Mac, which is the kind of drift a shop only discovers through a consumer that
+  stopped trusting it.
+
+  The signature is the bare hex, not `sha256=<hex>`. `main.js` has two webhook
+  transports that disagree about this, and the bare one is what every delivery
+  actually goes through — so it is the spelling consumers verify.
+
+- **(Maintainers) The Mac can send a webhook, with both layers of the guard.**
+  The transport, the HMAC signature and the retry policy.
+
+  The URL is typed by the shop, so the guard is the feature. Two layers, and
+  neither is enough alone: the **name** is checked against the shared ranges —
+  loopback, RFC1918, link-local, cloud metadata, and the spellings that hide
+  them (`[::1]`, `::ffff:127.0.0.1` in both forms, `2130706433`) — and then the
+  host is **resolved** and every answer is put through the same rule, because a
+  perfectly public name can have an A record pointing at `10.0.0.1`. Redirects
+  are not followed: a consumer answering `302` to a metadata endpoint would walk
+  straight past both.
+
+- **(Maintainers) The host ranges are a shared module now.** They were the top
+  of `lib/host-guard.js`, which cannot be shared — it requires Node's `dns` for
+  its second layer. `lib/host-ranges.js` holds the pure range checks and
+  `host-guard` re-exports them, so there is exactly one copy of rules that are
+  almost entirely made of holes somebody already found. Its 19 existing tests
+  pass unchanged through the re-export.
+
 - **The Mac can draft a message to a customer.** On a job with a customer on it:
   pick what the message is about — a status update, ready for pickup, a quote
   follow-up, a payment reminder, an apology for a delay, or your own note — and

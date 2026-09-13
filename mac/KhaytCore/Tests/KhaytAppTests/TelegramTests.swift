@@ -33,7 +33,8 @@ struct TelegramTests {
     ]
 
     static func move(_ root: inout [String: JSONValue], _ stage: Stage)
-    async throws -> (undo: [Shop.ChangedRecord], notices: [String], telegram: TelegramMessage?) {
+    async throws -> (undo: [Shop.ChangedRecord], notices: [String], telegram: TelegramMessage?,
+                     webhooks: [KhaytEngine.WebhookDelivery]) {
         let engine = try KhaytEngine()
         let words = Words()
         await words.load("en", engine: engine)
@@ -107,24 +108,55 @@ struct TelegramTests {
         }
     }
 
-    @Test("a move that would ALSO reach a webhook is still refused whole")
-    func stillRefused() async throws {
-        var telegram = Self.configured
+    @Test("a move that reaches a bot AND a webhook sends both")
+    func bothChannels() async throws {
+        let telegram = Self.configured
         var root = Self.book(telegram)
-        // A shop with webhooks on as well: this app cannot deliver those, and a
-        // move made with a piece missing is worse than a move refused.
+        // A shop with both switched on. This used to be refused whole — the app
+        // could send the message but not the webhook, and half a move is worse
+        // than none. It can send both now, so it does.
         root["settings"] = .object([
             "currency": .string("SAR"),
             "telegram": .object(telegram),
             "webhooks": .object(["enabled": .bool(true),
-                                 "subscriptions": .array([.object(["id": .string("W1"),
-                                                                   "url": .string("https://example.test/hook"),
-                                                                   "events": .array([.string("*")])])])]),
+                                 "subscriptions": .array([.object([
+                                    "id": .string("W1"),
+                                    "url": .string("https://example.test/hook"),
+                                    "events": .array([.string("status_changed")]),
+                                    "enabled": .bool(true)])])]),
         ])
-        telegram["notifyOnComplete"] = .bool(true)
+        let out = try await Self.move(&root, .completed)
+        #expect(out.telegram != nil, "the bot would be told nothing")
+        #expect(out.webhooks.map(\.url) == ["https://example.test/hook"],
+                Comment(rawValue: "the consumer would be told nothing: \(out.webhooks.map(\.url))"))
+    }
+
+    /// And a channel this app still cannot reach refuses the whole move.
+    @Test("a move that would ALSO email the customer is still refused whole")
+    func stillRefused() async throws {
+        let telegram = Self.configured
+        var root = Self.book(telegram)
+        root["clients"] = .array([.object(["id": .string("A"), "name": .string("Acme"),
+                                           "email": .string("buyer@example.test")])])
+        root["printLog"] = .array((Self.rowsOf(root, "printLog")).map { row in
+            guard case .object(var job) = row else { return row }
+            job["clientId"] = .string("A")
+            return .object(job)
+        })
+        root["settings"] = .object([
+            "currency": .string("SAR"),
+            "telegram": .object(telegram),
+            "emailConfig": .object(["provider": .string("resend"),
+                                    "triggers": .array([.string("completed")])]),
+        ])
         await #expect(throws: Shop.MoveRefused.self) {
             _ = try await Self.move(&root, .completed)
         }
+    }
+
+    static func rowsOf(_ root: [String: JSONValue], _ collection: String) -> [JSONValue] {
+        if case .array(let r)? = root[collection] { return r }
+        return []
     }
 
     // MARK: - The two checks spelled out in Swift

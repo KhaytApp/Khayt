@@ -362,9 +362,9 @@ function StatusRules() {
    Call exactly once per completion. surveyToken generation is idempotent; the
    webhooks are NOT, so call this once per completion path only. */
 function fireOrderCompletionEvents(order) {
-  fireWebhook('status_changed', { orderId: order.id, project: order.project, newStatus: 'completed', client: order.client });
+  fireStatusWebhook('status_changed', order, 'completed');
   fireOrderWebhook('status', order);
-  fireWebhook('order_delivered', { orderId: order.id, project: order.project, client: order.client });
+  fireStatusWebhook('order_delivered', order);
   if (!order.surveyToken) {
     ensureSurveyToken(order);
     saveAll();
@@ -459,9 +459,7 @@ function runStatusEffects(order, effects, { prevTier, undo, toastText } = {}) {
       case 'email': autoSendEmailNotification(order, e.status); break;
       case 'telegram': sendTelegramForOrder(order, e.status); break;
       case 'webhook':
-        fireWebhook(e.event, e.event === 'order_delivered'
-          ? { orderId: order.id, project: order.project, client: order.client }
-          : { orderId: order.id, project: order.project, newStatus: e.newStatus, client: order.client });
+        fireStatusWebhook(e.event, order, e.newStatus);
         break;
       case 'order_webhook': fireOrderWebhook(e.event, order); break;
       case 'ensure_survey_token': ensureSurveyToken(order); saveAll(); break;
