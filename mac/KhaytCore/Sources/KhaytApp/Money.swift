@@ -123,7 +123,18 @@ enum Money {
     /// slicer wrote into a 3MF.
     /// `figure` is for money and always shows two decimals, which turned a
     /// 180g failure into "180.00 grams".
-    static func grams(_ n: Double) -> String {
+    static func grams(_ n: Double) -> String { quantity(n) }
+
+    /// A figure a shop reads as a QUANTITY rather than as money: hours,
+    /// grams, a percentage. Whole where it is whole, and a half when there is
+    /// one.
+    ///
+    /// Separate from `figure` for the reason that comment gives — two forced
+    /// decimals turned a 180 g failure into "180.00 grams" — and named for the
+    /// kind of number rather than for grams, because hours and percentages
+    /// want exactly the same treatment and a second copy of this formatter is
+    /// a second chance to get the locale wrong.
+    static func quantity(_ n: Double) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
         f.locale = digits
