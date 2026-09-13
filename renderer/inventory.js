@@ -3103,21 +3103,24 @@ async function deleteProduct(productId) {
 /* ----- Product editor modal ----- */
 // Default pricing for a catalog product: sum the calculator's per-part cost, apply the
 // product's margin. Shared by the editor's live summary and its save (stored as basePrice).
+/* Through `lib/product-pricing.js`, which is where this arithmetic now lives.
+ *
+ * It was here, and that was fine while one app had a product editor. The Mac
+ * grew one and the hole showed at once: a product written down there saved at
+ * 0.00 with no hours and no grams, because nothing on that side summed its
+ * parts. A product's price is COMPUTED, and two apps computing it separately is
+ * two prices for one product — with the one the customer sees decided by
+ * whichever app saved last.
+ *
+ * The context is passed explicitly now. `computePartBaseCost` falls back to
+ * `global.inventory` and `global.settings`, which exist HERE and in no other
+ * host, so the omission was invisible from this side. */
 function productDefaultPricing(d) {
-  const partsCost = (d.parts || []).reduce((s, p) =>
-    s + (typeof computePartBaseCost === 'function' ? computePartBaseCost(p) : (+p.baseCost || 0)), 0);
-  // BOM: fold non-printed components into the assembly's unit cost.
-  const compCost = (typeof computeComponentsCost === 'function')
-    ? computeComponentsCost(d.components, typeof consumables !== 'undefined' ? consumables : []) : 0;
-  const cost = partsCost + compCost;
-  const margin = Math.max(0, num(d.defaultMargin, 30));
-  const basePrice = +(cost * (1 + margin / 100)).toFixed(2);
-  /* `basePrice` stays exactly what it has always been — cost plus margin — and
-   * `price` is what the shop charges. Keeping both is the point: a shop that can
-   * only see its rounded price cannot tell a healthy margin from a rounding
-   * accident. */
-  const fp = KhaytProductPrice.finalPrice(d, basePrice);
-  return { cost: +cost.toFixed(2), basePrice, price: fp.final, priceSource: fp.source };
+  return KhaytProductPricing.priceProduct(d, {
+    inventory: typeof inventory !== 'undefined' ? inventory : [],
+    settings: typeof settings !== 'undefined' ? settings : {},
+    consumables: typeof consumables !== 'undefined' ? consumables : [],
+  });
 }
 
 /* ── GROUPS AND CATEGORIES, shared with the print-file library ──────────────

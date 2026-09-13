@@ -281,7 +281,10 @@ async function aiSuggestPrice() {
   if (typeof KhaytAiPrice === 'undefined') { toast(t('common.feature_missing'), 'error'); return; }
   const fsel = $('#filamentSelect');
   const material = fsel?.options?.[fsel.selectedIndex]?.text || '';
-  const comps = KhaytAiPrice.buildComparables(printLog, { material, now: Date.now() });
+  // `settings` so the comparables are net of tax. Without it an inclusive-VAT
+  // shop is shown the margin on money it never kept, and this screen exists to
+  // recommend a margin from exactly these numbers.
+  const comps = KhaytAiPrice.buildComparables(printLog, { material, settings, now: Date.now() });
   if (!comps.count) { toast(t('ai.price_no_history') || 'Not enough priced history yet', 'error'); return; }
 
   // Current job cost + specs (mirrors updateGrandTotal).
