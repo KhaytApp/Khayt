@@ -1118,6 +1118,239 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.8] - 2026-09-13
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Changed
+
+- **Take a job from something you already make.** A product in the catalogue now
+  has *New Job from This*: its parts, its components, its margin and its name,
+  filled in — and then it is an ordinary job sheet, because a customer who wants
+  two in a different colour is still ordering the product.
+
+  The job **names the product**, which is what the catalogue counts to say a
+  thing has been made 14 times and earned 6,300. A job typed out by hand that
+  happens to match is not counted, and nothing on that screen says so.
+
+  Its **components come with it** — the magnets, the screws, the box. A job
+  without them is under-priced by exactly their cost, every time it is sold.
+
+- **Pricing tiers can be added on the Mac, and picked where they are used.**
+  A product can carry named margins — Retail 45%, Wholesale 20% — and they are
+  offered as chips beside the margin on the job sheet. A margin and not a price,
+  so a tier stays right when filament gets dearer.
+
+- **Documents can be attached to a product here.** Assembly instructions, a
+  safety sheet, a drawing. A copy is taken, so your own file can be moved or
+  renamed afterwards. Each one says whether it goes in the customer's box or
+  stays on the floor's copy — and they are listed **on the job**, which is where
+  somebody stands when they are about to make the thing.
+
+- **Ask what to charge, beside the figure you already have.** The job sheet
+  already shows what you usually make on work like this. *Ask what to charge*
+  now sends those comparables — and only those — to be weighed, so an outlier
+  or a thin sample can be argued about in a sentence rather than averaged away.
+
+  **The reason is always shown.** A margin that changed with no sentence beside
+  it is a number you cannot argue with when a customer does.
+
+  If the answer is unusable, your own median is what comes back — it was worked
+  out on your Mac before anything was sent, so a refusal is not a failure.
+
+- **Finishing a job on the Mac now tells the systems you have connected.** A
+  shop with webhooks configured could not move a job on the Mac at all: the app
+  refused the move rather than make it with a piece missing. It sends them now,
+  so that refusal is gone — and both webhook systems are covered, the
+  subscription list and the single order webhook, because a shop can have both
+  and Khayt sends to both.
+
+  The message goes out **after** the job is saved and only if it was, and a
+  delivery that fails is said out loud rather than swallowed — the whole point
+  of refusing these moves before was that a piece of the move would silently not
+  happen.
+
+- **(Maintainers) The webhook payload and its envelope are shared rules now.**
+  Two apps sign the same bytes, so the field names, their ORDER, and the
+  `{ event, payload, timestamp }` envelope `main.js` has posted since webhooks
+  shipped are all in `lib/webhook-bus.js` and used from both sides. A literal in
+  one app would have meant deliveries that verify from Khayt and fail from the
+  Mac, which is the kind of drift a shop only discovers through a consumer that
+  stopped trusting it.
+
+  The signature is the bare hex, not `sha256=<hex>`. `main.js` has two webhook
+  transports that disagree about this, and the bare one is what every delivery
+  actually goes through — so it is the spelling consumers verify.
+
+- **(Maintainers) The Mac can send a webhook, with both layers of the guard.**
+  The transport, the HMAC signature and the retry policy.
+
+  The URL is typed by the shop, so the guard is the feature. Two layers, and
+  neither is enough alone: the **name** is checked against the shared ranges —
+  loopback, RFC1918, link-local, cloud metadata, and the spellings that hide
+  them (`[::1]`, `::ffff:127.0.0.1` in both forms, `2130706433`) — and then the
+  host is **resolved** and every answer is put through the same rule, because a
+  perfectly public name can have an A record pointing at `10.0.0.1`. Redirects
+  are not followed: a consumer answering `302` to a metadata endpoint would walk
+  straight past both.
+
+- **(Maintainers) The host ranges are a shared module now.** They were the top
+  of `lib/host-guard.js`, which cannot be shared — it requires Node's `dns` for
+  its second layer. `lib/host-ranges.js` holds the pure range checks and
+  `host-guard` re-exports them, so there is exactly one copy of rules that are
+  almost entirely made of holes somebody already found. Its 19 existing tests
+  pass unchanged through the re-export.
+
+- **The Mac can draft a message to a customer.** On a job with a customer on it:
+  pick what the message is about — a status update, ready for pickup, a quote
+  follow-up, a payment reminder, an apology for a delay, or your own note — and
+  it writes one.
+
+  **It drafts. It does not send.** The message comes back in a box you can edit,
+  with Copy under it, and you send it through whatever you actually use. A
+  message written about somebody's order, in your shop's name, is not something
+  to put on the wire before a person has read it.
+
+  This is the one feature that sends another person's data, and what travels is
+  exactly what the settings screen says: the customer's name, the order
+  reference, project, status and due date, and the amount and outstanding
+  balance. Their email address, phone number and address are on the same record
+  and are **not** passed — which is a test, because handing the whole record
+  over is the obvious way to write this and the disclosure would quietly stop
+  being true.
+
+- **You can ask the Mac about your own book.** *"How did this month compare with
+  last?"*, *"How much is still owed to me?"* — in the Book menu, when you have
+  switched the assistant on.
+
+  **It is given a summary, not your book**, and the screen says so before you
+  ask anything: totals, counts and what is outstanding. No customer name, email,
+  phone number, order reference or project title is in what leaves your Mac —
+  and that is a test, not a promise, because it is exactly the sentence that
+  would quietly stop being true when the summary gains a field.
+
+  The suggested questions are the ones the summary can actually answer. A blank
+  box with a cursor in it is a test a shop can fail.
+
+- **A product made from an unsliced model now has a weight, a time and a
+  price.** Most of a shop's library is models nothing has sliced yet, and those
+  files record no weight and no time — so the product arrived with neither,
+  which meant no cost and therefore no price at all.
+
+  Khayt measures the mesh and prices it at the rate your own finished jobs
+  actually ran at. Where the file cannot answer, the geometry does.
+
+  **It says the figures are estimates**, and says it two different ways: one
+  sentence when the rate came from your own measured jobs and names how many,
+  another when there are none yet and it is an assumption. An estimate that
+  looks typed is the same mistake as a zero that looks typed.
+- **Comparable margins are net of tax — which changes a figure Khayt has been
+  showing.** AI price assist recommends a margin from what a shop has actually
+  realized, and it computed those margins against the **gross** price. For an
+  inclusive-VAT shop — Saudi, the Gulf, most of Europe — part of every price was
+  the tax authority's and was never revenue, so every comparable overstated.
+
+  A Riyadh shop at 15% was shown a median of **56.5% where it had made 50.0%**,
+  and pricing to the number it was shown leaves it thinner than it thinks by
+  exactly that much. An unregistered shop's figures do not move: its price is
+  its revenue.
+
+  *(This shipped in the previous release under a product-pricing change, which
+  did not describe it. It moves a number a shop may have priced against, so it
+  is written down here.)*
+
+- **The Mac shows what you usually make, before you pick a margin.** On the new
+  job sheet: *"You usually make 34% on PETG — median of 6 finished jobs."*,
+  with one click to use it.
+
+  **No AI is involved and none is needed.** It is arithmetic over your own
+  finished jobs, so it works with the assistant switched off, with no key, and
+  with nothing sent anywhere. Net of tax, for the reason above.
+
+- **(Maintainers) What still needs the other app is a test, not a claim.**
+  `NeedsTheOtherAppTests` holds the list, and it is closed: a screen that sends
+  a shop to Khayt without a declared entry fails the suite, an entry for
+  something already working fails it too, and the count is a ratchet. Three
+  times this session a screen was found telling a shop to go elsewhere for
+  something the Mac had done for weeks — each true when written.
+
+- **A product made from a model recorded its quantity in a field nothing
+  reads.** *Make a product from this* wrote `quantity` where every consumer
+  reads `qty` — the calculator's per-part cost, the packaging split, the price
+  tiers, and the specs a catalogue row shows. So the real field was absent and a
+  junk one sat beside it.
+
+  Benign only by accident: the arithmetic falls back to one where `qty` is
+  missing, and the value written was always one. It would have stopped being
+  benign the moment anything wrote a different number. Found in a real shop's
+  book. The test that covered this path asserted `quantity` — it agreed with the
+  code rather than with the rule, which is why nothing caught it.
+
+- **A product added on the Mac now has a price.** It did not. The sheet could
+  not hold the product's *parts*, and a product's price is made entirely of
+  them — so one written down here saved at 0.00 with no hours and no grams, and
+  had to be finished in the other app before it could be sold.
+
+  Parts are on the sheet now: name, spool, grams, hours, quantity. The cost, the
+  price and the totals appear as you build it, so a margin typed above is no
+  longer a number chosen blind. A part with no spool chosen says that it costs
+  nothing and that saving will price the product at zero — which is what the
+  other app does silently.
+
+- **(Maintainers) Pricing a product is one rule both apps call.** It was
+  `productDefaultPricing` inside `renderer/inventory.js`, which was fine while
+  one app had a product editor. Lifted to `lib/product-pricing.js` and proved
+  identical to the function it replaced on every shape tried.
+
+  It also carries a bug the renderer could not see: `computePartBaseCost` falls
+  back to `global.inventory` and `global.settings`, which exist in the renderer
+  and in no other host. The resin branch is chosen by looking a part's filament
+  up in that shelf, and the two branches are different formulas — so a resin
+  part priced without one takes the filament formula. The context is passed
+  explicitly now.
+
+- **Three empty screens told you to go to the other app for things this one
+  does.** "Print files added in Khayt appear here", and the same for printers
+  and spools — all three stopped being true when the Mac learnt to import
+  models, find printers on the network, and look a filament up from the
+  catalogue.
+
+- **The Mac's AI settings say, per feature, where each one actually runs.** The
+  screen offers a provider and a switch per feature, with what each one sends
+  written beside it — and the Mac bundles the half that decides *whether* a
+  feature may run, not all of the features themselves. So a shop could switch on "Draft a customer
+  reply", read exactly what it transmits, save, and find nothing on the Mac ever
+  drafts a reply.
+
+  The screen still earns its place: the book syncs, so a shop running both apps
+  had no way to see — let alone refuse — what the other one sends, and the
+  consent it records is real and shop-wide. But a switch that does nothing where
+  you switched it has to say so.
+- **The Mac can draft a quote from a description.** Say what the job is — "20
+  cable clips, black PETG" — and the grams, the hours, the quantity and the
+  spool fill themselves in. It was the other app's feature; the Mac had the
+  consent screen for it and no way to run it.
+
+  **It fills the form. Your calculator still sets the price.** The draft lands
+  in the same fields you type into, nothing reaches the cart until you press
+  Add, and the figure comes from your own rates exactly as it does for a part
+  typed by hand. What it assumed is listed under the box, always — a drafted
+  part is a guess with numbers in it, and the assumptions are the only way to
+  tell a good one from a confident one. A material you do not stock is said,
+  not quietly swapped for one you do.
+
+  Nothing is sent unless you switched that feature on, and the check is made
+  where the data would leave rather than on the screen that offered the switch.
+
+- **(Maintainers) A drafted part's print time was in MINUTES, in a field that
+  means hours.** `draftToPart` passed the model's `printTimeMin` straight into
+  `printTime` — which the calculator, the store, the invoice and both editors
+  all read as hours. It was not visibly wrong only because the single call site
+  remembered to divide by 60. The Mac was about to be a second caller, and one
+  that did not know would have quoted a ninety-minute print as ninety hours.
+  The module converts now and the call site does not.
+
 ## [4.0.0-alpha.7] - 2026-09-13
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
