@@ -192,9 +192,11 @@ function renderIntegrationsSettings() {
 
   const cloud = settings.cloud || {};
   const cloudReady = !!(cloud.enabled && cloud.url && cloud.shopId);
-  const cloudBase = String(cloud.url || '').replace(/\/+$/, '');
-  const importUrl = (pid) => `${cloudBase}/v1/shops/${cloud.shopId}/import/${pid}`;
-  const feedUrl = (pid) => `${cloudBase}/v1/shops/${cloud.shopId}/feed/${pid}`;
+  // Through the registry, so the Mac's directory and this one cannot disagree
+  // about a cloud route — a URL that differs by a slash is a webhook the store
+  // reports as delivered and the cloud never sees.
+  const importUrl = (pid) => KhaytIntegrations.importUrl(cloud.url, cloud.shopId, pid);
+  const feedUrl = (pid) => KhaytIntegrations.feedUrl(cloud.url, cloud.shopId, pid);
   const pill = (label) => `<span style="font-size:10px;color:var(--text-muted);border:1px solid var(--border-soft);border-radius:999px;padding:1px 7px;">${escapeHtml(label)}</span>`;
   const linkBtn = (url, label) => `<button class="btn small ghost integCopy" type="button" data-url="${escapeHtml(url)}">${escapeHtml(label)}</button>`;
   const codeBtn = (label) => `<button class="btn small ghost integCode" type="button">${escapeHtml(label)}</button>`;

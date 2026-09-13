@@ -1271,6 +1271,11 @@ final class Words {
         // "Slicer integration" — a fine heading for a page in a scrolling
         // settings screen, and too long for a macOS tab, which it widened by
         // half. The heading inside the pane still uses Khayt's wording.
+        // The directory itself is `integ.*` in the SHARED locale — every one of
+        // those keys already ships in both languages, so the pane reads the
+        // same words the Electron page does. Only this app's own tab name is
+        // here, because the other app's settings navigation is not a tab list.
+        "mac.nav_integrations": ["en": "Integrations", "ar": "التكاملات"],
         "mac.nav_slicers":   ["en": "Slicers", "ar": "برامج التقطيع"],
         "mac.no_slicers":    ["en": "No slicer set up yet. Khayt can look for the ones you already have.",
                               "ar": "لم يُضبط أي برنامج شرائح بعد. يستطيع خيط البحث عمّا لديك."],

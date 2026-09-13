@@ -41,6 +41,33 @@ struct BundledLogicIsNotAForkTests {
         }
     }
 
+    /// A module's source with template-literal TEXT removed and its `${…}`
+    /// interpolations kept — the part JavaScriptCore actually evaluates.
+    static func runnable(_ source: String) -> String {
+        var out = ""
+        var rest = source[...]
+        while let open = rest.firstIndex(of: "`") {
+            out += rest[..<open]
+            var i = rest.index(after: open)
+            var template = ""
+            while i < rest.endIndex, rest[i] != "`" {
+                if rest[i] == "\\", rest.index(after: i) < rest.endIndex {
+                    i = rest.index(i, offsetBy: 2)
+                    continue
+                }
+                template.append(rest[i])
+                i = rest.index(after: i)
+            }
+            // Only the interpolations, which are evaluated; the rest is text
+            // this module is writing out for something else to run.
+            for part in template.matches(of: #/\$\{[\s\S]*?\}/#) {
+                out += " " + part.output.description
+            }
+            rest = i < rest.endIndex ? rest[rest.index(after: i)...] : rest[rest.endIndex...]
+        }
+        return out + rest
+    }
+
     @Test("a bundled module cannot need Node")
     func bundledModulesArePure() throws {
         // These run in JavaScriptCore, which has no `require`, no `fs`, no
@@ -55,9 +82,36 @@ struct BundledLogicIsNotAForkTests {
             // prose — "hang the main process." — and the guard read them as
             // Node dependencies. It has been blind to line comments since it
             // was written; nothing had tripped it before.
-            let stripped = source
-                .replacing(#/\/\*[\s\S]*?\*\//#, with: "")
-                .replacing(#/(^|[^:])\/\/[^\n]*/#, with: "$1")
+            //
+            // ── AND CODE A MODULE WRITES IS NOT CODE IT RUNS ──────────────
+            //
+            // `medusa-subscriber.js` EMITS TypeScript for the shop's own Medusa
+            // project, and that file reads `process.env.MEDUSA_ADMIN_URL` — in
+            // Node, on the shop's server, where `process` exists. Read flat,
+            // the module "contains process." and this refused to bundle it.
+            //
+            // So the TEXT inside a template literal is dropped and its `${…}`
+            // interpolations are kept: those are the only part of a template
+            // this runtime evaluates. A module genuinely reaching for
+            // `process.env` inside one is still caught — checked by putting it
+            // there and watching this fail, not assumed.
+            //
+            // The same narrowing is in `test/mac-core-is-not-a-fork.test.js`,
+            // which is the Node half of this guard. Both, because a guard that
+            // exists twice and agrees in only one place is worse than one that
+            // exists once.
+            // ORDER MATTERS, AND GETTING IT WRONG LOOKS LIKE THE FEATURE
+            // WORKING. Block comments first — they hold most of the backticks
+            // in this repo, as prose. Then TEMPLATES, then line comments: the
+            // emitted subscriber opens with `` `// ${SUBSCRIBER_PATH} `` and a
+            // line-comment stripper run first eats that and leaves an
+            // unterminated backtick, so the template scanner then swallows the
+            // wrong half of the file. That was the first version of this, and
+            // it failed loudly rather than quietly, which is the only reason it
+            // took minutes instead of a release.
+            let stripped = Self.runnable(
+                source.replacing(#/\/\*[\s\S]*?\*\//#, with: "")
+            ).replacing(#/(^|[^:])\/\/[^\n]*/#, with: "$1")
             #expect(!stripped.contains("require('fs')"), "\(module).js now requires fs")
             #expect(!stripped.contains("require('path')"), "\(module).js now requires path")
             #expect(!stripped.contains("require('crypto')"), "\(module).js now requires crypto")

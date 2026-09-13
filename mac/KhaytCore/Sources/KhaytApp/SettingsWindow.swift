@@ -4,11 +4,11 @@ import KhaytCore
 
 /// The panes of the Settings window, in the order Khayt's own page has them.
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case business, invoice, payments, operations, slicers, assistant, preferences
+    case business, invoice, payments, operations, integrations, slicers, assistant, preferences
     var id: String { rawValue }
 }
 
-/// The shop's own settings — ⌘, — in six panes.
+/// The shop's own settings — ⌘, — in eight panes.
 ///
 /// Each pane is its own draft with its own Save. A pane saves ONLY the keys it
 /// shows, and `lib/settings-edit.js` keeps everything else as it finds it: the
@@ -36,6 +36,9 @@ struct SettingsWindow: View {
             OperationsPane(shop: shop)
                 .tabItem { Label(shop.words.callIt("set.nav_ops"), systemImage: "gearshape.2") }
                 .tag(SettingsPane.operations)
+            IntegrationsPane(shop: shop)
+                .tabItem { Label(shop.words.callIt("mac.nav_integrations"), systemImage: "shippingbox") }
+                .tag(SettingsPane.integrations)
             SlicersPane(shop: shop)
                 .tabItem { Label(shop.words.callIt("mac.nav_slicers"), systemImage: "cube.transparent") }
                 .tag(SettingsPane.slicers)

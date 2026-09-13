@@ -129,9 +129,31 @@ test('nothing the Mac app bundles needs Node', () => {
   // JavaScriptCore has no `require`, no `fs`, no `process`. A module that grew
   // one of those in lib/ would load here and throw at its first call — from
   // inside a screen, with no clue why.
+  //
+  // ── CODE THIS MODULE RUNS, NOT CODE IT WRITES ───────────────────────────
+  //
+  // `medusa-subscriber.js` EMITS TypeScript for the shop's own Medusa project,
+  // and that file reads `process.env.MEDUSA_ADMIN_URL` — in Node, on the shop's
+  // server, where `process` exists. Read as a flat string the module contains
+  // "process.", and this refused to bundle it.
+  //
+  // So the text INSIDE a template literal is dropped and its `${…}`
+  // interpolations are kept. Those are the only part of a template that this
+  // runtime evaluates, so a module genuinely reaching for `process.env` in one
+  // is still caught — which was checked by putting it there and watching this
+  // fail, rather than assumed.
+  const runnable = (src) => src.replace(/`(?:[^`\\]|\\.)*`/g, (t) =>
+    (t.match(/\$\{[\s\S]*?\}/g) || []).join(' '));
   for (const m of declaredModules()) {
-    const src = fs.readFileSync(path.join(ROOT, 'lib', `${m}.js`), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    // ORDER MATTERS. Block comments first — they hold most of the backticks in
+    // this repo, as prose. Then TEMPLATES, then line comments: the emitted
+    // subscriber opens with `` `// ${SUBSCRIBER_PATH} ``, and stripping line
+    // comments first eats that and leaves an unterminated backtick, so the
+    // template scanner swallows the wrong half of the file.
+    const src = runnable(
+      fs.readFileSync(path.join(ROOT, 'lib', `${m}.js`), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, ''),
+    ).replace(/(^|[^:])\/\/.*$/gm, '$1');
     for (const forbidden of ["require('fs')", "require('path')", "require('crypto')", 'process.']) {
       assert.ok(!src.includes(forbidden),
         `lib/${m}.js now uses ${forbidden}, which does not exist in JavaScriptCore — `
