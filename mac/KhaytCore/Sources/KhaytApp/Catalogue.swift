@@ -123,7 +123,11 @@ struct Catalogue: View {
     private var table: some View {
         Table(shop.shownProducts.sorted(using: order), selection: $selection,
               sortOrder: $order, columnCustomization: $columns) {
-            TableColumn(shop.words.callIt("cat.title"), value: \.name) { row in
+            // `pe.name`. This column holds a product's name; `cat.title` is
+            // what the whole screen is called, and "Product Catalog" as the
+            // heading over a column of product names reads as a mistake
+            // because it is one.
+            TableColumn(shop.words.callIt("pe.name"), value: \.name) { row in
                 VStack(alignment: .leading, spacing: 1) {
                     // A product with no name in any language reads as blank in
                     // Khayt too; saying so beats a row that looks lost.

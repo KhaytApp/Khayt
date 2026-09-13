@@ -66,7 +66,13 @@ struct ProductSheet: View {
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
-                    Text(shop.words.callIt("cat.title")).gridColumnAlignment(.trailing)
+                    // `pe.name`, not `cat.title`. The latter is the SCREEN's
+                    // name — "Product Catalog" — and it was the label on the
+                    // field where a shop types the product's name. Correct in
+                    // the sidebar, where it names the screen, and nonsense
+                    // here. Found by photographing this sheet, which nothing in
+                    // the harness had ever done.
+                    Text(shop.words.callIt("pe.name")).gridColumnAlignment(.trailing)
                         .foregroundStyle(.secondary)
                     TextField("", text: name(language)).textFieldStyle(.roundedBorder)
                         .focused($focused)

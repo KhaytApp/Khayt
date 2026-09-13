@@ -156,18 +156,30 @@ private struct PictureCard: View {
     let makePrimary: () -> Void
     let remove: () -> Void
 
+    /// ── SIZED TO THE LONGEST WORD, NOT TO THE PICTURE ─────────────────────
+    ///
+    /// The card was 84pt, which is a fine size for a thumbnail and too narrow
+    /// for the label underneath it: "Actual print" — the one kind that earns
+    /// this whole feature — rendered as "Actual pri…". A menu whose most
+    /// important entry is the one that does not fit is worse than no menu.
+    ///
+    /// So the picture follows the WORD. 118pt holds every kind in both
+    /// languages ("Actual print", "طباعة فعلية"), and one width for every card
+    /// keeps the strip a row rather than a staircase.
+    static let cardWidth: CGFloat = 118
+
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             ZStack(alignment: .topLeading) {
                 if let image = Self.decode(picture.thumbnail) {
                     Image(nsImage: image)
                         .resizable().aspectRatio(contentMode: .fill)
-                        .frame(width: 84, height: 64)
+                        .frame(width: Self.cardWidth, height: 70)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 } else {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(.quaternary)
-                        .frame(width: 84, height: 64)
+                        .frame(width: Self.cardWidth, height: 70)
                         .overlay(Image(systemName: "photo").foregroundStyle(.tertiary))
                 }
                 if isPrimary {
@@ -195,7 +207,7 @@ private struct PictureCard: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .controlSize(.small)
-            .frame(width: 90)
+            .frame(width: Self.cardWidth)
             .help(kinds.first { $0.key == kind }?.hint ?? "")
         }
         .contextMenu {

@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **A product's name field was labelled "Product Catalog".** `cat.title` is what
+  the whole SCREEN is called — right in the sidebar, nonsense as the label on
+  the field where a shop types a product's name, and as the heading over the
+  catalogue's column of product names. Both now use `pe.name`, the key the
+  Electron editor uses.
+
+  Found by photographing the product sheet, which nothing in the screenshot
+  harness had ever done — it has been editable on the Mac for months and did not
+  appear in one of the fifty-one pictures. It does now, against a product that
+  actually has pictures, because an empty strip is the half that was never the
+  question.
+
 - **A product can have more than one picture on the Mac, and each says what it
   is.** The catalogue held one: a shop selling a printed part chose between a
   render, a photo of the real thing, a scale shot and a detail of the finish.
