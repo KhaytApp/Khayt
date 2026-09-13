@@ -220,6 +220,10 @@ struct WordsAreTranslatedTests {
         #"\(base)En"#, #"\(base)Ar"#,                       // store field names
         #" on \($0)"#,                                       // the lock's English sentence
         #"\(rawValue) Key"#,                                 // a Keychain item's name
+        // Mailgun's HTTP Basic username is the literal string `api`. It goes
+        // into an Authorization header, is never rendered, and translating it
+        // would break authentication rather than help anybody read it.
+        #"api:\(apiKey)"#,
         #"\(url.lastPathComponent).tmp.\(ProcessInfo.processInfo.processIdentifier).\(UUID().uuidString)"#,
     ]
 

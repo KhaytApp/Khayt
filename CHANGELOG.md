@@ -6,6 +6,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The Mac can email the customer, so it stops refusing the move.** A job
+  whose next stage tells the customer by email could not be moved on the Mac at
+  all: the app refuses a move it cannot carry out whole — rightly, because a
+  half-made move leaves somebody untold while the book says otherwise — and it
+  had no way to send one. It sends through **SendGrid and Mailgun** now, and
+  the message is not a second app's idea of one: the subject, the body and the
+  decision to send at all are the rule `lib/order-email.js`, which the other
+  app now asks as well. The key is opened where it is used and never held.
+
+  A shop on its **own mail server** is still sent to the other app, and that is
+  written down rather than discovered: `custom` is SMTP — a socket, EHLO,
+  STARTTLS, a dialogue — and a second implementation of a protocol is how two
+  apps come to disagree about whether a customer was told. The refusal names
+  it now ("an email through your own mail server (SMTP)") instead of saying
+  email is missing, because those are different things to a shop deciding what
+  to change.
+
 - **Take a job from something you already make.** A product in the catalogue now
   has *New Job from This*: its parts, its components, its margin and its name,
   filled in — and then it is an ordinary job sheet, because a customer who wants
@@ -890,6 +907,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **No email has left Khayt since 31 August, and nothing said so.** Three
+  functions — the status notification to a customer, *Email* on an order or
+  quote, and the printer-alert digest — each open with
+  `const shopName = shopName() || 'Khayt';`. `shopName` is also a global
+  function, so the `const` shadows it and the line reads the binding before it
+  exists: `ReferenceError`, thrown before anything is addressed, every time
+  since it appeared in #822. Nobody awaited those calls, so each became an
+  unhandled rejection — no toast, no error, no email. A shop that finished a
+  job watched it move and had no reason to think the customer had not been
+  told. The local is renamed in all three; a test now fails on any `const` or
+  `let` in `renderer/` that shadows the function it calls.
+
+- **An unconfigured mail provider built and addressed an email nobody could
+  send.** With `emailConfig.provider` set to the empty string — never
+  configured, or cleared — the renderer refused only the literal `'none'`, so
+  it assembled the whole message and handed it to a transport that matches no
+  provider, which returned a `mailto:` fallback the caller ignores. Meanwhile
+  `outboundFor`, which decides whether a move reaches outside the shop, said
+  the opposite. Both halves now ask one rule, and the answer is the true one:
+  nothing is delivered, so nothing is built.
 
 - **Khayt said "Anthropic" on five screens whatever provider you had chosen.**
   Left behind when providers became selectable. The worst of them was on the

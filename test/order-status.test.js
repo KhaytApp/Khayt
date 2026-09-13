@@ -21,6 +21,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 require('../lib/assembly.js');
+// Loaded BEFORE order-status, the way a host loads it: `outboundFor` asks this
+// module whether a move emails the customer, and throws rather than guessing
+// when it is absent. A test that did not load it would be testing a host that
+// cannot move a job at all.
+require('../lib/order-email.js');
 const S = require('../lib/order-status.js');
 
 const NOW_MS = Date.parse('2026-09-04T09:15:00.000Z');
@@ -629,6 +634,7 @@ test('the outbound conditions still match the renderer they were copied from', (
   const integrations = read('renderer/integrations.js');
   const extras = read('renderer/operations-extras.js');
   const telegram = read('lib/telegram-message.js');
+  const email = read('lib/order-email.js');
 
   const pinned = [
     ['fireWebhook', integrations, "const wh = settings.webhooks;\n  if (!wh?.enabled) return;"],
@@ -641,8 +647,16 @@ test('the outbound conditions still match the renderer they were copied from', (
       "if (newStatus === 'completed' && tg.notifyOnComplete) {"],
     ['telegram hold', telegram,
       "} else if (newStatus === 'on_hold' && tg.notifyOnHold) {"],
-    ['autoSendEmailNotification', integrations,
-      "const cfg = settings.emailConfig;\n  if (!cfg || cfg.provider === 'none' || !(cfg.triggers || []).includes(newStatus)) return;"],
+    // The email guards moved into lib/order-email.js when the Mac app learned
+    // to send one — the same move the Telegram guards made above — so they are
+    // pinned THERE, and pinned by RUNNING the rule beside outboundFor in
+    // test/order-email.test.js rather than by reading its text. What is pinned
+    // here is that the renderer still asks the module instead of opening with
+    // its own copy of the conditions again.
+    ['autoSendEmailNotification asks the module', integrations,
+      "const mail = KhaytOrderEmail.messageFor(order, newStatus, {"],
+    ['order-email owns the guard', email,
+      "if (!provider || provider === 'none') return none;"],
     ['republishPortalIfPublished', integrations,
       "if (!order || !order.cloudPublished) return;"],
     ['republishPortalIfPublished cloud', integrations,

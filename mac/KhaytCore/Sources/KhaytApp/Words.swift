@@ -400,7 +400,11 @@ final class Words {
         "mac.reach_webhooks":      ["en": "a webhook",        "ar": "إشعار ويب"],
         "mac.reach_event_webhook": ["en": "an order webhook", "ar": "إشعار ويب للطلب"],
         "mac.reach_telegram":      ["en": "a Telegram message", "ar": "رسالة تيليجرام"],
-        "mac.reach_email":         ["en": "an email to the customer", "ar": "بريداً للعميل"],
+        // Only a shop on SMTP is refused for email now: SendGrid and Mailgun
+        // are sent from here. Naming the provider is the difference between a
+        // shop that knows what to change and one that thinks email is missing.
+        "mac.reach_email":         ["en": "an email through your own mail server (SMTP)",
+                                    "ar": "بريداً عبر خادم بريدك (SMTP)"],
         "mac.reach_portal":        ["en": "the customer's tracking link", "ar": "رابط متابعة العميل"],
         "mac.and":           ["en": "and",            "ar": "و"],
         // The menu bar's own titles, said before any book is open
@@ -1096,6 +1100,10 @@ final class Words {
         "mac.telegram_sent":   ["en": "Telegram message sent.", "ar": "أُرسلت رسالة تيليجرام."],
         "mac.telegram_failed": ["en": "The job was saved, but the Telegram message did not go out:",
                                 "ar": "حُفظ العمل، لكن لم تُرسل رسالة تيليجرام:"],
+        "mac.email_sent":      ["en": "The customer was emailed.",
+                                "ar": "أُرسل بريد إلى العميل."],
+        "mac.email_failed":    ["en": "The job was saved, but the customer's email did not go out:",
+                                "ar": "حُفظ العمل، لكن لم يُرسل بريد العميل:"],
         "mac.webhooks_sent":   ["en": "Told {n} other system(s).",
                                 "ar": "أُبلغ {n} نظام آخر."],
         "mac.webhook_failed":  ["en": "The job was saved, but {where} was not told:",

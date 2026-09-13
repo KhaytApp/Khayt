@@ -109,7 +109,8 @@ struct MoveJobTests {
     /// The same move, with everything it hands back.
     static func moveFully(_ root: inout [String: JSONValue], _ id: String, _ stage: Stage)
     async throws -> (undo: [Shop.ChangedRecord], notices: [String],
-                     telegram: TelegramMessage?, webhooks: [KhaytEngine.WebhookDelivery]) {
+                     telegram: TelegramMessage?, webhooks: [KhaytEngine.WebhookDelivery],
+                     email: OrderEmail?) {
         let engine = try KhaytEngine()
         let words = Words()
         await words.load("en", engine: engine)
@@ -261,7 +262,7 @@ struct MoveJobTests {
                 ])]),
             ]),
         ])
-        let (_, _, _, owed) = try await Self.moveFully(&root, "J1", .completed)
+        let (_, _, _, owed, _) = try await Self.moveFully(&root, "J1", .completed)
         #expect(Self.string(Self.row(root, "printLog", "J1")?["status"]) == "completed",
                 "the move was refused for a channel this app can reach")
         #expect(owed.map(\.url) == ["https://example.test/hook"],
