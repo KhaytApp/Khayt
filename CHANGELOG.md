@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **A product made from a model recorded its quantity in a field nothing
+  reads.** *Make a product from this* wrote `quantity` where every consumer
+  reads `qty` — the calculator's per-part cost, the packaging split, the price
+  tiers, and the specs a catalogue row shows. So the real field was absent and a
+  junk one sat beside it.
+
+  Benign only by accident: the arithmetic falls back to one where `qty` is
+  missing, and the value written was always one. It would have stopped being
+  benign the moment anything wrote a different number. Found in a real shop's
+  book. The test that covered this path asserted `quantity` — it agreed with the
+  code rather than with the rule, which is why nothing caught it.
+
 - **A product added on the Mac now has a price.** It did not. The sheet could
   not hold the product's *parts*, and a product's price is made entirely of
   them — so one written down here saved at 0.00 with no hours and no grams, and

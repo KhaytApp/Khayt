@@ -509,7 +509,22 @@ extension SampleShopTests {
         #expect(part["printFileId"] == JSONValue.string(file.id),
                 "the part is not joined to the model — only a filename would be left")
         #expect(part["name"] == JSONValue.string(file.title))
-        #expect(part["quantity"] == JSONValue.number(1))
+
+        // ── `qty`, AND THIS TEST USED TO PIN THE BUG ──────────────────────
+        //
+        // It asserted `quantity`, which is what the code wrote and what NOTHING
+        // reads: the calculator's per-part cost, the packaging split, the price
+        // tiers and the catalogue's specs all read `qty`. So the product was
+        // written with a field no consumer looks at and the real one absent,
+        // and the test agreed with the code instead of with the rule.
+        //
+        // It was benign only by accident — `Math.max(1, +part.qty || 1)` falls
+        // back to one and the value written was always one. Found in a real
+        // shop's book, on a product made from the library.
+        #expect(part["qty"] == JSONValue.number(1),
+                "the part's quantity is in a field the calculator does not read")
+        #expect(part["quantity"] == nil,
+                "a field nothing reads was written beside the one that matters")
         // And a filename too, because the other app reads that field.
         if case .string(let ref)? = part["fileRef"] { #expect(!ref.isEmpty) }
     }

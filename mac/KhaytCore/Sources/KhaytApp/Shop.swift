@@ -1556,7 +1556,15 @@ final class Shop {
         // The part's name is the model's, which is what a shop would have
         // typed. Everything else on it came from the file.
         part["name"] = .string(file.title)
-        part["quantity"] = .number(1)
+        // `qty`, NOT `quantity`. Every consumer reads `qty` — the calculator's
+        // per-part cost, the packaging split, the price tiers, the specs the
+        // catalogue row shows — so `quantity` is a field nothing reads, with
+        // the real one absent beside it.
+        //
+        // Benign only by accident: `Math.max(1, +part.qty || 1)` falls back to
+        // one, and the value written here was always one. It would have stopped
+        // being benign the moment anything wrote a different number.
+        part["qty"] = .number(1)
 
         var product = newProduct()
         // The model's name in every language the catalogue carries — the same
