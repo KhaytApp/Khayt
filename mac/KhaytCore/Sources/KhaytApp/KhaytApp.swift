@@ -822,6 +822,26 @@ final class Activator: NSObject, NSApplicationDelegate {
             shop.editingCustomer = nil
             await settle()
 
+            // THE PRODUCT SHEET WAS PHOTOGRAPHED BY NOTHING.
+            //
+            // It has been editable on this app for months and no shot in this
+            // harness contained it, so its picture strip — a horizontal row of
+            // cards, which is exactly the shape that breaks when the window is
+            // mirrored — could have been drawn wrong in Arabic for a whole
+            // release with every screenshot looking fine.
+            //
+            // An EXISTING product rather than a new one: a new one has no
+            // pictures, and the empty strip is the half that was never the
+            // question.
+            if let id = shop.catalogueRows.first?.id,
+               let product = await shop.productForEditing(id) {
+                shop.editingProduct = product
+                await settle()
+                captureSheet(named: "30-edit-product", into: dir)
+                shop.editingProduct = nil
+                await settle()
+            }
+
             // The document itself. It is built by the runtime and drawn by
             // WebKit AFTER the sheet appears, so it gets longer than a settle:
             // photographed too early this is a spinner, which is exactly what

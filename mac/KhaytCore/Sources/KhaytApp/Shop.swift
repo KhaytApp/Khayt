@@ -1576,7 +1576,32 @@ final class Shop {
     }
 
     /// Write it down. Follows `saveCustomer` exactly, including the undo.
-    func saveProduct(_ product: Product) async {
+    /// A product's pictures, read the way the shared rule reads them.
+    ///
+    /// Never by pulling `images` off the record: a product can carry the legacy
+    /// `imagePath`/`thumbnail` pair, the array, or BOTH — an older build
+    /// editing a record a newer one saved writes the legacy fields and leaves
+    /// the array behind — and deciding which wins is exactly the migration
+    /// `lib/product-images.js` exists to own.
+    func pictures(of productId: String) async -> [StagedPicture] {
+        guard let engine,
+              let row = productRows.first(where: { Self.recordId($0) == productId }),
+              let read = try? await engine.productPictures(of: row) else { return [] }
+        return read.images.map {
+            StagedPicture(id: $0.id, kind: $0.kind, caption: $0.caption,
+                          thumbnail: $0.thumbnail, path: $0.path, bytes: nil)
+        }
+    }
+
+    /// Save a product, and its pictures.
+    ///
+    /// `pictures` is nil for a caller that is not editing them at all, which is
+    /// not the same as an empty array — that means "this product now has none"
+    /// and is how the last picture is removed. The two were one value in the
+    /// first draft and a product with its last photo deleted came back with the
+    /// photo still on it.
+    func saveProduct(_ product: Product, pictures: [StagedPicture]? = nil,
+                     unlinking removed: [String] = []) async {
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -1586,11 +1611,68 @@ final class Shop {
         }
         let keys = await allLanguageKeys()
 
+        // ── THE BYTES GO DOWN BEFORE THE RECORD DOES ──────────────────────
+        //
+        // A record naming a file that was never written is a broken picture on
+        // every screen that draws the catalogue. A file written for a record
+        // that was never saved is a few unreferenced kilobytes nobody sees. So
+        // if one of the two has to fail, it is this one, first, where the
+        // failure can still be reported instead of shipped.
+        var staged = pictures
+        if staged != nil {
+            for i in staged!.indices {
+                guard let bytes = staged![i].bytes else { continue }
+                do {
+                    staged![i].path = try ProductPhotos.write(
+                        bytes, productId: product.id, imageId: staged![i].id, in: build)
+                    staged![i].bytes = nil
+                } catch {
+                    moveProblem = String(describing: error)
+                    return
+                }
+            }
+        }
+
+        // The picture fields, settled BEFORE the write opens.
+        //
+        // `StoreWriter.update` takes a synchronous closure and the shared rule
+        // lives behind an actor, so the mirroring cannot happen inside it. That
+        // is the right way round anyway: this is a pure transformation of a
+        // record, and doing it here keeps the write itself to the one thing a
+        // write should be.
+        var pictureFields: [String: JSONValue] = [:]
+        if let staged {
+            var draft: [String: JSONValue] = [
+                "id": .string(product.id),
+                // Written even when the array is EMPTY, so removing the last
+                // picture actually removes it. `normalise` treats an empty
+                // array beside a set `imagePath` as an unmigrated product and
+                // rebuilds the array from it — which would resurrect the
+                // picture just deleted — so the legacy fields are cleared here
+                // in the same breath.
+                "images": .array(staged.map { $0.record() }),
+                "imagePath": .string(staged.first?.path ?? ""),
+                "thumbnail": .string(staged.first?.thumbnail ?? ""),
+            ]
+            // And then the shared rule has the last word on all three, because
+            // `imagePath` and `thumbnail` are what the storefront, the portal
+            // and label printing still read, and a Swift copy of that mirroring
+            // is a second thing to get out of step.
+            if let engine, case .object(let applied)? =
+                try? await engine.applyProductPictures(.object(draft)) {
+                draft = applied
+            }
+            for key in ["images", "imagePath", "thumbnail"] {
+                pictureFields[key] = draft[key] ?? .string("")
+            }
+        }
+
         var undo: [ChangedRecord] = []
         do {
             try StoreWriter.update(build) { root in
                 var rows = Self.rows(root, "products")
                 var record = product.record(keys: keys)
+                for (key, value) in pictureFields { record[key] = value }
                 if let at = rows.firstIndex(where: { Self.recordId($0) == product.id }) {
                     guard case .object(let was) = rows[at] else { return }
                     undo.append(ChangedRecord(collection: "products", id: product.id, was: was))
@@ -1608,6 +1690,12 @@ final class Shop {
                 root["products"] = .array(rows)
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("mac.edit_product")) }
+            // ONLY NOW. A file unlinked before the record is written is a file
+            // the shop cannot get back if the write fails — and one unlinked
+            // when the sheet was cancelled is one it never asked to lose.
+            for path in removed where !path.isEmpty {
+                ProductPhotos.delete(path, in: build)
+            }
             editingProduct = nil
             await load(source)
         } catch {

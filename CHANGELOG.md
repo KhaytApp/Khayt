@@ -6,6 +6,56 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) The palette knows what ink goes on a filled brand shape.**
+  Every colour in it is measured against the surfaces the app draws on — card,
+  ground, recessed — and none of those is a filled brand shape, so a badge
+  painted in the app's own colour with white text on it was measured by nothing
+  at all. White reads 7.28:1 on the light fill and **3.22:1** on the dark one,
+  under what AA asks of text. The fill lightens for dark appearance so it stands
+  out from a dark ground, which means its ink has to darken — the opposite
+  direction from every other colour in the file, and not something a call site
+  typing `.white` can be expected to work out. `Khayt.onBrand` now, with a test
+  that measures the pair.
+
+- **A product's name field was labelled "Product Catalog".** `cat.title` is what
+  the whole SCREEN is called — right in the sidebar, nonsense as the label on
+  the field where a shop types a product's name, and as the heading over the
+  catalogue's column of product names. Both now use `pe.name`, the key the
+  Electron editor uses.
+
+  Found by photographing the product sheet, which nothing in the screenshot
+  harness had ever done — it has been editable on the Mac for months and did not
+  appear in one of the fifty-one pictures. It does now, against a product that
+  actually has pictures, because an empty strip is the half that was never the
+  question.
+
+- **A product can have more than one picture on the Mac, and each says what it
+  is.** The catalogue held one: a shop selling a printed part chose between a
+  render, a photo of the real thing, a scale shot and a detail of the finish.
+  The product sheet now carries a strip — add several at once, drag the order
+  that matters, and label each one.
+
+  The label is the point rather than the count. A customer looking at a listing
+  is asking a question the pictures rarely answer — *is that a render, or is
+  that what arrives?* — and guessing wrong is a refund. The first picture is the
+  one the catalogue, the storefront and the invoice use, which the sheet now
+  says in words instead of leaving it to be inferred from a row of thumbnails.
+
+  Nothing touches the pictures folder until Save. A picture picked and then
+  cancelled leaves no file behind, and one removed and then cancelled is still
+  there.
+
+- **(Maintainers) Product picture filenames now match Khayt's exactly.** Both
+  apps write into one folder beside one book, and the name is built by replacing
+  everything outside `[A-Za-z0-9_-]`. A JavaScript regex does that per UTF-16
+  code unit and Swift was doing it per character, which is a different string
+  for anything outside the basic plane: a product called `Café` or `Part 🔥` got
+  one filename from Khayt and another from the Mac, each recording a path the
+  other could not open. Caught by checking against `main.js`'s own output rather
+  than against a Swift copy of its regex — the first version of that test
+  compared the implementation with a duplicate of itself and passed while both
+  were wrong.
+
 - **The Mac app wears the new icon's colours.** Khayt's accent was the cyan of
   the icon before last, and the app had been sitting beside its own orange-on-
   navy mark looking like a different product. It is now the mark's navy, at the

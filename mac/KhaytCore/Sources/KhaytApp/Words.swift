@@ -163,6 +163,25 @@ final class Words {
     /// replaces every occurrence of each. Matched here rather than approximated,
     /// because a string that comes back still saying `{days}` is worse than one
     /// that says nothing.
+    /// A word, or something sensible when neither locale has the key.
+    ///
+    /// ── `callIt(k)` DOES NOT FALL BACK, AND LOOKS LIKE IT DOES ────────────
+    ///
+    /// A missing key comes back as the KEY — "pe.kind_render" on screen, in a
+    /// menu, in front of a customer. So the idiomatic-looking
+    /// `callIt(k) != "" ? callIt(k) : mine` is always the first branch and
+    /// never falls back, which is the same shape as the renderer's
+    /// `t('k') || 'Fallback'` bug.
+    ///
+    /// It matters here because some words come from `lib/`. The picture kinds
+    /// carry their own English labels, and a shop running a locale that has not
+    /// been given `pe.kind_*` should read "Actual print" rather than the key
+    /// that would have produced it.
+    func callIt(_ key: String, fallback: String) -> String {
+        let said = callIt(key)
+        return said == key ? fallback : said
+    }
+
     func callIt(_ key: String, _ params: [String: JSONValue]) -> String {
         var out = callIt(key)
         for (name, value) in params {
@@ -1550,10 +1569,29 @@ final class Words {
         "mac.product_need_name": ["en": "A product needs a name in at least one language.",
                                   "ar": "يحتاج المنتج إلى اسم بلغة واحدة على الأقل."],
         // Said on the sheet, because the alternative is a shop assuming the
-        // parts and the photo were dropped when it saved.
-        "mac.product_kept":  ["en": "Parts, prices per quantity, photos and documents "
+        // parts were dropped when it saved. PHOTOS CAME OFF THIS LIST when the
+        // sheet learnt to edit them — a sentence promising to leave something
+        // alone, on a screen that now changes it, is worse than no sentence.
+        "mac.product_kept":  ["en": "Parts, prices per quantity and documents "
                               + "stay as they are — edit those in Khayt.",
-                              "ar": "تبقى القطع وأسعار الكميات والصور والمستندات كما هي — عدّلها في خيط."],
+                              "ar": "تبقى القطع وأسعار الكميات والمستندات كما هي — عدّلها في خيط."],
+        // ── A PRODUCT'S PICTURES ──────────────────────────────────────────
+        //
+        // The kind labels themselves are NOT here: `pe.kind_render` and its
+        // siblings are in the shared locale, so the word a shop reads beside a
+        // photo is the same in both apps and in all nine languages. Only what
+        // this sheet says around them is new.
+        "mac.pictures":      ["en": "Pictures",        "ar": "الصور"],
+        "mac.add_picture":   ["en": "Add Pictures…",   "ar": "إضافة صور…"],
+        "mac.no_pictures":   ["en": "No pictures yet", "ar": "لا صور بعد"],
+        "mac.make_main":     ["en": "Use as the main picture", "ar": "اجعلها الصورة الرئيسية"],
+        "mac.remove_picture": ["en": "Remove Picture", "ar": "إزالة الصورة"],
+        // What the first picture IS, which is the thing a shop cannot guess
+        // from a strip of thumbnails.
+        "mac.main_picture_is": ["en": "The first picture is the one the catalogue, "
+                                + "the storefront and the invoice use.",
+                                "ar": "الصورة الأولى هي التي يستخدمها الكتالوج والمتجر والفاتورة."],
+        "mac.picture_caption": ["en": "Caption", "ar": "تعليق"],
         "mac.delete_product": ["en": "Delete product", "ar": "حذف المنتج"],
         // The document a customer is handed
         "mac.save_pdf":      ["en": "Save PDF",     "ar": "حفظ PDF"],

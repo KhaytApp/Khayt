@@ -133,6 +133,27 @@ enum Khayt {
     /// renaming it was most of what made this change reviewable.
     static let brand = adaptive(light: 0x0B54AD, dark: 0x4591ED, name: "khaytBrand")
 
+    /// The ink that goes ON a `brand` fill.
+    ///
+    /// ── WHY THIS IS NOT JUST `.white` ─────────────────────────────────────
+    ///
+    /// Because `.white` is wrong half the time, and measurably so. `brand` is
+    /// two colours: `#0B54AD` in light appearance, where white reads at 7.28:1,
+    /// and `#4591ED` in dark — where white is **3.22:1**, under the 4.5 AA asks
+    /// of text. The badge that found this is 9pt, so the small-text bar is the
+    /// one that applies.
+    ///
+    /// The fill lightens for dark appearance because it has to be visible
+    /// against a dark ground; its ink therefore has to DARKEN, which is the
+    /// opposite direction from everything else in this file. Black on
+    /// `#4591ED` is 6.53:1.
+    ///
+    /// Declared here rather than written at the call site because there is no
+    /// way to look at `.foregroundStyle(.white)` and see that it fails in one
+    /// appearance — and `PaletteTests.inkOnFillsIsLegible` measures this pair
+    /// the way `contrastHolds` measures the rest.
+    static let onBrand = adaptive(light: 0xFFFFFF, dark: 0x0B1622, name: "khaytOnBrand")
+
     /// The filament itself, and the ONE thing it is allowed to mean: something
     /// is being made right now.
     ///

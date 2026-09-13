@@ -132,6 +132,18 @@ public actor KhaytEngine {
         // and "saudi kings" as two groups, each holding part of one collection,
         // is precisely the mess this module exists to prevent.
         "organise",
+        // A product's pictures — more than one, and each saying what it IS.
+        //
+        // The catalogue held `imagePath` and `thumbnail`: one file and one data
+        // URI, so a shop selling a printed part had a single slot for a render,
+        // a photo of the real thing, a scale shot and a detail of the finish,
+        // and had to choose. Bundled rather than ported because the reading is
+        // not the hard part — the MIGRATION is. A product can arrive in three
+        // states at once (legacy fields, the array, or both because an older
+        // build edited it after a newer one saved it), and "the array wins
+        // except when it is empty" is a rule that must be identical in both
+        // apps or a picture resurrects itself after being deleted.
+        "product-images",
         // Not business logic — the one list of which store fields hold
         // credentials. Bundling it is what stops the Mac app from becoming a
         // sixth hand-maintained copy; SafeStorage encrypts exactly these.
@@ -6014,6 +6026,129 @@ public actor KhaytEngine {
         try runtime.call("KhaytPrintKits", "emptyKitIds",
                          [JSONValue.array(orders), JSONValue.array(defs)],
                          as: [String].self)
+    }
+
+    // MARK: - A product's pictures
+
+    /// What a picture IS, which is the question this whole feature turns on.
+    ///
+    /// A customer looking at a listing is asking something the pictures rarely
+    /// answer: is that a render, or is that what arrives? Guessing wrong is a
+    /// refund. The labels come from the shared rule rather than a Swift enum,
+    /// so adding a kind is one edit in `lib/` and not two that can disagree.
+    public struct ProductImageKind: Decodable, Sendable, Identifiable {
+        public let key: String
+        public let label: String
+        public let hint: String
+        public var id: String { key }
+    }
+
+    /// One picture on a product.
+    public struct ProductImage: Decodable, Sendable, Identifiable {
+        public let id: String
+        /// The file on disk, relative to the `products` folder beside the book.
+        public let path: String
+        /// A small data URI, which is what the grid draws.
+        public let thumbnail: String
+        public let kind: String
+        public let caption: String
+    }
+
+    /// A product's pictures, and the legacy fields kept as a VIEW of the first.
+    ///
+    /// `imagePath` and `thumbnail` are still written because everything else
+    /// reads them — the storefront catalogue, the published portal, label
+    /// printing — and renaming the field everywhere at once would be a far
+    /// larger and riskier change. They mirror `images[0]`; they are not a
+    /// second source of truth.
+    public struct ProductPictures: Decodable, Sendable {
+        public let images: [ProductImage]
+        public let imagePath: String
+        public let thumbnail: String
+    }
+
+    public func productImageKinds() throws -> [ProductImageKind] {
+        try runtime.call2("KhaytProductImages.KINDS", [], as: [ProductImageKind].self)
+    }
+
+    /// Read a product's pictures, whatever shape the record arrived in.
+    ///
+    /// This is the MIGRATION, and it is the reason the module is bundled rather
+    /// than rewritten: a product can carry legacy fields, the array, or both,
+    /// and "the array wins except when it is empty" has to mean the same thing
+    /// in both apps.
+    public func productPictures(of product: JSONValue) throws -> ProductPictures {
+        try runtime.call("KhaytProductImages", "normalise", [product], as: ProductPictures.self)
+    }
+
+    /// The product record with its pictures normalised, for writing back.
+    public func applyProductPictures(_ product: JSONValue) throws -> JSONValue {
+        try runtime.call("KhaytProductImages", "apply", [product], as: JSONValue.self)
+    }
+
+    /// Move a picture to the front. The first is what the grid, the storefront
+    /// and the invoice use, so the order is a decision the shop makes rather
+    /// than an accident of upload order.
+    public func makeProductImagePrimary(_ product: JSONValue, id: String) throws -> JSONValue {
+        try runtime.call2("KhaytProductImages.makePrimary(ARG0, ARG1)",
+                          [product, .string(id)], as: JSONValue.self)
+    }
+
+    /// Take a picture off a product, and say which file is now unreferenced.
+    ///
+    /// The removed record comes back so the caller can unlink the file — and
+    /// the caller must do that only AFTER the save, because cancelling the
+    /// sheet has to leave every picture where it was.
+    public struct ProductImageRemoval: Decodable, Sendable {
+        public let product: JSONValue
+        public let removed: ProductImage?
+    }
+
+    public func removeProductImage(_ product: JSONValue, id: String) throws -> ProductImageRemoval {
+        // `remove` mutates its argument and returns the removed record, which
+        // is two results and one return value. Both are carried back rather
+        // than calling twice — a second call would operate on a product that
+        // had already lost the picture.
+        try runtime.call2("""
+            (function (p, id) {
+              var gone = KhaytProductImages.remove(p, id);
+              return { product: p, removed: gone };
+            })(ARG0, ARG1)
+            """, [product, .string(id)], as: ProductImageRemoval.self)
+    }
+
+    /// Say what a picture is. An unknown kind is REFUSED rather than stored,
+    /// and the refusal reaches Swift as `changed: false` rather than silently
+    /// leaving the record as it was.
+    public struct ProductImageKindChange: Decodable, Sendable {
+        public let product: JSONValue
+        public let changed: Bool
+    }
+
+    public func setProductImageKind(_ product: JSONValue, id: String,
+                                    kind: String) throws -> ProductImageKindChange {
+        try runtime.call2("""
+            (function (p, id, k) {
+              var ok = KhaytProductImages.setKind(p, id, k);
+              return { product: p, changed: !!ok };
+            })(ARG0, ARG1, ARG2)
+            """, [product, .string(id), .string(kind)], as: ProductImageKindChange.self)
+    }
+
+    /// Does this listing show the real thing?
+    ///
+    /// The question a customer is actually asking, and one a shop should be
+    /// able to answer at a glance across a whole catalogue.
+    public func productHasRealPhoto(_ product: JSONValue) throws -> Bool {
+        try runtime.call("KhaytProductImages", "hasRealPhoto", [product], as: Bool.self)
+    }
+
+    /// The id a new picture gets. Minted by the rule so both apps name a file
+    /// the same way — the filename on disk is built from it.
+    public func productImageId(_ productId: String, index: Int) throws -> String {
+        try runtime.call("KhaytProductImages", "imageId",
+                         [JSONValue.string(productId), JSONValue.number(Double(index))],
+                         as: String.self)
     }
 
     // MARK: - Money received
