@@ -455,6 +455,13 @@ public actor KhaytEngine {
         // invent anything not in it. What leaves the building is therefore a
         // known, inspectable payload rather than "the shop's data".
         "ai-assistant",
+        // Drafting a message to a customer. The ONE feature whose payload is
+        // another person's data — the disclosure names it exactly: the
+        // customer's name, the order reference, project, status and due date,
+        // and the amount and outstanding balance. Nothing else about them
+        // travels, and a test holds the payload to that list rather than to a
+        // promise.
+        "ai-reply",
         // What to charge, grounded in what this shop has ACTUALLY made.
         //
         // `buildComparables` needs no model at all: it is the shop's own
@@ -6708,6 +6715,81 @@ public actor KhaytEngine {
               return said
                 ? { ok: true, answer: said, problem: null }
                 : { ok: false, answer: null, problem: 'no answer in the reply' };
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "data": response])],
+            as: AiAnswer.self)
+    }
+
+    // MARK: - Drafting a message to a customer
+
+    /// What a message can be for. The ids and their words are the rule's, so
+    /// the two apps offer a shop the same six.
+    public struct ReplyIntent: Decodable, Sendable, Identifiable {
+        public let id: String
+        public let label: String
+    }
+
+    public func replyIntents() throws -> [ReplyIntent] {
+        try runtime.call2("KhaytAiReply.REPLY_INTENTS", [], as: [ReplyIntent].self)
+    }
+
+    /// Build the drafting call.
+    ///
+    /// ── THE ONE FEATURE THAT SENDS ANOTHER PERSON'S DATA ──────────────────
+    ///
+    /// The disclosure names exactly what travels: the customer's name, the
+    /// order reference, project, status and due date, and the amount and
+    /// outstanding balance. The `client` handed in here is therefore built from
+    /// a NAME alone — an email address, a phone number and a postal address are
+    /// all on the record this is called beside, and none of them is the shop's
+    /// to send on that customer's behalf.
+    public func aiReplyRequest(settings: [String: JSONValue], order: JSONValue,
+                               clientName: String, intent: String, note: String,
+                               currency: String, shopName: String, language: String,
+                               apiKey: String) throws -> AiRequest {
+        try runtime.call2("""
+            (function (a) {
+              if (!KhaytAiPrivacy.isFeatureEnabled((a.settings || {}).ai, 'reply')) {
+                throw new Error('AI_FEATURE_NOT_CONSENTED');
+              }
+              var t = KhaytAiTools.resolveTool('reply', KhaytAiReply.REPLY_SCHEMA);
+              var settings = { ai: Object.assign({}, (a.settings || {}).ai, { apiKey: a.apiKey }) };
+              return KhaytAiProviders.buildRequest(settings, {
+                apiKey: a.apiKey,
+                system: KhaytAiReply.buildReplySystem({ shopName: a.shopName, lang: a.lang }),
+                prompt: KhaytAiReply.buildReplyRequest({
+                  order: a.order,
+                  // A NAME, and nothing else about the person.
+                  client: { name: a.clientName },
+                  intent: a.intent, extra: a.note, currency: a.currency,
+                }),
+                tool: t.tool,
+                maxTokens: t.maxTokens,
+              });
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "order": order,
+                      "clientName": .string(clientName), "intent": .string(intent),
+                      "note": .string(note), "currency": .string(currency),
+                      "shopName": .string(shopName), "lang": .string(language),
+                      "apiKey": .string(apiKey)])],
+            as: AiRequest.self)
+    }
+
+    public func aiReplyRead(settings: [String: JSONValue],
+                            response: JSONValue) throws -> AiAnswer {
+        try runtime.call2("""
+            (function (a) {
+              var out = KhaytAiProviders.readResponse(a.settings, a.data);
+              if (!out.ok) {
+                return { ok: false, answer: null,
+                         problem: KhaytAiTools.describeStop(out.stop) };
+              }
+              var said = KhaytAiReply.pickMessage(out.draft);
+              return said
+                ? { ok: true, answer: said, problem: null }
+                : { ok: false, answer: null, problem: 'no message in the reply' };
             })(ARG0)
             """,
             [.object(["settings": .object(settings), "data": response])],

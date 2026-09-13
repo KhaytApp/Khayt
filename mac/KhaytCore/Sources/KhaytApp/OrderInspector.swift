@@ -45,6 +45,17 @@ private struct Detail: View {
                 // leg of it. Only where there is a kit to show or a book that
                 // has kits in it — a picker offering to file a job into
                 // nothing, on every job, is a control that says nothing.
+                // Only where the shop has agreed to it, and only on a job
+                // that names a customer — a message drafted about nobody has
+                // no one to send it to.
+                if shop.aiReplyAllowed, !job.client.isEmpty {
+                    Divider()
+                    Button(shop.words.callIt("mac.draft_a_message")) {
+                        shop.draftingFor = job
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                }
                 if shop.kit(of: job.id) != nil || !shop.kits.isEmpty || shop.canWrite {
                     Divider()
                     KitSection(shop: shop, job: job)
