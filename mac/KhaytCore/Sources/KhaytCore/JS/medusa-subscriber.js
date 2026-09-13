@@ -1,0 +1,186 @@
+'use strict';
+
+(function (global) {
+/**
+ * The Medusa subscriber Khayt hands a shop to paste into its own project.
+ *
+ * WHY THIS FILE EXISTS AT ALL
+ *
+ * Every other storefront in the directory is served by one button: copy an
+ * import link, paste it into the store's webhook settings, done. Medusa has no
+ * webhook settings. It is a self-hosted framework, not a hosted store, and its
+ * `order.placed` event is delivered in-process to a *subscriber* — a file in the
+ * shop's own repository — carrying `{ id }` and nothing else (verified against
+ * Medusa's own subscriber documentation, not inferred).
+ *
+ * So for Medusa, "Copy import link" on its own is a URL with nowhere to go. The
+ * shop has to write the POST, and to write it they have to know that the event
+ * gives them an id rather than an order and that they must fetch the rest
+ * themselves. Handing them the finished file is the difference between Medusa
+ * being supported and Medusa being listed.
+ *
+ * Kept out of the renderer and out of a docs page so it is one artefact with one
+ * test, rather than a snippet in a markdown file that drifts from the mapper it
+ * has to feed.
+ *
+ * WHAT THE FIELD LIST IS FOR
+ *
+ * `fields` is not decoration. Medusa marks `items`, `shipping_address`,
+ * `billing_address` and `customer` as @expandable: a graph query that does not
+ * ask for them returns an order without them, and the intake would arrive with
+ * no customer name and no line items — which is exactly what a shop would report
+ * as "Khayt imported an empty order".
+ *
+ * Every field here is one the mapper in khayt-cloud reads, with one deliberate
+ * exception: `currency_code` is requested and not read. It is kept because an
+ * order's amounts are meaningless without it and the mapper is the only thing
+ * that does not need it yet — but it is named as an exception rather than left
+ * to look like the rule, since this comment used to claim the list had none.
+ *
+ * The reverse mistake is the one that actually bit: two fields the mapper DOES
+ * read were missing from this list, so their fallbacks could never fire. See
+ * `custom_display_id` and `items.detail.*` below.
+ */
+
+/** The subscriber's canonical filename inside the shop's Medusa project. */
+const SUBSCRIBER_PATH = 'src/subscribers/khayt-order-placed.ts';
+
+/**
+ * Fields the import mapper reads. Keep in step with the `medusa` branch of
+ * `mapPlatformOrder` — a field dropped here arrives as a blank there.
+ */
+const FIELDS = [
+  'id',
+  'display_id',
+  // The mapper's ref falls back to this when `display_id` is empty, and it was
+  // never requested — so the fallback could not fire and the ref fell through
+  // to the raw `id` instead of the number the shop says out loud. A fallback
+  // that cannot be reached is worse than no fallback: the code reads as though
+  // the case is handled.
+  'custom_display_id',
+  'email',
+  'currency_code',
+  'metadata',
+  'items.*',
+  /* `material` IS NOT ON THE LINE ITEM, and `items.*` will not bring it.
+   *
+   * The line-item DTO denormalises some product columns — product_title,
+   * product_description, product_subtitle — but NOT material, so a subscriber
+   * that asks only for `items.*` sends nothing for it, for ever, silently. The
+   * integrator running the first real Medusa storefront found this by checking
+   * against a freshly migrated database rather than trusting the DTO's types,
+   * which cannot tell you what the module graph can traverse.
+   *
+   * Requested here, and mapped onto each line's `metadata.material` below,
+   * because that is where Khayt's importer reads it from. */
+  'items.product.material',
+  // `items.*` selects the line item's OWN columns and does NOT expand a nested
+  // relation — Medusa's own shipped subscriber lists `items.product.is_giftcard`
+  // explicitly alongside `items.*` for exactly that reason. The mapper reads
+  // `it.detail.quantity` as its quantity fallback, so `detail` has to be asked
+  // for by name or that fallback is dead too.
+  'items.detail.*',
+  'shipping_address.*',
+  'billing_address.*',
+  'customer.*',
+];
+
+/**
+ * Render the subscriber with the shop's own import URL baked in.
+ *
+ * @param {string} importUrl  e.g. https://cloud.khaytapp.com/v1/shops/abc/import/medusa
+ * @returns {string} TypeScript source, ready to save at SUBSCRIBER_PATH
+ */
+function subscriberSource(importUrl) {
+  // A URL is about to be embedded in a double-quoted TS string literal. It is
+  // the app's own cloud URL rather than anything a stranger supplies, but "it
+  // came from our own settings" is how injection bugs are argued for, so the two
+  // characters that could end the literal are escaped rather than trusted.
+  const url = String(importUrl || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]/g, '');
+
+  return `// ${SUBSCRIBER_PATH}
+//
+// Sends every placed order to Khayt, which files it under Order requests.
+// Generated by Khayt — the URL below is your shop's import link.
+import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
+import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
+
+const KHAYT_IMPORT_URL = "${url}"
+// Optional. Set it and each Order request carries a link straight back to the
+// order in your admin. Khayt cannot derive this — your admin lives wherever you
+// host it. Khayt refuses anything that is not http(s) when it opens the link.
+const MEDUSA_ADMIN_URL = process.env.MEDUSA_ADMIN_URL ?? ""
+
+export default async function khaytOrderPlaced({
+  event: { data },
+  container,
+}: SubscriberArgs<{ id: string }>) {
+  const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
+  const query = container.resolve(ContainerRegistrationKeys.QUERY)
+
+  // order.placed carries the order's ID and nothing else, so fetch the rest.
+  // Every field below is one Khayt reads — items and the addresses are
+  // expandable, and omitting them imports an order with no lines and no name.
+  const { data: [order] } = await query.graph({
+    entity: "order",
+    fields: [
+${FIELDS.map((f) => `      "${f}",`).join('\n')}
+    ],
+    filters: { id: data.id },
+  })
+
+  if (!order) {
+    logger.warn(\`Khayt: order \${data.id} vanished before it could be sent\`)
+    return
+  }
+
+  /* Fold the product's material onto each line, and drop the product itself.
+   *
+   * \`material\` is a product column rather than a line-item one, so it is
+   * fetched for that one string and not sent as a shape of its own. A line's
+   * own \`metadata.material\` WINS where both exist, so a bespoke commission can
+   * carry a material the catalogue product does not.
+   */
+  const payload = {
+    ...order,
+    metadata: { ...(order.metadata ?? {}), ...(MEDUSA_ADMIN_URL ? { admin_url: \`\${MEDUSA_ADMIN_URL.replace(/\\/+$/, "")}/orders/\${order.id}\` } : {}) },
+    items: (order.items ?? []).map(({ product, ...line }: any) => ({
+      ...line,
+      metadata: { ...(line.metadata ?? {}), material: line.metadata?.material ?? product?.material ?? undefined },
+    })),
+  }
+
+  try {
+    const res = await fetch(KHAYT_IMPORT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    /* THROW, so Medusa retries. The import endpoint deduplicates on
+     * \`medusa:#\${display_id}\`, answers 200 to a repeat with
+     * \`{"duplicate": true}\`, and only notifies the shop on a genuine first
+     * delivery — so a retry cannot become a second order request.
+     *
+     * This used to swallow failures, back when that guarantee did not exist.
+     * Swallowing means a failed import reaches a log and nothing else; throwing
+     * means Medusa keeps trying until it lands. */
+    if (!res.ok) {
+      throw new Error(\`Khayt: import returned \${res.status} for order \${order.display_id ?? order.id}\`)
+    }
+  } catch (e) {
+    logger.error(\`Khayt: could not reach the import endpoint — \${e}\`)
+    throw e
+  }
+}
+
+export const config: SubscriberConfig = {
+  event: "order.placed",
+}
+`;
+}
+
+const api = { subscriberSource, SUBSCRIBER_PATH, FIELDS };
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+global.KhaytMedusa = api;
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -3305,6 +3305,17 @@ final class Shop {
     /// screen before the feature exists.
     var cloudConnected: Bool { Self.cloudConnected(settingsDict) }
 
+    /// Where this shop's cloud is, for the links a storefront needs pasted
+    /// into it. Nil unless the connection is actually finished — a half-set-up
+    /// cloud would produce a URL that looks right and serves nothing.
+    var cloudAddress: (url: String, shopId: String)? {
+        guard cloudConnected, case .object(let cloud)? = settingsDict["cloud"],
+              case .string(let url)? = cloud["url"],
+              case .string(let shopId)? = cloud["shopId"],
+              !url.isEmpty, !shopId.isEmpty else { return nil }
+        return (url, shopId)
+    }
+
     /// The same, as a function of the settings alone — `settingsValue` is only
     /// the model's to set, and a rule about a shop's data should be testable
     /// without building one.

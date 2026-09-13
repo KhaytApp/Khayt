@@ -55,6 +55,41 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   than against a Swift copy of its regex — the first version of that test
   compared the implementation with a duplicate of itself and passed while both
   were wrong.
+- **The Mac can connect a storefront.** Khayt's cloud serves an import route per
+  platform — paste it into Salla, Zid, Shopify or WooCommerce as an order
+  webhook and new orders arrive in Order requests — and a feed route that
+  publishes the catalogue back. Both links were built and shown only by the
+  Electron settings page, so a shop keeping its book on the Mac had the cloud,
+  had the shop id, and no way to find out what to paste. There is an
+  Integrations pane now, with the storefronts and payment systems for its
+  market, and a market picker for a shop that sells into more than one.
+
+  Medusa gets the code as well as the link. It is a self-hosted framework with
+  no webhook settings to paste a URL into, so Khayt hands over the subscriber
+  file to save in the shop's own project — the link on its own would be a URL
+  with nowhere to put it.
+
+  Switching a payment system on in one market cannot switch another market's
+  off. The directory shows one market at a time, and a shop selling into two has
+  providers configured outside the list on screen; the save merges rather than
+  replaces, so the first the shop would have heard of it is an invoice that
+  stopped offering a way to pay.
+
+- **(Maintainers) The cloud's import and feed routes are written down once.**
+  They were built inline in `renderer/settings.js`. A route shape in two places
+  is one that can disagree, and the failure is silent in the worst way: the
+  shop pastes a URL the cloud does not serve, the store reports the webhook as
+  delivered because a 404 is a response, and no orders arrive.
+
+- **(Maintainers) The "no Node in a bundled module" guard now separates code a
+  module RUNS from code it WRITES.** `medusa-subscriber.js` emits TypeScript
+  that reads `process.env.MEDUSA_ADMIN_URL` — in Node, on the shop's own
+  server — and the guard, reading the file flat, refused to bundle it. Template
+  literal text is dropped and its `${…}` interpolations kept, which are the only
+  part JavaScriptCore evaluates; a module genuinely reaching for `process` in
+  one is still caught, checked by putting it there and watching both halves
+  fail. Both halves, because the guard exists in Node and in Swift and one that
+  agrees in only one place is worse than one that exists once.
 
 - **The Mac app wears the new icon's colours.** Khayt's accent was the cyan of
   the icon before last, and the app had been sitting beside its own orange-on-

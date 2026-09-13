@@ -185,6 +185,21 @@ public final class JSRuntime {
                           // bundled, which is what the check is for; the tests
                           // that needed it all failed at once and said why.
                           "stl-estimate": "KhaytStl",
+                          // `integrations-registry.js` publishes
+                          // `KhaytIntegrations` — the file is named for what it
+                          // holds, the global for the subject. Its own note in
+                          // `renderer/integrations.js` says that name is the
+                          // registry's, written the day the feature api took it
+                          // and `forLocale` stopped existing.
+                          "integrations-registry": "KhaytIntegrations",
+                          // `medusa-subscriber.js` publishes `KhaytMedusa` —
+                          // the file is named for what it produces, the global
+                          // for the platform. Caught the moment it was bundled,
+                          // which is what this check is for: the engine refused
+                          // to start, the whole Integrations pane fell back to
+                          // raw keys, and the reason was named on the first
+                          // line of the failure.
+                          "medusa-subscriber": "KhaytMedusa",
                           "store-validate": "KhaytStoreValidate",
                           "pnl-report": "KhaytPnl",
                           // `thumbnail-extract.js` publishes `KhaytThumb`. Same

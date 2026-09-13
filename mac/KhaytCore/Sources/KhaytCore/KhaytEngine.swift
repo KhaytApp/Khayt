@@ -144,6 +144,25 @@ public actor KhaytEngine {
         // except when it is empty" is a rule that must be identical in both
         // apps or a picture resurrects itself after being deleted.
         "product-images",
+        // ── WHICH STOREFRONTS AND PAYMENT SYSTEMS A MARKET USES ──────────
+        //
+        // A curated list per market, and the single source of truth behind the
+        // Integrations directory in both apps. Bundled rather than retyped
+        // because the failure of a second copy is quiet and expensive: a
+        // platform id spelled differently here is an import link pointing at a
+        // route the cloud does not serve, and a shop that pastes it into its
+        // store gets no orders and no error.
+        //
+        // The global is `KhaytIntegrations`, not the derived name — see the
+        // exceptions map in `JSRuntime.globalName(for:)`. `renderer/
+        // integrations.js` has a comment about that name being owned by this
+        // file, written the day the feature api clobbered the registry.
+        "integrations-registry",
+        // The one storefront that cannot be connected with a link. Medusa is a
+        // self-hosted framework with no webhook UI, so the shop pastes a few
+        // lines into its own project instead; handing it only a URL is handing
+        // it a URL with nowhere to put it.
+        "medusa-subscriber",
         // Not business logic — the one list of which store fields hold
         // credentials. Bundling it is what stops the Mac app from becoming a
         // sixth hand-maintained copy; SafeStorage encrypts exactly these.
@@ -6149,6 +6168,99 @@ public actor KhaytEngine {
         try runtime.call("KhaytProductImages", "imageId",
                          [JSONValue.string(productId), JSONValue.number(Double(index))],
                          as: String.self)
+    }
+
+    // MARK: - Storefronts and payment systems, by market
+
+    /// One storefront a shop in this market is likely to be selling through.
+    ///
+    /// `dir` is the directions it supports: `in` to import orders, `out` to
+    /// publish the catalogue. `setup == "subscriber"` means it CAN post orders
+    /// and has no webhook UI to paste a URL into — the shop installs a few
+    /// lines of code instead, and offering it only a link is offering it a URL
+    /// with nowhere to put it.
+    public struct Storefront: Decodable, Sendable, Identifiable {
+        public let id: String
+        public let name: String
+        public let dir: [String]
+        public let webhook: Bool?
+        public let setup: String?
+        public var importsOrders: Bool { dir.contains("in") }
+        public var publishesCatalogue: Bool { dir.contains("out") }
+        public var needsSubscriberCode: Bool { setup == "subscriber" }
+    }
+
+    public struct PaymentSystem: Decodable, Sendable, Identifiable {
+        public let id: String
+        public let name: String
+    }
+
+    /// A market: what it is called, and what it sells and gets paid through.
+    public struct IntegrationMarket: Decodable, Sendable {
+        /// The country's name, keyed by language — `en` and `ar` today.
+        public let country: [String: String]
+        public let storefronts: [Storefront]
+        public let payments: [PaymentSystem]
+    }
+
+    /// The market for a locale, falling back to `en` — the rule's own fallback,
+    /// not a Swift one, so a shop running a language with no curated list gets
+    /// the same directory in both apps rather than an empty screen in one.
+    public func integrationMarket(_ locale: String) throws -> IntegrationMarket {
+        try runtime.call("KhaytIntegrations", "forLocale",
+                         [JSONValue.string(locale)], as: IntegrationMarket.self)
+    }
+
+    /// Every market, in the registry's own order, with the name each is shown
+    /// under in a given language.
+    public struct MarketChoice: Decodable, Sendable, Identifiable {
+        public let id: String
+        public let title: String
+    }
+
+    public func integrationMarkets(in language: String) throws -> [MarketChoice] {
+        try runtime.call2("""
+            (function (lang) {
+              return Object.keys(KhaytIntegrations.MARKETS).map(function (loc) {
+                var m = KhaytIntegrations.forLocale(loc);
+                return { id: loc, title: m.country[lang] || m.country.en };
+              });
+            })(ARG0)
+            """, [.string(language)], as: [MarketChoice].self)
+    }
+
+    /// The two links a shop pastes into its store.
+    ///
+    /// Built by the registry rather than here. This is a cloud ROUTE SHAPE, and
+    /// a route written down twice is one that can disagree — spell it
+    /// differently and the shop pastes a URL the cloud does not serve, gets no
+    /// orders, and gets no error either, because the store reports a successful
+    /// delivery to a 404.
+    public func storefrontImportURL(cloud: String, shopId: String, platform: String) throws -> String {
+        try runtime.call("KhaytIntegrations", "importUrl",
+                         [JSONValue.string(cloud), JSONValue.string(shopId), JSONValue.string(platform)],
+                         as: String.self)
+    }
+
+    public func storefrontFeedURL(cloud: String, shopId: String, platform: String) throws -> String {
+        try runtime.call("KhaytIntegrations", "feedUrl",
+                         [JSONValue.string(cloud), JSONValue.string(shopId), JSONValue.string(platform)],
+                         as: String.self)
+    }
+
+    /// The Medusa subscriber a shop pastes into its own project, and where.
+    ///
+    /// The URL is embedded in a double-quoted TypeScript string literal, and
+    /// the module escapes the two characters that could end it rather than
+    /// trusting that the value came from the shop's own settings — "it is our
+    /// own URL" being exactly how injection bugs are argued for.
+    public func medusaSubscriber(importURL: String) throws -> String {
+        try runtime.call("KhaytMedusa", "subscriberSource",
+                         [JSONValue.string(importURL)], as: String.self)
+    }
+
+    public func medusaSubscriberPath() throws -> String {
+        try runtime.call2("KhaytMedusa.SUBSCRIBER_PATH", [], as: String.self)
     }
 
     // MARK: - Money received
