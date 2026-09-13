@@ -200,6 +200,32 @@ struct PaletteTests {
         }
     }
 
+    /// Ink ON a fill, which `contrastHolds` above cannot see.
+    ///
+    /// ── THE BUG THIS GUARDS, AND IT WAS MINE ──────────────────────────────
+    ///
+    /// Every colour in this palette is measured against the SURFACES the app
+    /// draws on — card, ground, recessed. None of those is a filled brand
+    /// shape, so a badge painted `Khayt.brand` with `.foregroundStyle(.white)`
+    /// on it was measured by nothing at all. In light appearance white reads at
+    /// 7.28:1 on `#0B54AD` and looks obviously right; in dark it is **3.22:1**
+    /// on `#4591ED`, under the 4.5 AA asks of text, and the badge is 9pt.
+    ///
+    /// The fill LIGHTENS for dark appearance because it must stand out from a
+    /// dark ground, so its ink has to DARKEN — the opposite direction from
+    /// every other colour here, which is exactly why it cannot be left to
+    /// whatever a call site types.
+    @Test("ink on a filled brand shape is legible in both appearances")
+    func inkOnFillsIsLegible() {
+        for dark in [false, true] {
+            let fill = Self.resolved(Khayt.brand, dark: dark)
+            let ink = Self.resolved(Khayt.onBrand, dark: dark)
+            let ratio = Self.contrast(ink, fill)
+            #expect(ratio >= 4.5,
+                    "onBrand is \(String(format: "%.2f", ratio)):1 on a brand fill, \(dark ? "dark" : "light")")
+        }
+    }
+
     /// `note` must not read as a second accent.
     ///
     /// THE BUG THIS GUARDS. `note` was hue 206 and the accent moved to 213 —

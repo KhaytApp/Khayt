@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) The palette knows what ink goes on a filled brand shape.**
+  Every colour in it is measured against the surfaces the app draws on — card,
+  ground, recessed — and none of those is a filled brand shape, so a badge
+  painted in the app's own colour with white text on it was measured by nothing
+  at all. White reads 7.28:1 on the light fill and **3.22:1** on the dark one,
+  under what AA asks of text. The fill lightens for dark appearance so it stands
+  out from a dark ground, which means its ink has to darken — the opposite
+  direction from every other colour in the file, and not something a call site
+  typing `.white` can be expected to work out. `Khayt.onBrand` now, with a test
+  that measures the pair.
+
 - **A product's name field was labelled "Product Catalog".** `cat.title` is what
   the whole SCREEN is called — right in the sidebar, nonsense as the label on
   the field where a shop types a product's name, and as the heading over the

@@ -190,7 +190,7 @@ private struct PictureCard: View {
                         .font(.system(size: 9, weight: .semibold))
                         .padding(.horizontal, 4).padding(.vertical, 1)
                         .background(RoundedRectangle(cornerRadius: 3).fill(Khayt.brand))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Khayt.onBrand)
                         .padding(3)
                 }
             }
