@@ -167,6 +167,13 @@ public actor KhaytEngine {
         // credentials. Bundling it is what stops the Mac app from becoming a
         // sixth hand-maintained copy; SafeStorage encrypts exactly these.
         "store-secret-paths",
+        // The body a consumer receives when an order changes, and the policy
+        // for getting it there: which subscriptions match an event, how long to
+        // wait after a failure, and that a 410 means stop for good. Both apps
+        // deliver from these, so a consumer cannot be told two different things
+        // about the same order by two copies of one shop.
+        "webhooks",
+        "webhook-bus",
         // What happens to a job when its stage changes: what may move, and what
         // moving it costs. Lifted out of renderer/order-flows.js so this app can
         // move a job by the same rules rather than reimplement the most
@@ -599,6 +606,26 @@ public actor KhaytEngine {
         // secret list is: a second, more forgiving copy in Swift is how the two
         // apps come to disagree about what they are willing to connect to.
         "printer-host",
+        // ── WHERE AN OUTBOUND REQUEST MAY GO AT ALL ──────────────────────
+        //
+        // The ranges a shop-configured URL must never reach: loopback, RFC1918,
+        // link-local, cloud metadata, and the spellings that hide them —
+        // `[::1]`, `::ffff:127.0.0.1` in both its dotted and hex forms, and
+        // numeric IPv4 like `2130706433`.
+        //
+        // BUNDLED RATHER THAN REWRITTEN, and this module more than most. Every
+        // line of it is a hole somebody found: `127.0.0.1` was blocked while
+        // `http://[::1]:PORT/` sailed through to fetch, and the unit tests
+        // passed the one shape that worked. A second implementation in Swift
+        // would start again from the version that looked right.
+        //
+        // PRINTER-HOST FIRST: the numeric-IPv4 canonicaliser is there, reached
+        // through the global. Without it `2130706433` is just a hostname.
+        //
+        // And this is ONE LAYER OF TWO. It inspects a NAME; a public-looking
+        // one can still resolve to an internal address, so the caller must also
+        // resolve and check every answer. `WebhookClient` does.
+        "host-ranges",
         // Who the shop's best customers are and what it is asked for most.
         // ORDER-MONEY, CONTENT-LANGUAGES, BUSINESS-SCOPE AND DATE-RANGE ARE ALL
         // ALREADY ABOVE and must be: it reaches every one of them through a
@@ -6805,6 +6832,83 @@ public actor KhaytEngine {
             """,
             [.object(["settings": .object(settings), "data": response])],
             as: AiAnswer.self)
+    }
+
+    // MARK: - Telling somebody else that an order changed
+
+    /// May an outbound request go to this host AT ALL?
+    ///
+    /// The NAME layer. Loopback, RFC1918, link-local, cloud metadata, and the
+    /// spellings that hide them. This is half of the guard: a public-looking
+    /// name can still resolve to an internal address, so every resolved
+    /// address has to be asked the same question — see `WebhookClient`.
+    public func isBlockedHost(_ host: String) throws -> Bool {
+        try runtime.call("KhaytHostRanges", "isBlockedHost",
+                         [JSONValue.string(host)], as: Bool.self)
+    }
+
+    /// One subscription a shop has set up.
+    public struct WebhookSubscription: Decodable, Sendable, Identifiable {
+        public let id: String
+        public let url: String
+        public let events: [String]
+        public let secret: String?
+        public let enabled: Bool?
+    }
+
+    /// Which subscriptions want this event, after the legacy shape is migrated.
+    public func webhookSubscriptions(_ webhooks: JSONValue,
+                                     event: String) throws -> [WebhookSubscription] {
+        try runtime.call2("""
+            (function (a) {
+              var subs = KhaytWebhookBus.migrateLegacyWebhooks(a.webhooks);
+              return KhaytWebhookBus.matchSubscriptions(subs, a.event);
+            })(ARG0)
+            """,
+            [.object(["webhooks": webhooks, "event": .string(event)])],
+            as: [WebhookSubscription].self)
+    }
+
+    /// The body a consumer receives: the normalised order event, wrapped in the
+    /// delivery envelope whose `id` doubles as the idempotency key.
+    public func webhookBody(event: String, order: JSONValue, shopName: String,
+                            clientName: String, currency: String,
+                            at: String, deliveryId: String) throws -> JSONValue {
+        try runtime.call2("""
+            (function (a) {
+              var payload = KhaytWebhooks.buildWebhookEvent(a.event, a.order, {
+                at: a.at, shopName: a.shopName,
+                clientName: a.clientName, currency: a.currency,
+              });
+              return KhaytWebhookBus.buildDeliveryBody(payload.event, payload, a.id, a.at);
+            })(ARG0)
+            """,
+            [.object(["event": .string(event), "order": order,
+                      "shopName": .string(shopName), "clientName": .string(clientName),
+                      "currency": .string(currency), "at": .string(at),
+                      "id": .string(deliveryId)])],
+            as: JSONValue.self)
+    }
+
+    /// What to do after one attempt. `gone` is a consumer saying stop for good.
+    public struct WebhookNext: Decodable, Sendable {
+        public let retry: Bool
+        public let afterMs: Double
+        public let gone: Bool
+    }
+
+    public func webhookNext(status: Int, attempt: Int) throws -> WebhookNext {
+        try runtime.call2("""
+            (function (a) {
+              return {
+                retry: KhaytWebhookBus.shouldRetry(a.status, a.attempt),
+                afterMs: KhaytWebhookBus.backoffDelayMs(a.attempt + 1),
+                gone: KhaytWebhookBus.isGone(a.status),
+              };
+            })(ARG0)
+            """,
+            [.object(["status": .number(Double(status)), "attempt": .number(Double(attempt))])],
+            as: WebhookNext.self)
     }
 
     // MARK: - Money received

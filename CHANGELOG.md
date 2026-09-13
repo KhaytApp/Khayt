@@ -16,6 +16,25 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
   If the answer is unusable, your own median is what comes back — it was worked
   out on your Mac before anything was sent, so a refusal is not a failure.
+- **(Maintainers) The Mac can send a webhook, with both layers of the guard.**
+  The transport, the HMAC signature and the retry policy are in place; the move
+  that fires one is next.
+
+  The URL is typed by the shop, so the guard is the feature. Two layers, and
+  neither is enough alone: the **name** is checked against the shared ranges —
+  loopback, RFC1918, link-local, cloud metadata, and the spellings that hide
+  them (`[::1]`, `::ffff:127.0.0.1` in both forms, `2130706433`) — and then the
+  host is **resolved** and every answer is put through the same rule, because a
+  perfectly public name can have an A record pointing at `10.0.0.1`. Redirects
+  are not followed: a consumer answering `302` to a metadata endpoint would walk
+  straight past both.
+
+- **(Maintainers) The host ranges are a shared module now.** They were the top
+  of `lib/host-guard.js`, which cannot be shared — it requires Node's `dns` for
+  its second layer. `lib/host-ranges.js` holds the pure range checks and
+  `host-guard` re-exports them, so there is exactly one copy of rules that are
+  almost entirely made of holes somebody already found. Its 19 existing tests
+  pass unchanged through the re-export.
 
 - **The Mac can draft a message to a customer.** On a job with a customer on it:
   pick what the message is about — a status update, ready for pickup, a quote
