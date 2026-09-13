@@ -2321,7 +2321,18 @@
     "name": "Accountant",
     "amount": 600
    }
-  ]
+  ],
+  "ai": {
+   "enabled": true,
+   "provider": "anthropic",
+   "apiKey": "",
+   "features": {
+    "quote": true,
+    "price": true,
+    "reply": false,
+    "assistant": false
+   }
+  }
  },
  "machines": [
   {

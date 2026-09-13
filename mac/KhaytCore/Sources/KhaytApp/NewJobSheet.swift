@@ -52,6 +52,12 @@ struct NewJobSheet: View {
     @State private var clientId: String?
     @State private var parts: [Draft] = []
     @State private var draft = Draft()
+    /// What the shop typed for the assistant to read, and what came back.
+    @State private var described = ""
+    @State private var drafting = false
+    /// Every inference the model made, for the shop to read BEFORE it quotes.
+    @State private var assumptions: [String] = []
+    @State private var aiProblem: String?
     @State private var margin = 40.0
     @State private var discountPct = 0.0
     @State private var shippingCost = 0.0
@@ -169,7 +175,94 @@ struct NewJobSheet: View {
                 .padding(.vertical, 2)
             }
 
+            // ABOVE the form it fills, not below it. Below, a shop types a
+            // description and has to look UP to watch grams and hours appear —
+            // the order on screen has to be the order of the work: say what it
+            // is, see what that filled in, correct it, add it.
+            describeBox
             partForm
+        }
+    }
+
+    /// Describe the job in words and let the assistant fill the part.
+    ///
+    /// ── IT FILLS THE FORM; THE CALCULATOR STILL PRICES IT ─────────────────
+    ///
+    /// `lib/ai-quote.js` calls that its governing contract, and the shape of
+    /// this screen is what keeps it: the draft lands in the SAME fields a shop
+    /// types into, and nothing is added to the cart until Add is pressed. So
+    /// every figure is seen, and changeable, before it reaches a customer — and
+    /// the price is the shop's own calculator's, from the shop's own rates,
+    /// exactly as it is for a part typed by hand.
+    ///
+    /// Only shown when the shop has actually agreed to it. A box offering to
+    /// draft a quote for a shop that has not switched the feature on is an
+    /// advertisement on a screen somebody is trying to work in.
+    @ViewBuilder private var describeBox: some View {
+        if shop.aiCanDraftQuotes {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles").foregroundStyle(Khayt.brand)
+                    TextField(shop.words.callIt("mac.describe_the_job"), text: $described)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { Task { await draftFromDescription() } }
+                    Button(shop.words.callIt("mac.draft_it")) {
+                        Task { await draftFromDescription() }
+                    }
+                    .disabled(drafting || described.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                if drafting {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text(shop.words.callIt("mac.drafting")).font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                // WHAT IT ASSUMED, always, and not folded away. A drafted part
+                // is a guess with figures in it, and the assumptions are the
+                // only way to tell a good one from a confident one.
+                if !assumptions.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(shop.words.callIt("mac.it_assumed"))
+                            .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        ForEach(assumptions, id: \.self) { note in
+                            Text("• " + note).font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                if let aiProblem {
+                    Text(aiProblem).font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .card(padding: 10)
+        }
+    }
+
+    /// Ask, then fill the form the shop was going to type into.
+    private func draftFromDescription() async {
+        let said = described.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !said.isEmpty, !drafting else { return }
+        drafting = true
+        aiProblem = nil
+        assumptions = []
+        defer { drafting = false }
+
+        let out = await shop.draftPartFromDescription(said)
+        switch out {
+        case .refused(let why):
+            aiProblem = why
+        case .filled(let filled):
+            // Only the fields the model is entitled to answer for. The name is
+            // what the shop typed, because a model naming the job is a model
+            // writing on an invoice.
+            if draft.name.isEmpty { draft.name = said }
+            if filled.grams > 0 { draft.grams = Money.quantity(filled.grams) }
+            if filled.hours > 0 { draft.hours = Money.quantity(filled.hours) }
+            if filled.qty > 0 { draft.qty = filled.qty }
+            if let spool = filled.spoolId { draft.spoolId = spool }
+            assumptions = filled.assumptions
         }
     }
 

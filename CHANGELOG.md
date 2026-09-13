@@ -6,10 +6,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
-- **The Mac's AI settings say where those features actually run.** The screen
-  offers a provider and a switch per feature, with what each one sends written
-  beside it — and the Mac bundles the half that decides *whether* a feature may
-  run, not the features themselves. So a shop could switch on "Draft a customer
+- **The Mac's AI settings say, per feature, where each one actually runs.** The
+  screen offers a provider and a switch per feature, with what each one sends
+  written beside it — and the Mac bundles the half that decides *whether* a
+  feature may run, not all of the features themselves. So a shop could switch on "Draft a customer
   reply", read exactly what it transmits, save, and find nothing on the Mac ever
   drafts a reply.
 
@@ -17,6 +17,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   had no way to see — let alone refuse — what the other one sends, and the
   consent it records is real and shop-wide. But a switch that does nothing where
   you switched it has to say so.
+- **The Mac can draft a quote from a description.** Say what the job is — "20
+  cable clips, black PETG" — and the grams, the hours, the quantity and the
+  spool fill themselves in. It was the other app's feature; the Mac had the
+  consent screen for it and no way to run it.
+
+  **It fills the form. Your calculator still sets the price.** The draft lands
+  in the same fields you type into, nothing reaches the cart until you press
+  Add, and the figure comes from your own rates exactly as it does for a part
+  typed by hand. What it assumed is listed under the box, always — a drafted
+  part is a guess with numbers in it, and the assumptions are the only way to
+  tell a good one from a confident one. A material you do not stock is said,
+  not quietly swapped for one you do.
+
+  Nothing is sent unless you switched that feature on, and the check is made
+  where the data would leave rather than on the screen that offered the switch.
+
+- **(Maintainers) A drafted part's print time was in MINUTES, in a field that
+  means hours.** `draftToPart` passed the model's `printTimeMin` straight into
+  `printTime` — which the calculator, the store, the invoice and both editors
+  all read as hours. It was not visibly wrong only because the single call site
+  remembered to divide by 60. The Mac was about to be a second caller, and one
+  that did not know would have quoted a ninety-minute print as ninety hours.
+  The module converts now and the call site does not.
 
 - **(Maintainers) The palette knows what ink goes on a filled brand shape.**
   Every colour in it is measured against the surfaces the app draws on — card,

@@ -876,9 +876,6 @@ struct AssistantPane: View {
                 // switched it has to say so, or the next question is why the
                 // quote screen never offers a draft.
                 Section(shop.words.callIt("set.ai_feats")) {
-                    Text(shop.words.callIt("mac.ai_runs_in_khayt"))
-                        .font(.caption).foregroundStyle(Khayt.note)
-                        .fixedSize(horizontal: false, vertical: true)
                     ForEach(features) { f in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 6) {
@@ -900,6 +897,13 @@ struct AssistantPane: View {
                             if f.needsConsent {
                                 Text(shop.words.callIt("set.ai_reconsent"))
                                     .font(.caption).foregroundStyle(Khayt.attention)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            // On the features this app cannot perform yet, and
+                            // only those. See `Shop.aiFeaturesOnThisMac`.
+                            if !Shop.aiRunsHere(f.id) {
+                                Text(shop.words.callIt("mac.ai_elsewhere"))
+                                    .font(.caption).foregroundStyle(Khayt.note)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
