@@ -1583,6 +1583,25 @@ final class Shop {
     }
 
     /// Write it down. Follows `saveCustomer` exactly, including the undo.
+    /// Price a product from the parts the sheet is holding.
+    ///
+    /// Through the shared rule, which is what `renderer/inventory.js` now
+    /// prices with too. A product's price is COMPUTED — the calculator's
+    /// per-part cost, the components, the margin, the shop's rounding — and two
+    /// apps computing it separately is two prices for one product, with the one
+    /// the customer sees decided by which app last saved it.
+    func priceProduct(parts: [JSONValue], margin: Double?,
+                      components: JSONValue?) async -> KhaytEngine.ProductPricing? {
+        guard let engine else { return nil }
+        var record: [String: JSONValue] = ["parts": .array(parts)]
+        if let margin { record["defaultMargin"] = .number(margin) }
+        if let components { record["components"] = components }
+        return try? await engine.priceProduct(.object(record),
+                                              inventory: inventoryRows,
+                                              settings: settingsDict,
+                                              consumables: consumableRows)
+    }
+
     // MARK: - Drafting a quote from a description
 
     /// The AI features this app can actually perform.
@@ -1691,7 +1710,8 @@ final class Shop {
     /// first draft and a product with its last photo deleted came back with the
     /// photo still on it.
     func saveProduct(_ product: Product, pictures: [StagedPicture]? = nil,
-                     unlinking removed: [String] = []) async {
+                     unlinking removed: [String] = [],
+                     parts: [JSONValue]? = nil) async {
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -1757,12 +1777,40 @@ final class Shop {
             }
         }
 
+        // ── THE PARTS, AND THE PRICE THEY MAKE ────────────────────────────
+        //
+        // A product's price is not typed anywhere: it is the calculator's
+        // per-part cost summed over these, plus the components, plus the
+        // margin, plus the shop's rounding. So the two are written together and
+        // through the SHARED rule — which `renderer/inventory.js` prices with
+        // too, because two apps computing this separately is two prices for one
+        // product and the customer sees whichever app saved last.
+        //
+        // Settled before the write opens: `StoreWriter.update` takes a
+        // synchronous closure and the rule lives behind an actor.
+        var partFields: [String: JSONValue] = [:]
+        if let parts {
+            partFields["parts"] = .array(parts)
+            var forPricing: [String: JSONValue] = ["parts": .array(parts)]
+            if let margin = product.margin { forPricing["defaultMargin"] = .number(margin) }
+            if let components = product.rest["components"] {
+                forPricing["components"] = components
+            }
+            if let engine,
+               let priced = try? await engine.productPricingFields(
+                .object(forPricing), inventory: inventoryRows,
+                settings: settingsDict, consumables: consumableRows) {
+                for (key, value) in priced { partFields[key] = value }
+            }
+        }
+
         var undo: [ChangedRecord] = []
         do {
             try StoreWriter.update(build) { root in
                 var rows = Self.rows(root, "products")
                 var record = product.record(keys: keys)
                 for (key, value) in pictureFields { record[key] = value }
+                for (key, value) in partFields { record[key] = value }
                 if let at = rows.firstIndex(where: { Self.recordId($0) == product.id }) {
                     guard case .object(let was) = rows[at] else { return }
                     undo.append(ChangedRecord(collection: "products", id: product.id, was: was))

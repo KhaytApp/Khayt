@@ -448,6 +448,19 @@ public actor KhaytEngine {
         // an async transport and is deliberately NOT used here: Swift does the
         // request, so nothing has to await inside JavaScriptCore.
         "ai-quote",
+        // What to charge, grounded in what this shop has ACTUALLY made.
+        //
+        // `buildComparables` needs no model at all: it is the shop's own
+        // realized margins, and a Mac with the assistant switched off entirely
+        // still gets "six comparable jobs, median 34%". The model only phrases
+        // a recommendation on top of numbers that are already on the screen.
+        //
+        // TAX FIRST, and `tax` is already far above. It reaches `KhaytTax`
+        // through the global to net a price of tax, because for an inclusive
+        // shop — Saudi, the Gulf, most of Europe — part of the price was never
+        // the shop's. Without it every comparable overstates, and this module
+        // exists to recommend a margin FROM those comparables.
+        "ai-price",
         // ── WHAT A MODEL WOULD COST BEFORE IT IS EVER SLICED ──────────────
         //
         // Geometry into a weight and a time. The Mac could MEASURE a mesh from
@@ -583,6 +596,18 @@ public actor KhaytEngine {
         // is read through it, and the shop that keeps this book writes in two
         // languages.
         "product-price",
+        // What a catalogue product costs, and what it is therefore worth.
+        //
+        // AFTER `calculator-cost` and `product-price`, both of which it reaches
+        // through globals: the per-part cost and the shop's own rounding.
+        //
+        // It was `productDefaultPricing` inside `renderer/inventory.js`, which
+        // was fine while one app had a product editor. This one grew one, and
+        // the hole showed at once — a product written down here came back
+        // priced 0.00 with no hours and no grams, because nothing on this side
+        // summed its parts. A product's price is COMPUTED, not typed, and two
+        // apps computing it separately is two prices for one product.
+        "product-pricing",
         "product-specs",
         // The merge engine. `applyDeltas` is what folds a chain from the cloud
         // onto a base, and it is the same function the Electron app merges
@@ -6421,6 +6446,190 @@ public actor KhaytEngine {
     public func aiHttpError(status: Int, body: JSONValue) throws -> String {
         try runtime.call2("KhaytAiTools.describeHttpError(ARG0, ARG1)",
                           [.number(Double(status)), body], as: String.self)
+    }
+
+    // MARK: - What to charge, from what this shop has actually made
+
+    /// One finished job the shop can be compared against.
+    public struct PriceExample: Decodable, Sendable, Identifiable {
+        public let project: String
+        public let price: Double
+        public let marginPct: Double
+        public var id: String { project + "-" + String(price) }
+    }
+
+    /// What this shop has actually realized, on jobs like this one.
+    ///
+    /// ── NO MODEL IS INVOLVED, AND THAT IS THE POINT ───────────────────────
+    ///
+    /// `buildComparables` is deterministic arithmetic over the shop's own
+    /// history. A shop with the assistant switched off entirely — or with no
+    /// key, or no wish to send anything anywhere — still gets "six comparable
+    /// jobs, median 34%", which is most of the value and none of the risk.
+    /// The model only phrases a recommendation on top of numbers that are
+    /// already on the screen.
+    ///
+    /// `basis` says what the answer is made of: `material` when there were at
+    /// least three jobs in the same family, `all` when it had to fall back to
+    /// every priced job, and `none` when the shop has no priced history yet.
+    /// A median over two jobs presented as "your margin" is the sort of figure
+    /// that gets acted on and should not be.
+    public struct PriceComparables: Decodable, Sendable {
+        public let basis: String
+        public let material: String
+        public let count: Int
+        public let avgMarginPct: Double?
+        public let medianMarginPct: Double?
+        public let minMarginPct: Double?
+        public let maxMarginPct: Double?
+        public let suggestedMargin: Double?
+        public let examples: [PriceExample]?
+
+        /// Enough history to be worth showing at all.
+        public var hasHistory: Bool { count > 0 && basis != "none" }
+        /// Made of the same material, rather than of everything the shop sells.
+        public var sameMaterial: Bool { basis == "material" }
+    }
+
+    /// The shop's own comparable margins for a material.
+    ///
+    /// `settings` is NOT optional in practice even though the rule tolerates
+    /// its absence: without it the margins come back gross, and for an
+    /// inclusive-VAT shop that is the margin on money it never kept.
+    public func priceComparables(orders: [JSONValue], material: String,
+                                 settings: [String: JSONValue]) throws -> PriceComparables {
+        try runtime.call2("""
+            KhaytAiPrice.buildComparables(ARG0, { material: ARG1, settings: ARG2 })
+            """,
+            [.array(orders), .string(material), .object(settings)],
+            as: PriceComparables.self)
+    }
+
+    /// Ask the model to weigh those comparables and recommend one.
+    ///
+    /// Consent is checked here, where the data leaves — the comparables carry
+    /// the shop's own project names, prices and margins.
+    public func aiPriceRequest(settings: [String: JSONValue],
+                               comparables: JSONValue, job: JSONValue,
+                               shopName: String, language: String,
+                               apiKey: String) throws -> AiRequest {
+        try runtime.call2("""
+            (function (a) {
+              if (!KhaytAiPrivacy.isFeatureEnabled((a.settings || {}).ai, 'price')) {
+                throw new Error('AI_FEATURE_NOT_CONSENTED');
+              }
+              var t = KhaytAiTools.resolveTool('price', KhaytAiPrice.PRICE_SCHEMA);
+              var settings = { ai: Object.assign({}, (a.settings || {}).ai, { apiKey: a.apiKey }) };
+              return KhaytAiProviders.buildRequest(settings, {
+                apiKey: a.apiKey,
+                system: KhaytAiPrice.buildPriceSystem({ shopName: a.shopName, lang: a.lang }),
+                prompt: KhaytAiPrice.buildPriceRequest(a.comparables, a.job),
+                tool: t.tool,
+                maxTokens: t.maxTokens,
+              });
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "comparables": comparables,
+                      "job": job, "shopName": .string(shopName),
+                      "lang": .string(language), "apiKey": .string(apiKey)])],
+            as: AiRequest.self)
+    }
+
+    /// A recommendation, and why.
+    public struct PriceSuggestion: Decodable, Sendable {
+        public let ok: Bool
+        public let suggestedMargin: Double?
+        public let suggestedPrice: Double?
+        public let rationale: String?
+        public let problem: String?
+    }
+
+    /// Read one back, falling back to the shop's own median when the model
+    /// gives nothing usable — which is a real answer, not a failure: the
+    /// median was computed here, from this shop's history, before anything was
+    /// sent anywhere.
+    public func aiPriceRead(settings: [String: JSONValue], response: JSONValue,
+                            fallbackMargin: Double?) throws -> PriceSuggestion {
+        try runtime.call2("""
+            (function (a) {
+              var out = KhaytAiProviders.readResponse(a.settings, a.data);
+              var fallback = (a.fallback === null) ? null
+                : { suggestedMargin: a.fallback, suggestedPrice: null, rationale: '' };
+              if (!out.ok) {
+                var f = KhaytAiPrice.pickPrice(null, fallback);
+                return f
+                  ? { ok: true, suggestedMargin: f.suggestedMargin,
+                      suggestedPrice: f.suggestedPrice, rationale: f.rationale, problem: null }
+                  : { ok: false, suggestedMargin: null, suggestedPrice: null,
+                      rationale: null, problem: KhaytAiTools.describeStop(out.stop) };
+              }
+              var p = KhaytAiPrice.pickPrice(out.draft, fallback);
+              if (!p) {
+                return { ok: false, suggestedMargin: null, suggestedPrice: null,
+                         rationale: null, problem: 'no margin in the answer' };
+              }
+              return { ok: true, suggestedMargin: p.suggestedMargin,
+                       suggestedPrice: p.suggestedPrice, rationale: p.rationale, problem: null };
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "data": response,
+                      "fallback": fallbackMargin.map { JSONValue.number($0) } ?? .null])],
+            as: PriceSuggestion.self)
+    }
+
+    // MARK: - What a product costs, and what it is worth
+
+    /// A product priced from its own parts.
+    ///
+    /// A product's price is COMPUTED, never typed: the calculator's per-part
+    /// cost summed over the parts, plus bought-in components, plus the shop's
+    /// margin, then whatever rounding it has asked for. `basePrice` is cost
+    /// plus margin and `price` is what the shop charges — both are kept,
+    /// because a shop that can only see its rounded price cannot tell a healthy
+    /// margin from a rounding accident.
+    public struct ProductPricing: Decodable, Sendable {
+        public let cost: Double
+        public let basePrice: Double
+        public let price: Double
+        public let priceSource: String
+        /// How many parts the figures came from. ZERO is the answer that
+        /// matters: a product with no parts has no cost, and saying so beats
+        /// showing a confident 0.00.
+        public let parts: Int
+        public let hours: Double
+        public let grams: Double
+    }
+
+    /// `inventory` and `settings` are the COST CONTEXT and are not optional in
+    /// practice: `computePartBaseCost` falls back to renderer globals that do
+    /// not exist here, and the resin branch is chosen by looking a part's
+    /// filament up in the shelf. Without it a resin part is priced by the
+    /// filament formula — a different answer, not a missing one.
+    public func priceProduct(_ product: JSONValue, inventory: [JSONValue],
+                             settings: [String: JSONValue],
+                             consumables: [JSONValue]) throws -> ProductPricing {
+        try runtime.call2("""
+            KhaytProductPricing.priceProduct(ARG0,
+              { inventory: ARG1, settings: ARG2, consumables: ARG3 })
+            """,
+            [product, .array(inventory), .object(settings), .array(consumables)],
+            as: ProductPricing.self)
+    }
+
+    /// Only the three fields the pricing rule owns, for writing back.
+    ///
+    /// Separate from `priceProduct` on purpose: spreading the whole answer onto
+    /// a record would put `parts` (a count) over `parts` (the list), which is
+    /// the shape of bug that eats data.
+    public func productPricingFields(_ product: JSONValue, inventory: [JSONValue],
+                                     settings: [String: JSONValue],
+                                     consumables: [JSONValue]) throws -> [String: JSONValue] {
+        try runtime.call2("""
+            KhaytProductPricing.pricingFields(ARG0,
+              { inventory: ARG1, settings: ARG2, consumables: ARG3 })
+            """,
+            [product, .array(inventory), .object(settings), .array(consumables)],
+            as: [String: JSONValue].self)
     }
 
     // MARK: - Money received
