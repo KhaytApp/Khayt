@@ -1647,6 +1647,12 @@ final class Words {
                                           "ar": "تحقق عادةً {pct}% على {material} — "
                                           + "وسيط {n} عملًا منتهيًا."],
         "mac.use_it":        ["en": "Use it",          "ar": "استخدمه"],
+        "mac.ask_what_to_charge": ["en": "Ask what to charge", "ar": "اسأل عن السعر"],
+        "mac.advice_no_reason": ["en": "Suggested {pct}%, with no reason given.",
+                                 "ar": "اقترح {pct}% دون ذكر سبب."],
+        "mac.ai_price_not_consented": ["en": "Switch on \"Price advice\" in "
+                                       + "Settings → AI assist first.",
+                                       "ar": "فعّل «نصيحة التسعير» في الإعدادات ← مساعد الذكاء أولًا."],
         // ── DRAFTING A MESSAGE TO A CUSTOMER ──────────────────────────────
         "mac.draft_a_message": ["en": "Draft a message", "ar": "صياغة رسالة"],
         "mac.what_about":    ["en": "About",             "ar": "بخصوص"],

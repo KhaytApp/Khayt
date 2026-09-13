@@ -47,10 +47,7 @@ struct NeedsTheOtherAppTests {
         // NARROWED, not removed. The comparables half — the shop's own realized
         // margins, net of tax — is on the new-job sheet and needs no model at
         // all. What is still missing is the half that asks one to weigh them.
-        Gap(id: "ai.price.recommendation",
-            what: "Asking the assistant to weigh those comparables and recommend one",
-            why: "The comparables are shown here already; the model call that "
-               + "phrases a recommendation over them has no surface yet."),
+
 
 
         Gap(id: "product.tiers",
@@ -158,7 +155,7 @@ struct NeedsTheOtherAppTests {
         // A number, deliberately. It is a ratchet: lowering it is the work,
         // raising it needs somebody to decide that on purpose and say why in
         // the commit.
-        #expect(Self.known.count <= 6, Comment(rawValue: """
+        #expect(Self.known.count <= 5, Comment(rawValue: """
             \(Self.known.count) things still need the other app. This number is \
             a ratchet — if a new dependency is genuinely unavoidable, lower \
             something else first or raise this deliberately.

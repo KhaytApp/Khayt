@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **Ask what to charge, beside the figure you already have.** The job sheet
+  already shows what you usually make on work like this. *Ask what to charge*
+  now sends those comparables — and only those — to be weighed, so an outlier
+  or a thin sample can be argued about in a sentence rather than averaged away.
+
+  **The reason is always shown.** A margin that changed with no sentence beside
+  it is a number you cannot argue with when a customer does.
+
+  If the answer is unusable, your own median is what comes back — it was worked
+  out on your Mac before anything was sent, so a refusal is not a failure.
+
 - **The Mac can draft a message to a customer.** On a job with a customer on it:
   pick what the message is about — a status update, ready for pickup, a quote
   follow-up, a payment reminder, an apology for a delay, or your own note — and

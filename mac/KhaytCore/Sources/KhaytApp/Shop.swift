@@ -425,6 +425,7 @@ final class Shop {
             aiQuoteAllowed = aiFeatures.first { $0.id == "quote" }?.enabled ?? false
             aiAssistantAllowed = aiFeatures.first { $0.id == "assistant" }?.enabled ?? false
             aiReplyAllowed = aiFeatures.first { $0.id == "reply" }?.enabled ?? false
+            aiPriceAllowed = aiFeatures.first { $0.id == "price" }?.enabled ?? false
             taxSummary = await describeTax(root["settings"])
             await readSettingsTables(root)
             // What each job still owes is `order-money`'s answer, not a
@@ -1655,6 +1656,16 @@ final class Shop {
                                                   settings: settingsDict)
     }
 
+    /// The same answer, unparsed — what the model is shown when asked to weigh
+    /// it. Kept as the raw value rather than re-encoding the decoded struct,
+    /// because the rule's own shape is what its prompt builder expects and a
+    /// Swift round-trip is a chance to lose a field.
+    func priceComparablesRaw(material: String) async -> JSONValue? {
+        guard let engine else { return nil }
+        return try? await engine.rawPriceComparables(orders: orderRows, material: material,
+                                                     settings: settingsDict)
+    }
+
     /// Price a product from the parts the sheet is holding.
     ///
     /// Through the shared rule, which is what `renderer/inventory.js` now
@@ -1672,6 +1683,54 @@ final class Shop {
                                               inventory: inventoryRows,
                                               settings: settingsDict,
                                               consumables: consumableRows)
+    }
+
+    /// Whether the shop has agreed to price advice, on this book.
+    private(set) var aiPriceAllowed = false
+
+    /// A recommended margin, with the reason for it.
+    struct PriceAdvice: Sendable {
+        var margin: Double
+        var rationale: String
+    }
+
+    /// Advice or a sentence. Not `Result<_, String>` — `String` is not an
+    /// `Error`, and inventing an error type for something the shop simply has
+    /// to READ buys nothing.
+    enum PriceOutcome: Sendable {
+        case advised(PriceAdvice)
+        case refused(String)
+    }
+
+    /// Ask the model to weigh this shop's own comparables.
+    ///
+    /// The comparables are already on screen — computed here, net of tax, with
+    /// nothing sent anywhere. This is the optional second opinion over them.
+    func recommendMargin(comparables: KhaytEngine.PriceComparables,
+                         raw: JSONValue, cost: Double, grams: Double,
+                         hours: Double, material: String) async
+        -> PriceOutcome {
+        let job = JSONValue.object([
+            "material": .string(material), "grams": .number(grams),
+            "hours": .number(hours), "cost": .number(cost),
+            "currency": .string(currency),
+        ])
+        do {
+            let out = try await AiClient.recommendMargin(
+                comparables: raw, job: job,
+                fallback: comparables.suggestedMargin, shop: self)
+            guard out.ok, let margin = out.suggestedMargin else {
+                return .refused(out.problem ?? words.callIt("mac.ai_no_draft"))
+            }
+            return .advised(PriceAdvice(margin: margin,
+                                        rationale: out.rationale ?? ""))
+        } catch AiClient.Failure.notConsented {
+            return .refused(words.callIt("mac.ai_price_not_consented"))
+        } catch AiClient.Failure.noKey {
+            return .refused(words.callIt("mac.ai_no_key"))
+        } catch {
+            return .refused(String(describing: error))
+        }
     }
 
     // MARK: - Drafting a message to a customer
