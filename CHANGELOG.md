@@ -16,9 +16,33 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
   If the answer is unusable, your own median is what comes back — it was worked
   out on your Mac before anything was sent, so a refusal is not a failure.
+
+- **Finishing a job on the Mac now tells the systems you have connected.** A
+  shop with webhooks configured could not move a job on the Mac at all: the app
+  refused the move rather than make it with a piece missing. It sends them now,
+  so that refusal is gone — and both webhook systems are covered, the
+  subscription list and the single order webhook, because a shop can have both
+  and Khayt sends to both.
+
+  The message goes out **after** the job is saved and only if it was, and a
+  delivery that fails is said out loud rather than swallowed — the whole point
+  of refusing these moves before was that a piece of the move would silently not
+  happen.
+
+- **(Maintainers) The webhook payload and its envelope are shared rules now.**
+  Two apps sign the same bytes, so the field names, their ORDER, and the
+  `{ event, payload, timestamp }` envelope `main.js` has posted since webhooks
+  shipped are all in `lib/webhook-bus.js` and used from both sides. A literal in
+  one app would have meant deliveries that verify from Khayt and fail from the
+  Mac, which is the kind of drift a shop only discovers through a consumer that
+  stopped trusting it.
+
+  The signature is the bare hex, not `sha256=<hex>`. `main.js` has two webhook
+  transports that disagree about this, and the bare one is what every delivery
+  actually goes through — so it is the spelling consumers verify.
+
 - **(Maintainers) The Mac can send a webhook, with both layers of the guard.**
-  The transport, the HMAC signature and the retry policy are in place; the move
-  that fires one is next.
+  The transport, the HMAC signature and the retry policy.
 
   The URL is typed by the shop, so the guard is the feature. Two layers, and
   neither is enough alone: the **name** is checked against the shared ranges —

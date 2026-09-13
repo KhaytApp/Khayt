@@ -6869,25 +6869,87 @@ public actor KhaytEngine {
             as: [WebhookSubscription].self)
     }
 
-    /// The body a consumer receives: the normalised order event, wrapped in the
-    /// delivery envelope whose `id` doubles as the idempotency key.
-    public func webhookBody(event: String, order: JSONValue, shopName: String,
-                            clientName: String, currency: String,
-                            at: String, deliveryId: String) throws -> JSONValue {
-        try runtime.call2("""
+    /// One delivery, addressed and ready to post.
+    ///
+    /// `body` is the FINAL wire body, envelope and all — nothing else may be
+    /// added to it, because the signature is over exactly these bytes.
+    public struct WebhookDelivery: Decodable, Sendable {
+        public let url: String
+        /// As it stands in the book. A sealed one is opened at the point of
+        /// use, the way the Telegram token is.
+        public let secret: String
+        public let event: String
+        public let deliveryId: String
+        public let body: JSONValue
+    }
+
+    /// Every webhook a move owes, to every consumer that asked for it.
+    ///
+    /// The two systems are kept apart here rather than merged, because they
+    /// really are different: the subscription bus fans one event out to many
+    /// URLs each with its own secret, and `eventWebhooks` is one URL with one
+    /// switch per event. A shop can have both, and then a job that completes
+    /// sends to both — which is what the other app does today.
+    public func webhookDeliveries(order: JSONValue, effects: [WebhookEffect],
+                                  settings: [String: JSONValue], shopName: String,
+                                  clientName: String, currency: String,
+                                  at: String, nowMs: Double) throws -> [WebhookDelivery] {
+        let asked = effects.map { effect -> JSONValue in
+            .object(["kind": .string(effect.kind), "event": .string(effect.event),
+                     "newStatus": effect.newStatus.map { JSONValue.string($0) } ?? .null])
+        }
+        return try runtime.call2("""
             (function (a) {
-              var payload = KhaytWebhooks.buildWebhookEvent(a.event, a.order, {
-                at: a.at, shopName: a.shopName,
-                clientName: a.clientName, currency: a.currency,
-              });
-              return KhaytWebhookBus.buildDeliveryBody(payload.event, payload, a.id, a.at);
+              var settings = a.settings || {}, out = [];
+              for (var i = 0; i < a.effects.length; i++) {
+                var e = a.effects[i];
+                if (e.kind === 'webhook') {
+                  // The subscription bus. Off entirely unless the shop switched
+                  // it on, and then only the subscriptions listening for THIS
+                  // event — `matchSubscriptions` also drops the disabled ones.
+                  var wh = settings.webhooks || {};
+                  if (!wh.enabled) continue;
+                  var subs = KhaytWebhookBus.matchSubscriptions(
+                    KhaytWebhookBus.migrateLegacyWebhooks(wh), e.event);
+                  if (!subs.length) continue;
+                  var payload = KhaytWebhookBus.statusPayload(e.event, a.order, e.newStatus);
+                  var body = KhaytWebhookBus.buildDeliveryBody(e.event, payload, null, a.at);
+                  for (var j = 0; j < subs.length; j++) {
+                    // The id carries the subscription, so two consumers on one
+                    // event do not dedupe each other's delivery away.
+                    var id = body.id + '_' + subs[j].id;
+                    var one = Object.assign({}, body, { id: id });
+                    out.push({
+                      url: subs[j].url, secret: subs[j].secret || '', event: e.event,
+                      deliveryId: id,
+                      body: KhaytWebhookBus.buildWireBody(e.event, one, a.nowMs),
+                    });
+                  }
+                } else if (e.kind === 'order_webhook') {
+                  // The single configured URL. https only, and each event has
+                  // its own switch which defaults to on.
+                  var w = settings.eventWebhooks || {};
+                  if (!w.enabled || !/^https:\\/\\//i.test(w.url || '')) continue;
+                  if (w.events && w.events[e.event] === false) continue;
+                  var built = KhaytWebhooks.buildWebhookEvent(e.event, a.order, {
+                    at: a.at, shopName: a.shopName,
+                    clientName: a.clientName, currency: a.currency,
+                  });
+                  out.push({
+                    url: w.url, secret: w.secret || '', event: built.event,
+                    deliveryId: built.id,
+                    body: KhaytWebhookBus.buildWireBody(built.event, built, a.nowMs),
+                  });
+                }
+              }
+              return out;
             })(ARG0)
             """,
-            [.object(["event": .string(event), "order": order,
-                      "shopName": .string(shopName), "clientName": .string(clientName),
-                      "currency": .string(currency), "at": .string(at),
-                      "id": .string(deliveryId)])],
-            as: JSONValue.self)
+            [.object(["order": order, "effects": .array(asked),
+                      "settings": .object(settings), "shopName": .string(shopName),
+                      "clientName": .string(clientName), "currency": .string(currency),
+                      "at": .string(at), "nowMs": .number(nowMs)])],
+            as: [WebhookDelivery].self)
     }
 
     /// What to do after one attempt. `gone` is a consumer saying stop for good.
@@ -7118,6 +7180,7 @@ private let MOVE_SCRIPT = """
   var moved = KhaytOrderStatus.apply(order, status, moveCtx);
   var notices = moved.notices.slice();
   var performed = [], cosmetic = [], outbound = [], unhandled = [], activity = null;
+  var webhookEffects = [];
 
   var COSMETIC = {
     render: 1, toast_updated: 1, toast_updated_undoable: 1,
@@ -7172,6 +7235,14 @@ private let MOVE_SCRIPT = """
       cosmetic.push(e.type);
     } else if (OUTBOUND[e.type]) {
       outbound.push(e.type);
+      // With their arguments, because two webhooks on one move differ only in
+      // what they are called.
+      if (e.type === 'webhook' || e.type === 'order_webhook') {
+        webhookEffects.push({
+          kind: e.type, event: e.event,
+          newStatus: typeof e.newStatus === 'string' ? e.newStatus : null,
+        });
+      }
     } else {
       unhandled.push(e.type);
     }
@@ -7180,7 +7251,8 @@ private let MOVE_SCRIPT = """
   return {
     ok: true, gate: gate, order: order, inventory: inventory, consumables: consumables,
     notices: notices, activity: activity,
-    performed: performed, cosmetic: cosmetic, outbound: outbound, unhandled: unhandled
+    performed: performed, cosmetic: cosmetic, outbound: outbound, unhandled: unhandled,
+    webhookEffects: webhookEffects
   };
 })()
 """

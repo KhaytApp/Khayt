@@ -481,8 +481,8 @@ async function batchMoveStatus() {
       deductPackagingConsumables(o);
       if (o.clientId) autoExportStatusPage(o);
       autoSendEmailNotification(o, 'completed');
-      fireWebhook('status_changed', { orderId: o.id, project: o.project, newStatus: 'completed', client: o.client });
-      fireWebhook('order_delivered', { orderId: o.id, project: o.project, client: o.client });
+      fireStatusWebhook('status_changed', o, 'completed');
+      fireStatusWebhook('order_delivered', o);
       fireOrderWebhook('status', o);
     }
   }

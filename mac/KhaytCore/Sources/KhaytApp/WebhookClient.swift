@@ -52,12 +52,19 @@ enum WebhookClient {
     }
 
     /// One delivery. Returns the HTTP status, or throws for a fault.
+    ///
+    /// `body` is the finished wire body — `KhaytWebhookBus.buildWireBody`, the
+    /// envelope `main.js` has posted since webhooks shipped. It is not touched
+    /// here: the signature is over exactly these bytes, and a field added in
+    /// passing is a delivery the consumer verifies and rejects.
     @discardableResult
     static func deliver(_ body: JSONValue, to url: URL, secret: String,
-                        event: String, deliveryId: String,
-                        engine: KhaytEngine) async throws -> Int {
+                        event: String, engine: KhaytEngine) async throws -> Int {
         guard let host = url.host, !host.isEmpty else { throw Failure.blocked("") }
-        guard url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http" else {
+        // https ONLY, which is what the other app allows. Plain http would
+        // carry a shop's order data and its HMAC across the network in the
+        // clear, and there is no consumer that needs it.
+        guard url.scheme?.lowercased() == "https" else {
             throw Failure.blocked(url.scheme ?? "")
         }
 
@@ -77,16 +84,22 @@ enum WebhookClient {
         request.httpBody = payload
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(event, forHTTPHeaderField: "X-Khayt-Event")
-        // The id doubles as the idempotency key, so a consumer that sees a
-        // retry of a delivery it already handled can say so.
-        request.setValue(deliveryId, forHTTPHeaderField: "Idempotency-Key")
         if !secret.isEmpty {
-            // `sha256=<hex>` over the exact bytes sent, which is what the other
-            // app signs and therefore what a consumer is already verifying.
+            // ── BARE HEX, NOT `sha256=<hex>` ───────────────────────────────
+            //
+            // Because that is what a consumer of this app is already verifying.
+            // `main.js` has two webhook transports and they disagree with each
+            // other about this: `hub:webhook-post` writes the prefix,
+            // `hub:fire-webhook` writes the hex alone — and `hub:fire-webhook`
+            // is the one every delivery actually goes through, because the
+            // renderer routes even the single-URL webhook down the durable path
+            // to get its retries. So the prefixed spelling is the one nobody
+            // receives, and matching it would have meant every delivery from
+            // this Mac failing verification at a consumer that accepts Khayt's.
             let mac = HMAC<SHA256>.authenticationCode(
                 for: payload, using: SymmetricKey(data: Data(secret.utf8)))
-            let hex = mac.map { String(format: "%02x", $0) }.joined()
-            request.setValue("sha256=" + hex, forHTTPHeaderField: "X-Khayt-Signature")
+            request.setValue(mac.map { String(format: "%02x", $0) }.joined(),
+                             forHTTPHeaderField: "X-Khayt-Signature")
         }
 
         let (_, response) = try await session.data(for: request)

@@ -97,13 +97,24 @@ struct MoveJobTests {
         // one.
         let words = Words()
         await words.load("en", engine: engine)
-        // The message a shop's Telegram bot would send is the third thing a move
-        // hands back; these cases are about the book, so it is dropped here and
-        // tested in TelegramTests.
+        // What the move would SEND — the Telegram message and the webhooks —
+        // is dropped here; these cases are about the book. `moveFully` hands
+        // back everything, for the cases that are about what goes out.
         let out = try await Shop.applyMove(to: &root, id: id, stage: stage, engine: engine,
                                            words: words, holdReason: holdReason, qcNotes: qcNotes,
                                            actuals: actuals)
         return (out.undo, out.notices)
+    }
+
+    /// The same move, with everything it hands back.
+    static func moveFully(_ root: inout [String: JSONValue], _ id: String, _ stage: Stage)
+    async throws -> (undo: [Shop.ChangedRecord], notices: [String],
+                     telegram: TelegramMessage?, webhooks: [KhaytEngine.WebhookDelivery]) {
+        let engine = try KhaytEngine()
+        let words = Words()
+        await words.load("en", engine: engine)
+        return try await Shop.applyMove(to: &root, id: id, stage: stage,
+                                        engine: engine, words: words)
     }
 
     // MARK: -
@@ -195,23 +206,28 @@ struct MoveJobTests {
     /// The failure this whole design exists to prevent: a move made here that
     /// silently does not send what the same move sends in Khayt.
     ///
-    /// TELEGRAM IS NO LONGER AN EXAMPLE OF ONE. This app sends those itself
-    /// now, so the case is written with a webhook — which it still cannot
-    /// deliver, and still refuses whole. See `TelegramTests` for the other
-    /// half: a shop whose only integration is a bot can finish a job here.
+    /// NEITHER TELEGRAM NOR A WEBHOOK IS AN EXAMPLE OF ONE ANY MORE. This app
+    /// sends both itself now, so the case is written with an email to the
+    /// customer — which it still cannot send, and still refuses whole. See
+    /// `TelegramTests` and `WebhookGuardTests` for the other half.
     @Test("a move that would reach somebody is refused whole")
     func refusedForOutbound() async throws {
+        // An email only reaches somebody when there is somebody to reach: the
+        // rule wants a provider, this status among its triggers, and a customer
+        // with an address on file.
         let wired: [String: JSONValue] = [
             "autoDeduct": .bool(true),
-            "webhooks": .object([
-                "enabled": .bool(true),
-                "subscriptions": .array([.object([
-                    "id": .string("W1"), "url": .string("https://example.test/hook"),
-                    "events": .array([.string("*")]),
-                ])]),
-            ]),
+            "emailConfig": .object(["provider": .string("resend"),
+                                    "triggers": .array([.string("completed")])]),
         ]
         var root = Self.book(settings: wired)
+        root["clients"] = .array([.object(["id": .string("A"), "name": .string("Acme"),
+                                           "email": .string("buyer@example.test")])])
+        root["printLog"] = .array(Self.rowValues(root, "printLog").map { row in
+            guard case .object(var job) = row, job["id"] == .string("J1") else { return row }
+            job["clientId"] = .string("A")
+            return .object(job)
+        })
         let before = root
 
         await #expect(throws: Shop.MoveRefused.self) {
@@ -221,18 +237,35 @@ struct MoveJobTests {
         }
         #expect(root == before, "not the job, not the spools, not the packaging")
 
-        // A channel that says nothing about THIS move does not block it. A
-        // webhook is not such a channel — `webhooks.enabled` fires for every
-        // status change, and the subscriptions are matched when it is sent —
-        // so the case is written with an email the shop only sends on
-        // completion.
-        var moving = Self.book(settings: [
-            "autoDeduct": .bool(true),
-            "emailConfig": .object(["provider": .string("resend"),
-                                    "triggers": .array([.string("completed")])]),
-        ])
+        // A channel that says nothing about THIS move does not block it: the
+        // same shop moving the same job to `printing` sends no email, so
+        // nothing is missed and nothing is refused.
+        var moving = root
         _ = try await Self.move(&moving, "J1", .pending)
         #expect(Self.string(Self.row(moving, "printLog", "J1")?["status"]) == "pending")
+    }
+
+    /// And the channels this app CAN reach do not refuse it.
+    ///
+    /// The gap this closes: a shop with webhooks configured could not finish a
+    /// job on this Mac at all. Now it can, and the consumers are told.
+    @Test("a shop with webhooks configured can finish a job here, and is told what to send")
+    func webhooksNoLongerRefuse() async throws {
+        var root = Self.book(settings: [
+            "autoDeduct": .bool(true),
+            "webhooks": .object([
+                "enabled": .bool(true),
+                "subscriptions": .array([.object([
+                    "id": .string("W1"), "url": .string("https://example.test/hook"),
+                    "events": .array([.string("status_changed")]), "enabled": .bool(true),
+                ])]),
+            ]),
+        ])
+        let (_, _, _, owed) = try await Self.moveFully(&root, "J1", .completed)
+        #expect(Self.string(Self.row(root, "printLog", "J1")?["status"]) == "completed",
+                "the move was refused for a channel this app can reach")
+        #expect(owed.map(\.url) == ["https://example.test/hook"],
+                Comment(rawValue: "the consumer would be told nothing: \(owed.map(\.url))"))
     }
 
     @Test("the refusal names the channel, so a shop knows what it would have missed")

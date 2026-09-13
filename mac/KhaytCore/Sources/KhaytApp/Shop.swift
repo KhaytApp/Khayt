@@ -5602,13 +5602,14 @@ final class Shop {
         var undoSnapshot: [ChangedRecord] = []
         var said: [String] = []
         var telegram: TelegramMessage?
+        var owed: [KhaytEngine.WebhookDelivery] = []
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
-                (undoSnapshot, said, telegram) = try await Self.applyMove(
+                (undoSnapshot, said, telegram, owed) = try await Self.applyMove(
                     to: &root, id: id, stage: stage, engine: engine, words: self.words,
                     holdReason: holdReason, qcNotes: qcNotes, actuals: actuals)
             }
@@ -5625,10 +5626,60 @@ final class Shop {
             // refusing these moves before was that a piece of the move would
             // silently not happen.
             if let telegram { await tell(telegram) }
+            if !owed.isEmpty { await fire(owed) }
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
         } catch {
             moveProblem = String(describing: error)
+        }
+    }
+
+    /// Deliver what the move owes, and say what did not arrive.
+    ///
+    /// Not fatal, for the same reason a failed Telegram message is not: the job
+    /// IS moved and the book says so. Undoing a correct write because a
+    /// consumer was down would be the wrong trade. The shop is TOLD, which is
+    /// the whole point of the app having refused these moves before.
+    private func fire(_ deliveries: [KhaytEngine.WebhookDelivery]) async {
+        guard let engine else { return }
+        var sent = 0
+        for one in deliveries {
+            // The HOST, not the whole URL: a webhook URL usually carries a
+            // token in its path, and a sentence on screen is a sentence that
+            // gets screenshotted into a support chat.
+            let name = URL(string: one.url)?.host ?? one.url
+            guard let url = URL(string: one.url) else {
+                moveProblem = words.callIt("mac.webhook_failed", ["where": .string(name)])
+                    + " " + words.callIt("mac.webhook_bad_url")
+                continue
+            }
+            do {
+                // SEALED SECRETS ARE OPENED AT THE POINT OF USE, the way the
+                // Telegram token is. `settings.webhooks.secret` is a registered
+                // path, and the legacy config carries it down into every
+                // migrated subscription — so signing with the string as it sits
+                // in the book would sign with the ciphertext and every delivery
+                // would fail verification at the consumer.
+                // `open` returns a value with no marker untouched, so this is
+                // the same call whether the shop's secret is sealed or is from
+                // a store written before sealing existed.
+                let secret = try await Secrets.open(one.secret, for: source)
+                let status = try await WebhookClient.deliver(
+                    one.body, to: url, secret: secret, event: one.event, engine: engine)
+                if (200..<300).contains(status) {
+                    sent += 1
+                } else {
+                    moveProblem = words.callIt("mac.webhook_failed", ["where": .string(name)])
+                        + " HTTP \(status)"
+                }
+            } catch {
+                moveProblem = words.callIt("mac.webhook_failed", ["where": .string(name)])
+                    + " " + ((error as? LocalizedError)?.errorDescription
+                             ?? String(describing: error))
+            }
+        }
+        if sent > 0 {
+            moveNotices.append(words.callIt("mac.webhooks_sent", ["n": .number(Double(sent))]))
         }
     }
 
@@ -5693,7 +5744,8 @@ final class Shop {
                                   engine: KhaytEngine, words: Words,
                                   holdReason: String? = nil, qcNotes: String? = nil,
                                   actuals: Actuals? = nil)
-    async throws -> (undo: [ChangedRecord], notices: [String], telegram: TelegramMessage?) {
+    async throws -> (undo: [ChangedRecord], notices: [String], telegram: TelegramMessage?,
+                     webhooks: [KhaytEngine.WebhookDelivery]) {
 
         var orders = rows(root, "printLog")
         let inventory = rows(root, "inventory")
@@ -5751,7 +5803,13 @@ final class Shop {
         // rather than swallowed, so a shop knows the customer was not told.
         let reaches = (try? await engine.outbound(order: target, to: stage.rawValue,
                                                   settings: settings, clients: clients)) ?? []
-        let cannotSend = reaches.filter { $0.channel != "telegram" }
+        // The channels this app can actually reach. Everything else is still
+        // refused WHOLE rather than made with a piece missing — an email or a
+        // portal refresh cannot be sent from here and cannot be sent
+        // afterwards, so a half-made move would leave a customer told nothing
+        // with no way to notice.
+        let canSend: Set<String> = ["telegram", "webhooks", "event_webhook"]
+        let cannotSend = reaches.filter { !canSend.contains($0.channel) }
         if !cannotSend.isEmpty {
             throw MoveRefused(sentence: words.outboundRefusal(cannotSend))
         }
@@ -5785,6 +5843,35 @@ final class Shop {
             changedOrder["surveyToken"] = .string(surveyToken())
         }
 
+        // ── WHAT THE MOVE OWES OUTWARD, BUILT FROM THE MOVED JOB ──────────
+        //
+        // AFTER the move, because the body names the job's state and the whole
+        // point of the message is that the state changed: built from the record
+        // as it was before, every consumer would be told the job is still where
+        // it was. The other app builds them here too, for the same reason.
+        //
+        // And HERE rather than after the write, because this runs inside the
+        // write and the settings, the subscriptions and the customer's name are
+        // the ones on disk. Sending is the caller's job; this only addresses.
+        var owed: [KhaytEngine.WebhookDelivery] = []
+        if let asked = move.webhookEffects, !asked.isEmpty {
+            var clientName = ""
+            if case .string(let clientId)? = changedOrder["clientId"] {
+                for row in clients where recordId(row) == clientId {
+                    if case .object(let c) = row {
+                        clientName = plainString(c["nameEn"]) ?? plainString(c["nameAr"])
+                            ?? plainString(c["name"]) ?? ""
+                    }
+                }
+            }
+            owed = (try? await engine.webhookDeliveries(
+                order: .object(changedOrder), effects: asked, settings: settings,
+                shopName: plainString(settings["bizEn"]) ?? plainString(settings["bizAr"]) ?? "Khayt",
+                clientName: clientName, currency: shopCurrencyOf(settings),
+                at: ISO8601DateFormatter().string(from: Date()),
+                nowMs: Date().timeIntervalSince1970 * 1000)) ?? []
+        }
+
         var undo: [ChangedRecord] = []
         write(&root, "printLog", changed: [.object(changedOrder)], before: orders, into: &undo)
         write(&root, "inventory", changed: move.inventory ?? [], before: inventory, into: &undo)
@@ -5795,7 +5882,7 @@ final class Shop {
         }
 
         let notices = (move.notices ?? []).map { words.sentence(for: $0) }
-        return (undo, notices, telegram)
+        return (undo, notices, telegram, owed)
     }
 
     // MARK: - Reading and writing rows

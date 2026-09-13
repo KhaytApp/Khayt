@@ -57,6 +57,41 @@
     );
   }
 
+  /**
+   * What a lifecycle event carries.
+   *
+   * Four fields, written down ONCE. Both apps sign the bytes of this object, so
+   * a field renamed in one of them — or the keys written in a different order,
+   * which changes the JSON and therefore the HMAC — is a delivery a consumer
+   * verifies and rejects. `order_delivered` deliberately carries no status:
+   * delivered is not one (a handed-over job stays `completed` with a
+   * `deliveredAt`), so a `newStatus` here would be inventing a state.
+   */
+  function statusPayload(event, order, newStatus) {
+    const o = order || {};
+    if (event === 'order_delivered') {
+      return { orderId: o.id, project: o.project, client: o.client };
+    }
+    return { orderId: o.id, project: o.project, newStatus: newStatus, client: o.client };
+  }
+
+  /**
+   * The envelope that actually goes on the wire.
+   *
+   * `main.js` hub:fire-webhook has posted this shape since the day webhooks
+   * shipped, so it is what every consumer's parser is written against — the
+   * delivery body above is NESTED inside it rather than being the body. It is
+   * here rather than inline in the transport because a second app now sends
+   * these, and a consumer cannot be asked to accept two shapes.
+   */
+  function buildWireBody(event, body, nowMs) {
+    return {
+      event,
+      payload: body,
+      timestamp: typeof nowMs === 'number' ? nowMs : Date.now(),
+    };
+  }
+
   /** The signed body a consumer receives. `id` doubles as the idempotency key. */
   function buildDeliveryBody(event, payload, id, nowIso) {
     return {
@@ -154,6 +189,7 @@
     EVENTS, MAX_ATTEMPTS, DELIVERY_LOG_CAP, PENDING_CAP,
     schedulePending, duePending, futurePending, removePending,
     migrateLegacyWebhooks, matchSubscriptions, buildDeliveryBody,
+    statusPayload, buildWireBody,
     backoffDelayMs, shouldRetry, isGone, appendDelivery, deliveriesFor,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

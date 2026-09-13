@@ -254,6 +254,23 @@ function resumePendingWebhooks() {
   for (const p of Bus.futurePending(pending)) setTimeout(() => fire(p), Math.min(p.inMs, 2_147_000_000));
 }
 
+/**
+ * A status or lifecycle event, with its payload built by the shared rule.
+ *
+ * The payload is `KhaytWebhookBus.statusPayload` rather than an object literal
+ * at each call site, because the Mac app signs the same bytes: a field renamed
+ * here — or the keys written in a different order, which changes the JSON and
+ * therefore the HMAC — would be a delivery a consumer verifies and rejects from
+ * one app and accepts from the other. The Bus is reached for through the same
+ * guard as everywhere else in this file: `bedready.html` is a second entry
+ * point with its own script list.
+ */
+function fireStatusWebhook(eventName, order, newStatus) {
+  const Bus = (typeof KhaytWebhookBus !== 'undefined') ? KhaytWebhookBus : null;
+  if (!Bus) return;
+  return fireWebhook(eventName, Bus.statusPayload(eventName, order, newStatus));
+}
+
 async function fireWebhook(eventName, payload) {
   const wh = settings.webhooks;
   if (!wh?.enabled) return;

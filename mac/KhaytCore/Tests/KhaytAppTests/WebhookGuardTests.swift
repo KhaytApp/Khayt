@@ -98,16 +98,19 @@ struct WebhookGuardTests {
                 "a link-local address is not blocked")
     }
 
-    @Test("a scheme that is not http(s) never reaches the network")
+    @Test("a scheme that is not https never reaches the network")
     func onlyHttp() async throws {
         let engine = try KhaytEngine()
-        for bad in ["file:///etc/passwd", "ftp://example.com/x", "gopher://example.com/"] {
+        // Plain http is on this list on purpose: the other app refuses it too,
+        // and a webhook over http carries a shop's order data and its HMAC in
+        // the clear.
+        for bad in ["file:///etc/passwd", "ftp://example.com/x", "gopher://example.com/",
+                    "http://example.com/hook"] {
             guard let url = URL(string: bad) else { continue }
             var threw = false
             do {
                 _ = try await WebhookClient.deliver(.object([:]), to: url, secret: "",
-                                                    event: "order.status",
-                                                    deliveryId: "dlv_1", engine: engine)
+                                                    event: "order.status", engine: engine)
             } catch { threw = true }
             #expect(threw, Comment(rawValue: "\(bad) was not refused"))
         }
@@ -116,18 +119,20 @@ struct WebhookGuardTests {
     @Test("a blocked host is refused before anything is sent")
     func blockedNeverSends() async throws {
         let engine = try KhaytEngine()
-        for bad in ["http://127.0.0.1:8080/hook",
-                    "http://[::1]:8080/hook",
-                    "http://169.254.169.254/latest/meta-data/",
-                    "http://10.0.0.5/hook"] {
+        // https, every one. Over http they would be refused for the SCHEME —
+        // the assertion below would still pass, on `blocked("http")`, and the
+        // guard this test exists for would never have run.
+        for bad in ["https://127.0.0.1:8080/hook",
+                    "https://[::1]:8080/hook",
+                    "https://169.254.169.254/latest/meta-data/",
+                    "https://10.0.0.5/hook"] {
             guard let url = URL(string: bad) else {
                 Issue.record(Comment(rawValue: "could not parse \(bad)")); continue
             }
             var said = ""
             do {
                 _ = try await WebhookClient.deliver(.object([:]), to: url, secret: "",
-                                                    event: "order.status",
-                                                    deliveryId: "dlv_1", engine: engine)
+                                                    event: "order.status", engine: engine)
                 Issue.record(Comment(rawValue: "\(bad) was delivered to"))
             } catch { said = String(describing: error) }
             // The CASE, not the sentence. `String(describing:)` on the enum
@@ -139,29 +144,125 @@ struct WebhookGuardTests {
 
     // MARK: - The body and the signature
 
-    @Test("the delivery body is the shared shape, with the id as the idempotency key")
-    func bodyIsShared() async throws {
-        let engine = try KhaytEngine()
+    /// A completed job, and a shop with BOTH webhook systems switched on.
+    static func book() -> (order: JSONValue, settings: [String: JSONValue]) {
         let order = JSONValue.object([
             "id": .string("ORD-01042"), "project": .string("Coffee dallah stand"),
-            "status": .string("completed"), "price": .number(450),
-            "dueDate": .string("2026-09-20"),
+            "client": .string("Maha"), "status": .string("completed"),
+            "price": .number(450), "dueDate": .string("2026-09-20"),
         ])
-        let body = try await engine.webhookBody(
-            event: "status", order: order, shopName: "Tuwaiq Additive",
-            clientName: "Maha", currency: "SAR",
-            at: "2026-09-13T10:00:00.000Z", deliveryId: "dlv_abc123")
-        guard case .object(let o) = body else { Issue.record("no body"); return }
-        #expect(o["id"] == JSONValue.string("dlv_abc123"),
-                "the delivery id is not the idempotency key")
-        #expect(o["event"] == JSONValue.string("order.status"))
-        #expect(o["version"] == JSONValue.number(1))
-        guard case .object(let payload)? = o["payload"],
-              case .object(let ord)? = payload["order"] else {
-            Issue.record("no order in the payload"); return
+        let settings: [String: JSONValue] = [
+            "webhooks": .object([
+                "enabled": .bool(true),
+                "subscriptions": .array([
+                    .object(["id": .string("whs_a"), "url": .string("https://a.example.com/h"),
+                             "events": .array([.string("status_changed")]),
+                             "secret": .string("s3cret"), "enabled": .bool(true)]),
+                    .object(["id": .string("whs_b"), "url": .string("https://b.example.com/h"),
+                             "events": .array([.string("payment_received")]),
+                             "enabled": .bool(true)]),
+                ]),
+            ]),
+            "eventWebhooks": .object([
+                "enabled": .bool(true), "url": .string("https://c.example.com/orders"),
+                "secret": .string("other"),
+            ]),
+        ]
+        return (order, settings)
+    }
+
+    @Test("a completed move addresses both webhook systems, and only the listeners")
+    func bothSystems() async throws {
+        let engine = try KhaytEngine()
+        let (order, settings) = Self.book()
+        let owed = try await engine.webhookDeliveries(
+            order: order,
+            effects: [
+                .init(kind: "webhook", event: "status_changed", newStatus: "completed"),
+                .init(kind: "order_webhook", event: "status", newStatus: nil),
+                .init(kind: "webhook", event: "order_delivered", newStatus: nil),
+            ],
+            settings: settings, shopName: "Tuwaiq Additive", clientName: "Maha",
+            currency: "SAR", at: "2026-09-13T10:00:00.000Z", nowMs: 1_789_000_000_000)
+
+        // `whs_b` listens for a payment and must not be told about a status;
+        // `order_delivered` has no listener at all. So: one bus delivery and
+        // one order webhook.
+        #expect(owed.map(\.url) == ["https://a.example.com/h", "https://c.example.com/orders"],
+                Comment(rawValue: "addressed \(owed.map(\.url))"))
+        #expect(owed[0].secret == "s3cret", "the subscription's own secret is not used")
+        #expect(owed[1].secret == "other")
+        // The two systems have two event vocabularies, and neither is renamed.
+        #expect(owed[0].event == "status_changed")
+        #expect(owed[1].event == "order.status")
+        // The id carries the subscription, so two consumers of one event do not
+        // dedupe each other's delivery away.
+        #expect(owed[0].deliveryId.hasSuffix("_whs_a"),
+                Comment(rawValue: "delivery id was \(owed[0].deliveryId)"))
+    }
+
+    @Test("what goes on the wire is the envelope the other app has always posted")
+    func theWireBody() async throws {
+        let engine = try KhaytEngine()
+        let (order, settings) = Self.book()
+        let owed = try await engine.webhookDeliveries(
+            order: order,
+            effects: [.init(kind: "webhook", event: "status_changed", newStatus: "completed")],
+            settings: settings, shopName: "Tuwaiq Additive", clientName: "Maha",
+            currency: "SAR", at: "2026-09-13T10:00:00.000Z", nowMs: 1_789_000_000_000)
+        let one = try #require(owed.first)
+
+        // ── THE SHAPE IS `main.js` hub:fire-webhook's, NOT A NEW ONE ──────
+        //
+        // `{ event, payload, timestamp }` with the delivery body NESTED in
+        // `payload` — a consumer's parser is written against this, and the
+        // signature is over exactly these bytes.
+        guard case .object(let wire) = one.body else { Issue.record("no body"); return }
+        #expect(wire["event"] == JSONValue.string("status_changed"))
+        #expect(wire["timestamp"] == JSONValue.number(1_789_000_000_000))
+        guard case .object(let body)? = wire["payload"] else {
+            Issue.record("the delivery body is not nested in `payload`"); return
         }
-        #expect(ord["id"] == JSONValue.string("ORD-01042"))
-        #expect(ord["currency"] == JSONValue.string("SAR"))
+        #expect(body["id"] == JSONValue.string(one.deliveryId),
+                "the id in the body is not the one this delivery is called")
+        #expect(body["version"] == JSONValue.number(1))
+        guard case .object(let payload)? = body["payload"] else {
+            Issue.record("no payload"); return
+        }
+        #expect(payload["orderId"] == JSONValue.string("ORD-01042"))
+        #expect(payload["newStatus"] == JSONValue.string("completed"))
+        #expect(payload["client"] == JSONValue.string("Maha"))
+    }
+
+    @Test("a shop with nothing switched on is not told anything")
+    func nothingConfigured() async throws {
+        let engine = try KhaytEngine()
+        let (order, _) = Self.book()
+        for settings: [String: JSONValue] in [
+            [:],
+            // Subscriptions, but the system itself is off.
+            ["webhooks": .object(["enabled": .bool(false),
+                                  "subscriptions": .array([
+                                    .object(["id": .string("x"),
+                                             "url": .string("https://a.example.com/h"),
+                                             "events": .array([.string("status_changed")]),
+                                             "enabled": .bool(true)])])])],
+            // A URL that is not https — refused by the rule, not by the client.
+            ["eventWebhooks": .object(["enabled": .bool(true),
+                                       "url": .string("http://c.example.com/orders")])],
+            // And the per-event switch.
+            ["eventWebhooks": .object(["enabled": .bool(true),
+                                       "url": .string("https://c.example.com/orders"),
+                                       "events": .object(["status": .bool(false)])])],
+        ] {
+            let owed = try await engine.webhookDeliveries(
+                order: order,
+                effects: [.init(kind: "webhook", event: "status_changed", newStatus: "completed"),
+                          .init(kind: "order_webhook", event: "status", newStatus: nil)],
+                settings: settings, shopName: "Tuwaiq Additive", clientName: "Maha",
+                currency: "SAR", at: "2026-09-13T10:00:00.000Z", nowMs: 1)
+            #expect(owed.isEmpty, Comment(rawValue: "addressed \(owed.map(\.url))"))
+        }
     }
 
     @Test("which subscriptions want an event is the shared rule's answer")
@@ -169,13 +270,13 @@ struct WebhookGuardTests {
         let engine = try KhaytEngine()
         let webhooks = JSONValue.object(["subscriptions": .array([
             .object(["id": .string("A"), "url": .string("https://a.example.com/h"),
-                     "events": .array([.string("order.status")]), "enabled": .bool(true)]),
+                     "events": .array([.string("status_changed")]), "enabled": .bool(true)]),
             .object(["id": .string("B"), "url": .string("https://b.example.com/h"),
-                     "events": .array([.string("order.paid")]), "enabled": .bool(true)]),
+                     "events": .array([.string("payment_received")]), "enabled": .bool(true)]),
             .object(["id": .string("C"), "url": .string("https://c.example.com/h"),
-                     "events": .array([.string("order.status")]), "enabled": .bool(false)]),
+                     "events": .array([.string("status_changed")]), "enabled": .bool(false)]),
         ])])
-        let want = try await engine.webhookSubscriptions(webhooks, event: "order.status")
+        let want = try await engine.webhookSubscriptions(webhooks, event: "status_changed")
         #expect(want.map(\.id) == ["A"],
                 Comment(rawValue: "matched \(want.map(\.id)) — B wants another event, C is off"))
     }
@@ -245,6 +346,39 @@ struct WebhookWiringTests {
         // And no Swift copy of the ranges.
         #expect(!client.contains("169.254") && !client.contains("192.168"),
                 "the client carries its own copy of the blocked ranges")
+    }
+
+    @Test("the deliveries a move owes are actually sent")
+    func theyAreSent() throws {
+        // ── THE BUG THIS CATCHES IS A CORRECT MODULE WITH NO CALLER ───────
+        //
+        // Everything above can pass with `applyMove` handing back a list that
+        // nothing posts. Delete the `fire(owed)` line and this is the only test
+        // in the suite that notices.
+        let shop = try WebhookWiringTests.code("Shop.swift")
+        #expect(shop.contains("await fire(owed)"),
+                "a move addresses its webhooks and never sends them")
+        #expect(shop.contains("WebhookClient.deliver("),
+                "nothing in the app posts a webhook")
+        // AFTER the write. A consumer told about a job that was not saved is
+        // worse than a consumer told nothing.
+        guard let wrote = shop.range(of: "registerMoveUndo("),
+              let sent = shop.range(of: "await fire(owed)") else {
+            Issue.record("the move no longer writes or no longer sends"); return
+        }
+        #expect(wrote.lowerBound < sent.lowerBound,
+                "the webhook goes out before the move is known to have been written")
+    }
+
+    @Test("the signature is the spelling a consumer of the other app verifies")
+    func signatureSpelling() throws {
+        // `hub:fire-webhook` writes the hex alone, and it is the transport every
+        // delivery from the other app goes through. The prefixed spelling is
+        // the one nobody receives — see WebhookClient for the whole story.
+        let client = try WebhookWiringTests.code("WebhookClient.swift")
+        #expect(!client.contains("\"sha256=\""),
+                "the signature carries a prefix the other app does not send")
+        #expect(client.contains("X-Khayt-Signature"))
     }
 
     @Test("redirects are not followed")

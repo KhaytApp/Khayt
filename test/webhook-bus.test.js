@@ -151,3 +151,43 @@ test('pending queue is bounded so a broken endpoint cannot grow it forever', () 
   assert.equal(q.length, B.PENDING_CAP);
   assert.equal(q[q.length - 1].id, 'd' + (B.PENDING_CAP + 49), 'newest kept');
 });
+
+/* ── The bytes two apps sign ──────────────────────────────────────────────
+ *
+ * The Mac app posts these webhooks too, and it builds them from this module.
+ * So the payload's field names AND their order are part of the contract: JSON
+ * preserves insertion order, the HMAC is over those bytes, and a consumer that
+ * verifies a delivery from one app must verify the identical delivery from the
+ * other.
+ */
+test('statusPayload is the exact object the renderer used to build inline', () => {
+  const order = { id: 'ORD-1', project: 'Bracket', client: 'Acme' };
+  assert.equal(
+    JSON.stringify(B.statusPayload('status_changed', order, 'completed')),
+    JSON.stringify({ orderId: 'ORD-1', project: 'Bracket', newStatus: 'completed', client: 'Acme' }));
+});
+
+test('order_delivered carries no status, because delivered is not one', () => {
+  // A handed-over job stays `completed` with a `deliveredAt`; a `newStatus`
+  // here would be inventing a state neither app has.
+  const order = { id: 'ORD-1', project: 'Bracket', client: 'Acme' };
+  assert.equal(
+    JSON.stringify(B.statusPayload('order_delivered', order, 'completed')),
+    JSON.stringify({ orderId: 'ORD-1', project: 'Bracket', client: 'Acme' }));
+});
+
+test('buildWireBody is the envelope main.js has posted since webhooks shipped', () => {
+  assert.equal(
+    JSON.stringify(B.buildWireBody('status_changed', { id: 'dlv_1' }, 1789)),
+    JSON.stringify({ event: 'status_changed', payload: { id: 'dlv_1' }, timestamp: 1789 }));
+});
+
+test('the transport builds its body from this module, not from a literal', () => {
+  // The envelope is written down once because a second app sends it now. A
+  // main.js that went back to building it inline would drift silently — the
+  // deliveries would still arrive, and only the Mac's would fail verification.
+  const main = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'main.js'), 'utf8');
+  assert.match(main, /webhookBus\.buildWireBody\(webhookEvent, payload\)/,
+    'hub:fire-webhook no longer uses the shared envelope');
+});

@@ -32,11 +32,6 @@ struct NeedsTheOtherAppTests {
 
     /// THE LIST. Shorten it; do not lengthen it without a very good `why`.
     static let known: [Gap] = [
-        Gap(id: "outbound.webhooks",
-            what: "Moving a job when an outbound webhook is configured",
-            why: "The payload and retry policy are lib/webhooks.js and "
-               + "lib/webhook-bus.js, neither bundled; and sending one needs "
-               + "the SSRF guard in lib/host-guard.js, which is also not."),
         Gap(id: "outbound.email",
             what: "Moving a job that would email the customer",
             why: "Needs a provider integration — the address, the key and the "
@@ -148,6 +143,37 @@ struct NeedsTheOtherAppTests {
                 "ai.quote works here and is still on the list")
         #expect(!Self.known.contains { $0.id.contains("telegram") },
                 "Telegram is sent by this app and must not be listed")
+        #expect(!Self.known.contains { $0.id.contains("webhook") },
+                "Webhooks are sent by this app and must not be listed")
+
+        // ── AND THE REMAINING OUTBOUND GAPS ARE REALLY STILL REFUSED ──────
+        //
+        // `applyMove` refuses a move it cannot carry out WHOLE, and the set of
+        // channels it can carry is one line in `Shop.swift`. A channel added
+        // there while its Gap stayed behind is exactly the stale sentence this
+        // file exists to catch — and it would be caught nowhere else, because
+        // the app would be working and only the words would be wrong.
+        let shop = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appending(path: "Sources/KhaytApp/Shop.swift"),
+            encoding: .utf8)
+        guard let line = shop.range(of: "let canSend: Set<String> = ["),
+              let close = shop[line.upperBound...].firstIndex(of: "]") else {
+            Issue.record("applyMove no longer says which channels it can send")
+            return
+        }
+        let canSend = String(shop[line.upperBound..<close])
+        for (gap, channel) in [("outbound.email", "email"),
+                               ("outbound.portal", "portal")]
+        where Self.known.contains(where: { $0.id == gap }) {
+            #expect(!canSend.contains("\"\(channel)\""), Comment(rawValue: """
+                \(gap) is on the list, but applyMove now sends \(channel) — \
+                the entry is stale and a shop is being told to open the other \
+                app for something this one does.
+                """))
+        }
     }
 
     @Test("the list is not growing")
