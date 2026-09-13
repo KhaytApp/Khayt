@@ -41,6 +41,14 @@ private struct Detail: View {
                     Divider()
                     parts
                 }
+                // What the whole object came to, for a shop looking at one
+                // leg of it. Only where there is a kit to show or a book that
+                // has kits in it — a picker offering to file a job into
+                // nothing, on every job, is a control that says nothing.
+                if shop.kit(of: job.id) != nil || !shop.kits.isEmpty || shop.canWrite {
+                    Divider()
+                    KitSection(shop: shop, job: job)
+                }
                 // Only for an invoice that is actually owed a report. A job
                 // still on the bench is not late, and a shop that has not
                 // opted into Phase 2 is not subject to any of this — saying

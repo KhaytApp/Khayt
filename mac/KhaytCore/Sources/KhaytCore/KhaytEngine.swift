@@ -364,6 +364,15 @@ public actor KhaytEngine {
         // records last-writer-wins, and a record can travel between machines
         // disagreeing with itself. Preferring either list blindly loses data.
         "print-file-parts",
+        // …and the OTHER thing four prints can be: not one print of four
+        // files, but four separate jobs that make one physical object. A
+        // figure printed as Head, Hand, Body and Legs is four print-log
+        // entries, and "what did that figure cost me" was arithmetic across
+        // four rows done by hand. Grouping ACROSS orders rather than merging
+        // them, because the actuals live on the order — folding four jobs into
+        // one would replace four measured numbers with one, which is exactly
+        // what `estimate-calibration` above learns from.
+        "print-kits",
         // What a part SHOULD say, according to the file it was printed from.
         // A part typed by hand keeps the figure it was typed with; the model
         // beside it holds what the slicer actually measured, and nothing ever
@@ -5872,6 +5881,139 @@ public actor KhaytEngine {
                                   .object(["tracking": bytes(tokens.tracking),
                                            "quoteApproval": bytes(tokens.quoteApproval)])],
                                  as: NewOrder.self)
+    }
+
+    // MARK: - Several prints that are one object
+
+    /// What a kit's jobs add up to, WITH the count behind each total.
+    ///
+    /// `measuredTime` and `measuredWeight` are not decoration. Summing
+    /// `actualPrintTime` across entries where some are null yields a number
+    /// that looks like the kit's total and silently omits whatever was never
+    /// measured — the single bug `lib/print-kits.js` exists to avoid — so a
+    /// caller that shows a total without its count has reintroduced it at the
+    /// last step.
+    public struct KitRollup: Decodable, Sendable {
+        public let jobs: Int
+        public let estHours: Double
+        public let estGrams: Double
+        public let actualHours: Double
+        public let actualGrams: Double
+        /// Null when the kit spans two currencies: 12 SAR + 3 EUR is 15 of nothing.
+        public let cost: Double?
+        public let currency: String?
+        public let mixedCurrency: Bool
+        public let measuredTime: Int
+        public let measuredWeight: Int
+        public let costed: Int
+    }
+
+    /// How far the estimate was off across the whole kit.
+    ///
+    /// Absent unless EVERY counted job was measured — a kit where three of four
+    /// are measured has a real per-job story and no kit-level delta, because
+    /// the estimate covers four jobs and the actual covers three.
+    public struct KitAccuracy: Decodable, Sendable {
+        public let time: Double?
+        public let weight: Double?
+    }
+
+    /// One kit: several print-log entries that are one physical object.
+    public struct PrintKit: Decodable, Sendable, Identifiable {
+        public let id: String
+        public let name: String
+        /// The definition is gone and the jobs are not. `groupByKit` keeps
+        /// these on purpose: a deleted name must not take the shop's history
+        /// off the screen with it, and the kit keeps a name derived from its
+        /// own work rather than showing a raw id.
+        public let orphaned: Bool
+        public let rollup: KitRollup
+        public let accuracy: KitAccuracy?
+        /// Every job counted AND measured on both axes.
+        public let complete: Bool
+        /// The order ids, newest-first within the kit, rather than the whole
+        /// records — Swift already has those, and crossing them back would be
+        /// the largest payload in this file for no new information.
+        public let jobIds: [String]
+    }
+
+    /// Group the print log into kits, each with its rollup already totalled.
+    ///
+    /// `isComplete` is asked here rather than exposed as its own bridge: it
+    /// takes a kit, and a kit that has crossed into Swift is no longer the
+    /// shape it wants.
+    public func kits(orders: [JSONValue], defs: [JSONValue]) throws -> [PrintKit] {
+        try runtime.call2("""
+            (function (a) {
+              var g = KhaytPrintKits.groupByKit(a.orders, a.defs);
+              return (g.kits || []).map(function (k) {
+                return {
+                  id: k.id, name: k.name, orphaned: !!k.orphaned,
+                  rollup: k.rollup, accuracy: k.accuracy,
+                  complete: KhaytPrintKits.isComplete(k),
+                  jobIds: (k.entries || []).map(function (e) {
+                    return String((e && e.id) || '');
+                  }),
+                };
+              });
+            })(ARG0)
+            """,
+            [.object(["orders": .array(orders), "defs": .array(defs)])],
+            as: [PrintKit].self)
+    }
+
+    /// Which kit a typed name means, and whether saying it made a new one.
+    public struct KitName: Decodable, Sendable {
+        public let id: String
+        public let name: String
+        public let created: Bool
+    }
+
+    /// An exact name (ignoring case and repeated spaces) IS that kit.
+    ///
+    /// Reusing it rather than minting a second one is the whole point: you
+    /// print three parts, file them as "Dragon", print the fourth next week,
+    /// and reproducing the string from memory must not cost you a second kit
+    /// with the rollup split between them.
+    ///
+    /// The id is supplied rather than minted in JavaScript because minting one
+    /// is the host's job — the same reason nothing in `lib/` reads a clock.
+    public func resolveKitName(_ name: String, known: [JSONValue],
+                               newId: String) throws -> KitName? {
+        try runtime.call2("""
+            KhaytPrintKits.resolveKitName(ARG0.name, ARG0.defs, function () { return ARG0.newId; })
+            """,
+            [.object(["name": .string(name), "defs": .array(known),
+                      "newId": .string(newId)])],
+            as: KitName?.self)
+    }
+
+    /// A kit name one or two edits from this one.
+    ///
+    /// Offered so a near-miss is caught BEFORE it becomes a second kit, and
+    /// never acted on: "Leg L" and "Leg R" are one edit apart and genuinely
+    /// different, so silently merging them would move somebody's jobs on a
+    /// guess.
+    public struct NearKitName: Decodable, Sendable {
+        public let id: String
+        public let name: String
+        public let distance: Int
+    }
+
+    public func similarKitNames(_ name: String, known: [JSONValue]) throws -> [NearKitName] {
+        try runtime.call("KhaytPrintKits", "similarKitNames",
+                         [JSONValue.string(name), JSONValue.array(known)],
+                         as: [NearKitName].self)
+    }
+
+    /// Kit definitions no job points at any more.
+    ///
+    /// Deliberately NOT the mirror of `orphaned`: that is a job whose
+    /// definition is gone, this is a definition whose jobs are.
+    public func emptyKitIds(orders: [JSONValue], defs: [JSONValue]) throws -> [String] {
+        try runtime.call("KhaytPrintKits", "emptyKitIds",
+                         [JSONValue.array(orders), JSONValue.array(defs)],
+                         as: [String].self)
     }
 
     // MARK: - Money received

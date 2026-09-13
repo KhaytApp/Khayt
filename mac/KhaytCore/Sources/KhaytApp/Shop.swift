@@ -411,6 +411,11 @@ final class Shop {
             if case .array(let rows)? = root["expenses"] { expenseRows = rows } else { expenseRows = [] }
             if case .array(let rows)? = root["wasteLog"] { wasteRows = rows } else { wasteRows = [] }
             readSnapshots(root)
+            // AFTER `orderRows` is read, which it groups. A kit is several
+            // print-log entries that are one physical object, and the rollup
+            // is asked for here rather than in the view so that a table
+            // redrawing on every keystroke does not cross into JavaScript.
+            await readKits(root)
             taxSummary = await describeTax(root["settings"])
             await readSettingsTables(root)
             // What each job still owes is `order-money`'s answer, not a
@@ -2127,6 +2132,244 @@ final class Shop {
     struct OneOrderEdit {
         let order: JSONValue
         var activity: String? = nil
+    }
+
+    // MARK: - Several prints that are one object
+
+    /// The kits in this book, each already totalled.
+    ///
+    /// A figure printed as Head, Hand, Body and Legs is four jobs and four
+    /// print-log entries, and "what did that figure cost me" was arithmetic
+    /// across four rows that nobody does. Grouped ACROSS orders rather than
+    /// merged into one, because the actuals live on the order — folding four
+    /// jobs into one would replace four measured numbers with one, and those
+    /// are what the estimator calibrates from.
+    private(set) var kits: [KhaytEngine.PrintKit] = []
+
+    /// `settings.kits` as written — `[{id, name}]`. Kept raw because every
+    /// rule that touches a kit name takes this list, and re-encoding a decoded
+    /// Swift struct would be a second opinion about its shape.
+    private(set) var kitDefs: [JSONValue] = []
+
+    /// The kit this job is filed under, if any.
+    func kit(of id: Order.ID) -> KhaytEngine.PrintKit? {
+        kits.first { $0.jobIds.contains(id) }
+    }
+
+    /// Read the kits back after the book changed. Called from `load`.
+    private func readKits(_ root: [String: JSONValue]) async {
+        if case .array(let rows)? = Self.settings(root)["kits"] { kitDefs = rows }
+        else { kitDefs = [] }
+        kits = (try? await engine?.kits(orders: orderRows, defs: kitDefs)) ?? []
+    }
+
+    /// File every job named under one kit, creating it if the name is new.
+    ///
+    /// ONE WRITE for all of them, and the settings change in the same write:
+    /// a kit whose definition reached the book while its jobs did not is a
+    /// name attached to nothing, and the reverse is an orphan. Both are
+    /// recoverable and neither should be produced by a crash in the middle.
+    func fileJobs(_ ids: [Order.ID], inKitNamed name: String) async {
+        guard !ids.isEmpty, let build = source.build, let engine else { return }
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        // Through the engine, so a name matching one the shop already uses IS
+        // that kit rather than a second one holding half the rollup.
+        guard let resolved = try? await engine.resolveKitName(
+            clean, known: kitDefs, newId: Self.mintKitId(clean)) else {
+            writeProblem = words.callIt("mac.kit_unknown"); return
+        }
+        await writeKits(build, named: words.callIt("mac.file_in", ["name": .string(resolved.name)])) { root in
+            var settings = Self.settings(root)
+            var defs = Self.kitRows(settings)
+            if !defs.contains(where: { Self.recordId($0) == resolved.id }) {
+                defs.append(.object(["id": .string(resolved.id), "name": .string(resolved.name)]))
+            }
+            settings["kits"] = .array(defs)
+            root["settings"] = .object(settings)
+            Self.stampKit(&root, ids: Set(ids), to: resolved.id)
+        }
+    }
+
+    /// Kit names one or two edits from this one, to ask about before filing.
+    ///
+    /// Asked by the view rather than inside `fileJobs`, because the answer is a
+    /// QUESTION for the shop and not a decision this app may make: "Leg L" and
+    /// "Leg R" are one edit apart and genuinely different.
+    func nearKits(_ name: String) async -> [KhaytEngine.NearKitName] {
+        guard let engine else { return [] }
+        return (try? await engine.similarKitNames(name, known: kitDefs)) ?? []
+    }
+
+    /// Take jobs back out.
+    ///
+    /// Grouping after the fact means grouping the wrong things sometimes, and
+    /// until this existed the only correction was disbanding the whole kit —
+    /// which is why anyone would rather leave it wrong.
+    ///
+    /// A definition left pointing at nothing goes with them. The jobs are what
+    /// a kit IS; with none left there is nothing to keep, and the name is
+    /// clutter the shop reads past every time it files something.
+    func unfileJobs(_ ids: [Order.ID]) async {
+        guard !ids.isEmpty, let build = source.build else { return }
+        await writeKits(build, named: words.callIt("mac.remove_from_kit")) { root in
+            Self.stampKit(&root, ids: Set(ids), to: nil)
+        }
+        await sweepEmptyKits()
+    }
+
+    /// Drop kit names no job points at any more.
+    ///
+    /// A SECOND transaction, after the jobs have moved and the book has been
+    /// read back, because the rule that answers this is asynchronous and the
+    /// store write is not. That is the right way round anyway: taking jobs out
+    /// is the shop's action, and sweeping up a name attached to nothing is a
+    /// tidy-up. A crash between the two leaves an empty kit name — which is
+    /// exactly the state `lib/print-kits.js` chose to report rather than act
+    /// on, and one more filing puts it back to work.
+    private func sweepEmptyKits() async {
+        guard let build = source.build, let engine, !kitDefs.isEmpty else { return }
+        let dead = Set((try? await engine.emptyKitIds(orders: orderRows, defs: kitDefs)) ?? [])
+        guard !dead.isEmpty else { return }
+        await writeKits(build, named: words.callIt("mac.remove_from_kit")) { root in
+            var settings = Self.settings(root)
+            settings["kits"] = .array(Self.kitRows(settings)
+                .filter { !dead.contains(Self.recordId($0) ?? "") })
+            root["settings"] = .object(settings)
+        }
+    }
+
+    /// Rename a kit — and ADOPT an orphan.
+    ///
+    /// A kit whose definition was deleted still groups its jobs, and there was
+    /// no way back: the jobs were stuck in something unnameable. Naming one
+    /// writes the definition again.
+    ///
+    /// Refuses a name another kit already holds rather than merging into it.
+    /// Merging would move somebody else's jobs on the strength of a typo, and
+    /// "reuse the kit with this name" is a rule that belongs to FILING, where
+    /// the shop has just chosen which jobs are involved.
+    func renameKit(_ kitId: String, to name: String) async {
+        guard let build = source.build else { return }
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        let folded = clean.lowercased()
+        if let taken = kitDefs.first(where: {
+            Self.recordId($0) != kitId && Self.kitName($0)?.lowercased() == folded
+        }), let other = Self.kitName(taken) {
+            writeProblem = words.callIt("mac.kit_name_taken", ["name": .string(other)])
+            return
+        }
+        await writeKits(build, named: words.callIt("mac.rename_kit")) { root in
+            var settings = Self.settings(root)
+            var defs = Self.kitRows(settings)
+            if let at = defs.firstIndex(where: { Self.recordId($0) == kitId }) {
+                guard case .object(var def) = defs[at] else { return }
+                def["name"] = .string(clean)
+                defs[at] = .object(def)
+            } else {
+                // The orphan, adopted.
+                defs.append(.object(["id": .string(kitId), "name": .string(clean)]))
+            }
+            settings["kits"] = .array(defs)
+            root["settings"] = .object(settings)
+        }
+    }
+
+    /// Take every job out of a kit and forget the kit. The prints are untouched.
+    func disbandKit(_ kitId: String) async {
+        guard let build = source.build else { return }
+        let ids = Set(kits.first { $0.id == kitId }?.jobIds ?? [])
+        await writeKits(build, named: words.callIt("mac.disband_kit")) { root in
+            Self.stampKit(&root, ids: ids, to: nil)
+            var settings = Self.settings(root)
+            let defs = Self.kitRows(settings)
+            settings["kits"] = .array(defs.filter { Self.recordId($0) != kitId })
+            root["settings"] = .object(settings)
+        }
+    }
+
+    /// Put `kitId` on some jobs, or take it off, stamping only what changed.
+    ///
+    /// REMOVED rather than set to an empty string. `groupByKit` reads the field
+    /// with a trim and treats blank as ungrouped, so an empty string would work
+    /// — right up until the record syncs to a machine running a build that
+    /// checks the key's presence instead.
+    static func stampKit(_ root: inout [String: JSONValue],
+                                 ids: Set<String>, to kitId: String?) {
+        guard !ids.isEmpty, case .array(var rows)? = root["printLog"] else { return }
+        var touched = false
+        for i in rows.indices {
+            guard case .object(var record) = rows[i],
+                  let id = recordId(rows[i]), ids.contains(id) else { continue }
+            let was = record["kitId"]
+            if let kitId { record["kitId"] = .string(kitId) } else { record["kitId"] = nil }
+            guard record["kitId"] != was else { continue }
+            StoreWriter.stamp(&record)
+            rows[i] = .object(record)
+            touched = true
+        }
+        guard touched else { return }
+        root["printLog"] = .array(rows)
+    }
+
+    /// The shared shape of every kit edit: one guarded write, then re-read.
+    ///
+    /// `named` is carried for the Edit menu's benefit the day these become
+    /// undoable; the write itself is one transaction either way.
+    private func writeKits(_ build: StoreReader.Build, named actionName: String,
+                           change: @escaping (inout [String: JSONValue]) -> Void) async {
+        do {
+            try StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in change(&root) }
+            writeProblem = nil
+            await load(source)
+        } catch {
+            writeProblem = String(describing: error)
+        }
+    }
+
+    /// A kit id from the name the shop typed, salted so two kits called the
+    /// same thing on two machines do not collide into one after a sync.
+    ///
+    /// ── AND IT IS `uid`, NOT A STRING BUILT HERE ──────────────────────────
+    ///
+    /// Twice now this was written inline and twice `WordsAreTranslatedTests`
+    /// refused it. That guard flags any short literal carrying an
+    /// interpolation, because that is the shape of a unit written in Swift
+    /// where the catalogue has a word for it — `"\(n) kg"` — and it cannot
+    /// tell one from an id prefix. First it caught the English fallback "kit";
+    /// with that gone it caught "KIT-" itself.
+    ///
+    /// The guard is not wrong either time, and the answer was already in this
+    /// file: every other id in the app comes from `uid(_:)`, which takes the
+    /// prefix as an ARGUMENT so no literal ever sits next to an interpolation.
+    /// A kit id is an id like any other and had no business being special.
+    ///
+    /// The slug is still worth having — `KIT-dragon-…` is readable in a store
+    /// somebody is debugging — and is dropped when the name leaves nothing,
+    /// which is most Arabic names, since it keeps only ASCII.
+    private static func mintKitId(_ name: String) -> String {
+        let slug = name.lowercased()
+            .map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "-" }
+            .reduce(into: "") { $0.append($1) }
+        let trimmed = slug.split(separator: "-").prefix(4).joined(separator: "-")
+        return trimmed.isEmpty ? uid("KIT") : uid("KIT-" + trimmed)
+    }
+
+    private static func kitName(_ value: JSONValue) -> String? {
+        guard case .object(let o) = value, case .string(let n)? = o["name"] else { return nil }
+        return n
+    }
+
+    /// `settings.kits` — a collection that lives INSIDE settings rather than
+    /// at the root, which is why `Shop.rows` cannot reach it.
+    private static func kitRows(_ settings: [String: JSONValue]) -> [JSONValue] {
+        if case .array(let rows)? = settings["kits"] { return rows }
+        return []
     }
 
     /// One order as the book holds it, rather than as this app decoded it.
@@ -5489,7 +5732,26 @@ final class Shop {
     var shown: [Order] {
         var rows = orders
         if let stage { rows = rows.filter { Stage.of($0) == stage } }
+        // Narrowed to one kit, when the band above the table has been asked
+        // for one. A chip that only states a total is decoration; this is what
+        // makes it a control — "show me the four jobs that made the figure".
+        if let kitFilter, let kit = kits.first(where: { $0.id == kitFilter }) {
+            let inKit = Set(kit.jobIds)
+            rows = rows.filter { inKit.contains($0.id) }
+        }
         return matching(rows)
+    }
+
+    /// Which kit the book is narrowed to, if any. Not persisted: a filter that
+    /// survives a relaunch is a book that opens showing four of its jobs with
+    /// no visible reason why.
+    var kitFilter: String? {
+        didSet {
+            guard kitFilter != oldValue else { return }
+            // A selection outside the narrowed book is a row the table cannot
+            // show and an inspector describing something invisible.
+            if let selection, !shown.contains(where: { $0.id == selection }) { self.selection = nil }
+        }
     }
 
     func count(_ stage: Stage) -> Int { orders.count { Stage.of($0) == stage } }

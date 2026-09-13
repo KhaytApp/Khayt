@@ -41,6 +41,30 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the wrong day. The suite exists to prove that adding measured actuals moved no
   money, and lateness is not money: what is pinned now is that the sample still
   carries overdue work for the attention list to find.
+- **The Mac app can group several prints that are one object.** A figure
+  printed as a head, two hands and a body on four evenings is four jobs in the
+  book, and "what did that figure cost me" was arithmetic across four rows that
+  nobody does. The Electron app has grouped them since its Orders Log learnt to;
+  the Mac could not. A kit now sits above the jobs table with its own totals,
+  clicking one narrows the book to the jobs that made it, and the selected job
+  says which kit it belongs to and what the whole object came to.
+
+  Grouped ACROSS orders rather than merged into one, and that is not tidiness:
+  what a print really took is recorded on the ORDER and nowhere else, so folding
+  four jobs into one would replace four measured numbers with one — and those
+  four are exactly what the estimator learns its rate from.
+
+  **Every total says how many jobs are behind it.** Adding up what four prints
+  took, when one of them was never measured, gives a figure that looks like the
+  answer and is the answer for three. So a kit that is not fully measured says
+  "3 of 4 measured" in amber, and offers no percentage against the estimate at
+  all — an estimate covering four jobs and an actual covering three do not
+  divide into anything true.
+
+  Naming is a pick rather than a retype: a name a kit already has IS that kit,
+  whatever the capitals, and a name one edit away from an existing one is
+  questioned before it becomes a second kit with the takings split between them.
+  A kit whose name was deleted keeps its jobs and can be named again.
 
 - **(Maintainers) The print-risk import path is proven by importing, not by
   reading the call site.** The wiring guard claimed a behaviour test needed a

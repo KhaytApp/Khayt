@@ -116,7 +116,13 @@ struct ShopWindow: View {
                 } else if shop.showingCustomers {
                     CustomersTable(shop: shop)
                 } else {
-                    OrdersTable(shop: shop)
+                    // The kits above the book they group. Nothing at all when
+                    // the shop has never made one — a band explaining an empty
+                    // feature is furniture on the screen people live in.
+                    VStack(spacing: 0) {
+                        KitBand(shop: shop)
+                        OrdersTable(shop: shop)
+                    }
                 }
             }
         }

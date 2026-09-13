@@ -663,6 +663,62 @@ final class Words {
         "mac.add_to_favourites": ["en": "Add to Favourites", "ar": "إضافة إلى المفضّلة"],
         "mac.remove_from_favourites": ["en": "Remove from Favourites", "ar": "إزالة من المفضّلة"],
         "mac.file_in":       ["en": "File in {name}",  "ar": "احفظ في {name}"],
+
+        // ── KITS: SEVERAL PRINTS THAT ARE ONE OBJECT ──────────────────────
+        //
+        // "Kit" and not "assembly", deliberately. An assembly in Khayt is one
+        // ORDER holding several parts plus bought-in components, gated on QC —
+        // a thing you sell. A kit is a grouping ACROSS orders, over work
+        // already done. Two words because they are two things, and a shop can
+        // have both on the same job.
+        "mac.kits":          ["en": "Kits",            "ar": "الأطقم"],
+        "mac.kit":           ["en": "Kit",             "ar": "الطقم"],
+        "mac.no_kit":        ["en": "No kit",          "ar": "بلا طقم"],
+        "mac.new_kit":       ["en": "New Kit…",        "ar": "طقم جديد…"],
+        "mac.kit_name_title": ["en": "These jobs are one object",
+                               "ar": "هذه الأعمال شيء واحد"],
+        "mac.kit_name_hint": ["en": "Name it, and their hours, filament and cost are totalled together.",
+                              "ar": "سمِّه، فتُجمع ساعاته وخيطه وتكلفته معًا."],
+        "mac.kit_name_field": ["en": "Kit name",       "ar": "اسم الطقم"],
+        "mac.remove_from_kit": ["en": "Remove from Kit", "ar": "إزالة من الطقم"],
+        "mac.rename_kit":    ["en": "Rename Kit…",     "ar": "إعادة تسمية الطقم…"],
+        "mac.disband_kit":   ["en": "Disband Kit",     "ar": "تفكيك الطقم"],
+        "mac.disband_kit_q": ["en": "Take these jobs out of {name}?",
+                              "ar": "إخراج هذه الأعمال من {name}؟"],
+        "mac.disband_kit_hint": ["en": "The prints themselves are not touched.",
+                                 "ar": "لا تُمسّ المطبوعات نفسها."],
+        "mac.kit_name_taken": ["en": "Another kit is already called {name}",
+                               "ar": "يوجد طقم آخر بالاسم {name}"],
+        "mac.kit_unknown":   ["en": "This kit could not be named",
+                              "ar": "تعذّرت تسمية هذا الطقم"],
+        // Asked, never assumed. A name one edit from an existing kit is far
+        // more often a slip than a second kit, and the cost of being wrong is
+        // asymmetric — a wrongly-merged job is one click to pull out again,
+        // while a silently split rollup looks correct and is never noticed.
+        // But "Leg L" and "Leg R" are one edit apart and genuinely different,
+        // so the shop answers rather than the app deciding.
+        "mac.kit_near_q":    ["en": "A kit called {name} already exists",
+                              "ar": "يوجد بالفعل طقم اسمه {name}"],
+        "mac.kit_near_hint": ["en": "Add these jobs to it, or make a second kit called {typed}?",
+                              "ar": "أضف هذه الأعمال إليه، أم تُنشئ طقمًا ثانيًا اسمه {typed}؟"],
+        "mac.kit_use_existing": ["en": "Add to {name}", "ar": "أضف إلى {name}"],
+        "mac.kit_make_new":  ["en": "Make {typed}",    "ar": "أنشئ {typed}"],
+        // The count behind every total, which is not decoration: a build total
+        // that silently omits an unmeasured job is the one bug lib/print-kits.js
+        // exists to prevent, and hiding the count reintroduces it at the last
+        // step.
+        "mac.kit_measured":  ["en": "{n} of {total} measured",
+                              "ar": "قيس {n} من {total}"],
+        "mac.kit_all_measured": ["en": "every job measured", "ar": "كل عمل مقيس"],
+        "mac.kit_mixed_currency": ["en": "mixed currencies", "ar": "عملات مختلطة"],
+        "mac.kit_vs_estimate": ["en": "vs estimate",   "ar": "مقابل التقدير"],
+        // The definition is gone and the jobs are not.
+        "mac.kit_orphaned":  ["en": "name deleted",    "ar": "حُذف الاسم"],
+        "mac.kit_orphaned_help": ["en": "This kit's name was deleted. Renaming it writes the name back.",
+                                  "ar": "حُذف اسم هذا الطقم. إعادة التسمية تُعيد كتابته."],
+        "mac.no_kits":       ["en": "No kits yet",     "ar": "لا أطقم بعد"],
+        "mac.no_kits_hint":  ["en": "A figure printed as head, hands and body is four jobs and one object. File them together and Khayt totals them.",
+                              "ar": "تمثال يُطبع رأسًا ويدين وجسمًا هو أربعة أعمال وشيء واحد. احفظها معًا يجمعها خيط."],
         "mac.filament_n":    ["en": "Filament {n}",    "ar": "الخيط {n}"],
         "mac.n_swaps":       ["en": "{n} filament swaps", "ar": "{n} تبديلات خيط"],
         "mac.library_wont_open": ["en": "This library will not open", "ar": "لا تُفتح هذه المكتبة"],
