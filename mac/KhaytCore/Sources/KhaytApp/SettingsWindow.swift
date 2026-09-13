@@ -861,7 +861,24 @@ struct AssistantPane: View {
                 // EVERY ROW STATES WHAT IT SENDS, and names the provider it
                 // sends to — a disclosure that says "Anthropic" to a shop on
                 // OpenAI is worse than none.
+                //
+                // ── AND WHERE THEY RUN, WHICH IS NOT YET HERE ─────────────
+                //
+                // This app bundles `ai-providers` and `ai-privacy` — the half
+                // that decides which vendor and whether a feature MAY run — and
+                // none of `ai-quote`, `ai-price`, `ai-reply` or `ai-assistant`,
+                // which are the features themselves. So every switch below is
+                // real consent over a shared book and a no-op on this Mac.
+                //
+                // The screen still earns its place: the book syncs, so a shop
+                // running both apps had no way to see — let alone refuse — what
+                // the other one sends. But a switch that does nothing where you
+                // switched it has to say so, or the next question is why the
+                // quote screen never offers a draft.
                 Section(shop.words.callIt("set.ai_feats")) {
+                    Text(shop.words.callIt("mac.ai_runs_in_khayt"))
+                        .font(.caption).foregroundStyle(Khayt.note)
+                        .fixedSize(horizontal: false, vertical: true)
                     ForEach(features) { f in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 6) {

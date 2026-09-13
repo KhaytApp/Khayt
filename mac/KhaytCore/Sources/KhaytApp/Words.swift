@@ -1276,6 +1276,14 @@ final class Words {
         // same words the Electron page does. Only this app's own tab name is
         // here, because the other app's settings navigation is not a tab list.
         "mac.nav_integrations": ["en": "Integrations", "ar": "التكاملات"],
+        // Said on the assistant pane. The consent is real and shared — the book
+        // syncs — but the features themselves are not on this app yet, and a
+        // switch that does nothing where you switched it has to say so.
+        "mac.ai_runs_in_khayt": ["en": "These run in the Windows and Linux app for now. "
+                                 + "Switching one on here records your answer for the whole shop; "
+                                 + "this Mac does not send anything yet.",
+                                 "ar": "تعمل هذه في تطبيق ويندوز ولينكس حاليًا. تشغيلها هنا يسجّل "
+                                 + "إجابتك للمتجر كله؛ ولا يرسل هذا الماك أي شيء بعد."],
         "mac.nav_slicers":   ["en": "Slicers", "ar": "برامج التقطيع"],
         "mac.no_slicers":    ["en": "No slicer set up yet. Khayt can look for the ones you already have.",
                               "ar": "لم يُضبط أي برنامج شرائح بعد. يستطيع خيط البحث عمّا لديك."],
