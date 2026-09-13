@@ -75,9 +75,17 @@ test('the shop is told which number it is looking at', () => {
 test('the editor and the search agree on which price they show', () => {
   const fs = require('fs');
   const path = require('path');
+  // The rule MOVED, and this guard follows it rather than being relaxed. It
+  // lived in `renderer/inventory.js` while one app had a product editor; the
+  // Mac grew one, so pricing a product is `lib/product-pricing.js` now and both
+  // apps call it. What has to hold is unchanged: the editor applies the shop's
+  // own rounding, so the editor and the search cannot show different prices.
+  const rule = fs.readFileSync(path.join(__dirname, '..', 'lib', 'product-pricing.js'), 'utf8');
+  assert.match(rule, /finalPrice\(d, basePrice\)/,
+    'product pricing must apply the shop\'s own rounding rule');
   const inv = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'inventory.js'), 'utf8');
-  assert.match(inv, /KhaytProductPrice\.finalPrice\(d, basePrice\)/,
-    'productDefaultPricing must apply the shop\'s own rule');
+  assert.match(inv, /KhaytProductPricing\.priceProduct/,
+    'the editor must price through the shared rule, not its own copy');
   assert.match(inv, /draft\.price = pricing\.price/, 'and the charged price has to be saved');
   const shell = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'shell.js'), 'utf8');
   assert.match(shell, /p\.price != null \? p\.price/,

@@ -6,6 +6,35 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **A product added on the Mac now has a price.** It did not. The sheet could
+  not hold the product's *parts*, and a product's price is made entirely of
+  them — so one written down here saved at 0.00 with no hours and no grams, and
+  had to be finished in the other app before it could be sold.
+
+  Parts are on the sheet now: name, spool, grams, hours, quantity. The cost, the
+  price and the totals appear as you build it, so a margin typed above is no
+  longer a number chosen blind. A part with no spool chosen says that it costs
+  nothing and that saving will price the product at zero — which is what the
+  other app does silently.
+
+- **(Maintainers) Pricing a product is one rule both apps call.** It was
+  `productDefaultPricing` inside `renderer/inventory.js`, which was fine while
+  one app had a product editor. Lifted to `lib/product-pricing.js` and proved
+  identical to the function it replaced on every shape tried.
+
+  It also carries a bug the renderer could not see: `computePartBaseCost` falls
+  back to `global.inventory` and `global.settings`, which exist in the renderer
+  and in no other host. The resin branch is chosen by looking a part's filament
+  up in that shelf, and the two branches are different formulas — so a resin
+  part priced without one takes the filament formula. The context is passed
+  explicitly now.
+
+- **Three empty screens told you to go to the other app for things this one
+  does.** "Print files added in Khayt appear here", and the same for printers
+  and spools — all three stopped being true when the Mac learnt to import
+  models, find printers on the network, and look a filament up from the
+  catalogue.
+
 - **The Mac's AI settings say, per feature, where each one actually runs.** The
   screen offers a provider and a switch per feature, with what each one sends
   written beside it — and the Mac bundles the half that decides *whether* a

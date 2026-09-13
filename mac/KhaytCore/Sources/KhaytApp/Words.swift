@@ -742,8 +742,11 @@ final class Words {
         "mac.n_swaps":       ["en": "{n} filament swaps", "ar": "{n} تبديلات خيط"],
         "mac.library_wont_open": ["en": "This library will not open", "ar": "لا تُفتح هذه المكتبة"],
         "mac.no_models":     ["en": "No models yet",   "ar": "لا نماذج بعد"],
-        "mac.no_models_hint": ["en": "Print files added in Khayt appear here.",
-                               "ar": "تظهر هنا ملفات الطباعة المضافة في خيط."],
+        // WAS "Print files added in Khayt appear here." — which stopped being
+        // true when this app learnt to import, and until it was noticed it was
+        // sending people to the other app for something they could do here.
+        "mac.no_models_hint": ["en": "Add models with the Import button, or drop a folder here.",
+                               "ar": "أضف النماذج بزر الاستيراد، أو أفلت مجلدًا هنا."],
         "mac.is_urgent":     ["en": "Marked urgent",   "ar": "معلَّم كعاجل"],
         "mac.overdue_unpaid": ["en": "Overdue and unpaid", "ar": "متأخر وغير مدفوع"],
         "mac.due_on":        ["en": "Due {date}",      "ar": "الاستحقاق {date}"],
@@ -965,11 +968,15 @@ final class Words {
         "mac.per_kilo":      ["en": "Per kilo",        "ar": "لكل كيلو"],
         "mac.inventory":     ["en": "Filament",        "ar": "الخيوط"],
         "mac.no_machines":   ["en": "No machines yet", "ar": "لا طابعات بعد"],
-        "mac.no_machines_hint": ["en": "Printers added in Khayt appear here.",
-                                 "ar": "تظهر هنا الطابعات المضافة في خيط."],
+        // WAS "Printers added in Khayt appear here." Same stale pointer: this
+        // app finds printers on the network and adds them itself.
+        "mac.no_machines_hint": ["en": "Add a printer, or let Khayt find the ones on your network.",
+                                 "ar": "أضف طابعة، أو دع خيط يجد الطابعات على شبكتك."],
         "mac.no_stock":      ["en": "No filament recorded", "ar": "لا خيوط مسجّلة"],
-        "mac.no_stock_hint": ["en": "Spools added in Khayt appear here.",
-                              "ar": "تظهر هنا البكرات المضافة في خيط."],
+        // WAS "Spools added in Khayt appear here." Same again: a spool can be
+        // looked up from the catalogue here rather than typed anywhere else.
+        "mac.no_stock_hint": ["en": "Add a spool — start typing a filament and Khayt fills the rest.",
+                              "ar": "أضف بكرة — ابدأ بكتابة الخيط ويكمل خيط الباقي."],
         "mac.needs_attention": ["en": "Needs attention", "ar": "يحتاج انتباهك"],
         "mac.the_floor":     ["en": "The floor",       "ar": "الورشة"],
         // The SHELF: the sidebar row, the Go menu item, the screen itself.
@@ -1602,9 +1609,21 @@ final class Words {
         // parts were dropped when it saved. PHOTOS CAME OFF THIS LIST when the
         // sheet learnt to edit them — a sentence promising to leave something
         // alone, on a screen that now changes it, is worse than no sentence.
-        "mac.product_kept":  ["en": "Parts, prices per quantity and documents "
-                              + "stay as they are — edit those in Khayt.",
-                              "ar": "تبقى القطع وأسعار الكميات والمستندات كما هي — عدّلها في خيط."],
+        // PARTS CAME OFF THIS LIST when the sheet learnt to hold them — which
+        // is what made a product written down here a shell: its price is made
+        // entirely of its parts, so with no way to add one it saved at 0.00
+        // with no hours and no grams.
+        "mac.product_kept":  ["en": "Prices per quantity and documents stay as they are — "
+                              + "edit those in Khayt.",
+                              "ar": "تبقى أسعار الكميات والمستندات كما هي — عدّلها في خيط."],
+        "mac.parts_cost_nothing": ["en": "These parts have no filament chosen, so they cost "
+                                   + "nothing — saving will set this product's price to zero. "
+                                   + "Pick a spool for each part.",
+                                   "ar": "لم يُختر خيط لهذه القطع، فلا تكلفة لها — سيصبح سعر المنتج "
+                                   + "صفرًا عند الحفظ. اختر بكرة لكل قطعة."],
+        "mac.no_parts_no_price": ["en": "Add a part to give this product a price — "
+                                  + "it is worked out from what the parts cost.",
+                                  "ar": "أضف قطعة ليكون للمنتج سعر — يُحسب من تكلفة القطع."],
         // ── A PRODUCT'S PICTURES ──────────────────────────────────────────
         //
         // The kind labels themselves are NOT here: `pe.kind_render` and its
