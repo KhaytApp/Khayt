@@ -6519,6 +6519,17 @@ public actor KhaytEngine {
             as: PriceComparables.self)
     }
 
+    /// The comparables as the rule shapes them, for handing to its own prompt
+    /// builder. Decoding and re-encoding through `PriceComparables` would work
+    /// today and lose whatever field is added to the rule tomorrow.
+    public func rawPriceComparables(orders: [JSONValue], material: String,
+                                    settings: [String: JSONValue]) throws -> JSONValue {
+        try runtime.call2("""
+            KhaytAiPrice.buildComparables(ARG0, { material: ARG1, settings: ARG2 })
+            """,
+            [.array(orders), .string(material), .object(settings)], as: JSONValue.self)
+    }
+
     /// Ask the model to weigh those comparables and recommend one.
     ///
     /// Consent is checked here, where the data leaves — the comparables carry

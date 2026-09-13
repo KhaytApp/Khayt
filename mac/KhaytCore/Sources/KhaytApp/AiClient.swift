@@ -176,6 +176,45 @@ enum AiClient {
         return message
     }
 
+    /// Ask the model to weigh the shop's own comparables and recommend a margin.
+    ///
+    /// ── THE COMPARABLES ARE ALREADY ON SCREEN ─────────────────────────────
+    ///
+    /// This is the smaller half of the feature and the optional one. The shop
+    /// has already been shown its own median, computed here, net of tax, with
+    /// no model and no network. What this adds is a second opinion that can
+    /// weigh outliers and a thin sample and say so in a sentence — and if it
+    /// gives nothing usable, `pickPrice` falls back to that same median, which
+    /// is a real answer rather than a failure.
+    static func recommendMargin(comparables: JSONValue, job: JSONValue,
+                                fallback: Double?, shop: Shop) async throws
+        -> KhaytEngine.PriceSuggestion {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiPriceRequest(
+                settings: settings, comparables: comparables, job: job,
+                shopName: shop.shopName, language: shop.words.language, apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+
+        let data = try await send(request, engine: engine)
+        return try await engine.aiPriceRead(settings: settings, response: data,
+                                            fallbackMargin: fallback)
+    }
+
     /// POST it, retrying only what the shared policy says is transient.
     private static func send(_ shaped: KhaytEngine.AiRequest,
                              engine: KhaytEngine) async throws -> JSONValue {

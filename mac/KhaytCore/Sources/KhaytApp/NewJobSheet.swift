@@ -61,6 +61,9 @@ struct NewJobSheet: View {
     @State private var margin = 40.0
     /// The shop's own realized margins on jobs like this one. Nil until asked.
     @State private var comparables: KhaytEngine.PriceComparables?
+    @State private var advising = false
+    /// What the model said, and why. Shown under the comparables it weighed.
+    @State private var advice: String?
     @State private var discountPct = 0.0
     @State private var shippingCost = 0.0
     @State private var deposit = 0.0
@@ -345,8 +348,27 @@ struct NewJobSheet: View {
                             Button(shop.words.callIt("mac.use_it")) { margin = median }
                                 .buttonStyle(.link).font(.caption)
                         }
+                        // The OPTIONAL second opinion. The median above was
+                        // computed here with nothing sent anywhere; this asks a
+                        // model to weigh outliers and a thin sample and say why
+                        // in a sentence. Offered only where the shop agreed.
+                        if shop.aiPriceAllowed {
+                            Button(shop.words.callIt("mac.ask_what_to_charge")) {
+                                Task { await advise() }
+                            }
+                            .buttonStyle(.link).font(.caption)
+                            .disabled(advising)
+                        }
+                        if advising { ProgressView().controlSize(.small) }
                         Spacer()
                     }
+                }
+            }
+            if let advice {
+                GridRow {
+                    Color.clear.frame(height: 0)
+                    Text(advice).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             GridRow {
@@ -488,6 +510,34 @@ struct NewJobSheet: View {
             part.spoolId.flatMap { id in shop.spools.first { $0.id == id }?.material }
         }.first ?? ""
         comparables = await shop.priceComparables(material: material)
+    }
+
+    /// Ask for a second opinion on the margin.
+    private func advise() async {
+        guard let c = comparables, c.hasHistory, !advising else { return }
+        advising = true
+        advice = nil
+        defer { advising = false }
+        let material = parts.compactMap { part in
+            part.spoolId.flatMap { id in shop.spools.first { $0.id == id }?.material }
+        }.first ?? ""
+        guard let raw = await shop.priceComparablesRaw(material: material) else { return }
+        let cost = parts.reduce(0.0) { $0 + $1.cost * Double($1.qty) }
+        let grams = parts.reduce(0.0) { $0 + (Double($1.grams) ?? 0) * Double($1.qty) }
+        let hours = parts.reduce(0.0) { $0 + (Double($1.hours) ?? 0) * Double($1.qty) }
+        switch await shop.recommendMargin(comparables: c, raw: raw, cost: cost,
+                                          grams: grams, hours: hours, material: material) {
+        case .advised(let said):
+            margin = said.margin
+            // The REASON, always. A margin that changed with no sentence beside
+            // it is a number a shop cannot argue with when a customer does.
+            advice = said.rationale.isEmpty
+                ? shop.words.callIt("mac.advice_no_reason",
+                                    ["pct": .number(said.margin)])
+                : said.rationale
+        case .refused(let why):
+            advice = why
+        }
     }
 
     private func reprice() async {
