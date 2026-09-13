@@ -181,6 +181,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **Khayt can show a camera that only speaks RTSP** — which includes the Buddy3D
+  that sits beside a Prusa CORE One. Give the machine the camera's address as
+  `rtsp://…` and set its type to RTSP; Khayt opens the stream, takes one frame,
+  and hangs up, the same way it takes a still from any other camera. **The
+  camera has to be publishing locally first**: switch on "RTSP stream on local
+  network" in the Prusa app, or the camera answers "no stream" and the tile says
+  it is waiting. Mac only for now — the Windows and Linux app has no decoder.
+
 - **(Mac) What a model would take, before anybody slices it.** Khayt could
   measure a mesh from the day it could read one and could never price one — a
   model you had not printed showed a size and a triangle count and no answer to
@@ -884,6 +892,259 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.7] - 2026-09-13
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **The assistant has a screen of its own.** Khayt's AI features could be
+  switched on in the other app and not this one, so a shop on a Mac could be
+  told a feature was running and have no way to see — let alone refuse — what
+  it sends. Settings → AI assist now carries both halves together: which
+  provider you use, and a switch per feature with what each one transmits
+  written beside it.
+
+  **The two halves ship together deliberately.** A provider chooser on its own
+  would let you point Khayt at a vendor without being told that drafting a
+  customer reply sends their name, their order reference and their outstanding
+  balance. A list of switches on its own would name a vendor you had not
+  chosen. The one that sends a customer's data is badged as such, and nothing
+  on the screen works consent out for itself — it asks the same rule the gate
+  asks, so a feature can never read as off while it runs.
+
+  Your key is sealed with the book's own key before it is written, the same way
+  a printer's key is, because this file syncs, is backed up and is exported. A
+  key that cannot be sealed is refused rather than stored in the clear.
+
+- **A model in your library can become a product.** The library knew what
+  each model weighs and how long it takes — parsed when you imported it — and
+  the catalogue asked you to type both in again. *Make a product from this* is
+  on the Model menu and on a model's right-click menu, and the product arrives
+  with its first part already filled: weight and time from what the slicer
+  measured, material and layer height from the setup you have had most success
+  with.
+
+  **It is joined to the model, not just named after it.** A part used to carry
+  the file's NAME — a filename somebody typed — so nothing else could follow
+  it. It carries the model's identity now, which is what makes "for this part,
+  at these settings, how far out is my estimate?" answerable later.
+
+  What the file cannot answer for is named on screen rather than left at zero,
+  because a zero that looks typed is worse than a blank you were told about.
+
+- **Khayt can show a camera that only speaks RTSP** — which includes the Buddy3D
+  that sits beside a Prusa CORE One. Give the machine the camera's address as
+  `rtsp://…` and set its type to RTSP; Khayt opens the stream, takes one frame,
+  and hangs up, the same way it takes a still from any other camera. **The
+  camera has to be publishing locally first**: switch on "RTSP stream on local
+  network" in the Prusa app, or the camera answers "no stream" and the tile says
+  it is waiting. Mac only for now — the Windows and Linux app has no decoder.
+
+- **A printer that changed address can be found again.** A DHCP lease
+  expires overnight, the router hands out a different address, and Khayt polls
+  a host that answers nothing. It said *offline* — which is also what it says
+  when a printer is switched off, and the two have completely different fixes.
+
+  A machine that has gone quiet now offers *Find it on the network*. Where the
+  printer announces the serial or the hardware address Khayt recorded — neither
+  of which moves with a lease — that is identity, and one click points Khayt at
+  it. Where the evidence is only that exactly one printer of the right model is
+  answering, it says so and asks you to check first, because pointing the app
+  at a machine is what it will later send commands through.
+
+  **What this was costing.** Khayt freezes a job's real filament and duration
+  on the edge out of printing, because the printer's counters reset when the
+  next job starts. Every print that finished while the address was stale is a
+  measurement that no longer exists — found exactly that way when a Snapmaker
+  U1 moved from .77 to .56 and the completion history came back empty rather
+  than short.
+
+- **What a model would take, before anybody slices it.** Khayt could
+  measure a mesh from the day it could read one and could never price one — a
+  model you had not printed showed a size and a triangle count and no answer to
+  the question you actually had. The library inspector now says what it would
+  take in filament and in hours.
+
+  **It does not ask how fast your printers are, because nobody knows that about
+  their own printer.** The estimator's hardest number had been the same guess
+  for everyone since it was written. It turns out not to need guessing: it only
+  ever appears multiplied by density, and that product is grams per hour —
+  which every job whose real weight and duration were recorded has measured.
+  So Khayt learns it from your own work, says how many jobs it learned from,
+  and says plainly when it is still using its own default instead.
+
+  It will not learn from a job nobody measured, from one job, or from a figure
+  divided across several parts — calibrating an estimator against its own
+  estimates teaches it nothing.
+
+  Settings → Preferences carries the four numbers you can answer for: density,
+  infill, wall thickness and waste. There is deliberately no field for the
+  speed.
+
+- **The Mac app can group several prints that are one object.** A figure
+  printed as a head, two hands and a body on four evenings is four jobs in the
+  book, and "what did that figure cost me" was arithmetic across four rows that
+  nobody does. The Electron app has grouped them since its Orders Log learnt to;
+  the Mac could not. A kit now sits above the jobs table with its own totals,
+  clicking one narrows the book to the jobs that made it, and the selected job
+  says which kit it belongs to and what the whole object came to.
+
+  Grouped ACROSS orders rather than merged into one, and that is not tidiness:
+  what a print really took is recorded on the ORDER and nowhere else, so folding
+  four jobs into one would replace four measured numbers with one — and those
+  four are exactly what the estimator learns its rate from.
+
+  **Every total says how many jobs are behind it.** Adding up what four prints
+  took, when one of them was never measured, gives a figure that looks like the
+  answer and is the answer for three. So a kit that is not fully measured says
+  "3 of 4 measured" in amber, and offers no percentage against the estimate at
+  all — an estimate covering four jobs and an actual covering three do not
+  divide into anything true.
+
+  Naming is a pick rather than a retype: a name a kit already has IS that kit,
+  whatever the capitals, and a name one edit away from an existing one is
+  questioned before it becomes a second kit with the takings split between them.
+  A kit whose name was deleted keeps its jobs and can be named again.
+
+- **A product can have more than one picture on the Mac, and each says what it
+  is.** The catalogue held one: a shop selling a printed part chose between a
+  render, a photo of the real thing, a scale shot and a detail of the finish.
+  The product sheet now carries a strip — add several at once, drag the order
+  that matters, and label each one.
+
+  The label is the point rather than the count. A customer looking at a listing
+  is asking a question the pictures rarely answer — *is that a render, or is
+  that what arrives?* — and guessing wrong is a refund. The first picture is the
+  one the catalogue, the storefront and the invoice use, which the sheet now
+  says in words instead of leaving it to be inferred from a row of thumbnails.
+
+  Nothing touches the pictures folder until Save. A picture picked and then
+  cancelled leaves no file behind, and one removed and then cancelled is still
+  there.
+
+- **The Mac can connect a storefront.** Khayt's cloud serves an import route per
+  platform — paste it into Salla, Zid, Shopify or WooCommerce as an order
+  webhook and new orders arrive in Order requests — and a feed route that
+  publishes the catalogue back. Both links were built and shown only by the
+  Electron settings page, so a shop keeping its book on the Mac had the cloud,
+  had the shop id, and no way to find out what to paste. There is an
+  Integrations pane now, with the storefronts and payment systems for its
+  market, and a market picker for a shop that sells into more than one.
+
+  Medusa gets the code as well as the link. It is a self-hosted framework with
+  no webhook settings to paste a URL into, so Khayt hands over the subscriber
+  file to save in the shop's own project — the link on its own would be a URL
+  with nowhere to put it.
+
+  Switching a payment system on in one market cannot switch another market's
+  off. The directory shows one market at a time, and a shop selling into two has
+  providers configured outside the list on screen; the save merges rather than
+  replaces, so the first the shop would have heard of it is an invoice that
+  stopped offering a way to pay.
+
+### Changed
+
+- **The Mac app wears the new icon's colours.** Khayt's accent was the cyan of
+  the icon before last, and the app had been sitting beside its own orange-on-
+  navy mark looking like a different product. It is now the mark's navy, at the
+  lightness a label can actually be read at — 5.60:1 on the lightest surface it
+  draws in light appearance, 5.26:1 in dark, measured against the real card and
+  ground colours rather than against white.
+
+  **The accent is the navy and not the orange, and that is the finding.** The
+  obvious move on a re-brand is to take the mark's loudest colour. Measured, the
+  filament in the new icon is hue 23° and Khayt's "something is being made right
+  now" was already hue 19° — four degrees. The new icon did not bring an orange
+  to the app; it agreed with the one already in it. Spending that hue on
+  selection, links and section rails would have cost the app the one colour that
+  means *printing*, on a dashboard that draws exactly that distinction on a
+  single control. So the accent is the mark's other colour, and both halves of
+  the icon are now on every screen.
+
+  The informational colour moved with it, because it had to: it was hue 206,
+  seven degrees from the new accent, and a desaturated blue beside a saturated
+  one of the same hue is a colour nobody can name. It is a true slate now — same
+  hue, a third of the saturation — and a test measures that, so undoing it fails
+  rather than quietly producing two accents.
+
+  The Electron app needed no re-accent: measured, its default theme was already
+  there — primary at hue 214 against the icon's navy at 213, accent at 25
+  against the filament at 23. The two apps agree on Khayt's colours for the
+  first time.
+
+- **(Maintainers) The cloud's import and feed routes are written down once.**
+  They were built inline in `renderer/settings.js`. A route shape in two places
+  is one that can disagree, and the failure is silent in the worst way: the
+  shop pastes a URL the cloud does not serve, the store reports the webhook as
+  delivered because a 404 is a response, and no orders arrive.
+
+- **(Maintainers) The "no Node in a bundled module" guard now separates code a
+  module RUNS from code it WRITES.** `medusa-subscriber.js` emits TypeScript
+  that reads `process.env.MEDUSA_ADMIN_URL` — in Node, on the shop's own
+  server — and the guard, reading the file flat, refused to bundle it. Template
+  literal text is dropped and its `${…}` interpolations kept, which are the only
+  part JavaScriptCore evaluates; a module genuinely reaching for `process` in
+  one is still caught, checked by putting it there and watching both halves
+  fail. Both halves, because the guard exists in Node and in Swift and one that
+  agrees in only one place is worse than one that exists once.
+
+### Fixed
+
+- **Khayt said "Anthropic" on five screens whatever provider you had chosen.**
+  Left behind when providers became selectable. The worst of them was on the
+  privacy screen, telling a shop its customer data went to Anthropic when it
+  was going wherever that shop had pointed Khayt.
+
+- **An address a key must not travel to was accepted.** The Mac's own
+  `URL` is a small stand-in — JavaScriptCore has none — and it was missing the
+  three fields the address rule reads. So the check for credentials written
+  into an address never fired, and a self-hosted address came back as the
+  literal word "undefined" with the path stuck on the end.
+
+- **A product's name field was labelled "Product Catalog".** `cat.title` is what
+  the whole SCREEN is called — right in the sidebar, nonsense as the label on
+  the field where a shop types a product's name, and as the heading over the
+  catalogue's column of product names. Both now use `pe.name`, the key the
+  Electron editor uses.
+
+  Found by photographing the product sheet, which nothing in the screenshot
+  harness had ever done — it has been editable on the Mac for months and did not
+  appear in one of the fifty-one pictures. It does now, against a product that
+  actually has pictures, because an empty strip is the half that was never the
+  question.
+
+- **(Maintainers) Product picture filenames now match Khayt's exactly.** Both
+  apps write into one folder beside one book, and the name is built by replacing
+  everything outside `[A-Za-z0-9_-]`. A JavaScript regex does that per UTF-16
+  code unit and Swift was doing it per character, which is a different string
+  for anything outside the basic plane: a product called `Café` or `Part 🔥` got
+  one filename from Khayt and another from the Mac, each recording a path the
+  other could not open. Caught by checking against `main.js`'s own output rather
+  than against a Swift copy of its regex — the first version of that test
+  compared the implementation with a duplicate of itself and passed while both
+  were wrong.
+
+- **(Maintainers) The palette knows what ink goes on a filled brand shape.**
+  Every colour in it is measured against the surfaces the app draws on — card,
+  ground, recessed — and none of those is a filled brand shape, so a badge
+  painted in the app's own colour with white text on it was measured by nothing
+  at all. White reads 7.28:1 on the light fill and **3.22:1** on the dark one,
+  under what AA asks of text. The fill lightens for dark appearance so it stands
+  out from a dark ground, which means its ink has to darken — the opposite
+  direction from every other colour in the file, and not something a call site
+  typing `.white` can be expected to work out. `Khayt.onBrand` now, with a test
+  that measures the pair.
+
+- **(Maintainers) A sample-book test was pinned to the calendar.** `SampleFigures`
+  asserted the sample shop had exactly six late jobs. The sample's due dates are
+  absolute, so a job crosses into late whenever the date moves, and it went to
+  nine overnight. It passed for as long as it did only because nobody ran it on
+  the wrong day. The suite exists to prove that adding measured actuals moved no
+  money, and lateness is not money: what is pinned now is that the sample still
+  carries overdue work for the attention list to find.
+
 ## [4.0.0-alpha.6] - 2026-09-12
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
@@ -1323,13 +1584,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   prints it is drawn from, so a figure from two is not mistaken for a figure
   from twenty.
 
-- **Khayt can show a camera that only speaks RTSP** — which includes the Buddy3D
-  that sits beside a Prusa CORE One. Give the machine the camera's address as
-  `rtsp://…` and set its type to RTSP; Khayt opens the stream, takes one frame,
-  and hangs up, the same way it takes a still from any other camera. **The
-  camera has to be publishing locally first**: switch on "RTSP stream on local
-  network" in the Prusa app, or the camera answers "no stream" and the tile says
-  it is waiting. Mac only for now — the Windows and Linux app has no decoder.
 - **Finishing a job on the Mac asks what it actually took.** Print time and
   grams, pre-filled with what you quoted, so a job that ran as expected is one
   Return away and one that did not can be corrected on the spot. Before, the
