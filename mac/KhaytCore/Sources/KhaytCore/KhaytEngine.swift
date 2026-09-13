@@ -448,6 +448,13 @@ public actor KhaytEngine {
         // an async transport and is deliberately NOT used here: Swift does the
         // request, so nothing has to await inside JavaScriptCore.
         "ai-quote",
+        // Questions about the shop's own book, answered from a summary this
+        // app builds. `buildShopContext` is deterministic — it reduces the
+        // whole book to a few hundred bytes of figures — and that summary is
+        // ALL the model is given, with the system prompt forbidding it to
+        // invent anything not in it. What leaves the building is therefore a
+        // known, inspectable payload rather than "the shop's data".
+        "ai-assistant",
         // What to charge, grounded in what this shop has ACTUALLY made.
         //
         // `buildComparables` needs no model at all: it is the shop's own
@@ -6630,6 +6637,81 @@ public actor KhaytEngine {
             """,
             [product, .array(inventory), .object(settings), .array(consumables)],
             as: [String: JSONValue].self)
+    }
+
+    // MARK: - Asking about the book
+
+    /// The summary the assistant is given, and nothing else.
+    ///
+    /// ── THIS IS THE PAYLOAD, AND IT IS WORTH LOOKING AT ───────────────────
+    ///
+    /// `buildShopContext` reduces the whole book — orders, shelf, customers,
+    /// settings — to a few hundred bytes of totals and counts. That summary is
+    /// the ENTIRE thing the model sees; the system prompt forbids it to invent
+    /// anything absent from it. So "the assistant sends your data" has a
+    /// precise answer a shop can be shown, rather than a shrug.
+    public func shopSummary(collections: [String: JSONValue], now: Date) throws -> JSONValue {
+        try runtime.call2("KhaytAiAssistant.buildShopContext(ARG0, { now: ARG1 })",
+                          [.object(collections), .number(now.timeIntervalSince1970 * 1000)],
+                          as: JSONValue.self)
+    }
+
+    /// One question, with the turns before it so a follow-up resolves.
+    public func aiAssistantRequest(settings: [String: JSONValue], summary: JSONValue,
+                                   question: String, history: [JSONValue],
+                                   shopName: String, language: String,
+                                   apiKey: String) throws -> AiRequest {
+        try runtime.call2("""
+            (function (a) {
+              if (!KhaytAiPrivacy.isFeatureEnabled((a.settings || {}).ai, 'assistant')) {
+                throw new Error('AI_FEATURE_NOT_CONSENTED');
+              }
+              // ASSISTANT_SCHEMA, not null. `resolveTool` falls back to an
+              // empty object schema, which is a tool with no field to fill —
+              // the model would have nowhere to put the answer and `pickAnswer`
+              // would read nothing back.
+              var t = KhaytAiTools.resolveTool('assistant', KhaytAiAssistant.ASSISTANT_SCHEMA);
+              var settings = { ai: Object.assign({}, (a.settings || {}).ai, { apiKey: a.apiKey }) };
+              return KhaytAiProviders.buildRequest(settings, {
+                apiKey: a.apiKey,
+                system: KhaytAiAssistant.buildAssistantSystem({ shopName: a.shopName, lang: a.lang }),
+                prompt: KhaytAiAssistant.buildAssistantRequest(a.summary, a.question, a.history),
+                tool: t.tool,
+                maxTokens: t.maxTokens,
+              });
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "summary": summary,
+                      "question": .string(question), "history": .array(history),
+                      "shopName": .string(shopName), "lang": .string(language),
+                      "apiKey": .string(apiKey)])],
+            as: AiRequest.self)
+    }
+
+    /// The answer, or the reason there isn't one.
+    public struct AiAnswer: Decodable, Sendable {
+        public let ok: Bool
+        public let answer: String?
+        public let problem: String?
+    }
+
+    public func aiAssistantRead(settings: [String: JSONValue],
+                                response: JSONValue) throws -> AiAnswer {
+        try runtime.call2("""
+            (function (a) {
+              var out = KhaytAiProviders.readResponse(a.settings, a.data);
+              if (!out.ok) {
+                return { ok: false, answer: null,
+                         problem: KhaytAiTools.describeStop(out.stop) };
+              }
+              var said = KhaytAiAssistant.pickAnswer(out.draft);
+              return said
+                ? { ok: true, answer: said, problem: null }
+                : { ok: false, answer: null, problem: 'no answer in the reply' };
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "data": response])],
+            as: AiAnswer.self)
     }
 
     // MARK: - Money received

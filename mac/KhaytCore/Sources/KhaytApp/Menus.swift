@@ -162,6 +162,13 @@ private struct BookMenu: View {
         }
         .disabled(shop.spools.isEmpty)
 
+        // Only where the shop has agreed to it. A menu item offering to send a
+        // summary of the book to a vendor, on a shop that has switched the
+        // feature off, is an advertisement in a menu.
+        if shop.aiAssistantAllowed {
+            Button(Words.upfront("mac.ask_the_book") + "\u{2026}") { shop.askingTheBook = true }
+        }
+
         Button(Words.upfront("mac.check_cloud") + "\u{2026}") { shop.checkingCloud = true }
             .disabled(!shop.cloudConnected)
         // The way back out of automatic sync, and the only one there is.

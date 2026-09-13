@@ -423,6 +423,7 @@ final class Shop {
             // question that decides whether data leaves the building.
             let aiFeatures = (try? await engine?.aiFeatures(settings: Self.settings(root))) ?? []
             aiQuoteAllowed = aiFeatures.first { $0.id == "quote" }?.enabled ?? false
+            aiAssistantAllowed = aiFeatures.first { $0.id == "assistant" }?.enabled ?? false
             taxSummary = await describeTax(root["settings"])
             await readSettingsTables(root)
             // What each job still owes is `order-money`'s answer, not a
@@ -1671,6 +1672,64 @@ final class Shop {
                                               settings: settingsDict,
                                               consumables: consumableRows)
     }
+
+    // MARK: - Asking about the book
+
+    /// The collections the assistant's summary is built from.
+    ///
+    /// Named rather than handing over the whole store: the summary is the only
+    /// thing that leaves the building, and it is built from these four. A shop
+    /// asking "what does it send?" is owed a list, and this is it.
+    var bookForAssistant: [String: JSONValue] {
+        ["printLog": .array(orderRows),
+         "inventory": .array(inventoryRows),
+         "clients": .array(clientRows),
+         "settings": settingsValue]
+    }
+
+    /// Whether the shop has agreed to the assistant, on this book.
+    private(set) var aiAssistantAllowed = false
+
+    /// One question and its answer, kept so a follow-up resolves.
+    struct AskedTurn: Identifiable, Sendable {
+        let id = UUID()
+        let question: String
+        var answer: String?
+        var problem: String?
+    }
+
+    /// True while the ask-the-book sheet is up.
+    var askingTheBook = false
+
+    private(set) var asked: [AskedTurn] = []
+    var asking = false
+
+    /// Ask the assistant, keeping the conversation so "and last month?" works.
+    func ask(_ question: String) async {
+        let said = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !said.isEmpty, !asking else { return }
+        asking = true
+        defer { asking = false }
+        asked.append(AskedTurn(question: said))
+        let at = asked.count - 1
+
+        // The turns BEFORE this one, which is what lets a follow-up resolve.
+        let history: [JSONValue] = asked.dropLast().compactMap { turn in
+            guard let answer = turn.answer else { return nil }
+            return .object(["q": .string(turn.question), "a": .string(answer)])
+        }
+        do {
+            asked[at].answer = try await AiClient.ask(said, history: history, shop: self)
+        } catch AiClient.Failure.notConsented {
+            asked[at].problem = words.callIt("mac.ai_assistant_not_consented")
+        } catch AiClient.Failure.noKey {
+            asked[at].problem = words.callIt("mac.ai_no_key")
+        } catch {
+            asked[at].problem = String(describing: error)
+        }
+    }
+
+    func forgetConversation() { asked = [] }
 
     // MARK: - Drafting a quote from a description
 

@@ -90,6 +90,46 @@ enum AiClient {
         return draft
     }
 
+    /// Ask a question about the shop's own book.
+    ///
+    /// The model is given a SUMMARY — a few hundred bytes of totals and counts
+    /// that `buildShopContext` reduces the whole book to — and the system
+    /// prompt forbids it to answer with anything not in that summary. So what
+    /// leaves the building is a known payload, not "your data".
+    static func ask(_ question: String, history: [JSONValue],
+                    shop: Shop) async throws -> String {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+
+        let summary = try await engine.shopSummary(collections: shop.bookForAssistant,
+                                                   now: Date())
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiAssistantRequest(
+                settings: settings, summary: summary, question: question,
+                history: history, shopName: shop.shopName,
+                language: shop.words.language, apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+
+        let data = try await send(request, engine: engine)
+        let read = try await engine.aiAssistantRead(settings: settings, response: data)
+        guard read.ok, let answer = read.answer else {
+            throw Failure.refused(read.problem ?? "no answer")
+        }
+        return answer
+    }
+
     /// POST it, retrying only what the shared policy says is transient.
     private static func send(_ shaped: KhaytEngine.AiRequest,
                              engine: KhaytEngine) async throws -> JSONValue {
