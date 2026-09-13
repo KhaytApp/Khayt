@@ -130,6 +130,52 @@ enum AiClient {
         return answer
     }
 
+    /// Draft a message to a customer about one job.
+    ///
+    /// ── WHAT IS HANDED OVER, AND WHAT IS NOT ──────────────────────────────
+    ///
+    /// The disclosure on the settings screen names it: the customer's name, the
+    /// order reference, project, status and due date, and the amount and
+    /// outstanding balance. The customer record sitting right here also has an
+    /// email address, a phone number, a tax registration and an address — none
+    /// of which is the shop's to send on that person's behalf, and none of
+    /// which is passed.
+    ///
+    /// It DRAFTS. Nothing is sent to anyone: the message comes back for the
+    /// shop to read, change and send itself, which is also the only honest
+    /// scope while this app cannot email.
+    static func draftReply(order: JSONValue, clientName: String, intent: String,
+                           note: String, shop: Shop) async throws -> String {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiReplyRequest(
+                settings: settings, order: order, clientName: clientName,
+                intent: intent, note: note, currency: shop.currency,
+                shopName: shop.shopName, language: shop.words.language, apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+
+        let data = try await send(request, engine: engine)
+        let read = try await engine.aiReplyRead(settings: settings, response: data)
+        guard read.ok, let message = read.answer else {
+            throw Failure.refused(read.problem ?? "no message")
+        }
+        return message
+    }
+
     /// POST it, retrying only what the shared policy says is transient.
     private static func send(_ shaped: KhaytEngine.AiRequest,
                              engine: KhaytEngine) async throws -> JSONValue {

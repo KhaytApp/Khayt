@@ -1647,6 +1647,21 @@ final class Words {
                                           "ar": "تحقق عادةً {pct}% على {material} — "
                                           + "وسيط {n} عملًا منتهيًا."],
         "mac.use_it":        ["en": "Use it",          "ar": "استخدمه"],
+        // ── DRAFTING A MESSAGE TO A CUSTOMER ──────────────────────────────
+        "mac.draft_a_message": ["en": "Draft a message", "ar": "صياغة رسالة"],
+        "mac.what_about":    ["en": "About",             "ar": "بخصوص"],
+        "mac.what_to_say":   ["en": "What should it say?", "ar": "ماذا تريد أن تقول؟"],
+        "mac.draft_again":   ["en": "Draft another",     "ar": "صُغ أخرى"],
+        "mac.copy_message":  ["en": "Copy",              "ar": "نسخ"],
+        "mac.copied":        ["en": "Copied",            "ar": "نُسخ"],
+        // Said under every draft. It DRAFTS; the shop sends.
+        "mac.draft_not_sent": ["en": "Nothing has been sent. Read it, change what you want, "
+                               + "and send it yourself.",
+                               "ar": "لم يُرسل شيء. اقرأها وعدّل ما تشاء وأرسلها بنفسك."],
+        "mac.ai_reply_not_consented": ["en": "Switch on \"Customer message drafting\" in "
+                                       + "Settings → AI assist first.",
+                                       "ar": "فعّل «صياغة رسائل العملاء» في الإعدادات ← مساعد الذكاء أولًا."],
+
         // ── ASKING ABOUT THE BOOK ─────────────────────────────────────────
         "mac.ask_the_book":  ["en": "Ask about your book", "ar": "اسأل عن دفترك"],
         "mac.ask_a_question": ["en": "Ask a question",     "ar": "اطرح سؤالًا"],

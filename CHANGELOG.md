@@ -6,6 +6,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The Mac can draft a message to a customer.** On a job with a customer on it:
+  pick what the message is about — a status update, ready for pickup, a quote
+  follow-up, a payment reminder, an apology for a delay, or your own note — and
+  it writes one.
+
+  **It drafts. It does not send.** The message comes back in a box you can edit,
+  with Copy under it, and you send it through whatever you actually use. A
+  message written about somebody's order, in your shop's name, is not something
+  to put on the wire before a person has read it.
+
+  This is the one feature that sends another person's data, and what travels is
+  exactly what the settings screen says: the customer's name, the order
+  reference, project, status and due date, and the amount and outstanding
+  balance. Their email address, phone number and address are on the same record
+  and are **not** passed — which is a test, because handing the whole record
+  over is the obvious way to write this and the disclosure would quietly stop
+  being true.
+
 - **You can ask the Mac about your own book.** *"How did this month compare with
   last?"*, *"How much is still owed to me?"* — in the Book menu, when you have
   switched the assistant on.

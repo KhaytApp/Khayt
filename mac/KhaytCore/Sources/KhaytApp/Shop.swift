@@ -424,6 +424,7 @@ final class Shop {
             let aiFeatures = (try? await engine?.aiFeatures(settings: Self.settings(root))) ?? []
             aiQuoteAllowed = aiFeatures.first { $0.id == "quote" }?.enabled ?? false
             aiAssistantAllowed = aiFeatures.first { $0.id == "assistant" }?.enabled ?? false
+            aiReplyAllowed = aiFeatures.first { $0.id == "reply" }?.enabled ?? false
             taxSummary = await describeTax(root["settings"])
             await readSettingsTables(root)
             // What each job still owes is `order-money`'s answer, not a
@@ -1671,6 +1672,42 @@ final class Shop {
                                               inventory: inventoryRows,
                                               settings: settingsDict,
                                               consumables: consumableRows)
+    }
+
+    // MARK: - Drafting a message to a customer
+
+    /// Whether the shop has agreed to message drafting, on this book.
+    private(set) var aiReplyAllowed = false
+
+    /// The job a message is being drafted about, while the sheet is up.
+    var draftingFor: Order?
+
+    /// Draft one, or say why not.
+    ///
+    /// Returns the text for the shop to read and change. NOTHING IS SENT: this
+    /// app cannot email, and a drafted message a shop has not read is not a
+    /// message anyone should be sending on its behalf anyway.
+    func draftMessage(for job: Order, intent: String, note: String) async -> DraftOutcomeText {
+        guard let row = orderRow(job.id) else { return .refused(words.callIt("mac.move_gone")) }
+        do {
+            // The NAME only. The customer record has an email, a phone and an
+            // address on it; the disclosure does not name them and they are not
+            // the shop's to send on that person's behalf.
+            let text = try await AiClient.draftReply(
+                order: row, clientName: job.client, intent: intent, note: note, shop: self)
+            return .drafted(text)
+        } catch AiClient.Failure.notConsented {
+            return .refused(words.callIt("mac.ai_reply_not_consented"))
+        } catch AiClient.Failure.noKey {
+            return .refused(words.callIt("mac.ai_no_key"))
+        } catch {
+            return .refused(String(describing: error))
+        }
+    }
+
+    enum DraftOutcomeText: Sendable {
+        case drafted(String)
+        case refused(String)
     }
 
     // MARK: - Asking about the book

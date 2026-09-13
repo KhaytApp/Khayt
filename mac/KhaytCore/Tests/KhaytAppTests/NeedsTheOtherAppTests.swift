@@ -51,10 +51,7 @@ struct NeedsTheOtherAppTests {
             what: "Asking the assistant to weigh those comparables and recommend one",
             why: "The comparables are shown here already; the model call that "
                + "phrases a recommendation over them has no surface yet."),
-        Gap(id: "ai.reply",
-            what: "Drafting a reply to a customer",
-            why: "lib/ai-reply.js is not bundled. It sends customer data, so it "
-               + "wants the consent path proven before the transport."),
+
 
         Gap(id: "product.tiers",
             what: "Prices per quantity on a product",
@@ -161,7 +158,7 @@ struct NeedsTheOtherAppTests {
         // A number, deliberately. It is a ratchet: lowering it is the work,
         // raising it needs somebody to decide that on purpose and say why in
         // the commit.
-        #expect(Self.known.count <= 7, Comment(rawValue: """
+        #expect(Self.known.count <= 6, Comment(rawValue: """
             \(Self.known.count) things still need the other app. This number is \
             a ratchet — if a new dependency is genuinely unavoidable, lower \
             something else first or raise this deliberately.
