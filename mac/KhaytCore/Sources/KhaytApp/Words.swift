@@ -1636,6 +1636,17 @@ final class Words {
                                    + "Pick a spool for each part.",
                                    "ar": "لم يُختر خيط لهذه القطع، فلا تكلفة لها — سيصبح سعر المنتج "
                                    + "صفرًا عند الحفظ. اختر بكرة لكل قطعة."],
+        // The shop's own realized margins, NET OF TAX. Two sentences because
+        // the rule falls back to every priced job when a material has fewer
+        // than three, and a median over "everything you sell" is a different
+        // claim from a median over "jobs in this material".
+        "mac.you_usually_make": ["en": "You usually make {pct}% — median of {n} finished jobs.",
+                                 "ar": "تحقق عادةً {pct}% — وسيط {n} عملًا منتهيًا."],
+        "mac.you_usually_make_material": ["en": "You usually make {pct}% on {material} — "
+                                          + "median of {n} finished jobs.",
+                                          "ar": "تحقق عادةً {pct}% على {material} — "
+                                          + "وسيط {n} عملًا منتهيًا."],
+        "mac.use_it":        ["en": "Use it",          "ar": "استخدمه"],
         "mac.no_parts_no_price": ["en": "Add a part to give this product a price — "
                                   + "it is worked out from what the parts cost.",
                                   "ar": "أضف قطعة ليكون للمنتج سعر — يُحسب من تكلفة القطع."],

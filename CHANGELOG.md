@@ -18,6 +18,35 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   sentence when the rate came from your own measured jobs and names how many,
   another when there are none yet and it is an assumption. An estimate that
   looks typed is the same mistake as a zero that looks typed.
+- **Comparable margins are net of tax — which changes a figure Khayt has been
+  showing.** AI price assist recommends a margin from what a shop has actually
+  realized, and it computed those margins against the **gross** price. For an
+  inclusive-VAT shop — Saudi, the Gulf, most of Europe — part of every price was
+  the tax authority's and was never revenue, so every comparable overstated.
+
+  A Riyadh shop at 15% was shown a median of **56.5% where it had made 50.0%**,
+  and pricing to the number it was shown leaves it thinner than it thinks by
+  exactly that much. An unregistered shop's figures do not move: its price is
+  its revenue.
+
+  *(This shipped in the previous release under a product-pricing change, which
+  did not describe it. It moves a number a shop may have priced against, so it
+  is written down here.)*
+
+- **The Mac shows what you usually make, before you pick a margin.** On the new
+  job sheet: *"You usually make 34% on PETG — median of 6 finished jobs."*,
+  with one click to use it.
+
+  **No AI is involved and none is needed.** It is arithmetic over your own
+  finished jobs, so it works with the assistant switched off, with no key, and
+  with nothing sent anywhere. Net of tax, for the reason above.
+
+- **(Maintainers) What still needs the other app is a test, not a claim.**
+  `NeedsTheOtherAppTests` holds the list, and it is closed: a screen that sends
+  a shop to Khayt without a declared entry fails the suite, an entry for
+  something already working fails it too, and the count is a ratchet. Three
+  times this session a screen was found telling a shop to go elsewhere for
+  something the Mac had done for weeks — each true when written.
 
 - **A product made from a model recorded its quantity in a field nothing
   reads.** *Make a product from this* wrote `quantity` where every consumer

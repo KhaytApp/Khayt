@@ -59,6 +59,8 @@ struct NewJobSheet: View {
     @State private var assumptions: [String] = []
     @State private var aiProblem: String?
     @State private var margin = 40.0
+    /// The shop's own realized margins on jobs like this one. Nil until asked.
+    @State private var comparables: KhaytEngine.PriceComparables?
     @State private var discountPct = 0.0
     @State private var shippingCost = 0.0
     @State private var deposit = 0.0
@@ -317,6 +319,36 @@ struct NewJobSheet: View {
                     Toggle(shop.words.callIt("calc.rush_fee"), isOn: $rush).fixedSize()
                 }
             }
+            // ── WHAT THIS SHOP HAS ACTUALLY MADE ON WORK LIKE THIS ────────
+            //
+            // No model is involved. `buildComparables` is arithmetic over the
+            // shop's own finished jobs, so a shop with the assistant switched
+            // off — or with no key, or no wish to send anything anywhere — gets
+            // this, which is most of the value and none of the risk.
+            //
+            // NET OF TAX. For an inclusive-VAT shop part of every price was the
+            // tax authority's and was never revenue; margin against the gross
+            // overstates it, and a shop pricing to an overstated median prices
+            // thin by exactly that much.
+            if let c = comparables, c.hasHistory, let median = c.medianMarginPct {
+                GridRow {
+                    Color.clear.frame(height: 0)
+                    HStack(spacing: 6) {
+                        Text(shop.words.callIt(
+                            c.sameMaterial ? "mac.you_usually_make_material"
+                                           : "mac.you_usually_make",
+                            ["n": .number(Double(c.count)),
+                             "pct": .number(median),
+                             "material": .string(c.material)]))
+                            .font(.caption).foregroundStyle(.secondary)
+                        if abs(margin - median) >= 0.05 {
+                            Button(shop.words.callIt("mac.use_it")) { margin = median }
+                                .buttonStyle(.link).font(.caption)
+                        }
+                        Spacer()
+                    }
+                }
+            }
             GridRow {
                 Text(shop.words.callIt("oe.shipping")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
@@ -433,6 +465,7 @@ struct NewJobSheet: View {
         // One crossing for all three: the figure, where it went, and what it was
         // worked out at. They have to agree, so they are asked for together
         // rather than computed twice from the same inputs.
+        defer { Task { await readComparables() } }
         let costed = await shop.costedPart(spoolId: next.spoolId,
                                            grams: Double(next.grams) ?? 0,
                                            hours: Double(next.hours) ?? 0,
@@ -442,6 +475,19 @@ struct NewJobSheet: View {
         next.rates = costed?.rates
         parts.append(next)
         draft = Draft()
+    }
+
+    /// Ask what this shop has made on jobs in this material.
+    ///
+    /// Keyed on the cart's first bound spool, because that is what the shop has
+    /// said the job is made of. With nothing bound the rule falls back to every
+    /// priced job and says so through `basis`, which is why the sentence names
+    /// the material only when the comparables actually are that material.
+    private func readComparables() async {
+        let material = parts.compactMap { part in
+            part.spoolId.flatMap { id in shop.spools.first { $0.id == id }?.material }
+        }.first ?? ""
+        comparables = await shop.priceComparables(material: material)
     }
 
     private func reprice() async {

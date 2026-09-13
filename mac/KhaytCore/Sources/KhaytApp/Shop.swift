@@ -1637,6 +1637,22 @@ final class Shop {
     }
 
     /// Write it down. Follows `saveCustomer` exactly, including the undo.
+    /// What this shop has actually realized on jobs like this one.
+    ///
+    /// NO MODEL IS INVOLVED. `buildComparables` is arithmetic over the shop's
+    /// own finished jobs — so this needs no key, no consent and no network, and
+    /// a shop that will never switch the assistant on still gets it.
+    ///
+    /// `settings` is passed because the margins are NET OF TAX: for an
+    /// inclusive-VAT shop part of every price was the tax authority's and was
+    /// never revenue, and a median computed on the gross is one a shop would
+    /// price against and come out thin.
+    func priceComparables(material: String) async -> KhaytEngine.PriceComparables? {
+        guard let engine else { return nil }
+        return try? await engine.priceComparables(orders: orderRows, material: material,
+                                                  settings: settingsDict)
+    }
+
     /// Price a product from the parts the sheet is holding.
     ///
     /// Through the shared rule, which is what `renderer/inventory.js` now
