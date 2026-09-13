@@ -534,7 +534,7 @@ struct VersionsSection: View {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         if version.id == versions.activeId {
                             Image(systemName: "largecircle.fill.circle")
-                                .font(.caption2).foregroundStyle(Khayt.cyan)
+                                .font(.caption2).foregroundStyle(Khayt.brand)
                         } else {
                             Image(systemName: "circle")
                                 .font(.caption2).foregroundStyle(.quaternary)
@@ -587,7 +587,7 @@ struct PartsSection: View {
                         // what "Open in slicer" resolves to.
                         if part.filename == parts.primary {
                             Image(systemName: "star.fill")
-                                .font(.system(size: 8)).foregroundStyle(Khayt.cyan)
+                                .font(.system(size: 8)).foregroundStyle(Khayt.brand)
                                 // A star with no explanation is decoration.
                                 .help(shop.words.callIt("plib.part_primary"))
                         }

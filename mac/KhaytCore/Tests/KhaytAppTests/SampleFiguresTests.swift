@@ -22,8 +22,27 @@ struct SampleFiguresTests {
         #expect(abs(shop.owed - 52_691.57) < 0.005, "owed is \(shop.owed)")
 
         let facts = try #require(shop.facts, "the dashboard computed nothing")
-        #expect(facts.lateCount == 6, "late is \(facts.lateCount)")
         #expect(facts.activeCount == 11, "open is \(facts.activeCount)")
+
+        // ── LATE IS A FUNCTION OF TODAY, AND WAS PINNED AS IF IT WERE NOT ──
+        //
+        // This read `lateCount == 6` and passed for as long as it did only
+        // because nobody ran it on the wrong day. The sample's due dates are
+        // ABSOLUTE — `ORD-01001` is due 2026-09-12 — so a job crosses into
+        // late every time the calendar moves, and the figure went to 9 the
+        // morning after this was last green. A test that fails on a date is a
+        // test that will be edited to whatever today says, which is how a
+        // guard stops guarding.
+        //
+        // What this suite is actually for is the CLAIM in its own name: eight
+        // jobs gaining measured actuals moved no money. Lateness is not money
+        // and never was. So what is pinned is the property of the DATA rather
+        // than of the clock — the sample still carries overdue work for the
+        // attention list to find, and has not quietly lost it.
+        #expect(facts.lateCount >= 6,
+                "the sample has stopped carrying overdue work: late is \(facts.lateCount)")
+        #expect(facts.lateCount <= facts.activeCount,
+                "more jobs are late (\(facts.lateCount)) than are open (\(facts.activeCount))")
         // FIVE machines, not the three filament printers this book started
         // with: a Roland UV flatbed and a Ruida laser joined them when Khayt
         // learnt that a machine is not always an FDM printer. The fleet is why

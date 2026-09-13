@@ -67,7 +67,7 @@ struct Calculator: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 DetailSection(shop.words.callIt("mac.calc_part"),
-                              accent: Khayt.cyan, symbol: "wrench.and.screwdriver.fill") {
+                              accent: Khayt.brand, symbol: "wrench.and.screwdriver.fill") {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 10) {
                             field(shop.words.callIt("mac.calc_weight"), $grams,
@@ -190,7 +190,7 @@ struct Calculator: View {
     /// What the price is, and where it went.
     @ViewBuilder private var answer: some View {
         DetailSection(shop.words.callIt("mac.calc_price"),
-                      accent: Khayt.cyan, symbol: "banknote.fill") {
+                      accent: Khayt.brand, symbol: "banknote.fill") {
             VStack(alignment: .leading, spacing: 10) {
                 BigFigure(value: Money.figure(quoted?.total ?? 0),
                           unit: Money.mark(shop.currency))
@@ -225,7 +225,7 @@ struct Calculator: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .card(rail: Khayt.cyan, padding: 14)
+            .card(rail: Khayt.brand, padding: 14)
         }
 
         // The four buckets, which is the thing a shop argues with. Same figures

@@ -34,7 +34,7 @@ struct KhaytApp: App {
                 // better served closing one of them. No maximum: a Mac has a
                 // large display and more of this app on it is better.
                 .frame(minWidth: 900, minHeight: 480)
-                // The app's own colour — the cyan of the letter in its icon —
+                // The app's own colour — the navy its icon lays filament on —
                 // and only when this Mac's owner has not chosen one of their
                 // own. The HIG is explicit that a chosen system accent replaces
                 // an app's; an app with an asset catalog gets that behaviour
@@ -283,7 +283,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             // EVERY mark at the size and tint an empty screen draws it.
             //
             // A mark is legible at 64pt in `98-marks` and legible in the
-            // sidebar at 16pt; 44pt in cyan at half opacity on the ground
+            // sidebar at 16pt; 44pt in the brand at half opacity on the ground
             // colour is a third case and neither of the others proves it. The
             // waste mark's purge tower and the reports mark's bars are the two
             // that lose their inner lines first.
@@ -295,7 +295,7 @@ final class Activator: NSObject, NSApplicationDelegate {
                             ForEach(row, id: \.self) { mark in
                                 VStack(spacing: 7) {
                                     Drawn(mark: mark, size: 44)
-                                        .foregroundStyle(Khayt.cyan.opacity(0.5))
+                                        .foregroundStyle(Khayt.brand.opacity(0.5))
                                     Text(mark.rawValue).font(.caption2)
                                         .foregroundStyle(.secondary)
                                 }
@@ -315,7 +315,7 @@ final class Activator: NSObject, NSApplicationDelegate {
                             ForEach(row, id: \.self) { mark in
                                 VStack(spacing: 7) {
                                     Drawn(mark: mark, size: 44)
-                                        .foregroundStyle(Khayt.cyan.opacity(0.5))
+                                        .foregroundStyle(Khayt.brand.opacity(0.5))
                                     Text(mark.rawValue).font(.caption2)
                                         .foregroundStyle(.secondary)
                                 }

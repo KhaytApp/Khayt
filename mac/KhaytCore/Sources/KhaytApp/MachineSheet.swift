@@ -47,7 +47,7 @@ struct MachineSheet: View {
     // The colour a new machine starts with, before the shop picks one. The
     // app's own, so a printer added and left alone still looks like it belongs
     // to Khayt rather than to whatever SwiftUI's `.blue` happens to be.
-    @State private var swatch = Khayt.cyan
+    @State private var swatch = Khayt.brand
     @State private var model = ""
     @State private var search = ""
     @State private var nozzleDiameter: Double = 0.4

@@ -25,7 +25,7 @@ struct ProductProfitTable: View {
             Text(words.callIt("mac.pp_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.cyan)
+                .foregroundStyle(Khayt.brand)
 
             if let report, !report.rows.isEmpty {
                 if let best = report.totals.bestPerHour, let rate = best.profitPerHour {
@@ -70,7 +70,7 @@ struct ProductProfitTable: View {
                                 // row is the ordinary case.
                                 .foregroundStyle(row.profit < 0 ? Khayt.late : .primary)
                             Capsule()
-                                .fill((row.profit < 0 ? Khayt.late : Khayt.cyan).opacity(0.55))
+                                .fill((row.profit < 0 ? Khayt.late : Khayt.brand).opacity(0.55))
                                 .frame(width: max(4, (abs(row.profit) / widest) * 90), height: 3)
                         }
                     }

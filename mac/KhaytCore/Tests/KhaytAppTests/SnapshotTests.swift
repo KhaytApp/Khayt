@@ -238,7 +238,7 @@ import KhaytCore
         try render(VStack(spacing: 0) {
             Banner(text: "Importing 137 of 490 — Fallen AT-AT Remote Holder.stl",
                    symbol: "gearshape.arrow.trianglehead.2.clockwise.rotate.90",
-                   tint: Khayt.cyan) {
+                   tint: Khayt.brand) {
                 // THE YELLOW BLOCK IN THIS PICTURE IS NOT A BUG. A linear
                 // `ProgressView` is an `NSProgressIndicator`, and
                 // `ImageRenderer` draws every AppKit-backed control as that
@@ -803,12 +803,12 @@ import KhaytCore
 
         try render(HStack(alignment: .top, spacing: 16) {
             BreakEvenCard(shop: shop, report: short)
-                .card(rail: (short.surplus ?? 0) < 0 ? Khayt.late : Khayt.cyan, padding: 14)
+                .card(rail: (short.surplus ?? 0) < 0 ? Khayt.late : Khayt.brand, padding: 14)
             BreakEvenCard(shop: shop, report: ahead)
-                .card(rail: (ahead.surplus ?? 0) < 0 ? Khayt.late : Khayt.cyan, padding: 14)
+                .card(rail: (ahead.surplus ?? 0) < 0 ? Khayt.late : Khayt.brand, padding: 14)
             // And the state a shop starts in, which is the one it sees first.
             BreakEvenCard(shop: shop, report: nil)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
         }
         .frame(width: 900).padding(Metric.screen).background(Khayt.ground),
                    "43-break-even", size: CGSize(width: 940, height: 420))
@@ -832,10 +832,10 @@ import KhaytCore
 
         try render(VStack(spacing: 16) {
             CashFlowChart(shop: shop, flow: flow)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             // And the state a quiet shop sees, which is the one it sees first.
             CashFlowChart(shop: shop, flow: nil)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
         }
         .frame(width: 620).padding(Metric.screen).background(Khayt.ground),
                    "44-cash-flow", size: CGSize(width: 660, height: 480))
@@ -862,7 +862,7 @@ import KhaytCore
         #expect(worth.totals.quiet > 0, "no quiet customer, so that row is undrawn")
 
         try render(ClientValueTable(shop: shop, report: worth)
-                    .card(rail: Khayt.cyan, padding: 14)
+                    .card(rail: Khayt.brand, padding: 14)
                     .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
                    "45-client-value", size: CGSize(width: 600, height: 560))
     }
@@ -912,7 +912,7 @@ import KhaytCore
 
         try render(VStack(spacing: 16) {
             CapacityCard(shop: shop, report: real)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             CapacityCard(shop: shop, report: heavy)
                 .card(rail: Khayt.late, padding: 14)
         }
@@ -937,10 +937,10 @@ import KhaytCore
 
         try render(VStack(spacing: 16) {
             QuoteFunnelCard(shop: shop, report: funnel)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             // And the state a shop that has never quoted sees.
             QuoteFunnelCard(shop: shop, report: nil)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
         }
         .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
                    "47-quote-funnel", size: CGSize(width: 600, height: 540))
@@ -971,7 +971,7 @@ import KhaytCore
                                             totals: earns.totals)
         try render(VStack {
             ProductProfitTable(shop: shop, report: top)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             Spacer(minLength: 0)
         }
         .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
@@ -992,9 +992,9 @@ import KhaytCore
 
         try render(VStack(spacing: 16) {
             CustomerMixCard(shop: shop, report: mix)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             CustomerMixCard(shop: shop, report: nil)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             Spacer(minLength: 0)
         }
         .frame(width: 520).padding(Metric.screen).background(Khayt.ground),
@@ -1015,7 +1015,7 @@ import KhaytCore
 
         try render(VStack(spacing: 16) {
             MachineReliabilityCard(shop: shop, report: scrap)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             Spacer(minLength: 0)
         }
         .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
@@ -1043,9 +1043,9 @@ import KhaytCore
 
         try render(VStack(spacing: 16) {
             ThroughputCard(shop: shop, report: when)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             ThroughputCard(shop: shop, report: thin)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             Spacer(minLength: 0)
         }
         .frame(width: 620).padding(Metric.screen).background(Khayt.ground),
@@ -1063,7 +1063,7 @@ import KhaytCore
 
         try render(VStack(spacing: 16) {
             MaterialCostCard(shop: shop, report: prices)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             Spacer(minLength: 0)
         }
         .frame(width: 520).padding(Metric.screen).background(Khayt.ground),
@@ -1087,10 +1087,10 @@ import KhaytCore
 
         try render(VStack(spacing: 16) {
             QualityCard(shop: shop, report: quality)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             // And the state a shop sees before it has inspected anything.
             QualityCard(shop: shop, report: nil)
-                .card(rail: Khayt.cyan, padding: 14)
+                .card(rail: Khayt.brand, padding: 14)
             Spacer(minLength: 0)
         }
         .frame(width: 520).padding(Metric.screen).background(Khayt.ground),

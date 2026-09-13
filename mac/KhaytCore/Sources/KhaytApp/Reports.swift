@@ -465,24 +465,24 @@ struct Reports: View {
                     // that frames it: a shop reading who its best customers are
                     // should know first whether it is finding new ones.
                     CustomerMixCard(shop: shop, report: mix)
-                        .card(rail: Khayt.cyan, padding: 14)
+                        .card(rail: Khayt.brand, padding: 14)
                     ClientValueTable(shop: shop, report: worth)
-                        .card(rail: Khayt.cyan, padding: 14)
+                        .card(rail: Khayt.brand, padding: 14)
                     // ── AND WHICH OF THEM EARNS ───────────────────────────
                     //
                     // The list above is what sells MOST. This is what makes
                     // money, and the two are routinely in a different order —
                     // which is the finding, and why they sit on one screen.
                     ProductProfitTable(shop: shop, report: earns)
-                        .card(rail: Khayt.cyan, padding: 14)
+                        .card(rail: Khayt.brand, padding: 14)
                     ThroughputCard(shop: shop, report: when)
-                        .card(rail: Khayt.cyan, padding: 14)
+                        .card(rail: Khayt.brand, padding: 14)
                     // Beside what the shop MADE, because work done twice was
                     // billed once — the gap between the two figures on this
                     // card is time the shop was not paid for.
                     QualityCard(shop: shop, report: quality)
                         .card(rail: (quality?.firstPassYield ?? 1) < 0.75
-                                    ? Khayt.attention : Khayt.cyan,
+                                    ? Khayt.attention : Khayt.brand,
                               padding: 14)
                 }
                 .padding(Metric.screen)
@@ -765,7 +765,7 @@ struct Reports: View {
                         Text(shop.words.callIt("an.pnl_net"))
                             .font(.system(size: 10, weight: .semibold))
                             .textCase(.uppercase).tracking(0.6)
-                            .foregroundStyle(Khayt.cyan)
+                            .foregroundStyle(Khayt.brand)
                         BigFigure(value: Money.figure(net), unit: Money.mark(shop.currency),
                                   tint: net < 0 ? Khayt.late : nil, size: 28)
                         // ── AND THE SUM THAT MADE IT ─────────────────────
@@ -788,7 +788,7 @@ struct Reports: View {
                         Text(shop.words.callIt("an.pnl_title"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    .card(rail: net < 0 ? Khayt.late : Khayt.cyan, padding: 14)
+                    .card(rail: net < 0 ? Khayt.late : Khayt.brand, padding: 14)
 
                     // ── AND WHETHER IT WAS ENOUGH ─────────────────────────
                     //
@@ -797,7 +797,7 @@ struct Reports: View {
                     // what the shop had to bill to cover the rent, and that
                     // figure lived nowhere in this app at all.
                     BreakEvenCard(shop: shop, report: floor)
-                        .card(rail: (floor?.surplus ?? 0) < 0 ? Khayt.late : Khayt.cyan,
+                        .card(rail: (floor?.surplus ?? 0) < 0 ? Khayt.late : Khayt.brand,
                               padding: 14)
 
                     // The components it is made of. Net is deliberately NOT

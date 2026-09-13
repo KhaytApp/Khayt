@@ -16,7 +16,7 @@ import SwiftUI
 ///
 /// The palette in `Palette.swift` was already chosen, contrast-checked and
 /// documented — and 48 of its 71 uses were the one amber, while the app's own
-/// cyan appeared six times and `note` never at all. The identity existed and
+/// the accent appeared six times and `note` never at all. The identity existed and
 /// never reached the screen.
 ///
 /// ── THE DEVICE ────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ import SwiftUI
 /// what the card is about. It is the one repeated shape in the app, so it is
 /// the thing that makes two Khayt screens look like the same program, and it
 /// carries meaning rather than decorating — `Khayt.late` on the late work,
-/// `Khayt.hot` on what is being made right now, `Khayt.cyan` on the shop's own
+/// `Khayt.hot` on what is being made right now, `Khayt.brand` on the shop's own
 /// figures.
 ///
 /// **A card with nothing to say gets no rail.** That is the half that makes it
@@ -189,7 +189,7 @@ extension Khayt {
     /// `PaletteTests` measured every colour against `#FFFFFF` and `#1E1E1E`,
     /// neither of which this app draws on. Made to ask about the three real
     /// surfaces instead, it failed **ten** pairs on the palette as it then
-    /// shipped: `cyan` at 3.84:1 on a recessed strip, `hot` at 4.02, `marked`
+    /// shipped: the accent at 3.84:1 on a recessed strip, `hot` at 4.02, `marked`
     /// at 2.56. Every one of them had been on screen for months.
     ///
     /// The whole light ramp is solved against `recessed` now — the darkest
@@ -324,7 +324,7 @@ struct BigFigure: View {
 /// same idea ended up four different sizes on four screens.
 struct Chip: View {
     let text: String
-    var tint: Color = Khayt.cyan
+    var tint: Color = Khayt.brand
     var symbol: String?
 
     var body: some View {

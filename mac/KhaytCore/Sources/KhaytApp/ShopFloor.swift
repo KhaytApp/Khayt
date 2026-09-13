@@ -80,14 +80,14 @@ struct Machines: View {
                 // nowhere in this app.
                 if !shop.machines.isEmpty {
                     CapacityCard(shop: shop, report: load)
-                        .card(rail: load?.totals.overbooked == true ? Khayt.late : Khayt.cyan,
+                        .card(rail: load?.totals.overbooked == true ? Khayt.late : Khayt.brand,
                               padding: 14)
                     // Capacity says whether a machine is busy; this says
                     // whether being busy is worth it. The pair is the case for
                     // servicing one printer and selling another.
                     MachineReliabilityCard(shop: shop, report: scrap)
                         .card(rail: (scrap?.totals.scrapRate ?? 0) >= 0.05
-                                    ? Khayt.attention : Khayt.cyan,
+                                    ? Khayt.attention : Khayt.brand,
                               padding: 14)
                 }
                 LazyVGrid(columns: columns, spacing: 16) {
@@ -603,7 +603,7 @@ struct Inventory: View {
                     if !shop.spools.isEmpty,
                        shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         MaterialCostCard(shop: shop, report: prices)
-                            .card(rail: Khayt.cyan, padding: 14)
+                            .card(rail: Khayt.brand, padding: 14)
                             .padding(.bottom, 14)
                     }
                     LazyVGrid(columns: columns, spacing: 14) {

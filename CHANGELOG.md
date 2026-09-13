@@ -6,6 +6,42 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The Mac app wears the new icon's colours.** Khayt's accent was the cyan of
+  the icon before last, and the app had been sitting beside its own orange-on-
+  navy mark looking like a different product. It is now the mark's navy, at the
+  lightness a label can actually be read at — 5.60:1 on the lightest surface it
+  draws in light appearance, 5.26:1 in dark, measured against the real card and
+  ground colours rather than against white.
+
+  **The accent is the navy and not the orange, and that is the finding.** The
+  obvious move on a re-brand is to take the mark's loudest colour. Measured, the
+  filament in the new icon is hue 23° and Khayt's "something is being made right
+  now" was already hue 19° — four degrees. The new icon did not bring an orange
+  to the app; it agreed with the one already in it. Spending that hue on
+  selection, links and section rails would have cost the app the one colour that
+  means *printing*, on a dashboard that draws exactly that distinction on a
+  single control. So the accent is the mark's other colour, and both halves of
+  the icon are now on every screen.
+
+  The informational colour moved with it, because it had to: it was hue 206,
+  seven degrees from the new accent, and a desaturated blue beside a saturated
+  one of the same hue is a colour nobody can name. It is a true slate now — same
+  hue, a third of the saturation — and a test measures that, so undoing it fails
+  rather than quietly producing two accents.
+
+  The Electron app needed no re-accent: measured, its default theme was already
+  there — primary at hue 214 against the icon's navy at 213, accent at 25
+  against the filament at 23. The two apps agree on Khayt's colours for the
+  first time.
+
+- **(Maintainers) A sample-book test was pinned to the calendar.** `SampleFigures`
+  asserted the sample shop had exactly six late jobs. The sample's due dates are
+  absolute, so a job crosses into late whenever the date moves, and it went to
+  nine overnight. It passed for as long as it did only because nobody ran it on
+  the wrong day. The suite exists to prove that adding measured actuals moved no
+  money, and lateness is not money: what is pinned now is that the sample still
+  carries overdue work for the attention list to find.
+
 - **(Maintainers) The print-risk import path is proven by importing, not by
   reading the call site.** The wiring guard claimed a behaviour test needed a
   real store, a real library root and a ten-million-facet file. It needs a temp

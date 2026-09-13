@@ -435,28 +435,45 @@ to do. They were also not Khayt's colours, and not contrast-checked; SwiftUI's
 `.green` is 2.4:1 on white.
 
 **Nothing in the palette was invented.** It was taken from the app icon: a
-printed Arabic khaa whose letter and diamond were cyan `#2BCDE4`. So the app's
-colour is that cyan, and amber means exactly one thing —
-something is being made right now. The status hues are
+chrome nozzle extruding one loop of filament in the shape of an Arabic khaa,
+orange `#DF6011` on navy `#0A2A50`. The app's colour is that **navy**, at hue
+213 lifted to a lightness a label can be read at, and the orange means exactly
+one thing — something is being made right now. The status hues are
 `renderer/themes/command/tokens.css` for light and `renderer/styles.css` for
 dark, unchanged, so "done" is the same green in both of a shop's apps. Khayt's
 light themes already darken those to clear WCAG AA on white and `styles.css`
 says so in as many words; that work is taken rather than redone.
 
-> **The icon has moved on and this palette has not.** Khayt's icon is now
-> orange `#E06010` on navy `#0A2A51`. Re-accenting the app to match is a
-> separate change, not a find-and-replace: every contrast ratio recorded in
-> this file was measured against the cyan, and `Palette.swift` darkens it to
-> `#0A6E81` for light appearance precisely because `#2BCDE4` is 1.9:1 on
-> white. Until that pass is done, the icon and the UI accent differ on
-> purpose.
+**Why the accent is the navy and not the orange**, which is the part worth
+reading before changing any of it. The obvious move on a re-brand is to take
+the mark's strongest colour, and measured it is the wrong one: the filament in
+the icon is hue 23°, and `Khayt.hot` — "something is being made right now" —
+was already hue 19°. Four degrees. The new icon did not bring an orange to this
+app; it agreed with the one already in it. Spending that colour on selection,
+links and section rails would have cost the app the one hue that means
+*printing* — `Dashboard.swift` draws exactly that distinction on a single
+control, `tint: printing ? Khayt.hot : Khayt.brand` — and would not even have
+made the app resemble its icon, because the icon's orange was already on the
+screen. So the accent is the mark's other colour, and both halves of it are now
+on every screen.
+
+`Khayt.note` moved with it, and had to. It was hue 206, seven degrees from the
+new accent, and a desaturated blue next to a saturated one of the same hue is a
+colour nobody can name. Its saturation is dropped to a true slate — same hue,
+12–14% rather than 29–37% — because saturation is what the eye reads as "the
+app is talking", and `note` is precisely the colour that should not be.
+`PaletteTests.noteIsASlate` measures that, so undoing it fails a test rather
+than quietly producing two accents.
+
+The accent is named `Khayt.brand`, for its role. It was `Khayt.cyan`, and an
+accent named for a hue it no longer has is a lie in 59 files.
 
 `PaletteTests` measures all of it — every colour, both appearances, against the
 surface it actually sits on, at 4.5:1. `marked` (the favourite star) is the one
 held to 3:1 instead, and only because it is never text: a gold dark enough for
 4.5:1 on white is brown, and a brown star is not a star.
 
-The app tints itself cyan **only when this Mac's owner has not chosen an accent
+The app tints itself with its own colour **only when this Mac's owner has not chosen an accent
 colour of their own**, because the HIG says a chosen accent replaces an app's.
 An app with an asset catalog gets that free; this bundle is assembled by hand,
 so `Khayt.appTint` asks. `AppleAccentColor` is absent for multicolour and 0–7
