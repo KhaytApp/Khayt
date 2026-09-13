@@ -1458,7 +1458,11 @@ function updateResinFieldsVisibility() {
           const client = KhaytAiQuote.createAiQuoteClient({ transport, model: settings.ai.model });
           const draft = await client.extract(desc, { materials: inventory });
           const { part, assumptions } = KhaytAiQuote.draftToPart(draft, { inventory, defaults: {} });
-          if (part.printTime && $('#printTime')) $('#printTime').value = (part.printTime / 60).toFixed(2);
+          // No /60 any more: `draftToPart` returns HOURS, like every other
+          // part in the app. It used to hand back the model's minutes in a
+          // field named `printTime`, and this line was the only thing standing
+          // between that and a ninety-minute job quoted as ninety hours.
+          if (part.printTime && $('#printTime')) $('#printTime').value = part.printTime.toFixed(2);
           if (part.printWeight && $('#printWeight')) $('#printWeight').value = part.printWeight.toFixed(1);
           if (typeof updateGrandTotal === 'function') updateGrandTotal();
           const note = assumptions.length ? '\n• ' + assumptions.join('\n• ') : '';

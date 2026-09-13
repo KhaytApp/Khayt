@@ -426,6 +426,28 @@ public actor KhaytEngine {
         // never be skipped: the consent is per feature because the four send
         // very different things, and one of them sends a customer's name.
         "ai-privacy",
+        // ── AND THE FEATURES THEMSELVES ───────────────────────────────────
+        //
+        // `ai-providers` and `ai-privacy` are the half that decides WHICH
+        // vendor and WHETHER a feature may run. Without these the assistant
+        // pane was a consent screen for features this app could not perform:
+        // a shop switched one on, read what it sends, saved, and nothing here
+        // ever sent anything.
+        //
+        // `ai-tools` FIRST, and it is not optional. It owns the tool
+        // definition each task gets — the model leans on the tool's name and
+        // description heavily, and one shared `quote_extract` definition was
+        // mis-framing price, reply and assistant calls — plus the retry policy
+        // and the sentence a shop reads for an HTTP fault. `main.js` drives its
+        // transport from exactly these, so a second opinion here would be two
+        // apps disagreeing about what a 429 means.
+        "ai-tools",
+        // Quote from a description. The PURE halves are what this app needs —
+        // the system prompt, the extraction schema, the validation, and turning
+        // an accepted draft into a calculator part. `createAiQuoteClient` takes
+        // an async transport and is deliberately NOT used here: Swift does the
+        // request, so nothing has to await inside JavaScriptCore.
+        "ai-quote",
         // ── WHAT A MODEL WOULD COST BEFORE IT IS EVER SLICED ──────────────
         //
         // Geometry into a weight and a time. The Mac could MEASURE a mesh from
@@ -6261,6 +6283,144 @@ public actor KhaytEngine {
 
     public func medusaSubscriberPath() throws -> String {
         try runtime.call2("KhaytMedusa.SUBSCRIBER_PATH", [], as: String.self)
+    }
+
+    // MARK: - Drafting a quote from a description
+
+    /// One request to a provider, shaped by whichever one the shop chose.
+    ///
+    /// Four providers spell structured output three different ways, and none of
+    /// that belongs in Swift. This is `buildRequest`'s answer, carried across.
+    public struct AiRequest: Decodable, Sendable {
+        public let url: String
+        public let headers: [String: String]
+        /// The JSON body, already shaped. Swift encodes it and sends it; it has
+        /// no opinion about what is in it.
+        public let body: JSONValue
+        public let provider: String
+        public let model: String
+    }
+
+    /// Why a request could not be built. A configuration fault the shop has to
+    /// see, not a network error worth retrying — which is why `buildRequest`
+    /// throws rather than returning half a request.
+    public struct AiRefused: Error, LocalizedError, Sendable {
+        public let sentence: String
+        public var errorDescription: String? { sentence }
+    }
+
+    /// Build the quote-extraction call for this shop.
+    ///
+    /// ── CONSENT IS CHECKED HERE, NOT ONLY ON THE SCREEN ───────────────────
+    ///
+    /// This is the single point where shop data leaves the device, so a caller
+    /// that forgets to ask — or a future one that never knew to — still cannot
+    /// transmit a feature the owner has not agreed to. `main.js` enforces it at
+    /// exactly the same place and says the same thing about why.
+    public func aiQuoteRequest(settings: [String: JSONValue], description: String,
+                               materials: [JSONValue], apiKey: String) throws -> AiRequest {
+        try runtime.call2("""
+            (function (a) {
+              if (!KhaytAiPrivacy.isFeatureEnabled((a.settings || {}).ai, 'quote')) {
+                throw new Error('AI_FEATURE_NOT_CONSENTED');
+              }
+              // The tool's NAME and DESCRIPTION are what the model leans on, so
+              // each task gets its own rather than one shared 'quote_extract'.
+              var t = KhaytAiTools.resolveTool('quote', KhaytAiQuote.EXTRACTION_SCHEMA);
+              var settings = { ai: Object.assign({}, (a.settings || {}).ai, { apiKey: a.apiKey }) };
+              return KhaytAiProviders.buildRequest(settings, {
+                apiKey: a.apiKey,
+                system: KhaytAiQuote.buildSystemContext(a.materials),
+                prompt: a.description,
+                tool: t.tool,
+                maxTokens: t.maxTokens,
+              });
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "description": .string(description),
+                      "materials": .array(materials), "apiKey": .string(apiKey)])],
+            as: AiRequest.self)
+    }
+
+    /// What the model sent back, validated.
+    ///
+    /// `ok` false is an answer: the model may refuse, run out of tokens, or
+    /// return something that is not a draft, and a shop is owed the reason
+    /// rather than an empty form.
+    public struct AiQuoteDraft: Decodable, Sendable {
+        public let ok: Bool
+        /// Present only when `ok`. The model's physical facts — never a price.
+        public let draft: JSONValue?
+        /// Why not, when not.
+        public let problem: String?
+    }
+
+    /// Read one reply with the provider that shaped it, then validate it.
+    ///
+    /// Both halves together because a draft that parses and fails validation is
+    /// the same outcome to a caller as one that does not parse: nothing usable
+    /// arrived, and the sentence differs.
+    public func aiQuoteRead(settings: [String: JSONValue],
+                            response: JSONValue) throws -> AiQuoteDraft {
+        try runtime.call2("""
+            (function (a) {
+              var out = KhaytAiProviders.readResponse(a.settings, a.data);
+              if (!out.ok) {
+                return { ok: false, draft: null,
+                         problem: KhaytAiTools.describeStop(out.stop) };
+              }
+              var v = KhaytAiQuote.validateDraft(out.draft);
+              if (!v.ok) {
+                return { ok: false, draft: null,
+                         problem: 'invalid extraction: ' + v.errors.join('; ') };
+              }
+              return { ok: true, draft: out.draft, problem: null };
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "data": response])],
+            as: AiQuoteDraft.self)
+    }
+
+    /// Turn an accepted draft into a part the calculator can price.
+    ///
+    /// THE AI FILLS THE FORM; THE CALCULATOR COMPUTES THE PRICE. The module's
+    /// own header calls that its governing contract, and it is why nothing here
+    /// returns money: the model states physical facts, the shop's own rates turn
+    /// them into a figure, and the shop can see and change every one first.
+    public func aiQuoteToPart(draft: JSONValue, inventory: [JSONValue],
+                              defaults: [String: JSONValue],
+                              reclaimsTax: Bool) throws -> JSONValue {
+        try runtime.call2("""
+            KhaytAiQuote.draftToPart(ARG0, { inventory: ARG1, defaults: ARG2, reclaimsTax: ARG3 })
+            """,
+            [draft, .array(inventory), .object(defaults), .bool(reclaimsTax)],
+            as: JSONValue.self)
+    }
+
+    /// The shared retry policy, so the two apps cannot disagree about a 429.
+    public struct AiRetry: Decodable, Sendable {
+        public let retry: Bool
+        public let afterMs: Double
+    }
+
+    public func aiRetry(status: Int, attempt: Int, retryAfter: String?) throws -> AiRetry {
+        try runtime.call2("""
+            (function (a) {
+              return {
+                retry: KhaytAiTools.shouldRetry(a.status),
+                afterMs: KhaytAiTools.retryDelayMs(a.attempt, a.retryAfter),
+              };
+            })(ARG0)
+            """,
+            [.object(["status": .number(Double(status)), "attempt": .number(Double(attempt)),
+                      "retryAfter": retryAfter.map { JSONValue.string($0) } ?? .null])],
+            as: AiRetry.self)
+    }
+
+    /// The sentence a shop reads for an HTTP fault — the other app's wording.
+    public func aiHttpError(status: Int, body: JSONValue) throws -> String {
+        try runtime.call2("KhaytAiTools.describeHttpError(ARG0, ARG1)",
+                          [.number(Double(status)), body], as: String.self)
     }
 
     // MARK: - Money received

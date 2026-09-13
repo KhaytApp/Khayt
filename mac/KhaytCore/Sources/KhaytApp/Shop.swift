@@ -416,6 +416,13 @@ final class Shop {
             // is asked for here rather than in the view so that a table
             // redrawing on every keystroke does not cross into JavaScript.
             await readKits(root)
+            // Whether the shop has agreed to the assistant drafting a quote.
+            // Asked of the shared rule — it reads the master switch, the
+            // per-feature answer AND the consent migration, and a Swift copy
+            // would be a fourth place for those three to disagree on the one
+            // question that decides whether data leaves the building.
+            let aiFeatures = (try? await engine?.aiFeatures(settings: Self.settings(root))) ?? []
+            aiQuoteAllowed = aiFeatures.first { $0.id == "quote" }?.enabled ?? false
             taxSummary = await describeTax(root["settings"])
             await readSettingsTables(root)
             // What each job still owes is `order-money`'s answer, not a
@@ -1576,6 +1583,89 @@ final class Shop {
     }
 
     /// Write it down. Follows `saveCustomer` exactly, including the undo.
+    // MARK: - Drafting a quote from a description
+
+    /// The AI features this app can actually perform.
+    ///
+    /// ── A LIST, BECAUSE THE ALTERNATIVE WAS A CAVEAT THAT OUTLIVED ITSELF ─
+    ///
+    /// The assistant pane carried one sentence over the whole list saying these
+    /// run in the other app. It was true when it was written and false the hour
+    /// `quote` started working here, which is how a caveat becomes a lie.
+    ///
+    /// So the pane asks this instead, per feature, and the note disappears from
+    /// each one as it lands. ADD AN ID HERE when its feature can run — the note
+    /// is the only thing telling a shop the switch does nothing on this Mac,
+    /// and leaving it on a working feature is as wrong as dropping it from a
+    /// missing one.
+    static let aiFeaturesOnThisMac: Set<String> = ["quote"]
+
+    static func aiRunsHere(_ id: String) -> Bool { aiFeaturesOnThisMac.contains(id) }
+
+    /// Has the shop actually agreed to this, on this book?
+    ///
+    /// Asked of the shared rule rather than worked out from the settings here.
+    /// `isFeatureEnabled` reads the master switch, the per-feature answer AND
+    /// the consent migration — a Swift copy would be a fourth place for the
+    /// three to disagree, and the one that decides whether data leaves.
+    var aiCanDraftQuotes: Bool { aiQuoteAllowed }
+    private(set) var aiQuoteAllowed = false
+
+    /// What came back, in the shape the sheet's own form takes.
+    struct DraftedPart: Sendable {
+        var qty: Int
+        var grams: Double
+        var hours: Double
+        var spoolId: String?
+        var assumptions: [String]
+    }
+
+    /// Either a filled form or a sentence saying why not.
+    ///
+    /// A sentence rather than a thrown error, because every way this can go
+    /// wrong is something the shop has to READ: a feature it has not switched
+    /// on, a key it has not set, a provider that refused, a network that did
+    /// not answer. A spinner that stops with nothing said is the one outcome
+    /// that teaches people the button is broken.
+    enum DraftOutcome: Sendable {
+        case filled(DraftedPart)
+        case refused(String)
+    }
+
+    /// Ask the assistant to fill a part from a description.
+    func draftPartFromDescription(_ said: String) async -> DraftOutcome {
+        guard let engine else { return .refused(words.callIt("mac.move_no_engine")) }
+        do {
+            let draft = try await AiClient.draftQuote(said, shop: self)
+            // `defaults` are the shop's RATE fields, which this screen does not
+            // take from the draft — it costs the part with `costedPart`, the
+            // same call a hand-typed part goes through. Empty is honest here;
+            // filling it would be pretending the model set rates it never saw.
+            let out = try await engine.aiQuoteToPart(
+                draft: draft, inventory: inventoryRows,
+                defaults: [:], reclaimsTax: reclaimsTax)
+            guard case .object(let o) = out, case .object(let part)? = o["part"] else {
+                return .refused(words.callIt("mac.ai_no_draft"))
+            }
+            var notes: [String] = []
+            if case .array(let list)? = o["assumptions"] {
+                notes = list.compactMap(Self.plainString)
+            }
+            return .filled(DraftedPart(
+                qty: Int(Self.plainNumber(part["qty"]) ?? 1),
+                grams: Self.plainNumber(part["printWeight"]) ?? 0,
+                hours: Self.plainNumber(part["printTime"]) ?? 0,
+                spoolId: Self.plainString(part["filamentId"]),
+                assumptions: notes))
+        } catch AiClient.Failure.notConsented {
+            return .refused(words.callIt("mac.ai_not_consented"))
+        } catch AiClient.Failure.noKey {
+            return .refused(words.callIt("mac.ai_no_key"))
+        } catch {
+            return .refused(String(describing: error))
+        }
+    }
+
     /// A product's pictures, read the way the shared rule reads them.
     ///
     /// Never by pulling `images` off the record: a product can carry the legacy

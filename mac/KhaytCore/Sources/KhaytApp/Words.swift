@@ -1276,14 +1276,31 @@ final class Words {
         // same words the Electron page does. Only this app's own tab name is
         // here, because the other app's settings navigation is not a tab list.
         "mac.nav_integrations": ["en": "Integrations", "ar": "التكاملات"],
-        // Said on the assistant pane. The consent is real and shared — the book
-        // syncs — but the features themselves are not on this app yet, and a
-        // switch that does nothing where you switched it has to say so.
-        "mac.ai_runs_in_khayt": ["en": "These run in the Windows and Linux app for now. "
-                                 + "Switching one on here records your answer for the whole shop; "
-                                 + "this Mac does not send anything yet.",
-                                 "ar": "تعمل هذه في تطبيق ويندوز ولينكس حاليًا. تشغيلها هنا يسجّل "
-                                 + "إجابتك للمتجر كله؛ ولا يرسل هذا الماك أي شيء بعد."],
+        // Said on the assistant pane, PER FEATURE, on the ones this app cannot
+        // perform yet. It was one note over the whole list — and stopped being
+        // true the moment "Quote from a description" started working here,
+        // which is exactly how a caveat becomes a lie: it outlives the
+        // limitation it described. Attached to the features themselves now, so
+        // it disappears feature by feature as each one lands.
+        "mac.ai_elsewhere":  ["en": "Runs in the Windows and Linux app for now — switching it on "
+                              + "here records your answer for the whole shop.",
+                              "ar": "يعمل في تطبيق ويندوز ولينكس حاليًا — تشغيله هنا يسجّل إجابتك "
+                              + "للمتجر كله."],
+        // ── DRAFTING A QUOTE FROM A DESCRIPTION ───────────────────────────
+        "mac.describe_the_job": ["en": "Describe the job — \"20 cable clips, black PETG\"",
+                                 "ar": "صف العمل — «٢٠ مشبك كابل، PETG أسود»"],
+        "mac.draft_it":      ["en": "Draft",           "ar": "صُغ"],
+        "mac.drafting":      ["en": "Asking…",         "ar": "جارٍ السؤال…"],
+        // Always shown, never folded away: a drafted part is a guess with
+        // figures in it, and the assumptions are the only way to tell a good
+        // one from a confident one.
+        "mac.it_assumed":    ["en": "It assumed",      "ar": "افترض"],
+        "mac.ai_no_draft":   ["en": "Nothing usable came back — fill the part in yourself.",
+                              "ar": "لم يصل شيء صالح — املأ القطعة بنفسك."],
+        "mac.ai_not_consented": ["en": "Switch on \"Quote from a description\" in Settings → AI assist first.",
+                                 "ar": "فعّل «تسعيرة من وصف» في الإعدادات ← مساعد الذكاء أولًا."],
+        "mac.ai_no_key":     ["en": "Add your provider's API key in Settings → AI assist.",
+                              "ar": "أضف مفتاح المزوّد في الإعدادات ← مساعد الذكاء."],
         "mac.nav_slicers":   ["en": "Slicers", "ar": "برامج التقطيع"],
         "mac.no_slicers":    ["en": "No slicer set up yet. Khayt can look for the ones you already have.",
                               "ar": "لم يُضبط أي برنامج شرائح بعد. يستطيع خيط البحث عمّا لديك."],

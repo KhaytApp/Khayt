@@ -33,7 +33,10 @@ test('draftToPart builds a calculator part; rates come from defaults, not the mo
   });
   assert.equal(part.qty, 10);
   assert.equal(part.printWeight, 40);
-  assert.equal(part.printTime, 90);
+  // HOURS. The model answers in minutes (`printTimeMin`) and this converts,
+  // because `printTime` means hours on every other part in the codebase — the
+  // calculator, the store, the invoice and both editors.
+  assert.equal(part.printTime, 1.5, 'printTime is hours, not the model\'s minutes');
   assert.equal(part.filamentId, 'f-pla');
   assert.equal(part.spoolCost, 50);
   assert.equal(part.laborRate, 30, 'rate fields come from shop defaults');
