@@ -2295,7 +2295,7 @@ final class Shop {
     /// with a trim and treats blank as ungrouped, so an empty string would work
     /// — right up until the record syncs to a machine running a build that
     /// checks the key's presence instead.
-    private static func stampKit(_ root: inout [String: JSONValue],
+    static func stampKit(_ root: inout [String: JSONValue],
                                  ids: Set<String>, to kitId: String?) {
         guard !ids.isEmpty, case .array(var rows)? = root["printLog"] else { return }
         var touched = false
