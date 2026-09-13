@@ -1,0 +1,177 @@
+import Foundation
+import Testing
+import KhaytCore
+@testable import KhaytApp
+
+/// Everything a shop still has to open the other app for.
+///
+/// ── WHY THIS IS A TEST AND NOT A DOCUMENT ─────────────────────────────────
+///
+/// "The Mac app is the product; you should never need Khayt" is a standing
+/// requirement, and a requirement nobody can measure decays into a claim. Three
+/// separate times this session a screen was found telling a shop to go to the
+/// other app for something this one had done for weeks — the library's empty
+/// state, the machines', the shelf's — and each had been true when it was
+/// written.
+///
+/// So the list lives here, and it is CLOSED: a dependency not named below fails
+/// the suite. Adding one is then a deliberate act with a sentence attached
+/// rather than a line of code nobody notices, and removing one is a line
+/// deleted from a test, which is the direction this list is supposed to move.
+@MainActor
+struct NeedsTheOtherAppTests {
+
+    /// A thing this app cannot do yet, and what a shop hits when it tries.
+    struct Gap {
+        let id: String
+        /// What a shop is actually trying to do.
+        let what: String
+        /// Why it is not here yet — the honest reason, not a plan.
+        let why: String
+    }
+
+    /// THE LIST. Shorten it; do not lengthen it without a very good `why`.
+    static let known: [Gap] = [
+        Gap(id: "outbound.webhooks",
+            what: "Moving a job when an outbound webhook is configured",
+            why: "The payload and retry policy are lib/webhooks.js and "
+               + "lib/webhook-bus.js, neither bundled; and sending one needs "
+               + "the SSRF guard in lib/host-guard.js, which is also not."),
+        Gap(id: "outbound.email",
+            what: "Moving a job that would email the customer",
+            why: "Needs a provider integration — the address, the key and the "
+               + "template all live in the other app's main process."),
+        Gap(id: "outbound.portal",
+            what: "Moving a published job, which refreshes the customer's link",
+            why: "The refresh is a cloud write this app does not make."),
+        // NARROWED, not removed. The comparables half — the shop's own realized
+        // margins, net of tax — is on the new-job sheet and needs no model at
+        // all. What is still missing is the half that asks one to weigh them.
+        Gap(id: "ai.price.recommendation",
+            what: "Asking the assistant to weigh those comparables and recommend one",
+            why: "The comparables are shown here already; the model call that "
+               + "phrases a recommendation over them has no surface yet."),
+        Gap(id: "ai.reply",
+            what: "Drafting a reply to a customer",
+            why: "lib/ai-reply.js is not bundled. It sends customer data, so it "
+               + "wants the consent path proven before the transport."),
+        Gap(id: "ai.assistant",
+            what: "Asking questions about the book",
+            why: "lib/ai-assistant.js is not bundled."),
+        Gap(id: "product.tiers",
+            what: "Prices per quantity on a product",
+            why: "The tier editor is the other app's; the reading rule "
+               + "(lib/product-price.js) is already bundled and used."),
+        Gap(id: "product.documents",
+            what: "Documents attached to a product",
+            why: "No surface here for them yet, and no shared rule to lift — "
+               + "attaching one is a file copy plus a store write, both of "
+               + "which this app already does elsewhere."),
+    ]
+
+    // MARK: - The list is closed
+
+    @Test("every screen that sends a shop to the other app is on the list")
+    func noUndeclaredDependency() throws {
+        // Reads the SOURCE, because the thing that goes stale is a sentence.
+        // A string telling a shop to do something in Khayt is a dependency
+        // whether or not anyone remembered to write it down here.
+        let dir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp")
+        let words = try String(contentsOf: dir.appending(path: "Words.swift"), encoding: .utf8)
+
+        // The sentences that point at the other app, as a shop would read them.
+        var pointers: [String] = []
+        for line in words.split(separator: "\n", omittingEmptySubsequences: false) {
+            let text = String(line)
+            guard !text.trimmingCharacters(in: .whitespaces).hasPrefix("//") else { continue }
+            guard let en = text.range(of: "\"en\": \"") else { continue }
+            let rest = text[en.upperBound...]
+            guard let close = rest.firstIndex(of: "\"") else { continue }
+            let said = String(rest[..<close])
+            let points = said.contains(" in Khayt")
+                || said.contains("Windows and Linux app")
+                || said.contains("the other app")
+            if points { pointers.append(said) }
+        }
+
+        // Each one must correspond to something on the list above. The match is
+        // by hand rather than by pattern, because the point is that somebody
+        // looked: an unrecognised pointer is a dependency nobody declared.
+        let allowed = [
+            "Prices per quantity and documents stay as they are",   // product.tiers, product.documents
+            "Runs in the Windows and Linux app for now",            // ai.*
+            "Do it in Khayt so it is sent",                         // outbound.*
+            "Another app has this book open",                       // not a gap: a lock
+        ]
+        let undeclared = pointers.filter { said in
+            !allowed.contains { said.hasPrefix($0) }
+        }
+        #expect(undeclared.isEmpty, Comment(rawValue: """
+            \(undeclared.count) screen(s) send a shop to the other app without \
+            being on the list in NeedsTheOtherAppTests:
+
+            \(undeclared.joined(separator: "\n"))
+
+            Either add a Gap with an honest `why`, or — better — the sentence is \
+            stale and this app already does it.
+            """))
+    }
+
+    @Test("the list itself is honest: nothing on it is already done")
+    func nothingListedIsAlreadyDone() async throws {
+        // The failure this catches is the one that actually happened three
+        // times: a limitation written down, fixed, and the sentence left behind
+        // telling shops to go elsewhere for something that works here.
+        // The module list is internal to KhaytCore, so this reads the source —
+        // which is the right thing anyway: the question is what the app SHIPS,
+        // and that is what the list in `KhaytEngine.swift` decides.
+        let engineSource = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appending(path: "Sources/KhaytCore/KhaytEngine.swift"),
+            encoding: .utf8)
+
+        // An AI gap is only real while its module is absent.
+        // Only the gaps whose id names a module. `ai.price.recommendation` is
+        // a gap in a SURFACE, not a missing module — `ai-price.js` is bundled
+        // and its deterministic half is on screen.
+        for gap in Self.known
+        where gap.id.hasPrefix("ai.") && gap.id.split(separator: ".").count == 2 {
+            let module = "ai-" + gap.id.dropFirst("ai.".count)
+            #expect(!engineSource.contains("\"\(module)\","), Comment(rawValue: """
+                \(gap.id) is on the list, but \(module).js IS bundled — \
+                either it works now and the entry should go, or the module is \
+                bundled and unreachable.
+                """))
+        }
+
+        // The outbound gaps are only real while the move refuses them.
+        // Telegram is deliberately NOT on the list: this app sends it.
+        #expect(Shop.aiRunsHere("quote"), "quote is done and must not be listed")
+        #expect(!Self.known.contains { $0.id == "ai.quote" },
+                "ai.quote works here and is still on the list")
+        #expect(!Self.known.contains { $0.id.contains("telegram") },
+                "Telegram is sent by this app and must not be listed")
+    }
+
+    @Test("the list is not growing")
+    func theListOnlyShrinks() {
+        // A number, deliberately. It is a ratchet: lowering it is the work,
+        // raising it needs somebody to decide that on purpose and say why in
+        // the commit.
+        #expect(Self.known.count <= 8, Comment(rawValue: """
+            \(Self.known.count) things still need the other app. This number is \
+            a ratchet — if a new dependency is genuinely unavoidable, lower \
+            something else first or raise this deliberately.
+            """))
+        // And every entry says what a shop is trying to do and why it cannot.
+        for gap in Self.known {
+            #expect(!gap.what.isEmpty && gap.why.count > 30,
+                    Comment(rawValue: "\(gap.id) has no honest reason written down"))
+        }
+    }
+}
