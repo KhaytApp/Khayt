@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The Mac's AI settings say where those features actually run.** The screen
+  offers a provider and a switch per feature, with what each one sends written
+  beside it — and the Mac bundles the half that decides *whether* a feature may
+  run, not the features themselves. So a shop could switch on "Draft a customer
+  reply", read exactly what it transmits, save, and find nothing on the Mac ever
+  drafts a reply.
+
+  The screen still earns its place: the book syncs, so a shop running both apps
+  had no way to see — let alone refuse — what the other one sends, and the
+  consent it records is real and shop-wide. But a switch that does nothing where
+  you switched it has to say so.
+
 - **(Maintainers) The palette knows what ink goes on a filled brand shape.**
   Every colour in it is measured against the surfaces the app draws on — card,
   ground, recessed — and none of those is a filled brand shape, so a badge
