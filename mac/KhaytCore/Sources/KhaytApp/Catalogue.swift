@@ -103,6 +103,22 @@ struct Catalogue: View {
     @ViewBuilder private func menu(for row: KhaytEngine.CatalogueRow) -> some View {
         Button(shop.words.callIt("mac.edit_product") + "\u{2026}") { edit(row.id) }
             .disabled(!shop.canMoveJobs)
+        Button(shop.words.callIt("mac.job_from_product") + "\u{2026}") { take(row.id) }
+            .disabled(!shop.canMoveJobs)
+    }
+
+    /// Take a job from one, rather than typing out what the shop already makes.
+    ///
+    /// The point is not the typing. A job taken this way carries `productId`,
+    /// which is what the catalogue counts to say this product has been made 14
+    /// times and earned 6,300 — a hand-typed job that happens to match is not
+    /// counted, and the figures on this screen are quietly short by it.
+    private func take(_ id: KhaytEngine.CatalogueRow.ID) {
+        guard shop.canMoveJobs else { return }
+        Task {
+            guard let product = await shop.productForEditing(id) else { return }
+            shop.takeJob(from: product)
+        }
     }
 
     /// Nothing here, or nothing matching — two different things to say.
@@ -185,6 +201,8 @@ struct Catalogue: View {
         .contextMenu(forSelectionType: KhaytEngine.CatalogueRow.ID.self) { ids in
             if let id = ids.first {
                 Button(shop.words.callIt("mac.edit_product") + "\u{2026}") { edit(id) }
+                    .disabled(!shop.canMoveJobs)
+                Button(shop.words.callIt("mac.job_from_product") + "\u{2026}") { take(id) }
                     .disabled(!shop.canMoveJobs)
             }
         } primaryAction: { ids in

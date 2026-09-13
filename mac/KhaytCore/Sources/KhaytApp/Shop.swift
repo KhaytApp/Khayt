@@ -1514,6 +1514,59 @@ final class Shop {
         return Product.from(record, keys: await allLanguageKeys())
     }
 
+    /// The papers that travel with a job, through the shared rule.
+    ///
+    /// Empty for a job nobody took from a product, which is most of them — and
+    /// for a product with nothing attached.
+    func documents(for job: Order) async -> [KhaytEngine.OrderDocument] {
+        guard job.productId?.isEmpty == false, let engine else { return [] }
+        return (try? await engine.orderDocuments(
+            order: .object(["productId": .string(job.productId ?? "")]),
+            products: productRows)) ?? []
+    }
+
+    // MARK: - Taking a job from something the shop already makes
+
+    /// The product a new job is being taken from, if any.
+    ///
+    /// ── WHY A JOB REMEMBERS ITS PRODUCT ───────────────────────────────────
+    ///
+    /// `productId` on the order is not bookkeeping. It is what the catalogue
+    /// counts to say a product has been made 14 times and earned 6,300; it is
+    /// what `lib/product-docs.js` follows to put the right assembly sheet in
+    /// the box; and it is what a shop's second machine reads to know two
+    /// orders are the same thing. A job typed out by hand that happens to
+    /// match a product is none of those.
+    var jobFromProduct: Product?
+
+    /// Start a job from a product: its parts, its components, its margin.
+    func takeJob(from product: Product) {
+        jobFromProduct = product
+        takingAJob = true
+    }
+
+    /// The tiers a product offers, as the sheet shows them.
+    ///
+    /// A NAMED MARGIN, not a price. "Wholesale 20%" replaces the margin on the
+    /// sheet and the price follows from the parts, so a tier stays right when
+    /// filament gets dearer — which a stored price would not.
+    struct PriceTier: Identifiable, Sendable, Hashable {
+        var id: String { label + "/" + String(margin) }
+        let label: String
+        let margin: Double
+    }
+
+    static func tiers(of product: Product?) -> [PriceTier] {
+        guard case .array(let rows)? = product?.rest["priceTiers"] else { return [] }
+        return rows.compactMap { row in
+            guard case .object(let o) = row,
+                  let label = plainString(o["label"])?.trimmingCharacters(in: .whitespaces),
+                  !label.isEmpty,
+                  let margin = plainNumber(o["margin"]) else { return nil }
+            return PriceTier(label: label, margin: margin)
+        }
+    }
+
     /// A blank product with an id in Khayt's own shape — `uid('PROD')`, as the
     /// Electron editor mints it, so one written here is indistinguishable.
     func newProduct() -> Product {
@@ -1936,7 +1989,9 @@ final class Shop {
     /// photo still on it.
     func saveProduct(_ product: Product, pictures: [StagedPicture]? = nil,
                      unlinking removed: [String] = [],
-                     parts: [JSONValue]? = nil) async {
+                     parts: [JSONValue]? = nil,
+                     tiers: [JSONValue]? = nil, docs: [JSONValue]? = nil,
+                     unlinkingDocs droppedDocs: [String] = []) async {
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -2029,6 +2084,16 @@ final class Shop {
             }
         }
 
+        // ── WRITTEN EVEN WHEN THE LIST IS EMPTY ───────────────────────────
+        //
+        // Because removing the last tier has to actually remove it. Everything
+        // else about a product is merged forward from the record that was
+        // there, so an absent key means "the sheet is not editing this" — and
+        // an empty list has to be a list, not an absence.
+        var listFields: [String: JSONValue] = [:]
+        if let tiers { listFields["priceTiers"] = .array(tiers) }
+        if let docs { listFields["docs"] = .array(docs) }
+
         var undo: [ChangedRecord] = []
         do {
             try StoreWriter.update(build) { root in
@@ -2036,10 +2101,12 @@ final class Shop {
                 var record = product.record(keys: keys)
                 for (key, value) in pictureFields { record[key] = value }
                 for (key, value) in partFields { record[key] = value }
+                for (key, value) in listFields { record[key] = value }
                 if let at = rows.firstIndex(where: { Self.recordId($0) == product.id }) {
                     guard case .object(let was) = rows[at] else { return }
                     undo.append(ChangedRecord(collection: "products", id: product.id, was: was))
-                    // The parts, the price tiers, the photo, the documents: the
+                    // Whatever this sheet is not editing — the components, the
+                    // storefront fields, anything a newer build writes: the
                     // shop's, and none of this app's business to drop.
                     for (key, value) in was where record[key] == nil {
                         record[key] = value
@@ -2058,6 +2125,9 @@ final class Shop {
             // when the sheet was cancelled is one it never asked to lose.
             for path in removed where !path.isEmpty {
                 ProductPhotos.delete(path, in: build)
+            }
+            for name in droppedDocs where !name.isEmpty {
+                ProductDocs.delete(name, in: build)
             }
             editingProduct = nil
             await load(source)
@@ -2249,7 +2319,8 @@ final class Shop {
 
     func newJobInput(parts: [NewJobSheet.Draft], project: String, clientId: String?,
                      margin: Double, discountPct: Double, shippingCost: Double,
-                     deposit: Double, rush: Bool, asQuote: Bool) -> [String: JSONValue] {
+                     deposit: Double, rush: Bool, asQuote: Bool,
+                     fromProduct product: Product? = nil) -> [String: JSONValue] {
         var input: [String: JSONValue] = [
             "parts": .array(Self.partRows(parts, spools: spools,
                                           unnamed: words.callIt("mac.a_part"))),
@@ -2262,6 +2333,19 @@ final class Shop {
             "asQuote": .bool(asQuote),
         ]
         if let clientId { input["clientId"] = .string(clientId) }
+        // ── WHAT THE PRODUCT BRINGS WITH IT ───────────────────────────────
+        //
+        // The components (magnets, screws, a box) and the assembly count are
+        // the product's, not the parts' — they are what turns printed pieces
+        // into the thing the customer buys, and the shared rule prices and
+        // deducts them. Carried here because a job taken from a product and
+        // then missing its packaging would under-price every sale and leave
+        // the consumable count wrong on the shelf.
+        if let product {
+            input["productId"] = .string(product.id)
+            if let components = product.rest["components"] { input["components"] = components }
+            if let qty = product.rest["assemblyQty"] { input["assemblyQty"] = qty }
+        }
         return input
     }
 

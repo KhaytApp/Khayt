@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import KhaytCore
 
 /// Writing a product down.
@@ -34,6 +35,14 @@ struct ProductSheet: View {
     /// only written back on save. See `StagedPicture`.
     /// The parts this product is made of — where its price comes from.
     @State private var parts: [PartRow] = []
+
+    /// The named margins this product can be quoted at.
+    @State private var tiers: [TierRow] = []
+
+    /// The papers that travel with it, and the ones to unlink once it saves.
+    @State private var docs: [ProductDocs.Attached] = []
+    @State private var removedDocs: [String] = []
+    @State private var docProblem: String?
     @State private var newPart = PartRow()
     /// What those parts cost, priced by the shared rule.
     @State private var pricing: KhaytEngine.ProductPricing?
@@ -54,6 +63,26 @@ struct ProductSheet: View {
     ///
     /// The same five things a job's part is described by, because it is the
     /// same kind of thing and the calculator prices it the same way.
+    /// One named margin, as this sheet collects it.
+    ///
+    /// A MARGIN AND NOT A PRICE. "Wholesale 20%" is the whole record, and the
+    /// price follows from the parts — so a tier stays right when filament gets
+    /// dearer, which a stored price would not. `renderer/inventory.js` writes
+    /// the same two fields.
+    struct TierRow: Identifiable, Equatable {
+        let id = UUID()
+        var label = ""
+        var margin: Double = 20
+
+        /// Nothing for a row with no name: an unnamed tier is a chip with no
+        /// label on the job sheet, which nobody can pick on purpose.
+        var record: JSONValue? {
+            let name = label.trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty else { return nil }
+            return .object(["label": .string(name), "margin": .number(max(0, margin))])
+        }
+    }
+
     struct PartRow: Identifiable, Equatable {
         var id = UUID()
         var name = ""
@@ -164,16 +193,11 @@ struct ProductSheet: View {
             ProductPictureStrip(shop: shop, productId: draft.id,
                                 pictures: $pictures, removed: $removedPictures)
 
-            // What this app is STILL not editing. It was "parts, prices per
-            // quantity and documents" — and parts came off that list when this
-            // sheet learnt to hold them, because a product with no parts has no
-            // price, which made "written down on the Mac" mean "a shell you
-            // have to finish in the other app".
-            if !isNew {
-                Text(shop.words.callIt("mac.product_kept"))
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Divider()
+            tiersSection
+
+            Divider()
+            docsSection
 
             HStack {
                 if !draft.hasAName {
@@ -188,8 +212,13 @@ struct ProductSheet: View {
                     let staged = pictures
                     let unlink = removedPictures
                     let rows = parts.map { $0.record(spools: shop.spools) }
+                    let tierRows = tiers.compactMap { $0.record }
+                    let docRows = docs.map { $0.record }
+                    let dropped = removedDocs
                     Task { await shop.saveProduct(saving, pictures: staged,
-                                                  unlinking: unlink, parts: rows) }
+                                                  unlinking: unlink, parts: rows,
+                                                  tiers: tierRows, docs: docRows,
+                                                  unlinkingDocs: dropped) }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!draft.hasAName)
@@ -218,11 +247,137 @@ struct ProductSheet: View {
             if case .array(let list)? = existing.rest["parts"] {
                 parts = list.compactMap(PartRow.from)
             }
+            tiers = Shop.tiers(of: existing).map { TierRow(label: $0.label, margin: $0.margin) }
+            if case .array(let list)? = existing.rest["docs"] {
+                docs = list.compactMap(ProductDocs.Attached.from)
+            }
             await reprice()
         }
         // Re-priced when the margin changes, because the margin is above the
         // parts on this sheet and a shop typing one is watching the total.
         .task(id: draft.margin) { await reprice() }
+    }
+
+    /// The prices this product can be quoted at.
+    ///
+    /// They are offered on the job sheet as chips beside the margin field —
+    /// which is the only thing a tier changes. Editable here because the pair
+    /// only works if both halves are: a tier nobody can add is a feature a shop
+    /// reads about and cannot use, and until now adding one meant opening the
+    /// other app.
+    private var tiersSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(shop.words.callIt("cat.tiers_section"))
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Button(shop.words.callIt("mac.add_tier")) {
+                    tiers.append(TierRow(label: shop.words.callIt("mac.wholesale"), margin: 20))
+                }
+            }
+            if tiers.isEmpty {
+                Text(shop.words.callIt("cat.no_tiers"))
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                ForEach($tiers) { $tier in
+                    HStack(spacing: 8) {
+                        TextField(shop.words.callIt("cat.tier_label"), text: $tier.label)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("", value: $tier.margin, format: .number)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 60).multilineTextAlignment(.trailing)
+                        Text("%").foregroundStyle(.secondary)
+                        Button {
+                            tiers.removeAll { $0.id == tier.id }
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(shop.words.callIt("common.delete"))
+                    }
+                }
+                Text(shop.words.callIt("cat.tiers_hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// The papers that go with it.
+    ///
+    /// A copy is taken, so the shop's own file can be moved or renamed
+    /// afterwards without the product losing its instructions. Removing one
+    /// only unlinks the file once the product is SAVED — a document deleted
+    /// here and then a cancelled sheet must leave the file where it was.
+    private var docsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(shop.words.callIt("pdoc.title")).font(.subheadline.weight(.semibold))
+                Spacer()
+                Button(shop.words.callIt("pdoc.add") + "\u{2026}") { attach() }
+            }
+            if docs.isEmpty {
+                Text(shop.words.callIt("pdoc.none"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ForEach($docs) { $doc in
+                    HStack(spacing: 8) {
+                        Text(doc.originalName).lineLimit(1).truncationMode(.middle)
+                        Spacer(minLength: 8)
+                        // Absent means yes, and the box says so plainly: this
+                        // decides whether the sheet goes in the customer's box
+                        // or stays on the floor's work order.
+                        Toggle(shop.words.callIt("pdoc.pack"), isOn: $doc.packWithOrder)
+                            .toggleStyle(.checkbox).font(.caption)
+                        Button(shop.words.callIt("common.open")) {
+                            if let build = shop.source.build {
+                                ProductDocs.open(doc.filename, in: build)
+                            }
+                        }
+                        .buttonStyle(.borderless)
+                        Button {
+                            removedDocs.append(doc.filename)
+                            docs.removeAll { $0.filename == doc.filename }
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(shop.words.callIt("common.delete"))
+                    }
+                }
+                Text(shop.words.callIt("pdoc.hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let docProblem {
+                Text(docProblem).font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func attach() {
+        guard let build = shop.source.build else {
+            docProblem = shop.words.callIt("mac.move_sample"); return
+        }
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        // The kinds the other app's dialog offers, and then anything — which
+        // is also what it does, because a shop's drawing can be in a format
+        // nobody thought to list.
+        panel.allowedContentTypes = ProductDocs.kinds.compactMap { UTType(filenameExtension: $0) }
+        panel.allowsOtherFileTypes = true
+        panel.prompt = shop.words.callIt("pdoc.add")
+        guard panel.runModal() == .OK else { return }
+        docProblem = nil
+        for url in panel.urls {
+            do {
+                docs.append(try ProductDocs.attach(url, productId: draft.id, in: build))
+            } catch {
+                docProblem = shop.words.callIt("pdoc.attach_failed") + " " + url.lastPathComponent
+            }
+        }
     }
 
     /// What the product is made of, and therefore what it costs.

@@ -650,6 +650,14 @@ public actor KhaytEngine {
         // apps computing it separately is two prices for one product.
         "product-pricing",
         "product-specs",
+        // Which papers travel with an order. It is a two-audience rule and
+        // that is the whole of it: the work order lists everything, the
+        // delivery note only what the shop marked to ship, and "not marked"
+        // means ship because the flag was added after shops had attached
+        // documents. A Swift re-reading of a `docs` array would default the
+        // other way on the first absent flag and quietly stop shipping safety
+        // sheets that used to go out.
+        "product-docs",
         // The merge engine. `applyDeltas` is what folds a chain from the cloud
         // onto a base, and it is the same function the Electron app merges
         // with — a second opinion about which of two edits wins is the one
@@ -6832,6 +6840,28 @@ public actor KhaytEngine {
             """,
             [.object(["settings": .object(settings), "data": response])],
             as: AiAnswer.self)
+    }
+
+    /// One document that travels with an order.
+    public struct OrderDocument: Decodable, Sendable, Identifiable {
+        public var id: String { filename }
+        public let filename: String
+        /// What the shop called it — the name on disk is a timestamp.
+        public let name: String
+        /// Whether it goes in the customer's box, or stays on the floor's copy.
+        public let packWithOrder: Bool
+    }
+
+    /// The papers attached to the product this order is for.
+    ///
+    /// Through the shared rule rather than by reading the product's `docs`,
+    /// because the two-audience split and the absent-flag default are the rule
+    /// — and defaulting the other way would quietly stop shipping safety sheets
+    /// that shops attached before the flag existed.
+    public func orderDocuments(order: JSONValue,
+                               products: [JSONValue]) throws -> [OrderDocument] {
+        try runtime.call2("KhaytProductDocs.docsForOrder(ARG0, ARG1)",
+                          [order, .array(products)], as: [OrderDocument].self)
     }
 
     // MARK: - Telling somebody else that an order changed
