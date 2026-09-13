@@ -221,7 +221,9 @@ private struct StorefrontRow: View {
                 cloud: cloud.url, shopId: cloud.shopId, platform: store.id),
               let source = try? await engine.medusaSubscriber(importURL: url) else { return }
         put(source)
-        let path = (try? await engine.medusaSubscriberPath()) ?? "src/subscribers/khayt-order-placed.ts"
+        // The shared string already names the file and where it goes —
+        // `medusaSubscriberPath()` is there for a caller that needs the path
+        // itself, and repeating it here would be the same sentence twice.
         copied = shop.words.callIt("integ.subscriber_copied")
     }
 
