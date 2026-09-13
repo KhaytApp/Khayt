@@ -1626,17 +1626,6 @@ final class Words {
         "mac.edit_product":  ["en": "Edit product", "ar": "تعديل المنتج"],
         "mac.product_need_name": ["en": "A product needs a name in at least one language.",
                                   "ar": "يحتاج المنتج إلى اسم بلغة واحدة على الأقل."],
-        // Said on the sheet, because the alternative is a shop assuming the
-        // parts were dropped when it saved. PHOTOS CAME OFF THIS LIST when the
-        // sheet learnt to edit them — a sentence promising to leave something
-        // alone, on a screen that now changes it, is worse than no sentence.
-        // PARTS CAME OFF THIS LIST when the sheet learnt to hold them — which
-        // is what made a product written down here a shell: its price is made
-        // entirely of its parts, so with no way to add one it saved at 0.00
-        // with no hours and no grams.
-        "mac.product_kept":  ["en": "Prices per quantity and documents stay as they are — "
-                              + "edit those in Khayt.",
-                              "ar": "تبقى أسعار الكميات والمستندات كما هي — عدّلها في خيط."],
         "mac.parts_cost_nothing": ["en": "These parts have no filament chosen, so they cost "
                                    + "nothing — saving will set this product's price to zero. "
                                    + "Pick a spool for each part.",

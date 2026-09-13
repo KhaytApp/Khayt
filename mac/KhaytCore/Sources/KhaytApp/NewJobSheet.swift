@@ -95,7 +95,28 @@ struct NewJobSheet: View {
         var rates: KhaytEngine.Rates?
 
         var isComplete: Bool { (Double(grams) ?? 0) > 0 || (Double(hours) ?? 0) > 0 }
+
+        /// One of a product's parts, as this sheet holds it.
+        ///
+        /// The same fields `ProductSheet.PartRow` writes, read back — a job
+        /// taken from a product starts as the product's own parts, and then
+        /// belongs to the job: changing the grams here prices THIS job and
+        /// leaves the catalogue alone.
+        @MainActor static func from(_ value: JSONValue) -> Draft? {
+            guard case .object(let o) = value else { return nil }
+            var row = Draft()
+            row.name = Shop.plainString(o["name"]) ?? ""
+            row.spoolId = Shop.plainString(o["filamentId"])
+            row.grams = Money.quantity(Shop.plainNumber(o["printWeight"]) ?? 0)
+            row.hours = Money.quantity(Shop.plainNumber(o["printTime"]) ?? 0)
+            row.qty = max(1, Int(Shop.plainNumber(o["qty"]) ?? 1))
+            return row
+        }
     }
+
+    /// The product this job is being taken from, if any. Held so the sheet can
+    /// offer its tiers and the saved order can name it.
+    @State private var product: Product?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -113,6 +134,21 @@ struct NewJobSheet: View {
         .frame(maxHeight: 640)
         .onAppear {
             margin = shop.defaultMargin
+            // ── FROM A PRODUCT, IF THE SHOP ASKED FOR ONE ─────────────────
+            //
+            // Its parts, its margin and its name, filled in — and then it is
+            // an ordinary job sheet: everything here can be changed before it
+            // is taken, because a customer who wants two of them in a
+            // different colour is still ordering the product.
+            if let taken = shop.jobFromProduct {
+                product = taken
+                project = taken.anyName()
+                if case .array(let rows)? = taken.rest["parts"] {
+                    parts = rows.compactMap(Draft.from)
+                }
+                if let own = taken.margin { margin = own }
+                shop.jobFromProduct = nil
+            }
             focused = true
         }
         .task(id: signature) { await reprice() }
@@ -320,6 +356,36 @@ struct NewJobSheet: View {
                     Text(shop.words.callIt("calc.quote.discount")).foregroundStyle(.secondary)
                     percent($discountPct)
                     Toggle(shop.words.callIt("calc.rush_fee"), isOn: $rush).fixedSize()
+                }
+            }
+            // ── THE PRODUCT'S OWN TIERS ───────────────────────────────────
+            //
+            // A shop that sells the same thing retail and wholesale keeps the
+            // two margins on the product. They are offered HERE, beside the
+            // margin field, because that is the only thing a tier changes: the
+            // price follows from the parts, so a tier stays right when
+            // filament gets dearer in a way a stored price would not.
+            if !Shop.tiers(of: product).isEmpty {
+                GridRow {
+                    Color.clear.frame(height: 0)
+                    HStack(spacing: 6) {
+                        Text(shop.words.callIt("cat.pick_tier"))
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(Shop.tiers(of: product)) { tier in
+                            Button {
+                                margin = tier.margin
+                            } label: {
+                                Text("\(tier.label) \(Money.quantity(tier.margin))%")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                            // The one in force is shown as chosen, so a shop
+                            // can see which price it is quoting rather than
+                            // reading the margin back off the field.
+                            .tint(abs(margin - tier.margin) < 0.005 ? Khayt.brand : nil)
+                        }
+                        Spacer()
+                    }
                 }
             }
             // ── WHAT THIS SHOP HAS ACTUALLY MADE ON WORK LIKE THIS ────────
@@ -552,7 +618,7 @@ struct NewJobSheet: View {
         await shop.createJob(shop.newJobInput(
             parts: parts, project: project, clientId: clientId,
             margin: margin, discountPct: discountPct, shippingCost: shippingCost,
-            deposit: deposit, rush: rush, asQuote: asQuote))
+            deposit: deposit, rush: rush, asQuote: asQuote, fromProduct: product))
         if shop.moveProblem == nil { shop.takingAJob = false } else { problem = shop.moveProblem }
     }
 }

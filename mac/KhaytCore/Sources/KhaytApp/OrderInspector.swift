@@ -30,6 +30,8 @@ private struct Detail: View {
     let split: TaxSplit?
     @State private var zatca: KhaytEngine.ZatcaReporting.Invoice?
     @State private var editing: Order.Part?
+    /// The papers this job's product carries. Empty for a job typed by hand.
+    @State private var papers: [KhaytEngine.OrderDocument] = []
 
     var body: some View {
         ScrollView {
@@ -69,6 +71,36 @@ private struct Detail: View {
                     Divider()
                     ZatcaLine(state: zatca, shop: shop)
                 }
+                // ── THE PAPERS THAT GO WITH IT ───────────────────────
+                //
+                // Here rather than only on the product, because this is where
+                // somebody stands when they are about to make the thing: the
+                // assembly sheet is no use filed against a catalogue entry
+                // nobody opens while the printer is running.
+                if !papers.isEmpty {
+                    Divider()
+                    DetailSection(shop.words.callIt("pdoc.title")) {
+                        ForEach(papers) { paper in
+                            HStack(spacing: 8) {
+                                Button(paper.name) {
+                                    if let build = shop.source.build {
+                                        ProductDocs.open(paper.filename, in: build)
+                                    }
+                                }
+                                .buttonStyle(.link)
+                                .lineLimit(1).truncationMode(.middle)
+                                // Said plainly, because it decides what goes in
+                                // the box: a setup sheet the floor reads is not
+                                // a sheet to hand the customer.
+                                if !paper.packWithOrder {
+                                    Text(shop.words.callIt("pdoc.not_shipped"))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+                }
                 if !job.notes.isEmpty {
                     Divider()
                     DetailSection(shop.words.callIt("doc.notes")) { Text(job.notes).textSelection(.enabled) }
@@ -78,6 +110,7 @@ private struct Detail: View {
         }
         .task(id: job.id) {
             zatca = await shop.zatcaReporting()?.invoices.first { $0.id == job.id }
+            papers = await shop.documents(for: job)
         }
         .sheet(item: $editing) { part in
             EditPartSheet(shop: shop, orderId: job.id, part: part)

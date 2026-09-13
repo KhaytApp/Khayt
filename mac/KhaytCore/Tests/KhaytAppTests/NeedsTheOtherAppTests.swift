@@ -45,15 +45,6 @@ struct NeedsTheOtherAppTests {
 
 
 
-        Gap(id: "product.tiers",
-            what: "Prices per quantity on a product",
-            why: "The tier editor is the other app's; the reading rule "
-               + "(lib/product-price.js) is already bundled and used."),
-        Gap(id: "product.documents",
-            what: "Documents attached to a product",
-            why: "No surface here for them yet, and no shared rule to lift — "
-               + "attaching one is a file copy plus a store write, both of "
-               + "which this app already does elsewhere."),
     ]
 
     // MARK: - The list is closed
@@ -88,7 +79,6 @@ struct NeedsTheOtherAppTests {
         // by hand rather than by pattern, because the point is that somebody
         // looked: an unrecognised pointer is a dependency nobody declared.
         let allowed = [
-            "Prices per quantity and documents stay as they are",   // product.tiers, product.documents
             "Runs in the Windows and Linux app for now",            // ai.*
             "Do it in Khayt so it is sent",                         // outbound.*
             "Another app has this book open",                       // not a gap: a lock
@@ -145,6 +135,8 @@ struct NeedsTheOtherAppTests {
                 "Telegram is sent by this app and must not be listed")
         #expect(!Self.known.contains { $0.id.contains("webhook") },
                 "Webhooks are sent by this app and must not be listed")
+        #expect(!Self.known.contains { $0.id.hasPrefix("product.") },
+                "the product sheet holds all of it now and must not be listed")
 
         // ── AND THE REMAINING OUTBOUND GAPS ARE REALLY STILL REFUSED ──────
         //
@@ -181,7 +173,7 @@ struct NeedsTheOtherAppTests {
         // A number, deliberately. It is a ratchet: lowering it is the work,
         // raising it needs somebody to decide that on purpose and say why in
         // the commit.
-        #expect(Self.known.count <= 4, Comment(rawValue: """
+        #expect(Self.known.count <= 3, Comment(rawValue: """
             \(Self.known.count) things still need the other app. This number is \
             a ratchet — if a new dependency is genuinely unavoidable, lower \
             something else first or raise this deliberately.

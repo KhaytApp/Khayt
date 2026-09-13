@@ -6,6 +6,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **Take a job from something you already make.** A product in the catalogue now
+  has *New Job from This*: its parts, its components, its margin and its name,
+  filled in — and then it is an ordinary job sheet, because a customer who wants
+  two in a different colour is still ordering the product.
+
+  The job **names the product**, which is what the catalogue counts to say a
+  thing has been made 14 times and earned 6,300. A job typed out by hand that
+  happens to match is not counted, and nothing on that screen says so.
+
+  Its **components come with it** — the magnets, the screws, the box. A job
+  without them is under-priced by exactly their cost, every time it is sold.
+
+- **Pricing tiers can be added on the Mac, and picked where they are used.**
+  A product can carry named margins — Retail 45%, Wholesale 20% — and they are
+  offered as chips beside the margin on the job sheet. A margin and not a price,
+  so a tier stays right when filament gets dearer.
+
+- **Documents can be attached to a product here.** Assembly instructions, a
+  safety sheet, a drawing. A copy is taken, so your own file can be moved or
+  renamed afterwards. Each one says whether it goes in the customer's box or
+  stays on the floor's copy — and they are listed **on the job**, which is where
+  somebody stands when they are about to make the thing.
+
 - **Ask what to charge, beside the figure you already have.** The job sheet
   already shows what you usually make on work like this. *Ask what to charge*
   now sends those comparables — and only those — to be weighed, so an outlier

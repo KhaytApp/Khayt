@@ -52,6 +52,12 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// on a job taken for a walk-in, and on every job in a shop that has never
     /// used the customer screen.
     let clientId: String?
+    /// The catalogue product this job is for, when it was taken from one.
+    ///
+    /// What the catalogue counts to say a product has been made 14 times and
+    /// earned 6,300 — and what `lib/product-docs.js` follows to put the right
+    /// assembly sheet in the box. Absent on a job somebody typed out.
+    let productId: String?
     let completedAt: String?
     let deliveredAt: String?
     let dueDate: String?
@@ -60,7 +66,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, date, status, project, client, currency, price, paidAmount, costBasis
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
-        case machineId, clientId, completedAt, deliveredAt, dueDate, parts
+        case machineId, clientId, productId, completedAt, deliveredAt, dueDate, parts
     }
 
     /// THREE FIELDS A NEW JOB HAS NOT GOT YET.
@@ -98,6 +104,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         notes = try c.decode(String.self, forKey: .notes)
         machineId = try c.decodeIfPresent(String.self, forKey: .machineId)
         clientId = try c.decodeIfPresent(String.self, forKey: .clientId)
+        productId = try c.decodeIfPresent(String.self, forKey: .productId)
         completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
         deliveredAt = try c.decodeIfPresent(String.self, forKey: .deliveredAt)
         dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate)
