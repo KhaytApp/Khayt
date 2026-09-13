@@ -1566,6 +1566,31 @@ final class Shop {
         // being benign the moment anything wrote a different number.
         part["qty"] = .number(1)
 
+        // ── WHAT THE FILE COULD NOT ANSWER, THE GEOMETRY OFTEN CAN ────────
+        //
+        // A shop's library is mostly UNSLICED models — the file this was found
+        // on is a 15 MB 3MF with no weight, no time and no material recorded,
+        // because nothing has sliced it yet. `partPatch` correctly reports both
+        // as missing, and the product was then written with neither, which is
+        // honest and not much use: a product with no weight has no cost, so it
+        // has no price.
+        //
+        // This app can MEASURE the mesh and price it at the shop's OWN measured
+        // rate, which the other app cannot do at all. So where the file cannot
+        // answer, the geometry does — and the answer is LABELLED, because an
+        // estimate that looks typed is the same bug as a zero that looks typed.
+        var estimated: [String] = []
+        if let e = estimates[file.id] {
+            if Self.plainNumber(part["printWeight"]) ?? 0 <= 0, e.grams > 0 {
+                part["printWeight"] = .number(e.grams)
+                estimated.append(words.callIt("mac.weight"))
+            }
+            if Self.plainNumber(part["printTime"]) ?? 0 <= 0, e.hours > 0 {
+                part["printTime"] = .number(e.hours)
+                estimated.append(words.callIt("common.hours"))
+            }
+        }
+
         var product = newProduct()
         // The model's name in every language the catalogue carries — the same
         // name, because a model has one and a shop can correct it on the sheet.
@@ -1575,11 +1600,32 @@ final class Shop {
         product.rest["parts"] = .array([.object(part)])
 
         // Said plainly, and only when there is something to say.
-        if !patch.missing.isEmpty {
-            productNote = words.callIt("mac.product_from_file_missing",
-                                       ["fields": .string(patch.missing.joined(separator: ", "))])
-        } else {
-            productNote = nil
+        //
+        // The ESTIMATED fields are named first and separately from the ones
+        // still blank. They are different claims: one is a figure this app
+        // worked out and stands behind, the other is a gap the shop has to
+        // fill. Rolling them into one sentence would make the estimate sound
+        // like a measurement, which is exactly what it is not.
+        if !estimated.isEmpty {
+            let e = estimates[file.id]
+            productNote = words.callIt(
+                e?.isCalibrated == true ? "mac.product_estimated_calibrated"
+                                        : "mac.product_estimated",
+                ["fields": .string(estimated.joined(separator: ", ")),
+                 "n": .number(Double(e?.jobs ?? 0))])
+        }
+        let stillMissing = patch.missing.filter { field in
+            Self.plainNumber(part[field]).map { $0 <= 0 } ?? true
+        }
+        if !stillMissing.isEmpty {
+            let gap = words.callIt("mac.product_from_file_missing",
+                                   ["fields": .string(stillMissing.joined(separator: ", "))])
+            // APPENDED, not assigned. The `else { productNote = nil }` this
+            // replaced was right when there was one sentence; with two it wiped
+            // the estimate note whenever nothing was left missing — which is
+            // the good case, and the one where the shop most needs telling that
+            // the figures are estimates.
+            productNote = productNote.map { $0 + " " + gap } ?? gap
         }
         return product
     }

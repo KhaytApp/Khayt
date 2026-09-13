@@ -529,6 +529,55 @@ extension SampleShopTests {
         if case .string(let ref)? = part["fileRef"] { #expect(!ref.isEmpty) }
     }
 
+    @Test("an unsliced model still gets a weight and a time, from its geometry")
+    func productFromUnslicedModel() async throws {
+        // ── THE CASE A REAL SHOP'S LIBRARY IS MOSTLY MADE OF ──────────────
+        //
+        // Found in one: a 15 MB 3MF with no weight, no time and no material
+        // recorded, because nothing has sliced it. `partPatch` reports both as
+        // missing — correctly — and the product was then written with neither,
+        // which is honest and not much use: no weight means no cost, and no
+        // cost means no price. That is the "added a product but no price"
+        // report, one layer down.
+        //
+        // This app can measure the mesh and price it at the shop's own measured
+        // rate, so where the file cannot answer, the geometry does.
+        let shop = Shop()
+        await shop.load(.sample)
+        let file = try #require(
+            shop.files.first { f in
+                f.mesh.map { $0.volumeMm3 > 0 } == true && shop.estimates[f.id] != nil
+            },
+            "the sample library has no measured mesh to estimate from")
+
+        let product = try #require(await shop.productFromFile(file),
+                                   Comment(rawValue: shop.productProblem ?? "no product"))
+        guard case .array(let parts)? = product.rest["parts"], case .object(let part) = parts.first
+        else { Issue.record("no first part"); return }
+
+        #expect((Shop.plainNumber(part["printWeight"]) ?? 0) > 0,
+                "an unsliced model produced a part weighing nothing, so the product has no price")
+        #expect((Shop.plainNumber(part["printTime"]) ?? 0) > 0,
+                "the part takes no time, so nothing but material can be costed")
+    }
+
+    @Test("an estimate is never presented as a measurement")
+    func estimatesAreLabelled() async throws {
+        // A figure a shop believes was measured, and prices against, is the
+        // whole risk here. An estimate that looks typed is the same bug as a
+        // zero that looks typed — which this very path already had a note for.
+        let shop = Shop()
+        await shop.load(.sample)
+        let file = try #require(
+            shop.files.first { f in
+                f.mesh.map { $0.volumeMm3 > 0 } == true && shop.estimates[f.id] != nil
+            })
+        _ = await shop.productFromFile(file)
+        let note = try #require(shop.productNote,
+                                "weight and time were filled from an estimate and nothing said so")
+        #expect(note.lowercased().contains("estimat"), Comment(rawValue: note))
+    }
+
     @Test("what the file could not answer for is said, not left as zeros")
     func productFromModelIsHonest() async throws {
         // A gcode record has no mesh and often no setups, so some fields cannot

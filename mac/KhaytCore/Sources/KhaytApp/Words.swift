@@ -1525,6 +1525,21 @@ final class Words {
         // NAMED, not swallowed. A field the file could not answer for is left
         // at zero, and a zero that looks typed is worse than a blank somebody
         // was told about.
+        // ── AN ESTIMATE, SAID AS ONE ──────────────────────────────────────
+        //
+        // Two sentences, not one, because they are two different claims. A
+        // calibrated estimate is grounded in the shop's own finished jobs and
+        // says how many; an uncalibrated one is an assumption and says so. A
+        // figure a shop believes is measured, and prices against, is the whole
+        // risk this wording exists to avoid.
+        "mac.product_estimated": ["en": "{fields} estimated from the model itself — "
+                                  + "no measured jobs yet, so check before you sell it.",
+                                  "ar": "{fields} مُقدَّرة من المجسم نفسه — لا أعمال مقيسة بعد، "
+                                  + "فراجعها قبل البيع."],
+        "mac.product_estimated_calibrated": ["en": "{fields} estimated from the model, at the rate "
+                                             + "your own {n} measured jobs actually ran at.",
+                                             "ar": "{fields} مُقدَّرة من المجسم، بالمعدل الذي جرت "
+                                             + "به {n} من أعمالك المقيسة."],
         "mac.product_from_file_missing": ["en": "Filled in from the file. It could not answer for: {fields} — check those before you sell it.",
                                           "ar": "تم التعبئة من الملف. ولم يُجب عن: {fields} — راجعها قبل البيع."],
         // The catalogue's two layouts. Said as tooltips on the toggle, so they

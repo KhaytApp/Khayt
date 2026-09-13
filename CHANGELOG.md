@@ -6,6 +6,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **A product made from an unsliced model now has a weight, a time and a
+  price.** Most of a shop's library is models nothing has sliced yet, and those
+  files record no weight and no time — so the product arrived with neither,
+  which meant no cost and therefore no price at all.
+
+  Khayt measures the mesh and prices it at the rate your own finished jobs
+  actually ran at. Where the file cannot answer, the geometry does.
+
+  **It says the figures are estimates**, and says it two different ways: one
+  sentence when the rate came from your own measured jobs and names how many,
+  another when there are none yet and it is an assumption. An estimate that
+  looks typed is the same mistake as a zero that looks typed.
+
 - **A product made from a model recorded its quantity in a field nothing
   reads.** *Make a product from this* wrote `quantity` where every consumer
   reads `qty` — the calculator's per-part cost, the packaging split, the price
