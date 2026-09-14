@@ -49,9 +49,7 @@ struct PortalRefreshTests {
     ]
 
     static func move(_ root: inout [String: JSONValue], _ stage: Stage)
-    async throws -> (undo: [Shop.ChangedRecord], notices: [String], telegram: TelegramMessage?,
-                     webhooks: [KhaytEngine.WebhookDelivery], email: OrderEmail?,
-                     portal: PortalRefresh?) {
+    async throws -> Shop.MoveOutcome {
         let engine = try KhaytEngine()
         let words = Words()
         await words.load("en", engine: engine)
