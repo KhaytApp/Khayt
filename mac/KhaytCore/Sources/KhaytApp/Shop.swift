@@ -5687,13 +5687,14 @@ final class Shop {
         var said: [String] = []
         var telegram: TelegramMessage?
         var owed: [KhaytEngine.WebhookDelivery] = []
+        var mail: OrderEmail?
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
-                (undoSnapshot, said, telegram, owed) = try await Self.applyMove(
+                (undoSnapshot, said, telegram, owed, mail) = try await Self.applyMove(
                     to: &root, id: id, stage: stage, engine: engine, words: self.words,
                     holdReason: holdReason, qcNotes: qcNotes, actuals: actuals)
             }
@@ -5710,6 +5711,7 @@ final class Shop {
             // refusing these moves before was that a piece of the move would
             // silently not happen.
             if let telegram { await tell(telegram) }
+            if let mail { await post(mail) }
             if !owed.isEmpty { await fire(owed) }
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
@@ -5772,6 +5774,34 @@ final class Shop {
     /// Not fatal: the job IS finished, the book says so, and undoing a correct
     /// write because a message did not go out would be the wrong trade. The
     /// shop is told, and can send it by hand.
+    /// Send the customer the email this move owes them, and say so if it failed.
+    ///
+    /// Not fatal, for the reason `tell` is not: the job IS finished and the
+    /// book says so. What is NOT acceptable is silence — the app refused these
+    /// moves in the first place precisely so that no customer would go untold
+    /// while a shop believed otherwise.
+    private func post(_ mail: OrderEmail) async {
+        do {
+            // OPENED AT THE POINT OF USE, like the bot token and the webhook
+            // secret. `settings.emailConfig.apiKey` is a registered sealed
+            // path, so the string in the book is ciphertext; handing it to a
+            // provider would fail authentication on every send and read to the
+            // shop as an expired key.
+            var config: [String: JSONValue] = [:]
+            if case .object(let c)? = settingsDict["emailConfig"] { config = c }
+            let key = try await Secrets.open(Self.plainString(config["apiKey"]) ?? "", for: source)
+            try await EmailClient.send(mail, apiKey: key, config: config)
+            moveNotices.append(words.callIt("mac.email_sent"))
+        } catch let failure as EmailClient.Failure {
+            moveProblem = words.callIt("mac.email_failed") + " "
+                + (failure.errorDescription ?? String(describing: failure))
+        } catch let locked as Secrets.Failure {
+            moveProblem = words.callIt("mac.email_failed") + " " + locked.description
+        } catch {
+            moveProblem = words.callIt("mac.email_failed") + " " + String(describing: error)
+        }
+    }
+
     private func tell(_ message: TelegramMessage) async {
         do {
             // THE TOKEN IS ENCRYPTED ON DISK, and the rule that this app never
@@ -5823,13 +5853,32 @@ final class Shop {
     /// reads — the other jobs the WIP limit counts, the spools it draws from,
     /// the settings that decide whether it deducts at all — must be what is in
     /// the file, not what this app last drew on screen.
+    /// The customer's name as the shop writes it, for a message about their job.
+    ///
+    /// One resolution, used by the webhook bodies and by the email, because a
+    /// customer called one thing in a webhook and another in the email about
+    /// the same move is the shop speaking with two voices. Empty when the job
+    /// has no customer, or the customer has no name — the email greets the
+    /// address in that case, which is what the other app does.
+    static func emailClientName(for order: [String: JSONValue],
+                                in clients: [JSONValue]) -> String {
+        guard case .string(let clientId)? = order["clientId"] else { return "" }
+        for row in clients where recordId(row) == clientId {
+            if case .object(let c) = row {
+                return plainString(c["nameEn"]) ?? plainString(c["nameAr"])
+                    ?? plainString(c["name"]) ?? ""
+            }
+        }
+        return ""
+    }
+
     static func applyMove(to root: inout [String: JSONValue],
                                   id: Order.ID, stage: Stage,
                                   engine: KhaytEngine, words: Words,
                                   holdReason: String? = nil, qcNotes: String? = nil,
                                   actuals: Actuals? = nil)
     async throws -> (undo: [ChangedRecord], notices: [String], telegram: TelegramMessage?,
-                     webhooks: [KhaytEngine.WebhookDelivery]) {
+                     webhooks: [KhaytEngine.WebhookDelivery], email: OrderEmail?) {
 
         var orders = rows(root, "printLog")
         let inventory = rows(root, "inventory")
@@ -5892,8 +5941,24 @@ final class Shop {
         // portal refresh cannot be sent from here and cannot be sent
         // afterwards, so a half-made move would leave a customer told nothing
         // with no way to notice.
+        //
+        // EMAIL IS CONDITIONAL, and the condition is the provider rather than
+        // the channel. SendGrid and Mailgun are one HTTPS POST each and this
+        // app makes them; `custom` is SMTP, which it does not speak. So the
+        // question is not "can I email" but "can I email THROUGH THIS", and
+        // `via` is what the shared rule sends along to answer it. A shop on
+        // SMTP is still refused, by name, and still has the other app.
         let canSend: Set<String> = ["telegram", "webhooks", "event_webhook"]
-        let cannotSend = reaches.filter { !canSend.contains($0.channel) }
+        // A loop rather than a `filter`, because asking the module whether a
+        // provider can be carried is a call into the engine actor, and an
+        // `await` cannot happen inside a synchronous closure.
+        var cannotSend: [Outbound] = []
+        for reach in reaches {
+            if canSend.contains(reach.channel) { continue }
+            if reach.channel == "email",
+               (try? await engine.emailProviderIsHttp(reach.via ?? "")) == true { continue }
+            cannotSend.append(reach)
+        }
         if !cannotSend.isEmpty {
             throw MoveRefused(sentence: words.outboundRefusal(cannotSend))
         }
@@ -5939,15 +6004,7 @@ final class Shop {
         // the ones on disk. Sending is the caller's job; this only addresses.
         var owed: [KhaytEngine.WebhookDelivery] = []
         if let asked = move.webhookEffects, !asked.isEmpty {
-            var clientName = ""
-            if case .string(let clientId)? = changedOrder["clientId"] {
-                for row in clients where recordId(row) == clientId {
-                    if case .object(let c) = row {
-                        clientName = plainString(c["nameEn"]) ?? plainString(c["nameAr"])
-                            ?? plainString(c["name"]) ?? ""
-                    }
-                }
-            }
+            let clientName = emailClientName(for: changedOrder, in: clients)
             owed = (try? await engine.webhookDeliveries(
                 order: .object(changedOrder), effects: asked, settings: settings,
                 shopName: plainString(settings["bizEn"]) ?? plainString(settings["bizAr"]) ?? "Khayt",
@@ -5955,6 +6012,24 @@ final class Shop {
                 at: ISO8601DateFormatter().string(from: Date()),
                 nowMs: Date().timeIntervalSince1970 * 1000)) ?? []
         }
+
+        // ── AND WHAT IT OWES THE CUSTOMER ─────────────────────────────────
+        //
+        // Built from the moved job for the same reason as the webhooks, and
+        // through the same module the other app builds it with, so a customer
+        // whose shop has two machines is not written to twice in two voices.
+        //
+        // `outboundFor` has already refused the move if this could not be
+        // carried, so reaching here means it can be. A nil is the ordinary
+        // case: no provider, a status the shop does not announce, or no
+        // address on file — none of which is an error and none of which is
+        // worth a sentence.
+        let mail = try? await engine.orderEmail(
+            order: .object(changedOrder), newStatus: stage.rawValue,
+            settings: settings, clients: clients,
+            shopName: plainString(settings["bizEn"]) ?? plainString(settings["bizAr"]) ?? "Khayt",
+            clientName: emailClientName(for: changedOrder, in: clients),
+            statusLabel: words.callIt("queue." + stage.rawValue, fallback: stage.rawValue))
 
         var undo: [ChangedRecord] = []
         write(&root, "printLog", changed: [.object(changedOrder)], before: orders, into: &undo)
@@ -5966,7 +6041,7 @@ final class Shop {
         }
 
         let notices = (move.notices ?? []).map { words.sentence(for: $0) }
-        return (undo, notices, telegram, owed)
+        return (undo, notices, telegram, owed, mail)
     }
 
     // MARK: - Reading and writing rows

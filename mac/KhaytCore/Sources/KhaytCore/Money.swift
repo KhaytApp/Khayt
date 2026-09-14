@@ -233,6 +233,13 @@ public struct Outbound: Decodable, Sendable, Equatable {
     public let channel: String
     /// Why it applies: `enabled`, `published`, or the status that triggers it.
     public let why: String
+    /// HOW it would be carried, when that decides whether this app can carry it.
+    ///
+    /// Only `email` sets it, and it is the provider: `sendgrid` and `mailgun`
+    /// are one HTTPS POST each, `custom` is SMTP — a socket and a dialogue that
+    /// Electron's main process implements and this app does not. The channel
+    /// alone cannot answer "can I send this", so the provider travels with it.
+    public let via: String?
 }
 
 /// A job moved from one stage to another, and everything that moved with it.
@@ -336,6 +343,29 @@ public struct TelegramMessage: Decodable, Sendable, Equatable {
     public let botToken: String
     public let chatId: String
     public let message: String
+}
+
+/// The email a status change owes a customer, as `lib/order-email.js` writes it.
+///
+/// Addressed and finished: `html` is the body the other app has been sending
+/// since email notifications shipped, escaped by the module rather than by a
+/// renderer global this app does not have. Sending is not this type's business
+/// — `EmailClient` carries it, and `provider` says which door it goes through.
+public struct OrderEmail: Decodable, Sendable, Equatable {
+    public let to: String
+    public let subject: String
+    public let html: String
+    public let provider: String
+
+    /// Spelled out because the implicit memberwise initialiser of a public
+    /// struct is internal, and `EmailClient`'s own tests build one to prove
+    /// that a send which fails is reported rather than swallowed.
+    public init(to: String, subject: String, html: String, provider: String) {
+        self.to = to
+        self.subject = subject
+        self.html = html
+        self.provider = provider
+    }
 }
 
 /// A machine as a rule left it, or the reason it would not.

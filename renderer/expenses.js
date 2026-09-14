@@ -142,7 +142,11 @@ async function emailOrderToClient(orderId, isQuote = false) {
   const client = order.clientId ? clients.find(c => c.id === order.clientId) : null;
   if (!client?.email) { toast(t('ord.no_email'), 'error'); return; }
   const clientName = localName(client) || order.project || '';
-  const shopName = shopName() || 'Khayt';
+  // `shopName` is a global function (app-helpers.js). A const of the same
+  // name in this scope shadows it, so the initialiser reads the const
+  // before it exists — a TDZ ReferenceError thrown before anything is
+  // sent, on every call since #822. The local is renamed, not the global.
+  const shop = shopName() || 'Khayt';
   const subjectText = isQuote
     ? `Quote #${order.id} — ${order.project}`
     : `Invoice for order #${order.id} — ${order.project}`;
@@ -155,7 +159,7 @@ async function emailOrderToClient(orderId, isQuote = false) {
   );
   if (smtpReady && window.hubAPI?.sendEmail) {
     const htmlBody = `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;">
-      <h2 style="color:${safeCssColor(settings.invAccentColor, '#5E2E14')};">${escapeHtml(shopName)}</h2>
+      <h2 style="color:${safeCssColor(settings.invAccentColor, '#5E2E14')};">${escapeHtml(shop)}</h2>
       <p>Dear ${escapeHtml(clientName)},</p>
       <p>${isQuote
         ? `Please find below your quote <strong>${escapeHtml(order.id)}</strong> for <strong>${fmtPrice(order.price)}</strong>.`
@@ -165,7 +169,7 @@ async function emailOrderToClient(orderId, isQuote = false) {
       <p>Date: ${escapeHtml(order.date || '')}</p>
       ${!isQuote && settings.paymentInstructions ? `<p>${escapeHtml(settings.paymentInstructions)}</p>` : ''}
       <p>Thank you for your business!</p>
-      <p style="font-size:12px;color:#888;">— ${escapeHtml(shopName)}</p>
+      <p style="font-size:12px;color:#888;">— ${escapeHtml(shop)}</p>
     </div>`;
     try {
       const result = await window.hubAPI.sendEmail({ to: client.email, subject: subjectText, body: htmlBody, smtpConfig: cfg });
@@ -195,7 +199,7 @@ async function emailOrderToClient(orderId, isQuote = false) {
     `Order: ${order.project}`, `Date: ${order.date}`,
   ];
   if (!isQuote && settings.paymentInstructions) bodyLines.push('', settings.paymentInstructions);
-  bodyLines.push('', 'Thank you for your business!', shopName);
+  bodyLines.push('', 'Thank you for your business!', shop);
   const mailtoUrl = `mailto:${encodeURIComponent(client.email)}?subject=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyLines.join('\n'))}`;
   window.open(mailtoUrl);
   // 'opened', not 'sent' — nothing has been delivered yet and there is no attachment.

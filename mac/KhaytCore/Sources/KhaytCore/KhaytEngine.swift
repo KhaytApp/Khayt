@@ -186,6 +186,13 @@ public actor KhaytEngine {
         // app refuses. A missing module that changes an answer instead of
         // raising is the worst kind, so it is listed rather than guarded against.
         "assembly",
+        // What a status change emails the customer, and — before the move —
+        // WHETHER it would. `order-status.outboundFor` asks this module rather
+        // than carrying a second copy of the conditions, and throws when it is
+        // absent: a build without it would answer "this move reaches nobody"
+        // for a shop that emails every customer, and this app would then make
+        // the move it exists to refuse.
+        "order-email",
         "order-status",
         // ── HOW WRONG THE SHOP'S OWN ESTIMATES ARE ────────────────────────
         //
@@ -4457,6 +4464,40 @@ public actor KhaytEngine {
             """,
             [order, .string(newStatus), .object(settings), .string(currency)],
             as: TelegramMessage?.self)
+    }
+
+    /// The email a move owes a customer, or nil when it owes none.
+    ///
+    /// `lib/order-email.js`, which also decides whether there is one to send —
+    /// the same function `outboundFor` asks, so what this app announces before
+    /// a move and what it sends after it cannot drift apart.
+    ///
+    /// The three strings are what only a host knows: the shop's name and the
+    /// customer's in the language the shop reads, and the stage in words.
+    /// `Words` supplies the label, the same way the other app supplies `t()`.
+    public func orderEmail(order: JSONValue, newStatus: String,
+                           settings: [String: JSONValue], clients: [JSONValue],
+                           shopName: String, clientName: String,
+                           statusLabel: String) throws -> OrderEmail? {
+        try runtime.call2("""
+            KhaytOrderEmail.messageFor(ARG0, ARG1, {
+              settings: ARG2, clients: ARG3,
+              shopName: ARG4, clientName: ARG5, statusLabel: ARG6
+            })
+            """,
+            [order, .string(newStatus), .object(settings), .array(clients),
+             .string(shopName), .string(clientName), .string(statusLabel)],
+            as: OrderEmail?.self)
+    }
+
+    /// Can an app that speaks only HTTPS carry this mail provider?
+    ///
+    /// The list is `lib/order-email.js`'s, asked rather than repeated, so a
+    /// provider added to the other app cannot quietly make this one claim it
+    /// can send through something it has never heard of.
+    public func emailProviderIsHttp(_ provider: String) throws -> Bool {
+        try runtime.call2("KhaytOrderEmail.isHttpProvider(ARG0)",
+                          [.string(provider)], as: Bool.self)
     }
 
     /// Who owes the shop money, and how long they have owed it.

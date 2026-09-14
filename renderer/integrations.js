@@ -44,30 +44,32 @@ const BNPL_CATALOG = [
    ============================================================ */
 async function autoSendEmailNotification(order, newStatus) {
   const cfg = settings.emailConfig;
-  if (!cfg || cfg.provider === 'none' || !(cfg.triggers || []).includes(newStatus)) return;
-  if (!order.clientId) return;
-  const client = clients.find(c => c.id === order.clientId);
-  if (!client?.email) {
-    // Only toast if email notifications are expected (not a silent skip)
-    if (cfg && cfg.provider !== 'none' && (cfg.triggers || []).includes(newStatus)) {
+  const client = order.clientId ? clients.find(c => c.id === order.clientId) : null;
+
+  // The message — and the decision to send one at all — is
+  // `lib/order-email.js`, so the Mac app sends the same email rather than a
+  // second app's idea of one. What stays here is what only this app has: the
+  // toasts, and the transport in the main process.
+  const mail = KhaytOrderEmail.messageFor(order, newStatus, {
+    settings, clients,
+    shopName: shopName() || 'Khayt',
+    clientName: client ? localName(client) : '',
+    statusLabel: t('queue.' + newStatus) || newStatus,
+  });
+  if (!mail) {
+    // A customer with no address on file, on a move the shop DOES want told
+    // about, is worth saying out loud — it is the one "not sent" that looks
+    // like a bug rather than a setting. Every other no is a silent skip.
+    const wanted = cfg && cfg.provider && cfg.provider !== 'none' &&
+      (cfg.triggers || []).includes(newStatus) && order.clientId && !client?.email;
+    if (wanted) {
       toast(t('notify.no_email') || `No email on file for ${localName(client)} — notification not sent`, 'info', 3000);
     }
     return;
   }
-  const shopName = shopName() || 'Khayt';
-  const statusLabel = t('queue.' + newStatus) || newStatus;
-  const subject = `${shopName} — Order ${order.id} Update: ${statusLabel}`;
-  const body = `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;">
-    <h2 style="color:#5E2E14;">${escapeHtml(shopName)}</h2>
-    <p>Dear ${escapeHtml(localName(client) || client.email)},</p>
-    <p>Your order <strong>${escapeHtml(order.id)}</strong> (${escapeHtml(order.project || '')}) has been updated:</p>
-    <p style="font-size:18px;font-weight:bold;color:#5E2E14;">${escapeHtml(statusLabel)}</p>
-    ${order.dueDate ? `<p>Due date: ${escapeHtml(order.dueDate)}</p>` : ''}
-    <p>Thank you for your business!</p>
-    <p style="font-size:12px;color:#888;">— ${escapeHtml(shopName)}</p>
-  </div>`;
+  const { to, subject, html: body } = mail;
   try {
-    const result = await window.hubAPI?.sendEmail?.({ to: client.email, subject, body, smtpConfig: cfg });
+    const result = await window.hubAPI?.sendEmail?.({ to, subject, body, smtpConfig: cfg });
     if (result?.ok) {
       toast(t('notify.email_sent'), 'success', 2000);
     } else if (result?.fallback && result?.mailtoUrl) {
@@ -1699,10 +1701,12 @@ function firePrinterAlert(alert) {
   const cfg = settings.emailConfig;
   const to = (settings.emailDigest && settings.emailDigest.recipientEmail) || settings.email;
   if (cfg && cfg.provider && cfg.provider !== 'none' && to) {
-    const shopName = shopName() || 'Khayt';
-    const subject = `${shopName} — Printer ${alert.type} alert`;
+    // Renamed, not shadowed — see the note in `emailOrderToClient`. This alert
+    // has thrown before sending on every printer alert since #822.
+    const shop = shopName() || 'Khayt';
+    const subject = `${shop} — Printer ${alert.type} alert`;
     const body = `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;">
-      <h2 style="color:#5E2E14;">${escapeHtml(shopName)}</h2>
+      <h2 style="color:#5E2E14;">${escapeHtml(shop)}</h2>
       <p>${escapeHtml(message)}</p>
     </div>`;
     window.hubAPI?.sendEmail?.({ to, subject, body, smtpConfig: cfg })
