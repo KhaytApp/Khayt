@@ -35,18 +35,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   inside a bundle — so the catalogue's "No price" chip finds only the products
   nobody has got round to pricing, and leaves the deliberate ones alone.
 
-### Added
-
-- **The Mac app can say what a model IS, and tag it.** It could already file
-  models into a project; category and tags were readable, filterable and
-  impossible to set, so filling them meant opening the other app. There is now
-  a Category menu beside the Group menu in the library, offering the names the
-  book already uses first and a new one second, plus a tag box that reconciles
-  what is typed against the tags already in use — "Resin" and "resin" are one
-  tag. Tagging several models at once replaces what each carried rather than
-  merging, and the box starts from what they already have in common so nothing
-  is handed a tag it never had.
-
 - **A project is a folder in the library now, with a picture on it.** A group
   was only ever a filter in the sidebar: the grid itself was flat, so a project
   with forty files in it looked like forty files. A shop said so — *"the
@@ -573,6 +561,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+
+- **The Mac app can say what a model IS, and tag it.** It could already file
+  models into a project; category and tags were readable, filterable and
+  impossible to set, so filling them meant opening the other app. There is now
+  a Category menu beside the Group menu in the library, offering the names the
+  book already uses first and a new one second, plus a tag box that reconciles
+  what is typed against the tags already in use — "Resin" and "resin" are one
+  tag. Tagging several models at once replaces what each carried rather than
+  merging, and the box starts from what they already have in common so nothing
+  is handed a tag it never had.
 
 - **Khayt can show a camera that only speaks RTSP** — which includes the Buddy3D
   that sits beside a Prusa CORE One. Give the machine the camera's address as
