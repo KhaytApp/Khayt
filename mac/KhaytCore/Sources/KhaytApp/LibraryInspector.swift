@@ -141,6 +141,14 @@ struct LibraryInspector: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+            // What it IS, beside the set it is in. Both are filterable now and
+            // both are settable now, so a model that carries one and not the
+            // other should say so rather than look the same either way.
+            if let category = file.category, !category.isEmpty {
+                Label(category, systemImage: "tag")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
             if let tags = file.tags, !tags.isEmpty {
                 Text(tags.joined(separator: " · "))
                     .font(.caption)

@@ -2516,7 +2516,8 @@
    "geometryKey": "4295525:3487958.9:1141.57x757.09x207.37",
    "rev": 3,
    "timesPrinted": 7,
-   "lastPrinted": "2026-08-12"
+   "lastPrinted": "2026-08-12",
+   "category": "Wall art"
   },
   {
    "id": "PF-sample-king-2",
@@ -2575,7 +2576,8 @@
    "geometryKey": "4306525:3487958.9:1141.57x757.09x207.37",
    "rev": 3,
    "timesPrinted": 6,
-   "lastPrinted": "2026-08-13"
+   "lastPrinted": "2026-08-13",
+   "category": "wall art"
   },
   {
    "id": "PF-sample-king-3",
@@ -2634,7 +2636,8 @@
    "geometryKey": "4317525:3487958.9:1141.57x757.09x207.37",
    "rev": 3,
    "timesPrinted": 5,
-   "lastPrinted": "2026-08-14"
+   "lastPrinted": "2026-08-14",
+   "category": "Wall art"
   },
   {
    "id": "PF-sample-king-4",
@@ -2693,7 +2696,8 @@
    "geometryKey": "4328525:3487958.9:1141.57x757.09x207.37",
    "rev": 3,
    "timesPrinted": 4,
-   "lastPrinted": "2026-08-15"
+   "lastPrinted": "2026-08-15",
+   "category": "Wall art"
   },
   {
    "id": "PF-sample-king-5",
@@ -2752,7 +2756,8 @@
    "geometryKey": "4339525:3487958.9:1141.57x757.09x207.37",
    "rev": 3,
    "timesPrinted": 3,
-   "lastPrinted": "2026-08-16"
+   "lastPrinted": "2026-08-16",
+   "category": "wall art"
   },
   {
    "id": "PF-sample-king-6",
@@ -2811,7 +2816,8 @@
    "geometryKey": "4350525:3487958.9:1141.57x757.09x207.37",
    "rev": 3,
    "timesPrinted": 2,
-   "lastPrinted": "2026-08-17"
+   "lastPrinted": "2026-08-17",
+   "category": "Wall art"
   },
   {
    "id": "PF-sample-king-7",
@@ -2870,7 +2876,8 @@
    "geometryKey": "4361525:3487958.9:1141.57x757.09x207.37",
    "rev": 3,
    "timesPrinted": 1,
-   "lastPrinted": "2026-08-18"
+   "lastPrinted": "2026-08-18",
+   "category": "Wall art"
   },
   {
    "id": "PF-sample-dallah",
@@ -2948,7 +2955,8 @@
      "layerHeightMm": 0.2,
      "nozzleMm": 0.4
     }
-   ]
+   ],
+   "category": "Decorative"
   },
   {
    "id": "PF-sample-falcon",
@@ -3102,7 +3110,8 @@
     },
     "contentHash": "sample-falcon",
     "at": 1756900000000
-   }
+   },
+   "category": "Decorative"
   },
   {
    "id": "PF-sample-dental-a",
@@ -3164,7 +3173,8 @@
      "ext": "stl",
      "kind": "model"
     }
-   ]
+   ],
+   "category": "Dental"
   },
   {
    "id": "PF-sample-dental-b",
@@ -3210,7 +3220,8 @@
    "geometryKey": "874110:708029.1:78.2x60.4x39.5",
    "rev": 1,
    "timesPrinted": 9,
-   "lastPrinted": "2026-08-28"
+   "lastPrinted": "2026-08-28",
+   "category": "Dental"
   },
   {
    "id": "PF-sample-bracket",
@@ -3393,7 +3404,8 @@
     },
     "contentHash": "sample-bracket",
     "at": 1756900000000
-   }
+   },
+   "category": "Functional parts"
   },
   {
    "id": "PF-sample-lantern",
@@ -3503,7 +3515,8 @@
      "ext": "stl",
      "kind": "model"
     }
-   ]
+   ],
+   "category": "Decorative"
   },
   {
    "id": "PF-sample-vase",
@@ -3747,7 +3760,8 @@
      "ext": "stl",
      "kind": "model"
     }
-   ]
+   ],
+   "category": "Functional parts"
   }
  ],
  "inventory": [
@@ -4514,7 +4528,7 @@
    "id": "PRD-3E4E75",
    "nameEn": "Turbine bracket",
    "nameAr": "حامل توربين",
-   "category": "",
+   "category": "Engineering",
    "notes": "",
    "active": true,
    "parts": [
@@ -4558,7 +4572,7 @@
    "id": "PRD-6A91F9",
    "nameEn": "Dental model set",
    "nameAr": "طقم نماذج أسنان",
-   "category": "",
+   "category": "Dental",
    "notes": "",
    "active": true,
    "parts": [
@@ -4584,7 +4598,7 @@
    "id": "PRD-0522F9",
    "nameEn": "Kaaba desk piece",
    "nameAr": "مجسم الكعبة للمكتب",
-   "category": "",
+   "category": "Gifts",
    "notes": "",
    "active": true,
    "parts": [
@@ -4610,7 +4624,7 @@
    "id": "PRD-8F047C",
    "nameEn": "Cable chain, 40 links",
    "nameAr": "سلسلة كابلات، 40 وصلة",
-   "category": "",
+   "category": "Parts",
    "notes": "",
    "active": true,
    "parts": [
@@ -4636,7 +4650,7 @@
    "id": "PRD-9FE0F9",
    "nameEn": "Museum replica — Kings",
    "nameAr": "نسخة متحفية — الملوك",
-   "category": "",
+   "category": "Gifts",
    "notes": "",
    "active": true,
    "parts": [
@@ -4663,7 +4677,7 @@
    "id": "PRD-51069B",
    "nameEn": "Drone arm v4",
    "nameAr": "",
-   "category": "",
+   "category": "Engineering",
    "notes": "",
    "active": true,
    "parts": [
@@ -4689,7 +4703,7 @@
    "id": "PRD-EF6642",
    "nameEn": "Signage letters, 12",
    "nameAr": "حروف لافتة، 12",
-   "category": "",
+   "category": "Signage",
    "notes": "",
    "active": true,
    "parts": [
@@ -4715,7 +4729,7 @@
    "id": "PRD-68297E",
    "nameEn": "Gearbox housing",
    "nameAr": "علبة تروس",
-   "category": "",
+   "category": "Engineering",
    "notes": "",
    "active": true,
    "parts": [
@@ -4737,7 +4751,7 @@
    "id": "PRD-2CF8FF",
    "nameEn": "Falcon hood",
    "nameAr": "برقع الصقر",
-   "category": "",
+   "category": "Gifts",
    "notes": "",
    "active": true,
    "parts": [
@@ -4763,7 +4777,7 @@
    "id": "PRD-F68FC0",
    "nameEn": "Camera rig plate",
    "nameAr": "لوح حامل كاميرا",
-   "category": "",
+   "category": "Engineering",
    "notes": "",
    "active": true,
    "parts": [
@@ -4811,7 +4825,7 @@
    "id": "PRD-A86347",
    "nameEn": "Coffee dallah stand",
    "nameAr": "حامل دلة القهوة",
-   "category": "",
+   "category": "Gifts",
    "notes": "",
    "active": true,
    "parts": [
@@ -4837,7 +4851,7 @@
    "id": "PRD-3C492B",
    "nameEn": "Prosthetic socket trial",
    "nameAr": "قالب تجريبي لمقبس طرف صناعي",
-   "category": "",
+   "category": "Dental",
    "notes": "",
    "active": true,
    "parts": [
@@ -4859,7 +4873,7 @@
    "id": "PRD-49E07C",
    "nameEn": "HVAC duct adapter",
    "nameAr": "",
-   "category": "",
+   "category": "Engineering",
    "notes": "",
    "active": true,
    "parts": [
@@ -4885,7 +4899,7 @@
    "id": "PRD-3B7A21",
    "nameEn": "Shelf brackets, 24",
    "nameAr": "كتائف رفوف، 24",
-   "category": "",
+   "category": "Parts",
    "notes": "",
    "active": true,
    "parts": [
@@ -4937,7 +4951,7 @@
    "id": "PRD-B5BCAD",
    "nameEn": "Ramadan lantern",
    "nameAr": "فانوس رمضان",
-   "category": "",
+   "category": "Gifts",
    "notes": "",
    "active": true,
    "parts": [
@@ -4963,7 +4977,7 @@
    "id": "PRD-0E40B5",
    "nameEn": "Robot gripper fingers",
    "nameAr": "أصابع قابض روبوت",
-   "category": "",
+   "category": "Parts",
    "notes": "",
    "active": true,
    "parts": [
@@ -4989,7 +5003,7 @@
    "id": "PRD-9A0055",
    "nameEn": "Wind tunnel model",
    "nameAr": "",
-   "category": "",
+   "category": "engineering",
    "notes": "",
    "active": true,
    "parts": [
@@ -5015,7 +5029,7 @@
    "id": "PRD-293BE2",
    "nameEn": "Souq stall sign",
    "nameAr": "لوحة بسطة السوق",
-   "category": "",
+   "category": "Signage",
    "notes": "",
    "active": true,
    "parts": [
@@ -5036,6 +5050,51 @@
     "mode": "up"
    },
    "createdAt": "2026-01-05"
+  },
+  {
+   "id": "PRD-7C1D04",
+   "nameEn": "Tasbih bead jig",
+   "nameAr": "قالب حبات المسبحة",
+   "category": "Parts",
+   "notes": "",
+   "active": true,
+   "parts": [
+    {
+     "name": "Tasbih bead jig",
+     "material": "PLA",
+     "printWeight": 18,
+     "supportWeight": 0,
+     "printTime": 0.6,
+     "qty": 1,
+     "colour": "white"
+    }
+   ],
+   "basePrice": 0,
+   "defaultMargin": null,
+   "createdAt": "2026-09-02"
+  },
+  {
+   "id": "PRD-5B9E22",
+   "nameEn": "Sample swatch card",
+   "nameAr": "بطاقة عينات",
+   "category": "Gifts",
+   "notes": "",
+   "active": true,
+   "parts": [
+    {
+     "name": "Sample swatch card",
+     "material": "PLA silk",
+     "printWeight": 6,
+     "supportWeight": 0,
+     "printTime": 0.2,
+     "qty": 1,
+     "colour": "orange"
+    }
+   ],
+   "basePrice": 0,
+   "defaultMargin": null,
+   "priceOverride": 0,
+   "createdAt": "2026-09-02"
   }
  ],
  "giftCards": [

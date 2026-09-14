@@ -132,6 +132,13 @@ public actor KhaytEngine {
         // and "saudi kings" as two groups, each holding part of one collection,
         // is precisely the mess this module exists to prevent.
         "organise",
+        // The third axis, and the one a shop types freehand. Bundled for the
+        // same reason as `organise` and with more force: a tag is typed into a
+        // comma-separated box with nothing to guide it, so "resin", "Resin" and
+        // " resin" become three chips each finding a third of the files. The
+        // rule that folds them is here, not in the reading, and a second copy
+        // of it would fold differently on one of the two apps.
+        "tags",
         // A product's pictures — more than one, and each saying what it IS.
         //
         // The catalogue held `imagePath` and `thumbnail`: one file and one data
@@ -2402,6 +2409,15 @@ public actor KhaytEngine {
             name = try row.decode(String.self)
             count = try row.decode(Int.self)
         }
+
+        /// For a row the rule did not produce: a filter still switched on after
+        /// the other axes have narrowed past it, which must stay on screen at
+        /// the count it actually has rather than disappear while still
+        /// narrowing what is under it.
+        public init(name: String, count: Int) {
+            self.name = name
+            self.count = count
+        }
     }
 
     /// The names a shop has actually used, most-used first, with counts.
@@ -2411,6 +2427,26 @@ public actor KhaytEngine {
     /// is not.
     public func groupCounts(_ records: [JSONValue]) throws -> [GroupCount] {
         try runtime.call("KhaytOrganise", "counts", [JSONValue.array(records), "group"],
+                         as: [GroupCount].self)
+    }
+
+    /// The same, for what a thing IS rather than the set it belongs to.
+    ///
+    /// `lib/organise.js` carries both axes because a library of hundreds is
+    /// asked two different questions: you look for the GROUP when you want the
+    /// set, and the CATEGORY when you do not yet know what you want.
+    public func categoryCounts(_ records: [JSONValue]) throws -> [GroupCount] {
+        try runtime.call("KhaytOrganise", "counts", [JSONValue.array(records), "category"],
+                         as: [GroupCount].self)
+    }
+
+    /// Tags, which are the third axis: free-form and many per record.
+    ///
+    /// `lib/tags.js` rather than `organise`, because counting a field that
+    /// holds a list is a different sum — and it folds spellings the same way, so
+    /// a record naming one tag twice in two spellings counts once for it.
+    public func tagCounts(_ records: [JSONValue]) throws -> [GroupCount] {
+        try runtime.call("KhaytTags", "tagCounts", [JSONValue.array(records)],
                          as: [GroupCount].self)
     }
 
@@ -2427,6 +2463,34 @@ public actor KhaytEngine {
         return try runtime.call("KhaytOrganise", "assign",
                                 [JSONValue.object([:]), patch, knownNames],
                                 as: [String: JSONValue].self)
+    }
+
+    /// The same, for what a thing IS rather than the set it belongs to.
+    ///
+    /// One field, not two: `assign` writes `group` AND `folder` for a group
+    /// because of a sync decision the module header explains, and writes only
+    /// `category` for a category because nothing older ever wrote a second
+    /// spelling of it.
+    public func fileUnderCategory(_ name: String, known: [String]) throws -> [String: JSONValue] {
+        let patch: [String: JSONValue] = ["category": .string(name)]
+        let knownNames: [String: JSONValue] = ["category": .array(known.map { .string($0) })]
+        return try runtime.call("KhaytOrganise", "assign",
+                                [JSONValue.object([:]), patch, knownNames],
+                                as: [String: JSONValue].self)
+    }
+
+    /// Typed tags, reconciled against the ones the shop already uses.
+    ///
+    /// Takes what somebody typed — a comma-separated line, or a list — and
+    /// returns the tags to store. A tag matching one already in use IS that tag
+    /// and adopts its spelling; anything else is kept exactly as typed. Asked of
+    /// `lib/tags.js` rather than written here because its own note says what
+    /// happens otherwise: "resin", "Resin" and " resin" become three chips, each
+    /// finding a third of the files, and nothing errors.
+    public func normaliseTags(_ typed: String, known: [String]) throws -> [String] {
+        try runtime.call("KhaytTags", "normaliseTags",
+                         [JSONValue.string(typed), .array(known.map { .string($0) })],
+                         as: [String].self)
     }
 
     /// The name one record is filed under. `folder` wins over `group` — see the

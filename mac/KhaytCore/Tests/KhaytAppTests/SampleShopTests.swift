@@ -312,6 +312,137 @@ extension SampleShopTests {
         #expect(reconciled > 0, "no sample record disagrees with itself, so the reconciliation is never exercised")
     }
 
+    /// A library the shop has FILED, which the sample was not.
+    ///
+    /// Every model in it was ungrouped, so a project — a folder with a picture
+    /// and a count — could not be drawn from the sample at all. The feature had
+    /// nothing to show itself with, and anyone judging the library from the
+    /// demo book saw the flat list the grouping was built to replace.
+    ///
+    /// The spread that matters is THREE cases in one library, because each is a
+    /// different picture: a project big enough to need one, a small one, and
+    /// models that belong to none and must still be reachable.
+    @Test("the sample library has projects, of two sizes, and loose models too")
+    func groupSpread() throws {
+        let files = try Self.rows("printFiles")
+        var counts: [String: Int] = [:]
+        var loose = 0
+        for file in files {
+            var name = ""
+            if case .string(let g)? = file["group"], !g.isEmpty { name = g }
+            else if case .string(let f)? = file["folder"], !f.isEmpty { name = f }
+            if name.isEmpty { loose += 1 } else { counts[name, default: 0] += 1 }
+        }
+
+        #expect(counts.count >= 2, "the sample library has fewer than two projects in it")
+        #expect(loose > 0, """
+            every sample model is filed, so the loose half of the library — \
+            which is what a shop sees the day it imports — is never drawn
+            """)
+        #expect(counts.values.contains { $0 >= 5 }, """
+            no sample project is big enough to be worth a folder; a folder of \
+            two proves nothing about a library of hundreds
+            """)
+        #expect(counts.values.contains { $0 < 5 }, "every sample project is large")
+
+        // The cover is the first file that HAS a picture, so a project whose
+        // models are all pictureless would draw an empty square. Not a case the
+        // sample needs to contain, but one it must not contain by accident.
+        for (name, _) in counts {
+            let held = files.filter { file in
+                if case .string(let g)? = file["group"] { return g == name }
+                if case .string(let f)? = file["folder"] { return f == name }
+                return false
+            }
+            let withPicture = held.contains { file in
+                if case .string(let t)? = file["thumbFile"] { return !t.isEmpty }
+                if case .string(let t)? = file["thumbnail"] { return !t.isEmpty }
+                return false
+            }
+            #expect(withPicture, "the sample project \(name) would draw an empty folder")
+        }
+    }
+
+    /// The library filter bar hides itself when there is nothing to offer, which
+    /// is right on a shop's first day and wrong in the sample: a sample library
+    /// with no categories and no tags draws no chips, so the whole bar — every
+    /// state of it, in both languages and both appearances — is a screen nobody
+    /// has ever looked at.
+    @Test("the sample library can be filtered on every axis the bar offers")
+    func filterSpread() throws {
+        let files = try Self.rows("printFiles")
+        func text(_ row: [String: JSONValue], _ key: String) -> String {
+            if case .string(let v)? = row[key] { return v }
+            return ""
+        }
+
+        var categories: Set<String> = []
+        var uncategorised = 0
+        var spellings: [String: Set<String>] = [:]
+        var tagged = 0
+        for file in files {
+            let c = text(file, "category")
+            if c.isEmpty { uncategorised += 1 } else {
+                categories.insert(c.lowercased())
+                spellings[c.lowercased(), default: []].insert(c)
+            }
+            if case .array(let tags)? = file["tags"], !tags.isEmpty { tagged += 1 }
+        }
+
+        #expect(categories.count >= 2, """
+            the sample library has \(categories.count) categories, so the chips             that narrow it are never drawn beside one another
+            """)
+        #expect(uncategorised > 0, """
+            every sample model has a category, so "filed under nothing" — the             state most of a real library is in — is never on screen
+            """)
+        #expect(tagged > 0, "no sample model is tagged, so the tag chips never draw")
+        #expect(spellings.values.contains { $0.count > 1 }, """
+            every sample category is spelled one way, so the folding rule — one             chip for "Wall art" and "wall art" — is never exercised by the sample
+            """)
+    }
+
+    /// The catalogue's chips, by the same argument as the library's above.
+    @Test("the sample catalogue can be filtered on every axis its bar offers")
+    func catalogueFilterSpread() throws {
+        let products = try Self.rows("products")
+        func text(_ row: [String: JSONValue], _ key: String) -> String {
+            if case .string(let v)? = row[key] { return v }
+            return ""
+        }
+
+        var categories: Set<String> = []
+        var uncategorised = 0, materials: Set<String> = [], unpriced = 0, free = 0
+        var spellings: [String: Set<String>] = [:]
+        for product in products {
+            let c = text(product, "category")
+            if c.isEmpty { uncategorised += 1 } else {
+                categories.insert(c.lowercased())
+                spellings[c.lowercased(), default: []].insert(c)
+            }
+            if case .array(let parts)? = product["parts"] {
+                for case .object(let part) in parts { materials.insert(text(part, "material")) }
+            }
+            let base = Shop.plainNumber(product["basePrice"]) ?? 0
+            let override = Shop.plainNumber(product["priceOverride"])
+            if override != nil { if override! <= 0 { free += 1 } } else if base <= 0 { unpriced += 1 }
+        }
+
+        #expect(categories.count >= 2, """
+            the sample catalogue has \(categories.count) categories, so the             chips that narrow it are never drawn beside one another
+            """)
+        #expect(uncategorised > 0, "every sample product is filed, so that state never draws")
+        #expect(materials.count >= 2, "the sample catalogue is all one material")
+        #expect(spellings.values.contains { $0.count > 1 }, """
+            every sample category is spelled one way, so the folding rule is             never exercised on this screen
+            """)
+        #expect(unpriced > 0, """
+            no sample product is unpriced, so the one catalogue chip worth             interrupting a shop for is never drawn
+            """)
+        #expect(free > 0, """
+            no sample product is free ON PURPOSE, so the case the unpriced chip             must NOT sweep up is never in front of anyone
+            """)
+    }
+
     @Test("exactly one kind of sample file offers a choice of version")
     func versionSpread() async throws {
         let files = try Self.rows("printFiles")

@@ -31,6 +31,15 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let group: String?
     /// What `group` used to be called. Nothing was migrated, deliberately.
     let folder: String?
+    /// What the thing IS — busts, functional parts, toys — as against `group`,
+    /// which is the set it belongs to. `lib/organise.js` explains why a library
+    /// of hundreds needs both: you look for the GROUP when you want the set,
+    /// and the CATEGORY when you do not yet know what you want.
+    ///
+    /// Read but never written here: filing by category is Khayt's screen for
+    /// now. It was not decoded at all until the library grew filters, which is
+    /// why this app could not offer one.
+    let category: String?
     let material: String?
     let favorite: Bool?
     /// SHA-256 of the file's bytes.
