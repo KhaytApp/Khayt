@@ -1304,6 +1304,71 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.11] - 2026-09-14
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Changed
+
+- **The library and the catalogue can be narrowed now, not just searched.** A
+  shop asked *"where are the filters for products and models?"* and the honest
+  answer was a search box: you had to type what you could have pressed, and
+  there was no way to ask a question you cannot spell — "what have I not filed
+  yet" being the one that matters on a library of a hundred and fifty-two
+  models with eighty-three of them in no project at all. Both screens now carry
+  a row of chips above the grid. The library offers the models in no project,
+  every category in use and every tag in use; the catalogue offers the products
+  nobody has priced, every category and every material. Each chip says how many
+  it holds, so a shop can tell whether it is worth pressing before pressing it.
+
+- **The chip counts describe what is actually on screen.** Each axis counts
+  what the *other* axes leave — the folder you are standing in, the search box,
+  and whichever other chips are on. The other app's catalogue shipped the
+  opposite and recorded what it felt like: with a category on, a group chip
+  said 7 and pressing it showed 2. A chip that is switched on stays on the row
+  even when its count falls to nothing, so there is always something on screen
+  explaining why the grid is empty.
+
+- **Counts fold the shop's own spellings.** "Wall art" typed once and "wall
+  art" typed twice is one chip holding three, not two chips each holding part
+  of a collection — the same rule that already decides which group a model is
+  filed under, rather than a second opinion about it written in Swift.
+
+- **A product priced at nothing on purpose is not called unpriced.** Khayt
+  treats a typed zero as a real answer — a giveaway, a sample, a part priced
+  inside a bundle — so the catalogue's "No price" chip finds only the products
+  nobody has got round to pricing, and leaves the deliberate ones alone.
+
+- **A project is a folder in the library now, with a picture on it.** A group
+  was only ever a filter in the sidebar: the grid itself was flat, so a project
+  with forty files in it looked like forty files. A shop said so — *"the
+  grouping for models is very weak, it's completely not right for a single
+  project"* — and that was exactly right, because the shop's own idea of a
+  project existed in the data and nowhere in the picture. Projects now come
+  first in the library as folders, each wearing a picture borrowed from the
+  best thing inside it and saying how many models it holds; opening one shows
+  what is in it. Loose models follow, as before.
+
+- **Four buttons showed their own names instead of words.** *New Job from This*
+  in the catalogue, *Add a tier* and the name of a new tier on the product
+  sheet, and a heading in the model inspector each read as `mac.job_from_product`
+  and the like: they were added as calls with no words written behind them, and
+  a missing key is not blank and does not fall back — it IS the key, which
+  reads as placeholder text nobody removed.
+
+### Added
+
+- **The Mac app can say what a model IS, and tag it.** It could already file
+  models into a project; category and tags were readable, filterable and
+  impossible to set, so filling them meant opening the other app. There is now
+  a Category menu beside the Group menu in the library, offering the names the
+  book already uses first and a new one second, plus a tag box that reconciles
+  what is typed against the tags already in use — "Resin" and "resin" are one
+  tag. Tagging several models at once replaces what each carried rather than
+  merging, and the box starts from what they already have in common so nothing
+  is handed a tag it never had.
+
 ## [4.0.0-alpha.10] - 2026-09-14
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
