@@ -3792,6 +3792,7 @@ final class Shop {
     var cloudProblem: String?
     /// True while the passphrase sheet is up.
     var checkingCloud = false
+    var signingIntoCloud = false
     /// True while the request is in flight.
     var cloudBusy = false
     /// What the last send put up, if there was one.
@@ -3845,6 +3846,100 @@ final class Shop {
     /// Khayt deliberately stores nowhere — that is what makes the cloud copy
     /// end-to-end encrypted — so this app must ask each time and hold it no
     /// longer than the unwrap.
+    /// Sign this Mac in to the shop's cloud, and unlock it in the same breath.
+    ///
+    /// THE TOKEN IS A SESSION, NOT A SETTING. The server issues it at login and
+    /// it is sealed against the Keychain of the machine that asked — so a book
+    /// carried to another Mac arrives with a token nothing here can read, and
+    /// until this existed the only cure was to open the other app. That is the
+    /// one thing this app is for not needing.
+    ///
+    /// Four things happen, in this order and for these reasons:
+    ///
+    ///   1. **Log in**, which is the only part that was missing.
+    ///   2. **Unwrap the keyset with the passphrase, BEFORE anything is
+    ///      written.** A token saved beside a passphrase that does not fit
+    ///      leaves the shop connected and unable to read a word of its own
+    ///      cloud data, which looks like the server losing it.
+    ///   3. **Seal the token.** A token written in plaintext would sit in a
+    ///      file that syncs, backs up and exports. `Secrets.seal` refuses
+    ///      rather than downgrading, so a Mac with no Keychain is told.
+    ///   4. **Write `settings.cloud` whole**, inside the write chain — the
+    ///      same shape `renderer/settings.js` writes, so the other app reads
+    ///      this Mac's sign-in as its own.
+    ///
+    /// The passphrase is used and not kept, the way `checkCloud` uses it: it is
+    /// the one thing Khayt stores nowhere, which is what makes the cloud copy
+    /// end-to-end encrypted.
+    func signInToCloud(url: String, email: String, password: String,
+                       passphrase: String) async {
+        cloudProblem = nil
+        cloudBusy = true
+        defer { cloudBusy = false }
+        guard let build = source.build, let engine else {
+            cloudProblem = words.callIt("mac.move_sample"); return
+        }
+        do {
+            let session = try await CloudSignIn.logIn(url: url, email: email,
+                                                      password: password, engine: engine)
+            // A shop that has never synced has no key to unlock, and making its
+            // first one is a different flow with its own failure modes.
+            guard case .object(let keyset)? = session.keyset else {
+                throw CloudSignIn.Failure.noKeyset
+            }
+            guard case .object(let wrappedFields)? = keyset["wrappedByPassphrase"],
+                  let wrapped = try? JSONDecoder().decode(
+                      SyncCrypto.Blob.self,
+                      from: JSONEncoder().encode(JSONValue.object(wrappedFields)))
+            else {
+                throw CloudReader.Failure.malformed("the keyset has no passphrase-wrapped key")
+            }
+            // Before the write, so a wrong passphrase changes nothing.
+            let dek = try SyncCrypto.unwrapDek(secret: passphrase, wrapped: wrapped)
+            let sealed = try await Secrets.seal(session.token, for: build)
+
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var settings = Self.settings(root)
+                // `lastServerRev: 0` on purpose, exactly as the other app writes
+                // it: this machine has seen nothing from the server yet, and a
+                // carried-over rev would let a push claim a base it never read.
+                settings["cloud"] = .object([
+                    "enabled": .bool(true),
+                    "url": .string(url),
+                    "email": .string(email),
+                    "shopId": .string(session.shopId),
+                    "token": .string(sealed),
+                    "keyset": .object(keyset),
+                    "lastServerRev": .number(0),
+                    "verified": .bool(session.verified),
+                    "role": .string(session.role),
+                ])
+                root["settings"] = .object(settings)
+            }
+
+            cloudDek = dek
+            if case .locked = syncStatus { syncStatus = .idle }
+            await load(source)
+            moveNotices = [words.callIt("mac.cloud_signed_in")]
+        } catch let failure as CloudSignIn.Failure {
+            cloudProblem = failure.errorDescription ?? String(describing: failure)
+        } catch let locked as Secrets.Failure {
+            cloudProblem = words.callIt("mac.cloud_signin_failed") + " " + locked.description
+        } catch let crypto as SyncCrypto.Failure {
+            // The overwhelmingly common one, and worth its own sentence: the
+            // login succeeded and the passphrase did not fit.
+            cloudProblem = words.callIt("mac.cloud_wrong_passphrase")
+                + " (" + String(describing: crypto) + ")"
+        } catch {
+            cloudProblem = words.callIt("mac.cloud_signin_failed") + " "
+                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+        }
+    }
+
     func checkCloud(passphrase: String) async {
         cloudProblem = nil
         cloudCheck = nil

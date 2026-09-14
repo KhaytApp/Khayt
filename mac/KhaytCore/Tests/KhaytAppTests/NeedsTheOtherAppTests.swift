@@ -141,6 +141,12 @@ struct NeedsTheOtherAppTests {
                 "Webhooks are sent by this app and must not be listed")
         #expect(!Self.known.contains { $0.id.hasPrefix("product.") },
                 "the product sheet holds all of it now and must not be listed")
+        // Signing in to the cloud is done HERE now — `CloudSignIn.logIn` gets a
+        // token, `Shop.signInToCloud` seals it and writes `settings.cloud`. It
+        // was on this list for about an hour, which is the right length of time
+        // for something whose fix is a call the app was one function short of.
+        #expect(!Self.known.contains { $0.id.contains("signin") },
+                "the cloud sign-in is on this app now and must not be listed")
 
         // ── AND THE REMAINING OUTBOUND GAPS ARE REALLY STILL REFUSED ──────
         //
@@ -190,7 +196,10 @@ struct NeedsTheOtherAppTests {
         // A number, deliberately. It is a ratchet: lowering it is the work,
         // raising it needs somebody to decide that on purpose and say why in
         // the commit.
-        #expect(Self.known.count <= 3, Comment(rawValue: """
+        // 3 → 1 on 2026-09-14. `cloud.signin` was added and then closed the
+        // same day — this app signs in to the cloud itself now — so the cap
+        // follows the list down rather than leaving the slot it used.
+        #expect(Self.known.count <= 1, Comment(rawValue: """
             \(Self.known.count) things still need the other app. This number is \
             a ratchet — if a new dependency is genuinely unavoidable, lower \
             something else first or raise this deliberately.
