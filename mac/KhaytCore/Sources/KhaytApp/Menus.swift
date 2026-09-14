@@ -169,6 +169,14 @@ private struct BookMenu: View {
             Button(Words.upfront("mac.ask_the_book") + "\u{2026}") { shop.askingTheBook = true }
         }
 
+        // Signing in, which is what a book carried to a new Mac needs first:
+        // the saved token is sealed against the Keychain of the machine that
+        // obtained it, so it arrives unreadable and every cloud item below goes
+        // quiet. NOT disabled on `cloudConnected` — a shop whose token cannot
+        // be opened still counts as connected, and that is exactly when this is
+        // the item you want.
+        Button(Words.upfront("mac.cloud_sign_in") + "\u{2026}") { shop.signingIntoCloud = true }
+
         Button(Words.upfront("mac.check_cloud") + "\u{2026}") { shop.checkingCloud = true }
             .disabled(!shop.cloudConnected)
         // The way back out of automatic sync, and the only one there is.
