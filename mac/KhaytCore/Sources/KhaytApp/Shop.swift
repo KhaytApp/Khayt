@@ -5865,9 +5865,12 @@ final class Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
-                (undoSnapshot, said, telegram, owed, mail, portal) = try await Self.applyMove(
+                let out = try await Self.applyMove(
                     to: &root, id: id, stage: stage, engine: engine, words: self.words,
                     holdReason: holdReason, qcNotes: qcNotes, actuals: actuals)
+                undoSnapshot = out.undo; said = out.notices
+                telegram = out.telegram; owed = out.webhooks
+                mail = out.email; portal = out.portal
             }
             // Only once the swap has happened. The last ownership check is after
             // the mutation, so a book that changed hands mid-move throws here —
@@ -6058,6 +6061,29 @@ final class Shop {
     /// reads — the other jobs the WIP limit counts, the spools it draws from,
     /// the settings that decide whether it deducts at all — must be what is in
     /// the file, not what this app last drew on screen.
+    /// Everything one move produced: what changed, what to say, and what it
+    /// owes the world outside this book.
+    ///
+    /// A STRUCT rather than the tuple this was. `applyMove` returned six
+    /// positional values, and every new outbound channel — email, then the
+    /// portal — meant editing the signature plus four test helpers plus a
+    /// `let (_, _, _, owed, _, _)` that nobody could read. Twice in one day.
+    /// Names also make `out.portal` mean something at the call site, where
+    /// `out.5` did not.
+    ///
+    /// The three outbound fields are nil or empty when the move owes nothing —
+    /// which is the common case, a shop with no integrations configured.
+    struct MoveOutcome {
+        /// Enough to put the book back as it was.
+        let undo: [ChangedRecord]
+        /// Sentences for the person, already in their language.
+        let notices: [String]
+        let telegram: TelegramMessage?
+        let webhooks: [KhaytEngine.WebhookDelivery]
+        let email: OrderEmail?
+        let portal: PortalRefresh?
+    }
+
     /// The customer's name as the shop writes it, for a message about their job.
     ///
     /// One resolution, used by the webhook bodies and by the email, because a
@@ -6082,9 +6108,7 @@ final class Shop {
                                   engine: KhaytEngine, words: Words,
                                   holdReason: String? = nil, qcNotes: String? = nil,
                                   actuals: Actuals? = nil)
-    async throws -> (undo: [ChangedRecord], notices: [String], telegram: TelegramMessage?,
-                     webhooks: [KhaytEngine.WebhookDelivery], email: OrderEmail?,
-                     portal: PortalRefresh?) {
+    async throws -> MoveOutcome {
 
         var orders = rows(root, "printLog")
         let inventory = rows(root, "inventory")
@@ -6268,7 +6292,8 @@ final class Shop {
         }
 
         let notices = (move.notices ?? []).map { words.sentence(for: $0) }
-        return (undo, notices, telegram, owed, mail, portal)
+        return MoveOutcome(undo: undo, notices: notices, telegram: telegram,
+                           webhooks: owed, email: mail, portal: portal)
     }
 
     // MARK: - Reading and writing rows
