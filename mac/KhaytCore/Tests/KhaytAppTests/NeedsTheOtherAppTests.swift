@@ -36,6 +36,24 @@ struct NeedsTheOtherAppTests {
         // now: the words are `lib/order-email.js` and the sending is one
         // URLSession POST each. What is left is the third provider, and it is
         // not a missing `if`.
+        // ADDED 2026-09-14, which is the direction this list is not supposed to
+        // move — so it is here with the whole reason rather than quietly.
+        //
+        // Found by restoring a shop's book onto a new Mac: `settings.cloud.token`
+        // is sealed against the Keychain of the machine that obtained it, so it
+        // arrives unreadable, and there is no way to obtain a new one here.
+        Gap(id: "cloud.signin",
+            what: "Signing in to Khayt's cloud — or signing in again after a "
+                + "move to a new Mac, where the saved token cannot be decrypted",
+            why: "The token is not a field anyone types: the server issues it at "
+               + "login and the other app writes the whole `settings.cloud` "
+               + "object at once. This app deliberately does not touch that "
+               + "object — `pullFromCloud` says so in as many words, because the "
+               + "desktop's cached server view is its own bookkeeping — so there "
+               + "is nothing here to sign in with. AND NOTHING ON SCREEN SAYS "
+               + "SO, which is the worse half: a shop whose token has gone finds "
+               + "out from a move reporting that the customer's link was not "
+               + "refreshed, with no sentence telling it where to go."),
         Gap(id: "outbound.email.smtp",
             what: "Moving a job that would email the customer through the "
                 + "shop's own mail server",
@@ -190,7 +208,10 @@ struct NeedsTheOtherAppTests {
         // A number, deliberately. It is a ratchet: lowering it is the work,
         // raising it needs somebody to decide that on purpose and say why in
         // the commit.
-        #expect(Self.known.count <= 3, Comment(rawValue: """
+        // 3 → 2 on 2026-09-14. The list reached 1 when the portal went, and
+        // `cloud.signin` put it back to 2 — so the cap comes down to 2 rather
+        // than leaving a spare slot behind for the next thing to slip into.
+        #expect(Self.known.count <= 2, Comment(rawValue: """
             \(Self.known.count) things still need the other app. This number is \
             a ratchet — if a new dependency is genuinely unavoidable, lower \
             something else first or raise this deliberately.
