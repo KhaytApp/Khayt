@@ -1202,6 +1202,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The Mac signs in to the cloud itself.** `settings.cloud.token` is a session
+  token the server issues at login, sealed against the Keychain of the machine
+  that asked for it — so a shop's book carried to a new Mac arrives with a token
+  nothing on that Mac can read, every cloud feature goes quiet, and the only
+  cure was to open the other app. **Book → Sign in to the cloud** asks for the
+  server, the account, its password and the sync passphrase, and does the rest
+  here.
+
+  The passphrase is checked **before anything is written**: a token saved beside
+  a key that does not open leaves a shop connected and unable to read a word of
+  its own cloud, which reads as the server having lost it. The new token is
+  sealed the way the other app seals it, and `settings.cloud` is written in the
+  same shape, so both apps read each other's sign-in.
+
+  Everything after the token already worked — pulling, unlocking, comparing,
+  pushing. This was one missing call, and it was the difference between a Mac
+  that keeps a shop's book and one that needs another app to stay reachable.
+
 - **The Mac refreshes the customer's tracking link, so a published job can be
   moved here at all.** A job published to the portal could not be moved on the
   Mac: the app refuses a move it cannot carry out whole, and the refresh — a
