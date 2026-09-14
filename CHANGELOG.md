@@ -6,6 +6,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **A project is a folder in the library now, with a picture on it.** A group
+  was only ever a filter in the sidebar: the grid itself was flat, so a project
+  with forty files in it looked like forty files. A shop said so — *"the
+  grouping for models is very weak, it's completely not right for a single
+  project"* — and that was exactly right, because the shop's own idea of a
+  project existed in the data and nowhere in the picture. Projects now come
+  first in the library as folders, each wearing a picture borrowed from the
+  best thing inside it and saying how many models it holds; opening one shows
+  what is in it. Loose models follow, as before.
+
+- **Four buttons showed their own names instead of words.** *New Job from This*
+  in the catalogue, *Add a tier* and the name of a new tier on the product
+  sheet, and a heading in the model inspector each read as `mac.job_from_product`
+  and the like: they were added as calls with no words written behind them, and
+  a missing key is not blank and does not fall back — it IS the key, which
+  reads as placeholder text nobody removed.
+
 - **The sheet that compares this Mac with the cloud could grow past the screen
   too.** It draws one row for every collection that differs — up to
   thirty-three — so the further the two copies had drifted apart, the taller it

@@ -32,8 +32,20 @@ struct LibraryGrid: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.spacing),
                                              count: count),
                               spacing: Self.spacing) {
-                        ForEach(shop.shownFiles) { file in
-                            cell(for: file).id(file.id)
+                        ForEach(shop.shownEntries) { entry in
+                            switch entry {
+                            case .folder(let name, let count, let cover):
+                                FolderCell(name: name, count: count,
+                                           thumbnail: cover.flatMap { shop.thumbnail(for: $0) },
+                                           words: shop.words)
+                                    .id(entry.id)
+                                    // A folder OPENS. The shelf already filters
+                                    // by group, so entering one is setting it —
+                                    // the sidebar and the grid stay one idea.
+                                    .onTapGesture { shop.shelf = .library(name) }
+                            case .file(let file):
+                                cell(for: file).id(file.id)
+                            }
                         }
                     }
                     .padding(Metric.screen)
@@ -167,6 +179,54 @@ struct LibraryGrid: View {
                 Thumbnail(source: shop.thumbnail(for: file))
                     .frame(width: 320, height: 320)
             }
+    }
+}
+
+/// A project, as a folder.
+///
+/// Deliberately the same shape as `Cell` — same square picture, same two lines
+/// of text — so a library of folders and files reads as one grid rather than
+/// two. What differs is what it says: a folder has no size and no print count,
+/// it has how many things are in it.
+private struct FolderCell: View {
+    let name: String
+    let count: Int
+    let thumbnail: ThumbnailSource?
+    let words: Words
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Thumbnail(source: thumbnail)
+                .aspectRatio(1, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                // The mark that says this is a place and not a thing. Bottom
+                // trailing, where a file puts nothing, so it never sits on top
+                // of the palette a file draws bottom-leading.
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white)
+                        .shadow(radius: 2)
+                        .padding(6)
+                }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(2, reservesSpace: true)
+                    .multilineTextAlignment(.leading)
+                Text(words.callIt("mac.n_models", ["n": .number(Double(count))]))
+                    .font(.caption2)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(.top, 6)
+            .padding(.horizontal, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(6)
+        .contentShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
