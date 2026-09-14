@@ -22,6 +22,17 @@ struct LibraryGrid: View {
     private static let spacing: CGFloat = 16
 
     var body: some View {
+        VStack(spacing: 0) {
+            // Above the grid rather than in the sidebar, where the group filter
+            // used to live: the chips describe what is on screen and change it,
+            // and a control that narrows a grid from another column is a
+            // control a shop has to remember it set.
+            LibraryFilterBar(shop: shop)
+            grid
+        }
+    }
+
+    private var grid: some View {
         GeometryReader { geometry in
             // Fixed columns rather than `.adaptive`, because the arrow keys have
             // to know how many there are: moving down is moving forward by one

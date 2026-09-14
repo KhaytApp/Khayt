@@ -297,6 +297,9 @@ final class Words {
         "mac.pipeline":      ["en": "Pipeline",      "ar": "المسار"],
         "mac.board":         ["en": "Board",         "ar": "اللوح"],
         "mac.nothing_here":  ["en": "nothing here",  "ar": "لا شيء هنا"],
+        // A catalogue chip, and the one worth interrupting for: a product a
+        // shop cannot sell sitting among ones it can.
+        "mac.no_price_yet":  ["en": "No price",      "ar": "بلا سعر"],
         "mac.no_jobs":       ["en": "No jobs yet",   "ar": "لا أعمال بعد"],
         // Needs attention — what is wrong, and the button that goes to it
         "mac.attn_go_machine": ["en": "Open printer",  "ar": "افتح الطابعة"],
@@ -673,6 +676,29 @@ final class Words {
         "mac.group_name_kept": ["en": "A name already in use keeps its spelling.",
                                 "ar": "الاسم المستخدَم من قبل يحتفظ بهجائه."],
         "mac.file_it":       ["en": "File",            "ar": "احفظ"],
+        // ── AND THE TWO AXES THE GROUPING MENU NEVER HAD ─────────────────
+        //
+        // A group is the SET a model belongs to; a category is what it IS, and
+        // a tag is everything neither of those covers. Both could be filtered
+        // on this Mac and neither could be set from it, so a shop wanting to
+        // call something a bust had to open the other app — which is the
+        // definition of a gap rather than a difference.
+        "mac.category":      ["en": "Category",        "ar": "التصنيف"],
+        "mac.new_category":  ["en": "New Category\u{2026}", "ar": "تصنيف جديد\u{2026}"],
+        "mac.remove_from_category": ["en": "Remove from Category",
+                                     "ar": "إزالة من التصنيف"],
+        "mac.category_n_models": ["en": "Categorise {n} Models", "ar": "تصنيف {n} نماذج"],
+        "mac.category_why":  ["en": "Say what the selected models ARE",
+                              "ar": "حدّد ما تمثّله النماذج المختارة"],
+        "mac.name_this_category": ["en": "Name this category", "ar": "سمِّ هذا التصنيف"],
+        "mac.category_example": ["en": "Wall art",      "ar": "فن جداري"],
+        "mac.tags":          ["en": "Tags",            "ar": "الوسوم"],
+        "mac.tag_models":    ["en": "Tag Models",      "ar": "وسم النماذج"],
+        "mac.tag_example":   ["en": "relief, portrait", "ar": "نقش، صورة"],
+        // Said out loud because it is the surprising half: tagging several at
+        // once REPLACES what each carried rather than adding to it.
+        "mac.tags_replaced": ["en": "These become the tags on every model selected.",
+                              "ar": "تصبح هذه وسوم كل نموذج مختار."],
         "mac.n_models":      ["en": "{n} models",      "ar": "{n} نماذج"],
         "mac.together":      ["en": "Together",        "ar": "مجتمعة"],
         "mac.on_disk":       ["en": "On disk",         "ar": "على القرص"],

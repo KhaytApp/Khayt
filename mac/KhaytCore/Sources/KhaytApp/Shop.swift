@@ -127,10 +127,32 @@ final class Shop {
     var selection: Order.ID?
     var fileSelection: Set<LibraryFile.ID> = []
     var customerSelection: Customer.ID?
-    var shelf: Shelf = .dashboard
+    /// Which screen, and for the library which folder.
+    ///
+    /// Moving between them recounts the filter chips, because both bars count
+    /// what is in front of the shop rather than what is in the book: opening a
+    /// project of forty must not leave a chip promising the hundred behind it.
+    /// Set from a dozen places — a click, a menu, a folder tile — so the recount
+    /// is here rather than at each of them.
+    var shelf: Shelf = .dashboard {
+        didSet {
+            guard shelf != oldValue else { return }
+            if case .library = shelf { recountLibrarySoon() }
+            else if case .library = oldValue { recountLibrarySoon() }
+        }
+    }
     /// Opens the way Khayt opens. See `LibrarySort`.
     var librarySort: LibrarySort = .khayt
-    var search = ""
+    /// Typed into the search box. The chips count what the search leaves, so
+    /// they follow it — the other app's catalogue does the same, and a chip
+    /// saying seven over a searched list of two is the bug its note describes.
+    var search = "" {
+        didSet {
+            guard search != oldValue else { return }
+            if case .library = shelf { recountLibrarySoon() }
+            if case .catalogue = shelf { recountCatalogueSoon() }
+        }
+    }
 
     /// Which shelf of the book is open. One selection rather than two, because
     /// "a stage is chosen" and "the library is showing" are not independent —
@@ -338,6 +360,12 @@ final class Shop {
             if case .array(let catalog)? = root["products"] { productRows = catalog } else { productRows = [] }
             catalogueRows = (try? await engine?.catalogue(
                 productRows, language: words.language, settings: Self.settings(root))) ?? []
+            productCategories = Dictionary(uniqueKeysWithValues: productRows.compactMap { row in
+                guard case .object(let p) = row, case .string(let id)? = p["id"] else { return nil }
+                if case .string(let c)? = p["category"] { return (id, c) }
+                return (id, "")
+            })
+            await readCatalogueFacets()
             catalogueLanguages = await Self.catalogueLanguages(Self.settings(root), engine: engine)
             if case .array(let fleet)? = root["machines"] { machineRows = fleet } else { machineRows = [] }
             // Recurring maintenance tasks, written by the Electron app's
@@ -401,6 +429,15 @@ final class Shop {
                 }
             }
             licences = standings
+            // The library's own chips, counted once per book for the same
+            // reason as everything above it: the grid redraws on every
+            // keystroke in the search box, and a hop into JavaScript per chip
+            // per redraw is a hop for a constant.
+            if case .array(let rows)? = root["printFiles"] { libraryRows = rows } else { libraryRows = [] }
+            await readLibraryFacets()
+            // And the names those chips can be filed under, which is the whole
+            // book rather than what the chips are currently counting.
+            await readLibraryNames()
             // The status of each, from the shared rule rather than a Swift
             // comparison of two date strings — asked once for all of them,
             // because the table redraws on every keystroke in the search box.
@@ -459,6 +496,10 @@ final class Shop {
         } catch {
             orders = []
             files = []
+            libraryRows = []
+            libraryFacets = LibraryFacets()
+            categoriesInUse = []
+            tagsInUse = []
             machines = []
             spools = []
             wear = [:]
@@ -1060,7 +1101,126 @@ final class Shop {
     /// on screen and nothing on disk.
     func setCatalogueForTesting(_ rows: [KhaytEngine.CatalogueRow]) { catalogueRows = rows }
 
-    /// The catalogue, matching the search box.
+    /// What the catalogue can be narrowed by.
+    ///
+    /// Two axes and a state, answering three different questions:
+    ///
+    ///   CATEGORY — what the shop files a product under, and what the other
+    ///              app's catalogue chips already use. NOT `group`: products
+    ///              carry `category`, and a chip on a field nothing writes is a
+    ///              chip that never appears.
+    ///   MATERIAL — what it is printed in. "Everything in resin" is the
+    ///              question the search box was being used for.
+    ///   NO PRICE — added and never priced. The catalogue's own "unfiled": a
+    ///              product a shop cannot sell, sitting silently among ones it
+    ///              can, and the only one of the three worth interrupting for.
+    ///
+    /// Counted the same way as the library's — each axis over what the others
+    /// leave, by the shared folding rule. `LibraryFacets` carries the argument
+    /// for both, including the bug the other app shipped by counting the whole
+    /// catalogue while the grid narrowed on three things at once.
+    ///
+    /// A product's material is not a field `lib/organise.js` knows — it is
+    /// derived from the parts — so the rows are handed over as records it does
+    /// know. What is borrowed is the FOLDING, not the field name: a catalogue
+    /// holding "PETG" and "petg" has one material.
+    struct CatalogueFacets: Equatable {
+        var categories: [KhaytEngine.GroupCount] = []
+        var materials: [KhaytEngine.GroupCount] = []
+        var unpriced = 0
+        var isEmpty: Bool { categories.isEmpty && materials.isEmpty && unpriced == 0 }
+    }
+
+    private(set) var catalogueFacets = CatalogueFacets()
+
+    var catalogueCategory: FilterChoice? { didSet { recountCatalogueSoon() } }
+    var catalogueMaterial: FilterChoice? { didSet { recountCatalogueSoon() } }
+    /// Products with no price at all.
+    var catalogueUnpricedOnly = false { didSet { recountCatalogueSoon() } }
+
+    /// Nothing typed and nothing worked out — NOT "costs zero".
+    ///
+    /// `lib/product-price.js` is explicit that a typed zero is a real answer:
+    /// *"a giveaway, a sample, a part priced inside a bundle"*, and it goes out
+    /// of its way not to re-price those at cost plus margin. A chip that swept
+    /// them up with the ones nobody has got round to pricing would tell a shop
+    /// its deliberate freebies are mistakes.
+    static func isUnpriced(_ row: KhaytEngine.CatalogueRow) -> Bool {
+        row.final <= 0 && row.source != "override"
+    }
+
+    var catalogueFilterOn: Bool {
+        catalogueCategory != nil || catalogueMaterial != nil || catalogueUnpricedOnly
+    }
+
+    func clearCatalogueFilter() {
+        catalogueCategory = nil
+        catalogueMaterial = nil
+        catalogueUnpricedOnly = false
+    }
+
+    enum CatalogueAxis { case unpriced, category, material }
+
+    /// A row's category, which the catalogue row does not carry: it is the
+    /// product's own field, read from the record the row was built from.
+    private var productCategories: [String: String] = [:]
+
+    private func cataloguePool(skipping axis: CatalogueAxis) -> [KhaytEngine.CatalogueRow] {
+        var rows = catalogueRows
+        if axis != .unpriced, catalogueUnpricedOnly { rows = rows.filter(Self.isUnpriced) }
+        if axis != .category, let category = catalogueCategory {
+            rows = rows.filter { category.matches(productCategories[$0.id]) }
+        }
+        if axis != .material, let material = catalogueMaterial {
+            rows = rows.filter { material.matches($0.material) }
+        }
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return rows }
+        return rows.filter { Self.catalogueMatches($0, q, category: productCategories[$0.id]) }
+    }
+
+    private static func catalogueMatches(_ row: KhaytEngine.CatalogueRow, _ q: String,
+                                         category: String?) -> Bool {
+        row.name.lowercased().contains(q)
+            || row.description.lowercased().contains(q)
+            || row.material.lowercased().contains(q)
+            || row.group.lowercased().contains(q)
+            || (category ?? "").lowercased().contains(q)
+    }
+
+    /// The same race as `libraryRecount`, for the same reason.
+    private var catalogueRecount = 0
+
+    func readCatalogueFacets() async {
+        catalogueRecount += 1
+        let mine = catalogueRecount
+        guard let engine, !catalogueRows.isEmpty else { catalogueFacets = CatalogueFacets(); return }
+        let categoryRows = cataloguePool(skipping: .category).map {
+            JSONValue.object(["category": .string(productCategories[$0.id] ?? "")])
+        }
+        let materialRows = cataloguePool(skipping: .material).map {
+            JSONValue.object(["category": .string($0.material)])
+        }
+        let categories = (try? await engine.categoryCounts(categoryRows)) ?? []
+        let materials = (try? await engine.categoryCounts(materialRows)) ?? []
+        guard mine == catalogueRecount else { return }
+        let unpriced = cataloguePool(skipping: .unpriced).count(where: Self.isUnpriced)
+        catalogueFacets = CatalogueFacets(categories: categories, materials: materials,
+                                          unpriced: unpriced)
+    }
+
+    private var catalogueRecountTask: Task<Void, Never>?
+    private func recountCatalogueSoon() { catalogueRecountTask = Task { await readCatalogueFacets() } }
+
+    /// The same, for the catalogue's chips. See `settleLibraryFacets`.
+    func settleCatalogueFacets() async {
+        while let pending = catalogueRecountTask {
+            catalogueRecountTask = nil
+            await pending.value
+        }
+    }
+
+    /// The catalogue, matching the search box and whatever chips are on.
     ///
     /// The rule `shownExpenses` states: a search field that does nothing on the
     /// screen you are looking at is worse than no search field. Every other
@@ -1071,14 +1231,17 @@ final class Shop {
     /// Name, description, material and group: a shop hunting for "the palm one"
     /// or "everything in resin" is asking one of those four.
     var shownProducts: [KhaytEngine.CatalogueRow] {
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return catalogueRows }
-        return catalogueRows.filter {
-            $0.name.lowercased().contains(q)
-                || $0.description.lowercased().contains(q)
-                || $0.material.lowercased().contains(q)
-                || $0.group.lowercased().contains(q)
+        var rows = catalogueRows
+        // Every axis narrows at once, as in the library: "the resin ones in the
+        // Kings collection" is one question, not two screens.
+        if catalogueUnpricedOnly { rows = rows.filter(Self.isUnpriced) }
+        if let category = catalogueCategory {
+            rows = rows.filter { category.matches(productCategories[$0.id]) }
         }
+        if let material = catalogueMaterial { rows = rows.filter { material.matches($0.material) } }
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return rows }
+        return rows.filter { Self.catalogueMatches($0, q, category: productCategories[$0.id]) }
     }
 
     /// Whether the screen now showing has anything for the search box to narrow.
@@ -6729,6 +6892,85 @@ final class Shop {
 
     var ungroupedCount: Int { files.count { $0.groupName == nil } }
 
+    /// The categories and the tags the shop already uses, most-used first.
+    ///
+    /// Offered before typing, and that order is the point: the menu exists so a
+    /// model gets filed under a name that is ALREADY in use rather than a second
+    /// spelling of it.
+    ///
+    /// The WHOLE book, deliberately — not `libraryFacets`, which is narrowed by
+    /// the shelf and whatever chips are on. A shop standing inside one project
+    /// and offered only that project's categories would type a name the book
+    /// already holds elsewhere, and the folding rule can only fold against names
+    /// it was given. That is the exact drift this menu exists to prevent.
+    private(set) var categoriesInUse: [String] = []
+    private(set) var tagsInUse: [String] = []
+
+    private func readLibraryNames() async {
+        guard let engine, !libraryRows.isEmpty else {
+            categoriesInUse = []; tagsInUse = []; return
+        }
+        categoriesInUse = ((try? await engine.categoryCounts(libraryRows)) ?? []).map(\.name)
+        tagsInUse = ((try? await engine.tagCounts(libraryRows)) ?? []).map(\.name)
+    }
+
+    /// File the selected models under a category, or clear it with "".
+    func fileSelection(underCategory name: String) async {
+        guard !fileSelection.isEmpty else { return }
+        let ids = fileSelection
+        // Through the engine, for the same reason as the group above: a name
+        // matching one the shop already uses adopts that spelling rather than
+        // becoming a second chip holding part of the same idea.
+        guard let engine,
+              let patch = try? await engine.fileUnderCategory(name, known: categoriesInUse)
+        else {
+            writeProblem = words.callIt("mac.group_unknown")
+            return
+        }
+        let named = name.isEmpty
+            ? words.callIt("mac.remove_from_category")
+            : words.callIt("mac.file_in", ["name": .string(name)])
+        editFiles(ids, named: named) { record in
+            for (key, value) in patch { record[key] = value }
+        }
+    }
+
+    /// Set the tags on the selected models from a typed, comma-separated line.
+    ///
+    /// Replaces rather than merges. Tagging several models at once is how a
+    /// shop says "these are the same kind of thing", and a merge would make the
+    /// result depend on what each already carried — so what is typed is what
+    /// they all end up with, which is the only version of this a person can
+    /// predict.
+    func tagSelection(_ typed: String) async {
+        guard !fileSelection.isEmpty else { return }
+        let ids = fileSelection
+        guard let engine, let tags = try? await engine.normaliseTags(typed, known: tagsInUse)
+        else {
+            writeProblem = words.callIt("mac.group_unknown")
+            return
+        }
+        editFiles(ids, named: words.callIt("mac.tag_models")) { record in
+            record["tags"] = .array(tags.map { .string($0) })
+        }
+    }
+
+    /// What the tag box starts with: the tags shared by everything selected.
+    ///
+    /// Not the first one's tags. With several chosen, showing one model's tags
+    /// and then writing them to all of them would quietly hand the rest a set
+    /// they never had.
+    var tagsOnSelection: [String] {
+        let chosen = selectedFiles
+        guard let first = chosen.first else { return [] }
+        var shared = first.tags ?? []
+        for file in chosen.dropFirst() {
+            let theirs = Set((file.tags ?? []).map { $0.lowercased() })
+            shared = shared.filter { theirs.contains($0.lowercased()) }
+        }
+        return shared
+    }
+
     /// What the library grid shows: projects as folders, then loose files.
     ///
     /// Only at the TOP of the library. Inside a folder the shelf already
@@ -6741,10 +6983,191 @@ final class Shop {
         return LibraryEntry.top(of: shownFiles, order: librarySort.order)
     }
 
+    /// One axis of the library filter: a name, or the things that have none.
+    ///
+    /// "Unfiled" is a CASE rather than a sentinel string. The other app used a
+    /// magic value and it went through a `data-` attribute, where a NUL became
+    /// U+FFFD and the chip quietly matched nothing — the Unfiled chip was dead
+    /// for weeks. A case cannot be mangled on the way to a comparison.
+    enum FilterChoice: Hashable {
+        case named(String)
+        case unfiled
+
+        /// Does a record's value for this axis match? Case-insensitively,
+        /// because the shop's own spellings are folded everywhere else too.
+        func matches(_ value: String?) -> Bool {
+            switch self {
+            case .unfiled: return (value ?? "").isEmpty
+            case .named(let want):
+                return (value ?? "").lowercased() == want.lowercased()
+            }
+        }
+    }
+
+    /// The chips the library filter bar offers.
+    ///
+    /// ── EVERY AXIS IS COUNTED OVER WHAT THE OTHERS LEAVE ──────────────────
+    ///
+    /// A chip says a number, a shop decides whether to press it on that number,
+    /// and a count describing a different population from the grid under it is
+    /// a lie the shop cannot see. The other app shipped exactly that and its own
+    /// note records the symptom: *"these counted the whole catalogue while the
+    /// grid narrows on three things at once, so with a category on, a group
+    /// chip said 7 and pressing it showed 2."*
+    ///
+    /// So each axis is counted over the rows the OTHER axes leave — the shelf,
+    /// the search box and the two chips that are not this one. Counting a chip
+    /// against its own axis would instead narrow the row to whatever is already
+    /// on and the shop could never press a second value.
+    ///
+    /// ── AND FROM THE SHARED RULE, NOT FROM SWIFT ──────────────────────────
+    ///
+    /// The arithmetic is the easy half. What matters is the FOLDING: a shop that
+    /// typed "Wall art" once and "wall art" twice has one category holding
+    /// three, not two holding some each. `Dictionary(grouping:)` would get the
+    /// sum right and the shop's own idea of its library wrong.
+    struct LibraryFacets: Equatable {
+        var categories: [KhaytEngine.GroupCount] = []
+        var tags: [KhaytEngine.GroupCount] = []
+        /// Models in no project at all — the answer to "what have I not filed
+        /// yet". Zero inside a folder, where nothing can be unfiled, which is
+        /// how that chip disappears when it would teach the wrong thing.
+        var unfiled = 0
+        var isEmpty: Bool { categories.isEmpty && tags.isEmpty && unfiled == 0 }
+    }
+
+    private(set) var libraryFacets = LibraryFacets()
+
+    /// The library rows as they sit in the book. Kept because the counts are
+    /// asked of a JavaScript rule, which reads records rather than `LibraryFile`
+    /// — and re-encoding the decoded ones per keystroke would be a hop for a
+    /// round trip.
+    private var libraryRows: [JSONValue] = []
+
+    enum LibraryAxis { case unfiled, category, tag }
+
+    /// What one axis counts: the shelf, the search, and the other two chips.
+    private func libraryPool(skipping axis: LibraryAxis) -> [JSONValue] {
+        var rows = libraryRows
+        if case .library(let group) = shelf, let group {
+            rows = rows.filter { Self.rowGroup($0) == group }
+        }
+        if axis != .unfiled, libraryUnfiledOnly {
+            rows = rows.filter { Self.rowGroup($0) == nil }
+        }
+        if axis != .category, let category = libraryCategory {
+            rows = rows.filter { category.matches(Self.rowText($0, "category")) }
+        }
+        if axis != .tag, let tag = libraryTag {
+            rows = rows.filter { Self.rowTags($0).contains { $0.lowercased() == tag.lowercased() } }
+        }
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return rows }
+        return rows.filter { row in
+            Self.rowText(row, "title").lowercased().contains(q)
+                || Self.rowText(row, "material").lowercased().contains(q)
+                || Self.rowTags(row).contains { $0.lowercased().contains(q) }
+        }
+    }
+
+    /// The group a record is in, by the rule the grid files it under —
+    /// `folder` if the key is there at all, then `group`. Splitting on `group`
+    /// alone would count a model under one project and draw it in another.
+    private static func rowGroup(_ row: JSONValue) -> String? {
+        guard case .object(let o) = row else { return nil }
+        let text: (String) -> String? = { key in
+            if case .string(let v)? = o[key] { return v }
+            return o[key] == nil ? nil : ""
+        }
+        return LibraryFile.groupName(folder: text("folder"), group: text("group"))
+    }
+
+    private static func rowText(_ row: JSONValue, _ key: String) -> String {
+        guard case .object(let o) = row, case .string(let v)? = o[key] else { return "" }
+        return v
+    }
+
+    private static func rowTags(_ row: JSONValue) -> [String] {
+        guard case .object(let o) = row, case .array(let rows)? = o["tags"] else { return [] }
+        return rows.compactMap { if case .string(let t) = $0 { t } else { nil } }
+    }
+
+    /// Recount the chips. Called from the setters below rather than by the
+    /// views, so a chip cannot be added to a screen and quietly left stale.
+    /// Typing in the search box starts one of these per keystroke, and each
+    /// hops into JavaScript twice. The LAST one started is the only one allowed
+    /// to write — otherwise a slow recount of "wal" lands after a fast one of
+    /// "wall art" and the chips describe a search the shop has finished typing.
+    ///
+    /// Not covered by a test, and deliberately kept anyway: an actor makes no
+    /// promise about the order its suspended callers resume in, so this cannot
+    /// be forced to happen from a test and a passing suite is not evidence it
+    /// never will. `settleLibraryFacets` is what the tests use, and it proves
+    /// the recount finishes — not the order two of them finish in.
+    private var libraryRecount = 0
+
+    func readLibraryFacets() async {
+        libraryRecount += 1
+        let mine = libraryRecount
+        guard let engine, !libraryRows.isEmpty else { libraryFacets = LibraryFacets(); return }
+        let categories = (try? await engine.categoryCounts(libraryPool(skipping: .category))) ?? []
+        let tags = (try? await engine.tagCounts(libraryPool(skipping: .tag))) ?? []
+        guard mine == libraryRecount else { return }
+        let unfiled = libraryPool(skipping: .unfiled).count { Self.rowGroup($0) == nil }
+        libraryFacets = LibraryFacets(categories: categories, tags: tags, unfiled: unfiled)
+    }
+
+    private var libraryRecountTask: Task<Void, Never>?
+    private func recountLibrarySoon() { libraryRecountTask = Task { await readLibraryFacets() } }
+
+    /// Wait for the chips to catch up with what was last asked of them.
+    ///
+    /// The recounts are started by the setters, so nothing on screen has to
+    /// remember to ask — but that leaves no moment at which they are known to be
+    /// finished, and a test that reads them right after changing the shelf is
+    /// reading whatever happened to land. Draining in a loop rather than
+    /// awaiting once, because a change made WHILE one is in flight starts
+    /// another.
+    func settleLibraryFacets() async {
+        while let pending = libraryRecountTask {
+            libraryRecountTask = nil
+            await pending.value
+        }
+    }
+
+    /// What a shop is looking at: a category, a tag, both, or neither.
+    ///
+    /// The GROUP axis is not here — it is the shelf, because a group is a
+    /// folder now and opening one is navigating rather than filtering. Unfiled
+    /// is the exception and lives here, since there is no folder to open for
+    /// models that are in none.
+    var libraryCategory: FilterChoice? { didSet { recountLibrarySoon() } }
+    var libraryTag: String? { didSet { recountLibrarySoon() } }
+    /// Models in no project at all — the answer to "what have I not filed yet".
+    var libraryUnfiledOnly = false { didSet { recountLibrarySoon() } }
+
+    var libraryFilterOn: Bool {
+        libraryCategory != nil || libraryTag != nil || libraryUnfiledOnly
+    }
+
+    func clearLibraryFilter() {
+        libraryCategory = nil
+        libraryTag = nil
+        libraryUnfiledOnly = false
+    }
+
     var shownFiles: [LibraryFile] {
         var rows = files
         if case .library(let group) = shelf, let group {
             rows = rows.filter { $0.groupName == group }
+        }
+        // Every axis narrows at once, deliberately: "the busts in the Saudi
+        // Kings" is the question a library of hundreds is actually asked — the
+        // same reasoning renderer/printfiles.js gives for its own chips.
+        if libraryUnfiledOnly { rows = rows.filter { ($0.groupName ?? "").isEmpty } }
+        if let category = libraryCategory { rows = rows.filter { category.matches($0.category) } }
+        if let tag = libraryTag {
+            rows = rows.filter { ($0.tags ?? []).contains { $0.lowercased() == tag.lowercased() } }
         }
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
         if !q.isEmpty {

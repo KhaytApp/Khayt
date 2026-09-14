@@ -264,7 +264,16 @@ struct ShopWindow: View {
                 }
             }
             ToolbarItem(placement: .principal) {
-                if shop.showingLibrary { GroupMenu(shop: shop) } else { OwedSummary(shop: shop) }
+                // Two menus in one item rather than two items: the three axes
+                // belong together, and a toolbar that collapses them apart when
+                // the window narrows would separate "which set" from "what it
+                // is" at exactly the size where the sidebar is already gone.
+                if shop.showingLibrary {
+                    HStack(spacing: 6) {
+                        GroupMenu(shop: shop)
+                        CategoryMenu(shop: shop)
+                    }
+                } else { OwedSummary(shop: shop) }
             }
             // IMPORT, ON THE SCREEN IT IMPORTS INTO.
             //

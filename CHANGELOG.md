@@ -6,6 +6,47 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The library and the catalogue can be narrowed now, not just searched.** A
+  shop asked *"where are the filters for products and models?"* and the honest
+  answer was a search box: you had to type what you could have pressed, and
+  there was no way to ask a question you cannot spell — "what have I not filed
+  yet" being the one that matters on a library of a hundred and fifty-two
+  models with eighty-three of them in no project at all. Both screens now carry
+  a row of chips above the grid. The library offers the models in no project,
+  every category in use and every tag in use; the catalogue offers the products
+  nobody has priced, every category and every material. Each chip says how many
+  it holds, so a shop can tell whether it is worth pressing before pressing it.
+
+- **The chip counts describe what is actually on screen.** Each axis counts
+  what the *other* axes leave — the folder you are standing in, the search box,
+  and whichever other chips are on. The other app's catalogue shipped the
+  opposite and recorded what it felt like: with a category on, a group chip
+  said 7 and pressing it showed 2. A chip that is switched on stays on the row
+  even when its count falls to nothing, so there is always something on screen
+  explaining why the grid is empty.
+
+- **Counts fold the shop's own spellings.** "Wall art" typed once and "wall
+  art" typed twice is one chip holding three, not two chips each holding part
+  of a collection — the same rule that already decides which group a model is
+  filed under, rather than a second opinion about it written in Swift.
+
+- **A product priced at nothing on purpose is not called unpriced.** Khayt
+  treats a typed zero as a real answer — a giveaway, a sample, a part priced
+  inside a bundle — so the catalogue's "No price" chip finds only the products
+  nobody has got round to pricing, and leaves the deliberate ones alone.
+
+### Added
+
+- **The Mac app can say what a model IS, and tag it.** It could already file
+  models into a project; category and tags were readable, filterable and
+  impossible to set, so filling them meant opening the other app. There is now
+  a Category menu beside the Group menu in the library, offering the names the
+  book already uses first and a new one second, plus a tag box that reconciles
+  what is typed against the tags already in use — "Resin" and "resin" are one
+  tag. Tagging several models at once replaces what each carried rather than
+  merging, and the box starts from what they already have in common so nothing
+  is handed a tag it never had.
+
 - **A project is a folder in the library now, with a picture on it.** A group
   was only ever a filter in the sidebar: the grid itself was flat, so a project
   with forty files in it looked like forty files. A shop said so — *"the

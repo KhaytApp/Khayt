@@ -62,9 +62,15 @@ struct Catalogue: View {
     }
 
     @ViewBuilder private var content: some View {
-        switch layout {
-        case .table: table
-        case .grid:  grid
+        VStack(spacing: 0) {
+            // Above both layouts, because the chips narrow the CATALOGUE and
+            // not the table: a filter that survived switching to the grid and a
+            // filter that did not would be two filters.
+            CatalogueFilterBar(shop: shop)
+            switch layout {
+            case .table: table
+            case .grid:  grid
+            }
         }
     }
 
