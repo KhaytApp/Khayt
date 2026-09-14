@@ -1177,6 +1177,74 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.9] - 2026-09-14
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Changed
+
+- **The Mac refreshes the customer's tracking link, so a published job can be
+  moved here at all.** A job published to the portal could not be moved on the
+  Mac: the app refuses a move it cannot carry out whole, and the refresh — a
+  cloud write — was one it could not make. So a shop that had published
+  anything could not run its board on this app, which is the one thing the
+  board is for. The link is refreshed from here now, through the same rule the
+  other app uses (`lib/portal-refresh.js`): the same payload, the same guards,
+  the same path. A refresh that fails says so rather than leaving a customer
+  reading "Printing" about a job that was collected yesterday.
+
+  **That was the last entry on the list of things this app sends you elsewhere
+  for, apart from SMTP mail.**
+
+- **A shop whose portal trial had lapsed was refused moves for a message
+  nobody was going to get.** The rule that decides where a move reaches never
+  looked at the trial, while the code that actually publishes returns early
+  when it has run out. So the two disagreed: one said the move reached the
+  customer's link, the other would have sent nothing — and on the Mac that
+  disagreement is a move refused outright. Both halves ask one rule now. (No
+  shop is affected today: while the beta is free every trial is active.)
+
+- **The Mac can email the customer, so it stops refusing the move.** A job
+  whose next stage tells the customer by email could not be moved on the Mac at
+  all: the app refuses a move it cannot carry out whole — rightly, because a
+  half-made move leaves somebody untold while the book says otherwise — and it
+  had no way to send one. It sends through **SendGrid and Mailgun** now, and
+  the message is not a second app's idea of one: the subject, the body and the
+  decision to send at all are the rule `lib/order-email.js`, which the other
+  app now asks as well. The key is opened where it is used and never held.
+
+  A shop on its **own mail server** is still sent to the other app, and that is
+  written down rather than discovered: `custom` is SMTP — a socket, EHLO,
+  STARTTLS, a dialogue — and a second implementation of a protocol is how two
+  apps come to disagree about whether a customer was told. The refusal names
+  it now ("an email through your own mail server (SMTP)") instead of saying
+  email is missing, because those are different things to a shop deciding what
+  to change.
+
+### Fixed
+
+- **No email has left Khayt since 31 August, and nothing said so.** Three
+  functions — the status notification to a customer, *Email* on an order or
+  quote, and the printer-alert digest — each open with
+  `const shopName = shopName() || 'Khayt';`. `shopName` is also a global
+  function, so the `const` shadows it and the line reads the binding before it
+  exists: `ReferenceError`, thrown before anything is addressed, every time
+  since it appeared in #822. Nobody awaited those calls, so each became an
+  unhandled rejection — no toast, no error, no email. A shop that finished a
+  job watched it move and had no reason to think the customer had not been
+  told. The local is renamed in all three; a test now fails on any `const` or
+  `let` in `renderer/` that shadows the function it calls.
+
+- **An unconfigured mail provider built and addressed an email nobody could
+  send.** With `emailConfig.provider` set to the empty string — never
+  configured, or cleared — the renderer refused only the literal `'none'`, so
+  it assembled the whole message and handed it to a transport that matches no
+  provider, which returned a `mailto:` fallback the caller ignores. Meanwhile
+  `outboundFor`, which decides whether a move reaches outside the shop, said
+  the opposite. Both halves now ask one rule, and the answer is the true one:
+  nothing is delivered, so nothing is built.
+
 ## [4.0.0-alpha.8] - 2026-09-13
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
