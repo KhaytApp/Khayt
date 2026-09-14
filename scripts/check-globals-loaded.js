@@ -101,7 +101,6 @@ const isFlavourOwned = (owner) => FLAVOUR_DIRS.some((d) => owner.startsWith(d));
  */
 const KNOWN_ABSENT = {
   'renderer/bedready.html': [
-    ['KhaytCloudPlans', 'renderer/settings.js'],
     ['KhaytFlow', 'renderer/dashboard.js'],
     ['KhaytFlowShell', 'renderer/themes.js'],
     ['KhaytForeman', 'renderer/dashboard.js'],
@@ -110,7 +109,6 @@ const KNOWN_ABSENT = {
     ['KhaytMedusa', 'renderer/settings.js'],
     ['KhaytMeridian', 'renderer/dashboard.js'],
     ['KhaytMeridianShell', 'renderer/themes.js'],
-    ['KhaytPortalTrial', 'renderer/settings.js'],
     ['KhaytPrivacy', 'renderer/settings.js'],
     ['KhaytTelemetryScrub', 'renderer/settings.js'],
   ],
