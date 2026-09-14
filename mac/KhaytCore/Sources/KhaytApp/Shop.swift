@@ -6729,6 +6729,18 @@ final class Shop {
 
     var ungroupedCount: Int { files.count { $0.groupName == nil } }
 
+    /// What the library grid shows: projects as folders, then loose files.
+    ///
+    /// Only at the TOP of the library. Inside a folder the shelf already
+    /// carries the group, and the grid is the files in it — a folder within a
+    /// folder is a different feature and this is not pretending to be it.
+    var shownEntries: [LibraryEntry] {
+        guard case .library(let group) = shelf, group == nil else {
+            return shownFiles.map { LibraryEntry.file($0) }
+        }
+        return LibraryEntry.top(of: shownFiles, order: librarySort.order)
+    }
+
     var shownFiles: [LibraryFile] {
         var rows = files
         if case .library(let group) = shelf, let group {

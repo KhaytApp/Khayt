@@ -1100,6 +1100,16 @@ final class Words {
         "mac.telegram_sent":   ["en": "Telegram message sent.", "ar": "أُرسلت رسالة تيليجرام."],
         "mac.telegram_failed": ["en": "The job was saved, but the Telegram message did not go out:",
                                 "ar": "حُفظ العمل، لكن لم تُرسل رسالة تيليجرام:"],
+        // ── FOUR THAT RENDERED AS THEIR OWN KEYS ──────────────────────────
+        //
+        // Added as `callIt("mac.…")` calls in #1216 and #1224 with no words
+        // behind them, so the catalogue button read "mac.job_from_product" on
+        // screen. A missing key is not blank and does not fall back — it IS the
+        // key, which looks like placeholder text nobody removed.
+        "mac.job_from_product":    ["en": "New Job from This", "ar": "عمل جديد من هذا"],
+        "mac.add_tier":            ["en": "Add a tier", "ar": "إضافة شريحة"],
+        "mac.wholesale":           ["en": "Wholesale", "ar": "جملة"],
+        "mac.how_it_prints":       ["en": "How it prints", "ar": "كيف يُطبع"],
         "mac.cloud_sign_in":       ["en": "Sign in to the cloud", "ar": "تسجيل الدخول إلى السحابة"],
         "mac.cloud_signed_in":     ["en": "Signed in. This Mac can reach the shop's cloud.",
                                     "ar": "تم تسجيل الدخول. يستطيع هذا الجهاز الوصول إلى سحابة المشغل."],
