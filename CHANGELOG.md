@@ -1255,6 +1255,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The sheet that compares this Mac with the cloud could grow past the screen
+  too.** It draws one row for every collection that differs — up to
+  thirty-three — so the further the two copies had drifted apart, the taller it
+  got, and past the height of the display its own buttons became unreachable
+  like the product sheet's. Nobody had hit it; the copies simply had not
+  drifted far enough yet. It scrolls now.
+
 - **A saved password could look broken when it was only sealed by the other
   Khayt.** The Mac app comes in two builds — the released one and a locally
   built one — and they were treated as having separate books. They do not:
