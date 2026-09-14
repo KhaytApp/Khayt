@@ -192,6 +192,14 @@ public actor KhaytEngine {
         // absent: a build without it would answer "this move reaches nobody"
         // for a shop that emails every customer, and this app would then make
         // the move it exists to refuse.
+        // What the customer's tracking link should say when a job moves, and
+        // whether the link is live enough to be worth saying it to. The trial
+        // half needs `portal-trial` and the flag in `cloud-plans`, so all
+        // three travel together — without them `wouldRefresh` cannot judge a
+        // trial and says yes, which is safe but is not the true answer.
+        "portal-refresh",
+        "portal-trial",
+        "cloud-plans",
         "order-email",
         "order-status",
         // ── HOW WRONG THE SHOP'S OWN ESTIMATES ARE ────────────────────────
@@ -4488,6 +4496,62 @@ public actor KhaytEngine {
             [order, .string(newStatus), .object(settings), .array(clients),
              .string(shopName), .string(clientName), .string(statusLabel)],
             as: OrderEmail?.self)
+    }
+
+    /// The republish a move owes the customer's link, or nil when it owes none.
+    ///
+    /// `lib/portal-refresh.js`, which also answers whether there is one — the
+    /// same function `outboundFor` asks, so what this app refuses before a move
+    /// and what it sends after it cannot drift apart.
+    ///
+    /// `now` is passed because the portal trial is judged against it. The
+    /// module treats a missing clock as "the link is live"; this app always has
+    /// one, so it always gets the true answer.
+    public func portalRefresh(order: JSONValue, settings: [String: JSONValue],
+                              clients: [JSONValue], shopName: String,
+                              shopAddress: String, stages: [String],
+                              now: Date) throws -> PortalRefresh? {
+        try runtime.call2("""
+            KhaytPortalRefresh.requestFor(ARG0, {
+              settings: ARG1, clients: ARG2,
+              shopName: ARG3, shopAddress: ARG4, stages: ARG5, now: ARG6
+            })
+            """,
+            [order, .object(settings), .array(clients), .string(shopName),
+             .string(shopAddress), .array(stages.map { .string($0) }),
+             .number(now.timeIntervalSince1970 * 1000)],
+            as: PortalRefresh?.self)
+    }
+
+    /// The shop's cloud address, normalised — or the reason it is refused.
+    ///
+    /// `lib/cloud-client.js` puts every request through this before sending, so
+    /// this app does too rather than concatenating a stored string into a URL.
+    /// The address is a shop setting that supports self-hosting, it can arrive
+    /// by sync from another machine, and a bearer token rides in the header.
+    ///
+    /// Returns the normalised origin+path. Throws with the sentence the other
+    /// app would have shown.
+    public func cloudBaseUrl(_ raw: String) throws -> String {
+        try runtime.call2("""
+            (function (a) {
+              var base = KhaytBaseUrl.validateBaseUrl(a, {
+                what: 'server address', secret: 'password',
+              });
+              return base;
+            })(ARG0)
+            """,
+            [.string(raw)], as: String.self)
+    }
+
+    /// The path a portal republish is PUT to, under the shop's cloud base URL.
+    ///
+    /// Asked rather than spelled in Swift: it is the one part of this transport
+    /// both apps must agree on exactly, and `lib/cloud-client.js` builds the
+    /// same string for the other one.
+    public func portalPath(shopId: String, pubToken: String) throws -> String {
+        try runtime.call2("KhaytPortalRefresh.pathFor(ARG0, ARG1)",
+                          [.string(shopId), .string(pubToken)], as: String.self)
     }
 
     /// Can an app that speaks only HTTPS carry this mail provider?

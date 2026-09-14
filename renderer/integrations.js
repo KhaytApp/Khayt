@@ -1204,62 +1204,25 @@ async function aiDraftReply(orderId) {
 
 /** Publish an order's status to Khayt Cloud as a public link (owner-curated,
  *  plaintext — only what's shown below; the rest of your data stays encrypted). */
-/** Build the owner-curated portal payload for an order (plaintext, minimal). */
+/** Build the owner-curated portal payload for an order (plaintext, minimal).
+ *
+ *  The payload is `lib/portal-refresh.js`, so the Mac app publishes the same
+ *  words to the same link instead of a second app's idea of them. What stays
+ *  here is only what a host knows: the shop's name and address in the language
+ *  it reads, and the five timeline words. */
 function buildPortalPayload(order) {
-  const isQuote = order.status === 'quote';
-  const payload = {
+  return KhaytPortalRefresh.payloadFor(order, {
+    settings, clients,
     shopName: shopField('biz') || 'Khayt',
-    ref: order.id,
-    status: order.status,
-    statusLabel: isQuote ? 'Quote' : (CLOUD_PORTAL_STATUS_LABELS[order.status] || order.status),
-    eta: order.dueDate || '',
-    // Invoice/receipt fields the portal renders into a printable document.
-    issueDate: order.date || '',
-    invoiceNo: order.invoiceNumber || order.invoiceNum || order.id,
-    seller: {
-      name: shopField('biz') || 'Khayt',
-      vat: settings.vat || '',
-      // Same dead key as the ZATCA builds: the field is `addr`, per language.
-      address: shopField('addr') || '',
-    },
-    paid: (typeof payStatus === 'function' ? payStatus(order) === 'paid' : order.paymentStatus === 'paid'),
-  };
-  if (+order.price) {
-    payload.amount = (+order.price).toFixed(2);
-    try { if (typeof currencySymbol === 'function') payload.currency = currencySymbol(); } catch (e) { /* optional */ }
-  }
-  // Deposit (stored on the order so it survives status auto-refresh re-publishes).
-  if (isQuote && +order.cloudDeposit) {
-    payload.depositAmount = (+order.cloudDeposit).toFixed(2);
-    if (!payload.currency) { try { if (typeof currencySymbol === 'function') payload.currency = currencySymbol(); } catch (e) { /* optional */ } }
-  }
-  if (isQuote && order.cloudPayUrl) payload.payUrl = order.cloudPayUrl;
-  // Outstanding balance on an active order → let the customer pay it from the
-  // portal via the owner's pay link (mirrors the quote-deposit flow).
-  if (!isQuote && order.status !== 'completed' && order.status !== 'delivered') {
-    const bal = (+order.price || 0) - (+order.paidAmount || 0);
-    if (bal > 0.005) {
-      payload.balanceDue = bal.toFixed(2);
-      if (!payload.currency) { try { if (typeof currencySymbol === 'function') payload.currency = currencySymbol(); } catch (e) { /* optional */ } }
-      const payUrl = order.cloudPayUrl || (settings.cloud && settings.cloud.lastPayUrl) || '';
-      if (/^https?:\/\//i.test(payUrl)) payload.payUrl = payUrl;
-    }
-  }
-  if (order.status === 'on_hold' && order.holdReason) payload.note = String(order.holdReason);
-  // Order tracking timeline: a stage index into a localized 5-step flow. Quotes
-  // have no timeline. on_hold pauses at the print stage (the note explains why).
-  if (!isQuote) {
-    payload.stages = [
+    shopAddress: shopField('addr') || '',
+    stages: [
       t('track.received') || 'Received',
       t('track.printing') || 'Printing',
       t('track.finishing') || 'Finishing',
       t('track.done') || 'Done',
       t('track.ready') || 'Ready for pickup',
-    ];
-    const STAGE_BY_STATUS = { pending: 0, queued: 0, accepted: 0, received: 0, ordered: 0, printing: 1, post: 2, qc: 2, completed: 3, delivered: 4 };
-    payload.stage = order.status === 'on_hold' ? 1 : (STAGE_BY_STATUS[order.status] != null ? STAGE_BY_STATUS[order.status] : 0);
-  }
-  return { isQuote, payload };
+    ],
+  });
 }
 
 /** Keep a published portal link current: re-publish when the order changes
@@ -1267,19 +1230,35 @@ function buildPortalPayload(order) {
  *  Fire-and-forget; never blocks the caller. */
 function republishPortalIfPublished(orderId) {
   const order = printLog.find(o => o.id === orderId);
-  if (!order || !order.cloudPublished) return;
+  if (!order) return;
+  // The guards are `lib/portal-refresh.js`'s now — published at all, a token to
+  // publish under, cloud on with a shop id, and a portal trial that has not run
+  // out. They were written out here AND in `order-status.outboundFor`, which
+  // never checked the trial, so the two disagreed about whether a move on a
+  // published job reached anybody. One rule, asked by both.
+  //
+  // Still silent on a no: this fires on every status change, and a toast per
+  // kanban drag would be its own bug.
+  const req = KhaytPortalRefresh.requestFor(order, {
+    settings, clients,
+    shopName: shopField('biz') || 'Khayt',
+    shopAddress: shopField('addr') || '',
+    stages: [
+      t('track.received') || 'Received',
+      t('track.printing') || 'Printing',
+      t('track.finishing') || 'Finishing',
+      t('track.done') || 'Done',
+      t('track.ready') || 'Ready for pickup',
+    ],
+    now: Date.now(),
+  });
+  if (!req) return;
   const c = settings.cloud || {};
-  if (!(c.enabled && c.shopId) || !order.trackingToken) return;
-  // An expired trial stops refreshing links too — otherwise the feature carries
-  // on working for every order already published, and the trial means nothing.
-  // Silently, unlike the explicit publish: this fires on every status change and
-  // a toast per kanban drag would be its own bug.
-  const trial = portalTrialNow();
-  if (trial && !trial.available) return;
-  const { isQuote, payload } = buildPortalPayload(order);
-  const custEmail = order.clientId ? (clients.find((x) => x.id === order.clientId)?.email || '') : '';
-  Promise.resolve(window.hubAPI.cloudPublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken: order.trackingToken, kind: isQuote ? 'quote' : 'order', payload, customerEmail: custEmail }))
-    .catch((e) => console.error('portal auto-refresh:', e));
+  Promise.resolve(window.hubAPI.cloudPublish({
+    url: c.url, shopId: c.shopId, token: c.token,
+    pubToken: req.pubToken, kind: req.kind, payload: req.payload,
+    customerEmail: req.customerEmail,
+  })).catch((e) => console.error('portal auto-refresh:', e));
 }
 
 /** Owner view + reply for an order's portal message thread (cloud). */
@@ -1418,10 +1397,13 @@ async function publishOrderToCloudPortal(orderId) {
     return;
   }
 
-  const { isQuote, payload } = buildPortalPayload(order);
-  const custEmail = order.clientId ? (clients.find((x) => x.id === order.clientId)?.email || '') : '';
+  const { kind, payload, customerEmail } = buildPortalPayload(order);
+  // The dialog below speaks of a quote or an order in several places; the
+  // module already decided which this is, so read it from there rather than
+  // testing the status a second time.
+  const isQuote = kind === 'quote';
 
-  const r = await window.hubAPI.cloudPublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken, kind: isQuote ? 'quote' : 'order', payload, customerEmail: custEmail });
+  const r = await window.hubAPI.cloudPublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken, kind, payload, customerEmail });
   if (!r.ok) { toast('✗ ' + (r.error || 'publish failed'), 'error'); return; }
   order.cloudPublished = true; saveAll(); // track so status changes auto-refresh the link
 

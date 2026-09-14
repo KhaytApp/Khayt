@@ -368,6 +368,34 @@ public struct OrderEmail: Decodable, Sendable, Equatable {
     }
 }
 
+/// The republish a move owes the customer's tracking link.
+///
+/// `payload` is handed back as raw JSON rather than a decoded shape on purpose:
+/// it is the customer's page, its fields differ between a quote and an order,
+/// and every field this app "knew about" would be a second opinion waiting to
+/// disagree with `lib/portal-refresh.js`. The Mac's job is to PUT these bytes,
+/// not to have views about them.
+public struct PortalRefresh: Decodable, Sendable, Equatable {
+    /// `quote` or `order`.
+    public let kind: String
+    /// The public token the customer's link is addressed by.
+    public let pubToken: String
+    public let payload: JSONValue
+    /// Links the published item to a customer's portal account; empty when the
+    /// job has no customer or the customer has no address.
+    public let customerEmail: String
+
+    /// Spelled out for the reason `OrderEmail`'s is: the implicit memberwise
+    /// initialiser of a public struct is internal, and `PortalClient`'s tests
+    /// build one to prove a refresh that cannot be addressed is reported.
+    public init(kind: String, pubToken: String, payload: JSONValue, customerEmail: String) {
+        self.kind = kind
+        self.pubToken = pubToken
+        self.payload = payload
+        self.customerEmail = customerEmail
+    }
+}
+
 /// A machine as a rule left it, or the reason it would not.
 public struct MachineWritten: Decodable, Sendable {
     public let machine: JSONValue?
