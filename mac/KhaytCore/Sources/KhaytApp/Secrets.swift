@@ -80,9 +80,36 @@ enum Secrets {
     static func open(_ value: String, for build: StoreReader.Build) async throws -> String {
         guard !value.isEmpty else { return value }
         guard value.hasPrefix(SafeStorage.marker) else { return value }
-        guard let key = await key(for: build) else { throw Failure.noKeychain }
-        do { return try SafeStorage.open(value, key: key) }
-        catch { throw Failure.unreadable(String(describing: error)) }
+        // `mine`, not `key`: a local called `key` shadows the function of the
+        // same name, and the second call below cannot then reach it. The same
+        // shape as the `shopName` shadow that stopped every email leaving this
+        // app for two weeks — see the note in renderer/expenses.js.
+        guard let mine = await key(for: build) else { throw Failure.noKeychain }
+        do { return try SafeStorage.open(value, key: mine) }
+        catch {
+            // ── ONE BOOK, TWO KEYS ────────────────────────────────────────
+            //
+            // `Build` is written as two stores — `khayt` for a development run,
+            // `Khayt` for the shipped app. On a default macOS install that is
+            // NOT TRUE: APFS is case-insensitive, so both names are the SAME
+            // DIRECTORY, verified by inode on a real Mac. One book.
+            //
+            // Keychain SERVICE names are case-sensitive though, so the two
+            // builds do have two different keys — and a credential sealed by
+            // one cannot be opened by the other while both read and write the
+            // same file. A shop that signs in under a local build and then
+            // opens the released app sees its own token as gibberish, and
+            // nothing says why.
+            //
+            // So a failure falls back to the OTHER build's key before giving
+            // up. It is the same book; the key that opens it is whichever app
+            // wrote the field.
+            if let sibling = build.sibling, let other = await key(for: sibling),
+               let opened = try? SafeStorage.open(value, key: other) {
+                return opened
+            }
+            throw Failure.unreadable(String(describing: error))
+        }
     }
 
     /// The same, for a book this app is only reading (the sample has none).

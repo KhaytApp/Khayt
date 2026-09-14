@@ -57,6 +57,20 @@ public struct StoreReader: Sendable {
                 .appending(path: "Library/Application Support/\(rawValue)/khayt-store.json")
         }
         public var keychainService: String { "\(rawValue) Safe Storage" }
+
+        /// The other build, whose Keychain item may hold the key to a field in
+        /// THIS book.
+        ///
+        /// The two stores are one store on a case-insensitive volume — which is
+        /// every default macOS install — so a field in it may have been sealed
+        /// by either app. The Keychain names differ because service names ARE
+        /// case-sensitive, and that is the whole asymmetry.
+        public var sibling: Build? {
+            switch self {
+            case .development: return .shipped
+            case .shipped: return .development
+            }
+        }
         public var keychainAccount: String { "\(rawValue) Key" }
         public var exists: Bool { FileManager.default.fileExists(atPath: storeURL.path) }
 
@@ -90,8 +104,6 @@ public struct StoreReader: Sendable {
         self.secretsKey = unlockSecrets ? Self.keychainPassword(for: build).map(SafeStorage.key(fromPassword:)) : nil
     }
 
-    /// The login Keychain item Electron created. Returns nil rather than
-    /// throwing: a shop can look at its orders without granting this.
     /// Make the Keychain item Electron would have made, when there is none.
     ///
     /// ── THE LAST REASON A FRESH MAC NEEDED THE OTHER APP ──────────────────
@@ -141,6 +153,8 @@ public struct StoreReader: Sendable {
         return nil
     }
 
+    /// The login Keychain item Electron created. Returns nil rather than
+    /// throwing: a shop can look at its orders without granting this.
     static func keychainPassword(for build: Build) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
