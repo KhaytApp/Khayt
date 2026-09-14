@@ -6,6 +6,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **A saved password could look broken when it was only sealed by the other
+  Khayt.** The Mac app comes in two builds — the released one and a locally
+  built one — and they were treated as having separate books. They do not:
+  macOS folders are case-insensitive, so `khayt` and `Khayt` are the same
+  directory, and both builds have always been reading and writing ONE book. But
+  they seal credentials with two different keys, because the Keychain does tell
+  the names apart. So a cloud token saved by one build read as nonsense to the
+  other, which looks exactly like a password the server has stopped accepting.
+  Either build now opens a field the other sealed.
+
 - **A sheet too tall for the screen hid its own buttons, and a sheet cannot be
   moved.** Opening a product with enough parts, tiers and papers on it made the
   editor taller than the display — and macOS pins a sheet to the top of its
