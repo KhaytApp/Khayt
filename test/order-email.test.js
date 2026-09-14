@@ -30,6 +30,12 @@ const path = require('node:path');
 
 const Email = require('../lib/order-email.js');
 globalThis.KhaytOrderEmail = Email;
+// `outboundFor` asks the portal module too, and throws when it is missing.
+require('../lib/currencies.js');
+require('../lib/order-payment.js');
+require('../lib/portal-trial.js');
+require('../lib/cloud-plans.js');
+require('../lib/portal-refresh.js');
 const Status = require('../lib/order-status.js');
 
 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({

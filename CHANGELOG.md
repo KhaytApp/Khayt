@@ -6,6 +6,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The Mac refreshes the customer's tracking link, so a published job can be
+  moved here at all.** A job published to the portal could not be moved on the
+  Mac: the app refuses a move it cannot carry out whole, and the refresh — a
+  cloud write — was one it could not make. So a shop that had published
+  anything could not run its board on this app, which is the one thing the
+  board is for. The link is refreshed from here now, through the same rule the
+  other app uses (`lib/portal-refresh.js`): the same payload, the same guards,
+  the same path. A refresh that fails says so rather than leaving a customer
+  reading "Printing" about a job that was collected yesterday.
+
+  **That was the last entry on the list of things this app sends you elsewhere
+  for, apart from SMTP mail.**
+
+- **A shop whose portal trial had lapsed was refused moves for a message
+  nobody was going to get.** The rule that decides where a move reaches never
+  looked at the trial, while the code that actually publishes returns early
+  when it has run out. So the two disagreed: one said the move reached the
+  customer's link, the other would have sent nothing — and on the Mac that
+  disagreement is a move refused outright. Both halves ask one rule now. (No
+  shop is affected today: while the beta is free every trial is active.)
+
 - **The Mac can email the customer, so it stops refusing the move.** A job
   whose next stage tells the customer by email could not be moved on the Mac at
   all: the app refuses a move it cannot carry out whole — rightly, because a

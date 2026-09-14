@@ -5688,13 +5688,14 @@ final class Shop {
         var telegram: TelegramMessage?
         var owed: [KhaytEngine.WebhookDelivery] = []
         var mail: OrderEmail?
+        var portal: PortalRefresh?
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
-                (undoSnapshot, said, telegram, owed, mail) = try await Self.applyMove(
+                (undoSnapshot, said, telegram, owed, mail, portal) = try await Self.applyMove(
                     to: &root, id: id, stage: stage, engine: engine, words: self.words,
                     holdReason: holdReason, qcNotes: qcNotes, actuals: actuals)
             }
@@ -5712,6 +5713,7 @@ final class Shop {
             // silently not happen.
             if let telegram { await tell(telegram) }
             if let mail { await post(mail) }
+            if let portal { await refresh(portal) }
             if !owed.isEmpty { await fire(owed) }
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
@@ -5780,6 +5782,39 @@ final class Shop {
     /// book says so. What is NOT acceptable is silence — the app refused these
     /// moves in the first place precisely so that no customer would go untold
     /// while a shop believed otherwise.
+    /// Refresh the customer's tracking link, and say so if it did not go.
+    ///
+    /// Not fatal, for the reason the email and the message are not: the job IS
+    /// finished and the book says so. But a stale page is the failure mode this
+    /// whole refusal existed to prevent — a customer reading "Printing" about a
+    /// job that was collected yesterday — so it is said out loud.
+    private func refresh(_ portal: PortalRefresh) async {
+        guard let engine else { return }
+        do {
+            var cloud: [String: JSONValue] = [:]
+            if case .object(let c)? = settingsDict["cloud"] { cloud = c }
+            // `settings.cloud.token` is a registered sealed path, so the string
+            // in the book is ciphertext. Opened here, at the point of use, and
+            // never held — the same rule as the bot token and the webhook
+            // secret. Sent as the bearer, it would fail every request and read
+            // to a shop as a cloud that had stopped accepting its account.
+            let token = try await Secrets.open(Self.plainString(cloud["token"]) ?? "", for: source)
+            try await PortalClient.republish(
+                portal,
+                baseUrl: Self.plainString(cloud["url"]) ?? "",
+                shopId: Self.plainString(cloud["shopId"]) ?? "",
+                token: token, engine: engine)
+            moveNotices.append(words.callIt("mac.portal_refreshed"))
+        } catch let failure as PortalClient.Failure {
+            moveProblem = words.callIt("mac.portal_failed") + " "
+                + (failure.errorDescription ?? String(describing: failure))
+        } catch let locked as Secrets.Failure {
+            moveProblem = words.callIt("mac.portal_failed") + " " + locked.description
+        } catch {
+            moveProblem = words.callIt("mac.portal_failed") + " " + String(describing: error)
+        }
+    }
+
     private func post(_ mail: OrderEmail) async {
         do {
             // OPENED AT THE POINT OF USE, like the bot token and the webhook
@@ -5878,7 +5913,8 @@ final class Shop {
                                   holdReason: String? = nil, qcNotes: String? = nil,
                                   actuals: Actuals? = nil)
     async throws -> (undo: [ChangedRecord], notices: [String], telegram: TelegramMessage?,
-                     webhooks: [KhaytEngine.WebhookDelivery], email: OrderEmail?) {
+                     webhooks: [KhaytEngine.WebhookDelivery], email: OrderEmail?,
+                     portal: PortalRefresh?) {
 
         var orders = rows(root, "printLog")
         let inventory = rows(root, "inventory")
@@ -5957,6 +5993,9 @@ final class Shop {
             if canSend.contains(reach.channel) { continue }
             if reach.channel == "email",
                (try? await engine.emailProviderIsHttp(reach.via ?? "")) == true { continue }
+            // The customer's tracking link. `PortalClient` PUTs it, so a move
+            // on a published job is no longer refused.
+            if reach.channel == "portal" { continue }
             cannotSend.append(reach)
         }
         if !cannotSend.isEmpty {
@@ -6024,6 +6063,24 @@ final class Shop {
         // case: no provider, a status the shop does not announce, or no
         // address on file — none of which is an error and none of which is
         // worth a sentence.
+        // ── AND WHAT IT OWES THE CUSTOMER'S LINK ──────────────────────────
+        //
+        // After the move, like everything else here: the page says what the job
+        // is doing, and built from the record as it was the customer would be
+        // shown the stage it has just left.
+        let portal = try? await engine.portalRefresh(
+            order: .object(changedOrder), settings: settings, clients: clients,
+            shopName: plainString(settings["bizEn"]) ?? plainString(settings["bizAr"]) ?? "Khayt",
+            shopAddress: plainString(settings["addrEn"]) ?? plainString(settings["addrAr"]) ?? "",
+            stages: [
+                words.callIt("track.received", fallback: "Received"),
+                words.callIt("track.printing", fallback: "Printing"),
+                words.callIt("track.finishing", fallback: "Finishing"),
+                words.callIt("track.done", fallback: "Done"),
+                words.callIt("track.ready", fallback: "Ready for pickup"),
+            ],
+            now: Date())
+
         let mail = try? await engine.orderEmail(
             order: .object(changedOrder), newStatus: stage.rawValue,
             settings: settings, clients: clients,
@@ -6041,7 +6098,7 @@ final class Shop {
         }
 
         let notices = (move.notices ?? []).map { words.sentence(for: $0) }
-        return (undo, notices, telegram, owed, mail)
+        return (undo, notices, telegram, owed, mail, portal)
     }
 
     // MARK: - Reading and writing rows

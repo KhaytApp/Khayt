@@ -43,9 +43,6 @@ struct NeedsTheOtherAppTests {
                + "with a server the shop names. A second implementation of a "
                + "protocol is how two apps come to disagree about whether a "
                + "customer was told."),
-        Gap(id: "outbound.portal",
-            what: "Moving a published job, which refreshes the customer's link",
-            why: "The refresh is a cloud write this app does not make."),
         // NARROWED, not removed. The comparables half — the shop's own realized
         // margins, net of tax — is on the new-job sheet and needs no model at
         // all. What is still missing is the half that asks one to weigh them.
@@ -164,14 +161,9 @@ struct NeedsTheOtherAppTests {
             return
         }
         let canSend = String(shop[line.upperBound..<close])
-        for (gap, channel) in [("outbound.portal", "portal")]
-        where Self.known.contains(where: { $0.id == gap }) {
-            #expect(!canSend.contains("\"\(channel)\""), Comment(rawValue: """
-                \(gap) is on the list, but applyMove now sends \(channel) — \
-                the entry is stale and a shop is being told to open the other \
-                app for something this one does.
-                """))
-        }
+        #expect(!canSend.isEmpty, "applyMove still declares the channels it carries")
+        #expect(!Self.known.contains { $0.id == "outbound.portal" },
+                "the customer's tracking link is refreshed by this app now")
 
         // ── EMAIL IS NARROWER THAN A CHANNEL, SO IT IS ASKED, NOT READ ────
         //

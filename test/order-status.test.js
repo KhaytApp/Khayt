@@ -26,6 +26,13 @@ require('../lib/assembly.js');
 // when it is absent. A test that did not load it would be testing a host that
 // cannot move a job at all.
 require('../lib/order-email.js');
+// The portal half needs the same treatment, plus the two modules it reads to
+// judge a trial — `outboundFor` throws rather than guessing when any is absent.
+require('../lib/currencies.js');
+require('../lib/order-payment.js');
+require('../lib/portal-trial.js');
+require('../lib/cloud-plans.js');
+require('../lib/portal-refresh.js');
 const S = require('../lib/order-status.js');
 
 const NOW_MS = Date.parse('2026-09-04T09:15:00.000Z');
@@ -635,6 +642,7 @@ test('the outbound conditions still match the renderer they were copied from', (
   const extras = read('renderer/operations-extras.js');
   const telegram = read('lib/telegram-message.js');
   const email = read('lib/order-email.js');
+  const portal = read('lib/portal-refresh.js');
 
   const pinned = [
     ['fireWebhook', integrations, "const wh = settings.webhooks;\n  if (!wh?.enabled) return;"],
@@ -657,10 +665,17 @@ test('the outbound conditions still match the renderer they were copied from', (
       "const mail = KhaytOrderEmail.messageFor(order, newStatus, {"],
     ['order-email owns the guard', email,
       "if (!provider || provider === 'none') return none;"],
-    ['republishPortalIfPublished', integrations,
-      "if (!order || !order.cloudPublished) return;"],
-    ['republishPortalIfPublished cloud', integrations,
-      "if (!(c.enabled && c.shopId) || !order.trackingToken) return;"],
+    // The portal guards moved into lib/portal-refresh.js when the Mac app
+    // learned to refresh the link — the third lift of this shape — so they are
+    // pinned THERE, and pinned by RUNNING them beside outboundFor in
+    // test/portal-refresh.test.js. What is pinned here is that the renderer
+    // still asks the module rather than opening with its own copy again.
+    ['republishPortalIfPublished asks the module', integrations,
+      "const req = KhaytPortalRefresh.requestFor(order, {"],
+    ['portal-refresh owns the guards', portal,
+      "if (!o.cloudPublished || !o.trackingToken) return false;"],
+    ['portal-refresh owns the cloud guard', portal,
+      "if (!cloud.enabled || !cloud.shopId) return false;"],
     ['fireOrderWebhook', extras,
       "if (!w || !w.enabled || !/^https:\\/\\//i.test(w.url || '')) return;"],
     ['fireOrderWebhook per-event', extras, "if (w.events && w.events[type] === false) return;"],
