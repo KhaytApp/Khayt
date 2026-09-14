@@ -1108,6 +1108,28 @@ final class Words {
         "mac.cloud_wrong_passphrase": [
             "en": "Signed in, but that sync passphrase does not open this shop's key — nothing was saved.",
             "ar": "تم تسجيل الدخول، لكن عبارة المزامنة لا تفتح مفتاح هذا المشغل — لم يُحفظ شيء."],
+        "mac.cloud_key_local": [
+            "en": "The server did not send a sync key, so this Mac used the one already in your book. It opened — but the cloud has no copy to give another machine, so keep your recovery key safe.",
+            "ar": "لم يرسل الخادم مفتاح مزامنة، فاستخدم هذا الجهاز المفتاح الموجود في دفترك. فُتح المفتاح — لكن لا توجد نسخة لدى السحابة لتعطيها لجهاز آخر، فاحتفظ بمفتاح الاسترداد."],
+        "mac.cloud_forgot":        ["en": "Forgot the password?", "ar": "نسيت كلمة المرور؟"],
+        "mac.cloud_reset_title":   ["en": "Reset the account password", "ar": "إعادة تعيين كلمة مرور الحساب"],
+        "mac.cloud_reset_send":    ["en": "Email me a code", "ar": "أرسل لي رمزاً"],
+        "mac.cloud_reset_sent":    ["en": "If that address has an account, a code is on its way to {email}.",
+                                    "ar": "إن كان لهذا العنوان حساب، فالرمز في طريقه إلى {email}."],
+        "mac.cloud_reset_code":    ["en": "Code from the email", "ar": "الرمز من البريد"],
+        "mac.cloud_reset_newpw":   ["en": "New account password", "ar": "كلمة مرور جديدة للحساب"],
+        "mac.cloud_reset_do":      ["en": "Set the password", "ar": "تعيين كلمة المرور"],
+        "mac.cloud_reset_done":    ["en": "Password changed. Sign in with the new one.",
+                                    "ar": "تغيّرت كلمة المرور. سجّل الدخول بالجديدة."],
+        "mac.cloud_reset_failed":  ["en": "Could not set the password:", "ar": "تعذّر تعيين كلمة المرور:"],
+        "mac.cloud_reset_no_mail": ["en": "This server cannot send email, so no code will arrive. Nothing was changed.",
+                                    "ar": "لا يستطيع هذا الخادم إرسال البريد، لذا لن يصل رمز. لم يتغيّر شيء."],
+        "mac.cloud_reset_send_failed": ["en": "The server tried to send the code and could not. Nothing was changed.",
+                                        "ar": "حاول الخادم إرسال الرمز ولم يتمكّن. لم يتغيّر شيء."],
+        // The sentence that stops a shop resetting the wrong thing.
+        "mac.cloud_reset_note": [
+            "en": "This changes the account password only. Your shop's data stays encrypted under your sync passphrase — if THAT is what you have lost, a reset will not open it and your recovery key is what you need.",
+            "ar": "هذا يغيّر كلمة مرور الحساب فقط. تبقى بيانات مشغلك مشفّرة بعبارة المزامنة — فإن كانت هي المفقودة فلن تفتحها إعادة التعيين، ومفتاح الاسترداد هو ما تحتاجه."],
         "mac.cloud_server":        ["en": "Server", "ar": "الخادم"],
         "mac.cloud_email":         ["en": "Email", "ar": "البريد"],
         "mac.cloud_password":      ["en": "Password", "ar": "كلمة المرور"],

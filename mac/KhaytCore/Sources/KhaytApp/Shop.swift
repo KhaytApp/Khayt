@@ -3882,9 +3882,25 @@ final class Shop {
         do {
             let session = try await CloudSignIn.logIn(url: url, email: email,
                                                       password: password, engine: engine)
-            // A shop that has never synced has no key to unlock, and making its
-            // first one is a different flow with its own failure modes.
-            guard case .object(let keyset)? = session.keyset else {
+            // ── WHERE THE KEYSET COMES FROM, AND WHY BOTH PLACES COUNT ────
+            //
+            // The server returns `keyset: null` from login quite legitimately —
+            // it is stored and fetched separately (`PUT /v1/shops/{id}/keyset`),
+            // and login does not always carry it. The book has its own copy,
+            // which is what `checkCloud` has always unlocked with.
+            //
+            // So: the server's when it sends one, because another device may
+            // have rotated it; otherwise the book's. Demanding it from the
+            // login response refused a shop whose book HAS a key — which is
+            // precisely the restored-book case this whole path exists for, and
+            // it is how this was found.
+            var fromServer = true
+            var keysetValue = session.keyset
+            if keysetValue == nil {
+                keysetValue = cloudKeyset()
+                fromServer = false
+            }
+            guard case .object(let keyset)? = keysetValue else {
                 throw CloudSignIn.Failure.noKeyset
             }
             guard case .object(let wrappedFields)? = keyset["wrappedByPassphrase"],
@@ -3924,7 +3940,13 @@ final class Shop {
             cloudDek = dek
             if case .locked = syncStatus { syncStatus = .idle }
             await load(source)
-            moveNotices = [words.callIt("mac.cloud_signed_in")]
+            // Said, not swallowed: a server that holds no keyset cannot hand
+            // this shop's key to the NEXT machine, so the recovery key is the
+            // only copy that is not on a disk in this room. That is worth
+            // knowing before it matters.
+            moveNotices = fromServer
+                ? [words.callIt("mac.cloud_signed_in")]
+                : [words.callIt("mac.cloud_signed_in"), words.callIt("mac.cloud_key_local")]
         } catch let failure as CloudSignIn.Failure {
             cloudProblem = failure.errorDescription ?? String(describing: failure)
         } catch let locked as Secrets.Failure {
@@ -3936,6 +3958,59 @@ final class Shop {
                 + " (" + String(describing: crypto) + ")"
         } catch {
             cloudProblem = words.callIt("mac.cloud_signin_failed") + " "
+                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+        }
+    }
+
+    /// Ask the cloud to email a reset code.
+    ///
+    /// Nothing is written and nothing changes until the code comes back with a
+    /// new password. What this reports is whether the SERVER can send mail at
+    /// all — a server with none configured accepts the request and delivers
+    /// nothing, which from a shop's side looks exactly like an email that has
+    /// not arrived yet, and it would wait for it.
+    func requestPasswordReset(url: String, email: String) async {
+        cloudProblem = nil
+        cloudBusy = true
+        defer { cloudBusy = false }
+        guard let engine else { cloudProblem = words.callIt("mac.move_no_engine"); return }
+        do {
+            let sent = try await CloudSignIn.requestReset(url: url, email: email, engine: engine)
+            if !sent.configured {
+                cloudProblem = words.callIt("mac.cloud_reset_no_mail")
+            } else if sent.failed {
+                cloudProblem = words.callIt("mac.cloud_reset_send_failed")
+            } else {
+                moveNotices = [words.callIt("mac.cloud_reset_sent", ["email": .string(email)])]
+            }
+        } catch {
+            cloudProblem = words.callIt("mac.cloud_signin_failed") + " "
+                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+        }
+    }
+
+    /// Set a new account password with the emailed code.
+    ///
+    /// THE ACCOUNT PASSWORD ONLY. The shop's data stays encrypted under the key
+    /// the sync passphrase wraps, which this cannot read and does not touch —
+    /// so a shop that has lost its PASSPHRASE is not helped by this, and needs
+    /// its recovery key. The sheet says so where it can be read before typing.
+    ///
+    /// No sign-in follows automatically: the new password is a thing the person
+    /// just chose and may have mistyped into a password manager, and signing in
+    /// with it is the proof that it is what they think it is.
+    func resetCloudPassword(url: String, email: String, code: String,
+                            newPassword: String) async {
+        cloudProblem = nil
+        cloudBusy = true
+        defer { cloudBusy = false }
+        guard let engine else { cloudProblem = words.callIt("mac.move_no_engine"); return }
+        do {
+            try await CloudSignIn.resetPassword(url: url, email: email, code: code,
+                                                newPassword: newPassword, engine: engine)
+            moveNotices = [words.callIt("mac.cloud_reset_done")]
+        } catch {
+            cloudProblem = words.callIt("mac.cloud_reset_failed") + " "
                 + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
         }
     }

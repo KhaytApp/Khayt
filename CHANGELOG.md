@@ -6,6 +6,42 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **A sheet too tall for the screen hid its own buttons, and a sheet cannot be
+  moved.** Opening a product with enough parts, tiers and papers on it made the
+  editor taller than the display — and macOS pins a sheet to the top of its
+  window, so Cancel and Save sat below the bottom edge with no way to drag them
+  into view. Escape still closed it, which is the only reason this was an
+  annoyance rather than a trap. The product, machine and spool sheets now
+  scroll their contents with the buttons pinned below, capped to the height of
+  whatever display the Mac is actually plugged into. Reported from a shop's own
+  Mac; the tests are all taken on a large screen and would not have found it.
+
+- **Signing in works on a Mac that has never run the other app.** Two things
+  stopped it, both only visible on a machine carrying a restored book. The
+  Keychain item Khayt seals credentials with is created by the other app on its
+  first run, so a Mac that has only ever run this one had no key and could not
+  write the token it had just been given; it makes the item itself now, and
+  never replaces one that exists. And the server answers a login with no sync
+  key quite legitimately — it keeps that separately — so a book that already
+  carries its own key was refused for want of one. It uses the server's key
+  when there is one and the book's otherwise, and says which, because a server
+  holding no key cannot hand it to the next machine.
+
+- **The account password can be reset from the Mac.** *Forgot the password?* in
+  the sign-in sheet asks for a code by email and sets a new password with it.
+  The note above the fields says what a reset does NOT do: it cannot touch the
+  sync passphrase, so a shop that has lost THAT needs its recovery key, and no
+  number of resets will open anything.
+
+- **(Maintainers) The release script ran a comment.** `make-app.sh` writes
+  `Info.plist` from an unquoted heredoc — it has to be, it substitutes the
+  version — and a comment in it named two files in backticks. The shell ran
+  both as commands and substituted their empty output, so every build since
+  shipped a plist reading "The five are 's SERVICES" and printed two errors
+  nobody read. Escaped, and a test now refuses an unescaped backtick or an
+  unknown `$NAME` in that heredoc: anything backticked there EXECUTES during a
+  release build.
+
 - **The Mac signs in to the cloud itself.** `settings.cloud.token` is a session
   token the server issues at login, sealed against the Keychain of the machine
   that asked for it — so a shop's book carried to a new Mac arrives with a token

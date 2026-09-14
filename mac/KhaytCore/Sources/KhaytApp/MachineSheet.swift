@@ -99,7 +99,9 @@ struct MachineSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        // The tallest sheet in the app — 36 fields. A sheet cannot be moved, so
+        // without this its buttons sit below the screen. See `SheetFrame`.
+        SheetFrame(width: Self.width) {
             Text(shop.words.callIt(isNew ? "mach.add" : "mach.edit")).font(.headline)
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
@@ -274,7 +276,7 @@ struct MachineSheet: View {
                 }
             }
             }
-
+        } footer: {
             HStack {
                 Spacer()
                 Button(shop.words.callIt("common.cancel")) { dismiss() }
@@ -284,8 +286,6 @@ struct MachineSheet: View {
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .padding(18)
-        .frame(width: Self.width)
         .task {
             await shop.readCatalog()
             kinds = await shop.machineKindChoices()
