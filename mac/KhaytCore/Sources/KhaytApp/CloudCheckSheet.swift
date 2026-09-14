@@ -16,7 +16,11 @@ struct CloudCheckSheet: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        // The difference table is one row PER COLLECTION — up to thirty-three
+        // of them — so this sheet grows with how far the two copies have drifted
+        // apart. A sheet cannot be moved, so without a cap its own buttons go
+        // off the bottom of the screen. See `SheetFrame`.
+        SheetFrame(width: 520) {
             Text(shop.words.callIt("mac.check_cloud")).font(.headline)
 
             if let result = shop.cloudCheck {
@@ -31,6 +35,7 @@ struct CloudCheckSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+        } footer: {
             HStack {
                 Spacer()
                 Button(shop.words.callIt(shop.cloudCheck == nil ? "common.cancel" : "common.close")) {
@@ -62,8 +67,6 @@ struct CloudCheckSheet: View {
                 }
             }
         }
-        .padding(20)
-        .frame(width: 520)
         .onAppear { focused = true }
         // The data key is held only while this sheet is up — that is the whole
         // bargain that lets Send work without a second passphrase and a second
