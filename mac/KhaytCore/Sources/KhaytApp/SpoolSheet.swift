@@ -50,7 +50,9 @@ struct SpoolSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        // Scrolls, so Delete, Cancel and Save stay reachable however much
+        // history a spool has behind it. See `SheetFrame`.
+        SheetFrame(width: Self.width) {
             Text(shop.words.callIt(isNew ? "mac.new_spool" : "mac.edit_spool")).font(.headline)
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
@@ -216,6 +218,7 @@ struct SpoolSheet: View {
                 }
             }
 
+        } footer: {
             HStack {
                 if !isNew, shop.canMoveJobs {
                     Button(shop.words.callIt("common.delete"), role: .destructive) {
@@ -232,8 +235,6 @@ struct SpoolSheet: View {
                     .disabled(material.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .padding(18)
-        .frame(width: Self.width)
         .onAppear(perform: fill)
         .task { units = await shop.inventoryUnitChoices() }
         .task(id: material) { await loadColours() }

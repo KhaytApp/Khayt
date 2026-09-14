@@ -452,8 +452,15 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 
        The Bonjour list is required too: the system only browses the service
        types an app has declared, and an undeclared one silently finds nothing.
-       The five are `lib/printer-discovery.js`'s SERVICES, and adding a
-       protocol there means adding it here — `PrinterFinderTests` says so. -->
+       The five are \`lib/printer-discovery.js\`'s SERVICES, and adding a
+       protocol there means adding it here — \`PrinterFinderTests\` says so.
+
+       THE BACKTICKS ARE ESCAPED because this heredoc is UNQUOTED — it has to
+       be, it substitutes \$VERSION and \$SPARKLE_KEYS. Unescaped, the shell ran
+       these two as commands ("Permission denied", "command not found") and
+       replaced them with their empty output, so the shipped comment read "The
+       five are 's SERVICES". Harmless in a comment and not harmless in
+       general: anything backticked in here executes, and any \$NAME expands. -->
   <key>NSLocalNetworkUsageDescription</key>
   <string>Khayt looks for 3D printers on this network so you do not have to type their addresses.</string>
   <key>NSBonjourServices</key>

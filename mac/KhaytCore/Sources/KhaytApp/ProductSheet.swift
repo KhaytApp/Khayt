@@ -124,7 +124,10 @@ struct ProductSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        // Scrolls, and keeps Cancel and Save reachable on any screen — a sheet
+        // cannot be moved, so one taller than the display hides its own
+        // buttons. See `SheetFrame`.
+        SheetFrame(width: Self.width) {
             Text(shop.words.callIt(isNew ? "mac.new_product" : "mac.edit_product"))
                 .font(.headline)
 
@@ -198,7 +201,7 @@ struct ProductSheet: View {
 
             Divider()
             docsSection
-
+        } footer: {
             HStack {
                 if !draft.hasAName {
                     Text(shop.words.callIt("mac.product_need_name"))
@@ -224,8 +227,6 @@ struct ProductSheet: View {
                 .disabled(!draft.hasAName)
             }
         }
-        .padding(18)
-        .frame(width: Self.width)
         .onAppear {
             guard !started else { return }
             started = true

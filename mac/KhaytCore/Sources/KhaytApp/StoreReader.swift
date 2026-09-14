@@ -92,6 +92,55 @@ public struct StoreReader: Sendable {
 
     /// The login Keychain item Electron created. Returns nil rather than
     /// throwing: a shop can look at its orders without granting this.
+    /// Make the Keychain item Electron would have made, when there is none.
+    ///
+    /// ── THE LAST REASON A FRESH MAC NEEDED THE OTHER APP ──────────────────
+    ///
+    /// `<name> Safe Storage` is created by Chromium's OSCrypt the first time
+    /// Electron runs, and this app only ever READ it. So a Mac that has never
+    /// run the other app — a new machine with a restored book, which is exactly
+    /// how this was found — could obtain a cloud token and then fail to seal
+    /// it, and the only cure was to launch Electron once. That is the failure
+    /// this app exists not to have.
+    ///
+    /// The item is a random 16 bytes, base64'd, stored as a generic password
+    /// under the same service and account Electron uses — so a later Electron
+    /// run finds the key already there and agrees with it, rather than making a
+    /// second one. `SafeStorage` then does what it always did: PBKDF2 over this
+    /// password with `saltysalt`, 1003 iterations.
+    ///
+    /// **It never replaces an existing item.** Overwriting one would make every
+    /// already-sealed field in the book permanently unreadable — the old
+    /// ciphertext is worthless without the old password, and nothing would say
+    /// so. `errSecDuplicateItem` is therefore a SUCCESS here: somebody else got
+    /// there first and their key is the right one.
+    ///
+    /// Returns the password, new or existing, or nil when the Keychain refused.
+    @discardableResult
+    static func ensureKeychainPassword(for build: Build) -> String? {
+        if let existing = keychainPassword(for: build) { return existing }
+
+        var bytes = [UInt8](repeating: 0, count: 16)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
+            return nil
+        }
+        let password = Data(bytes).base64EncodedString()
+        let add: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: build.keychainService,
+            kSecAttrAccount as String: build.keychainAccount,
+            kSecValueData as String: Data(password.utf8),
+            // Available once the Mac has been unlocked after boot, and never
+            // synced to iCloud: it is the key to this machine's copy.
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+        ]
+        let status = SecItemAdd(add as CFDictionary, nil)
+        if status == errSecSuccess { return password }
+        // Somebody created it between the read and the write. Theirs wins.
+        if status == errSecDuplicateItem { return keychainPassword(for: build) }
+        return nil
+    }
+
     static func keychainPassword(for build: Build) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

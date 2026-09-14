@@ -42,6 +42,18 @@ enum Secrets {
         StoreReader.keychainPassword(for: build).map(SafeStorage.key(fromPassword:))
     }
 
+    /// The same lookup, allowed to CREATE the item when there is none.
+    ///
+    /// Reading and creating are separate seams on purpose. Opening a credential
+    /// must never invent a key — a book full of `__enc__` fields and a freshly
+    /// minted key would decrypt none of them, and "the Keychain says no" is the
+    /// true answer there. Sealing is the other direction: a shop typing a new
+    /// credential into a Mac that has never run the other app has nothing to
+    /// lose and everything to gain from a key existing.
+    static var keyMaker: @Sendable (StoreReader.Build) -> Data? = { build in
+        StoreReader.ensureKeychainPassword(for: build).map(SafeStorage.key(fromPassword:))
+    }
+
     /// Why a credential could not be opened, in a sentence a shop can act on.
     enum Failure: Error, CustomStringConvertible {
         case noKeychain
@@ -95,11 +107,14 @@ enum Secrets {
     ///
     /// The cache above still means one ASK per book per session; this means the
     /// window stays alive while it is being answered.
-    private static func key(for build: StoreReader.Build) async -> Data? {
+    private static func key(for build: StoreReader.Build,
+                            making: Bool = false) async -> Data? {
         if let cached = keys[build] { return cached }
-        let source = keySource
+        let source = making ? keyMaker : keySource
         let key = await Task.detached(priority: .userInitiated) { source(build) }.value
-        keys[build] = key
+        // Only a real key is remembered. Caching a nil from a READ would stop
+        // a later seal from ever creating one.
+        if key != nil { keys[build] = key }
         return key
     }
 
@@ -122,7 +137,13 @@ enum Secrets {
         guard !text.isEmpty else { return "" }
         // Already sealed — carried through a form that never opened it.
         guard !text.hasPrefix(SafeStorage.marker) else { return text }
-        guard let key = await key(for: build) else { throw Failure.noKeychain }
+        // MAKES the key when the Mac has none — the one place that is right.
+        // Electron's OSCrypt creates this item on its first run, so a Mac that
+        // has only ever run THIS app had no key at all and could not seal a
+        // thing: a cloud token obtained here could not be written, and the only
+        // cure was to launch the other app once. Found on a new machine with a
+        // restored book, which is the case this whole path exists for.
+        guard let key = await key(for: build, making: true) else { throw Failure.noKeychain }
         do { return try SafeStorage.seal(text, key: key) }
         catch { throw Failure.unreadable(String(describing: error)) }
     }
