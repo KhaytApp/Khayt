@@ -46,6 +46,42 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 22 }
 
+      # ── WHY THIS IS HERE, AND WHAT IT IS WORTH ─────────────────────────
+      #
+      # Measured on v4.0.0-alpha.9, step by step:
+      #
+      #     checkout              0m 05s
+      #     Build the app        39m 54s
+      #     Notarise and staple   0m 31s
+      #
+      # The whole release is one cold `swift build -c release`. Notarisation —
+      # the part everyone assumes is the wait — is half a minute.
+      #
+      # Nothing was cached, so every release compiled KhaytCore, both app
+      # extensions and Sparkle from nothing. An alpha usually changes a handful
+      # of files; SwiftPM recompiles by content, so a warm `.build` turns that
+      # forty minutes into a relink plus whatever actually changed.
+      #
+      # The key includes `Package.resolved` (a dependency bump must not reuse
+      # old artifacts) and a hash of the Swift sources. `restore-keys` lets a
+      # near-miss start from the last good build instead of from nothing, which
+      # is the case that matters: sources always differ slightly, or there
+      # would be no release to cut.
+      #
+      # SAFE BECAUSE SWIFTPM DECIDES, not this cache. It compares content and
+      # rebuilds what changed — the same mechanism every local build relies on.
+      # A cache that is wrong is a cache that is ignored, not a stale binary.
+      - name: Cache the Swift build
+        uses: actions/cache@v6
+        with:
+          path: |
+            mac/KhaytCore/.build
+            ~/Library/Caches/org.swift.swiftpm
+          key: swiftbuild-${{ runner.os }}-${{ hashFiles('mac/KhaytCore/Package.resolved') }}-${{ hashFiles('mac/KhaytCore/Sources/**/*.swift') }}
+          restore-keys: |
+            swiftbuild-${{ runner.os }}-${{ hashFiles('mac/KhaytCore/Package.resolved') }}-
+            swiftbuild-${{ runner.os }}-
+
       - name: Read the Mac app's own version
         id: v
         run: |
