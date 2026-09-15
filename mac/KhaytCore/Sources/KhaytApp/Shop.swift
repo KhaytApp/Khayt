@@ -176,6 +176,17 @@ final class Shop {
         case calculator
         case portfolio
         case giftCards
+
+        /// Whether two shelves are the same SCREEN, ignoring which folder or
+        /// which stage. The sidebar highlights Jobs while a stage is chosen
+        /// and Library while a project is open — the row names the screen, not
+        /// the filter on it.
+        func sameScreen(as other: Shelf) -> Bool {
+            switch (self, other) {
+            case (.jobs, .jobs), (.library, .library): true
+            default: self == other
+            }
+        }
     }
 
     var stage: Stage? { if case .jobs(let s) = shelf { s } else { nil } }
@@ -6891,6 +6902,67 @@ final class Shop {
     }
 
     var ungroupedCount: Int { files.count { $0.groupName == nil } }
+
+    // MARK: - What the shell needs to draw itself
+    //
+    // Small readings, kept together because they are all answers to "what
+    // does the window say about this book" rather than facts about the shop.
+
+    /// The title the window shows for the screen now open — §7's title bar.
+    /// Which question the Ledger is answering, and which row is open in the
+    /// inspector. Screen state, so it lives with the screen rather than in the
+    /// book — a shop reopening Khayt wants its jobs, not its last filter.
+    var ledgerFilter: LedgerFilter = .needsMe
+    var ledgerSelection: LedgerLine?
+
+    var shelfTitleKey: String {
+        switch shelf {
+        case .dashboard:  "mac.dashboard"
+        case .jobs:       "mac.all_jobs"
+        case .board:      "mac.board"
+        case .library:    "mac.all_models"
+        case .catalogue:  "cat.title"
+        case .customers:  "tab.clients"
+        case .machines:   "mac.machines"
+        case .inventory:  "mac.inventory"
+        case .expenses:   "mac.nav_expenses"
+        case .waste:      "mac.nav_waste"
+        case .reports:    "mac.nav_reports"
+        case .portfolio:  "pf.title"
+        case .calculator: "mac.calc_title"
+        case .colour:     "cmix.title"
+        case .giftCards:  "giftCards"
+        }
+    }
+
+    /// The file this book lives in, by name only. The whole path in a 150px
+    /// sidebar is a middle-truncated string nobody can read; the name is what
+    /// a shop with two books actually distinguishes them by.
+    var bookFileName: String {
+        source.build.map { $0.storeURL.lastPathComponent } ?? "sample-shop.json"
+    }
+
+    /// Whether this Mac is signed in to the cloud at all — NOT whether it has
+    /// synced recently, which is a different sentence and belongs in Settings.
+    var isCloudLinked: Bool { cloudConnected }
+
+    /// "saved 11:38", or when the book has never been written, nothing.
+    var lastSavedLabel: String {
+        guard let backup = lastBackup, let day = Order.day(backup) else {
+            return words.callIt("mac.never")
+        }
+        return words.callIt("mac.saved_at",
+                            ["t": .string(day.formatted(date: .omitted, time: .shortened))])
+    }
+
+    /// Is anything actually printing? One dot in the sidebar, and a dot is
+    /// the right weight: the number of running machines is on the Machines
+    /// screen, and repeating it in the nav is a figure to keep in step.
+    var anyMachineRunning: Bool {
+        machines.contains {
+            PrinterWatch.isPrinting(printers.readings[$0.id]?.status?.state ?? "")
+        }
+    }
 
     /// The categories and the tags the shop already uses, most-used first.
     ///

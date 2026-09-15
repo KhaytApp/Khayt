@@ -61,7 +61,83 @@ struct ShopWindow: View {
             && !shop.showingGiftCards
     }
 
+    /// Which window the shop is looking at.
+    ///
+    /// The redesign is a whole new shell — its own title bar, its own sidebar,
+    /// its own Dashboard — so it cannot be grafted into the existing
+    /// `NavigationSplitView` a screen at a time without the app briefly having
+    /// two sidebars. It goes behind a switch instead: the new one can be built,
+    /// looked at and lived with while the old one keeps working, and the screens
+    /// underneath are shared by both.
+    ///
+    /// Off by default until every screen has been migrated. Settings → General.
+    @AppStorage("ui.newShell") private var newShell = false
+
     var body: some View {
+        if newShell {
+            Shell(shop: shop) { screen }
+        } else {
+            classic
+        }
+    }
+
+    /// The content region, with no chrome of its own — shared by both shells,
+    /// which is what stops this being a fork of the app.
+    @ViewBuilder private var screen: some View {
+        if shop.showingDashboard {
+            Triage(shop: shop)
+        } else {
+            VStack(spacing: 0) {
+                EngineBanner(shop: shop)
+                MoveBanners(shop: shop)
+                SpendBanner(shop: shop)
+                classicScreens
+            }
+        }
+    }
+
+    /// Every screen but the Dashboard, shared by both shells.
+    @ViewBuilder private var classicScreens: some View {
+            if shop.showingDashboard {
+                Dashboard(shop: shop)
+            } else if shop.showingLibrary {
+                LibraryGrid(shop: shop)
+            } else if shop.showingBoard {
+                Kanban(shop: shop)
+            } else if shop.showingMachines {
+                Machines(shop: shop).environment(shop.cameras)
+            } else if shop.showingInventory {
+                Inventory(shop: shop)
+            } else if shop.showingExpenses {
+                Expenses(shop: shop)
+            } else if shop.showingWaste {
+                Waste(shop: shop)
+            } else if shop.showingReports {
+                Reports(shop: shop)
+            } else if shop.showingCatalogue {
+                Catalogue(shop: shop)
+            } else if shop.showingCalculator {
+                Calculator(shop: shop)
+            } else if shop.showingColour {
+                ColourStudio(shop: shop)
+            } else if shop.showingPortfolio {
+                Portfolio(shop: shop)
+            } else if shop.showingGiftCards {
+                GiftCards(shop: shop)
+            } else if shop.showingCustomers {
+                CustomersTable(shop: shop)
+            } else {
+                // The kits above the book they group. Nothing at all when
+                // the shop has never made one — a band explaining an empty
+                // feature is furniture on the screen people live in.
+                VStack(spacing: 0) {
+                    KitBand(shop: shop)
+                    OrdersTable(shop: shop)
+                }
+            }
+    }
+
+    private var classic: some View {
         NavigationSplitView {
             Sidebar(shop: shop)
                 // 190 was under every published minimum for a Mac source list
@@ -87,43 +163,7 @@ struct ShopWindow: View {
                 MoveBanners(shop: shop)
                 SpendBanner(shop: shop)
 
-                if shop.showingDashboard {
-                    Dashboard(shop: shop)
-                } else if shop.showingLibrary {
-                    LibraryGrid(shop: shop)
-                } else if shop.showingBoard {
-                    Kanban(shop: shop)
-                } else if shop.showingMachines {
-                    Machines(shop: shop).environment(shop.cameras)
-                } else if shop.showingInventory {
-                    Inventory(shop: shop)
-                } else if shop.showingExpenses {
-                    Expenses(shop: shop)
-                } else if shop.showingWaste {
-                    Waste(shop: shop)
-                } else if shop.showingReports {
-                    Reports(shop: shop)
-                } else if shop.showingCatalogue {
-                    Catalogue(shop: shop)
-                } else if shop.showingCalculator {
-                    Calculator(shop: shop)
-                } else if shop.showingColour {
-                    ColourStudio(shop: shop)
-                } else if shop.showingPortfolio {
-                    Portfolio(shop: shop)
-                } else if shop.showingGiftCards {
-                    GiftCards(shop: shop)
-                } else if shop.showingCustomers {
-                    CustomersTable(shop: shop)
-                } else {
-                    // The kits above the book they group. Nothing at all when
-                    // the shop has never made one — a band explaining an empty
-                    // feature is furniture on the screen people live in.
-                    VStack(spacing: 0) {
-                        KitBand(shop: shop)
-                        OrdersTable(shop: shop)
-                    }
-                }
+                classicScreens
             }
         }
         // On the split view, not inside `detail`. Inside it, the detail content
