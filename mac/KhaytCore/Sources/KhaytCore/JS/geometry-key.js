@@ -42,7 +42,27 @@ function geometryKey(geometry) {
   return `${tris}:${round(vol, 2)}:${dims.join('x')}`;
 }
 
-const api = { geometryKey, round };
+/**
+ * Which reader wrote a record's key, and whether it is due to be read again.
+ *
+ * A key is written once, on import, and nothing re-reads a file that has one —
+ * right for the ordinary case, and exactly what strands a book when a reader
+ * fault is fixed: the number the shop was shown stays wrong on every record
+ * the old reader wrote. So each record names the reader that measured it, and
+ * this number goes up when a fault is fixed. A record below it — or without
+ * one, written before the rule existed — is measured again by whichever app
+ * next opens the book with the file in reach, and only the keys that differ
+ * change. Reader 2: one plate's size rather than every plate boxed together,
+ * every component placed, roots over 8 MB read, zip64 containers opened.
+ */
+const READER = 2;
+
+function needsRemeasure(record) {
+  const r = Number(record && record.geometryReader);
+  return !(Number.isFinite(r) && r >= READER);
+}
+
+const api = { geometryKey, round, READER, needsRemeasure };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 global.KhaytGeometryKey = api;
 

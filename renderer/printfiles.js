@@ -1921,6 +1921,9 @@
                 // STL recognise each other.
                 rec.geometryKey = mi.geometryKey(p.geometry);
               }
+              // Which reader measured it, so a record from an older reader
+              // is read again after a fault is fixed and this one is not.
+              rec.geometryReader = mi.READER;
             } catch (_) { /* non-fatal */ }
           }
         }
@@ -1976,7 +1979,7 @@
           // geometryKey was never set and geometry matching silently did nothing. The
           // catch is for a malformed mesh, not for a missing module.
           const mi = MI();
-          if (mi) { try { rec.geometryKey = mi.geometryKey(rec.parsed); } catch (_) { /* non-fatal */ } }
+          if (mi) { try { rec.geometryKey = mi.geometryKey(rec.parsed); rec.geometryReader = mi.READER; } catch (_) { /* non-fatal */ } }
         }
       }
 

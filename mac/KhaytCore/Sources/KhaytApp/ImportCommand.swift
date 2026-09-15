@@ -347,62 +347,50 @@ enum ImportCommand {
     /// last component's placement; a root part over 8 MB refused and every
     /// part then measured at identity; every plate of a project boxed together
     /// with the gaps between them; and a zip64 container refused outright.
-    /// Forty-eight of this shop's seventy-two measured 3MFs carried a key from
+    /// Seventy-four of this shop's eighty-five measured 3MFs carried a key from
     /// one of those. Nothing in the app re-reads a file that already has a key,
     /// which is right for the ordinary case and is what leaves these behind.
     ///
-    /// So this reads every 3MF, under the rules as they are now, and rewrites
-    /// only the keys that changed — reporting each one, because a key that
-    /// changes is a number the shop was shown that was wrong. `--dry-run`
-    /// lists them and writes nothing. One write at the end, under the lock,
-    /// for the reason `drawMissingPreviews` gives.
+    /// The app now does this itself, once per book, for the files an older
+    /// reader measured (`Shop.remeasureIfDue`, the rule on `Remeasure`). This
+    /// is the same pass for EVERY 3MF, on demand — reporting each key that
+    /// changes, because that is a number the shop was shown that was wrong.
+    /// `--dry-run` lists them and writes nothing. One write at the end, under
+    /// the lock, for the reason `drawMissingPreviews` gives.
     private static func remeasure3MFs(shop: Shop, build: StoreReader.Build,
                                       root: String, dryRun: Bool,
                                       engine: KhaytEngine) async -> Int32 {
         let vault = URL(fileURLWithPath: root)
-        let wanted = shop.files.filter { ($0.sourceFile?.ext ?? "").lowercased() == "3mf" }
+        let wanted = shop.files.filter(Remeasure.is3MF)
         say("library: \(root)")
         say("3MF models to measure again: \(wanted.count) of \(shop.files.count)")
         guard !wanted.isEmpty else { return 0 }
 
-        var changed: [(LibraryFile, String, String)] = []   // file, was, now
-        var unreadable: [String] = []
         let started = Date()
-        for (i, file) in wanted.enumerated() {
-            guard let name = file.sourceFile?.filename else { continue }
-            let model = vault.appending(path: LibraryLocation.itemDirName(file.id))
-                             .appending(path: name)
-            say("[\(i + 1)/\(wanted.count)] \(file.title)")
-            guard let box = try? Mesh.measure3MF(model), box.triangleCount > 0,
-                  let key = try? await engine.geometryKey(triangleCount: box.triangleCount,
-                                                          volumeMm3: box.volumeMm3,
-                                                          x: box.x, y: box.y, z: box.z) else {
-                unreadable.append(file.title); continue
-            }
-            let was = file.geometryKey ?? ""
-            if was != key { changed.append((file, was, key)) }
+        let report = await Remeasure.measure(wanted, vault: vault, engine: engine) { i, n, file in
+            say("[\(i)/\(n)] \(file.title)")
         }
+        let troubled = !report.unreadable.isEmpty || !report.missing.isEmpty
 
         say("")
-        say("measured:  \(wanted.count - unreadable.count)")
-        say("changed:   \(changed.count)")
-        say("unreadable: \(unreadable.count)")
-        for (file, was, now) in changed {
-            say("  \(file.title)")
-            say("      before \(was.isEmpty ? "—" : was)")
-            say("      after  \(now)")
+        say("measured:   \(report.measured.count - report.unreadable.count)")
+        say("changed:    \(report.changed.count)")
+        say("unreadable: \(report.unreadable.count)")
+        say("missing:    \(report.missing.count)")
+        for change in report.changed {
+            say("  \(change.file.title)")
+            say("      before \(change.was.isEmpty ? "—" : change.was)")
+            say("      after  \(change.now)")
         }
-        for title in unreadable.prefix(10) { complain("  could not measure \(title)") }
+        for title in report.unreadable.prefix(10) { complain("  could not measure \(title)") }
+        for title in report.missing.prefix(10) { complain("  not in the library folder: \(title)") }
 
         if dryRun {
             say("")
             say("dry run: nothing was written.")
-            return unreadable.isEmpty ? 0 : 1
+            return troubled ? 1 : 0
         }
-        guard !changed.isEmpty else {
-            say(String(format: "nothing to rewrite; took %.0f s", Date().timeIntervalSince(started)))
-            return unreadable.isEmpty ? 0 : 1
-        }
+        guard !report.measured.isEmpty else { return troubled ? 1 : 0 }
 
         guard let claim = StoreLock.take(for: build) else {
             let who = StoreLock.held(StoreLock.verdict(for: build))
@@ -411,25 +399,24 @@ enum ImportCommand {
         }
         defer { StoreLock.release(claim, for: build) }
 
-        let keys = Dictionary(uniqueKeysWithValues: changed.map { ($0.0.id, $0.2) })
+        guard let reader = try? await engine.geometryReader() else {
+            complain("The shared rules could not say which reader this is; nothing was written.")
+            return 2
+        }
         do {
             try StoreWriter.update(storeURL: build.storeURL,
                                    owns: { StoreLock.weOwnIt(build) },
                                    whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) { root in
-                guard case .array(let rows)? = root["printFiles"] else { return }
-                root["printFiles"] = .array(rows.map { row in
-                    guard case .object(var o) = row, case .string(let id)? = o["id"],
-                          let key = keys[id] else { return row }
-                    o["geometryKey"] = .string(key)
-                    return .object(o)
-                })
+                Remeasure.apply(report, reader: reader, to: &root)
             }
         } catch {
             complain("The book refused the write: \(error)")
             return 2
         }
-        say(String(format: "rewritten: %d; took %.0f s", changed.count, Date().timeIntervalSince(started)))
-        return unreadable.isEmpty ? 0 : 1
+        say(String(format: "rewritten: %d; marked as read by reader %d: %d; took %.0f s",
+                   report.changed.count, reader, report.measured.count,
+                   Date().timeIntervalSince(started)))
+        return troubled ? 1 : 0
     }
 
     private static func size(_ bytes: Int) -> String {
