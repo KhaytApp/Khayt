@@ -274,6 +274,14 @@ struct InvoicePane: View {
                             Text(shop.words.callIt("set.tax_mode_inclusive")).tag("inclusive")
                             Text(shop.words.callIt("set.tax_mode_exclusive")).tag("exclusive")
                         }.labelsHidden()
+                        // OFF WITH THE RATE ABOVE IT. Whether a price includes
+                        // tax is a question about tax, and with VAT switched
+                        // off it was the one control in this block still live —
+                        // a picker a shop could change, twice, and watch every
+                        // figure in the app stay exactly where it was. The rate
+                        // beside it has been disabled all along; this was the
+                        // one that got missed.
+                        .disabled(!draft.enableVat)
                     }
                     // The arithmetic on a round number, because inclusive and
                     // exclusive both look plausible and differ by the tax on

@@ -107,8 +107,11 @@ struct NewJobSheet: View {
             var row = Draft()
             row.name = Shop.plainString(o["name"]) ?? ""
             row.spoolId = Shop.plainString(o["filamentId"])
-            row.grams = Money.quantity(Shop.plainNumber(o["printWeight"]) ?? 0)
-            row.hours = Money.quantity(Shop.plainNumber(o["printTime"]) ?? 0)
+            // `fieldValue`, NOT `quantity` — see the note there. The
+            // display formatter groups thousands, and `Double("1,234.6")` is
+            // nil, so every part over a kilo arrived as nothing.
+            row.grams = Money.fieldValue(Shop.plainNumber(o["printWeight"]))
+            row.hours = Money.fieldValue(Shop.plainNumber(o["printTime"]))
             row.qty = max(1, Int(Shop.plainNumber(o["qty"]) ?? 1))
             return row
         }
@@ -195,9 +198,28 @@ struct NewJobSheet: View {
         }
     }
 
+    /// A product was taken and none of its parts can be costed.
+    ///
+    /// Not "the total is zero" — the total is `—`, because §5 says a figure
+    /// nobody has been told is not a figure of nothing. What the shop needs is
+    /// the reason, on the screen where it met it: the product editor says this
+    /// when you are editing one, and a shop taking a job from the catalogue
+    /// never opens that sheet.
+    private var nothingToCost: Bool {
+        product != nil && !parts.isEmpty && parts.allSatisfy { !$0.isComplete }
+    }
+
     private var cart: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(shop.words.callIt("mac.parts")).font(.subheadline.weight(.semibold))
+
+            if nothingToCost, let product {
+                Text(shop.words.callIt("mac.product_not_costed",
+                                       ["product": .string(product.anyName())]))
+                    .font(.callout)
+                    .foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             ForEach(parts) { part in
                 HStack(spacing: 8) {
@@ -299,8 +321,8 @@ struct NewJobSheet: View {
             // what the shop typed, because a model naming the job is a model
             // writing on an invoice.
             if draft.name.isEmpty { draft.name = said }
-            if filled.grams > 0 { draft.grams = Money.quantity(filled.grams) }
-            if filled.hours > 0 { draft.hours = Money.quantity(filled.hours) }
+            if filled.grams > 0 { draft.grams = Money.fieldValue(filled.grams) }
+            if filled.hours > 0 { draft.hours = Money.fieldValue(filled.hours) }
             if filled.qty > 0 { draft.qty = filled.qty }
             if let spool = filled.spoolId { draft.spoolId = spool }
             assumptions = filled.assumptions
