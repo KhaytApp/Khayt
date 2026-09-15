@@ -1174,6 +1174,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **The Quick Look extensions build again on Xcode 26.x.** Its SwiftPM makes
+  `swiftbuild` the default engine, and that one links an executable for the
+  ordinary `_main` where the old engine used the target's own name — so the
+  thumbnail and preview extensions stopped linking, on a Mac that had simply
+  taken an Xcode update. The manifest names the entry symbol out loud now.
+
 - **One header at the top of every screen, not two.** The redesigned window
   draws its own navy strip, and the Mac's own title bar was still drawn above
   it — on Jobs and the Board with a stray "+" in it, because those screens
