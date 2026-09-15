@@ -22,7 +22,7 @@ struct Ledger: View {
 
             if let picked = shop.ledgerSelection {
                 JobInspector(row: picked, shop: shop)
-                    .frame(width: 282)
+                    .frame(width: Wide.inspector)
             }
         }
     }

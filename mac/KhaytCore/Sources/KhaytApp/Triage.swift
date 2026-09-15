@@ -231,7 +231,9 @@ struct TriageCard: View {
                         Text(line.because)
                             .font(TypeScale.body(11))
                             .foregroundStyle(Role.text2)
-                            .fixedSize(horizontal: false, vertical: true)
+                            // §10: a sentence that runs the width of a 2560
+                            // display is a sentence nobody finishes.
+                            .sentenceWidth(11)
                     }
                 }
             }
