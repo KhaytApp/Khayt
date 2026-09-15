@@ -4,42 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-### Fixed
-
-- **One header at the top of every screen, not two.** The redesigned window
-  draws its own navy strip, and the Mac's own title bar was still drawn above
-  it — on Jobs and the Board with a stray "+" in it, because those screens
-  declared a toolbar and a toolbar has nowhere to go but the window's bar. The
-  window's bar is off now and the traffic lights sit in Khayt's strip, which is
-  where the design put them.
-
-- **The buttons that screen used to have are in the strip.** Take a job, new
-  product, add a machine, suggest a schedule, issue a gift card, log an expense
-  or waste, import models, the list-or-grid switch and the period picker all
-  moved out of the toolbar and into the navy strip, on the screen that owns
-  them.
-
-- **Selecting a model, a job or a customer opens its details again.** The
-  detail panel was attached to the old window only, so in the redesigned one it
-  never appeared — a selected tile and nothing beside it. Its switch is back in
-  the strip too.
-
-- **The search field searches again.** It had become a picture of a search
-  field: the real one lived in the old window's toolbar. It narrows the screen
-  you are on, and says what it narrows in that screen's own words.
-
-- **Every editor opens.** Take a job, edit a product, record a payment, add a
-  spool and the rest were attached to the old window and did nothing at all in
-  the new one. Creating an order from the catalogue is one of these.
-
-- **Prices show the riyal mark.** The redesigned screens were writing "SAR"
-  while the tables beside them drew the mark, because the mark was waiting on a
-  font Khayt does not yet ship. macOS carries the official mark — checked with
-  the system, not assumed — so the whole app says the same thing.
-
-- **The sidebar's card says which book is open.** On the sample shop it says
-  so, and the card is the menu that switches back to the shop's own.
-
 ### Changed
 
 - **The redesigned window is what Khayt opens with now.** The new sidebar,
@@ -1209,6 +1173,41 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **One header at the top of every screen, not two.** The redesigned window
+  draws its own navy strip, and the Mac's own title bar was still drawn above
+  it — on Jobs and the Board with a stray "+" in it, because those screens
+  declared a toolbar and a toolbar has nowhere to go but the window's bar. The
+  window's bar is off now and the traffic lights sit in Khayt's strip, which is
+  where the design put them.
+
+- **The buttons that screen used to have are in the strip.** Take a job, new
+  product, add a machine, suggest a schedule, issue a gift card, log an expense
+  or waste, import models, the list-or-grid switch and the period picker all
+  moved out of the toolbar and into the navy strip, on the screen that owns
+  them.
+
+- **Selecting a model, a job or a customer opens its details again.** The
+  detail panel was attached to the old window only, so in the redesigned one it
+  never appeared — a selected tile and nothing beside it. Its switch is back in
+  the strip too.
+
+- **The search field searches again.** It had become a picture of a search
+  field: the real one lived in the old window's toolbar. It narrows the screen
+  you are on, and says what it narrows in that screen's own words.
+
+- **Every editor opens.** Take a job, edit a product, record a payment, add a
+  spool and the rest were attached to the old window and did nothing at all in
+  the new one. Creating an order from the catalogue is one of these.
+
+- **Prices show the riyal mark.** The redesigned screens were writing "SAR"
+  while the tables beside them drew the mark, because the mark was waiting on a
+  font Khayt does not yet ship. macOS carries the official mark — checked with
+  the system, not assumed — so the whole app says the same thing.
+
+- **The sidebar's card says which book is open.** On the sample shop it says
+  so, and the card is the menu that switches back to the shop's own.
+
 
 - **No email has left Khayt since 31 August, and nothing said so.** Three
   functions — the status notification to a customer, *Email* on an order or
