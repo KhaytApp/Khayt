@@ -183,7 +183,7 @@ struct OrdersTable: View {
             if rows.isEmpty { EmptyBook(shop: shop) }
         }
         .background(Khayt.ground)
-        .toolbar { NewJobButton(shop: shop) }
+        .screenToolbar { NewJobButton(shop: shop) }
     }
 }
 

@@ -112,7 +112,7 @@ struct Reports: View {
         // Only the Best page reads the period, so only it offers the control.
         // A picker on a screen it does not move is a control that teaches a
         // shop it does nothing.
-        .toolbar {
+        .screenToolbar {
             if shop.reportPage == .best {
                 ToolbarItem { PeriodMenu(shop: shop) }
             }

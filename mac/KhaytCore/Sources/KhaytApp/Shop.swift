@@ -1279,6 +1279,26 @@ final class Shop {
         }
     }
 
+    /// What this screen's search box looks for, in its own words.
+    ///
+    /// Three screens fell through to the jobs prompt and were asking for a
+    /// "Job, customer or number" while filtering spools, products and a board.
+    /// The board keeps the jobs prompt on purpose — it IS jobs.
+    ///
+    /// On the book rather than in the window because both shells ask for it:
+    /// the old one for its toolbar field, the new one for the strip's.
+    @MainActor var searchPrompt: String {
+        if shelf == .giftCards { return words.callIt("giftCardCode") }
+        if shelf == .portfolio { return words.callIt("pf.search_ph") }
+        if showingLibrary { return words.callIt("mac.search_models") }
+        if showingCustomers { return words.callIt("mac.search_people") }
+        if showingExpenses { return words.callIt("mac.search_expenses") }
+        if showingWaste { return words.callIt("mac.search_waste") }
+        if showingInventory { return words.callIt("mac.search_filament") }
+        if showingCatalogue { return words.callIt("mac.search_products") }
+        return words.callIt("mac.search_jobs")
+    }
+
     // MARK: - Finding a printer
 
     /// True while the find-printers sheet is up.
@@ -5485,6 +5505,14 @@ final class Shop {
     /// The machine being written down, or corrected.
     var editingMachine: Machine?
     var addingMachine = false
+
+    /// Writing down what was spent, and what was thrown away.
+    ///
+    /// On the book rather than in the screen because the new shell's strip
+    /// carries the "+" and the strip is not inside the screen — see
+    /// `ScreenActions`. The sheets stay where they were.
+    var addingExpense = false
+    var loggingWaste = false
     /// The printers Khayt knows, read once per launch — the catalogue is a
     /// constant, not something a book carries.
     private(set) var catalog: [CatalogPrinter] = []

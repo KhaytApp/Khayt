@@ -87,10 +87,10 @@ import KhaytCore
         // a layout that is right on one corner of them can be wrong on
         // another. Dark is not light dimmed and RTL is not LTR mirrored in the
         // text only — both have to be looked at.
-        write(Shell(shop: shop) { snapshotTriage(shop) }, "ui-01-shell-light")
-        write(Shell(shop: shop) { snapshotTriage(shop) }, "ui-02-shell-dark", dark: true)
-        write(Shell(shop: shop) { snapshotTriage(shop) }, "ui-03-shell-rtl", rtl: true)
-        write(Shell(shop: shop) { snapshotTriage(shop) },
+        write(Shell(shop: shop, searchWanted: .constant(false)) { snapshotTriage(shop) }, "ui-01-shell-light")
+        write(Shell(shop: shop, searchWanted: .constant(false)) { snapshotTriage(shop) }, "ui-02-shell-dark", dark: true)
+        write(Shell(shop: shop, searchWanted: .constant(false)) { snapshotTriage(shop) }, "ui-03-shell-rtl", rtl: true)
+        write(Shell(shop: shop, searchWanted: .constant(false)) { snapshotTriage(shop) },
               "ui-04-shell-rtl-dark", dark: true, rtl: true)
 
         // And the parts on their own, where a whole-window picture is too
@@ -103,13 +103,13 @@ import KhaytCore
     func ledgerAndEmpty() async throws {
         let shop = await sample()
         shop.ledgerSelection = shop.ledgerRows.first
-        write(Shell(shop: shop) { snapshotLedger(shop) }, "ui-07-ledger")
-        write(Shell(shop: shop) { snapshotLedger(shop) }, "ui-08-ledger-dark", dark: true)
+        write(Shell(shop: shop, searchWanted: .constant(false)) { snapshotLedger(shop) }, "ui-07-ledger")
+        write(Shell(shop: shop, searchWanted: .constant(false)) { snapshotLedger(shop) }, "ui-08-ledger-dark", dark: true)
 
         // A book with nothing in it — the screen a shop sees on the day it
         // installs, and the one most likely never to have been looked at.
         let fresh = Shop()
-        write(Shell(shop: fresh) { FirstRun(shop: fresh) }, "ui-09-first-run")
+        write(Shell(shop: fresh, searchWanted: .constant(false)) { FirstRun(shop: fresh) }, "ui-09-first-run")
     }
 
     /// Not a picture: a measurement.
@@ -121,7 +121,7 @@ import KhaytCore
     func fitsTheTarget() async throws {
         let shop = await sample()
         let renderer = ImageRenderer(content:
-            Shell(shop: shop) { Triage(shop: shop) }
+            Shell(shop: shop, searchWanted: .constant(false)) { Triage(shop: shop) }
                 .frame(width: Self.target.width))
         renderer.scale = 1
         let height = renderer.nsImage?.size.height ?? 0
