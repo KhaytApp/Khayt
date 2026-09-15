@@ -70,8 +70,12 @@ struct ShopWindow: View {
     /// looked at and lived with while the old one keeps working, and the screens
     /// underneath are shared by both.
     ///
-    /// Off by default until every screen has been migrated. Settings → General.
-    @AppStorage("ui.newShell") private var newShell = false
+    /// ON as of 4.0.0-alpha.12. The shell, the sidebar and the Dashboard are
+    /// drawn to the spec; the other screens are unchanged and sit inside it,
+    /// which is a mixed state and the point of an alpha. Settings → General →
+    /// Appearance switches back in one click, and the preference is a
+    /// preference — nothing about the book changes either way.
+    @AppStorage("ui.newShell") private var newShell = true
 
     var body: some View {
         if newShell {

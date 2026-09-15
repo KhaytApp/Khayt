@@ -37,12 +37,15 @@ struct LibraryGrid: View {
             // Fixed columns rather than `.adaptive`, because the arrow keys have
             // to know how many there are: moving down is moving forward by one
             // row, and `.adaptive` decides the count privately.
-            let count = Self.columns(across: geometry.size.width)
+            // §10: columns = floor(available ÷ 165). Tiles multiply; a tile
+            // never inflates, because a 300-point thumbnail is not a better
+            // thumbnail — it is the same picture with the row half as useful.
+            let count = Wide.columns(across: geometry.size.width - Metric.screen * 2)
             ScrollViewReader { scroller in
                 ScrollView {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.spacing),
-                                             count: count),
-                              spacing: Self.spacing) {
+                    LazyVGrid(columns: Wide.grid(across: geometry.size.width - Metric.screen * 2),
+                              alignment: .leading,
+                              spacing: Wide.tileGap) {
                         ForEach(shop.shownEntries) { entry in
                             switch entry {
                             case .folder(let name, let count, let cover):

@@ -143,7 +143,7 @@ struct ShellSidebar: View {
             Spacer(minLength: 0)
             file
         }
-        .frame(width: 150)
+        .frame(width: Wide.sidebar)
         .frame(maxHeight: .infinity)
         .background(Role.navy)
     }

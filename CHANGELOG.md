@@ -6,6 +6,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The redesigned window is what Khayt opens with now.** The new sidebar,
+  title bar and Dashboard are on by default; the other screens are unchanged
+  and sit inside the new shell, which is a mixed state and the point of an
+  alpha. Settings → General → Appearance switches back in one click, and it is
+  a preference — nothing about the shop's book changes either way.
+
+- **The app fills a big display instead of stretching into it.** Above the
+  13-inch size everything is drawn for, the sidebar, the inspector and the
+  board column stay exactly as wide as they were: a 400-point inspector is not
+  a better inspector, and chrome that grows with the window is the first thing
+  that makes a Mac app feel pulled out of shape. The middle takes the extra
+  room. In the library that means MORE models per row rather than bigger ones
+  — five at the smallest size, eight on a 13-inch full screen, thirteen on a
+  Studio Display — and explanatory sentences stop growing at a readable
+  length rather than running the whole width of the screen, where the eye
+  loses its place coming back from the far end.
+
 - **One word per screen, and the same word in both apps.** The sidebar read
   "Product Catalog", "All models", "Profit & Loss", "Colour studio" — software
   words, not shop words, and long enough that Arabic (20–30% longer at the
