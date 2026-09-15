@@ -507,6 +507,7 @@ final class Shop {
             if next.build != nil { startPublishingLeadTime() } else { stopPublishingLeadTime() }
             refreshSyncStatus()
             await readSlicers()
+            remeasureIfDue()
         } catch {
             orders = []
             files = []
@@ -691,6 +692,59 @@ final class Shop {
     /// are the same actions the context menu and the inspector use, named once
     /// so the two can never drift into meaning different things.
     func reload() { Task { await load(source) } }
+
+    // MARK: - Measuring the library again
+
+    /// Which books this process has already checked. Once per book per launch:
+    /// the pass reads every due 3MF and marks it, so the next launch finds
+    /// nothing due — and a book whose write was refused is simply due again.
+    private var remeasuredBooks: Set<String> = []
+    /// The pass in flight, so a quit — or a test — can wait for it.
+    private(set) var remeasuring: Task<Void, Never>?
+
+    /// Reads again the 3MFs an older reader measured, and rewrites the keys
+    /// that come out different. The rule and the reasons are on `Remeasure`;
+    /// this is the wiring: after the book loads, off the main thread at a
+    /// priority below the screen's, one write at the end, and a note when a
+    /// number the shop was shown has changed. Nothing for the sample book,
+    /// whose files are nobody's.
+    func remeasureIfDue() {
+        guard case .store(let build) = source, let roots = libraryRoots, let engine,
+              !remeasuredBooks.contains(build.rawValue) else { return }
+        remeasuredBooks.insert(build.rawValue)
+        let files = self.files
+        let vault = URL(fileURLWithPath: roots.primary)
+        remeasuring = Task { [weak self] in
+            let due = await Remeasure.due(files, engine: engine)
+            guard !due.isEmpty else { return }
+            let report = await Task.detached(priority: .utility) {
+                await Remeasure.measure(due, vault: vault, engine: engine)
+            }.value
+            guard !report.measured.isEmpty, let self else { return }
+            await self.recordRemeasure(report, build: build, engine: engine)
+        }
+    }
+
+    private func recordRemeasure(_ report: Remeasure.Report, build: StoreReader.Build,
+                                 engine: KhaytEngine) async {
+        guard let reader = try? await engine.geometryReader() else { return }
+        do {
+            try StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                Remeasure.apply(report, reader: reader, to: &root)
+            }
+        } catch {
+            // Somebody else has the book, or the disk refused: nothing was
+            // marked, so the same files are due at the next launch.
+            return
+        }
+        guard !report.changed.isEmpty else { return }
+        await load(source)
+        importNote = words.callIt("mac.remeasured", ["n": .number(Double(report.changed.count))])
+    }
     func open(_ next: Source) { Task { await load(next) } }
 
     var canEditSelection: Bool { canWrite && !fileSelection.isEmpty }

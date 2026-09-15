@@ -430,6 +430,8 @@ final class Words {
                               "ar": "لم يعد هذا العمل في الدفتر."],
         "mac.move_sample":   ["en": "The sample shop cannot be changed.",
                               "ar": "لا يمكن تغيير المحل التجريبي."],
+        "mac.remeasured":    ["en": "{n} models were measured again — their sizes were wrong.",
+                              "ar": "تم قياس {n} من النماذج من جديد — كانت أبعادها خاطئة."],
         "mac.move_no_engine": ["en": "The shared rules did not start, so nothing may be moved.",
                                "ar": "لم تبدأ القواعد المشتركة، فلا يمكن نقل شيء."],
         "mac.move_unhandled": ["en": "This move asks for something this app does not know how to do, so nothing was changed.",

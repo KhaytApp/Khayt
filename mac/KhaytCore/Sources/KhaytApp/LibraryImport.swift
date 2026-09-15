@@ -278,7 +278,8 @@ enum LibraryImport {
             of: "\\.[^.]+$", with: "", options: .regularExpression)
         let record = self.record(id: id, name: name, originalName: originalName,
                                  filename: filename, ext: ext, size: size,
-                                 hash: hash, key: key, colours: colours,
+                                 hash: hash, key: key,
+                                 reader: try? await engine.geometryReader(), colours: colours,
                                  swapCount: swapCount, thumbFile: thumbFile, group: group,
                                  riskAnalysis: riskAnalysis)
         do {
@@ -409,7 +410,8 @@ enum LibraryImport {
     /// record.
     static func record(id: String, name: String, originalName: String,
                        filename: String, ext: String, size: Int,
-                       hash: String?, key: String?, colours: [JSONValue],
+                       hash: String?, key: String?, reader: Int? = nil,
+                       colours: [JSONValue],
                        swapCount: Int, thumbFile: String?,
                        group: String? = nil,
                        riskAnalysis: [String: JSONValue]? = nil,
@@ -451,6 +453,10 @@ enum LibraryImport {
             "favorite": .bool(false),
             "contentHash": hash.map(JSONValue.string) ?? .null,
             "geometryKey": key.map(JSONValue.string) ?? .null,
+            // Which reader measured it. A record without this is read again
+            // the next time the book opens, which is what an import that
+            // could not even ask should get.
+            "geometryReader": reader.map { .number(Double($0)) } ?? .null,
         ]
         // Absent rather than null when the walk did not happen. A null here
         // would be indistinguishable from a walk that found nothing, and the

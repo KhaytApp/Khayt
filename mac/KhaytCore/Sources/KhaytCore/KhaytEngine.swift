@@ -2303,6 +2303,21 @@ public actor KhaytEngine {
         as: String?.self)
     }
 
+    /// Which reader this build measures with — written on every record it
+    /// keys, so a record from an older reader can be told apart and read
+    /// again after a fault is fixed. The number lives in `lib/geometry-key.js`
+    /// because both apps write it and both compare against it.
+    public func geometryReader() throws -> Int {
+        try runtime.call2("globalThis.KhaytGeometryKey.READER", [], as: Int.self)
+    }
+
+    /// Whether a record measured by `reader` (nil: before the rule existed)
+    /// is due to be read again under this build's reader.
+    public func needsRemeasure(reader: Int?) throws -> Bool {
+        try runtime.call2("globalThis.KhaytGeometryKey.needsRemeasure({ geometryReader: ARG0 })",
+                          [reader.map { .number(Double($0)) } ?? .null], as: Bool.self)
+    }
+
     // MARK: - The shop's slicers
 
     /// One slicer as the shop has it configured.

@@ -1212,6 +1212,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   from one of the faults above; nothing re-reads a file that already has one.
   `--dry-run` lists what would change.
 
+- **A book measured by an older reader measures itself again.** The fix
+  above reached only files imported after it. Every library record now names
+  the reader that keyed it, in both apps, and the Mac app reads again — once
+  per book after it opens, below the screen's priority — every 3MF an older
+  reader measured, rewriting only the keys that come out different and saying
+  how many. A due file that was right is marked and not read twice; a file
+  whose folder is not mounted is left for the day it is. `--remeasure` is the
+  same pass, on demand, for every file.
+
 - **A job taken from the catalogue is priced.** Any part weighing a kilo or
   more came into the sheet as nothing at all, so nothing was costed and the job
   opened at zero — a product the catalogue prices at 3,250 became a job priced
