@@ -133,6 +133,8 @@ struct BusinessPane: View {
     @State private var draft = Draft()
     @State private var original = Draft()
     @AppStorage("mac.menuBar") private var menuBar = true
+    /// The same key `ShopWindow` reads, so the two cannot drift apart.
+    @AppStorage("ui.newShell") private var newShell = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -148,6 +150,20 @@ struct BusinessPane: View {
                 Section(shop.words.callIt("set.biz_contact")) {
                     row(shop.words.callIt("set.phone")) { TextField("", text: $draft.phone) }
                     row(shop.words.callIt("set.email")) { TextField("", text: $draft.email) }
+                }
+                // ── THE REDESIGNED WINDOW ─────────────────────────────────
+                //
+                // Off by default while the rest of the app is migrated screen
+                // by screen. Here rather than hidden behind a `defaults write`
+                // because a switch nobody can reach is a feature nobody can
+                // judge — and the whole point of shipping it early is to live
+                // with it before the other fifteen screens follow.
+                Section(shop.words.callIt("set.appearance")) {
+                    Toggle(shop.words.callIt("set.new_shell"), isOn: $newShell)
+                    Text(shop.words.callIt("set.new_shell_why"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Section(shop.words.callIt("set.biz_tax")) {
                     // The registration number is called what the shop's tax
