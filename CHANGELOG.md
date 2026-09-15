@@ -1422,6 +1422,131 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.12] - 2026-09-15
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Changed
+
+- **The redesigned window is what Khayt opens with now.** The new sidebar,
+  title bar and Dashboard are on by default; the other screens are unchanged
+  and sit inside the new shell, which is a mixed state and the point of an
+  alpha. Settings → General → Appearance switches back in one click, and it is
+  a preference — nothing about the shop's book changes either way.
+
+- **The app fills a big display instead of stretching into it.** Above the
+  13-inch size everything is drawn for, the sidebar, the inspector and the
+  board column stay exactly as wide as they were: a 400-point inspector is not
+  a better inspector, and chrome that grows with the window is the first thing
+  that makes a Mac app feel pulled out of shape. The middle takes the extra
+  room. In the library that means MORE models per row rather than bigger ones
+  — five at the smallest size, eight on a 13-inch full screen, thirteen on a
+  Studio Display — and explanatory sentences stop growing at a readable
+  length rather than running the whole width of the screen, where the eye
+  loses its place coming back from the far end.
+
+- **One word per screen, and the same word in both apps.** The sidebar read
+  "Product Catalog", "All models", "Profit & Loss", "Colour studio" — software
+  words, not shop words, and long enough that Arabic (20–30% longer at the
+  same size) truncates where English is merely tight. They are Catalogue,
+  Library, Reports and Colour now, with Jobs, Customers, Inventory and Gift
+  cards alongside them. Four of those strings are shared with the Windows and
+  Linux app and change there too: a shop that hears "Catalogue" on the Mac and
+  reads "Product Catalog" on the floor PC has to learn they are one screen,
+  and that cost lands on whoever answers the phone. Values moved; no key did.
+
+- **(Maintainers) The mark on a money figure is never taken from a system
+  face.** macOS carries U+20C1, so falling back to it produces no
+  missing-glyph box — which is the problem rather than the reassurance: at
+  masthead size the system cut reads closer to a hash than to a currency mark,
+  so the app looks finished and is wrong, and nothing files a bug about it.
+  Until Khayt bundles its own single-glyph font the leaf says the ISO code,
+  which is unambiguous and visibly interim. The rule generalises: any mark the
+  app's meaning depends on comes from a font the app ships. A system face may
+  be absent; it may not be a surprise.
+
+- **(Maintainers) A filled diamond no longer means one thing in one table and
+  another in the next.** Silhouette separates kinds; fill separates severity,
+  and only inside a single kind. At 9.5pt filled-against-hollow is the hardest
+  distinction the app makes, and it was being asked to carry "a machine needs
+  looking at" against "this job is only a quote" across two different tables.
+  No glyph appears in both now.
+
+- **(Maintainers) The Saudi Riyal mark is U+20C1, and it is drawn as its own
+  leaf.** It was U+FDFC, which is the Iranian rial — a codepoint Unicode is
+  explicit that fonts must not remap. The mark is now set in a face that has
+  it rather than in the tabular figure face, which has no U+20C1 and
+  substitutes whatever is nearest; that substitution is how a non-currency
+  glyph got into the figures. Mark and digits are two leaves joined by one
+  non-breaking space, the mark carries a bidi isolate because it is class AL,
+  and the formatter shapes the digits only — it was placing the symbol where
+  the machine's locale wanted rather than where the design does.
+
+- **(Maintainers) A state is a KIND and a SEVERITY, in the shared rule's own
+  words.** `lib/attention.js` says `order` · `machine` · `nozzle` · `stock`
+  and `crit` · `warn`; the Mac had invented a parallel vocabulary and guessed
+  at the join, which silently put the due-today glyph on nine late jobs. The
+  glyph now names the kind and the word carries the severity, a worn nozzle is
+  a first-class state rather than a hole, and a severity nobody has listed
+  renders as an attention with its own word — never a new colour, and never
+  silently critical.
+
+- **(Maintainers) The type scale knows which face is rendering.** The brand
+  face ships as woff2, which Core Text cannot register, so the app runs on the
+  system face — and the tracking had been authored for the brand's narrower
+  figures. Left as it was on system display numerals it closes them up and the
+  money stops scanning. Both columns are written down now and the scale picks
+  by what is actually loaded, so bundling the real face changes nothing else.
+
+- **A counted string in Arabic may say the number in words.** آلة واحدة is
+  "one machine" and contains no numeral, which is correct Arabic and which the
+  placeholder guard called a mistake — so the numeral got added to satisfy it
+  and the app said "one one machine". The guard now runs per plural category
+  rather than per key, and nothing prepends a numeral to a form that has
+  already spelled one out.
+
+- **The redesigned window can be switched on from Settings.** It shipped
+  behind a preference with nothing to set it, which meant the only way to see
+  it was a `defaults write` — a switch nobody can reach is a feature nobody
+  can judge, and the point of landing it early is to live with it before the
+  rest of the app follows. Settings → General → Appearance, and you can switch
+  back at any time.
+
+- **(Maintainers) The Mac app has a design system, and it is enforced by
+  tests rather than by convention.** A colour role for every job, six type
+  steps, one spacing scale, and three rules a view cannot quietly break: a
+  state is a glyph AND a word AND a hue, so the app reads greyscaled; a figure
+  the book was never told is an em dash, never a zero; and every direction is
+  logical, so Arabic mirrors without a second code path. Nine guards read the
+  source and each one was proven by breaking the thing it guards. The shell,
+  the sidebar and the Dashboard are drawn to it and sit behind a switch while
+  the rest of the app is migrated screen by screen.
+
+- **(Maintainers) Three contrast failures the design's own measurements
+  caught.** The tertiary ink — which carries every column head, the OFFLINE
+  chip and the dash that means "not recorded" — sat at 2.33:1 against the
+  darkest content ground, roughly half the floor. White was hard-coded on the
+  brand fill, which passes in light and drops to 2.72:1 in dark. And a state
+  mark was painted on the navy sidebar in the value tuned for paper, which
+  measures 3.33:1 there. All three are now roles that cannot be mixed up, and
+  `ContrastTests` recomputes the whole table from the live values in both
+  appearances — including translucent grounds composited over what is beneath
+  them, and the STEPS between the three ink levels, because two inks that both
+  sit on the floor are one ink.
+
+- **(Maintainers) The riyal mark was jumping to the wrong side of its
+  digits.** U+FDFC is bidi class AL: the format pattern placed it before the
+  number and it drew after it. It is wrapped in isolates now and bound to its
+  digits with a non-breaking space, and a test reads the rendered string back
+  rather than trusting the pattern.
+
+- **A count said `{n}` instead of the number.** `counting` prepended the
+  numeral and left the placeholder in the value, so a sidebar that should have
+  read "5 machines · 31 people" read "5 {n} mac… · 31 {n} pe…". It substitutes
+  where the value asks for it now, which also stops a numeral being glued to a
+  word in whatever direction the paragraph happened to be.
+
 ## [4.0.0-alpha.11] - 2026-09-14
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
