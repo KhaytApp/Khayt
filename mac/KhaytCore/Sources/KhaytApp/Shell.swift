@@ -68,6 +68,24 @@ struct Shell<Content: View>: View {
     }
 }
 
+/// Which shell the window wears, and the ONE place its default lives.
+///
+/// ── THE BUG THIS EXISTS FOR ───────────────────────────────────────────────
+///
+/// `@AppStorage` takes its default per declaration, not per key. `ShopWindow`
+/// declared `= true` and `SettingsWindow` declared `= false`, under a comment
+/// saying "the same key, so the two cannot drift apart" — and before the key
+/// had ever been written they read different answers. The app opened in the
+/// new shell with the switch showing OFF, so a shop wanting the old one had to
+/// turn the switch ON and then off again.
+///
+/// A default is a value, so it is written down once and both sides read it.
+enum ShellChoice {
+    static let key = "ui.newShell"
+    /// ON as of 4.0.0-alpha.12 — see `ShopWindow.newShell` for why.
+    static let byDefault = true
+}
+
 /// The 40px navy strip.
 struct ShellTitleBar: View {
     @Bindable var shop: Shop

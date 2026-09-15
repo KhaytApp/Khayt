@@ -19,7 +19,6 @@ import KhaytCore
 struct Portfolio: View {
     @Bindable var shop: Shop
 
-    private let columns = [GridItem(.adaptive(minimum: 180, maximum: 260), spacing: 12, alignment: .top)]
 
     /// THE WINDOW'S search field, not one of this screen's own.
     ///
@@ -51,13 +50,22 @@ struct Portfolio: View {
             } else if shown.isEmpty {
                 NothingMatched(shop: shop, mark: .portfolio)
             } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(shown) { snap in cell(snap) }
+                // §10: tiles multiply. `.adaptive(minimum: 180, maximum: 260)`
+                // grew each photograph on a wide display instead of putting
+                // more of the shop's history on screen — see the note in
+                // `Catalogue.grid`, and `Wide.grid` for the arithmetic.
+                GeometryReader { geometry in
+                    ScrollView {
+                        LazyVGrid(columns:
+                                    Wide.grid(across: geometry.size.width - Metric.screen * 2),
+                                  alignment: .leading,
+                                  spacing: Wide.tileGap) {
+                            ForEach(shown) { snap in cell(snap) }
+                        }
+                        .padding(Metric.screen)
                     }
-                    .padding(Metric.screen)
+                    .background(Khayt.ground)
                 }
-                .background(Khayt.ground)
             }
         }
     }

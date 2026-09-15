@@ -161,13 +161,6 @@ struct LibraryGrid: View {
         }
     }
 
-    /// How many cells fit, never fewer than one.
-    static func columns(across width: CGFloat) -> Int {
-        let usable = width - 32   // the grid's own padding
-        guard usable > 0 else { return 1 }
-        return max(1, Int((usable + spacing) / (cellWidth + spacing)))
-    }
-
     /// Broken out of the grid body: the type-checker gave up on the whole
     /// expression once the modifiers went on.
     @ViewBuilder private func cell(for file: LibraryFile) -> some View {

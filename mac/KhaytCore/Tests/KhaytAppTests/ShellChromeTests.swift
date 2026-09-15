@@ -125,6 +125,28 @@ struct ShellChromeTests {
                 "the new strip has no Details switch, so a closed panel cannot be reopened")
     }
 
+    @Test("the switch and the window agree which shell is on")
+    func oneDefaultForTheShell() {
+        // `@AppStorage` takes its default per DECLARATION. Two declarations of
+        // one key with two defaults read differently until the key is first
+        // written, and this app shipped exactly that: the window opened in the
+        // new shell while Settings showed the switch off, so turning it ON did
+        // nothing and a shop wanting the old shell had to toggle it twice.
+        for name in ["ShopWindow.swift", "SettingsWindow.swift"] {
+            let text = Self.read(name)
+            #expect(text.contains("@AppStorage(ShellChoice.key)"), Comment(rawValue: """
+                \(name) names the shell key as a literal again. Both sides read \
+                `ShellChoice`, or they drift.
+                """))
+            #expect(!text.contains("@AppStorage(\"ui.newShell\")"), Comment(rawValue:
+                "\(name) still declares the key by hand"))
+            #expect(text.contains("= ShellChoice.byDefault"), Comment(rawValue: """
+                \(name) writes its own default for the shell. That is the bug: \
+                a default is a value, and it is written down once.
+                """))
+        }
+    }
+
     @Test("the shell takes the window's title bar off, and the old one puts it back")
     func chromeIsSwitched() {
         let window = Self.read("ShopWindow.swift")

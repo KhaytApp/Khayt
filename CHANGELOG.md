@@ -1205,6 +1205,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   font Khayt does not yet ship. macOS carries the official mark — checked with
   the system, not assumed — so the whole app says the same thing.
 
+- **The Appearance switch showed the wrong position.** `@AppStorage` takes its
+  default per declaration, and the window said "new shell" while Settings said
+  "old" — so before the switch had ever been touched it read OFF on a window
+  drawing the new shell, and getting back to the old one meant turning it on
+  and off again.
+
+- **A grid puts more on a big display, not bigger things.** The catalogue's
+  grid and the portfolio grew their tiles with the window instead of fitting
+  more in — a 260-point photograph is the same picture with the row half as
+  useful. Both use the library's arithmetic now.
+
 - **The sidebar's card says which book is open.** On the sample shop it says
   so, and the card is the menu that switches back to the shop's own.
 
