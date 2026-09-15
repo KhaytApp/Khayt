@@ -13,21 +13,28 @@ import SwiftUI
 /// draw fewer than two panes, and `SheetTabsTests` holds the app to the
 /// design's own table of which sheets have earned them.
 ///
-/// ── NOTHING CALLS THIS YET, AND THAT IS NOT AN OVERSIGHT ─────────────────
+/// ── ONE SHEET USES THIS, AND THAT IS THE WHOLE LIST ──────────────────────
 ///
-/// No sheet in the Mac app is tabbed today, and only one — Machine, at 22
-/// fields — clears twelve. Its fields are name, kind, model, colour, rate,
-/// nozzle and connection; the spec's panes for it are Machine · Build volume ·
-/// Rate · Service, and the Mac has no build-volume fields at all (they come
-/// from the printer catalogue) while having a Connection pane the spec does
-/// not list.
+/// `MachineSheet` — thirteen fields, above twelve, three panes. Nothing else
+/// in the Mac app clears the bar.
 ///
-/// Forcing the sheet into panes that do not match its fields would be worse
-/// than leaving it, so the rule is encoded here and the sheets follow once the
-/// design has answered which panes apply to the Mac's own field set. The
-/// alternative — retrofitting a tab strip onto a seven-field Customer form
-/// because a table says nineteen — is the exact failure §6's second half
-/// exists to prevent.
+/// It was uncalled for a while, on purpose: the design's table said Machine had
+/// 22 fields and named `Machine · Build volume · Rate · Service`, and the Mac
+/// has no build-volume fields at all (they come from the printer catalogue)
+/// while having a Connection block the table never listed. Forcing the sheet
+/// into panes that did not match its fields would have been worse than leaving
+/// it, so the rule was encoded and the question asked.
+///
+/// The answer: **three panes, not five** — Printer · Connection · Upkeep. The
+/// Camera block folds into Connection ("a URL and a toggle are a connection,
+/// not a subject") and the service fields leave Printer for Upkeep, "where the
+/// shop actually goes looking for them". Five tabs over thirteen fields is
+/// §6's rule failing in the other direction: not hiding work, but making a
+/// sheet look like a preferences window.
+///
+/// The rule for the remaining seventeen, in the design's words: **panes come
+/// from what the shop goes looking for, blocks from what reads well in a
+/// column — a pane may hold two blocks, never the reverse.**
 ///
 /// ── AND THE STRIP IS NOT A SEGMENTED CONTROL ──────────────────────────────
 ///
@@ -40,16 +47,6 @@ struct SheetPanes<Content: View>: View {
     @Binding var chosen: String
     let words: Words
     @ViewBuilder var content: (String) -> Content
-
-    struct Pane: Identifiable, Hashable {
-        /// A stable id, so a renamed label does not move the shop's place.
-        let id: String
-        let titleKey: String
-        /// Marks needing attention inside this pane — an empty required field,
-        /// a figure that will not parse. A pane that hides a problem is the
-        /// failure mode of tabs, so the strip says which one holds it.
-        var problems: Int = 0
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -97,6 +94,22 @@ struct SheetPanes<Content: View>: View {
     }
 }
 
+/// One pane of a sheet.
+///
+/// A top-level type rather than a member of `SheetPanes`, because a sheet
+/// declares its panes as a stored property and `SheetPanes` is generic over its
+/// content — naming `SheetPanes<Something>.Pane` there would make a sheet pick
+/// a content type before it has written the content.
+struct Pane: Identifiable, Hashable {
+    /// A stable id, so a renamed label does not move the shop's place.
+    let id: String
+    let titleKey: String
+    /// Marks needing attention inside this pane — an empty required field, a
+    /// figure that will not parse. A pane that hides a problem is the failure
+    /// mode of tabs, so the strip says which one holds it.
+    var problems: Int = 0
+}
+
 /// Which sheets have earned panes, and what those panes are.
 ///
 /// ── THESE COUNTS ARE THE OTHER APP'S, AND THAT IS THE POINT ──────────────
@@ -135,8 +148,11 @@ enum SheetMap {
               panes: ["job", "parts", "cost", "price", "dates", "notes"]),
         .init(name: "Product", fields: 28,
               panes: ["product", "model", "material", "price", "photos"]),
-        .init(name: "Machine", fields: 22,
-              panes: ["machine", "build", "rate", "service"]),
+        // THE ONE ROW COUNTED ON THIS APP RATHER THAN THE OTHER ONE. The
+        // design's table said 22 and named a build-volume pane the Mac has no
+        // fields for; corrected to what this sheet actually asks.
+        .init(name: "Machine", fields: 13,
+              panes: ["printer", "connection", "upkeep"]),
         .init(name: "Customer", fields: 19,
               panes: ["who", "contact", "billing", "notes"]),
         .init(name: "Shop settings", fields: 17,

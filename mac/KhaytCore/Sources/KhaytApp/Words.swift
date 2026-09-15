@@ -832,6 +832,15 @@ final class Words {
         "mac.state_out": ["en": "Out", "ar": "نفد"],
         "mac.state_low": ["en": "Low", "ar": "منخفض"],
         "mac.state_failed_send": ["en": "Not delivered", "ar": "لم تصل"],
+        // §4: gift cards get no chip — the balance column says it instead, and
+        // a spent card says `closed` where a figure would be.
+        "mac.gc_closed": ["en": "closed", "ar": "مغلقة"],
+        "mac.gc_all": ["en": "All", "ar": "الكل"],
+        // §6's panes, one word each. The Machine sheet is the only one in this
+        // app above twelve fields, and these are the three the design named.
+        "mac.pane_printer": ["en": "Printer", "ar": "الطابعة"],
+        "mac.pane_connection": ["en": "Connection", "ar": "الاتصال"],
+        "mac.pane_upkeep": ["en": "Upkeep", "ar": "الصيانة"],
         // §5: a total built over a hole says which way it is wrong.
         "mac.at_least":      ["en": "at least",     "ar": "على الأقل"],
         "mac.at_most":       ["en": "at most",      "ar": "على الأكثر"],

@@ -65,6 +65,10 @@ struct MachineSheet: View {
     /// the plaintext is never loaded into this sheet, so blank cannot mean
     /// "no key". `forgetKey` is how a shop says that on purpose.
     @State private var apiKey = ""
+    /// Which pane is open. Not `@SceneStorage`: two machines edited in one
+    /// session are two different questions, and reopening on "Upkeep" because
+    /// the last machine needed a nozzle is answering the wrong one.
+    @State private var pane = "printer"
 
     // The camera. `camSnapshot` may be typed as a path — `/webcam/?action=snapshot`
     // — and the shared rule makes it absolute against the printer's host.
@@ -103,6 +107,81 @@ struct MachineSheet: View {
         // without this its buttons sit below the screen. See `SheetFrame`.
         SheetFrame(width: Self.width) {
             Text(shop.words.callIt(isNew ? "mach.add" : "mach.edit")).font(.headline)
+
+            // §6: TABS ABOVE TWELVE FIELDS, AND NEVER AT OR BELOW.
+            //
+            // Both halves apply here and this sheet moves between them: a
+            // filament printer Khayt can talk to asks sixteen questions and
+            // earns panes; the same sheet for a laser cutter asks seven — no
+            // protocol in this repo, no nozzle to wear — and panes over seven
+            // fields would be §6 failing in the other direction, a short form
+            // pretending to be a preferences window.
+            if tabbed {
+                SheetPanes(panes: Self.panes, chosen: $pane, words: shop.words) { id in
+                    VStack(alignment: .leading, spacing: 14) {
+                        switch id {
+                        case "connection": connectionPane
+                        case "upkeep":     upkeepPane
+                        default:           printerPane
+                        }
+                    }
+                    .padding(.top, 14)
+                }
+            } else {
+                printerPane
+                if polled { LayerRule(); connectionPane }
+                LayerRule()
+                upkeepPane
+            }
+        } footer: {
+            HStack {
+                Spacer()
+                Button(shop.words.callIt("common.cancel")) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button(shop.words.callIt("common.save"), action: commit)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .task {
+            await shop.readCatalog()
+            kinds = await shop.machineKindChoices()
+        }
+        .onAppear(perform: fill)
+    }
+
+    /// The catalogue model this sheet is about to apply, if any.
+    @State private var chosen: String?
+
+    // MARK: - The three panes — §6, and the design's own names
+
+    /// Printer · Connection · Upkeep, in the order a shop meets them.
+    static let panes: [Pane] = [
+        .init(id: "printer", titleKey: "mac.pane_printer"),
+        .init(id: "connection", titleKey: "mac.pane_connection"),
+        .init(id: "upkeep", titleKey: "mac.pane_upkeep"),
+    ]
+
+    /// What this sheet is actually asking, which is not a constant.
+    ///
+    /// The design's table counted 13. That is the filament-printer-with-a-
+    /// protocol case; `lib/machine-kinds.js` says a laser cutter has no
+    /// protocol here and nothing on it wears like a nozzle, so the same sheet
+    /// asks seven. §6's rule is about the form in front of the person, so the
+    /// count has to be too.
+    private var fieldCount: Int {
+        var n = 6                                // name, kind, model, colour, power, target hours
+        if shows("nozzleDiameter") { n += 1 }    // nozzle size
+        if polled { n += 5 }                     // protocol, host, port, key, and the camera block
+        n += 1                                   // the downtime log
+        if shows("nozzleDiameter") { n += 3 }    // fitment, installed on, replace after
+        return n
+    }
+
+    private var tabbed: Bool { SheetMap.Sheet.earnsTabs(fieldCount) }
+
+    /// What the machine IS.
+    @ViewBuilder private var printerPane: some View {
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
@@ -181,41 +260,44 @@ struct MachineSheet: View {
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 70)
                 }
             }
+    }
 
-            // ── HOW KHAYT REACHES IT ─────────────────────────────────────
+    /// How Khayt reaches it — and the camera, which the design folds in here
+    /// because "a URL and a toggle are a connection, not a subject".
+    @ViewBuilder private var connectionPane: some View {
+        // ── HOW KHAYT REACHES IT ─────────────────────────────────────
+        //
+        // Only for a kind something here can actually ask.
+        // `lib/machine-kinds.js` says a laser cutter has no protocol in
+        // this repo, and offering it a host field would be inviting a shop
+        // to fill in a form that can never do anything.
+            Connection(
+                shop: shop, type: $apiType, host: $apiHost, port: $apiPort,
+                key: $apiKey, hasStoredKey: $hasStoredKey, forgetKey: $forgetKey,
+                testing: $testing, said: $testSaid, worked: $testWorked,
+                test: test)
+
+            // ── AND THE CAMERA ───────────────────────────────────────
             //
-            // Only for a kind something here can actually ask.
-            // `lib/machine-kinds.js` says a laser cutter has no protocol in
-            // this repo, and offering it a host field would be inviting a shop
-            // to fill in a form that can never do anything.
-            if polled {
-                LayerRule()
-                Connection(
-                    shop: shop, type: $apiType, host: $apiHost, port: $apiPort,
-                    key: $apiKey, hasStoredKey: $hasStoredKey, forgetKey: $forgetKey,
-                    testing: $testing, said: $testSaid, worked: $testWorked,
-                    test: test)
+            // Under the connection because it depends on it: the address is
+            // normalised against the printer's host, the credential that
+            // fetches a still is the printer's, and a snapshot may only be
+            // fetched from that same host at all.
+            LayerRule()
+            CameraSettings(
+                shop: shop, enabled: $camEnabled, snapshot: $camSnapshot,
+                rotate: $camRotate, flipH: $camFlipH, flipV: $camFlipV,
+                note: $camNote, looking: $camLooking, find: findCamera)
+    }
 
-                // ── AND THE CAMERA ───────────────────────────────────────
-                //
-                // Under the connection because it depends on it: the address is
-                // normalised against the printer's host, the credential that
-                // fetches a still is the printer's, and a snapshot may only be
-                // fetched from that same host at all.
-                LayerRule()
-                CameraSettings(
-                    shop: shop, enabled: $camEnabled, snapshot: $camSnapshot,
-                    rotate: $camRotate, flipH: $camFlipH, flipV: $camFlipV,
-                    note: $camNote, looking: $camLooking, find: findCamera)
-            }
-
+    /// What the shop goes looking for when the machine needs attention.
+    @ViewBuilder private var upkeepPane: some View {
             // ── WHEN IT IS OUT OF ACTION ─────────────────────────────────
             //
             // OUTSIDE the `polled` block, for every kind of machine: a laser is
             // booked out for a lens change the same way a printer is booked out
             // for a belt, and the band, the scheduler and the delivery promise
             // read these whatever the machine is.
-            LayerRule()
             DowntimeEditor(shop: shop, blocks: $downtime)
 
             // The whole wear block belongs to the nozzle, and only a filament
@@ -276,25 +358,7 @@ struct MachineSheet: View {
                 }
             }
             }
-        } footer: {
-            HStack {
-                Spacer()
-                Button(shop.words.callIt("common.cancel")) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button(shop.words.callIt("common.save"), action: commit)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-        }
-        .task {
-            await shop.readCatalog()
-            kinds = await shop.machineKindChoices()
-        }
-        .onAppear(perform: fill)
     }
-
-    /// The catalogue model this sheet is about to apply, if any.
-    @State private var chosen: String?
 
     private func fill() {
         guard let machine = existing else { focused = true; return }

@@ -61,11 +61,37 @@ extension Mark {
     var ink: Ink {
         switch self {
 
-        // A nozzle laying a bead. The app's own act, and its dashboard.
-        case .dashboard, .nozzle:
-            Ink(lines: [[p(12, 17), p(12, 21)]],
-                closed: [[p(5, 3), p(19, 3), p(16.5, 12), p(7.5, 12)]],
-                solid: [[p(8.5, 12), p(15.5, 12), p(12, 17)]])
+        // ── THESE TWO SHARED A SILHOUETTE, AND THAT WAS A COLLISION ──────
+        //
+        // Both were the nozzle laying a bead — the app's own act, used for the
+        // sidebar's Dashboard row and for a machine's nozzle. §6 is explicit
+        // that this counts even for a pair that never appears on one surface:
+        // the sidebar is permanently on screen, so the shape is LEARNED as
+        // "dashboard" and then contradicted in a machine row.
+        //
+        // The test is 13px on navy, side by side — not 20px in a specimen
+        // sheet, where almost anything reads apart.
+
+        // Four equal panes. A dashboard is the shop at a glance, and a glance
+        // is what four panes say.
+        case .dashboard:
+            Ink(closed: [[p(4, 4), p(11, 4), p(11, 11), p(4, 11)],
+                         [p(13, 4), p(20, 4), p(20, 11), p(13, 11)],
+                         [p(4, 13), p(11, 13), p(11, 20), p(4, 20)],
+                         [p(13, 13), p(20, 13), p(20, 20), p(13, 20)]])
+
+        // A tapered hot end with its heater band — the design's own path.
+        //
+        // SCALED TO FILL THIS SQUARE, not transcribed. The design draws on a
+        // 16-unit grid and its path fills 7.6 × 10.6 of it; dropped onto 24
+        // units at 1:1.5 the mark came out 11.4 wide, and `fillsTheGrid` is
+        // right to refuse that — a mark drawn small sits in a pool of space
+        // beside one that is not and the row looks ragged. The shape is the
+        // design's; the size is this set's.
+        case .nozzle:
+            Ink(lines: [[p(4.8, 8.59), p(19.2, 8.59)]],
+                closed: [[p(6.69, 1.96), p(17.31, 1.96), p(17.31, 11.81),
+                          p(12, 22.04), p(6.69, 11.81)]])
 
         // Layers stacking — widest at the bottom, because that is how a part
         // comes off a plate. Not a list: a list is what `tray.full` was.
