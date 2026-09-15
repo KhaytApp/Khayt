@@ -133,8 +133,10 @@ struct BusinessPane: View {
     @State private var draft = Draft()
     @State private var original = Draft()
     @AppStorage("mac.menuBar") private var menuBar = true
-    /// The same key `ShopWindow` reads, so the two cannot drift apart.
-    @AppStorage("ui.newShell") private var newShell = false
+    /// The same key AND the same default as `ShopWindow` — both from
+    /// `ShellChoice`, because declaring the default twice is how this switch
+    /// came to read OFF in a window that was drawing the new shell.
+    @AppStorage(ShellChoice.key) private var newShell = ShellChoice.byDefault
 
     var body: some View {
         VStack(spacing: 0) {

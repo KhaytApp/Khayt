@@ -25,19 +25,26 @@ struct GridKeysTests {
         }
     }
 
+    /// THE COUNT THE GRID ACTUALLY DRAWS, which was not the one measured here.
+    ///
+    /// `LibraryGrid` had a `columns(across:)` of its own — a 176pt cell and a
+    /// 16pt gap, pitch 192 — and nothing in the app called it. The grid asks
+    /// `Wide.columns`, pitch 165, and has since §10 landed. So this suite was
+    /// pinning arithmetic no screen used, which is the shape of bug that lets
+    /// the arrow keys and the grid disagree about what a row is.
     @Test("the column count follows the width, and is never zero")
     func columnsFitTheWidth() {
         // A pane narrower than one cell still gets one, or the grid divides by
         // nothing and the arrow keys stop meaning anything.
-        #expect(LibraryGrid.columns(across: 0) == 1)
-        #expect(LibraryGrid.columns(across: 40) == 1)
-        #expect(LibraryGrid.columns(across: 240) == 1)
-        #expect(LibraryGrid.columns(across: 420) == 2)
-        #expect(LibraryGrid.columns(across: 800) == 4)
+        #expect(Wide.columns(across: 0) == 1)
+        #expect(Wide.columns(across: 40) == 1)
+        #expect(Wide.columns(across: 240) == 1)
+        #expect(Wide.columns(across: 420) == 2)
+        #expect(Wide.columns(across: 800) == 4)
         // Monotonic: a wider pane never fits fewer.
         var last = 0
         for width in stride(from: 100.0, through: 2000.0, by: 37.0) {
-            let n = LibraryGrid.columns(across: width)
+            let n = Wide.columns(across: width)
             #expect(n >= last, "\(width)pt fits \(n), narrower fitted \(last)")
             last = n
         }

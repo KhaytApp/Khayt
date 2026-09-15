@@ -75,7 +75,7 @@ struct ShopWindow: View {
     /// which is a mixed state and the point of an alpha. Settings → General →
     /// Appearance switches back in one click, and the preference is a
     /// preference — nothing about the book changes either way.
-    @AppStorage("ui.newShell") private var newShell = true
+    @AppStorage(ShellChoice.key) private var newShell = ShellChoice.byDefault
 
     var body: some View {
         if newShell {

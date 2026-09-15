@@ -86,13 +86,19 @@ struct Catalogue: View {
 
     // MARK: - The grid
 
-    private static let cellWidth: CGFloat = 176
-    private static let spacing: CGFloat = 16
-
     private var grid: some View {
+        // §10: TILES MULTIPLY, THEY DO NOT INFLATE.
+        //
+        // `.adaptive` does the opposite — it takes the remainder and shares it
+        // out among the columns, so on a Studio Display a product photograph
+        // was drawn at 260pt instead of another two products being on screen.
+        // A 260-point photograph is the same picture with the row half as
+        // useful. `Wide.grid` is the same arithmetic `LibraryGrid` uses.
+        GeometryReader { geometry in
         ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: Self.cellWidth), spacing: Self.spacing)],
-                      spacing: Self.spacing) {
+            LazyVGrid(columns: Wide.grid(across: geometry.size.width - Metric.screen * 2),
+                      alignment: .leading,
+                      spacing: Wide.tileGap) {
                 ForEach(shop.shownProducts.sorted(using: order)) { row in
                     ProductCell(row: row, shop: shop, selected: selection == row.id)
                         .onTapGesture(count: 2) { edit(row.id) }
@@ -104,6 +110,7 @@ struct Catalogue: View {
         }
         .background(Khayt.ground)
         .overlay { emptyState }
+        }
     }
 
     @ViewBuilder private func menu(for row: KhaytEngine.CatalogueRow) -> some View {
