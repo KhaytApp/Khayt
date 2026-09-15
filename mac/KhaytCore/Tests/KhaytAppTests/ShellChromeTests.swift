@@ -176,3 +176,56 @@ struct ShellChromeTests {
                 "the shells no longer say which they are, so `.screenToolbar` cannot tell")
     }
 }
+
+/// What the strip says you are looking at.
+///
+/// The old window had a subtitle and a group menu in its toolbar; the new one
+/// has the strip, and the strip was naming the SCREEN. Open a library folder
+/// and the title still read "All models" while the sidebar row still sat on
+/// Library — nothing on screen named the folder, which is a place a shop can
+/// be without being able to tell.
+@MainActor
+struct ShelfTitleTests {
+
+    @Test("a library group is named by the group, not by the screen")
+    func groupNamesItself() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.shelf = .library(nil)
+        let all = shop.shelfTitle
+        shop.shelf = .library("Pose 1")
+        #expect(shop.shelfTitle == "Pose 1", """
+            a folder is still titled "\(shop.shelfTitle)". Opening one left the \
+            title on the screen's name and nothing anywhere saying which folder.
+            """)
+        #expect(all != shop.shelfTitle, "the folder and the whole library read the same")
+    }
+
+    @Test("a stage says which stage, and the whole book says the book")
+    func stagesNameThemselves() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.shelf = .jobs(nil)
+        let all = shop.shelfTitle
+        shop.shelf = .jobs(.printing)
+        #expect(shop.shelfTitle != all, "a stage is titled the same as every job")
+        #expect(!shop.shelfTitle.hasPrefix("queue."), """
+            the title is a word KEY — a missing key is not blank, it IS the key, \
+            so the strip would read "queue.printing"
+            """)
+    }
+
+    @Test("every other screen still has a word")
+    func nothingReadsAsAKey() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        for shelf in [Shop.Shelf.dashboard, .board, .customers, .machines, .inventory,
+                      .expenses, .waste, .reports, .catalogue, .colour, .calculator,
+                      .portfolio, .giftCards] {
+            shop.shelf = shelf
+            let title = shop.shelfTitle
+            #expect(!title.contains("."), Comment(rawValue:
+                "\(shelf) is titled \"\(title)\", which is a key rather than a word"))
+        }
+    }
+}

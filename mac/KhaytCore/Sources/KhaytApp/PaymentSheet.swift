@@ -40,14 +40,17 @@ struct PaymentSheet: View {
                 GridRow {
                     Text(shop.words.callIt("pay.amount_paid")).foregroundStyle(.secondary)
                     // The currency beside the box a figure is typed into, not
-                    // only beside the totals it is compared against.
+                    // only beside the totals it is compared against — and the
+                    // MARK, the way the two totals on this same sheet write it.
+                    // It said "SAR" here and drew the mark two rows above, so
+                    // one sheet spelled one currency two ways.
                     HStack(spacing: 4) {
                         TextField("", value: $amount, format: .number.precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder)
                             .monospacedDigit()
                             .focused($focused)
                             .onSubmit(commit)
-                        Text(currency).foregroundStyle(.secondary)
+                        Text(Money.mark(currency)).foregroundStyle(.secondary)
                     }
                 }
                 GridRow {
