@@ -70,6 +70,44 @@ struct Figure: View {
     }
 
     var body: some View {
+        if case .money(let code) = style, value != nil, Self.hasOwnMark(code) {
+            // ── TWO LEAVES, AND THE MARK IS NOT IN THE FIGURE FACE ────────
+            //
+            // §5: "Never ask the figure face for the mark — it has no U+20C1
+            // and substitutes whatever is nearest, which is how a non-currency
+            // glyph got into the figures." So the mark is its own leaf in a
+            // face that HAS it, the digits are their own leaf in the tabular
+            // one, and a non-breaking space joins them and nothing else.
+            //
+            // The mark is isolated (U+2068 … U+2069) because U+20C1 is bidi
+            // class AL: without it the algorithm carries it to the far side of
+            // the digits even in a leaf pinned left-to-right.
+            HStack(spacing: 0) {
+                // The mark carries its own binding space, so the gap is part
+                // of the mark's leaf rather than a third leaf of its own — a
+                // bare `Text(" ")` in a view is also a string literal, and the
+                // guard that keeps English out of views is right to say so.
+                Text(Self.markLeaf)
+                    .font(Self.markFont(size))
+                Text(renderedText)
+                    .font(TypeScale.figure(size, weight: weight))
+                    .monospacedDigit()
+            }
+            .foregroundStyle(tint)
+            .environment(\.layoutDirection, .leftToRight)
+            // A figure is one thing. Three leaves in a row can each be
+            // squeezed on their own, and the first squeeze broke "52,691.57"
+            // across two lines — a money figure that wraps is a money figure
+            // somebody misreads.
+            .lineLimit(1)
+            .fixedSize()
+            .accessibilityElement(children: .combine)
+        } else {
+            plain
+        }
+    }
+
+    private var plain: some View {
         Text(renderedText)
             .font(TypeScale.figure(size, weight: weight))
             .monospacedDigit()
@@ -91,6 +129,7 @@ struct Figure: View {
         case .plain:
             return Self.plain.string(from: NSNumber(value: value)) ?? "—"
         case .money(let code):
+            // Digits only. The mark is a separate leaf — see `body`.
             return Self.money(code).string(from: NSNumber(value: value)) ?? "—"
         case .unit(let unit):
             // A non-breaking space binds the unit to its digits, so a narrow
@@ -101,6 +140,51 @@ struct Figure: View {
             let n = Self.percent.string(from: NSNumber(value: value)) ?? "—"
             return value > 0 ? "+" + n : n
         }
+    }
+
+    /// How a money figure is composed, so the rule can be read back.
+    ///
+    /// Three pieces and no string that contains all of them: that IS the rule
+    /// — the mark and the digits are set in different faces and joined by one
+    /// non-breaking space.
+    struct MoneyParts: Equatable {
+        let mark: String
+        let gap: String
+        let digits: String
+    }
+
+    var moneyParts: MoneyParts? {
+        guard case .money(let code) = style, let value, Self.hasOwnMark(code) else { return nil }
+        return MoneyParts(mark: Self.isolated(Self.mark),
+                          gap: "\u{00A0}",
+                          digits: Self.money(code).string(from: NSNumber(value: value)) ?? "—")
+    }
+
+    /// U+20C1 SAUDI RIYAL SIGN — §5, and NOT U+FDFC, which is the Iranian
+    /// rial and which Unicode is explicit fonts must not remap.
+    static let mark = "\u{20C1}"
+
+    /// Which currencies Khayt draws a mark for itself rather than leaving to
+    /// the formatter. One, for now, and it is the shop's own.
+    static func hasOwnMark(_ code: String) -> Bool { code == "SAR" }
+
+    /// First-strong isolate … pop. The `<bdi>` of the reference implementation.
+    static func isolated(_ text: String) -> String { "\u{2068}" + text + "\u{2069}" }
+
+    /// The mark, isolated, with the non-breaking space that binds it to the
+    /// digits. One leaf: the space travels with the mark rather than standing
+    /// alone, so nothing can put a line break between them.
+    static let markLeaf = isolated(mark) + "\u{00A0}"
+
+    /// The face the mark is set in.
+    ///
+    /// `KhaytRiyal` when it is bundled — the spec's single-glyph font, still to
+    /// be cut. Until then the system face, which on macOS 26 carries U+20C1;
+    /// what it must never be is the monospaced figure face, which does not.
+    static func markFont(_ size: CGFloat) -> Font {
+        NSFontManager.shared.availableFontFamilies.contains("KhaytRiyal")
+            ? .custom("KhaytRiyal", fixedSize: size)
+            : .system(size: size, weight: .semibold)
     }
 
     // MARK: - Formatters
@@ -127,7 +211,10 @@ struct Figure: View {
     private static func money(_ code: String) -> NumberFormatter {
         if let made = moneyCache[code] { return made }
         let f = NumberFormatter()
-        f.numberStyle = .currency
+        // Digits, grouping and decimals — not the symbol. Khayt composes the
+        // mark itself (§5), because the formatter places it where the LOCALE
+        // wants rather than where the design does.
+        f.numberStyle = hasOwnMark(code) ? .decimal : .currency
         f.currencyCode = code
         // The LOCALE decides which side the symbol sits on, and for the riyal
         // that is not a detail: writing "﷼ 1,240" by hand puts an AL-class
@@ -143,27 +230,6 @@ struct Figure: View {
         //
         // Worth one look before this spreads: the two marks disagreeing across
         // the app is a question for the spec, not for this formatter.
-        if code == "SAR" {
-            // ISOLATED, not merely placed. U+FDFC is bidi class AL: beside
-            // Latin digits it forms its own right-to-left run and the algorithm
-            // reorders it to the far side of the number — the pattern below
-            // puts it first and it rendered last, which is precisely the jump
-            // §5 describes. U+2068/U+2069 (first-strong isolate, pop) are the
-            // `<bdi>` the reference implementation wraps it in.
-            f.currencySymbol = "\u{2068}\u{FDFC}\u{2069}"
-            // ── AND BOUND TO ITS DIGITS ───────────────────────────────────
-            //
-            // §5: the mark "must be bidi-isolated and bound to its digits with
-            // a non-breaking space". The machine's locale decides position for
-            // ITS currency, not for the shop's — on an en_US Mac it put the
-            // riyal after the number with nothing between, which is neither the
-            // Saudi convention nor readable.
-            //
-            // A PATTERN rather than a concatenation: the formatter still places
-            // the mark, so this is not the string-building §5 forbids.
-            f.positiveFormat = "¤\u{00A0}#,##0.00"
-            f.negativeFormat = "-¤\u{00A0}#,##0.00"
-        }
         f.maximumFractionDigits = 2
         f.minimumFractionDigits = 2
         moneyCache[code] = f

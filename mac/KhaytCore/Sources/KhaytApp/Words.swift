@@ -176,6 +176,17 @@ final class Words {
         if said.contains("{n}") {
             return said.replacingOccurrences(of: "{n}", with: number)
         }
+        // ── AND A FORM THAT SPELLS THE NUMBER OUT GETS NO NUMERAL ─────────
+        //
+        // §11: Arabic's natural `one` carries the number in words — آلة واحدة
+        // is "one machine" — so a numeral in front of it reads as "one one
+        // machine". The dual (آلتان) returns earlier, above.
+        //
+        // The test is the VALUE, not the language or the count: `يوم` is bare
+        // "day" and wants its numeral, `آلة واحدة` already has one. Checking
+        // for the word rather than assuming by language is what keeps the
+        // first of those working.
+        if n == 1, said.contains("واحد") { return said }
         // A plain space, not a non-breaking one. Binding the numeral to the
         // word is tempting and wrong here: eight existing tests read this
         // output back and compare it to "2 days", and a caller that has to
@@ -793,6 +804,12 @@ final class Words {
         "mac.state_blocked":   ["en": "Blocked",   "ar": "متوقف"],
         "mac.state_quoted":    ["en": "Quoted",    "ar": "عرض سعر"],
         "mac.state_offline":   ["en": "Offline",   "ar": "غير متصل"],
+        "mac.state_stopped": ["en": "Stopped", "ar": "متوقفة"],
+        "mac.state_check_it": ["en": "Check it", "ar": "افحصها"],
+        "mac.state_worn": ["en": "Worn", "ar": "مهترئة"],
+        "mac.state_out": ["en": "Out", "ar": "نفد"],
+        "mac.state_low": ["en": "Low", "ar": "منخفض"],
+        "mac.state_failed_send": ["en": "Not delivered", "ar": "لم تصل"],
         // §5: a total built over a hole says which way it is wrong.
         "mac.at_least":      ["en": "at least",     "ar": "على الأقل"],
         "mac.at_most":       ["en": "at most",      "ar": "على الأكثر"],
@@ -808,9 +825,9 @@ final class Words {
         "mac.offline":       ["en": "offline",      "ar": "غير متصل"],
         "mac.saved_at":      ["en": "saved {t}",    "ar": "حُفظ {t}"],
         "mac.n_machines":    ["en": "{n} machines", "ar": "{n} آلات"],
-        "mac.n_machines_one": ["en": "{n} machine", "ar": "{n} آلة"],
+        "mac.n_machines_one": ["en": "{n} machine", "ar": "آلة واحدة"],
         "mac.n_people":      ["en": "{n} people",   "ar": "{n} أشخاص"],
-        "mac.n_people_one":  ["en": "{n} person",   "ar": "{n} شخص"],
+        "mac.n_people_one":  ["en": "{n} person",   "ar": "شخص واحد"],
         // ── AND THE TWO AXES THE GROUPING MENU NEVER HAD ─────────────────
         //
         // A group is the SET a model belongs to; a category is what it IS, and

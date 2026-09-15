@@ -62,9 +62,10 @@ struct MachineTile: View {
 
     private var ground: Color {
         switch reading.state {
-        case .running:  Role.surf3
-        case .dueToday: Role.warnBg
-        default:        Role.surf2
+        case .running:            Role.surf3
+        case .machineCheck,
+             .machineStopped:     Role.warnBg
+        default:                  Role.surf2
         }
     }
 }

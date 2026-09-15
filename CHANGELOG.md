@@ -6,6 +6,39 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) The Saudi Riyal mark is U+20C1, and it is drawn as its own
+  leaf.** It was U+FDFC, which is the Iranian rial — a codepoint Unicode is
+  explicit that fonts must not remap. The mark is now set in a face that has
+  it rather than in the tabular figure face, which has no U+20C1 and
+  substitutes whatever is nearest; that substitution is how a non-currency
+  glyph got into the figures. Mark and digits are two leaves joined by one
+  non-breaking space, the mark carries a bidi isolate because it is class AL,
+  and the formatter shapes the digits only — it was placing the symbol where
+  the machine's locale wanted rather than where the design does.
+
+- **(Maintainers) A state is a KIND and a SEVERITY, in the shared rule's own
+  words.** `lib/attention.js` says `order` · `machine` · `nozzle` · `stock`
+  and `crit` · `warn`; the Mac had invented a parallel vocabulary and guessed
+  at the join, which silently put the due-today glyph on nine late jobs. The
+  glyph now names the kind and the word carries the severity, a worn nozzle is
+  a first-class state rather than a hole, and a severity nobody has listed
+  renders as an attention with its own word — never a new colour, and never
+  silently critical.
+
+- **(Maintainers) The type scale knows which face is rendering.** The brand
+  face ships as woff2, which Core Text cannot register, so the app runs on the
+  system face — and the tracking had been authored for the brand's narrower
+  figures. Left as it was on system display numerals it closes them up and the
+  money stops scanning. Both columns are written down now and the scale picks
+  by what is actually loaded, so bundling the real face changes nothing else.
+
+- **A counted string in Arabic may say the number in words.** آلة واحدة is
+  "one machine" and contains no numeral, which is correct Arabic and which the
+  placeholder guard called a mistake — so the numeral got added to satisfy it
+  and the app said "one one machine". The guard now runs per plural category
+  rather than per key, and nothing prepends a numeral to a form that has
+  already spelled one out.
+
 - **The redesigned window can be switched on from Settings.** It shipped
   behind a preference with nothing to set it, which meant the only way to see
   it was a `defaults write` — a switch nobody can reach is a feature nobody

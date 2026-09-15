@@ -109,7 +109,7 @@ extension Shop {
 
     private func state(of order: Order) -> ShopState {
         if order.isSettled { return .done }
-        if isLate(order) { return .late }
+        if isLate(order) { return .orderLate }
         switch order.status.lowercased() {
         case "printing":        return .running
         case "quote", "quoted": return .quoted
