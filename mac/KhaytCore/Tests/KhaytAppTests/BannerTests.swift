@@ -12,11 +12,26 @@ import Testing
 @MainActor
 struct BannerTests {
 
-    static func source(_ name: String) -> String {
+    /// A source file — and a recorded failure when there isn't one.
+    ///
+    /// It returned `""` for a file it could not find, which is how a dozen
+    /// structural tests came to have a silent third outcome: not pass, not
+    /// fail, but assert against the empty string. Half of them pass on it
+    /// (`!source.contains("bad thing")`) and half fail with a sentence about
+    /// entirely the wrong thing — moving `Money.swift` to another module
+    /// produced "the riyal mark moved off U+20C1" when what moved was the file.
+    ///
+    /// A test that reads nothing must say so.
+    static func source(_ name: String, file: StaticString = #filePath,
+                       line: UInt = #line) -> String {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytApp/\(name)")
-        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        if let text = try? String(contentsOf: url, encoding: .utf8) { return text }
+        Issue.record("\(name) is not in Sources/KhaytApp — this test is reading nothing",
+                     sourceLocation: SourceLocation(fileID: #fileID, filePath: "\(file)",
+                                                    line: Int(line), column: 1))
+        return ""
     }
 
     /// The three the window has to carry, above whatever screen is showing.

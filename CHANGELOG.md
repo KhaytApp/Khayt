@@ -1174,6 +1174,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **A job taken from the catalogue is priced.** Any part weighing a kilo or
+  more came into the sheet as nothing at all, so nothing was costed and the job
+  opened at zero — a product the catalogue prices at 3,250 became a job priced
+  at 0.00, with no error anywhere. The figures were being written into the
+  editable field by the DISPLAY formatter, which groups thousands: "1,234.6",
+  which the app then cannot read back. A shop's biggest prints are exactly the
+  ones over a kilo.
+
+  The same formatter was rounding every part it did read — 140.91 g became
+  140.9 g — so opening a product and saving it quietly changed its figures.
+
+- **And when a product genuinely has nothing to price, the sheet says so.** A
+  product with no weight, print time or filament recorded costs nothing,
+  correctly; the product editor has always said that, and a shop taking a job
+  from the catalogue never opens the product editor.
+
+- **The "Your prices" setting is switched off with the tax it belongs to.**
+  With VAT off it was the one control in that block still live — a picker a
+  shop could change and watch every figure in the app stay where it was.
+
 - **The Quick Look extensions build again on Xcode 26.x.** Its SwiftPM makes
   `swiftbuild` the default engine, and that one links an executable for the
   ordinary `_main` where the old engine used the target's own name — so the

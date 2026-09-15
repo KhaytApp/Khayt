@@ -116,8 +116,11 @@ struct ProductSheet: View {
             var row = PartRow()
             row.name = Shop.plainString(o["name"]) ?? ""
             row.spoolId = Shop.plainString(o["filamentId"])
-            row.grams = Money.quantity(Shop.plainNumber(o["printWeight"]) ?? 0)
-            row.hours = Money.quantity(Shop.plainNumber(o["printTime"]) ?? 0)
+            // `fieldValue`, NOT `quantity`: a part of a kilo or more read
+            // back as nothing, and opening a product then saving it rounded
+            // every figure in it. See `Money.fieldValue`.
+            row.grams = Money.fieldValue(Shop.plainNumber(o["printWeight"]))
+            row.hours = Money.fieldValue(Shop.plainNumber(o["printTime"]))
             row.qty = Int(Shop.plainNumber(o["qty"]) ?? 1)
             return row
         }

@@ -1895,6 +1895,20 @@ final class Words {
                                    + "Pick a spool for each part.",
                                    "ar": "لم يُختر خيط لهذه القطع، فلا تكلفة لها — سيصبح سعر المنتج "
                                    + "صفرًا عند الحفظ. اختر بكرة لكل قطعة."],
+        // THE SAME FACT, SAID WHERE THE SHOP MEETS IT.
+        //
+        // The warning above is in the product EDITOR. A shop that takes a job
+        // from the catalogue never opens that sheet: it presses Take a job,
+        // gets a form with a part in it and a total of zero, and has nothing to
+        // read. Reported exactly that way — "I click create a job for an item
+        // in catalogue but the price is zero?"
+        "mac.product_not_costed": ["en": "{product} has no weight, print time or "
+                                   + "filament recorded, so there is nothing to price yet. "
+                                   + "Fill the part in below, or open it in the Catalogue "
+                                   + "and cost it once.",
+                                   "ar": "لا يحتوي {product} على وزن أو زمن طباعة أو خيط مسجّل، "
+                                   + "فلا شيء لتسعيره بعد. أكمل القطعة أدناه، أو افتحه في "
+                                   + "الكتالوج وسعّره مرة واحدة."],
         // The shop's own realized margins, NET OF TAX. Two sentences because
         // the rule falls back to every priced job when a material has fewer
         // than three, and a median over "everything you sell" is a different

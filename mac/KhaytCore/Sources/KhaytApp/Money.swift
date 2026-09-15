@@ -143,6 +143,40 @@ enum Money {
         return f.string(from: n as NSNumber) ?? "\(n)"
     }
 
+    /// A figure on its way INTO a text field, not onto a screen.
+    ///
+    /// ── WHY THIS IS NOT `quantity` ────────────────────────────────────────
+    ///
+    /// `quantity` is a display formatter: it groups thousands and rounds to one
+    /// decimal, both of which are right for a label and wrong for a field
+    /// somebody is about to edit and the app is about to parse back with
+    /// `Double(_:)`.
+    ///
+    /// Rounding loses the shop's figures — a part recorded at 140.91 g came
+    /// into the editor as "140.9" and was saved back at 140.9.
+    ///
+    /// The grouping is worse, and it is the bug this was found by. At a
+    /// thousand and over, `quantity` writes "1,234.6" — and `Double("1,234.6")`
+    /// is **nil**. So every part weighing a kilo or more read back as nothing:
+    /// the part looked incomplete, nothing was costed, and a job taken from a
+    /// product the catalogue prices at 3,250 opened priced at zero, with no
+    /// error anywhere. A shop's biggest prints are exactly the ones over a kilo.
+    ///
+    /// So: no grouping, no lost precision, and an empty field — not "0" — for a
+    /// figure the book has never been told.
+    static func fieldValue(_ amount: Double?) -> String {
+        guard let amount else { return "" }
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.locale = digits
+        f.usesGroupingSeparator = false
+        f.minimumFractionDigits = 0
+        // Enough to hold anything a slicer writes. Four, not "as many as it
+        // takes", so a double's binary tail does not surface as 140.90999999.
+        f.maximumFractionDigits = 4
+        return f.string(from: amount as NSNumber) ?? "\(amount)"
+    }
+
     /// Money with the small change rubbed off, for a dashboard tile.
     ///
     /// A tile is read at a glance; "52,691.57 SAR" at 24pt either wraps or
