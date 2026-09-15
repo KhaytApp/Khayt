@@ -1216,6 +1216,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   more in — a 260-point photograph is the same picture with the row half as
   useful. Both use the library's arithmetic now.
 
+- **The Machine sheet is three panes instead of one long scroll.** Printer ·
+  Connection · Upkeep. It was the only editor in the app that asked more than
+  twelve questions, and on a 13-inch screen its Save button sat below the
+  bottom of it. A laser cutter, which asks seven, still gets one column — tabs
+  over a short form hide work rather than organise it.
+
+- **Gift cards lost their Status column and gained a filter.** Active, Used and
+  Expired were a coloured word restating what the row already said three times
+  over; a spent card now reads `closed` where its balance was and fades the way
+  every other settled row in the app does. The three words became the way to
+  ask instead — chips above the table — and each row says its state to
+  VoiceOver.
+
+- **The Dashboard and the nozzle are no longer the same icon.** Both were the
+  nozzle laying a bead. The sidebar is permanently on screen, so that shape is
+  learned as "dashboard" and then contradicted in a machine row.
+
 - **One currency, one spelling, on the payment sheet.** It drew the riyal mark
   beside the total and wrote "SAR" beside the box the amount is typed into —
   the same money, two ways, two rows apart.

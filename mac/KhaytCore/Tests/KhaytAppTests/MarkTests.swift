@@ -88,11 +88,14 @@ struct MarkTests {
                 .map { "\($0.0.x),\($0.0.y),\($0.1)" }.sorted().joined(separator: "|")
             return poly + "//" + round
         }
+        // NO EXEMPTIONS. `.nozzle` had one — "the dashboard IS the nozzle: the
+        // app's own act is its front door" — and §6 has ruled the other way:
+        // no two icons may share a silhouette, INCLUDING a pair that never
+        // appears on the same surface. The sidebar is permanently on screen,
+        // so the shape is learned as "dashboard" and then contradicted in a
+        // machine row.
         var seen: [String: Mark] = [:]
         for mark in Mark.allCases {
-            // The dashboard IS the nozzle: the app's own act is its front door,
-            // and that repetition is the point rather than an oversight.
-            if mark == .nozzle { continue }
             let print = fingerprint(mark)
             if let clash = seen[print] {
                 Issue.record("\(mark.rawValue) is the same drawing as \(clash.rawValue)")
@@ -101,11 +104,25 @@ struct MarkTests {
         }
     }
 
-    @Test("the dashboard and the nozzle are deliberately the same mark")
-    func theFrontDoorIsTheAct() {
-        #expect(Mark.dashboard.ink.solid.count == Mark.nozzle.ink.solid.count)
-        #expect(!Mark.dashboard.ink.solid.isEmpty,
-                "the bead is the one filled thing in the app's mark, and it is filled")
+    /// The pair §6 named, checked as a pair.
+    ///
+    /// `allDistinct` above would catch an exact copy. This catches the weaker
+    /// failure the design is actually worried about: two marks that are not
+    /// byte-identical and still read as one shape at 13px on navy. They now
+    /// differ in what they are MADE of — four closed panes against one tapered
+    /// outline and a band — which is a difference the eye keeps at any size.
+    @Test("the dashboard and the nozzle are not one shape")
+    func theFrontDoorIsNotTheAct() {
+        let dash = Mark.dashboard.ink
+        let nozzle = Mark.nozzle.ink
+        #expect(dash.closed.count != nozzle.closed.count, """
+            the dashboard and the nozzle are built from the same number of \
+            closed outlines again, which is how they came to be one drawing
+            """)
+        #expect(dash.lines.isEmpty && !nozzle.lines.isEmpty,
+                "the heater band is what makes the nozzle a nozzle")
+        #expect(dash.solid.isEmpty && nozzle.solid.isEmpty,
+                "§6: no fills — an icon inherits the text colour beside it")
     }
 
     /// The stroke has to scale with the mark, or a 32pt one is a 16pt one with

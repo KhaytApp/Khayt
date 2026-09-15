@@ -28,9 +28,30 @@ struct GiftCards: View {
         let term = shop.search.trimmingCharacters(in: .whitespaces).lowercased()
         guard !term.isEmpty else { return shop.giftCards }
         return shop.giftCards.filter {
-            $0.code.lowercased().contains(term) || (holder($0) ?? "").lowercased().contains(term)
+            guard shop.giftCardState == nil
+                    || shop.giftCardStatuses[$0.id] ?? "active" == shop.giftCardState else { return false }
+            guard !term.isEmpty else { return true }
+            return $0.code.lowercased().contains(term)
+                || (holder($0) ?? "").lowercased().contains(term)
         }
     }
+
+    /// What this card's state is called, for the filter and for VoiceOver.
+    private func state(_ card: GiftCard) -> String {
+        shop.giftCardStatuses[card.id] ?? "active"
+    }
+
+    private func stateWord(_ card: GiftCard) -> String {
+        switch state(card) {
+        case "expired": shop.words.callIt("gcExpired")
+        case "used":    shop.words.callIt("gcUsed")
+        default:        shop.words.callIt("gcActive")
+        }
+    }
+
+    /// A card that cannot be spent again. §6's fifth row state: 55% opacity,
+    /// which is the app's word for "this is settled, and it is not gone".
+    private func closed(_ card: GiftCard) -> Bool { state(card) != "active" }
 
     /// Who it was issued to: the client if they are still on the books, the
     /// name written down at the time if not, and a dash for a card sold across
@@ -53,24 +74,46 @@ struct GiftCards: View {
             } else if shown.isEmpty {
                 NothingMatched(shop: shop, mark: .giftCards)
             } else {
+                VStack(spacing: 0) {
+                GiftCardFilterBar(shop: shop)
                 Table(shown) {
                     TableColumn(shop.words.callIt("giftCardCode")) { card in
                         Text(card.code).monospaced()
+                            .opacity(closed(card) ? 0.55 : 1)
+                            // THE ONLY PLACE THE STATE IS STILL SAID IN WORDS.
+                            // With the chip gone, a sighted shop reads the
+                            // state off the balance and the date; a screen
+                            // reader has to be told, so the row says it.
+                            .accessibilityLabel(Text(card.code + ", " + stateWord(card)))
                     }
                     .width(min: 100, ideal: 120)
                     TableColumn(shop.words.callIt("giftCardBalance")) { card in
                         // Both figures, because "120" alone does not say whether
                         // the card was small or is nearly spent.
+                        //
+                        // AND `closed` WHERE A SPENT CARD'S FIGURE WOULD BE.
+                        // This is the column §4 points at when it says a gift
+                        // card earns no state chip: "0.00 / 200.00" is a sum,
+                        // and what the shop wants to know is that there is
+                        // nothing left on it.
                         HStack(spacing: 4) {
-                            Text(Money.figure(card.balance ?? 0)).monospacedDigit()
+                            if closed(card) {
+                                Text(shop.words.callIt("mac.gc_closed"))
+                                    .foregroundStyle(.tertiary)
+                            } else {
+                                Text(Money.figure(card.balance ?? 0)).monospacedDigit()
+                            }
                             Text("/").foregroundStyle(.tertiary)
                             Text(Money.text(card.initialBalance ?? 0, shop.currency))
                                 .monospacedDigit().foregroundStyle(.secondary)
                         }
+                        .opacity(closed(card) ? 0.55 : 1)
                     }
                     .width(min: 140, ideal: 180)
                     TableColumn(shop.words.callIt("giftCardIssuedTo")) { card in
-                        Text(holder(card) ?? "—").foregroundStyle(holder(card) == nil ? .tertiary : .primary)
+                        Text(holder(card) ?? "—")
+                            .foregroundStyle(holder(card) == nil ? .tertiary : .primary)
+                            .opacity(closed(card) ? 0.55 : 1)
                     }
                     .width(min: 120, ideal: 200)
                     // "Expires", not "Expiry Date (optional)" — that string is
@@ -79,15 +122,13 @@ struct GiftCards: View {
                     TableColumn(shop.words.callIt("giftCardExpires")) { card in
                         Text(card.expiresAt ?? "—").monospacedDigit()
                             .foregroundStyle(card.expiresAt == nil ? .tertiary : .secondary)
+                            .opacity(closed(card) ? 0.55 : 1)
                     }
                     .width(min: 100, ideal: 130)
-                    TableColumn(shop.words.callIt("common.status")) { card in
-                        Badge(state: shop.giftCardStatuses[card.id] ?? "active", shop: shop)
-                    }
-                    .width(min: 80, ideal: 100)
                 }
                 // As every other table in the app: the ground shows through.
                 .scrollContentBackground(.hidden)
+                }
             }
         }
         .background(Khayt.ground)
@@ -103,29 +144,4 @@ struct GiftCards: View {
         }
     }
 
-    /// The word and the colour, both chosen by the state the RULE returned.
-    struct Badge: View {
-        let state: String
-        let shop: Shop
-
-        var body: some View {
-            Text(word).font(.callout).foregroundStyle(tint)
-        }
-
-        private var word: String {
-            switch state {
-            case "expired": shop.words.callIt("gcExpired")
-            case "used": shop.words.callIt("gcUsed")
-            default: shop.words.callIt("gcActive")
-            }
-        }
-
-        private var tint: Color {
-            switch state {
-            case "expired": Khayt.attention
-            case "used": .secondary
-            default: Khayt.done
-            }
-        }
-    }
 }

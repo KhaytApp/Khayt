@@ -7495,6 +7495,12 @@ final class Shop {
     private(set) var giftCards: [GiftCard] = []
     private(set) var giftCardRows: [JSONValue] = []
     private(set) var giftCardStatuses: [String: String] = [:]
+    /// Which state the screen is narrowed to, or nil for all of them.
+    ///
+    /// §4 took the Status column off this screen — three other things in the
+    /// row already say it — and the three words became the way a shop ASKS
+    /// instead. See `GiftCardFilterBar`.
+    var giftCardState: String?
     /// True while the Issue sheet is up.
     var issuingGiftCard = false
 
