@@ -805,9 +805,9 @@ final class Words {
         "mac.offline":       ["en": "offline",      "ar": "غير متصل"],
         "mac.saved_at":      ["en": "saved {t}",    "ar": "حُفظ {t}"],
         "mac.n_machines":    ["en": "{n} machines", "ar": "{n} آلات"],
-        "mac.n_machines_one": ["en": "{n} machine", "ar": "آلة واحدة"],
+        "mac.n_machines_one": ["en": "{n} machine", "ar": "{n} آلة"],
         "mac.n_people":      ["en": "{n} people",   "ar": "{n} أشخاص"],
-        "mac.n_people_one":  ["en": "{n} person",   "ar": "شخص واحد"],
+        "mac.n_people_one":  ["en": "{n} person",   "ar": "{n} شخص"],
         // ── AND THE TWO AXES THE GROUPING MENU NEVER HAD ─────────────────
         //
         // A group is the SET a model belongs to; a category is what it IS, and
