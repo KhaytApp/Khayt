@@ -33,13 +33,26 @@ enum ShopState: String, CaseIterable, Hashable {
     // stands and must never compete for the eye with the list above.
     case running, queued, finishing, done, quoted, offline, failedToSend
 
-    /// One per kind, so two kinds never share a silhouette.
+    /// ── SILHOUETTE SEPARATES KINDS; FILL SEPARATES SEVERITY ─────────────
+    ///
+    /// And fill only ever separates severity INSIDE one kind: ■/□ for a
+    /// machine, ▼/▽ for stock. Across kinds the silhouettes differ outright.
+    ///
+    /// `◆` is retired for exactly this reason. Filled against hollow is the
+    /// hardest distinction in the app at 9.5pt, and `◆` was asking the eye to
+    /// make it against `◇` in the OTHER table — to learn whether a machine
+    /// needed looking at or a job was only a quote. No glyph appears in both
+    /// tables now.
+    ///
+    /// A new kind brings a new silhouette, never a new fill of an existing
+    /// one. If the silhouettes run out, the set is too big and a kind should
+    /// merge.
     var glyph: String {
         switch self {
         case .orderLate:      "▲"
         case .orderToday:     "◷"
         case .machineStopped: "■"
-        case .machineCheck:   "◆"
+        case .machineCheck:   "□"
         case .nozzleBlocked:  "⊘"
         case .nozzleWorn:     "◔"
         case .stockOut:       "▼"

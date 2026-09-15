@@ -136,7 +136,23 @@ struct DesignSpecTests {
         // space joins it to the digits. Four rules, one composition.
         let parts = try #require(Figure(value: 52691.57, style: .money(code: "SAR")).moneyParts)
 
-        #expect(parts.mark.contains("\u{20C1}"), "the mark is not the Saudi Riyal sign")
+        // §5: the glyph only when Khayt's OWN font is registered, and the ISO
+        // code otherwise — never the system's U+20C1, which macOS 26 has and
+        // which reads as a hash at masthead size. A box gets filed; a
+        // plausible-but-wrong mark ships.
+        if Figure.hasMarkFont {
+            #expect(parts.mark.contains("\u{20C1}"), "the mark is not the Saudi Riyal sign")
+        } else {
+            #expect(parts.mark.contains("SAR"), """
+                Khayt's mark font is not registered, so the leaf must say the ISO \
+                code — saying anything else means it is borrowing a glyph from a \
+                face the design does not control
+                """)
+            #expect(!parts.mark.contains("\u{20C1}"), """
+                the mark is being taken from a system face; §5 forbids that even \
+                when the system has the codepoint
+                """)
+        }
         #expect(!parts.mark.contains("\u{FDFC}"), """
             the mark is U+FDFC, the Iranian rial — Unicode is explicit that a             font must not remap it
             """)
@@ -147,7 +163,7 @@ struct DesignSpecTests {
         #expect(parts.digits.contains("52,691.57"), Comment(rawValue: parts.digits))
         // And the digits leaf carries no mark of its own: asking the figure
         // face for one is what put a non-currency glyph in the figures.
-        #expect(!parts.digits.contains("\u{20C1}") && !parts.digits.contains("SAR"), """
+        #expect(!parts.digits.contains("\u{20C1}") && !parts.digits.contains("\u{FDFC}"), """
             the digits leaf carries the currency too, so the formatter is still             placing it — and the locale decides where, not the design
             """)
     }

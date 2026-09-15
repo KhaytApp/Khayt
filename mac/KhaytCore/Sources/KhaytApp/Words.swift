@@ -331,7 +331,7 @@ final class Words {
 
     private nonisolated static let base: [String: [String: String]] = [
         // Shelves
-        "mac.all_jobs":      ["en": "All jobs",      "ar": "كل الأعمال"],
+        "mac.all_jobs":      ["en": "Jobs",          "ar": "الأعمال"],
         "mac.pipeline":      ["en": "Pipeline",      "ar": "المسار"],
         "mac.board":         ["en": "Board",         "ar": "اللوح"],
         "mac.nothing_here":  ["en": "nothing here",  "ar": "لا شيء هنا"],
@@ -510,7 +510,7 @@ final class Words {
         "mac.board_unplaced": ["en": "{n} job(s) are in a stage this board has no column for.",
                                "ar": "{n} من الأعمال في مرحلة لا عمود لها في هذا اللوح."],
         "mac.library":       ["en": "Library",       "ar": "المكتبة"],
-        "mac.all_models":    ["en": "All models",    "ar": "كل المجسمات"],
+        "mac.all_models":    ["en": "Library",       "ar": "المكتبة"],
         "mac.people":        ["en": "People",        "ar": "الأشخاص"],
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
@@ -1064,7 +1064,7 @@ final class Words {
         // form loses nothing — and the screens keep their full titles.
         "mac.nav_expenses":  ["en": "Expenses",       "ar": "المصروفات"],
         "mac.nav_waste":     ["en": "Waste",          "ar": "الهدر"],
-        "mac.nav_reports":   ["en": "Profit & Loss",  "ar": "الأرباح والخسائر"],
+        "mac.nav_reports":   ["en": "Reports",        "ar": "التقارير"],
         "mac.details_toggle": ["en": "Show or hide the details", "ar": "إظهار التفاصيل أو إخفاؤها"],
         "mac.hide_details":  ["en": "Hide details",    "ar": "إخفاء التفاصيل"],
         "mac.show_details":  ["en": "Show details",    "ar": "إظهار التفاصيل"],
@@ -1148,7 +1148,7 @@ final class Words {
         "mac.weight":        ["en": "Weight",          "ar": "الوزن"],
         "mac.cost":          ["en": "Cost",            "ar": "التكلفة"],
         "mac.per_kilo":      ["en": "Per kilo",        "ar": "لكل كيلو"],
-        "mac.inventory":     ["en": "Filament",        "ar": "الخيوط"],
+        "mac.inventory":     ["en": "Inventory",       "ar": "المخزون"],
         "mac.no_machines":   ["en": "No machines yet", "ar": "لا طابعات بعد"],
         // WAS "Printers added in Khayt appear here." Same stale pointer: this
         // app finds printers on the network and adds them itself.

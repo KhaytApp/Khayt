@@ -155,7 +155,10 @@ struct Figure: View {
 
     var moneyParts: MoneyParts? {
         guard case .money(let code) = style, let value, Self.hasOwnMark(code) else { return nil }
-        return MoneyParts(mark: Self.isolated(Self.mark),
+        // What is DRAWN, not what is intended — a description that reports
+        // the glyph while the view renders the ISO code is a test passing on
+        // a screen nobody has.
+        return MoneyParts(mark: Self.isolated(Self.hasMarkFont ? Self.mark : "SAR"),
                           gap: "\u{00A0}",
                           digits: Self.money(code).string(from: NSNumber(value: value)) ?? "—")
     }
@@ -171,20 +174,37 @@ struct Figure: View {
     /// First-strong isolate … pop. The `<bdi>` of the reference implementation.
     static func isolated(_ text: String) -> String { "\u{2068}" + text + "\u{2069}" }
 
-    /// The mark, isolated, with the non-breaking space that binds it to the
-    /// digits. One leaf: the space travels with the mark rather than standing
-    /// alone, so nothing can put a line break between them.
-    static let markLeaf = isolated(mark) + "\u{00A0}"
-
-    /// The face the mark is set in.
+    /// What the mark leaf actually says.
     ///
-    /// `KhaytRiyal` when it is bundled — the spec's single-glyph font, still to
-    /// be cut. Until then the system face, which on macOS 26 carries U+20C1;
-    /// what it must never be is the monospaced figure face, which does not.
-    static func markFont(_ size: CGFloat) -> Font {
+    /// ── NEVER THE SYSTEM'S GLYPH, EVEN WHEN THE SYSTEM HAS ONE ───────────
+    ///
+    /// macOS 26 carries U+20C1, so falling back to the system face produces no
+    /// missing-glyph box — and §5 is explicit that this is the problem rather
+    /// than the reassurance: at masthead size the system cut reads closer to a
+    /// hash than to a currency mark, so the app looks finished and is wrong,
+    /// and nothing files a bug about it. A box gets reported; a
+    /// plausible-but-wrong mark ships.
+    ///
+    /// So until `KhaytRiyal` is registered the leaf says the ISO code, which
+    /// is unambiguous and visibly not the final design. The composition does
+    /// not change — one flag swaps the text for the glyph when the font lands.
+    ///
+    /// The general rule, which is worth more than this one case: any mark
+    /// Khayt's meaning depends on comes from a font Khayt ships. A system face
+    /// is allowed to be ABSENT. It is not allowed to be a surprise.
+    static var markLeaf: String {
+        isolated(hasMarkFont ? mark : "SAR") + "\u{00A0}"
+    }
+
+    /// Whether the mark's own font is registered.
+    static var hasMarkFont: Bool {
         NSFontManager.shared.availableFontFamilies.contains("KhaytRiyal")
-            ? .custom("KhaytRiyal", fixedSize: size)
-            : .system(size: size, weight: .semibold)
+    }
+
+    /// The face the mark is set in — `KhaytRiyal`, or nothing.
+    static func markFont(_ size: CGFloat) -> Font {
+        hasMarkFont ? .custom("KhaytRiyal", fixedSize: size)
+                    : TypeScale.label(size)
     }
 
     // MARK: - Formatters
