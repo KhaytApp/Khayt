@@ -6,6 +6,40 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) The Mac app has a design system, and it is enforced by
+  tests rather than by convention.** A colour role for every job, six type
+  steps, one spacing scale, and three rules a view cannot quietly break: a
+  state is a glyph AND a word AND a hue, so the app reads greyscaled; a figure
+  the book was never told is an em dash, never a zero; and every direction is
+  logical, so Arabic mirrors without a second code path. Nine guards read the
+  source and each one was proven by breaking the thing it guards. The shell,
+  the sidebar and the Dashboard are drawn to it and sit behind a switch while
+  the rest of the app is migrated screen by screen.
+
+- **(Maintainers) Three contrast failures the design's own measurements
+  caught.** The tertiary ink — which carries every column head, the OFFLINE
+  chip and the dash that means "not recorded" — sat at 2.33:1 against the
+  darkest content ground, roughly half the floor. White was hard-coded on the
+  brand fill, which passes in light and drops to 2.72:1 in dark. And a state
+  mark was painted on the navy sidebar in the value tuned for paper, which
+  measures 3.33:1 there. All three are now roles that cannot be mixed up, and
+  `ContrastTests` recomputes the whole table from the live values in both
+  appearances — including translucent grounds composited over what is beneath
+  them, and the STEPS between the three ink levels, because two inks that both
+  sit on the floor are one ink.
+
+- **(Maintainers) The riyal mark was jumping to the wrong side of its
+  digits.** U+FDFC is bidi class AL: the format pattern placed it before the
+  number and it drew after it. It is wrapped in isolates now and bound to its
+  digits with a non-breaking space, and a test reads the rendered string back
+  rather than trusting the pattern.
+
+- **A count said `{n}` instead of the number.** `counting` prepended the
+  numeral and left the placeholder in the value, so a sidebar that should have
+  read "5 machines · 31 people" read "5 {n} mac… · 31 {n} pe…". It substitutes
+  where the value asks for it now, which also stops a numeral being glued to a
+  word in whatever direction the paragraph happened to be.
+
 - **The library and the catalogue can be narrowed now, not just searched.** A
   shop asked *"where are the filters for products and models?"* and the honest
   answer was a search box: you had to type what you could have pressed, and

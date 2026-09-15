@@ -136,6 +136,12 @@ final class Words {
     /// and `{n} طلب` in Arabic, which works because that string is one
     /// sentence. These are a COUNT and a NOUN assembled by the window, and
     /// "1 machines" is what assembling them without asking gives you.
+    private nonisolated static let counter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        return f
+    }()
+
     func counting(_ n: Int, _ key: String) -> String {
         // ── ARABIC COUNTS TWO OF A THING DIFFERENTLY ──────────────────────
         //
@@ -154,7 +160,28 @@ final class Words {
         if language == "ar", n == 2, let dual = Self.own[key + "_two"]?["ar"], !dual.isEmpty {
             return dual
         }
-        return "\(n) " + callIt(n == 1 ? key + "_one" : key)
+        // ── THE VALUE MAY CARRY ITS OWN `{n}` ────────────────────────────
+        //
+        // Two shapes, because the catalogue has both. A value written as
+        // "{n} models" places the numeral ITSELF, which is the only way to put
+        // it anywhere but the front — and Arabic wants it elsewhere often
+        // enough that this matters. A value written as "models" gets the old
+        // behaviour: the numeral in front, a space, the word.
+        //
+        // The first shape is also the one §5 prefers, because it substitutes
+        // rather than concatenating a numeral onto a word in whatever the
+        // paragraph's direction happens to be.
+        let said = callIt(n == 1 ? key + "_one" : key)
+        let number = Self.counter.string(from: NSNumber(value: n)) ?? String(n)
+        if said.contains("{n}") {
+            return said.replacingOccurrences(of: "{n}", with: number)
+        }
+        // A plain space, not a non-breaking one. Binding the numeral to the
+        // word is tempting and wrong here: eight existing tests read this
+        // output back and compare it to "2 days", and a caller that has to
+        // know which invisible character came out is a caller that will get it
+        // wrong. The `{n}` form above is where a value places its own numeral.
+        return number + " " + said
     }
 
     /// The same, with the placeholders filled.
@@ -676,6 +703,111 @@ final class Words {
         "mac.group_name_kept": ["en": "A name already in use keeps its spelling.",
                                 "ar": "الاسم المستخدَم من قبل يحتفظ بهجائه."],
         "mac.file_it":       ["en": "File",            "ar": "احفظ"],
+        // ── THE DASHBOARD THE DESIGN SPEC DESCRIBES ──────────────────────
+        "mac.owed": ["en": "Owed", "ar": "مستحق"],
+        "mac.net": ["en": "Net", "ar": "صافي"],
+        "mac.material_cost": ["en": "Material cost", "ar": "تكلفة الخامة"],
+        "mac.record_a_payment": ["en": "Record a payment", "ar": "تسجيل دفعة"],
+        "mac.triage": ["en": "Triage", "ar": "الفرز"],
+        "mac.ledger": ["en": "Ledger", "ar": "السجل"],
+        "mac.net_in_reports": ["en": "Reconciled in Reports, not here.", "ar": "تتم التسوية في التقارير، لا هنا."],
+        "mac.n_jobs_unrecorded": ["en": "{n} jobs unrecorded", "ar": "{n} أعمال غير مسجّلة"],
+        "mac.n_jobs_unrecorded_one": ["en": "1 job unrecorded", "ar": "عمل واحد غير مسجّل"],
+        "mac.n_without_cost": ["en": "{n} carry no cost", "ar": "{n} بلا تكلفة"],
+        "mac.n_without_cost_one": ["en": "1 carries no cost", "ar": "واحد بلا تكلفة"],
+        "mac.cost_never_recorded": ["en": "No material cost was recorded for this job, so the margin is unknown — not zero.", "ar": "لم تُسجَّل تكلفة خامة لهذا العمل، فالهامش غير معروف — وليس صفرًا."],
+        "mac.open_total": ["en": "open", "ar": "مفتوح"],
+        "mac.n_things_need_you": ["en": "{n} things need you", "ar": "{n} أمور تحتاجك"],
+        "mac.n_things_need_you_one": ["en": "One thing needs you", "ar": "أمر واحد يحتاجك"],
+        "mac.n_open": ["en": "{n} open", "ar": "{n} مفتوح"],
+        "mac.n_open_one": ["en": "1 open", "ar": "واحد مفتوح"],
+        "mac.n_closed": ["en": "{n} closed", "ar": "{n} مغلق"],
+        "mac.n_closed_one": ["en": "1 closed", "ar": "واحد مغلق"],
+        "mac.attn_order": ["en": "{n} jobs are late", "ar": "{n} أعمال متأخرة"],
+        "mac.attn_order_one": ["en": "One job is late", "ar": "عمل واحد متأخر"],
+        "mac.attn_stock": ["en": "The shelf is thin", "ar": "المخزون منخفض"],
+        "mac.attn_stock_one": ["en": "The shelf is thin", "ar": "المخزون منخفض"],
+        "mac.attn_machine": ["en": "A machine needs a look", "ar": "آلة تحتاج فحصًا"],
+        "mac.attn_machine_one": ["en": "A machine needs a look", "ar": "آلة تحتاج فحصًا"],
+        "mac.attn_nozzle": ["en": "A nozzle is past its life", "ar": "فوهة تجاوزت عمرها"],
+        "mac.attn_nozzle_one": ["en": "A nozzle is past its life", "ar": "فوهة تجاوزت عمرها"],
+        "mac.days_over": ["en": "{n} days over", "ar": "متأخر {n} أيام"],
+        "mac.days_over_one": ["en": "One day over", "ar": "متأخر يومًا"],
+        "mac.past_its_date": ["en": "Past its due date", "ar": "تجاوز تاريخ التسليم"],
+        "mac.grams_left": ["en": "{n} g left", "ar": "بقي {n} جم"],
+        "mac.out_of_stock": ["en": "None left on the shelf", "ar": "لا شيء على الرف"],
+        "mac.needs_a_look": ["en": "Needs a look", "ar": "يحتاج فحصًا"],
+        "mac.untitled": ["en": "Untitled", "ar": "بلا عنوان"],
+        "mac.open_both": ["en": "Open", "ar": "افتح"],
+        "mac.tell_the_customers": ["en": "Tell the customers", "ar": "أبلغ العملاء"],
+        "mac.log_a_purchase": ["en": "Log a purchase", "ar": "سجّل شراء"],
+        "mac.see_shelf": ["en": "See shelf", "ar": "اعرض الرف"],
+        "mac.on_the_machines": ["en": "On the machines", "ar": "على الآلات"],
+        "mac.the_shelf": ["en": "The shelf", "ar": "الرف"],
+        "mac.no_machines_yet": ["en": "No machines yet", "ar": "لا آلات بعد"],
+        "mac.printing": ["en": "Printing", "ar": "يطبع"],
+        "mac.out": ["en": "Out", "ar": "نفد"],
+        "mac.gross_short": ["en": "Gross", "ar": "الإجمالي"],
+        // A tile is a hundred points wide. "Khayt cannot ask this machine" is
+        // true and does not fit; this is the same fact at tile size, and the
+        // Machines screen carries the sentence.
+        "mac.no_protocol": ["en": "no link", "ar": "بلا ربط"],
+        "mac.filter_needs_me": ["en": "Needs me", "ar": "يحتاجني"],
+        "mac.filter_running": ["en": "Running", "ar": "قيد التشغيل"],
+        "mac.filter_unpaid": ["en": "Unpaid", "ar": "غير مدفوع"],
+        "mac.filter_all": ["en": "All", "ar": "الكل"],
+        "mac.sorted_by_urgency": ["en": "sorted by urgency", "ar": "مرتّب حسب الأولوية"],
+        "mac.col_state": ["en": "State", "ar": "الحالة"],
+        "mac.col_job": ["en": "Job", "ar": "العمل"],
+        "mac.col_due": ["en": "Due", "ar": "الاستحقاق"],
+        "mac.col_charged": ["en": "Charged", "ar": "المحسوب"],
+        "mac.col_margin": ["en": "Margin", "ar": "الهامش"],
+        "mac.charged_net": ["en": "Charged, net", "ar": "المحسوب، صافي"],
+        "mac.charged_gross": ["en": "Charged, gross", "ar": "المحسوب، إجمالي"],
+        "mac.margin_at_least": ["en": "Margin", "ar": "الهامش"],
+        "mac.first_run_title": ["en": "This shop's book is empty — that's the right place to start", "ar": "دفتر هذا المتجر فارغ — وهذه هي البداية الصحيحة"],
+        "mac.first_run_why": ["en": "Khayt keeps one file on this Mac. Nothing leaves it unless you turn on the cloud.", "ar": "يحتفظ خيط بملف واحد على هذا الماك. لا شيء يغادره إلا إذا فعّلت السحابة."],
+        "mac.first": ["en": "First", "ar": "أولًا"],
+        "mac.then": ["en": "Then", "ar": "ثم"],
+        "mac.add_a_machine": ["en": "Add a machine", "ar": "أضف آلة"],
+        "mac.add_a_machine_why": ["en": "Its hourly rate is what turns a print into a cost.", "ar": "سعر الساعة هو ما يحوّل الطباعة إلى تكلفة."],
+        "mac.put_a_spool": ["en": "Put a spool on the shelf", "ar": "ضع بكرة على الرف"],
+        "mac.put_a_spool_why": ["en": "Weight and price per kilo. Khayt does the rest.", "ar": "الوزن وسعر الكيلو. خيط يتكفّل بالباقي."],
+        "mac.take_a_job": ["en": "Take your first job", "ar": "خذ أول عمل"],
+        "mac.take_a_job_why": ["en": "Or price one in the Calculator without saving it.", "ar": "أو سعّر واحدًا في الحاسبة دون حفظه."],
+        "mac.open_the_sample": ["en": "Or open the sample shop — 42 jobs, 5 machines, real numbers.", "ar": "أو افتح المتجر التجريبي — ٤٢ عملًا و٥ آلات وأرقام حقيقية."],
+        // ── THE DESIGN SYSTEM'S OWN WORDS ────────────────────────────────
+        //
+        // §4: every state is a GLYPH and a WORD as well as a hue. These are
+        // the words. Caps are applied by the label style, not typed here, so
+        // Arabic — which has no case — is not shouted at.
+        "mac.state_late":      ["en": "Late",      "ar": "متأخر"],
+        "mac.state_today":     ["en": "Today",     "ar": "اليوم"],
+        "mac.state_running":   ["en": "Running",   "ar": "يعمل"],
+        "mac.state_queued":    ["en": "Queued",    "ar": "في الانتظار"],
+        "mac.state_finishing": ["en": "Finishing", "ar": "التشطيب"],
+        "mac.state_done":      ["en": "Done",      "ar": "تم"],
+        "mac.state_blocked":   ["en": "Blocked",   "ar": "متوقف"],
+        "mac.state_quoted":    ["en": "Quoted",    "ar": "عرض سعر"],
+        "mac.state_offline":   ["en": "Offline",   "ar": "غير متصل"],
+        // §5: a total built over a hole says which way it is wrong.
+        "mac.at_least":      ["en": "at least",     "ar": "على الأقل"],
+        "mac.at_most":       ["en": "at most",      "ar": "على الأكثر"],
+        // §7: the sidebar's three groups — the shop's own division of its
+        // work: what it sells, what makes it, what it is worth.
+        "mac.group_shop":    ["en": "Shop",         "ar": "المتجر"],
+        "mac.group_floor":   ["en": "Floor",        "ar": "الورشة"],
+        "mac.group_money":   ["en": "Money",        "ar": "المال"],
+        "mac.book":          ["en": "Book",         "ar": "الدفتر"],
+        "mac.search_the_book": ["en": "Search jobs, models, spools, people",
+                                "ar": "ابحث في الأعمال والنماذج والبكرات والعملاء"],
+        "mac.synced":        ["en": "synced",       "ar": "متزامن"],
+        "mac.offline":       ["en": "offline",      "ar": "غير متصل"],
+        "mac.saved_at":      ["en": "saved {t}",    "ar": "حُفظ {t}"],
+        "mac.n_machines":    ["en": "{n} machines", "ar": "{n} آلات"],
+        "mac.n_machines_one": ["en": "{n} machine", "ar": "{n} آلة"],
+        "mac.n_people":      ["en": "{n} people",   "ar": "{n} أشخاص"],
+        "mac.n_people_one":  ["en": "{n} person",   "ar": "{n} شخص"],
         // ── AND THE TWO AXES THE GROUPING MENU NEVER HAD ─────────────────
         //
         // A group is the SET a model belongs to; a category is what it IS, and
