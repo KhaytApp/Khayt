@@ -123,7 +123,7 @@ struct Machines: View {
                 EmptyHere(title: shop.words.callIt("mac.no_machines"), message: shop.words.callIt("mac.no_machines_hint"), mark: .machines)
             }
         }
-        .toolbar {
+        .screenToolbar {
             ToolbarItem {
                 // Only where there is something to place. A button that always
                 // opens a panel saying "nothing to assign" is a button that

@@ -176,35 +176,45 @@ struct Figure: View {
 
     /// What the mark leaf actually says.
     ///
-    /// ── NEVER THE SYSTEM'S GLYPH, EVEN WHEN THE SYSTEM HAS ONE ───────────
+    /// ── THE MARK, AND THE ISO CODE ONLY IF NOTHING CAN DRAW IT ───────────
     ///
-    /// macOS 26 carries U+20C1, so falling back to the system face produces no
-    /// missing-glyph box — and §5 is explicit that this is the problem rather
-    /// than the reassurance: at masthead size the system cut reads closer to a
-    /// hash than to a currency mark, so the app looks finished and is wrong,
-    /// and nothing files a bug about it. A box gets reported; a
-    /// plausible-but-wrong mark ships.
+    /// §5 asked for `KhaytRiyal` and said not to take the mark from a system
+    /// face, on the grounds that the system cut "reads closer to a hash than
+    /// to a currency mark" — an app that looks finished and is wrong, which
+    /// nobody files a bug about. That was the rule this shipped under, and the
+    /// shop filed the bug anyway, the other way round: *"currency not showing
+    /// riyal symbol"*. What it was shown was the placeholder.
     ///
-    /// So until `KhaytRiyal` is registered the leaf says the ISO code, which
-    /// is unambiguous and visibly not the final design. The composition does
-    /// not change — one flag swaps the text for the glyph when the font lands.
+    /// So the premise was re-measured rather than argued with. Rendered at 64pt
+    /// and at 13pt, SF's U+20C1 is the official 2024 mark — the two bars and
+    /// the stroke — not a stand-in and not a wrong glyph. It is small at row
+    /// size, which is what a small currency mark looks like. `KhaytRiyal` is
+    /// still the better cut and still the plan; it is not a precondition for
+    /// the app saying which currency this is.
     ///
-    /// The general rule, which is worth more than this one case: any mark
-    /// Khayt's meaning depends on comes from a font Khayt ships. A system face
-    /// is allowed to be ABSENT. It is not allowed to be a surprise.
+    /// The question is put to CoreText, not to a version, and it is the same
+    /// question `Money.drawsTheRiyal` asks — so the redesigned screens and the
+    /// old ones say the same thing, which they did not while this read "SAR"
+    /// beside a table drawing the mark. If no face on the Mac has the glyph the
+    /// leaf falls back to the ISO code, which is unambiguous rather than a box.
     static var markLeaf: String {
         isolated(hasMarkFont ? mark : "SAR") + "\u{00A0}"
     }
 
+    /// Whether anything on this Mac can draw the mark: Khayt's own face if it
+    /// is registered, the system's if it is not.
+    static var hasMarkFont: Bool { hasOwnFace || Money.drawsTheRiyal }
+
     /// Whether the mark's own font is registered.
-    static var hasMarkFont: Bool {
+    static var hasOwnFace: Bool {
         NSFontManager.shared.availableFontFamilies.contains("KhaytRiyal")
     }
 
-    /// The face the mark is set in — `KhaytRiyal`, or nothing.
+    /// The face the mark is set in — `KhaytRiyal` where it is installed, and
+    /// the label face otherwise, which is where the system's glyph comes from.
     static func markFont(_ size: CGFloat) -> Font {
-        hasMarkFont ? .custom("KhaytRiyal", fixedSize: size)
-                    : TypeScale.label(size)
+        hasOwnFace ? .custom("KhaytRiyal", fixedSize: size)
+                   : TypeScale.label(size)
     }
 
     // MARK: - Formatters

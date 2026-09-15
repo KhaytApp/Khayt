@@ -9,7 +9,60 @@ struct KhaytApp: App {
     @State private var shop = Shop()
     @NSApplicationDelegateAdaptor(Activator.self) private var activator
 
+    /// Which shell the window is wearing — see `ShopWindow`.
+    ///
+    /// Read HERE as well as there because the two shells want two different
+    /// windows: the old one puts its actions in a unified toolbar, and the new
+    /// one draws its own navy strip and wants no title bar at all. Nothing
+    /// short of the scene modifier achieves that: setting
+    /// `titlebarAppearsTransparent`, clearing the toolbar and inserting
+    /// `.fullSizeContentView` on the `NSWindow` by hand leaves a 32pt opaque
+    /// band painted over the strip — measured, at every one of those three
+    /// settings confirmed applied.
     var body: some Scene {
+        shopScene
+
+        // ⌘, — the shop's own settings, written through the same rule the
+        // Electron page saves through. The scene puts "Settings…" in the app
+        // menu by itself.
+        // AFTER the window, deliberately — see the note on scene order above.
+
+        Settings {
+            SettingsWindow(shop: shop)
+        }
+
+        // ⌘? — Khayt's own help, in a window BESIDE the app rather than on top
+        // of it: somebody reading "how do I file a download into groups" wants
+        // the library on screen while they read. See `HelpBook` for why this is
+        // not an Apple Help Book.
+        Window(Text(Words.upfront("mac.help_title")), id: HelpWindow.id) {
+            HelpWindow(shop: shop)
+        }
+        .defaultSize(width: 940, height: 640)
+        .keyboardShortcut("?", modifiers: .command)
+    }
+
+    /// The shop's window, with no title bar of its own.
+    ///
+    /// ── AND IT CANNOT BE A CHOICE HERE ────────────────────────────────────
+    ///
+    /// `SceneBuilder` takes no `if`, so the scene cannot be branched on which
+    /// shell is on: this is the window both of them get. The new shell is the
+    /// one that ships, so the scene is its shape — the 40pt navy strip IS the
+    /// title bar, and the traffic lights sit in it, which is why
+    /// `ShellTitleBar` starts 72pt in.
+    ///
+    /// The old shell asks for the bar back at the `NSWindow` — see
+    /// `WindowChrome`, which is also where the toolbar it needs is put back on.
+    /// That direction works by hand; the other one does not, which is what
+    /// decided this. Setting `titlebarAppearsTransparent`, clearing the toolbar
+    /// and inserting `.fullSizeContentView` — all three confirmed applied —
+    /// still left a 32pt opaque band painted over the navy strip.
+    private var shopScene: some Scene {
+        shopWindow.windowStyle(.hiddenTitleBar)
+    }
+
+    private var shopWindow: some Scene {
         // THE WINDOW FIRST. SwiftUI treats the first scene in this builder as
         // the app's primary one, and with `FloorMenuBar` ahead of it the app
         // launched with no window at all — the menu bar icon appeared, the
@@ -63,30 +116,7 @@ struct KhaytApp: App {
         // ~650pt against 644pt of column minimums and "Owed" — the figure the
         // toolbar is built around — was squeezed to a few pixels.
         .defaultSize(width: 1320, height: 760)
-        // The unified toolbar, sitting in the title bar rather than in a strip
-        // below it. It is most of the difference between a Mac window and a web
-        // page with a grey bar at the top.
-        .windowToolbarStyle(.unified)
-                .commands { KhaytCommands(shop: shop) }
-
-        // ⌘, — the shop's own settings, written through the same rule the
-        // Electron page saves through. The scene puts "Settings…" in the app
-        // menu by itself.
-        // AFTER the window, deliberately — see the note on scene order above.
-
-        Settings {
-            SettingsWindow(shop: shop)
-        }
-
-        // ⌘? — Khayt's own help, in a window BESIDE the app rather than on top
-        // of it: somebody reading "how do I file a download into groups" wants
-        // the library on screen while they read. See `HelpBook` for why this is
-        // not an Apple Help Book.
-        Window(Text(Words.upfront("mac.help_title")), id: HelpWindow.id) {
-            HelpWindow(shop: shop)
-        }
-        .defaultSize(width: 940, height: 640)
-        .keyboardShortcut("?", modifiers: .command)
+        .commands { KhaytCommands(shop: shop) }
     }
 }
 

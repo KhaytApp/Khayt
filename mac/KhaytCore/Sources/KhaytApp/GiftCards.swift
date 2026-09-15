@@ -91,7 +91,7 @@ struct GiftCards: View {
             }
         }
         .background(Khayt.ground)
-        .toolbar {
+        .screenToolbar {
             ToolbarItem {
                 Button {
                     shop.issuingGiftCard = true

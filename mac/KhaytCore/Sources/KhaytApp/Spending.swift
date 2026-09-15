@@ -9,7 +9,6 @@ import KhaytCore
 /// record Khayt would have written.
 struct Expenses: View {
     @Bindable var shop: Shop
-    @State private var adding = false
     @State private var order: [KeyPathComparator<Expense>] = [.init(\.date, order: .reverse)]
     @SceneStorage("expenses.columns") private var columns: TableColumnCustomization<Expense>
 
@@ -21,9 +20,9 @@ struct Expenses: View {
             Summary(shop: shop).frame(minWidth: 260, idealWidth: 300, maxWidth: 380)
         }
         .background(Khayt.ground)
-        .toolbar { SpendToolbar(shop: shop, add: { adding = true },
-                                addLabel: shop.words.callIt("exp.add_title")) }
-        .sheet(isPresented: $adding) { ExpenseSheet(shop: shop) }
+        .screenToolbar { SpendToolbar(shop: shop, add: { shop.addingExpense = true },
+                                      addLabel: shop.words.callIt("exp.add_title")) }
+        .sheet(isPresented: $shop.addingExpense) { ExpenseSheet(shop: shop) }
     }
 
     private var table: some View {
@@ -165,7 +164,6 @@ struct Expenses: View {
 /// What the shop threw away.
 struct Waste: View {
     @Bindable var shop: Shop
-    @State private var logging = false
     @State private var order: [KeyPathComparator<WasteEntry>] = [.init(\.date, order: .reverse)]
     @State private var selection: WasteEntry.ID?
     @SceneStorage("waste.columns") private var columns: TableColumnCustomization<WasteEntry>
@@ -178,9 +176,9 @@ struct Waste: View {
             Summary(shop: shop).frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
         }
         .background(Khayt.ground)
-        .toolbar { SpendToolbar(shop: shop, add: { logging = true },
-                                addLabel: shop.words.callIt("waste.add")) }
-        .sheet(isPresented: $logging) { WasteSheet(shop: shop) }
+        .screenToolbar { SpendToolbar(shop: shop, add: { shop.loggingWaste = true },
+                                      addLabel: shop.words.callIt("waste.add")) }
+        .sheet(isPresented: $shop.loggingWaste) { WasteSheet(shop: shop) }
     }
 
     private var table: some View {

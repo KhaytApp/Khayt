@@ -37,7 +37,7 @@ struct Catalogue: View {
 
     var body: some View {
         content
-            .toolbar {
+            .screenToolbar {
                 ToolbarItem {
                     Picker("", selection: $layout) {
                         Image(systemName: "list.bullet").tag(Layout.table)

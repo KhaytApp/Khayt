@@ -18,25 +18,61 @@ import SwiftUI
 /// content region on `bg`.
 struct Shell<Content: View>: View {
     @Bindable var shop: Shop
+    /// The menu bar's "put the caret in the search field" request — the window
+    /// owns it, because the menu item reaches the window, not the strip.
+    @Binding var searchWanted: Bool
+    /// Whether the detail panel is open on this screen. The window decides —
+    /// it owns the switch and the list of screens that have one.
+    var showingPanel = false
     @ViewBuilder var content: Content
 
     var body: some View {
         VStack(spacing: 0) {
-            ShellTitleBar(shop: shop)
+            ShellTitleBar(shop: shop, searchWanted: $searchWanted)
             HStack(spacing: 0) {
                 ShellSidebar(shop: shop)
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .background(Role.bg)
+                // A COLUMN, NOT AN `.inspector`.
+                //
+                // `.inspector` is a `NavigationSplitView` column: applied
+                // anywhere else it goes to the window instead, and the window
+                // came back 310pt narrower with no panel in it. §10 calls this
+                // a trailing inspector of a fixed width, which is a column.
+                if showingPanel {
+                    Divider()
+                    InspectorPane(shop: shop)
+                        .frame(width: Wide.inspector)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .background(Role.surf)
+                }
             }
         }
         .background(Role.bg)
+        // BOTH LINES, AND EACH ONE ALONE IS A DIFFERENT WRONG HEADER.
+        //
+        // `.hiddenTitleBar` on the scene stops the window painting its own bar,
+        // but SwiftUI keeps a 32pt top safe area where it used to be — and a
+        // background extends through a safe area while the content inside it
+        // does not, so the strip came out 71pt of navy with the traffic lights
+        // on one row and the title on another, 31pt below them. Measured at
+        // 2..143 in a 2× shot; the strip is 40.
+        //
+        // Without the scene modifier, this line alone pulls the strip up under
+        // an opaque 32pt band and leaves 8pt of navy showing.
+        .ignoresSafeArea(.container, edges: .top)
+        // The window's own title bar is off at the scene — see `shopScene` in
+        // `KhaytApp`, and `WindowChrome` for what the old shell keeps.
+        .windowTitleBar(hidden: true)
     }
 }
 
 /// The 40px navy strip.
 struct ShellTitleBar: View {
     @Bindable var shop: Shop
+    /// The menu bar's request for the caret, passed down from the window.
+    @Binding var searchWanted: Bool
 
     var body: some View {
         HStack(spacing: Space.lg) {
@@ -52,7 +88,7 @@ struct ShellTitleBar: View {
 
             Spacer(minLength: Space.md)
 
-            CommandField(words: shop.words)
+            CommandField(shop: shop, wanted: $searchWanted)
                 .frame(width: 290)
 
             Spacer(minLength: Space.md)
@@ -65,6 +101,11 @@ struct ShellTitleBar: View {
                 .font(TypeScale.label(10))
                 .tracking(shop.words.language == "ar" ? 0 : 2.4)
                 .foregroundStyle(Role.onNavy3)
+
+            // What this screen can do. The window has no title bar to put a
+            // toolbar in any more, so the items its screens used to declare are
+            // here — see `ScreenActions`.
+            ScreenActions(shop: shop)
 
             // What the book is doing. Two `Text`s, never one string — see §5.
             HStack(spacing: Space.xs) {
@@ -82,22 +123,37 @@ struct ShellTitleBar: View {
     }
 }
 
-/// The ⌘K field. A field-shaped button: ⌘K opens a palette, it is not a
-/// search box that lives in the toolbar — §8 says it searches the whole book
-/// and offers actions, which is a different thing from filtering a list.
+/// The field in the strip.
+///
+/// ── WHAT §8 ASKS FOR, AND WHAT THIS IS UNTIL THEN ────────────────────────
+///
+/// §8 wants ⌘K to open a PALETTE: it searches the whole book and offers
+/// actions, which is a different thing from filtering the list in front of
+/// you. That palette is not built.
+///
+/// What was here instead was the palette's lid — a field-shaped `Text` reading
+/// "Search jobs, models, spools, people" that could not be typed into, on a
+/// shell where the real search field was gone as well (it lived in the old
+/// shell's toolbar, and this shell has no toolbar). So the app showed a search
+/// box and had no search.
+///
+/// So it narrows the screen you are on, which is what the old field did, and
+/// says what it narrows in that screen's own words. When the palette lands it
+/// takes this place and this becomes its lid again.
 struct CommandField: View {
-    let words: Words
-    @Environment(\.layoutDirection) private var direction
+    @Bindable var shop: Shop
+    @Binding var wanted: Bool
+    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 7) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11, weight: .medium))
-            Text(words.callIt("mac.search_the_book"))
-                .font(TypeScale.body(11.5))
-                .lineLimit(1)
+            field
             Spacer(minLength: Space.xs)
-            Text("⌘K")
+            // Not a shortcut this field owns — the menu bar's Find item is what
+            // ⌘F reaches, and it asks for the caret through `wanted`.
+            Text(shop.canSearch ? "⌘F" : "⌘K")
                 .font(TypeScale.figure(10.5))
         }
         .foregroundStyle(Role.onNavy2)
@@ -105,6 +161,29 @@ struct CommandField: View {
         .frame(height: 24)
         .background(Color.white.opacity(0.1), in:
                         RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+        .onChange(of: wanted) { _, asked in
+            guard asked else { return }
+            focused = true
+            wanted = false
+        }
+    }
+
+    @ViewBuilder private var field: some View {
+        if shop.canSearch {
+            TextField("", text: $shop.search, prompt:
+                        Text(shop.searchPrompt).foregroundStyle(Role.onNavy3))
+                .textFieldStyle(.plain)
+                .font(TypeScale.body(11.5))
+                .foregroundStyle(Role.onNavy)
+                .focused($focused)
+                .lineLimit(1)
+        } else {
+            // A screen with nothing to narrow says so by not offering to. The
+            // words stay because the strip is the same width either way.
+            Text(shop.words.callIt("mac.search_the_book"))
+                .font(TypeScale.body(11.5))
+                .lineLimit(1)
+        }
     }
 }
 
@@ -151,24 +230,61 @@ struct ShellSidebar: View {
     /// Whose book this is. At the top because on a Mac that can open more than
     /// one, "which shop am I looking at" is the first question the window has
     /// to answer.
+    ///
+    /// ── AND WHICH BOOK, NOT JUST WHOSE ────────────────────────────────────
+    ///
+    /// The mock draws this card as a name and two counts. That is not enough on
+    /// its own: the old shell put the book's SOURCE in the toolbar because
+    /// mistaking the sample for the shop's real position is the one error this
+    /// app must not allow, and the new shell has no toolbar. So the card says
+    /// the source whenever it is not the shop's own book, and the card is the
+    /// menu that switches it — the same items the toolbar offered.
     private var book: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(shop.shopName)
-                .font(TypeScale.row(11.5, weight: .bold))
-                .foregroundStyle(Role.onNavy)
-                .lineLimit(1)
-            HStack(spacing: Space.xs) {
-                Text(shop.words.counting(shop.machines.count, "mac.n_machines"))
-                Text("·")
-                Text(shop.words.counting(shop.customers.count, "mac.n_people"))
+        Menu {
+            ForEach(Shop.available) { source in
+                Button {
+                    Task { await shop.load(source) }
+                } label: {
+                    Label(source.title(shop.words), systemImage: source.symbol)
+                }
             }
-            .font(TypeScale.body(9.5))
-            .foregroundStyle(Role.onNavy3)
-            .lineLimit(1)
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(shop.shopName)
+                    .font(TypeScale.row(11.5, weight: .bold))
+                    .foregroundStyle(Role.onNavy)
+                    .lineLimit(1)
+                // ON ITS OWN LINE, and that was measured too: inline after
+                // the counts the card read "Samp… · 5 ma… · 31 p…" — three
+                // truncations in a 134pt card, and the one word that matters
+                // was the first one cut.
+                if !shop.source.isReal {
+                    Text(shop.source.title(shop.words))
+                        .font(TypeScale.label(9))
+                        .foregroundStyle(Role.lateOnNavy)
+                        .lineLimit(1)
+                }
+                HStack(spacing: Space.xs) {
+                    Text(shop.words.counting(shop.machines.count, "mac.n_machines"))
+                    Text("·")
+                    Text(shop.words.counting(shop.customers.count, "mac.n_people"))
+                }
+                .font(TypeScale.body(9.5))
+                .foregroundStyle(Role.onNavy3)
+                .lineLimit(1)
+            }
+            .padding(.horizontal, Space.md)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, Space.md)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // A PLAIN LABEL, NOT A CONTROL. `.borderlessButton` still draws the
+        // system's own light well behind the label, which on navy is a white
+        // chip over the shop's name — and it clipped the counts line off the
+        // bottom of the card as well.
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
         .overlay {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .strokeBorder(Role.navyLine, lineWidth: 1)
