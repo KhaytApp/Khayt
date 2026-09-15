@@ -107,6 +107,22 @@ let package = Package(
         .executableTarget(name: "KhaytThumbnail", dependencies: ["KhaytCore"],
                           swiftSettings: [
                               .unsafeFlags(["-parse-as-library"]),
+                          ],
+                          // THE ENTRY SYMBOL, NAMED OUT LOUD.
+                          //
+                          // SwiftPM's `native` engine linked an executable with
+                          // `-e _<TargetName>_main` and `Entry.swift` supplied
+                          // exactly that. Xcode 26.x makes `swiftbuild` the
+                          // default — `native` is now deprecated — and it links
+                          // with the ordinary `_main`, so both extensions died
+                          // with `"_main", referenced from: <initial-undefines>`.
+                          //
+                          // Saying it here rather than adding a second
+                          // `@_cdecl("main")`: that links the product and then
+                          // collides with the XCTest runner's own `_main` when
+                          // the testable object joins the test bundle.
+                          linkerSettings: [
+                              .unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_KhaytThumbnail_main"]),
                           ]),
         // The Quick Look PREVIEW. Same shape as the thumbnail extension and for
         // the same reasons — no Swift entry point, `NSExtensionMain` supplied by
@@ -115,6 +131,22 @@ let package = Package(
         .executableTarget(name: "KhaytPreview", dependencies: ["KhaytCore"],
                           swiftSettings: [
                               .unsafeFlags(["-parse-as-library"]),
+                          ],
+                          // THE ENTRY SYMBOL, NAMED OUT LOUD.
+                          //
+                          // SwiftPM's `native` engine linked an executable with
+                          // `-e _<TargetName>_main` and `Entry.swift` supplied
+                          // exactly that. Xcode 26.x makes `swiftbuild` the
+                          // default — `native` is now deprecated — and it links
+                          // with the ordinary `_main`, so both extensions died
+                          // with `"_main", referenced from: <initial-undefines>`.
+                          //
+                          // Saying it here rather than adding a second
+                          // `@_cdecl("main")`: that links the product and then
+                          // collides with the XCTest runner's own `_main` when
+                          // the testable object joins the test bundle.
+                          linkerSettings: [
+                              .unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_KhaytPreview_main"]),
                           ]),
         .testTarget(name: "KhaytPreviewTests",
                     dependencies: ["KhaytPreview", "KhaytCore"]),

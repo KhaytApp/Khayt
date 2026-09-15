@@ -73,6 +73,56 @@ struct ThumbnailExtensionTests {
             """)
     }
 
+    /// THE ENTRY SYMBOL EXISTS AND IS THE ONE THE MANIFEST NAMES.
+    ///
+    /// `hasNoSwiftEntryPoint` above proves the extension has no SWIFT entry.
+    /// This proves it has a C one, and that it is called what `Package.swift`
+    /// passes to `-e`. Both halves are needed, and only the first existed:
+    /// when Xcode 26.x made `swiftbuild` the default SwiftPM engine, the
+    /// entry-symbol convention changed from `_<TargetName>_main` to the
+    /// ordinary `_main` and BOTH extensions stopped linking — while every test
+    /// here went on passing, because a binary that cannot link is a binary
+    /// this suite quietly skips.
+    @Test(arguments: ThumbnailExtensionTests.extensions)
+    func hasTheEntryPointTheManifestAsksFor(_ name: String) throws {
+        let binary = try #require(Self.binary(name), """
+            \(name) did not build. That is the failure this test exists for — \
+            the others take a missing binary as "nothing to check".
+            """)
+        let nm = Process()
+        nm.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        nm.arguments = ["nm", binary.path]
+        let pipe = Pipe()
+        nm.standardOutput = pipe
+        nm.standardError = FileHandle.nullDevice
+        try nm.run()
+        let out = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(),
+                         as: UTF8.self)
+        nm.waitUntilExit()
+        #expect(out.contains(" T "), "nm told us nothing; the check below would pass vacuously")
+        #expect(out.contains("_\(name)_main"), """
+            \(name) no longer defines `_\(name)_main`, which is the symbol \
+            Package.swift hands the linker with `-e`. Rename one and the other \
+            has to move with it.
+            """)
+    }
+
+    /// And the manifest still says which symbol that is.
+    @Test(arguments: ThumbnailExtensionTests.extensions)
+    func theManifestNamesTheEntryPoint(_ name: String) {
+        let manifest = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Package.swift")
+        let text = (try? String(contentsOf: manifest, encoding: .utf8)) ?? ""
+        #expect(!text.isEmpty, "Package.swift moved; this test is reading nothing")
+        #expect(text.contains("\"_\(name)_main\""), """
+            Package.swift stopped naming \(name)'s entry symbol. Without it the \
+            default engine links for `_main`, finds none, and the extension \
+            fails at LINK time — which is a red build, but on a target nothing \
+            else depends on.
+            """)
+    }
+
     /// The reply is measured in points and the picture in pixels, which is how
     /// a 256×256 plate render ended up drawn into the corner of a 1024×1024
     /// thumbnail on the first try.
