@@ -126,6 +126,9 @@ final class Shop {
 
     var selection: Order.ID?
     var fileSelection: Set<LibraryFile.ID> = []
+    /// The model the shop has asked to delete, until it confirms or backs out.
+    /// A question in the window's `WindowSheets`, so both shells can ask it.
+    var pendingLibraryDelete: LibraryFile?
     var customerSelection: Customer.ID?
     /// Which screen, and for the library which folder.
     ///
@@ -1794,6 +1797,33 @@ final class Shop {
     /// not answer for leaves fields at zero, and a zero that looks typed is
     /// worse than a blank somebody was told about.
     func productFromFile(_ file: LibraryFile) async -> Product? {
+        guard let filled = await partFields(from: file) else { return nil }
+        var product = newProduct()
+        // The model's name in every language the catalogue carries — the same
+        // name, because a model has one and a shop can correct it on the sheet.
+        for key in await allLanguageKeys() {
+            product.names[key.language] = file.title
+        }
+        product.rest["parts"] = .array([.object(filled.part)])
+        productNote = filled.note
+        return product
+    }
+
+    /// A library model, as one part of a product — the figures and the note
+    /// that goes with them.
+    ///
+    /// Split out of `productFromFile` so the product sheet can fill a part
+    /// from a model the shop CHOOSES, and not only make a whole product from a
+    /// model it selected in the library. Reported from the running app: "in
+    /// Catalogue I should be able to load the print file to calculate the
+    /// price". Same rule both ways round, so a product built either way prices
+    /// the same.
+    ///
+    /// `note` is what the shop has to be told: which figures are estimates
+    /// from the geometry rather than measurements, and which are still blank.
+    /// The two are different claims and are said separately. Nil when the
+    /// file answered for everything.
+    func partFields(from file: LibraryFile) async -> (part: [String: JSONValue], note: String?)? {
         productProblem = nil
         guard let engine, let rec = row(for: file.id) else {
             productProblem = words.callIt("mac.not_found"); return nil
@@ -1841,14 +1871,6 @@ final class Shop {
             }
         }
 
-        var product = newProduct()
-        // The model's name in every language the catalogue carries — the same
-        // name, because a model has one and a shop can correct it on the sheet.
-        for key in await allLanguageKeys() {
-            product.names[key.language] = file.title
-        }
-        product.rest["parts"] = .array([.object(part)])
-
         // Said plainly, and only when there is something to say.
         //
         // The ESTIMATED fields are named first and separately from the ones
@@ -1856,9 +1878,10 @@ final class Shop {
         // worked out and stands behind, the other is a gap the shop has to
         // fill. Rolling them into one sentence would make the estimate sound
         // like a measurement, which is exactly what it is not.
+        var note: String?
         if !estimated.isEmpty {
             let e = estimates[file.id]
-            productNote = words.callIt(
+            note = words.callIt(
                 e?.isCalibrated == true ? "mac.product_estimated_calibrated"
                                         : "mac.product_estimated",
                 ["fields": .string(estimated.joined(separator: ", ")),
@@ -1870,14 +1893,12 @@ final class Shop {
         if !stillMissing.isEmpty {
             let gap = words.callIt("mac.product_from_file_missing",
                                    ["fields": .string(stillMissing.joined(separator: ", "))])
-            // APPENDED, not assigned. The `else { productNote = nil }` this
-            // replaced was right when there was one sentence; with two it wiped
-            // the estimate note whenever nothing was left missing — which is
-            // the good case, and the one where the shop most needs telling that
-            // the figures are estimates.
-            productNote = productNote.map { $0 + " " + gap } ?? gap
+            // APPENDED, not assigned: with two sentences, assigning wiped the
+            // estimate note whenever nothing was left missing — the good case,
+            // and the one where the shop most needs telling.
+            note = note.map { $0 + " " + gap } ?? gap
         }
-        return product
+        return (part, note)
     }
 
     /// Open the product sheet on a product made from the selected model.
@@ -7517,6 +7538,59 @@ final class Shop {
     func count(group: String) -> Int { files.count { $0.groupName == group } }
 
     /// The record's folder on this Mac, if it is on this Mac at all.
+    /// Take a model out of the library — the record, and its files.
+    ///
+    /// ── THE MAC HAD NO WAY TO DO THIS ───────────────────────────────────────
+    ///
+    /// Reported from the running app: "I can't delete something from the
+    /// library?" — and the answer was that nothing in the Mac app could. The
+    /// menu offered Quick Look, Reveal, Open, Convert, Copy name; the model
+    /// stayed forever. The Electron app has had this since the library
+    /// existed, and a renderer-only feature is a gap to close.
+    ///
+    /// The rule is `renderer/printfiles.js deletePrintFile`'s, kept in step:
+    /// confirmed first, in the same words; every file in the model's own
+    /// folder is deleted and the record goes regardless — but a file that
+    /// would not go is SAID, because the record was once removed and "File
+    /// deleted" shown while the bytes stayed on disk. No undo: the files are
+    /// gone, and an undo that puts the record back without them is a model
+    /// that looks present and is not.
+    func deleteLibraryFile(_ file: LibraryFile) async {
+        importProblem = nil
+        importNote = nil
+        pendingLibraryDelete = nil
+        guard let build = source.build else {
+            importProblem = words.callIt("mac.move_sample"); return
+        }
+        var allGone = true
+        if let dir = directory(for: file) {
+            let contents = (try? FileManager.default.contentsOfDirectory(at: dir,
+                includingPropertiesForKeys: nil)) ?? []
+            for url in contents {
+                do { try FileManager.default.removeItem(at: url) } catch { allGone = false }
+            }
+            if allGone { try? FileManager.default.removeItem(at: dir) }
+        }
+        do {
+            try StoreWriter.update(build) { root in
+                var rows = Self.rows(root, "printFiles")
+                rows.removeAll { Self.recordId($0) == file.id }
+                root["printFiles"] = .array(rows)
+            }
+            // Out of the selection too, or the inspector keeps describing a
+            // model that is gone.
+            fileSelection.remove(file.id)
+            await load(source)
+            if allGone {
+                importNote = words.callIt("plib.deleted")
+            } else {
+                importProblem = words.callIt("plib.delete_partial")
+            }
+        } catch {
+            importProblem = String(describing: error)
+        }
+    }
+
     func directory(for file: LibraryFile) -> URL? {
         guard let roots = libraryRoots else { return nil }
         return LibraryLocation.directory(for: file.id, roots: roots.roots)

@@ -569,6 +569,26 @@ struct WindowSheets: ViewModifier {
             } message: {
                 Text(shop.words.callIt("mac.cancel_why"))
             }
+            // Deleting a model is the one library action that cannot be
+            // undone — the files go — so it asks, in the words the Electron
+            // app asks in, and the destructive button says what it does.
+            .confirmationDialog(
+                shop.words.callIt("plib.delete_title"),
+                isPresented: Binding(get: { shop.pendingLibraryDelete != nil },
+                                     set: { if !$0 { shop.pendingLibraryDelete = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button(shop.words.callIt("common.delete"), role: .destructive) {
+                    guard let file = shop.pendingLibraryDelete else { return }
+                    Task { await shop.deleteLibraryFile(file) }
+                }
+                Button(shop.words.callIt("common.cancel"), role: .cancel) {
+                    shop.pendingLibraryDelete = nil
+                }
+            } message: {
+                Text(shop.words.callIt("plib.delete_confirm",
+                                       ["name": .string(shop.pendingLibraryDelete?.title ?? "")]))
+            }
             .sheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
             .sheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
             .sheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }

@@ -35,6 +35,9 @@ enum ImportCommand {
         /// than import anything. For the models that came in before the app
         /// could draw them.
         var previewsOnly = false
+        /// Measure every 3MF in the library again and rewrite the keys that
+        /// changed. For the records measured under the reader's old rules.
+        var remeasure = false
     }
 
     enum Parsed: Equatable {
@@ -53,6 +56,12 @@ enum ImportCommand {
           --previews         draw the missing previews and record the missing
                              measurements in the library that is already there;
                              imports nothing, and needs no path
+          --remeasure        measure every 3MF in the library again and rewrite
+                             the measurements that changed; for the records
+                             written before the reader learned to place a
+                             multi-component object, read a root over 8 MB, take
+                             one plate's size, or open a zip64 file. Imports
+                             nothing, and needs no path
         """
 
     static func parse(_ arguments: [String]) -> Parsed {
@@ -66,6 +75,7 @@ enum ImportCommand {
             case "--keep-originals": options.keepOriginals = true
             case "--dry-run": options.dryRun = true
             case "--previews": options.previewsOnly = true
+            case "--remeasure": options.remeasure = true
             // AppKit puts its own arguments on a launched bundle — `-NSDocument…`,
             // and `-psn_…` when Finder opens it. Passing those to the walker
             // would report each as a path that is not there.
@@ -75,9 +85,9 @@ enum ImportCommand {
             case let path: options.paths.append(path)
             }
         }
-        // `--previews` works on the library that is already there, so it is
-        // the one form that needs no path.
-        guard !options.paths.isEmpty || options.previewsOnly else {
+        // `--previews` and `--remeasure` work on the library that is already
+        // there, so they are the forms that need no path.
+        guard !options.paths.isEmpty || options.previewsOnly || options.remeasure else {
             return .usage("--import needs at least one file or folder.\n\n\(usage)")
         }
         return .run(options)
@@ -118,6 +128,11 @@ enum ImportCommand {
             return await drawMissingPreviews(shop: shop, build: build,
                                              root: roots.primary, dryRun: options.dryRun,
                                              engine: engine)
+        }
+        if options.remeasure {
+            return await remeasure3MFs(shop: shop, build: build,
+                                       root: roots.primary, dryRun: options.dryRun,
+                                       engine: engine)
         }
 
         let chosen = options.paths.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
@@ -319,6 +334,102 @@ enum ImportCommand {
         for failure in failures.prefix(10) { complain("  \(failure)") }
         say(String(format: "took %.0f s", Date().timeIntervalSince(started)))
         return failures.isEmpty ? 0 : 1
+    }
+
+    /// Measure every 3MF again, and rewrite the keys that came out different.
+    ///
+    /// ── WHY A BOOK NEEDS THIS AT ALL ──────────────────────────────────────
+    ///
+    /// A `geometryKey` is written once, on import, by whichever app did the
+    /// importing. The Mac's 3MF reader had four faults that each produced a
+    /// plausible key — same triangle count, a box no part of the file has —
+    /// and wrote it into the book: a root object's components read under the
+    /// last component's placement; a root part over 8 MB refused and every
+    /// part then measured at identity; every plate of a project boxed together
+    /// with the gaps between them; and a zip64 container refused outright.
+    /// Forty-eight of this shop's seventy-two measured 3MFs carried a key from
+    /// one of those. Nothing in the app re-reads a file that already has a key,
+    /// which is right for the ordinary case and is what leaves these behind.
+    ///
+    /// So this reads every 3MF, under the rules as they are now, and rewrites
+    /// only the keys that changed — reporting each one, because a key that
+    /// changes is a number the shop was shown that was wrong. `--dry-run`
+    /// lists them and writes nothing. One write at the end, under the lock,
+    /// for the reason `drawMissingPreviews` gives.
+    private static func remeasure3MFs(shop: Shop, build: StoreReader.Build,
+                                      root: String, dryRun: Bool,
+                                      engine: KhaytEngine) async -> Int32 {
+        let vault = URL(fileURLWithPath: root)
+        let wanted = shop.files.filter { ($0.sourceFile?.ext ?? "").lowercased() == "3mf" }
+        say("library: \(root)")
+        say("3MF models to measure again: \(wanted.count) of \(shop.files.count)")
+        guard !wanted.isEmpty else { return 0 }
+
+        var changed: [(LibraryFile, String, String)] = []   // file, was, now
+        var unreadable: [String] = []
+        let started = Date()
+        for (i, file) in wanted.enumerated() {
+            guard let name = file.sourceFile?.filename else { continue }
+            let model = vault.appending(path: LibraryLocation.itemDirName(file.id))
+                             .appending(path: name)
+            say("[\(i + 1)/\(wanted.count)] \(file.title)")
+            guard let box = try? Mesh.measure3MF(model), box.triangleCount > 0,
+                  let key = try? await engine.geometryKey(triangleCount: box.triangleCount,
+                                                          volumeMm3: box.volumeMm3,
+                                                          x: box.x, y: box.y, z: box.z) else {
+                unreadable.append(file.title); continue
+            }
+            let was = file.geometryKey ?? ""
+            if was != key { changed.append((file, was, key)) }
+        }
+
+        say("")
+        say("measured:  \(wanted.count - unreadable.count)")
+        say("changed:   \(changed.count)")
+        say("unreadable: \(unreadable.count)")
+        for (file, was, now) in changed {
+            say("  \(file.title)")
+            say("      before \(was.isEmpty ? "—" : was)")
+            say("      after  \(now)")
+        }
+        for title in unreadable.prefix(10) { complain("  could not measure \(title)") }
+
+        if dryRun {
+            say("")
+            say("dry run: nothing was written.")
+            return unreadable.isEmpty ? 0 : 1
+        }
+        guard !changed.isEmpty else {
+            say(String(format: "nothing to rewrite; took %.0f s", Date().timeIntervalSince(started)))
+            return unreadable.isEmpty ? 0 : 1
+        }
+
+        guard let claim = StoreLock.take(for: build) else {
+            let who = StoreLock.held(StoreLock.verdict(for: build))
+            complain("\(who?.app ?? "Another app") has this book open. Close it and try again.")
+            return 3
+        }
+        defer { StoreLock.release(claim, for: build) }
+
+        let keys = Dictionary(uniqueKeysWithValues: changed.map { ($0.0.id, $0.2) })
+        do {
+            try StoreWriter.update(storeURL: build.storeURL,
+                                   owns: { StoreLock.weOwnIt(build) },
+                                   whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) { root in
+                guard case .array(let rows)? = root["printFiles"] else { return }
+                root["printFiles"] = .array(rows.map { row in
+                    guard case .object(var o) = row, case .string(let id)? = o["id"],
+                          let key = keys[id] else { return row }
+                    o["geometryKey"] = .string(key)
+                    return .object(o)
+                })
+            }
+        } catch {
+            complain("The book refused the write: \(error)")
+            return 2
+        }
+        say(String(format: "rewritten: %d; took %.0f s", changed.count, Date().timeIntervalSince(started)))
+        return unreadable.isEmpty ? 0 : 1
     }
 
     private static func size(_ bytes: Int) -> String {

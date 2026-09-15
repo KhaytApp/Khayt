@@ -88,14 +88,40 @@ public enum Zip {
         let tail = try read(handle, at: fileSize - tailLength, count: tailLength)
         guard let eocd = lastIndex(of: 0x0605_4b50, in: tail) else { throw Failure.notAZip }
 
-        let count = Int(u16(tail, eocd + 10))
-        let directorySize = Int(u32(tail, eocd + 12))
-        let directoryAt = Int(u32(tail, eocd + 16))
+        var count = Int(u16(tail, eocd + 10))
+        var directorySize = Int(u32(tail, eocd + 12))
+        var directoryAt = Int(u32(tail, eocd + 16))
+        // ── ZIP64, AND WHY A 34 KB FILE NEEDS IT ──────────────────────────
+        //
         // Zip64 writes 0xFFFF/0xFFFFFFFF here and puts the real values in its
-        // own record. Refused rather than guessed at: a misread offset is a
-        // read of arbitrary bytes, and no 3MF this reads is near 4 GB.
-        guard count != 0xFFFF, directoryAt != 0xFFFF_FFFF, directorySize != 0xFFFF_FFFF else {
-            throw Failure.unsupported(name: "the archive", method: 64)
+        // own record. This refused those markers on the note that "no 3MF
+        // this reads is near 4 GB" — true, and beside the point, because some
+        // writers emit zip64 for EVERY archive, size regardless. Thirteen of
+        // this shop's eighty-five 3MFs were such files, the smallest 34 KB,
+        // and every one was refused: no thumbnail, no measurement, no key.
+        // `lib/zip-read.js` refused them the same way, so the two apps agreed
+        // on those files perfectly, and both were wrong.
+        //
+        // The locator is the twenty bytes before the plain record and points
+        // at the zip64 record. Both are held to their signatures and to lying
+        // inside the file — a misread offset is a read of arbitrary bytes.
+        if count == 0xFFFF || directoryAt == 0xFFFF_FFFF || directorySize == 0xFFFF_FFFF {
+            let locator = eocd - 20
+            guard locator >= 0, u32(tail, locator) == 0x0706_4b50 else {
+                throw Failure.corrupt("zip64 markers with no locator before the record")
+            }
+            let recordAt = u64(tail, locator + 8)
+            guard recordAt >= 0, recordAt + 56 <= fileSize else {
+                throw Failure.corrupt("the zip64 record is outside the file")
+            }
+            let record = try read(handle, at: recordAt, count: 56)
+            guard u32(record, 0) == 0x0606_4b50 else {
+                throw Failure.corrupt("the zip64 locator points at something else")
+            }
+            count = u64(record, 32)
+            directorySize = u64(record, 40)
+            directoryAt = u64(record, 48)
+            guard count >= 0 else { throw Failure.corrupt("the zip64 record's entry count is not one") }
         }
         guard directoryAt >= 0, directorySize >= 0,
               directoryAt + directorySize <= fileSize else {
@@ -108,17 +134,45 @@ public enum Zip {
         while at + 46 <= directory.count, out.count < count {
             guard u32(directory, at) == 0x0201_4b50 else { break }
             let method = u16(directory, at + 10)
-            let compressed = Int(u32(directory, at + 20))
-            let uncompressed = Int(u32(directory, at + 24))
+            var compressed = Int(u32(directory, at + 20))
+            var uncompressed = Int(u32(directory, at + 24))
             let nameLength = Int(u16(directory, at + 28))
             let extraLength = Int(u16(directory, at + 30))
             let commentLength = Int(u16(directory, at + 32))
-            let localAt = Int(u32(directory, at + 42))
+            var localAt = Int(u32(directory, at + 42))
             let nameAt = at + 46
             guard nameAt + nameLength <= directory.count else {
                 throw Failure.corrupt("a member's name runs past the directory")
             }
             let name = String(decoding: directory[nameAt..<(nameAt + nameLength)], as: UTF8.self)
+            // A marked field's real value is in the zip64 extra (id 0x0001),
+            // in this order and only for the fields that are marked:
+            // uncompressed size, compressed size, local header offset. The
+            // same walk `lib/zip-read.js listEntries` makes.
+            if compressed == 0xFFFF_FFFF || uncompressed == 0xFFFF_FFFF || localAt == 0xFFFF_FFFF {
+                var q = nameAt + nameLength
+                let end = min(directory.count, q + extraLength)
+                var found = false
+                while q + 4 <= end {
+                    let id = u16(directory, q), length = Int(u16(directory, q + 2))
+                    if id == 0x0001 {
+                        var r = q + 4
+                        let stop = min(end, r + length)
+                        var s = uncompressed, c = compressed, o = localAt
+                        if uncompressed == 0xFFFF_FFFF, r + 8 <= stop { s = u64(directory, r); r += 8 }
+                        if compressed == 0xFFFF_FFFF, r + 8 <= stop { c = u64(directory, r); r += 8 }
+                        if localAt == 0xFFFF_FFFF, r + 8 <= stop { o = u64(directory, r); r += 8 }
+                        if s >= 0, c >= 0, o >= 0, s != 0xFFFF_FFFF, c != 0xFFFF_FFFF, o != 0xFFFF_FFFF {
+                            uncompressed = s; compressed = c; localAt = o; found = true
+                        }
+                        break
+                    }
+                    q += 4 + length
+                }
+                guard found else {
+                    throw Failure.corrupt("\(name) is marked zip64 and carries no zip64 extra")
+                }
+            }
             out.append(Entry(name: name, compressedSize: compressed, size: uncompressed,
                              method: method, offset: localAt))
             at = nameAt + nameLength + extraLength + commentLength
@@ -313,6 +367,17 @@ public enum Zip {
         guard at + 2 <= d.count else { return 0 }
         let i = d.startIndex + at
         return UInt16(d[i]) | UInt16(d[i + 1]) << 8
+    }
+
+    /// Little-endian 64-bit, as an `Int`. A value past `Int.max` is not an
+    /// offset into any file, and a short read is not a value: both come back
+    /// as -1, which every bounds check here refuses — and which `Int(_:)` on
+    /// a `UInt64` would have trapped on instead.
+    private static func u64(_ d: Data, _ at: Int) -> Int {
+        guard at >= 0, at + 8 <= d.count else { return -1 }
+        var v: UInt64 = 0
+        for k in (0..<8).reversed() { v = (v << 8) | UInt64(d[d.startIndex + at + k]) }
+        return v > UInt64(Int.max) ? -1 : Int(v)
     }
 
     private static func u32(_ d: Data, _ at: Int) -> UInt32 {

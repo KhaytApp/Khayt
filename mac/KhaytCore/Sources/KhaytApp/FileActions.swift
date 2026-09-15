@@ -154,5 +154,11 @@ struct ModelActions: View {
         if let original = file.sourceFile?.originalName ?? file.originalName {
             Button(shop.words.callIt("mac.copy_file_name")) { FileActions.copy(original) }
         }
+        Divider()
+        // Last, alone, and marked: the one item here that cannot be undone.
+        // The ellipsis is the promise that it asks first — see `WindowSheets`.
+        Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+            shop.pendingLibraryDelete = file
+        }
     }
 }
