@@ -1174,6 +1174,44 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **A model can be deleted from the library on the Mac.** There was no way to:
+  the menu offered Quick Look, Reveal, Open, Convert and Copy name, and a model
+  stayed forever. Delete asks first, in the words the other app asks in, takes
+  the record and the files, and says so if a file would not go rather than
+  showing "File deleted" over bytes still on disk.
+
+- **A product's part can be filled from a model in the library.** The product
+  sheet could only be typed into — grams and hours by hand — while the library
+  already knew both for every model the shop had sliced and could estimate them
+  for the rest. "From your print library…" beside Add part opens a picker in
+  the library's own order; the part keeps the link to its model through a save.
+  Same rule as making a product from a selected model, so both price alike.
+
+- **What a model could and could not answer for is now said.** The sentences
+  a product-from-model produced — "the weight is an estimate", "material is
+  still missing" — were written and shown nowhere, so an estimated figure
+  looked typed. The product sheet shows them.
+
+- **A multi-plate project is the size of its largest plate, not of every
+  plate laid side by side.** A slicer sets plates out in one coordinate space,
+  and both apps boxed the lot: a two-plate file whose widest plate is 80 mm
+  read as 295 mm across — the gap between the plates — and would not have "fit"
+  a 256 mm bed. The count and volume stay totals, because every plate gets
+  printed. Both apps, the same rule, checked file for file.
+
+- **The Mac reads a 3MF the way the file says.** Three faults, each producing a
+  plausible size no part of the file has: an object built from several
+  components was read with every component at the last one's position; a root
+  part over 8 MB — every scanned model that keeps its mesh inline — was refused
+  and then measured at identity, un-rotated and un-placed; and a zip64
+  container was refused outright, however small. Thirteen of one shop's files
+  were zip64 at 34 KB and had no thumbnail, no size and no key in either app.
+
+- **`Khayt --import --remeasure` rewrites the measurements the old reader
+  wrote.** Seventy-four of that shop's eighty-five measured 3MFs carried a key
+  from one of the faults above; nothing re-reads a file that already has one.
+  `--dry-run` lists what would change.
+
 - **A job taken from the catalogue is priced.** Any part weighing a kilo or
   more came into the sheet as nothing at all, so nothing was costed and the job
   opened at zero — a product the catalogue prices at 3,250 became a job priced

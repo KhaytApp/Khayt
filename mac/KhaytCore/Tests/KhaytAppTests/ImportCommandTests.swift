@@ -35,6 +35,16 @@ struct ImportCommandTests {
         #expect(Self.parse("--dry-run --import /a") == .run(.init(paths: ["/a"], dryRun: true)))
     }
 
+    @Test("--remeasure works on the library that is there, and needs no path")
+    func remeasureNeedsNoPath() {
+        #expect(Self.parse("--import --remeasure") == .run(.init(remeasure: true)))
+        #expect(Self.parse("--import --remeasure --dry-run")
+                == .run(.init(dryRun: true, remeasure: true)))
+        // And the usage names it, so a shop that types `--import` alone is
+        // told the form exists.
+        #expect(ImportCommand.usage.contains("--remeasure"))
+    }
+
     @Test("--import with nothing to import says so rather than doing nothing")
     func needsAPath() {
         guard case .usage(let message) = Self.parse("--import") else {

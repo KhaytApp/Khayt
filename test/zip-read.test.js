@@ -45,3 +45,28 @@ test('accepts ArrayBuffer / TypedArray input', () => {
   assert.equal(openZip(ab).file('a.txt').toString('utf8'), 'hi');
   assert.equal(openZip(new Uint8Array(ab)).file('a.txt').toString('utf8'), 'hi');
 });
+
+/* ── ZIP64 ───────────────────────────────────────────────────────────────── */
+
+test('a zip64 archive lists and reads, however small it is', () => {
+  // Some writers emit zip64 for every archive. Thirteen of one shop's 3MFs
+  // were such files — the smallest 34 KB — and every one listed as empty.
+  const buf = makeZip([
+    { name: '3D/3dmodel.model', data: '<model/>', method: 8 },
+    { name: 'Metadata/thumbnail.png', data: Buffer.from([0x89, 0x50, 0x4e, 0x47]) },
+  ], { zip64: true });
+  assert.ok(buf.includes(Buffer.from('PK\x06\x06', 'latin1')), 'the fixture is not zip64');
+  const entries = listEntries(buf);
+  assert.deepEqual(entries.map((e) => e.name), ['3D/3dmodel.model', 'Metadata/thumbnail.png']);
+  assert.equal(entries[0].size, 8, 'the real size came from the zip64 extra, not the marker');
+  assert.equal(readEntry(buf, entries[0]).toString('utf8'), '<model/>');
+  assert.equal(openZip(buf).file('Metadata/thumbnail.png').length, 4);
+});
+
+test('a zip64 archive whose locator is broken is empty, never a guess', () => {
+  const buf = makeZip([{ name: 'a.txt', data: 'hello' }], { zip64: true });
+  const loc = buf.lastIndexOf(Buffer.from('PK\x06\x07', 'latin1'));
+  const broken = Buffer.from(buf);
+  broken.writeBigUInt64LE(BigInt(buf.length + 4096), loc + 8);   // points past the file
+  assert.deepEqual(listEntries(broken), []);
+});

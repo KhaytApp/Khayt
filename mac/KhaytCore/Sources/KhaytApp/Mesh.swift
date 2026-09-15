@@ -41,6 +41,10 @@ enum Mesh {
         var minX = Double.infinity, minY = Double.infinity, minZ = Double.infinity
         var maxX = -Double.infinity, maxY = -Double.infinity, maxZ = -Double.infinity
 
+        /// How many plates the file lays out. One for anything that is not a
+        /// slicer project, and for a project with a single plate.
+        var plates = 1
+
         var x: Double { minX.isFinite && maxX.isFinite ? max(0, maxX - minX) : 0 }
         var y: Double { minY.isFinite && maxY.isFinite ? max(0, maxY - minY) : 0 }
         var z: Double { minZ.isFinite && maxZ.isFinite ? max(0, maxZ - minZ) : 0 }
@@ -293,12 +297,52 @@ enum Mesh {
         var isIdentity: Bool { self == Placement() }
     }
 
+    /// ── A BOX PER PLATE, NOT ONE BOX ROUND THE LOT ───────────────────────
+    ///
+    /// Reported from the running app: *"in library it is calculating the print
+    /// plate size as all the plates combined if there is more than one"*.
+    ///
+    /// Measured on the shop's own two-plate file: plate 1 is 77 × 170 × 9,
+    /// plate 2 is 80 × 80 × 26, and this returned **295 × 170 × 26**. The 295
+    /// is not the model — it is the distance between the two plates, because a
+    /// slicer lays them out side by side in one coordinate space and the walk
+    /// below faithfully measured all of it.
+    ///
+    /// That is wrong twice over. The Library shows a size no part of the file
+    /// has, and `lib/print-fit.js` is handed a 295 mm footprint for a model
+    /// whose widest plate is 80 — so a file that prints on a 256 mm bed two
+    /// plates at a time reports as too big for it.
+    ///
+    /// So the box is the LARGEST PLATE'S: the one that decides whether this
+    /// file can be printed at all. The triangle count and the volume stay
+    /// totals — every plate's material does get printed — which is why those
+    /// two were right all along and the box was not.
     static func measure3MF(_ url: URL) throws -> Measurement? {
-        var m = Measurement()
-        try each3MFTriangle(url) { ax, ay, az, bx, by, bz, cx, cy, cz in
-            m.add(ax, ay, az, bx, by, bz, cx, cy, cz)
+        var perPlate: [Int: Measurement] = [:]
+        var total = Measurement()
+        try each3MFTriangle(url) { plate, ax, ay, az, bx, by, bz, cx, cy, cz in
+            total.add(ax, ay, az, bx, by, bz, cx, cy, cz)
+            perPlate[plate, default: Measurement()]
+                .add(ax, ay, az, bx, by, bz, cx, cy, cz)
         }
-        return m.finished()
+        guard var out = total.finished() else { return nil }
+        out.plates = max(1, perPlate.count)
+        // The plate with the largest footprint — area, not a single axis, so a
+        // long thin plate does not beat a big square one on width alone. Ties
+        // go to the LOWEST plate number, and that is not tidiness: a
+        // dictionary's `max(by:)` picks whichever equal plate it visits last,
+        // and `lib/mf-convert.js measureMesh` picks the first. Two readers of
+        // one file must pick the same plate or they write two keys.
+        let biggest = perPlate.max { a, b in
+            let (x, y) = (a.value.x * a.value.y, b.value.x * b.value.y)
+            return x != y ? x < y : a.key > b.key
+        }
+        if let biggest = biggest?.value {
+            out.minX = biggest.minX; out.maxX = biggest.maxX
+            out.minY = biggest.minY; out.maxY = biggest.maxY
+            out.minZ = biggest.minZ; out.maxZ = biggest.maxZ
+        }
+        return out
     }
 
     /// Every triangle of a 3MF, placed where the build puts it.
@@ -310,20 +354,24 @@ enum Mesh {
     /// kind of wrong, since both answers would look plausible.
     ///
     /// Returns how many triangles it emitted.
+    /// The body is handed the PLATE each triangle belongs to, first. Callers
+    /// that do not care take `_` for it — the overhang pass judges a surface
+    /// the same whichever plate it is laid out on.
     @discardableResult
     static func each3MFTriangle(_ url: URL,
-                                _ body: (Double, Double, Double, Double, Double,
+                                _ body: (Int, Double, Double, Double, Double, Double,
                                          Double, Double, Double, Double) -> Void) throws -> Int {
         let entries = try Zip.entries(of: url)
         let models = entries.filter { $0.name.lowercased().hasSuffix(".model") }
         guard !models.isEmpty else { throw Failure.notAMesh("no model part in the archive") }
 
         var emitted = 0
+        var plate = 1
         func sink(_ ax: Double, _ ay: Double, _ az: Double,
                   _ bx: Double, _ by: Double, _ bz: Double,
                   _ cx: Double, _ cy: Double, _ cz: Double) {
             emitted += 1
-            body(ax, ay, az, bx, by, bz, cx, cy, cz)
+            body(plate, ax, ay, az, bx, by, bz, cx, cy, cz)
         }
 
         // THE BUILD PLACES THE OBJECTS, and where they are placed is part of
@@ -340,9 +388,10 @@ enum Mesh {
         // The triangle count and the volume are the same either way, which is
         // why they matched before this existed and why the box did not.
         if let plan = try buildPlan(entries, in: url), !plan.isEmpty {
-            for (path, placement) in plan {
+            for (path, placement, itemPlate, object) in plan {
                 guard let entry = entries.first(where: { equalPath($0.name, path) }) else { continue }
-                try streamModelPart(entry, in: url, placement: placement, body: sink)
+                plate = itemPlate
+                try streamModelPart(entry, in: url, placement: placement, only: object, body: sink)
             }
             if emitted > 0 { return emitted }
             // A build that named nothing this could find. Fall through and
@@ -413,7 +462,12 @@ enum Mesh {
                                       Double, Double, Double, Double) -> Void) throws -> Bool {
         switch ext ?? url.pathExtension.lowercased() {
         case "3mf":
-            return try each3MFTriangle(url, body) > 0
+            // The plate is dropped here on purpose: a surface overhangs by the
+            // same angle whichever plate it is laid out on, and this reader is
+            // shared with the formats that have no plates at all.
+            return try each3MFTriangle(url) { _, ax, ay, az, bx, by, bz, cx, cy, cz in
+                body(ax, ay, az, bx, by, bz, cx, cy, cz)
+            } > 0
         case "obj":
             guard let text = try? String(contentsOf: url, encoding: .utf8) else { return false }
             eachOBJTriangle(text, body)
@@ -434,35 +488,166 @@ enum Mesh {
     /// `[(part path, placement)]` from the root part's `<build>`, or nil when
     /// there is no root or no build in it.
     private static func buildPlan(_ entries: [Zip.Entry], in url: URL)
-        throws -> [(String, Placement)]? {
+        throws -> [(String, Placement, Int, String)]? {
         guard let root = entries.first(where: { equalPath($0.name, "3D/3dmodel.model") })
         else { return nil }
-        // The root is small — ten kilobytes on the file above — so unlike the
-        // mesh parts it is read whole.
-        guard let data = try? Zip.data(of: root, in: url) else { return nil }
-        let xml = String(decoding: data, as: UTF8.self)
+        // ── STREAMED, NOT READ WHOLE ────────────────────────────────────────
+        //
+        // This read the root with `Zip.data`, on the note that "the root is
+        // small — ten kilobytes on the file above". It is ten kilobytes when a
+        // slicer has split the meshes into `3D/Objects/*.model`; it is the
+        // whole model when it has not. The shop's scanned figures keep their
+        // mesh inline and their roots run 8–9 MB, just over `Zip.defaultLimit`
+        // — so `try?` turned the size refusal into nil, the plan came back nil,
+        // and the fallback measured every part at IDENTITY. On `jambe g.3mf`
+        // that is the raw mesh's box, 77 × 88 × 97, where the build item
+        // rotates it to 78 × 83 × 91. Same triangle count, same volume,
+        // plausible box: the quiet kind of wrong, and the geometryKey Khayt
+        // wrote for every such file.
+        //
+        // The plan needs the structural tags and nothing else, so the root is
+        // streamed the way the parts are and the vertex and triangle tags —
+        // all but a few kilobytes of it — are dropped on the way past.
+        guard let xml = try? structuralTags(of: root, in: url) else { return nil }
 
-        // objectid → (part it lives in, the component's own placement)
-        var componentOf: [String: (String, Placement)] = [:]
+        // ── EVERY COMPONENT, NOT THE LAST ONE ──────────────────────────────
+        //
+        // This was a dictionary of one component per root object, and a root
+        // object can have several: the shop's own AlQadsiah nameplate is one
+        // object made of two components into the same part file, objectid 3
+        // at +4.86 y / +4.5 z and objectid 4 at −1.5 z. The dictionary kept
+        // the second, and the part was then streamed WHOLE under that one
+        // placement — every object in it, at the wrong height. The triangle
+        // count came out right, which is what made it quiet: 75,472 either
+        // way, a volume of 42,772 against Electron's 127,445, and a box
+        // 149 mm across where the file says 170.
+        //
+        // So the plan is one entry per component, each naming the object it
+        // points at inside the part, and `streamModelPart` streams that object
+        // alone. `lib/mf-convert.js` resolves `path#objectid` the same way.
+        var componentsOf: [String: [(String, String, Placement)]] = [:]
+        var inlineMesh = Set<String>()
         var currentObject: String?
         for tag in tags(in: xml) {
             if tag.hasPrefix("<object") {
                 currentObject = value(of: "id", in: tag)
+            } else if tag.hasPrefix("<mesh"), let object = currentObject {
+                // A root object carrying its own mesh, referenced by an item:
+                // planned like a component into the root, or the whole item
+                // was skipped and the file fell to "stream every part".
+                inlineMesh.insert(object)
             } else if tag.hasPrefix("<component"), let object = currentObject,
-                      let path = value(of: "p:path", in: tag) ?? value(of: "path", in: tag) {
+                      let target = value(of: "objectid", in: tag) {
+                let path = value(of: "p:path", in: tag) ?? value(of: "path", in: tag)
+                    ?? "3D/3dmodel.model"
                 let placement = value(of: "transform", in: tag).flatMap(Placement.init) ?? Placement()
-                componentOf[object] = (path, placement)
+                componentsOf[object, default: []].append((path, target, placement))
             }
         }
 
-        var plan: [(String, Placement)] = []
+        let plateOf = plateMembership(entries, in: url)
+
+        var plan: [(String, Placement, Int, String)] = []
         for tag in tags(in: xml) where tag.hasPrefix("<item") {
-            guard let object = value(of: "objectid", in: tag),
-                  let (path, inner) = componentOf[object] else { continue }
+            guard let object = value(of: "objectid", in: tag) else { continue }
             let item = value(of: "transform", in: tag).flatMap(Placement.init) ?? Placement()
-            plan.append((path, item.composed(with: inner)))
+            let plate = plateOf[object] ?? 1
+            if let comps = componentsOf[object] {
+                for (path, target, inner) in comps {
+                    plan.append((path, item.composed(with: inner), plate, target))
+                }
+            } else if inlineMesh.contains(object) {
+                plan.append(("3D/3dmodel.model", item, plate, object))
+            }
         }
         return plan
+    }
+
+    /// Which plate each object sits on, from the slicer's own note of it.
+    ///
+    /// `Metadata/model_settings.config` carries one `<plate>` block per plate,
+    /// each listing the `object_id`s laid out on it. That file is a slicer
+    /// project's, so a plain 3MF has none and everything is plate one — which
+    /// is the truth for a plain 3MF.
+    ///
+    /// Numbered by BLOCK ORDER, deliberately ignoring the `plater_id` value
+    /// inside the block: `lib/mf-convert.js plateOf` numbers them that way,
+    /// and the two apps write one geometryKey for one file. Which plate is
+    /// called "2" never matters; which objects share a plate does. The first
+    /// block that names an object wins, as it does there.
+    ///
+    /// Read with the same tag scanner as the root part rather than a second
+    /// parser, for the reason `each3MFTriangle` gives about the overhang pass:
+    /// two readers of one file disagree quietly.
+    private static func plateMembership(_ entries: [Zip.Entry], in url: URL) -> [String: Int] {
+        guard let config = entries.first(where: {
+            $0.name.lowercased().hasSuffix("metadata/model_settings.config")
+        }), let data = try? Zip.data(of: config, in: url) else { return [:] }
+        let xml = String(decoding: data, as: UTF8.self)
+
+        var out: [String: Int] = [:]
+        var plate = 0
+        var inPlate = false
+        for tag in tags(in: xml) {
+            if tag.hasPrefix("</plate") {
+                inPlate = false
+            } else if tag.hasPrefix("<plate") {
+                plate += 1
+                inPlate = true
+            } else if inPlate, tag.hasPrefix("<metadata"),
+                      value(of: "key", in: tag) == "object_id",
+                      let v = value(of: "value", in: tag), out[v] == nil {
+                out[v] = plate
+            }
+        }
+        return out
+    }
+
+    /// The root part with its geometry left out: every tag that is not a
+    /// `<vertex`, `<triangle`, `<vertices` or `<triangles`, joined back into
+    /// text `tags(in:)` can read. Chunked with a carried tail, as
+    /// `streamModelPart` is, so a tag split across two chunks is not lost.
+    private static func structuralTags(of entry: Zip.Entry, in url: URL) throws -> String {
+        var kept = [UInt8]()
+        var carry = [UInt8]()
+        let skip = ["<vertex", "<triangle", "<vertices", "<triangles",
+                    "</vertex", "</triangle", "</vertices", "</triangles"]
+        func consume(_ bytes: UnsafeRawBufferPointer) -> Bool {
+            var buffer = carry
+            buffer.append(contentsOf: bytes.bindMemory(to: UInt8.self))
+            carry.removeAll(keepingCapacity: true)
+            var i = 0
+            var lastComplete = 0
+            while i < buffer.count {
+                guard buffer[i] == UInt8(ascii: "<") else { i += 1; continue }
+                guard let close = index(of: UInt8(ascii: ">"), in: buffer, from: i) else { break }
+                let tag = buffer[i..<close]
+                if !skip.contains(where: { startsLoosely(tag, with: $0) }) {
+                    kept.append(contentsOf: tag)
+                    kept.append(UInt8(ascii: ">"))
+                }
+                i = close + 1
+                lastComplete = i
+            }
+            if lastComplete < buffer.count { carry = Array(buffer[lastComplete...]) }
+            return true
+        }
+        try Zip.stream(entry, in: url, onChunk: consume)
+        return String(decoding: kept, as: UTF8.self)
+    }
+
+    /// `starts(_:with:)` insists the name ends after the prefix, which is right
+    /// for telling `<triangle` from `<trianglesets`. Here the point is to drop
+    /// a whole family, so a bare prefix match is what is wanted.
+    private static func startsLoosely(_ tag: ArraySlice<UInt8>, with text: String) -> Bool {
+        let want = Array(text.utf8)
+        guard tag.count >= want.count else { return false }
+        var i = tag.startIndex
+        for w in want {
+            if tag[i] != w { return false }
+            i = tag.index(after: i)
+        }
+        return true
     }
 
     /// `/3D/Objects/x.model` and `3D/Objects/x.model` are the same member: the
@@ -497,8 +682,13 @@ enum Mesh {
     }
 
     /// One `.model` part, streamed.
+    /// `only` is the id of the one `<object>` to read, or nil for all of them.
+    /// A part file holds every object a slicer split into it, and a component
+    /// names ONE — streaming the whole part for each component is how a
+    /// two-component object came out placed at one height (see `buildPlan`).
     private static func streamModelPart(_ entry: Zip.Entry, in url: URL,
                                         placement: Placement,
+                                        only: String? = nil,
                                         body: (Double, Double, Double, Double, Double,
                                                Double, Double, Double, Double) -> Void) throws {
         // Vertices, flat: x,y,z,x,y,z… Reserved generously because growing a
@@ -508,6 +698,9 @@ enum Mesh {
         // A tag can land across a chunk boundary, so the tail after the last
         // complete `>` is carried into the next chunk.
         var carry = [UInt8]()
+        // Whether the object being read is the one asked for. True throughout
+        // when nothing was asked for.
+        var wanted = only == nil
 
         func consume(_ bytes: UnsafeRawBufferPointer) -> Bool {
             var buffer = carry
@@ -520,7 +713,12 @@ enum Mesh {
                 guard buffer[i] == UInt8(ascii: "<") else { i += 1; continue }
                 guard let close = index(of: UInt8(ascii: ">"), in: buffer, from: i) else { break }
                 let tag = buffer[i..<close]
-                if starts(tag, with: "<mesh") {
+                if let only, starts(tag, with: "<object") {
+                    wanted = rawAttribute("id", in: tag) == only
+                } else if !wanted {
+                    // Not the object asked for: skip its vertices and its
+                    // triangles, but keep walking so the next `<object` is seen.
+                } else if starts(tag, with: "<mesh") {
                     // A `.model` part holds one object per model, and every
                     // one of them numbers its vertices FROM ZERO. Accumulating
                     // them into a single table makes each object after the
@@ -630,6 +828,34 @@ enum Mesh {
     private static func vertexOffset(_ v: Double) -> Int? {
         guard v.isFinite, v >= 0, v <= 1_000_000_000 else { return nil }
         return Int(v) * 3
+    }
+
+    /// The attribute as written, for an id rather than a number.
+    private static func rawAttribute(_ name: String, in tag: ArraySlice<UInt8>) -> String? {
+        let want = Array((name + "=\"").utf8)
+        var i = tag.startIndex
+        let end = tag.endIndex
+        outer: while i < end {
+            guard tag[i] == want[0] else { i = tag.index(after: i); continue }
+            if i > tag.startIndex {
+                let before = tag[tag.index(before: i)]
+                if !isSpace(before) && before != UInt8(ascii: "<") {
+                    i = tag.index(after: i); continue
+                }
+            }
+            var j = i
+            for w in want {
+                guard j < end, tag[j] == w else { i = tag.index(after: i); continue outer }
+                j = tag.index(after: j)
+            }
+            var chars = [UInt8]()
+            while j < end, tag[j] != UInt8(ascii: "\"") {
+                chars.append(tag[j])
+                j = tag.index(after: j)
+            }
+            return String(decoding: chars, as: UTF8.self)
+        }
+        return nil
     }
 
     private static func attribute(_ name: String, in tag: ArraySlice<UInt8>) -> Double? {

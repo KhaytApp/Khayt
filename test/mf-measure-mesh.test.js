@@ -185,3 +185,90 @@ test('a heap that cannot build the mesh can still measure it', () => {
   assert.match(builtIt.err, /Allocation failed|heap out of memory|JavaScript heap/,
     'the builder failed for some reason other than running out of memory, so this proves nothing');
 });
+
+/* ── A BOX PER PLATE ──────────────────────────────────────────────────────
+ *
+ * Reported from the Mac app, and true of this reader too: a slicer lays plates
+ * out side by side in one coordinate space, and a box drawn round everything in
+ * <build> is the layout, not the model. On the shop's own two-plate file that
+ * was 295 x 170 x 26 for a model whose widest plate is 80 mm — handed to
+ * print-fit, a part that goes on a 256 mm bed reported as too big for it.
+ *
+ * The bbox is the largest plate's; count, volume and area stay totals.
+ * The Mac app applies the same rule (Mesh.swift measure3MF) and the keys the
+ * two write for one file are compared by its Mesh3MFTests. */
+
+/** Two cubes on two plates, 300 mm apart — one 10 mm, one 20 mm. */
+function twoPlates({ config = true, order = ['2', '4'] } = {}) {
+  const big = CUBE_V.map(([x, y, z]) => [x * 2, y * 2, z * 2]);
+  const objXml = (id, verts) => `<object id="${id}" type="model"><mesh><vertices>`
+    + verts.map(([x, y, z]) => `<vertex x="${x}" y="${y}" z="${z}"/>`).join('')
+    + '</vertices><triangles>' + CUBE_T.map(([a, b, c]) => `<triangle v1="${a}" v2="${b}" v3="${c}"/>`).join('')
+    + '</triangles></mesh></object>';
+  const model = `<?xml version="1.0"?><model unit="millimeter"><resources>${objXml('2', CUBE_V)}${objXml('4', big)}</resources><build>`
+    + `<item objectid="2" transform="1 0 0 0 1 0 0 0 1 100 100 0"/>`
+    + `<item objectid="4" transform="1 0 0 0 1 0 0 0 1 400 100 0"/>`
+    + '</build></model>';
+  const msc = `<?xml version="1.0"?><config>`
+    + order.map((id, i) => `<plate><metadata key="plater_id" value="${i + 1}"/><model_instance><metadata key="object_id" value="${id}"/></model_instance></plate>`).join('')
+    + '</config>';
+  const members = [{ name: '3D/3dmodel.model', data: Buffer.from(model, 'utf8') }];
+  if (config) members.push({ name: 'Metadata/model_settings.config', data: Buffer.from(msc, 'utf8') });
+  return writeZip(members);
+}
+
+/** The building path, grouped by plate the same way — the claim is still "identical". */
+function accumulateByPlate(members) {
+  const rich = mf.extractTrianglesWithPaint(members);
+  const onPlate = mf.plateOf(members);
+  const groups = new Map();
+  rich.triangles.forEach((tri, i) => {
+    const k = onPlate.get(String(rich.objIds[i])) || 1;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(tri);
+  });
+  return new Map([...groups].map(([k, tris]) => [k, accumulateTriangles(tris)]));
+}
+
+test('a two-plate project measures its largest plate, not the gap between them', () => {
+  const members = mf.readMembers(twoPlates());
+  const g = mf.measureMesh(members);
+  assert.ok(g, 'measureMesh found nothing');
+  assert.equal(g.plates, 2, 'the plates were not told apart');
+  assert.deepEqual([g.bbox.x, g.bbox.y, g.bbox.z], [20, 20, 20],
+    `the box is ${g.bbox.x} x ${g.bbox.y} x ${g.bbox.z}: the layout, not the model`);
+  // Totals stay totals — both plates get printed.
+  assert.equal(g.triangleCount, 24);
+  assert.equal(g.volumeMm3, 1000 + 8000);
+
+  // And it is still identical to the building path, plate for plate.
+  const slow = accumulateByPlate(members);
+  const bigPlate = slow.get(2);
+  assert.deepEqual(g.bbox, bigPlate.bbox, 'the largest plate differs from the built one');
+  const totalVol = [...slow.values()].reduce((a, s) => a + s.volumeMm3, 0);
+  assert.ok(Math.abs(totalVol - g.volumeMm3) < 1e-9);
+});
+
+test('the largest plate is chosen by footprint, and a tie goes to the lowest plate', () => {
+  // Plate order swapped in the config: the 20 mm cube is now plate 1. Same
+  // answer — the plate NUMBER never matters, which objects share one does.
+  const g = mf.measureMesh(mf.readMembers(twoPlates({ order: ['4', '2'] })));
+  assert.deepEqual([g.bbox.x, g.bbox.y, g.bbox.z], [20, 20, 20]);
+  assert.equal(g.plates, 2);
+});
+
+test('a file with no plate structure is one plate, measured as it always was', () => {
+  const g = mf.measureMesh(mf.readMembers(twoPlates({ config: false })));
+  assert.equal(g.plates, 1);
+  // 100..410 across both cubes: with nothing saying otherwise, everything is
+  // on plate one and the old answer stands.
+  assert.equal(g.bbox.x, 320);
+});
+
+test('computeBounds — the converter\'s fit warnings — reads the largest plate too', () => {
+  const a = mf.analyze(twoPlates());
+  assert.deepEqual(a.bounds, { x: 20, y: 20, z: 20 },
+    `fitWarnings would say a ${a.bounds && a.bounds.x} mm footprint does not fit a 256 mm bed`);
+  const plain = mf.analyze(twoPlates({ config: false }));
+  assert.equal(plain.bounds.x, 320, 'a file with no plates keeps the whole-layout footprint');
+});

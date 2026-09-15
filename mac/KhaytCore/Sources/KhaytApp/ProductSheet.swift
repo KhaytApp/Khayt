@@ -44,6 +44,11 @@ struct ProductSheet: View {
     @State private var removedDocs: [String] = []
     @State private var docProblem: String?
     @State private var newPart = PartRow()
+    /// The library picker for the part being added — see `PickModelSheet`.
+    @State private var pickingModel = false
+    /// What the chosen model could and could not answer for, from
+    /// `Shop.partFields(from:)`. Shown until the part is added or replaced.
+    @State private var pickNote: String?
     /// What those parts cost, priced by the shared rule.
     @State private var pricing: KhaytEngine.ProductPricing?
     @State private var pictures: [StagedPicture] = []
@@ -90,6 +95,11 @@ struct ProductSheet: View {
         var grams = ""
         var hours = ""
         var qty = 1
+        /// The library model this part is printed from, when it came from one.
+        /// The real join — what lets "how far out is my estimate for THIS
+        /// part" be answered later. Kept through a save, or the link a shop
+        /// made by choosing a model is gone the first time it edits the price.
+        var printFileId: String?
 
         var isComplete: Bool { (Double(grams) ?? 0) > 0 || (Double(hours) ?? 0) > 0 }
 
@@ -108,6 +118,7 @@ struct ProductSheet: View {
                 o["spoolCost"] = .number(spool.cost ?? 0)
                 o["spoolWeight"] = .number(max(1, spool.weight ?? 1000))
             }
+            if let printFileId, !printFileId.isEmpty { o["printFileId"] = .string(printFileId) }
             return .object(o)
         }
 
@@ -122,6 +133,7 @@ struct ProductSheet: View {
             row.grams = Money.fieldValue(Shop.plainNumber(o["printWeight"]))
             row.hours = Money.fieldValue(Shop.plainNumber(o["printTime"]))
             row.qty = Int(Shop.plainNumber(o["qty"]) ?? 1)
+            row.printFileId = Shop.plainString(o["printFileId"])
             return row
         }
     }
@@ -260,6 +272,24 @@ struct ProductSheet: View {
         // Re-priced when the margin changes, because the margin is above the
         // parts on this sheet and a shop typing one is watching the total.
         .task(id: draft.margin) { await reprice() }
+        .sheet(isPresented: $pickingModel) {
+            PickModelSheet(shop: shop) { file in
+                Task {
+                    guard let filled = await shop.partFields(from: file) else { return }
+                    newPart.name = Shop.plainString(filled.part["name"]) ?? file.title
+                    newPart.grams = Money.fieldValue(Shop.plainNumber(filled.part["printWeight"]))
+                    newPart.hours = Money.fieldValue(Shop.plainNumber(filled.part["printTime"]))
+                    newPart.printFileId = file.id
+                    // The model's own filament, when the library knows one the
+                    // shop stocks; otherwise the picker is left for the shop.
+                    if let spool = Shop.plainString(filled.part["filamentId"]),
+                       shop.spools.contains(where: { $0.id == spool }) {
+                        newPart.spoolId = spool
+                    }
+                    pickNote = filled.note
+                }
+            }
+        }
     }
 
     /// The prices this product can be quoted at.
@@ -437,12 +467,31 @@ struct ProductSheet: View {
                 Stepper("× \(newPart.qty)", value: $newPart.qty, in: 1...999)
                     .monospacedDigit().fixedSize()
                 Spacer(minLength: 8)
+                // Fill the part from a model the shop already has, instead of
+                // typing what the library already knows. See `PickModelSheet`.
+                Button(shop.words.callIt("link.from_library") + "\u{2026}") { pickingModel = true }
+                    .disabled(shop.files.isEmpty)
                 Button(shop.words.callIt("mac.add_part")) {
                     parts.append(newPart)
                     newPart = PartRow()
+                    pickNote = nil
                     Task { await reprice() }
                 }
                 .disabled(!newPart.isComplete)
+            }
+            // ── WHAT THE FIGURES ARE, WHEN THEY CAME FROM A MODEL ────────────
+            //
+            // `productNote` and `productProblem` were set by `productFromFile`
+            // and read by nothing: a product made from an unsliced model
+            // carried an ESTIMATED weight, and the sentence saying so went
+            // nowhere. Both are shown here, with the picker's own note.
+            if let line = pickNote ?? shop.productNote {
+                Text(line).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let problem = shop.productProblem {
+                Text(problem).font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             // WHY IT COSTS THAT, not just what. A price with no working shown

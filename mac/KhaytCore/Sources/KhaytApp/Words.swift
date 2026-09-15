@@ -841,6 +841,9 @@ final class Words {
         "mac.pane_printer": ["en": "Printer", "ar": "الطابعة"],
         "mac.pane_connection": ["en": "Connection", "ar": "الاتصال"],
         "mac.pane_upkeep": ["en": "Upkeep", "ar": "الصيانة"],
+        // The picker's one verb. "Choose", not "Add": choosing a model fills
+        // the part in; adding the part is the next button along.
+        "mac.choose": ["en": "Choose", "ar": "اختيار"],
         // §5: a total built over a hole says which way it is wrong.
         "mac.at_least":      ["en": "at least",     "ar": "على الأقل"],
         "mac.at_most":       ["en": "at most",      "ar": "على الأكثر"],
