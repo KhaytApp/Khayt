@@ -99,7 +99,7 @@ struct ShellTitleBar: View {
             // is never without them.
             Spacer().frame(width: 72)
 
-            Text(shop.words.callIt(shop.shelfTitleKey))
+            Text(shop.shelfTitle)
                 .font(TypeScale.title(12, weight: .semibold))
                 .foregroundStyle(Role.onNavy)
                 .lineLimit(1)

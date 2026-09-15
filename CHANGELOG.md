@@ -1216,6 +1216,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   more in — a 260-point photograph is the same picture with the row half as
   useful. Both use the library's arithmetic now.
 
+- **Opening a library folder says which folder you are in.** The title kept
+  reading "All models", the sidebar row stayed on Library, and nothing on the
+  screen named the folder — a place a shop could be without being able to tell.
+  A chosen stage on the Jobs screen says which stage the same way.
+
 - **The sidebar's card says which book is open.** On the sample shop it says
   so, and the card is the menu that switches back to the shop's own.
 

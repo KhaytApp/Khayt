@@ -6943,6 +6943,24 @@ final class Shop {
     var ledgerFilter: LedgerFilter = .needsMe
     var ledgerSelection: LedgerLine?
 
+    /// WHAT THE STRIP SAYS YOU ARE LOOKING AT — the name, not the screen.
+    ///
+    /// `shelfTitleKey` answers with the SCREEN, and inside a library group that
+    /// is wrong in a way a shop cannot get out of: opening a folder left the
+    /// title reading "All models", the sidebar row still on Library, and
+    /// nothing anywhere naming the folder or offering a way back up. The old
+    /// window had a subtitle and a group menu in its toolbar; this one has the
+    /// strip.
+    ///
+    /// A stage does the same to Jobs, and says so the same way.
+    @MainActor var shelfTitle: String {
+        switch shelf {
+        case .library(let group?): group
+        case .jobs(let stage?):    words.callIt(stage.key)
+        default:                   words.callIt(shelfTitleKey)
+        }
+    }
+
     var shelfTitleKey: String {
         switch shelf {
         case .dashboard:  "mac.dashboard"
