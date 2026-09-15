@@ -748,6 +748,9 @@ final class Words {
         "mac.printing": ["en": "Printing", "ar": "يطبع"],
         "mac.out": ["en": "Out", "ar": "نفد"],
         "mac.gross_short": ["en": "Gross", "ar": "الإجمالي"],
+        "set.appearance": ["en": "Appearance", "ar": "المظهر"],
+        "set.new_shell": ["en": "Use the redesigned window", "ar": "استخدم النافذة الجديدة"],
+        "set.new_shell_why": ["en": "A new sidebar, title bar and Dashboard. The other screens are unchanged for now, and you can switch back at any time.", "ar": "شريط جانبي وشريط عنوان ولوحة معلومات جديدة. بقية الشاشات كما هي حاليًا، ويمكنك الرجوع في أي وقت."],
         // A tile is a hundred points wide. "Khayt cannot ask this machine" is
         // true and does not fit; this is the same fact at tile size, and the
         // Machines screen carries the sentence.

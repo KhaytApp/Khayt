@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **The redesigned window can be switched on from Settings.** It shipped
+  behind a preference with nothing to set it, which meant the only way to see
+  it was a `defaults write` — a switch nobody can reach is a feature nobody
+  can judge, and the point of landing it early is to live with it before the
+  rest of the app follows. Settings → General → Appearance, and you can switch
+  back at any time.
+
 - **(Maintainers) The Mac app has a design system, and it is enforced by
   tests rather than by convention.** A colour role for every job, six type
   steps, one spacing scale, and three rules a view cannot quietly break: a
