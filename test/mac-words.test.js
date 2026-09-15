@@ -65,6 +65,21 @@ test('every word the Mac app supplies carries both languages', () => {
 /**
  * A placeholder the other language drops is a sentence that comes out missing
  * its number — "{n} unpaid jobs" reading as " unpaid jobs" in Arabic.
+ *
+ * ── EXCEPT IN THE SINGULAR AND THE DUAL, WHERE ARABIC SPELLS IT ───────────
+ *
+ * Arabic's natural `one` and `two` forms carry the number IN WORDS: آلة واحدة
+ * is "one machine", آلتان is "two machines", and neither contains a numeral at
+ * all. Held to strict parity, correct Arabic fails this test — and the way it
+ * fails is quiet: somebody adds `{n}` to the Arabic to make the build pass and
+ * ships "١ آلة واحدة", which reads as "one one machine".
+ *
+ * That happened here. The fix is the guard, not the copy: parity is required
+ * per plural CATEGORY rather than per key, and the `one`/`two` categories are
+ * where a language is allowed to say the number rather than place it.
+ *
+ * Every other category — and every string that is not a plural at all — is
+ * still held to strict parity, which is almost all of them.
  */
 test('both languages carry the same placeholders', () => {
   const text = fs.readFileSync(WORDS, 'utf8');
@@ -84,7 +99,14 @@ test('both languages carry the same placeholders', () => {
     const marks = (s) => (s ? [...s.matchAll(/\{([a-zA-Z]+)\}/g)].map((x) => x[1]).sort() : []);
     const en = marks(side('en'));
     const ar = marks(side('ar'));
-    if (en.join(',') !== ar.join(',')) {
+    // The singular and the dual may spell the number out in Arabic; every
+    // other category must place it. An Arabic form that drops the placeholder
+    // in `one`/`two` is correct, so only the reverse — Arabic carrying a mark
+    // English does not — is wrong there.
+    const spellsItOut = /_(one|two)$/.test(key);
+    const same = en.join(',') === ar.join(',');
+    const arabicMayOmit = spellsItOut && ar.length === 0;
+    if (!same && !arabicMayOmit) {
       wrong.push(`${key}: en has [${en}] and ar has [${ar}]`);
     }
   }

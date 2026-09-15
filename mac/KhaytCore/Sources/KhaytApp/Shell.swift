@@ -246,7 +246,7 @@ private struct NavRow: View {
             Spacer(minLength: Space.xs)
             if item.alarm > 0 {
                 HStack(spacing: 2) {
-                    Text(ShopState.late.glyph)
+                    Text(ShopState.stockOut.glyph)
                     Figure(value: Double(item.alarm), size: 9.5, weight: .bold,
                            tint: Role.lateOnNavy)
                 }

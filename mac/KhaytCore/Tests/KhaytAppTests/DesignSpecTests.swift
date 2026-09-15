@@ -128,26 +128,50 @@ struct DesignSpecTests {
             """)
     }
 
-    @Test("the riyal mark stays on its own side of the number")
-    func riyalDoesNotJump() {
-        // §5: the mark "is bidi class AL and WILL jump to the wrong side of the
-        // number in a mixed run". It did — the format pattern placed it first
-        // and it rendered last, on an en_US Mac, in the monospaced figure face.
-        let drawn = Figure(value: 52691.57, style: .money(code: "SAR")).renderedText
-        let mark = drawn.firstIndex(of: "\u{FDFC}")
-        let digit = drawn.firstIndex(where: \.isNumber)
-        #expect(mark != nil, "the riyal mark is not in the string at all")
-        if let mark, let digit {
-            #expect(mark < digit, Comment(rawValue: """
-                the mark came after the digits in "\(drawn)" — it has jumped,                 which means the isolate around it has been dropped
-                """))
+    @Test("money is a mark and digits in different faces, in that order")
+    func riyalIsComposed() throws {
+        // §5, rewritten: the mark is U+20C1 — NOT U+FDFC, which is the Iranian
+        // rial — it is set in a face that has it rather than the figure face,
+        // it is isolated because it is bidi class AL, and one non-breaking
+        // space joins it to the digits. Four rules, one composition.
+        let parts = try #require(Figure(value: 52691.57, style: .money(code: "SAR")).moneyParts)
+
+        // §5: the glyph only when Khayt's OWN font is registered, and the ISO
+        // code otherwise — never the system's U+20C1, which macOS 26 has and
+        // which reads as a hash at masthead size. A box gets filed; a
+        // plausible-but-wrong mark ships.
+        if Figure.hasMarkFont {
+            #expect(parts.mark.contains("\u{20C1}"), "the mark is not the Saudi Riyal sign")
+        } else {
+            #expect(parts.mark.contains("SAR"), """
+                Khayt's mark font is not registered, so the leaf must say the ISO \
+                code — saying anything else means it is borrowing a glyph from a \
+                face the design does not control
+                """)
+            #expect(!parts.mark.contains("\u{20C1}"), """
+                the mark is being taken from a system face; §5 forbids that even \
+                when the system has the codepoint
+                """)
         }
-        // And it is isolated, which is what keeps it there.
-        #expect(drawn.contains("\u{2068}") && drawn.contains("\u{2069}"), """
-            the isolate is gone; the mark will reorder the next time this is             drawn beside anything right-to-left
+        #expect(!parts.mark.contains("\u{FDFC}"), """
+            the mark is U+FDFC, the Iranian rial — Unicode is explicit that a             font must not remap it
             """)
-        // Bound to its digits, not floating.
-        #expect(drawn.contains("\u{00A0}"), "the mark is not bound to its digits")
+        #expect(parts.mark.hasPrefix("\u{2068}") && parts.mark.hasSuffix("\u{2069}"), """
+            the mark is not isolated; U+20C1 is bidi class AL and will carry to             the far side of the digits even in a leaf pinned left to right
+            """)
+        #expect(parts.gap == "\u{00A0}", "the mark is not bound to its digits")
+        #expect(parts.digits.contains("52,691.57"), Comment(rawValue: parts.digits))
+        // And the digits leaf carries no mark of its own: asking the figure
+        // face for one is what put a non-currency glyph in the figures.
+        #expect(!parts.digits.contains("\u{20C1}") && !parts.digits.contains("\u{FDFC}"), """
+            the digits leaf carries the currency too, so the formatter is still             placing it — and the locale decides where, not the design
+            """)
+    }
+
+    @Test("a currency Khayt draws no mark for is left to the formatter")
+    func otherCurrenciesAreNotTouched() {
+        #expect(Figure(value: 10, style: .money(code: "USD")).moneyParts == nil)
+        #expect(Figure(value: 10, style: .money(code: "SAR")).moneyParts != nil)
     }
 
     @Test("no value is concatenated into a parent label")

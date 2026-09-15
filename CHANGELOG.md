@@ -6,6 +6,66 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **One word per screen, and the same word in both apps.** The sidebar read
+  "Product Catalog", "All models", "Profit & Loss", "Colour studio" — software
+  words, not shop words, and long enough that Arabic (20–30% longer at the
+  same size) truncates where English is merely tight. They are Catalogue,
+  Library, Reports and Colour now, with Jobs, Customers, Inventory and Gift
+  cards alongside them. Four of those strings are shared with the Windows and
+  Linux app and change there too: a shop that hears "Catalogue" on the Mac and
+  reads "Product Catalog" on the floor PC has to learn they are one screen,
+  and that cost lands on whoever answers the phone. Values moved; no key did.
+
+- **(Maintainers) The mark on a money figure is never taken from a system
+  face.** macOS carries U+20C1, so falling back to it produces no
+  missing-glyph box — which is the problem rather than the reassurance: at
+  masthead size the system cut reads closer to a hash than to a currency mark,
+  so the app looks finished and is wrong, and nothing files a bug about it.
+  Until Khayt bundles its own single-glyph font the leaf says the ISO code,
+  which is unambiguous and visibly interim. The rule generalises: any mark the
+  app's meaning depends on comes from a font the app ships. A system face may
+  be absent; it may not be a surprise.
+
+- **(Maintainers) A filled diamond no longer means one thing in one table and
+  another in the next.** Silhouette separates kinds; fill separates severity,
+  and only inside a single kind. At 9.5pt filled-against-hollow is the hardest
+  distinction the app makes, and it was being asked to carry "a machine needs
+  looking at" against "this job is only a quote" across two different tables.
+  No glyph appears in both now.
+
+- **(Maintainers) The Saudi Riyal mark is U+20C1, and it is drawn as its own
+  leaf.** It was U+FDFC, which is the Iranian rial — a codepoint Unicode is
+  explicit that fonts must not remap. The mark is now set in a face that has
+  it rather than in the tabular figure face, which has no U+20C1 and
+  substitutes whatever is nearest; that substitution is how a non-currency
+  glyph got into the figures. Mark and digits are two leaves joined by one
+  non-breaking space, the mark carries a bidi isolate because it is class AL,
+  and the formatter shapes the digits only — it was placing the symbol where
+  the machine's locale wanted rather than where the design does.
+
+- **(Maintainers) A state is a KIND and a SEVERITY, in the shared rule's own
+  words.** `lib/attention.js` says `order` · `machine` · `nozzle` · `stock`
+  and `crit` · `warn`; the Mac had invented a parallel vocabulary and guessed
+  at the join, which silently put the due-today glyph on nine late jobs. The
+  glyph now names the kind and the word carries the severity, a worn nozzle is
+  a first-class state rather than a hole, and a severity nobody has listed
+  renders as an attention with its own word — never a new colour, and never
+  silently critical.
+
+- **(Maintainers) The type scale knows which face is rendering.** The brand
+  face ships as woff2, which Core Text cannot register, so the app runs on the
+  system face — and the tracking had been authored for the brand's narrower
+  figures. Left as it was on system display numerals it closes them up and the
+  money stops scanning. Both columns are written down now and the scale picks
+  by what is actually loaded, so bundling the real face changes nothing else.
+
+- **A counted string in Arabic may say the number in words.** آلة واحدة is
+  "one machine" and contains no numeral, which is correct Arabic and which the
+  placeholder guard called a mistake — so the numeral got added to satisfy it
+  and the app said "one one machine". The guard now runs per plural category
+  rather than per key, and nothing prepends a numeral to a form that has
+  already spelled one out.
+
 - **The redesigned window can be switched on from Settings.** It shipped
   behind a preference with nothing to set it, which meant the only way to see
   it was a `defaults write` — a switch nobody can reach is a feature nobody

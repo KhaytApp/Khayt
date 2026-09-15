@@ -143,8 +143,8 @@ struct LedgerRow: View {
         .overlay(alignment: .leading) {
             // §6: an attention row carries a 3px leading border as well as a
             // ground, so it reads in greyscale too.
-            if row.state == .late && !selected {
-                Rectangle().fill(Role.late).frame(width: 3)
+            if row.state.isAttention && !selected {
+                Rectangle().fill(row.state.tint).frame(width: 3)
             }
         }
         .overlay(alignment: .bottom) { Rectangle().fill(Role.line).frame(height: 1) }
@@ -156,13 +156,13 @@ struct LedgerRow: View {
 
     private var ground: Color {
         if selected { return Role.navy }
-        if row.state == .late { return Role.lateBg }
+        if let ground = row.state.ground { return ground }
         return hovering ? Role.surf2 : .clear
     }
 
     private var dueTint: Color {
         if selected { return Role.onNavy2 }
-        return row.state == .late ? Role.late : Role.text2
+        return row.state.isAttention ? row.state.tint : Role.text2
     }
 }
 

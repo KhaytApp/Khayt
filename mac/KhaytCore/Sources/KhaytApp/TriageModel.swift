@@ -70,14 +70,12 @@ extension Shop {
         // The worst of them, not whichever happened to be first: a card
         // headed "9 jobs are late" that takes its colour from a job merely due
         // today is a card that under-reports itself.
-        let worst = items.contains { $0.severity == "crit" } ? "crit" : "warn"
-        // A job with days on the clock is LATE whatever the rule's severity
-        // says — severity grades how bad, it does not decide which state this
-        // is. Nine late jobs wearing the due-today glyph was the bug.
-        let overdue = items.contains { ($0.daysLate ?? 0) > 0 }
-        let state = kind == "order" && overdue
-            ? ShopState.late
-            : Self.state(forAttention: kind, severity: worst)
+        // The worst of them, not whichever happened to be first — and a job
+        // with days on the clock is `crit` whatever the rule graded it, since
+        // severity says HOW bad and `daysLate` says the work is already over.
+        let overdue = kind == "order" && items.contains { ($0.daysLate ?? 0) > 0 }
+        let worst = overdue || items.contains { $0.severity == "crit" } ? "crit" : "warn"
+        let state = ShopState.of(kind: kind, severity: worst)
         let lines = items.prefix(2).map { item in
             TriageItem.Line(subject: item.name ?? words.callIt("mac.untitled"),
                             because: because(item, kind: kind))
@@ -140,15 +138,6 @@ extension Shop {
     /// `lib/attention.js` rather than guessed at. Guessing produced "high",
     /// which matched nothing, so every card drew the warn glyph and nine late
     /// jobs looked like nine things due this afternoon.
-    private static func state(forAttention kind: String, severity: String) -> ShopState {
-        let critical = severity == "crit"
-        switch kind {
-        case "stock":            return critical ? .blocked : .dueToday
-        case "machine", "nozzle": return critical ? .late : .dueToday
-        default:                 return critical ? .late : .dueToday
-        }
-    }
-
     func perform(_ action: TriageAction) {
         if let go = action.go { shelf = go }
     }

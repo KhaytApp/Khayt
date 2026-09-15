@@ -16,68 +16,128 @@ import SwiftUI
 /// directions, and a symbol image at 9.5pt aligned to a caps baseline is a
 /// per-screen argument this avoids entirely.
 enum ShopState: String, CaseIterable, Hashable {
-    case late, dueToday, running, queued, finishing, done, blocked, quoted, offline
+    // ── ATTENTION: a KIND and a SEVERITY, from `lib/attention.js` ─────────
+    //
+    // The rule: the glyph names the KIND, the word carries the SEVERITY. Hue
+    // is third and never load-bearing. `nozzle` is first-class — a blocked
+    // nozzle stops a machine and a worn one ruins a finish, and those are
+    // different sentences to a shop.
+    case orderLate, orderToday
+    case machineStopped, machineCheck
+    case nozzleBlocked, nozzleWorn
+    case stockOut, stockLow
 
-    /// The mark. One per state, and no two alike in silhouette — round, ring,
-    /// triangle, diamond, half, tick, cross — so they separate by shape before
-    /// colour is considered at all.
+    // ── LIFECYCLE: where a job IS ────────────────────────────────────────
+    //
+    // Not attention, and not from attention.js. These say where the work
+    // stands and must never compete for the eye with the list above.
+    case running, queued, finishing, done, quoted, offline, failedToSend
+
+    /// ── SILHOUETTE SEPARATES KINDS; FILL SEPARATES SEVERITY ─────────────
+    ///
+    /// And fill only ever separates severity INSIDE one kind: ■/□ for a
+    /// machine, ▼/▽ for stock. Across kinds the silhouettes differ outright.
+    ///
+    /// `◆` is retired for exactly this reason. Filled against hollow is the
+    /// hardest distinction in the app at 9.5pt, and `◆` was asking the eye to
+    /// make it against `◇` in the OTHER table — to learn whether a machine
+    /// needed looking at or a job was only a quote. No glyph appears in both
+    /// tables now.
+    ///
+    /// A new kind brings a new silhouette, never a new fill of an existing
+    /// one. If the silhouettes run out, the set is too big and a kind should
+    /// merge.
     var glyph: String {
         switch self {
-        case .late:      "▲"
-        case .dueToday:  "◷"
-        case .running:   "●"
-        case .queued:    "◌"
-        case .finishing: "◑"
-        case .done:      "✓"
-        case .blocked:   "◆"
-        case .quoted:    "◇"
-        case .offline:   "✕"
+        case .orderLate:      "▲"
+        case .orderToday:     "◷"
+        case .machineStopped: "■"
+        case .machineCheck:   "□"
+        case .nozzleBlocked:  "⊘"
+        case .nozzleWorn:     "◔"
+        case .stockOut:       "▼"
+        case .stockLow:       "▽"
+        case .running:        "●"
+        case .queued:         "◌"
+        case .finishing:      "◑"
+        case .done:           "✓"
+        case .quoted:         "◇"
+        case .offline:        "✕"
+        case .failedToSend:   "✉"
         }
     }
 
-    /// The word's locale key. A key rather than a string because these are
-    /// read by a shop in two languages, and §9 is explicit that the Arabic
-    /// copy is still to come — a literal here would be the thing that has to
-    /// be hunted down later.
+    /// The word carries the severity: STOPPED and CHECK IT are the same kind
+    /// and different sentences.
     var wordKey: String {
         switch self {
-        case .late:      "mac.state_late"
-        case .dueToday:  "mac.state_today"
-        case .running:   "mac.state_running"
-        case .queued:    "mac.state_queued"
-        case .finishing: "mac.state_finishing"
-        case .done:      "mac.state_done"
-        case .blocked:   "mac.state_blocked"
-        case .quoted:    "mac.state_quoted"
-        case .offline:   "mac.state_offline"
+        case .orderLate:      "mac.state_late"
+        case .orderToday:     "mac.state_today"
+        case .machineStopped: "mac.state_stopped"
+        case .machineCheck:   "mac.state_check_it"
+        case .nozzleBlocked:  "mac.state_blocked"
+        case .nozzleWorn:     "mac.state_worn"
+        case .stockOut:       "mac.state_out"
+        case .stockLow:       "mac.state_low"
+        case .running:        "mac.state_running"
+        case .queued:         "mac.state_queued"
+        case .finishing:      "mac.state_finishing"
+        case .done:           "mac.state_done"
+        case .quoted:         "mac.state_quoted"
+        case .offline:        "mac.state_offline"
+        case .failedToSend:   "mac.state_failed_send"
         }
     }
 
-    /// The hue — the third of the three signals, never the only one.
     var tint: Color {
         switch self {
-        case .late, .blocked:      Role.late
-        case .dueToday, .finishing: Role.warn
-        case .running:             Role.ok
-        case .queued, .done:       Role.text2
-        case .quoted, .offline:    Role.text3
+        case .orderLate, .machineStopped, .nozzleBlocked, .stockOut: Role.late
+        case .orderToday, .machineCheck, .nozzleWorn, .stockLow, .finishing: Role.warn
+        case .running:                     Role.ok
+        case .queued, .done, .failedToSend: Role.text2
+        case .quoted, .offline:            Role.text3
         }
     }
 
-    /// The tinted ground behind a row or chip in this state, where it has one.
-    /// Most states do not: a table where every row is tinted has no tinted
-    /// rows, only stripes.
     var ground: Color? {
         switch self {
-        case .late, .blocked: Role.lateBg
-        case .dueToday:       Role.warnBg
-        case .running:        Role.okBg
-        default:              nil
+        case .orderLate, .machineStopped, .nozzleBlocked, .stockOut: Role.lateBg
+        case .failedToSend:                                          Role.lateBg
+        case .orderToday, .machineCheck, .nozzleWorn, .stockLow:     Role.warnBg
+        case .running:                                               Role.okBg
+        default:                                                     nil
         }
     }
 
     /// A finished job is drawn back, not away: still legible, plainly over.
     var rowOpacity: Double { self == .done ? 0.55 : 1 }
+
+    /// The shared rule's own words, mapped.
+    ///
+    /// An unlisted severity is `warn` with its own word — NEVER a new colour,
+    /// and never silently `crit`. Guessing `"high"` here once put the
+    /// due-today glyph on nine late jobs, which is the failure §4 exists to
+    /// prevent.
+    static func of(kind: String, severity: String) -> ShopState {
+        let critical = severity == "crit"
+        switch kind {
+        case "order":   return critical ? .orderLate : .orderToday
+        case "machine": return critical ? .machineStopped : .machineCheck
+        case "nozzle":  return critical ? .nozzleBlocked : .nozzleWorn
+        case "stock":   return critical ? .stockOut : .stockLow
+        default:        return .machineCheck
+        }
+    }
+
+    /// True for the states that come from `attention.js` rather than from
+    /// where a job happens to be. The two lists must not be mixed: lifecycle
+    /// never competes for the eye.
+    var isAttention: Bool {
+        switch self {
+        case .running, .queued, .finishing, .done, .quoted, .offline, .failedToSend: false
+        default: true
+        }
+    }
 }
 
 /// A state, as a chip — §6's chip, and the only way a state should reach a
