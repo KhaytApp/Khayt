@@ -690,6 +690,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Cost and revenue trends, on the Reports screen.** Twelve months of
+  what an hour of printing earned and what a gram of material cost, under the
+  cash flow. The same rule as the other app's chart (`lib/cost-trends.js`),
+  which it now also draws from.
+
 - **A job's price can be adjusted after it is taken — in both apps.** The
   Mac's edit-job sheet and the order editor on Windows and Linux both take a
   typed total ("we agreed 1,800 in the end"). The shared edit rule writes it,
@@ -1220,6 +1225,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **The cost and revenue trends chart left delivered jobs out and priced a
+  gram by what was left of the spool.** Revenue per print-hour counted only
+  `completed`, so a job finished AND handed over vanished from its month. And
+  "average material cost per gram" divided each spool's cost by its remaining
+  weight — a spool got dearer per gram as it was used — and read today's shelf
+  for every one of the twelve months, so the trend was one number repeated. A
+  delivered job counts; a gram costs the spool's price over its NEW weight; and
+  each month shows the spools opened in it, or nothing when none were.
 
 - **An invoice line for a part the customer agreed a price for printed the
   wrong amount.** The document shared the job's price among its parts by cost,

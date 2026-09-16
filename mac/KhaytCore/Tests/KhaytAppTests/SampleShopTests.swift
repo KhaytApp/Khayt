@@ -565,6 +565,27 @@ extension SampleShopTests {
         }
     }
 
+    // MARK: - The trends
+
+    /// The trends card draws a column where a month has a reading and a gap
+    /// where it has none, for two figures. A sample where every month had a
+    /// reading — or none did — is a card whose gap was never drawn.
+    @Test("the sample trends reach a month with a reading and a month without, on both rows")
+    func trendsSpan() async throws {
+        let engine = try KhaytEngine()
+        let book = try Self.book()
+        let trends = try await engine.costTrends(
+            orders: Shop.rows(book, "printLog"), spools: Shop.rows(book, "inventory"),
+            settings: Shop.settings(book), clients: Shop.rows(book, "clients"),
+            now: Date(), months: 12)
+        #expect(trends.anyReading)
+        #expect(trends.months.contains { $0.perHour != nil }, "no month earned anything per hour")
+        #expect(trends.months.contains { $0.perHour == nil }, "every month has printing — the gap is never drawn")
+        #expect(trends.months.contains { $0.costPerGram != nil }, "no month opened a spool")
+        #expect(trends.months.contains { $0.costPerGram == nil }, "a spool was opened every month — the gap is never drawn")
+        #expect(trends.perHour != nil && trends.costPerGram != nil)
+    }
+
     // MARK: - The customers
 
     /// The customer pane draws a price list, a standing order (running, paused,

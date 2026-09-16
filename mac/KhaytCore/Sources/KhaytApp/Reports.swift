@@ -26,6 +26,8 @@ struct Reports: View {
     /// because a shop can be profitable and unable to pay the rent, and the
     /// P&L alone cannot say which it is.
     @State private var flow: KhaytEngine.CashFlow?
+    /// A year of what an hour earned and what a gram cost. See `TrendsChart`.
+    @State private var trends: KhaytEngine.CostTrends?
     /// What each customer has been worth over its whole life with the shop —
     /// beside the top lists, which answer "who is biggest this period".
     @State private var worth: KhaytEngine.ClientValue?
@@ -101,6 +103,10 @@ struct Reports: View {
                         // are what the shop earned, and this is the follow-up
                         // question — did any of it arrive.
                         CashFlowChart(shop: shop, flow: flow)
+                            .padding(Metric.screen)
+                        // And the two figures behind both: what an hour of
+                        // printing earned and what a gram of material cost.
+                        TrendsChart(shop: shop, trends: trends)
                             .padding(Metric.screen)
                     }
                     Totals(shop: shop, rows: rows, floor: floor)
@@ -252,6 +258,7 @@ struct Reports: View {
             currencies: Invoice.currencyTable(shop), now: Date())) ?? []
         await recomputeBreakEven()
         await recomputeCashFlow()
+        await recomputeTrends()
         await recomputeClientValue()
         await recomputeFunnel()
         await recomputeProductProfit()
@@ -312,6 +319,19 @@ struct Reports: View {
             orders: shop.orderRows, expenses: shop.expenseRows,
             endMonth: month.string(from: Date()), months: 6,
             settings: shop.settingsDict, clients: shop.clientRows)
+    }
+
+    private func recomputeTrends() async {
+        guard let engine = shop.engine else { return }
+        // TWELVE MONTHS, the other app's window: a year shows a supplier's
+        // price rise as a step and a season as a shape. The orders and the
+        // shelf are handed over whole; which jobs count and how a gram is
+        // priced is the module's rule, for the reason `recomputeCashFlow`
+        // gives.
+        trends = try? await engine.costTrends(
+            orders: shop.orderRows, spools: shop.inventoryRows,
+            settings: shop.settingsDict, clients: shop.clientRows,
+            now: Date(), months: 12)
     }
 
     private func recomputeClientValue() async {

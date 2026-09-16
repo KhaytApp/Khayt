@@ -573,6 +573,8 @@ public actor KhaytEngine {
         "break-even",
         // What reached and left the bank, as opposed to what was earned.
         "cash-flow",
+        // Twelve months of revenue per print-hour and material cost per gram.
+        "cost-trends",
         // Which customers are worth keeping.
         "client-value",
         // Whether the shop can take another job, and when it would start.
@@ -4144,6 +4146,52 @@ public actor KhaytEngine {
                           [.array(orders), .array(expenses), .string(endMonth),
                            .number(Double(months)), .object(settings), .array(clients)],
                           as: CashFlow.self)
+    }
+
+    // MARK: - Cost and revenue trends
+
+    /// Twelve months of what an hour of printing earned and what a gram of
+    /// material cost — `lib/cost-trends.js`, over the same money and scope
+    /// rules as everything else here. Nulls where a month has no answer.
+    public struct CostTrends: Decodable, Sendable {
+        public let months: [Month]
+        public let perHour: Double?
+        public let costPerGram: Double?
+
+        public struct Month: Decodable, Sendable, Identifiable, Hashable {
+            public let key: String
+            public let revenue: Double
+            public let hours: Double
+            public let perHour: Double?
+            public let costPerGram: Double?
+            public let spoolsOpened: Int
+            public var id: String { key }
+        }
+
+        /// Anything drawn at all: a window with no finished hours and no
+        /// spool opened is a blank chart, and a blank chart says so.
+        public var anyReading: Bool { months.contains { $0.perHour != nil || $0.costPerGram != nil } }
+    }
+
+    public func costTrends(orders: [JSONValue], spools: [JSONValue],
+                           settings: [String: JSONValue], clients: [JSONValue],
+                           now: Date, months: Int = 12) throws -> CostTrends {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG2, clients: ARG3 };
+          return globalThis.KhaytCostTrends.costTrends(ARG0, ARG1, {
+            now: ARG4, months: ARG5,
+            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            countsForBusiness: function (o) {
+              return globalThis.KhaytBusinessScope
+                ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
+            },
+          });
+        })()
+        """#,
+                          [.array(orders), .array(spools), .object(settings), .array(clients),
+                           .number(now.timeIntervalSince1970 * 1000), .number(Double(months))],
+                          as: CostTrends.self)
     }
 
     // MARK: - Break-even
