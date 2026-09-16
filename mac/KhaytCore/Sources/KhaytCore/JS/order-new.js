@@ -119,6 +119,14 @@
     return localDateStr(d);
   }
 
+  /** A part the customer has agreed a price for. Zero is a price; absent is not. */
+  function isAgreed(p) {
+    const v = p && p.agreedPrice;
+    if (v === null || v === undefined || v === '') return false;
+    const n = +v;
+    return Number.isFinite(n) && n >= 0;
+  }
+
   /** `srv`-style hex from the bytes the caller supplies. */
   function hex(bytes) {
     return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -133,7 +141,16 @@
    *   `clientId`, `clientRef`, `productId`, `machineId`, `currency`
    *   `margin`, `discountPct`, `shippingCost`, `depositAmount`
    *   `rushEnabled`, `extraLines`, `components`, `assemblyQty`
+   *   `priceRound`   `{ step, mode }` — round the total, as a product's price is
+   *   `priceOverride` a typed total, used as is
    *   `asQuote`      a quote rather than an order
+   *
+   * A part carrying `agreedPrice` (set by `lib/price-agreements.js` from the
+   * customer's record) is priced at that figure per unit and NOT marked up;
+   * the rest of the cart is cost plus margin. Each part's `baseCost` stays
+   * the true cost of that part, agreed or not — it is what a margin is
+   * measured against, and an agreed price that overwrote it would report the
+   * part as sold at cost.
    *
    * `ctx`: `{ settings, orders, now, tokens }`. `tokens` is
    * `{ tracking, quoteApproval }`, each 16 bytes.
@@ -154,11 +171,18 @@
     const totalPrintTime = parts.reduce((s, p) => s + num(p.printTime, 0), 0);
     const extraLines = arrayOf(i.extraLines);
 
+    // The cart in two halves: what the customer has agreed a price for, and
+    // what is priced at cost plus margin.
+    const agreedAmount = parts.reduce((s, p) => s + (isAgreed(p)
+      ? positive(p.agreedPrice) * Math.max(1, num(p.qty, 1)) : 0), 0);
+    const costedBase = parts.reduce((s, p) => s + (isAgreed(p) ? 0 : num(p.baseCost, 0)), 0);
+
     const P = pricing();
     if (!P) throw new Error('KhaytOrderNew needs KhaytPricing');
     const rushEnabled = !!i.rushEnabled;
     const quote = P.quoteTotal({
-      baseCost: totalBaseCost,
+      baseCost: costedBase,
+      agreedAmount,
       qty: 1,                    // the cart's parts already carry their own qty
       margin: positive(i.margin),
       priceTier: null,           // a tier never applies to a multi-line cart
@@ -167,6 +191,8 @@
       rushPct: rushEnabled ? num(settings.rushFeePct, 25) : 0,
       shippingCost: positive(i.shippingCost),
       extraLines,
+      priceRound: i.priceRound || null,
+      priceOverride: i.priceOverride,
       business: true,
     });
 
@@ -203,6 +229,16 @@
       price: finalPrice,
       discountPct: discountPct || 0,
       priceBeforeDiscount: discountPct > 0 ? +quote.priceBeforeDiscount.toFixed(2) : null,
+      // How the price was reached, only when something other than the
+      // arithmetic reached it — every record before this had none of these,
+      // and a field that is always present is a field every reader must learn.
+      ...(agreedAmount > 0 ? { agreedAmount: +agreedAmount.toFixed(2) } : {}),
+      ...(quote.priceSource !== 'base' ? {
+        computedPrice: +quote.computedTotal.toFixed(2),
+        priceSource: quote.priceSource,
+      } : {}),
+      ...(quote.priceSource === 'rounded' ? { priceRound: { step: positive(i.priceRound.step), mode: i.priceRound.mode || 'nearest' } } : {}),
+      ...(quote.priceSource === 'override' ? { priceOverride: finalPrice } : {}),
       shippingCost: shippingCost > 0 ? +shippingCost.toFixed(2) : 0,
       deliveredAt: null,
       carrier: null,

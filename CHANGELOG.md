@@ -6,6 +6,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **A customer's agreed price is the price of that part — not a cost the
+  margin sits on.** Choosing a customer with a price agreement used to write
+  the agreed figure INTO the part's cost, so the job's margin went on top (a
+  part agreed at 50 on a 30% job billed 65) and the profit report then showed
+  the part sold at cost. The figure is now the part's price per unit
+  (`agreedPrice`), not marked up and not cut by the customer's standing
+  discount; the rest of the job is priced as before, and the part still knows
+  what it cost. Both apps, one rule (`lib/price-agreements.js`, through
+  `lib/pricing.js`). Jobs already saved are not re-priced.
+
 - **The redesigned window is what Khayt opens with now.** The new sidebar,
   title bar and Dashboard are on by default; the other screens are unchanged
   and sit inside the new shell, which is a mixed state and the point of an
@@ -679,6 +689,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+
+- **A job's total gets its last word: round it, or type it.** Cost plus margin
+  is where a price starts, not where it ends. On the new-job sheet (Mac) and the
+  calculator (Windows and Linux) the total can be rounded to the nearest 1, 5
+  or 10 — nearest, up or down, the same rule and words a product's price already
+  uses — or typed outright. A rounded or typed total shows "Calculated" and the
+  arithmetic beside it, so it is never mistaken for one, and the job records
+  which of the three reached its price (`computedPrice`, `priceSource`,
+  `priceRound` or `priceOverride`; a plain job carries none of them).
 
 - **(Mac) A customer's price agreements, standing order and communications
   log.** The three things that follow a customer into every job were stored,

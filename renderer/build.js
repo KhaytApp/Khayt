@@ -404,12 +404,29 @@ function updateGrandTotal() {
     }
   }
 
+  // The cart in two halves. A part the customer has agreed a price for
+  // (`agreedPrice`, from lib/price-agreements.js) is charged that figure and
+  // not marked up; the rest is cost plus margin. `totalCost` is every part's
+  // cost, agreed or not — the margin readout below measures against it.
+  const isAgreed = (p) => p.agreedPrice !== undefined && p.agreedPrice !== null && p.agreedPrice !== ''
+    && Number.isFinite(+p.agreedPrice) && +p.agreedPrice >= 0;
   let totalBase = 0;
+  let totalCost = 0;
+  let agreedAmount = 0;
   if (currentBuild.length > 0) {
-    totalBase = currentBuild.reduce((s, p) => s + (+p.baseCost || 0), 0);
+    totalCost = currentBuild.reduce((s, p) => s + (+p.baseCost || 0), 0);
+    totalBase = currentBuild.reduce((s, p) => s + (isAgreed(p) ? 0 : (+p.baseCost || 0)), 0);
+    agreedAmount = currentBuild.reduce((s, p) => s + (isAgreed(p) ? +p.agreedPrice * Math.max(1, +p.qty || 1) : 0), 0);
   } else {
     totalBase = liveBase * qty;
+    totalCost = totalBase;
   }
+  // The last word on the total: round it to a step, or type it. Same words and
+  // steps as a product's price; see lib/pricing.js.
+  const roundStep = biz ? Math.max(0, num($('#priceRoundStep')?.value, 0)) : 0;
+  const priceRound = roundStep > 0 ? { step: roundStep, mode: $('#priceRoundMode')?.value || 'nearest' } : null;
+  const overrideRaw = biz ? ($('#priceOverride')?.value ?? '') : '';
+  const priceOverride = String(overrideRaw).trim() === '' ? null : Math.max(0, num(overrideRaw, 0));
   const discountPct = biz ? Math.min(100, Math.max(0, num($('#discountPct').value, 0))) : 0;
   const shippingCost = biz ? Math.max(0, num($('#shippingCost')?.value, 0)) : 0;
   const rushEnabled = biz && !!$('#calcRushFee')?.checked;
@@ -424,9 +441,12 @@ function updateGrandTotal() {
   // that rule stays here, with the code that knows what a cart is.
   const _q = KhaytPricing.quoteTotal({
     baseCost: totalBase,
+    agreedAmount,
     qty,
     margin,
     priceTier: currentBuild.length === 0 ? activeTier : null,
+    priceRound,
+    priceOverride,
     discountPct,
     rushEnabled,
     rushPct,
@@ -453,6 +473,20 @@ function updateGrandTotal() {
   if (finalEl) {
     if (!finalEl.getAttribute('aria-live')) finalEl.setAttribute('aria-live', 'polite');
     finalEl.textContent = fmtMoney(finalPrice);
+  }
+  // What the arithmetic said, beside what the customer is asked for — so a
+  // rounded or typed total never passes for a calculated one.
+  const computedLine = $('#priceComputedLine');
+  if (computedLine) {
+    if (_q.priceSource && _q.priceSource !== 'base' && Math.abs(_q.computedTotal - finalPrice) >= 0.005) {
+      const said = _q.priceSource === 'override'
+        ? (t('pe.price_is_override') || 'Your own price')
+        : (t('pe.price_is_rounded') || 'Rounded from');
+      computedLine.textContent = `${said} · ${t('pe.price_is_base') || 'Calculated'} ${fmtMoney(_q.computedTotal)}`;
+      computedLine.style.display = 'inline';
+    } else {
+      computedLine.style.display = 'none';
+    }
   }
   // In enthusiast mode the "Project total" is really the cost — relabel it.
   const totalLabel = document.querySelector('.total-display .label');
@@ -509,7 +543,7 @@ function updateGrandTotal() {
   // cost, so adding a 100 fee to a 30%-margin job dropped the displayed margin to 17.6%
   // when it should rise to 58.8%. Shipping is deliberately still counted on both sides:
   // the shop bills it and pays the carrier, so it should not inflate margin.
-  const actualMarginPct = finalPrice > 0 ? ((finalPrice - (totalBase + shippingCost)) / finalPrice) * 100 : margin;
+  const actualMarginPct = finalPrice > 0 ? ((finalPrice - (totalCost + shippingCost)) / finalPrice) * 100 : margin;
   if (marginWarn) {
     const minPct = num(settings.minMarginPct, 0);
     const marginColor = actualMarginPct >= 40 ? 'var(--success)' : actualMarginPct >= 20 ? 'var(--warning)' : 'var(--danger)';
@@ -745,6 +779,8 @@ function renderBuild() {
           <strong>${escapeHtml(part.name)}</strong>
           ${partMachine ? `<span class="machine-badge" style="background:${safeCssColor(partMachine.color)}; font-size:10px; padding:1px 6px; vertical-align:middle; margin-inline-start:4px;">${escapeHtml(partMachine.name)}</span>` : ''}
           ${tierBadge}
+          ${(part.agreedPrice !== undefined && part.agreedPrice !== null && part.agreedPrice !== '' && Number.isFinite(+part.agreedPrice))
+            ? `<span class="tier-applied-badge">${escapeHtml(t('ce.pl_autofill'))} · ${fmtMoney(+part.agreedPrice)}</span>` : ''}
           <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(part.material)}</div>
           ${(part.extraMaterials || []).filter(m => m.material).map(m =>
             `<div style="font-size:11px; color:var(--text-muted); margin-inline-start:8px;">+ ${escapeHtml(m.material)} ${m.weight ? m.weight + 'g' : ''}</div>`

@@ -2042,6 +2042,11 @@ final class Words {
         "rec.end_date", "rec.skip_next", "rec.hint", "rec.created",
         "ce.comm_log", "ce.comm_empty", "ce.comm_note_ph", "ce.comm_call", "ce.comm_email",
         "ce.comm_wa", "ce.comm_meeting", "ce.comm_note", "common.add",
+        // The last word on a job's total — rounding and a typed price — in the
+        // words the product editor already uses for the same two things.
+        "pe.round_to", "pe.round_off", "pe.round_nearest", "pe.round_up", "pe.round_down",
+        "pe.price_override", "pe.price_override_ph", "pe.price_is_override",
+        "pe.price_is_rounded", "pe.price_is_base",
         "plib.material", "plib.tags_short", "plib.group_ph", "set.store_size",
         // What a slicer's config says about a model — see `LibraryInspector`.
 

@@ -64,7 +64,31 @@ public struct QuoteTotal: Codable, Sendable, Equatable {
     public let discountAmount: Double
     public let subtotal: Double
     public let rushFee: Double
+    /// What the customer is asked for — rounded, or typed, when the rule was.
     public let total: Double
+    /// What the arithmetic said before rounding or a typed figure. Optional
+    /// because the rule gained it in September 2026 and a bundle without it
+    /// must still decode.
+    public let computedTotal: Double?
+    /// `base`, `rounded` or `override`.
+    public let priceSource: String?
+    /// What the customer had already agreed, inside `total` and never marked up.
+    public let agreedAmount: Double?
+
+    public init(priceBeforeDiscount: Double, discountAmount: Double, subtotal: Double,
+                rushFee: Double, total: Double, computedTotal: Double? = nil,
+                priceSource: String? = nil, agreedAmount: Double? = nil) {
+        self.priceBeforeDiscount = priceBeforeDiscount; self.discountAmount = discountAmount
+        self.subtotal = subtotal; self.rushFee = rushFee; self.total = total
+        self.computedTotal = computedTotal; self.priceSource = priceSource
+        self.agreedAmount = agreedAmount
+    }
+
+    /// The figure to say beside the total when the total is not the arithmetic.
+    public var differsFromComputed: Bool {
+        guard let computedTotal, let priceSource, priceSource != "base" else { return false }
+        return abs(computedTotal - total) >= 0.005
+    }
 }
 
 

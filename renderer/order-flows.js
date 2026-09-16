@@ -130,6 +130,11 @@ function logPrint(asQuote = false) {
     depositAmount: Math.max(0, num($('#depositAmount')?.value, 0)),
     rushEnabled: !!$('#calcRushFee')?.checked,
     extraLines: currentExtraLines,
+    priceRound: (() => {
+      const step = Math.max(0, num($('#priceRoundStep')?.value, 0));
+      return step > 0 ? { step, mode: $('#priceRoundMode')?.value || 'nearest' } : null;
+    })(),
+    priceOverride: String($('#priceOverride')?.value ?? '').trim() === '' ? null : Math.max(0, num($('#priceOverride').value, 0)),
     components: (typeof currentComponents !== 'undefined' && Array.isArray(currentComponents))
       ? currentComponents : [],
     assemblyQty: (typeof currentAssemblyQty !== 'undefined') ? currentAssemblyQty : 1,
@@ -173,6 +178,8 @@ function logPrint(asQuote = false) {
   if ($('#calcClientRef')) $('#calcClientRef').value = '';
   if ($('#calcCurrency')) $('#calcCurrency').value = '';
   $('#discountPct').value = '0';
+  if ($('#priceRoundStep')) $('#priceRoundStep').value = '0';
+  if ($('#priceOverride')) $('#priceOverride').value = '';
   if ($('#shippingCost')) $('#shippingCost').value = '0';
   if ($('#depositAmount')) $('#depositAmount').value = '0';
   /* THE RUSH FEE IS PART OF ONE JOB, NOT A SETTING.
@@ -2130,7 +2137,9 @@ function openOrderEditor(orderId) {
           (prevDiscountPct < 100
             ? (+order.price - prevShipping - prevOldExtra) / (1 - prevDiscountPct / 100)
             : (+order.price - prevShipping - prevOldExtra)); // 100% discount: base = original price
-        const newPrice = sellingBase * (1 - draft.discountPct / 100) + draft.shippingCost + newExtraTotal;
+        // Plus what the customer agreed for particular parts, which the
+        // discount never touched — see lib/pricing.js.
+        const newPrice = sellingBase * (1 - draft.discountPct / 100) + (+order.agreedAmount || 0) + draft.shippingCost + newExtraTotal;
         order.price = +newPrice.toFixed(2);
         order.discountPct = draft.discountPct;
         order.priceBeforeDiscount = draft.discountPct > 0 ? +sellingBase.toFixed(2) : null;

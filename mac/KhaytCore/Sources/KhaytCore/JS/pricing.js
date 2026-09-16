@@ -46,6 +46,30 @@
  *
  * VAT is deliberately absent — it is applied at invoicing, not in the
  * calculator, so a quote total is pre-VAT and stays that way.
+ *
+ * AGREED PRICES, ROUNDING AND A TYPED PRICE (added 2026-09-16). Three inputs,
+ * each absent on every quote already sent and arithmetically inert when absent:
+ *
+ *   `agreedAmount` — the sum of the parts a CUSTOMER has agreed a price for
+ *   (`agreedPrice × qty`, resolved by the caller from `lib/price-agreements.js`).
+ *   A negotiated price is the price: it joins the subtotal AFTER the discount,
+ *   so a customer's standing discount does not quietly cut a figure that was
+ *   already negotiated, and it is not marked up. The rush fee, shipping and
+ *   extras apply to it as to everything else — a surcharge for priority is not
+ *   part of the price of a bracket.
+ *
+ *   `priceRound: { step, mode }` — the total is rounded to a multiple of `step`
+ *   (nearest / up / down), the same rule and the same steps a product's price
+ *   uses (`lib/product-price.js`). A shop that quotes 1,847.36 does not want to
+ *   say 1,847.36; it wants to say 1,850 and know it did.
+ *
+ *   `priceOverride` — a typed total, used as is. A shop that has just agreed
+ *   1,800 on the phone types 1,800.
+ *
+ * `total` is what the customer pays. `computedTotal` is what the arithmetic
+ * said before rounding or the typed figure, kept so a screen can show
+ * "Calculated 1,847.36" beside "1,850" and the shop can tell a healthy margin
+ * from a rounding accident. `priceSource` says which: base / rounded / override.
  */
 
 // Wrapped, like every other lib/ module the renderer loads. Plain <script> tags
@@ -117,7 +141,9 @@ function quoteTotal(input) {
     : baseCost * (1 + margin / 100);
 
   const discountAmount = priceBeforeDiscount * discountPct / 100;
-  const subtotal = priceBeforeDiscount - discountAmount;
+  // What the customer has already agreed is not discounted again — see above.
+  const agreed = business ? clampPositive(i.agreedAmount) : 0;
+  const subtotal = priceBeforeDiscount - discountAmount + agreed;
   const rushFee = subtotal * rushPct / 100;
 
   // What the buyer pays before extras — the base every percentage line uses.
@@ -127,10 +153,26 @@ function quoteTotal(input) {
   const extrasPercent = lines.reduce(
     (s, l) => s + (isPercentLine(l) ? extrasBase * clampPositive(l.pct) / 100 : 0), 0);
   const extras = extrasFixed + extrasPercent;
+  const computedTotal = subtotal + rushFee + shipping + extras;
+
+  // The last word: a typed figure, else the rounding rule, else the arithmetic.
+  // Neither in the hobbyist build, which prices nothing to round.
+  let total = computedTotal;
+  let priceSource = 'base';
+  const override = business ? optional(i.priceOverride) : null;
+  const round = business && i.priceRound ? i.priceRound : null;
+  if (override !== null && override >= 0) {
+    total = Math.round(override * 100) / 100;
+    priceSource = 'override';
+  } else if (round && clampPositive(round.step) > 0) {
+    total = roundToStep(computedTotal, clampPositive(round.step), round.mode);
+    priceSource = 'rounded';
+  }
 
   return {
     priceBeforeDiscount,
     discountAmount,
+    agreedAmount: agreed,
     subtotal,
     rushFee,
     shipping,
@@ -140,8 +182,37 @@ function quoteTotal(input) {
     extrasFixed,
     extrasPercent,
     extrasBase,
-    total: subtotal + rushFee + shipping + extras,
+    computedTotal,
+    priceSource,
+    total,
   };
+}
+
+/** null, undefined and '' are ABSENT, not zero — a cleared box is not a free job. */
+function optional(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Round to a multiple of `step`, the way a product's price is rounded.
+ *
+ * The product rule is the authority and is used when it is loaded; the copy
+ * below is the same arithmetic for a build that has this module alone, and
+ * `test/pricing.test.js` holds the two to the same answers. The epsilon is the
+ * part that matters: 45 / 5 is 9.000000000000002 for plenty of real prices,
+ * and without it a total already on a multiple rounds UP to the next one.
+ */
+function roundToStep(value, step, mode) {
+  const P = typeof globalThis !== 'undefined' ? globalThis.KhaytProductPrice : undefined;
+  if (P && typeof P.roundToStep === 'function') return P.roundToStep(value, step, mode);
+  const q = value / step;
+  const EPS = 1e-9;
+  const nearWhole = Math.abs(q - Math.round(q)) < EPS;
+  const raw = nearWhole ? Math.round(q)
+    : (mode === 'up' ? Math.ceil(q) : mode === 'down' ? Math.floor(q) : Math.round(q));
+  return Math.round(raw * step * 100) / 100;
 }
 
 /**
@@ -172,7 +243,7 @@ function activePriceTier(tiers, qty) {
     .find((t) => q >= num(t.minQty)) || null;
 }
 
-const pricingApi = { quoteTotal, activePriceTier, resolveExtraLines, isPercentLine };
+const pricingApi = { quoteTotal, activePriceTier, resolveExtraLines, isPercentLine, roundToStep };
 if (typeof module !== 'undefined' && module.exports) module.exports = pricingApi;
 if (typeof globalThis !== 'undefined') globalThis.KhaytPricing = pricingApi;
 
