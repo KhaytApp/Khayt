@@ -3963,6 +3963,18 @@
  ],
  "expenses": [
   {
+   "id": "EXP-0010",
+   "date": "2026-08-15",
+   "category": "tools",
+   "amount": 16100,
+   "note": "Second machine — Prusa CORE One, with enclosure",
+   "orderId": null,
+   "receiptPath": null,
+   "recurring": null,
+   "nextDue": null,
+   "vatAmount": 2100
+  },
+  {
    "id": "EXP-0009",
    "date": "2026-09-02",
    "category": "filament",
