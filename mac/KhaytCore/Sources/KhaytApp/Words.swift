@@ -2155,5 +2155,6 @@ final class Words {
         // The LAN server's pane, in the Electron page's own words.
         "lan.enabled", "lan.port", "lan.pin", "lan.bind_lan", "lan.bind_lan_hint",
         "lan.loopback_warn", "lan.not_running", "common.secret_unchanged", "lan.same_wifi_hint",
+        "icalDescription",
     ]
 }

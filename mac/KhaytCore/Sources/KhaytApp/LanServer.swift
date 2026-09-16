@@ -55,6 +55,9 @@ final class LanServer {
         var nowText: () -> String = { LanServer.clockText(Date()) }
         /// A PWA icon by file name, or nil.
         var icon: (String) -> Data? = { LanServer.bundledIcon($0) }
+        /// The calendar subscription token (`settings.lanApi.calendarToken`),
+        /// opened. Empty means only the owner PIN opens the feed.
+        var calendarToken: String = ""
         /// The legacy intake token (`settings.lanApi.intakeToken`), opened.
         /// Empty means the header route is closed; the cookie route is open.
         var intakeToken: String = ""
@@ -331,6 +334,9 @@ final class LanServer {
 
         case ("/api/survey", false) where request.method == "POST":
             return await surveySubmit(request)
+
+        case ("/calendar.ics", true):
+            return await calendar(request, store: store)
 
         case ("/api/intake", false) where request.method == "POST":
             return await intakeSubmit(request, store: store)
@@ -644,6 +650,28 @@ final class LanServer {
         return .open(200, #"{"ok":true}"#)
     }
 
+    // MARK: - The calendar
+
+    /// `GET /calendar.ics`: the shop's due dates, for the calendar token or the
+    /// owner PIN — a plain compare with no lockout, as the Node route has it,
+    /// because a calendar app polls this on a schedule of its own.
+    private func calendar(_ request: Request, store: JSONValue) async -> Response {
+        let token = (request.query["token"] ?? "").trimmingCharacters(in: .whitespaces)
+        let pin = (request.query["pin"] ?? request.headers["x-khayt-pin"] ?? "").trimmingCharacters(in: .whitespaces)
+        let byToken = !host.calendarToken.isEmpty && !token.isEmpty && Self.constantTimeEqual(token, host.calendarToken)
+        let byPin = !host.pin.isEmpty && !pin.isEmpty && Self.constantTimeEqual(pin, host.pin)
+        guard byToken || byPin else {
+            return Response(status: 401, headers: ["Content-Type": "text/plain; charset=utf-8"],
+                            body: Data("Unauthorized — use the calendar subscription link from Khayt Settings → Online.".utf8))
+        }
+        let ics = (try? await host.engine.lanCalendarFeed(store: store)) ?? ""
+        return Response(status: 200,
+                        headers: ["Content-Type": "text/calendar; charset=utf-8",
+                                  "Content-Disposition": "attachment; filename=\"khayt-orders.ics\"",
+                                  "Cache-Control": "no-cache"],
+                        body: Data(ics.utf8))
+    }
+
     // MARK: - The PIN
 
     /// Nil when the caller may pass; the refusal to send otherwise. The same
@@ -825,8 +853,10 @@ extension Shop {
         let pin = (try? await Secrets.open(config.pin, for: source)) ?? ""
         let lan = SettingsReader(settings: SettingsReader(settings: settingsDict).object("lanApi"))
         let intakeToken = (try? await Secrets.open(lan.text("intakeToken"), for: source)) ?? ""
+        let calendarToken = await ensureCalendarToken()
         var host = LanServer.Host(store: { [weak self] in self?.lanBook ?? [:] }, pin: pin, engine: engine)
         host.intakeToken = intakeToken
+        host.calendarToken = calendarToken
         host.record = { [weak self] entry in
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             try await self.recordIntake(entry)
@@ -844,6 +874,7 @@ extension Shop {
             _ = try await server.start(port: config.port, bind: config.bindLan ? .lan : .loopback)
             lanServer = server
             lanRunning = config
+            lanCalendarToken = calendarToken
         } catch {
             lanProblem = words.callIt("mac.lan_failed", ["error": .string(String(describing: error))])
         }
@@ -957,6 +988,43 @@ extension Shop {
         }
         if written { await load(source) }
         return written
+    }
+
+    /// The calendar token, opened — minted and sealed into the book the first
+    /// time the server starts, as the Electron main process's
+    /// `ensureLanCalendarToken` does. Plumbing with a Keychain in it, not a
+    /// rule; the feed itself is the shared module's.
+    func ensureCalendarToken() async -> String {
+        let lan = SettingsReader(settings: SettingsReader(settings: settingsDict).object("lanApi"))
+        let stored = lan.text("calendarToken")
+        if !stored.isEmpty { return (try? await Secrets.open(stored, for: source)) ?? "" }
+        guard let build = source.build else { return "" }
+        let minted = LanServer.randomToken(bytes: 16)
+        guard let sealed = try? await Secrets.seal(minted, for: build) else { return "" }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var settings: [String: JSONValue] = [:]
+                if case .object(let s)? = root["settings"] { settings = s }
+                var lanApi: [String: JSONValue] = [:]
+                if case .object(let l)? = settings["lanApi"] { lanApi = l }
+                // Another writer may have minted one first; keep theirs.
+                if case .string(let had)? = lanApi["calendarToken"], !had.isEmpty { return }
+                lanApi["calendarToken"] = .string(sealed)
+                settings["lanApi"] = .object(lanApi)
+                root["settings"] = .object(settings)
+            }
+        } catch { return "" }
+        return minted
+    }
+
+    /// The link a calendar app subscribes to, while the server is up.
+    var calendarLink: String? {
+        guard let base = lanURL, let token = lanCalendarToken, !token.isEmpty else { return nil }
+        return "\(base)calendar.ics?token=\(token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token)"
     }
 
     func stopLanServer() {
