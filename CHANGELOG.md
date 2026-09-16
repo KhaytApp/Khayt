@@ -1791,6 +1791,72 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.16] - 2026-09-16
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **(Mac) The phone's live queue, served by the Mac.** A new Online tab in
+  Settings carries the LAN block the Windows and Linux app keeps under
+  "Advanced": enable the server, listen on the shop's Wi‑Fi, set the owner
+  PIN. Switch it on and a phone on the same network gets the same live queue
+  page, status API, queue API and installable home-screen icon that app
+  serves — the same bytes, from one shared module (`lib/lan-pages.js`), behind
+  the same PIN and the same lockout rules (`lib/lan-auth.js`), with the same
+  security headers on every response. Saving restarts the server when the
+  port or the PIN changed. The intake form, quote approval, the calendar feed
+  and the webhooks are still the other app's; they follow.
+- **(Mac) The customer intake form, served by the Mac.** With the LAN server
+  on, `/intake` on a phone or laptop on the shop's Wi‑Fi is the same request
+  form the Windows and Linux app serves — same page, same session cookie,
+  same limits on opening and submitting it, same consent record — and a
+  submitted request lands on the Waiting screen at once. The form's template
+  and the rule that turns a submission into a waiting-list entry are one
+  shared module now (`lib/lan-intake.js`); the Node server draws from it and
+  is held byte-identical to its old handlers. Not yet on the Mac: pricing an
+  uploaded model on the form (the form does not offer the upload here) and
+  the legacy intake PIN route.
+- **(Mac) A customer approves a quote from their phone.** On a job that is a
+  quote, the inspector has "Copy quote link": the link points at this Mac,
+  carries the job's own approval token (minted into the job the first time,
+  as the Windows and Linux app mints it), and opens the same quote page that
+  app serves — the parts, the total in the shop's currency, the expiry, and
+  one button. Approving moves the job to pending inside the write on the
+  newest book; a quote that expired, or was already approved, gets the same
+  answer the other app gives. The page's small companions (not found, bad
+  link, expired, cannot approve, approved) are lifted out of the Node routes
+  into `lib/lan-quote-page.js`, verbatim, and the Node server draws from
+  them; the rule's clock is injectable so both hosts can be held to it. Not
+  yet on the Mac: the order tracking page and the legacy POST /order/:id.
+- **(Mac) Rounding and "Your own price" on the product sheet.** The two
+  controls Khayt's product editor has had all along — round to a step (up,
+  down or nearest) and a typed price that wins over everything — with the
+  price preview following them as they change. Until now a shop on the Mac
+  could see a catalogue price move and had no way to set it back.
+- The shared settings save (`lib/settings-edit.js`) now takes the LAN block
+  from a form and merges it the way the Electron page always did: the fields
+  shown over the stored block, a blank PIN keeps the current one, a port that
+  is not a port is 3219. The Electron page is unchanged.
+
+### Fixed
+
+- **(Mac) Saving a product no longer throws away its cost inputs or its
+  price.** The Mac product sheet rebuilt every part from the five fields it
+  shows, so the labour rate, prep and post time, power draw, wear and failure
+  rate the other app had priced the part with were dropped on save — a
+  portrait that cost 35.91 to make came back costing 10.57, and the product
+  re-priced itself from 50 to 13.74. The save also ignored the product's own
+  rounding and typed price. Now a part keeps every field the sheet does not
+  edit, and the product is priced through the shared rule with its rounding
+  and override, so the same product saves to the same price in both apps.
+- **(Mac) "New job from this" prices the job at the product's own rates.**
+  The job's parts were costed from grams and hours alone, so the same
+  portrait opened at 15 where the catalogue said 50. A part taken from a
+  product now carries the product's rates into the cost, and the job opens at
+  the catalogue price.
+
 ## [4.0.0-alpha.15] - 2026-09-16
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
