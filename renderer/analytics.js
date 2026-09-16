@@ -1110,19 +1110,18 @@ function renderExpenseCategoryChart() {
     return;
   }
 
-  const totals = {};
-  for (const e of filtered) {
-    const cat = e.category || 'other';
-    totals[cat] = (totals[cat] || 0) + (+e.amount || 0);
-  }
-
-  const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-  const grand = sorted.reduce((s, [, v]) => s + v, 0) || 1;
-  const maxV = sorted[0]?.[1] || 1;
+  // THE TAX ON A PURCHASE IS NOT A COST for a registered shop — it is
+  // reclaimed. The P&L has always charged `paid - claimable`; this summed the
+  // gross, so the two disagreed by the whole of it. One rule now, in
+  // `lib/expense-categories.js`, and the same reclaim test the P&L uses.
+  const taxProfile = KhaytTax.profileFromSettings(settings || {});
+  const reclaimsTax = !!(taxProfile && (taxProfile.rates || []).length);
+  const grouped = KhaytExpenseCategories.byCategory(filtered, { reclaimsTax });
+  const maxV = grouped.biggest || 1;
   const BAR_MAX_W = 200;
 
-  const rows = sorted.map(([cat, v]) => {
-    const pct = Math.round(v / grand * 100);
+  const rows = grouped.rows.map(({ category: cat, amount: v, share }) => {
+    const pct = Math.round(share * 100);
     const bw = Math.round((v / maxV) * BAR_MAX_W);
     return `<tr>
       <td style="padding:6px 8px;font-size:12px;white-space:nowrap;">${escapeHtml(expCatLabel(cat))}</td>
