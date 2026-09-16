@@ -2639,15 +2639,42 @@ final class Shop {
     ///
     /// The same `quoteTotal` the record will use, so the figure on the screen is
     /// the figure in the book.
+    /// How a job's total gets its last word: rounded to a step, or typed.
+    ///
+    /// The same rule and steps a product's price uses (`lib/product-price.js`);
+    /// `nil` step means the arithmetic stands. A typed `override` wins over
+    /// the rounding, as it does on a product.
+    struct PriceRule: Equatable, Sendable {
+        var step: Double = 0
+        var mode: String = "nearest"
+        var override: Double?
+
+        static let steps: [Double] = [0, 1, 5, 10]
+        static let modes = ["nearest", "up", "down"]
+
+        var isPlain: Bool { step <= 0 && override == nil }
+
+        /// The two inputs `lib/pricing.js` reads, or nothing.
+        var fields: [String: JSONValue] {
+            var out: [String: JSONValue] = [:]
+            if step > 0 { out["priceRound"] = .object(["step": .number(step), "mode": .string(mode)]) }
+            if let override { out["priceOverride"] = .number(override) }
+            return out
+        }
+    }
+
     func previewQuote(baseCost: Double, margin: Double, discountPct: Double,
-                      shippingCost: Double, rush: Bool) async -> QuoteTotal? {
+                      shippingCost: Double, rush: Bool,
+                      agreedAmount: Double = 0, rule: PriceRule = PriceRule()) async -> QuoteTotal? {
         guard let engine else { return nil }
         var input: [String: JSONValue] = [
             "baseCost": .number(baseCost), "qty": .number(1),
             "margin": .number(margin), "discountPct": .number(discountPct),
             "shippingCost": .number(shippingCost),
             "rushEnabled": .bool(rush), "business": .bool(true),
+            "agreedAmount": .number(agreedAmount),
         ]
+        for (key, value) in rule.fields { input[key] = value }
         // The shop's own rush percentage, or Khayt's default of twenty-five.
         if rush {
             var pct = 25.0
@@ -2677,6 +2704,11 @@ final class Shop {
                 "unitCost": .number(p.cost),
                 "baseCost": .number(p.cost * Double(max(1, p.qty))),
             ]
+            // What the customer agreed for this part, per unit. The cost above
+            // is still the cost: the shared rule charges the agreed figure
+            // instead of cost plus margin, and measures the margin against
+            // what it really cost. See lib/price-agreements.js.
+            if let agreed = p.agreedPrice { row["agreedPrice"] = .number(agreed) }
             // The rates this part was costed at, written down beside the cost.
             //
             // Not bookkeeping. `renderer/build.js` reads them straight back into
@@ -2702,7 +2734,8 @@ final class Shop {
     func newJobInput(parts: [NewJobSheet.Draft], project: String, clientId: String?,
                      margin: Double, discountPct: Double, shippingCost: Double,
                      deposit: Double, rush: Bool, asQuote: Bool,
-                     fromProduct product: Product? = nil) -> [String: JSONValue] {
+                     fromProduct product: Product? = nil,
+                     rule: PriceRule = PriceRule()) -> [String: JSONValue] {
         var input: [String: JSONValue] = [
             "parts": .array(Self.partRows(parts, spools: spools,
                                           unnamed: words.callIt("mac.a_part"))),
@@ -2715,6 +2748,9 @@ final class Shop {
             "asQuote": .bool(asQuote),
         ]
         if let clientId { input["clientId"] = .string(clientId) }
+        // The last word on the total — rounded to a step, or typed — travels
+        // to the rule, which writes how the price was reached on the record.
+        for (key, value) in rule.fields { input[key] = value }
         // ── WHAT THE PRODUCT BRINGS WITH IT ───────────────────────────────
         //
         // The components (magnets, screws, a box) and the assembly count are

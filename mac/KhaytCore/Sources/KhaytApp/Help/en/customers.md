@@ -19,10 +19,11 @@ is usually when you learn they exist.
 
 What this customer pays for particular things: a product word, a price, a note.
 The word is matched against a part's name when you take a job for them —
-"bracket" covers "Wall bracket, steel" — and the figure becomes what that part
-costs on the job, with the job's margin on top. You see the total before you
-save it. The same rule applies in both apps, so a job taken here and one taken
-on the shop's PC come to the same number.
+"bracket" covers "Wall bracket, steel" — and the figure is what the customer
+pays for each of that part. The job's margin does not touch it, and neither
+does the customer's discount; the rest of the job is priced as usual. The same
+rule applies in both apps, so a job taken here and one taken on the shop's PC
+come to the same number.
 
 ## A standing order
 

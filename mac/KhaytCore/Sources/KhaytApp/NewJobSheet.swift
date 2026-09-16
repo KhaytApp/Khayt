@@ -73,6 +73,11 @@ struct NewJobSheet: View {
     @State private var rush = false
     @State private var quoted: QuoteTotal?
     @State private var problem: String?
+    /// The last word on the total: round it to 1, 5 or 10, or type it.
+    @State private var rule = Shop.PriceRule()
+    /// The typed total as typed. Text, because a `Double?` behind a field
+    /// reformats under the cursor and cannot be cleared back to "auto".
+    @State private var overrideText = ""
     /// "Price agreement applied" — said once, under the customer, when
     /// choosing them changed a figure in the cart.
     @State private var agreementNote: String?
@@ -92,6 +97,9 @@ struct NewJobSheet: View {
         var hours = ""
         var qty = 1
         var cost: Double = 0
+        /// What the customer has agreed to pay for each of these, when they
+        /// have. The cost stays the cost; the price of this part is this.
+        var agreedPrice: Double?
         /// Where that cost went. Held per part so the sheet can add up the cart
         /// without asking the engine again for each one.
         var parts: KhaytEngine.CostParts?
@@ -234,8 +242,17 @@ struct NewJobSheet: View {
                         .lineLimit(1)
                     Text("×\(part.qty)").foregroundStyle(.secondary).monospacedDigit()
                     Spacer()
-                    Text(Money.figure(part.cost * Double(part.qty)))
-                        .monospacedDigit().foregroundStyle(.secondary)
+                    if let agreed = part.agreedPrice {
+                        // The agreed figure IS the price of this line; the
+                        // cost it replaced is said small beside it.
+                        Text(Money.figure(agreed * Double(part.qty)))
+                            .monospacedDigit()
+                        Text(shop.words.callIt("ce.pl_autofill") + " · " + Money.figure(part.cost * Double(part.qty)))
+                            .font(.caption).monospacedDigit().foregroundStyle(.tertiary)
+                    } else {
+                        Text(Money.figure(part.cost * Double(part.qty)))
+                            .monospacedDigit().foregroundStyle(.secondary)
+                    }
                     Button {
                         parts.removeAll { $0.id == part.id }
                     } label: { Image(systemName: "minus.circle") }
@@ -417,6 +434,40 @@ struct NewJobSheet: View {
                     }
                 }
             }
+            // ── THE LAST WORD ON THE TOTAL ────────────────────────────────
+            //
+            // Cost plus margin is where a price starts, not where it ends. A
+            // shop that quotes 1,847.36 says 1,850, and one that has just
+            // agreed 1,800 on the phone types 1,800. Same steps and words as
+            // a product's price; the rule is lib/pricing.js and the record
+            // says which of the three reached the figure.
+            GridRow {
+                Text(shop.words.callIt("pe.round_to")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Picker("", selection: $rule.step) {
+                        ForEach(Shop.PriceRule.steps, id: \.self) { step in
+                            Text(step == 0 ? shop.words.callIt("pe.round_off") : Money.quantity(step)).tag(step)
+                        }
+                    }
+                    .labelsHidden().frame(width: 130)
+                    if rule.step > 0 {
+                        Picker("", selection: $rule.mode) {
+                            ForEach(Shop.PriceRule.modes, id: \.self) { mode in
+                                Text(shop.words.callIt("pe.round_\(mode)")).tag(mode)
+                            }
+                        }
+                        .labelsHidden().frame(width: 110)
+                    }
+                    Text(shop.words.callIt("pe.price_override")).foregroundStyle(.secondary)
+                    TextField(shop.words.callIt("pe.price_override_ph"), text: $overrideText)
+                        .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
+                        .onChange(of: overrideText) { _, typed in
+                            let cleaned = typed.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
+                            rule.override = cleaned.isEmpty ? nil : max(0, Double(cleaned) ?? 0)
+                        }
+                }
+            }
             // ── WHAT THIS SHOP HAS ACTUALLY MADE ON WORK LIKE THIS ────────
             //
             // No model is involved. `buildComparables` is arithmetic over the
@@ -519,6 +570,12 @@ struct NewJobSheet: View {
             Text(shop.words.callIt("common.total")).foregroundStyle(.secondary)
             Text(quoted.map { Money.figure($0.total) } ?? "—")
                 .font(.title2.weight(.semibold)).monospacedDigit()
+            if let quoted, quoted.differsFromComputed, let computed = quoted.computedTotal {
+                // A rounded or typed total never passes for a calculated one.
+                Text(shop.words.callIt(quoted.priceSource == "override" ? "pe.price_is_override" : "pe.price_is_rounded")
+                     + " · " + shop.words.callIt("pe.price_is_base") + " " + Money.figure(computed))
+                    .font(.callout).foregroundStyle(.secondary).monospacedDigit()
+            }
             if let quoted, quoted.discountAmount > 0 {
                 Text("−" + Money.figure(quoted.discountAmount))
                     .font(.callout).foregroundStyle(.secondary).monospacedDigit()
@@ -574,7 +631,16 @@ struct NewJobSheet: View {
     /// Everything the price depends on, so the preview re-runs when any of it
     /// moves and not on every keystroke in the job's name.
     private var signature: String {
-        "\(parts.map { "\($0.cost)x\($0.qty)" }.joined())|\(margin)|\(discountPct)|\(shippingCost)|\(rush)"
+        "\(parts.map { "\($0.cost)x\($0.qty)@\($0.agreedPrice ?? -1)" }.joined())|\(margin)|\(discountPct)|\(shippingCost)|\(rush)|\(rule.step)|\(rule.mode)|\(rule.override ?? -1)"
+    }
+
+    /// The cart in two halves, the way the rule takes it: what is priced at
+    /// cost plus margin, and what the customer has already agreed.
+    private var costedBase: Double {
+        parts.filter { $0.agreedPrice == nil }.reduce(0) { $0 + $1.cost * Double($1.qty) }
+    }
+    private var agreedAmount: Double {
+        parts.reduce(0) { $0 + ($1.agreedPrice ?? 0) * Double($1.qty) }
     }
 
     private func addPart() async {
@@ -594,8 +660,7 @@ struct NewJobSheet: View {
         // too. The other app applies agreements only at the moment the
         // customer is picked; here the customer is usually picked first.
         if let agreed = await shop.agreedPrices(for: [next.name], clientId: clientId).first ?? nil {
-            next.cost = agreed
-            next.parts = nil
+            next.agreedPrice = agreed
             agreementNote = shop.words.callIt("ce.pl_autofill")
         }
         parts.append(next)
@@ -605,27 +670,24 @@ struct NewJobSheet: View {
     /// What choosing a customer brings with it: their discount, and the
     /// prices they have agreed for the parts already in the cart.
     ///
-    /// The agreed figure becomes the part's COST and the margin goes on top —
-    /// the shared rule's answer, the same in both apps; see
-    /// `lib/price-agreements.js` for why that is said out loud. The
-    /// breakdown is dropped for such a part: the figure is no longer filament
-    /// plus machine time, it is what was agreed.
+    /// The agreed figure is the PRICE of that part — the cost stays the cost,
+    /// and the shared rule charges the agreed figure instead of cost plus
+    /// margin (`lib/price-agreements.js`). A part with no agreement for this
+    /// customer loses one a previous customer left on it.
     private func customerChosen(_ chosen: String?) async {
         agreementNote = nil
-        guard let chosen, let client = shop.clients.first(where: { $0.id == chosen }) else { return }
+        guard let chosen, let client = shop.clients.first(where: { $0.id == chosen }) else {
+            for i in parts.indices { parts[i].agreedPrice = nil }
+            return
+        }
         if client.defaultDiscount > 0 { discountPct = client.defaultDiscount }
         let prices = await shop.agreedPrices(for: parts.map(\.name), clientId: chosen)
         var applied = 0
         for (i, price) in prices.enumerated() where i < parts.count {
-            guard let price else { continue }
-            parts[i].cost = price
-            parts[i].parts = nil
-            applied += 1
+            parts[i].agreedPrice = price
+            if price != nil { applied += 1 }
         }
-        if applied > 0 {
-            agreementNote = shop.words.callIt("ce.pl_autofill")
-            await reprice()
-        }
+        if applied > 0 { agreementNote = shop.words.callIt("ce.pl_autofill") }
     }
 
     /// Ask what this shop has made on jobs in this material.
@@ -672,16 +734,18 @@ struct NewJobSheet: View {
     private func reprice() async {
         guard !parts.isEmpty else { quoted = nil; return }
         quoted = await shop.previewQuote(
-            baseCost: parts.reduce(0) { $0 + $1.cost * Double($1.qty) },
+            baseCost: costedBase,
             margin: margin, discountPct: discountPct,
-            shippingCost: shippingCost, rush: rush)
+            shippingCost: shippingCost, rush: rush,
+            agreedAmount: agreedAmount, rule: rule)
     }
 
     private func save(asQuote: Bool) async {
         await shop.createJob(shop.newJobInput(
             parts: parts, project: project, clientId: clientId,
             margin: margin, discountPct: discountPct, shippingCost: shippingCost,
-            deposit: deposit, rush: rush, asQuote: asQuote, fromProduct: product))
+            deposit: deposit, rush: rush, asQuote: asQuote, fromProduct: product,
+            rule: rule))
         if shop.moveProblem == nil { shop.takingAJob = false } else { problem = shop.moveProblem }
     }
 }

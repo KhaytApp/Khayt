@@ -130,6 +130,8 @@ test('junk inputs cannot produce a NaN price', () => {
     rushEnabled: true, rushPct: 'x', shippingCost: {}, extraLines: [null, { amount: 'y' }, undefined],
   });
   for (const [k, v] of Object.entries(r)) {
+    // `priceSource` is a word, not money; everything else must be a number.
+    if (k === 'priceSource') { assert.equal(v, 'base'); continue; }
     assert.ok(Number.isFinite(v), `${k} is ${v}`);
   }
   assert.equal(r.total, 0);
@@ -277,4 +279,67 @@ test('junk lines are ignored rather than poisoning the total', () => {
     const q = quoteTotal({ baseCost: 100, qty: 1, margin: 0, extraLines: [bad] });
     assert.equal(q.total, 100, JSON.stringify(bad));
   }
+});
+
+/* ── The last word on the total: agreed parts, rounding, a typed figure ─────
+   Added 2026-09-16. Each is inert when absent — the equivalence tests above
+   are the proof, since none of them passes the new inputs. */
+const { roundToStep } = require('../lib/pricing.js');
+
+test('an agreed amount is added after the discount and never marked up', () => {
+  const q = quoteTotal({ baseCost: 100, margin: 30, agreedAmount: 200, discountPct: 10 });
+  assert.equal(q.priceBeforeDiscount, 130, 'the marked-up half');
+  assert.equal(q.discountAmount, 13, 'the discount is on the marked-up half only');
+  assert.equal(q.agreedAmount, 200);
+  assert.equal(q.subtotal, 317);
+  assert.equal(q.total, 317);
+  // Rush, shipping and extras still apply to it.
+  const rushed = quoteTotal({ baseCost: 0, agreedAmount: 200, rushEnabled: true, rushPct: 25, shippingCost: 10 });
+  assert.equal(rushed.rushFee, 50);
+  assert.equal(rushed.total, 260);
+  // The hobbyist build prices nothing, agreed or not.
+  assert.equal(quoteTotal({ baseCost: 100, agreedAmount: 200, business: false }).total, 100);
+});
+
+test('rounding to a step: nearest, up, down — and a total already on a multiple stays', () => {
+  const at = (mode) => quoteTotal({ baseCost: 1421.05, margin: 30, priceRound: { step: 5, mode } });
+  assert.equal(+at('nearest').computedTotal.toFixed(2), 1847.37);
+  assert.equal(at('nearest').total, 1845);
+  assert.equal(at('up').total, 1850);
+  assert.equal(at('down').total, 1845);
+  assert.equal(at('up').priceSource, 'rounded');
+  assert.equal(quoteTotal({ baseCost: 100, margin: 30, priceRound: { step: 5, mode: 'up' } }).total, 130, '130 is already a multiple of 5');
+  assert.equal(quoteTotal({ baseCost: 100, margin: 30, priceRound: { step: 1, mode: 'nearest' } }).total, 130);
+  assert.equal(quoteTotal({ baseCost: 100.4, margin: 0, priceRound: { step: 1, mode: 'nearest' } }).total, 100);
+  // No step, a zero step, or the hobbyist build: the arithmetic stands.
+  assert.equal(quoteTotal({ baseCost: 100.4, margin: 0, priceRound: { step: 0 } }).priceSource, 'base');
+  assert.equal(quoteTotal({ baseCost: 100.4, margin: 0, priceRound: null }).total, 100.4);
+  assert.equal(quoteTotal({ baseCost: 100.4, margin: 0, priceRound: { step: 5 }, business: false }).total, 100.4);
+});
+
+test('a typed price is the price, and a cleared box is not a free job', () => {
+  const q = quoteTotal({ baseCost: 100, margin: 30, priceRound: { step: 5, mode: 'up' }, priceOverride: 120 });
+  assert.equal(q.total, 120, 'typed wins over rounding');
+  assert.equal(q.priceSource, 'override');
+  assert.equal(q.computedTotal, 130, 'and the arithmetic is still there to show');
+  assert.equal(quoteTotal({ baseCost: 100, margin: 30, priceOverride: 0 }).total, 0, 'zero is a price');
+  for (const absent of [null, undefined, '']) {
+    assert.equal(quoteTotal({ baseCost: 100, margin: 30, priceOverride: absent }).total, 130, `${JSON.stringify(absent)} is absent`);
+  }
+  assert.equal(quoteTotal({ baseCost: 100, margin: 30, priceOverride: 'x' }).total, 130, 'garbage is absent');
+  assert.equal(quoteTotal({ baseCost: 100, margin: 30, priceOverride: -5 }).total, 130, 'a negative price is not a price');
+  assert.equal(quoteTotal({ baseCost: 100, margin: 30, priceOverride: 12.345 }).total, 12.35, 'money has two decimals');
+});
+
+test('the rounding here is the product rule\'s rounding, with or without that module loaded', () => {
+  // Without: the local copy.
+  const cases = [[1847.37, 5, 'nearest'], [1847.37, 5, 'up'], [1847.37, 5, 'down'], [45, 5, 'up'], [12.1, 0.5, 'nearest'], [1847.37, 1, 'up'], [1847.37, 10, 'nearest']];
+  const local = cases.map(([v, s, m]) => roundToStep(v, s, m));
+  // With: the same answers.
+  const P = require('../lib/product-price.js');
+  assert.ok(globalThis.KhaytProductPrice === P, 'the product rule registered itself');
+  const theirs = cases.map(([v, s, m]) => P.roundToStep(v, s, m));
+  assert.deepEqual(local, theirs);
+  assert.deepEqual(cases.map(([v, s, m]) => roundToStep(v, s, m)), theirs, 'and delegating gives the same');
+  assert.deepEqual(theirs, [1845, 1850, 1845, 45, 12, 1848, 1850]);
 });

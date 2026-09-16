@@ -414,3 +414,50 @@ test('the materials are the distinct ones, named once', () => {
   }), ctx());
   assert.equal(order.material, 'PLA, PETG');
 });
+
+/* ── Agreed parts, rounding and a typed price on the record (2026-09-16) ──── */
+
+test('an agreed part is charged its agreed price, not cost plus margin — and its cost stays its cost', () => {
+  const settings = { invNumNext: 1, invNumYear: NOW.getFullYear() };
+  const order = N.newOrder({
+    parts: [
+      { name: 'Wall bracket', qty: 4, unitCost: 3, baseCost: 12, agreedPrice: 50, printTime: 1 },
+      { name: 'Lid', qty: 1, unitCost: 2, baseCost: 2, printTime: 1 },
+    ],
+    margin: 30, discountPct: 10,
+  }, { settings, orders: [], now: NOW, tokens: TOKENS });
+  // Lid: 2 × 1.3 = 2.6, less 10% = 2.34. Bracket: 4 × 50 = 200, not discounted.
+  assert.equal(order.price, 202.34);
+  assert.equal(order.parts.reduce((t, p) => t + p.baseCost, 0), 14, 'the true cost of every part, agreed or not');
+  assert.equal(order.agreedAmount, 200);
+  assert.equal(order.parts[0].unitCost, 3, 'the part still knows what it cost');
+  assert.equal(order.parts[0].agreedPrice, 50);
+  assert.equal(order.computedPrice, undefined, 'nothing rounded, nothing typed: no provenance fields');
+  assert.equal(order.priceSource, undefined);
+});
+
+test('a rounded or typed total says so on the record; a plain one carries nothing new', () => {
+  const settings = { invNumNext: 1, invNumYear: NOW.getFullYear() };
+  const base = { parts: [{ name: 'x', qty: 1, unitCost: 100, baseCost: 100, printTime: 1 }], margin: 30 };
+  const plain = N.newOrder(base, { settings, orders: [], now: NOW, tokens: TOKENS });
+  for (const key of ['agreedAmount', 'computedPrice', 'priceSource', 'priceRound', 'priceOverride']) {
+    assert.equal(key in plain, false, `${key} on a record nothing touched`);
+  }
+  const rounded = N.newOrder({ ...base, priceRound: { step: 5, mode: 'up' } }, { settings, orders: [], now: NOW, tokens: TOKENS });
+  assert.equal(rounded.price, 130, 'already a multiple of 5');
+  assert.equal(rounded.priceSource, 'rounded');
+  assert.equal(rounded.computedPrice, 130);
+  assert.deepEqual(rounded.priceRound, { step: 5, mode: 'up' });
+  const rounded2 = N.newOrder({ ...base, margin: 31, priceRound: { step: 5, mode: 'up' } }, { settings, orders: [], now: NOW, tokens: TOKENS });
+  assert.equal(rounded2.price, 135);
+  assert.equal(rounded2.computedPrice, 131);
+  const typed = N.newOrder({ ...base, priceOverride: 120 }, { settings, orders: [], now: NOW, tokens: TOKENS });
+  assert.equal(typed.price, 120);
+  assert.equal(typed.priceSource, 'override');
+  assert.equal(typed.priceOverride, 120);
+  assert.equal(typed.computedPrice, 130);
+  assert.equal(typed.paymentStatus, 'unpaid');
+  // The deposit is judged against the price the customer is asked for.
+  const paid = N.newOrder({ ...base, priceOverride: 120, depositAmount: 120 }, { settings, orders: [], now: NOW, tokens: TOKENS });
+  assert.equal(paid.paymentStatus, 'paid');
+});

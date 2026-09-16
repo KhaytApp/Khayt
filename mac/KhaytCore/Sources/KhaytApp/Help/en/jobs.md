@@ -9,6 +9,19 @@ is printing on, what it will cost and what you are charging.
 can follow. Picking a model from your library fills in the material and the
 weight, so the price is computed rather than guessed.
 
+## What it will cost them
+
+A part's cost comes from the shared cost model — filament, machine time,
+electricity, labour, the failure allowance — and the price starts as cost plus
+the margin. Then the last word is yours: round the total to the nearest 1, 5 or
+10 (up or down, or to the nearest), or type the price you agreed. The sheet
+says "Calculated" beside a rounded or typed total so the arithmetic is never
+mistaken for the figure, and the job records which of the three reached its
+price.
+
+A customer's price agreements are applied when you choose them: a part they
+have a price for is charged that price and not marked up.
+
 ## Stages
 
 Every job sits at a stage, and the sidebar counts them:
