@@ -1904,6 +1904,102 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.18] - 2026-09-16
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **(Mac) A listing can be taken off the catalogue.** There was no way to
+  delete a product here at all — the words for it had been sitting in the app
+  unused. Right-click a product in the grid or the table and it asks, in
+  Khayt's own sentence, which names what survives as well as what goes: the
+  photo is removed, past invoices are kept. Deleting also unlinks every job
+  that named the product and drops it from any quote bundle, because a job
+  pointing at a product that is not there is the kind of fault that surfaces
+  months later as a screen that cannot draw. All of it comes back with one
+  undo, except the pictures, whose bytes are gone — the record is restored
+  without them rather than naming files that no longer exist.
+- **(Mac) Settings → Online can switch public pricing on, and make the
+  printer preset it needs.** The customer-facing price is built from a saved
+  preset — a name and the seven figures a part is costed at — and the shared
+  rule refuses outright without one. Until now a preset could only be made in
+  the other app's calculator, so the Mac could serve the upload and never
+  answer. The pane now carries the whole block (the switch, the preset, the
+  material or a flat spool cost, margin, minimum, waste and the per-visitor
+  hourly ceiling), says plainly when there is no preset yet, and will make
+  one: name it, adjust the seven figures, and it is saved and chosen. A name
+  already in use replaces that preset rather than doubling it, which is the
+  other app's rule and the same id, so anything pointing at it still does.
+- **(Mac) A customer can price their own model on the intake form.** With
+  public pricing switched on, the form offers an upload: the file is measured
+  in memory, priced on the shop's own preset, spool cost, margin and waste
+  allowance, and the figure is shown as an indication rather than a quote. A
+  sliced file is taken at the slicer's own weight and time; an STL, OBJ or
+  3MF is measured by this app's own reader. Nothing is written to disk — the
+  model is read and dropped, so there is no stranger's file on the shop's
+  machine to keep or explain. When the request is submitted, the price
+  attached to it is the one THIS server produced, recalled by reference, so
+  a browser cannot post a figure of its own. The rules are the shared ones
+  (`lib/public-quote.js`, `lib/gcode-parse.js`), which the other app already
+  quotes through, so a customer is never shown a different sum from the one
+  the shop would reach for the same part.
+
+### Fixed
+
+- **A delivered job was missing from what its printer had earned, in both
+  apps.** Khayt wrote `delivered` before it wrote `completed` with a
+  `deliveredAt` beside it, and both are still in shops' books — thirteen of
+  them in the sample. So "is this job finished" is a two-value test, written
+  out by hand in eight modules and got wrong in three places: the machine
+  P&L in both apps, and the machine revenue chart. Each filtered `completed`
+  alone, so a shop that marks work delivered saw its printers' earnings
+  computed on a subset, with nothing to say so. `lib/order-status.js` —
+  which already says in its own header that it exists so the two apps cannot
+  disagree about whether a job is finished — now names the test once, and
+  the three callers ask it. A test holds the Mac's copy of the list to the
+  rule's own, and another checks the charts have not gone back to comparing
+  by hand.
+- **A multi-colour print weighed nothing, so anything made from it cost
+  nothing.** A one-material slice reports a single filament weight, and that
+  is the only figure this read. A toolchanger does not produce one: a U1, an
+  XL or an AMS slice writes a weight per filament, which the library keeps
+  per colour. So every multi-colour file reported "no weight", and a product
+  or job made from one came out costing nothing — a 57 g dragon read as zero.
+  On the shop's own library, three of 152 files carried a weight and all
+  three carried it this way, so the branch that was read had never once
+  matched. The colours are summed now, and labelled as the slicer's own
+  arithmetic rather than an estimate, because that is what it is. A file that
+  genuinely knows no weight still says so.
+- **Public pricing settings were dropped on the way to the book.** The shared
+  settings save merges the LAN block by naming the fields it knows, and the
+  model-pricing block was not among them — so a pane that set a margin and a
+  preset would have had both discarded on save, silently. It is merged whole
+  now, over what was stored, so a field a newer build wrote survives a save
+  by an older pane.
+- **(Mac) A resin printer's progress was captioned with a claim about a file
+  it does not have.** The machine card names which signal a percentage came
+  from, so that "by layer" and "by file position" can be told apart on a
+  Moonraker printer. It was meant to say that only for Moonraker, which is
+  the one adapter that chooses between two signals — but `lib/sdcp.js` sets
+  the same field, to `time` or `none`, and anything the card did not
+  recognise was captioned "by file position". So an Elegoo resin printer
+  reporting its own elapsed ticks was described in terms of a file it never
+  had. The adapter now decides whether to caption at all, and a signal this
+  app has not been taught is left undescribed rather than described wrongly.
+- **(Mac) A product made on the Mac was priced on its filament alone.** The
+  other app's calculator puts a labour rate, prep and post time, power draw,
+  electricity, wear and a failure allowance on every part it writes; this
+  sheet wrote none of them, and the shared pricing rule injects none on
+  purpose. So a product added here cost whatever its filament cost and
+  nothing else — on a real portrait, 10.57 where the true cost is 35.91,
+  because those seven figures are seven tenths of what it takes to make.
+  The part being added now carries the same starting figures the other app's
+  form carries, folded away under "Labour, power and wear" so they can be
+  changed before the part goes in, and a part already in the list that has
+  none of them says so instead of quietly costing less.
+
 ## [4.0.0-alpha.17] - 2026-09-16
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
