@@ -588,6 +588,8 @@ public actor KhaytEngine {
         "privacy",
         "lan-intake",
         "lan-quote-page",
+        "carriers",
+        "lan-order-page",
         // Which customers are worth keeping.
         "client-value",
         // Whether the shop can take another job, and when it would start.
@@ -4477,6 +4479,46 @@ public actor KhaytEngine {
         public let order: JSONValue?
         public let printLog: JSONValue?
     }
+    // The customer's order page and its survey: `lib/lan-order-page.js`.
+
+    public func lanTrackingPage(order: JSONValue, store: JSONValue) throws -> String {
+        try runtime.call2("globalThis.KhaytLanOrderPage.trackingPage(ARG0, ARG1)", [order, store], as: String.self)
+    }
+    /// `order_not_found` or `invalid_tracking_link`, verbatim from the route.
+    public func lanOrderNotice(_ kind: String) throws -> String {
+        try runtime.call2("globalThis.KhaytLanOrderPage.notice(ARG0)", [.string(kind)], as: String.self)
+    }
+    public struct LanSurveyCheck: Decodable, Sendable {
+        public let ok: Bool
+        public let status: Double?
+        public let error: String?
+        public let token: String?
+        public let rating: Double?
+        public let comment: String?
+    }
+    public func lanSurveyCheck(body: JSONValue) throws -> LanSurveyCheck {
+        try runtime.call2("""
+            (function (b) {
+              var r = globalThis.KhaytLanOrderPage.surveyCheck(b);
+              return r.ok ? { ok: true, token: String(r.token), rating: r.rating,
+                              comment: (typeof r.comment === 'string' ? r.comment : null) } : r;
+            })(ARG0)
+            """, [body], as: LanSurveyCheck.self)
+    }
+    /// The order with its survey written and its token spent.
+    public func lanSurveyPatch(order: JSONValue, rating: Double, comment: String?, nowIso: String) throws -> JSONValue {
+        try runtime.call2("""
+            (function (o, r, c, at) {
+              var p = globalThis.KhaytLanOrderPage.surveyPatch(o, r, c, at);
+              return JSON.parse(JSON.stringify(p));
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, .number(rating), comment.map { JSONValue.string($0) } ?? .null, .string(nowIso)],
+            as: JSONValue.self)
+    }
+    public func lanSurveyLimit() throws -> Int {
+        Int(try runtime.call2("globalThis.KhaytLanOrderPage.SURVEY_SUBMIT_LIMIT", [], as: Double.self))
+    }
+
     public func lanQuoteApply(store: JSONValue, orderId: String, nowIso: String) throws -> LanQuoteApproval {
         try runtime.call2("""
             (function (s, id, now) {

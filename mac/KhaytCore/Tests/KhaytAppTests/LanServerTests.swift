@@ -55,6 +55,18 @@ struct LanServerTests {
                 if recordFails { throw CocoaError(.fileWriteUnknown) }
                 recorded.entries.append(entry)
             }
+            host.survey = { token, rating, comment, nowIso in
+                if recordFails { throw CocoaError(.fileWriteUnknown) }
+                guard case .array(var log)? = book.value["printLog"] else { return false }
+                for i in log.indices {
+                    guard case .object(let o) = log[i], case .string(let held)? = o["surveyToken"],
+                          LanServer.constantTimeEqual(token, held) else { continue }
+                    log[i] = try await engine.lanSurveyPatch(order: .object(o), rating: rating, comment: comment, nowIso: nowIso)
+                    book.value["printLog"] = .array(log)
+                    return true
+                }
+                return false
+            }
             host.approve = { id, nowIso in
                 if recordFails { throw CocoaError(.fileWriteUnknown) }
                 let result = try await engine.lanQuoteApply(store: .object(book.value), orderId: id, nowIso: nowIso)
@@ -554,6 +566,117 @@ struct LanServerTests {
         #expect(LanServer.quotePath("/order/x/y/quote") == nil)
         #expect(LanServer.approvePath("/order/Q-77/approve") == "Q-77")
         #expect(LanServer.approvePath("/order/Q-77/quote") == nil)
+    }
+
+    // MARK: - The customer's order page
+
+    static let trackedJob: [String: JSONValue] = [
+        "id": .string("T-5"), "project": .string("Vase <b>"), "client": .string("Sara"), "status": .string("printing"),
+        "material": .string("PETG"), "dueDate": .string("2027-02-01"),
+        "trackingToken": .string("0123456789abcdef0123456789abcdef"),
+        "shippingStatus": .string("in_transit"), "trackingNumber": .string("TN-1"), "carrier": .string("smsa"),
+    ]
+
+    @Test("the tracking page is the module's, behind the order's tracking token")
+    func trackingPage() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.trackedJob)
+        let missing = try await bench.get("/order/NOPE?token=x")
+        #expect(missing.status == 404)
+        #expect(missing.text == (try await bench.engine.lanOrderNotice("order_not_found")))
+        let noToken = try await bench.get("/order/T-5")
+        #expect(noToken.status == 403)
+        #expect(noToken.text == (try await bench.engine.lanOrderNotice("invalid_tracking_link")))
+        let page = try await bench.get("/order/T-5?token=0123456789abcdef0123456789abcdef")
+        #expect(page.status == 200)
+        #expect(page.headers["content-type"] == "text/html; charset=utf-8")
+        #expect(page.headers["x-frame-options"] == "DENY")
+        let expected = try await bench.engine.lanTrackingPage(order: .object(Self.trackedJob), store: .object(bench.book.value))
+        #expect(page.text == expected)
+        #expect(page.text.contains("Vase &lt;b&gt;"))
+        #expect(page.text.contains("Printing"))
+        // The carriers directory came along: a carrier name and its tracking link.
+        #expect(page.text.contains("SMSA"), "the carrier's name is missing — lib/carriers.js is not loaded")
+        #expect(page.text.contains("TN-1"))
+        // `/status` and a trailing slash are the same page.
+        let alias = try await bench.get("/order/T-5/status?token=0123456789abcdef0123456789abcdef")
+        #expect(alias.status == 200)
+    }
+
+    @Test("a quote's order page sends the customer to the quote page")
+    func trackingRedirectsQuotes() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.quoteJob)
+        let reply = try await bench.get("/order/Q-77")
+        #expect(reply.status == 302)
+        #expect(reply.headers["location"] == "/order/Q-77/quote")
+    }
+
+    @Test("a finished order's page offers the survey, and the survey lands on the order once")
+    func survey() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        var done = Self.trackedJob
+        done["status"] = .string("completed"); done["surveyToken"] = .string("survey-tok-1")
+        bench.book.put(done)
+        let page = try await bench.get("/order/T-5?token=0123456789abcdef0123456789abcdef")
+        #expect(page.text.contains(#"id="surveyCard""#))
+        let reply = try await bench.post("/api/survey", json: #"{"token":"survey-tok-1","orderId":"T-5","rating":4,"comment":"  lovely  "}"#)
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text == #"{"ok":true}"#)
+        #expect(reply.headers["access-control-allow-origin"] == "*")
+        let job = try #require(bench.book.job("T-5"))
+        #expect(job["surveyToken"] == nil, "the token was not spent")
+        if case .object(let survey)? = job["survey"] {
+            #expect(survey["rating"] == .number(4))
+            #expect(survey["comment"] == .string("lovely"))
+            #expect(survey["submittedAt"] == .string(LanServer.isoNow(Bench.start)))
+        } else { Issue.record("no survey on the order") }
+        // The page now thanks rather than asks.
+        let after = try await bench.get("/order/T-5?token=0123456789abcdef0123456789abcdef")
+        #expect(after.text.contains("Thank you for your feedback"))
+        #expect(!after.text.contains(#"id="surveyCard""#))
+        // A spent token is a 404, as on the Node server.
+        let again = try await bench.post("/api/survey", json: #"{"token":"survey-tok-1","rating":5}"#)
+        #expect(again.status == 404)
+        #expect(again.text == #"{"error":"Invalid or expired survey token"}"#)
+    }
+
+    @Test("the survey refuses what the Node route refuses, and is rate-limited")
+    func surveyRefusals() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let noRating = try await bench.post("/api/survey", json: #"{"token":"t"}"#)
+        #expect(noRating.status == 400)
+        #expect(noRating.text == #"{"error":"Invalid payload — token and rating (1-5) are required"}"#)
+        let six = try await bench.post("/api/survey", json: #"{"token":"t","rating":6}"#)
+        #expect(six.status == 400)
+        let unknown = try await bench.post("/api/survey", json: #"{"token":"nobody","rating":3}"#)
+        #expect(unknown.status == 404)
+        let limit = try await bench.engine.lanSurveyLimit()
+        #expect(limit == 30)
+        // Three used above; the rest of the bucket, then a 429.
+        for _ in 0..<(limit - 3) {
+            _ = try await bench.post("/api/survey", json: #"{"token":"nobody","rating":3}"#)
+        }
+        let over = try await bench.post("/api/survey", json: #"{"token":"nobody","rating":3}"#)
+        #expect(over.status == 429)
+        #expect(over.text.contains("Too many attempts"))
+    }
+
+    @Test("the tracking path keeps only what the Node route keeps")
+    func trackingPaths() {
+        #expect(LanServer.trackingPath("/order/T-5") == "T-5")
+        #expect(LanServer.trackingPath("/order/T-5/") == "T-5")
+        #expect(LanServer.trackingPath("/order/T-5/status") == "T-5")
+        #expect(LanServer.trackingPath("/order/T-5/status/") == "T-5")
+        #expect(LanServer.trackingPath("/order/a b;/") == "ab")
+        #expect(LanServer.trackingPath("/order/x/y") == nil)
+        #expect(LanServer.trackingPath("/order/") == nil)
+        // The quote and approve routes take theirs first; this one never sees them.
+        #expect(LanServer.quotePath("/order/T-5/quote") == "T-5")
     }
 
     // MARK: - The shop's side

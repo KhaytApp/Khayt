@@ -191,6 +191,28 @@ private struct Detail: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            // "Where is my order" — for a job that is under way or done, not a
+            // quote (that has its own link above). The page shows the customer
+            // the stage, the shipping and, once complete, a survey.
+            if job.status != "quote", shop.canMoveJobs {
+                Button(shop.words.callIt("mac.copy_tracking_link")) {
+                    Task {
+                        if let link = await shop.trackingLink(for: job.id) {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(link, forType: .string)
+                            shop.quoteLinkNote = shop.words.callIt("mac.tracking_link_copied")
+                        } else {
+                            shop.quoteLinkNote = shop.words.callIt("mac.quote_link_no_server")
+                        }
+                    }
+                }
+                .buttonStyle(.link)
+                .font(.callout)
+                if let note = shop.quoteLinkNote {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             if let due = Order.day(job.dueDate) {
                 DetailLine(shop.words.callIt("doc.due"), due.formatted(date: .abbreviated, time: .omitted),
                      warn: job.isOverdue())

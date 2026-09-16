@@ -2033,6 +2033,9 @@ final class Words {
                                   "ar": "نُسخ رابط عرض السعر. أرسله للعميل على نفس شبكة Wi‑Fi ليعتمده منه."],
         "mac.quote_link_no_server": ["en": "Switch the server on in Settings → Online first; the link points at this Mac.",
                                      "ar": "شغّل الخادم من الإعدادات ← الشبكة أولاً؛ فالرابط يشير إلى هذا الماك."],
+        "mac.copy_tracking_link": ["en": "Copy tracking link", "ar": "نسخ رابط متابعة الطلب"],
+        "mac.tracking_link_copied": ["en": "Tracking link copied. The customer sees the stage, the shipping and, once done, a short survey.",
+                                     "ar": "نُسخ رابط المتابعة. يرى العميل المرحلة والشحن، وبعد الإنجاز استبياناً قصيراً."],
     ]
 
     /// The Khayt keys this app leans on. Listed so a test can prove every one of

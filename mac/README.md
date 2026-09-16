@@ -1090,9 +1090,9 @@ failed.
 ## Not yet built
 
 The rest of analytics, the cloud portal, and most of the LAN server — the
-phone's live queue, the status API, the customer intake form and quote approval
-are here; the order tracking page, the calendar feed, the webhooks and pricing
-an uploaded model are not. `KhaytCore` came first
+phone's live queue, the status API, the customer intake form, quote approval
+and the order tracking page are here; the calendar feed, the webhooks, the kiosk
+and pricing an uploaded model are not. `KhaytCore` came first
 because the alternative, screens against a half-trusted engine, is how the two
 apps come to disagree about a shop's money.
 
