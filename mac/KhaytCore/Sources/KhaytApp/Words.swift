@@ -499,6 +499,10 @@ final class Words {
                                    "ar": "إظهار الورشة في شريط القوائم"],
         // Customers
         "mac.new_customer":  ["en": "New Customer",   "ar": "عميل جديد"],
+        // The heading over a customer's schedule in their pane. Khayt's own
+        // key for it, `rec.enable`, is the checkbox's sentence — "Recurring
+        // order (auto-create on schedule)" — and a heading is not a sentence.
+        "mac.standing_order": ["en": "Standing order", "ar": "طلب دوري"],
         "mac.edit_customer": ["en": "Edit Customer",  "ar": "تعديل العميل"],
         "mac.no_record":     ["en": "Not written down yet",
                               "ar": "غير مسجّل بعد"],
@@ -2028,6 +2032,16 @@ final class Words {
         "an.range.month", "an.range.last_month", "an.range.quarter", "an.range.year",
         "an.range.all",
         "flow.owed", "flow.paid", "plib.group", "plib.unfiled", "plib.favorite",
+        // A customer's price agreements, standing order and communications
+        // log — the words on Khayt's own customer editor, borrowed so the two
+        // editors call one thing by one name.
+        "ce.price_list", "ce.price_list_empty", "ce.price_list_hint", "ce.pl_product",
+        "ce.pl_price", "ce.pl_note", "ce.pl_autofill",
+        "rec.enable", "rec.interval", "rec.interval.weekly", "rec.interval.biweekly",
+        "rec.interval.monthly", "rec.interval.quarterly", "rec.next_due", "rec.paused",
+        "rec.end_date", "rec.skip_next", "rec.hint", "rec.created",
+        "ce.comm_log", "ce.comm_empty", "ce.comm_note_ph", "ce.comm_call", "ce.comm_email",
+        "ce.comm_wa", "ce.comm_meeting", "ce.comm_note", "common.add",
         "plib.material", "plib.tags_short", "plib.group_ph", "set.store_size",
         // What a slicer's config says about a model — see `LibraryInspector`.
 

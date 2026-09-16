@@ -851,6 +851,16 @@ final class Activator: NSObject, NSApplicationDelegate {
             captureSheet(named: "15-new-customer", into: dir)
             shop.editingCustomer = nil
             await settle()
+            // A customer WITH terms: the sheet's lower half — agreed prices
+            // and a standing order — is empty on a new customer, and an empty
+            // section is the half that was never the question.
+            if let terms = shop.clients.first(where: { $0.recurring != nil && !$0.priceList.isEmpty }) {
+                shop.editingCustomer = terms
+                await settle()
+                captureSheet(named: "15b-edit-customer", into: dir)
+                shop.editingCustomer = nil
+                await settle()
+            }
 
             // The assistant's screen, in its EMPTY state — which is the state
             // that has to work hardest. A blank box with a cursor in it is a
@@ -1127,6 +1137,14 @@ final class Activator: NSObject, NSApplicationDelegate {
             await settle()
             capture(named: "06-customers", into: dir)
             capturePanes(named: "06-customers", into: dir)
+            // The customer with the most written about them, for the pane's
+            // lower half: agreed prices, the standing order, and the log.
+            if let spoken = shop.customers.max(by: { ($0.record?.commLog.count ?? 0) < ($1.record?.commLog.count ?? 0) }),
+               spoken.record?.commLog.isEmpty == false {
+                shop.customerSelection = spoken.id
+                await settle()
+                capturePanes(named: "06b-customer-terms", into: dir)
+            }
 
             // ── SETTINGS IS PHOTOGRAPHED LAST, AND THAT IS DELIBERATE ─────
             //

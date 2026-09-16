@@ -32,6 +32,9 @@ struct NewJobSheet: View {
     var paper: some View {
         VStack(alignment: .leading, spacing: 16) {
             who
+            if let agreementNote {
+                Text(agreementNote).font(.caption).foregroundStyle(.secondary)
+            }
             cart
             money
             total
@@ -70,6 +73,9 @@ struct NewJobSheet: View {
     @State private var rush = false
     @State private var quoted: QuoteTotal?
     @State private var problem: String?
+    /// "Price agreement applied" — said once, under the customer, when
+    /// choosing them changed a figure in the cart.
+    @State private var agreementNote: String?
     @FocusState private var focused: Bool
 
     /// One part, as this screen collects it.
@@ -155,6 +161,7 @@ struct NewJobSheet: View {
             focused = true
         }
         .task(id: signature) { await reprice() }
+        .onChange(of: clientId) { _, chosen in Task { await customerChosen(chosen) } }
     }
 
     // MARK: - The screen
@@ -583,8 +590,42 @@ struct NewJobSheet: View {
         next.cost = costed?.cost ?? 0
         next.parts = costed?.parts
         next.rates = costed?.rates
+        // A part added AFTER the customer was chosen takes their agreed price
+        // too. The other app applies agreements only at the moment the
+        // customer is picked; here the customer is usually picked first.
+        if let agreed = await shop.agreedPrices(for: [next.name], clientId: clientId).first ?? nil {
+            next.cost = agreed
+            next.parts = nil
+            agreementNote = shop.words.callIt("ce.pl_autofill")
+        }
         parts.append(next)
         draft = Draft()
+    }
+
+    /// What choosing a customer brings with it: their discount, and the
+    /// prices they have agreed for the parts already in the cart.
+    ///
+    /// The agreed figure becomes the part's COST and the margin goes on top —
+    /// the shared rule's answer, the same in both apps; see
+    /// `lib/price-agreements.js` for why that is said out loud. The
+    /// breakdown is dropped for such a part: the figure is no longer filament
+    /// plus machine time, it is what was agreed.
+    private func customerChosen(_ chosen: String?) async {
+        agreementNote = nil
+        guard let chosen, let client = shop.clients.first(where: { $0.id == chosen }) else { return }
+        if client.defaultDiscount > 0 { discountPct = client.defaultDiscount }
+        let prices = await shop.agreedPrices(for: parts.map(\.name), clientId: chosen)
+        var applied = 0
+        for (i, price) in prices.enumerated() where i < parts.count {
+            guard let price else { continue }
+            parts[i].cost = price
+            parts[i].parts = nil
+            applied += 1
+        }
+        if applied > 0 {
+            agreementNote = shop.words.callIt("ce.pl_autofill")
+            await reprice()
+        }
     }
 
     /// Ask what this shop has made on jobs in this material.

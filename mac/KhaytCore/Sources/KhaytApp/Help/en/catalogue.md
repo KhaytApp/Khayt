@@ -41,7 +41,10 @@ The toggle in the toolbar switches between them. The list is the only view that
 puts margin next to weight, which is what pricing work needs; the grid is for
 recognising a thing by looking at it.
 
-## What is edited in the other app
+## Parts, tiers, pictures and papers
 
-Parts, prices per quantity, photos and documents are kept in Khayt for Windows
-and Linux. Editing a product here leaves all of them exactly as they were.
+A product's parts — what is printed, from which spool, how many — are where its
+price comes from, and they are edited here. So are its price tiers (a named
+margin, "Wholesale 20%", that replaces the shop's margin when a job is taken
+at that tier), its pictures, and the documents that go with it. Take a job
+from a product and all of it comes along.

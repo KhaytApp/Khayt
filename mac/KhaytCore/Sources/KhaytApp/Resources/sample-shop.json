@@ -4160,7 +4160,39 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "priceList": [
+    {
+     "product": "bracket",
+     "price": 45.0,
+     "note": "Framework agreement, 2026"
+    },
+    {
+     "product": "housing",
+     "price": 180.0,
+     "note": ""
+    }
+   ],
+   "commLog": [
+    {
+     "id": "CMM-MEXAMPLE1",
+     "type": "meeting",
+     "note": "Lab visit. They want the turbine bracket in PETG from Q4.",
+     "at": "2026-08-12T08:30:00.000Z"
+    },
+    {
+     "channel": "email",
+     "note": "PO for the sensor housing batch received.",
+     "at": "2026-08-20T11:05:00.000Z",
+     "quick": true
+    },
+    {
+     "id": "CMM-MEXAMPLE2",
+     "type": "whatsapp",
+     "note": "Asked for a delivery slot on Thursday.",
+     "at": "2026-09-02T14:12:00.000Z"
+    }
+   ]
   },
   {
    "id": "CLI-F633FC",
@@ -4172,7 +4204,15 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "commLog": [
+    {
+     "channel": "phone",
+     "note": "Called about the pending job; wants it before the 5th.",
+     "at": "2026-08-31T09:40:00.000Z",
+     "quick": true
+    }
+   ]
   },
   {
    "id": "CLI-1A9EB5",
@@ -4184,7 +4224,15 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "recurring": {
+    "enabled": true,
+    "interval": "monthly",
+    "nextDue": "2026-07-15",
+    "paused": false,
+    "endDate": null,
+    "leadDays": 3
+   }
   },
   {
    "id": "CLI-1EF91E",
@@ -4196,7 +4244,14 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "recurring": {
+    "enabled": false,
+    "interval": "quarterly",
+    "nextDue": "2026-10-01",
+    "paused": false,
+    "endDate": null
+   }
   },
   {
    "id": "CLI-418DAE",
@@ -4232,7 +4287,21 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "priceList": [
+    {
+     "product": "badge",
+     "price": 22.5,
+     "note": "Per unit, any colour"
+    }
+   ],
+   "recurring": {
+    "enabled": true,
+    "interval": "weekly",
+    "nextDue": "2026-09-05",
+    "paused": true,
+    "endDate": null
+   }
   },
   {
    "id": "CLI-994C0F",
