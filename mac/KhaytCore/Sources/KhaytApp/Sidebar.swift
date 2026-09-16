@@ -97,17 +97,28 @@ struct Sidebar: View {
             // What the shop spends and what it throws away. Below the floor,
             // because both are read at the end of a month rather than during a
             // day's work.
+            // ── WHAT THE SHOP'S MODE INCLUDES ─────────────────────────
+            //
+            // Expense tracking and full analytics are Professional features in
+            // `lib/feature-tiers.js`, and the other app hides both from a
+            // Simple shop. This one showed them to everybody, which is two
+            // apps disagreeing about what a shop has. The waste log is not
+            // gated anywhere and stays.
             Section(shop.words.callIt("mac.money")) {
-                Row(title: shop.words.callIt("mac.nav_expenses"), mark: .expenses,
-                    count: shop.expenses.count, selected: shop.shelf == .expenses)
-                    .tag(Shop.Shelf.expenses)
+                if shop.has("expenses") {
+                    Row(title: shop.words.callIt("mac.nav_expenses"), mark: .expenses,
+                        count: shop.expenses.count, selected: shop.shelf == .expenses)
+                        .tag(Shop.Shelf.expenses)
+                }
                 Row(title: shop.words.callIt("mac.nav_waste"), mark: .waste,
                     count: shop.wasteLog.count, selected: shop.shelf == .waste)
                     .tag(Shop.Shelf.waste)
                 // No count: a quarter is not a thing a shop has a number of.
-                Row(title: shop.words.callIt("mac.nav_reports"), mark: .reports,
-                    count: nil, selected: shop.shelf == .reports)
-                    .tag(Shop.Shelf.reports)
+                if shop.has("analytics") {
+                    Row(title: shop.words.callIt("mac.nav_reports"), mark: .reports,
+                        count: nil, selected: shop.shelf == .reports)
+                        .tag(Shop.Shelf.reports)
+                }
             }
             Section(shop.words.callIt("mac.people")) {
                 Row(title: shop.words.callIt("tab.clients"), mark: .clients, count: shop.customers.count,

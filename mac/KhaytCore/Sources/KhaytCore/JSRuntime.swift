@@ -192,6 +192,12 @@ public final class JSRuntime {
                           // registry's, written the day the feature api took it
                           // and `forLocale` stopped existing.
                           "integrations-registry": "KhaytIntegrations",
+                          // `feature-tiers.js` publishes `KhaytTiers` — the
+                          // file is named for the tiers it defines, the global
+                          // for the subject. Caught by this check the moment it
+                          // was bundled, which is what the check is for: every
+                          // test that used it failed at once and said why.
+                          "feature-tiers": "KhaytTiers",
                           // `medusa-subscriber.js` publishes `KhaytMedusa` —
                           // the file is named for what it produces, the global
                           // for the platform. Caught the moment it was bundled,

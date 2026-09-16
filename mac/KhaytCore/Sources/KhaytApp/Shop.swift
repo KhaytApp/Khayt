@@ -345,6 +345,11 @@ final class Shop {
             if let forced = ProcessInfo.processInfo.environment["KHAYT_LANG"] { wanted = forced }
             await words.load(wanted, engine: engine)
             settingsValue = root["settings"] ?? .object([:])
+            await readFeatures()
+            // A shop that has just switched to Simple must not be left looking
+            // at a screen that is no longer theirs.
+            if shelf == .reports, !has("analytics") { shelf = .dashboard }
+            if shelf == .expenses, !has("expenses") { shelf = .dashboard }
             lanBook = ["printLog": root["printLog"] ?? .array([]),
                        "waitingList": root["waitingList"] ?? .array([]),
                        "settings": root["settings"] ?? .object([:]),
@@ -2934,6 +2939,41 @@ final class Shop {
     var lanCalendarToken: String?
     /// What the last "Copy quote link" did, shown beside the button.
     var quoteLinkNote: String?
+
+    /// Which of the shop's chosen mode's features are on.
+    ///
+    /// ── WHY THIS EXISTS AT ALL ────────────────────────────────────────────
+    ///
+    /// Khayt has two modes and this app honoured neither. A shop set to
+    /// Simple in the other app opened this one and found the whole
+    /// Professional surface — the nine features `lib/feature-tiers.js` calls
+    /// Pro, of which this app has built four. Two apps disagreeing about what
+    /// a shop has bought is exactly what the shared rules exist to stop, and
+    /// the mode was the one such rule nothing here read.
+    ///
+    /// Resolved once per load rather than asked per row: the sidebar redraws
+    /// constantly and the answer only changes when the book does.
+    private(set) var features: Set<String> = []
+
+    /// Every key the tier registry knows. Asked for by name so a feature this
+    /// app has not heard of is simply never gated, rather than silently off.
+    static let gatedFeatures = ["analytics", "expenses", "maintenance", "zatca"]
+
+    /// Does this shop's mode include it? Unknown keys are on: a screen this
+    /// app added and forgot to classify must not vanish.
+    func has(_ feature: String) -> Bool {
+        Self.gatedFeatures.contains(feature) ? features.contains(feature) : true
+    }
+
+    private func readFeatures() async {
+        guard let engine else { features = Set(Self.gatedFeatures); return }
+        let mode = Self.plainString(settingsDict["mode"])
+        var on: Set<String> = []
+        for key in Self.gatedFeatures {
+            if (try? await engine.featureEnabled(key, mode: mode)) ?? true { on.insert(key) }
+        }
+        features = on
+    }
 
     var settingsDict: [String: JSONValue] {
         if case .object(let s) = settingsValue { return s }
