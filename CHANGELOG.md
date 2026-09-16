@@ -689,6 +689,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) Settings → Online can switch public pricing on, and make the
+  printer preset it needs.** The customer-facing price is built from a saved
+  preset — a name and the seven figures a part is costed at — and the shared
+  rule refuses outright without one. Until now a preset could only be made in
+  the other app's calculator, so the Mac could serve the upload and never
+  answer. The pane now carries the whole block (the switch, the preset, the
+  material or a flat spool cost, margin, minimum, waste and the per-visitor
+  hourly ceiling), says plainly when there is no preset yet, and will make
+  one: name it, adjust the seven figures, and it is saved and chosen. A name
+  already in use replaces that preset rather than doubling it, which is the
+  other app's rule and the same id, so anything pointing at it still does.
 - **(Mac) A customer can price their own model on the intake form.** With
   public pricing switched on, the form offers an upload: the file is measured
   in memory, priced on the shop's own preset, spool cost, margin and waste
@@ -1320,6 +1331,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **Public pricing settings were dropped on the way to the book.** The shared
+  settings save merges the LAN block by naming the fields it knows, and the
+  model-pricing block was not among them — so a pane that set a margin and a
+  preset would have had both discarded on save, silently. It is merged whole
+  now, over what was stored, so a field a newer build wrote survives a save
+  by an older pane.
 - **(Mac) A resin printer's progress was captioned with a claim about a file
   it does not have.** The machine card names which signal a percentage came
   from, so that "by layer" and "by file position" can be told apart on a

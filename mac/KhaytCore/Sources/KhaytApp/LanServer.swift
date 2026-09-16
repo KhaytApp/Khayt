@@ -1202,9 +1202,13 @@ extension Shop {
     /// Save the Online pane. A typed PIN is sealed for the book before it goes
     /// in, the way a printer key is; a blank one keeps the stored PIN, which
     /// is the rule's own reading of a blank.
-    func saveLanSettings(enabled: Bool, port: Int, pin typed: String, bindLan: Bool) async {
+    func saveLanSettings(enabled: Bool, port: Int, pin typed: String, bindLan: Bool,
+                         intakeQuote: [String: JSONValue]? = nil) async {
         var lan: [String: JSONValue] = ["enabled": .bool(enabled), "port": .number(Double(port)),
                                         "bindLan": .bool(bindLan)]
+        // Kept whole rather than spread, as the other app's page keeps it, so
+        // an older book without the key simply arrives as "off".
+        if let intakeQuote { lan["intakeQuote"] = .object(intakeQuote) }
         let trimmed = typed.trimmingCharacters(in: .whitespaces)
         if !trimmed.isEmpty, let build = source.build {
             do { lan["pin"] = .string(try await Secrets.seal(trimmed, for: build)) }

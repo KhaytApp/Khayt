@@ -400,6 +400,14 @@
         bindLan: has(l, 'bindLan') ? !!l.bindLan : !!storedLan.bindLan,
         pin: typedPin || storedLan.pin || '',
       };
+      // Public model pricing, kept WHOLE — the shape the Electron page keeps
+      // it in, so an older book without the key simply arrives as "off". It is
+      // merged over what was stored rather than replacing it, because a pane
+      // that shows eight of its fields must not drop a ninth a newer build
+      // wrote. Absent from the form means the pane is not editing it at all.
+      if (has(l, 'intakeQuote') && l.intakeQuote && typeof l.intakeQuote === 'object') {
+        out.lanApi.intakeQuote = { ...(storedLan.intakeQuote || {}), ...l.intakeQuote };
+      }
     } else {
       out.lanApi = storedLan;
     }

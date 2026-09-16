@@ -876,6 +876,88 @@ struct LanServerTests {
         #expect(byPin.status == 200)
     }
 
+    // MARK: - The pane that makes public pricing reachable
+
+    @Test("the pricing settings survive a save, including a field the pane never showed")
+    func quoteSettingsSave() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        var root: [String: JSONValue] = ["settings": .object([
+            "lanApi": .object([
+                "enabled": .bool(true), "port": .number(3219), "pin": .string("sealed"),
+                "intakeQuote": .object(["enabled": .bool(false), "marginPct": .number(30),
+                                        "somethingNewer": .number(7)]),
+            ]),
+        ])]
+        var draft = OnlinePane.Draft()
+        draft.enabled = true
+        draft.quoteOn = true
+        draft.presetId = "PRESET-1"
+        draft.margin = "40"
+        draft.waste = "5"          // shown as a percentage…
+        draft.spoolCost = "75"
+        try await Shop.applySettings(to: &root,
+                                     form: ["lanApi": .object([
+                                        "enabled": .bool(true),
+                                        "intakeQuote": .object(draft.quoteForm()),
+                                     ])],
+                                     country: nil, engine: engine)
+        guard case .object(let settings)? = root["settings"], case .object(let lan)? = settings["lanApi"],
+              case .object(let q)? = lan["intakeQuote"] else { Issue.record("no pricing block"); return }
+        #expect(q["enabled"] == .bool(true))
+        #expect(q["presetId"] == .string("PRESET-1"))
+        #expect(q["marginPct"] == .number(40))
+        // …and stored as a fraction, or every shop's allowance would be ×100.
+        #expect(q["wastePct"] == .number(0.05), Comment(rawValue: "\(q["wastePct"] ?? .null)"))
+        #expect(q["spoolCost"] == .number(75))
+        #expect(q["somethingNewer"] == .number(7), "a field a newer build wrote was dropped")
+        #expect(lan["pin"] == .string("sealed"), "the PIN was lost saving the pricing block")
+    }
+
+    @Test("the pane reads the block back the way it stores it")
+    func quoteSettingsRead() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        var draft = OnlinePane.Draft()
+        OnlinePane.Draft.readQuote(["lanApi": .object(["intakeQuote": .object([
+            "enabled": .bool(true), "presetId": .string("P1"), "filamentId": .string("seed-1"),
+            "spoolCost": .number(75), "spoolWeight": .number(1000), "marginPct": .number(30),
+            "minPrice": .number(20), "wastePct": .number(0.05), "hourlyLimit": .number(6),
+        ])])], into: &draft)
+        #expect(draft.quoteOn && draft.presetId == "P1" && draft.filamentId == "seed-1")
+        #expect(draft.margin == "30" && draft.spoolCost == "75" && draft.minPrice == "20")
+        // A fraction on the way in, a percentage on the way out, and back again.
+        #expect(draft.waste == "5", Comment(rawValue: draft.waste))
+        #expect(draft.quoteForm()["wastePct"] == .number(0.05))
+        #expect(draft.limit == "6")
+        // A book that has never had the block reads as off, with the defaults.
+        var fresh = OnlinePane.Draft()
+        OnlinePane.Draft.readQuote([:], into: &fresh)
+        #expect(!fresh.quoteOn && fresh.spoolWeight == "1000" && fresh.limit == "12")
+        #expect(fresh.quoteForm()["wastePct"] == .number(0))
+    }
+
+    @Test("a preset is a name and the seven figures, and the same name replaces rather than doubles")
+    func presetShape() async throws {
+        let one = try #require(Shop.Preset.from(.object([
+            "id": .string("PRNTR-1"), "name": .string("U1"),
+            "wearRate": .number(0.75), "powerDraw": .number(150), "elecRate": .number(0.18),
+            "laborRate": .number(90), "failureRate": .number(10),
+            "prepTime": .number(0.1), "postTime": .number(0.1),
+        ])))
+        #expect(one.name == "U1" && one.rates["laborRate"] == 90)
+        guard case .object(let back) = one.record else { Issue.record("not an object"); return }
+        // Every one of the seven, because `lib/public-quote.js` reads them all
+        // and a missing rate is silently costed at nothing.
+        for key in Shop.Preset.rateKeys {
+            #expect(back[key] != nil, Comment(rawValue: "\(key) missing from a saved preset"))
+        }
+        #expect(back["id"] == .string("PRNTR-1"))
+        // A row with no id is not a preset: the quote rule finds presets BY id.
+        #expect(Shop.Preset.from(.object(["name": .string("no id")])) == nil)
+    }
+
     // MARK: - The shop's side
 
     @Test("the settings pane's block saves through the shared rule and keeps what it did not show")
