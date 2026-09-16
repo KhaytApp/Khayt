@@ -704,6 +704,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   from a form and merges it the way the Electron page always did: the fields
   shown over the stored block, a blank PIN keeps the current one, a port that
   is not a port is 3219. The Electron page is unchanged.
+- **(Mac) The customer intake form, served by the Mac.** With the LAN server
+  on, `/intake` on a phone or laptop on the shop's Wi‑Fi is the same request
+  form the Windows and Linux app serves — same page, same session cookie,
+  same limits on opening and submitting it, same consent record — and a
+  submitted request lands on the Waiting screen at once. The form's template
+  and the rule that turns a submission into a waiting-list entry are one
+  shared module now (`lib/lan-intake.js`); the Node server draws from it and
+  is held byte-identical to its old handlers. Not yet on the Mac: pricing an
+  uploaded model on the form (the form does not offer the upload here) and
+  the legacy intake PIN route.
 
 - **The P&L by month as well as by quarter, with the margin on each.** On the
   Mac the Reports P&L page has a "By quarter / By month" switch and a Margin

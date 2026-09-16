@@ -97,8 +97,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 test('the intake budget ranges are not hardcoded to one currency', () => {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'lan-server.js'), 'utf8');
-  const form = src.match(/const renderIntakeFormPage = [\s\S]*?\n\s*(?:const|let|\/\/|\})/);
+  // The template lives in the shared module now (`lib/lan-intake.js`), which
+  // the Mac app serves from as well; the server only calls it.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'lan-intake.js'), 'utf8');
+  const form = src.match(/const renderIntakeFormPage = [\s\S]*?\n\s*(?:const|let|\/\/|\}|\/\*\*)/);
   assert.ok(form, 'could not find renderIntakeFormPage — this test is blind, fix the extraction');
   const body = form[0];
 

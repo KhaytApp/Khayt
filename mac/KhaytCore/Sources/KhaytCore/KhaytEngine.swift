@@ -585,6 +585,8 @@ public actor KhaytEngine {
         // the phone is shown — the same bytes the other app serves.
         "lan-auth",
         "lan-pages",
+        "privacy",
+        "lan-intake",
         // Which customers are worth keeping.
         "client-value",
         // Whether the shop can take another job, and when it would start.
@@ -4367,6 +4369,67 @@ public actor KhaytEngine {
     public func lanIsLockedOut(_ rec: LanFailures?, now: Date) throws -> Bool {
         try runtime.call2("globalThis.KhaytLanAuth.isLockedOut(ARG0, ARG1)",
                           [rec?.json ?? .null, .number(now.timeIntervalSince1970 * 1000)], as: Bool.self)
+    }
+
+    // The customer's way in: `lib/lan-intake.js`.
+
+    /// The intake form. `shopName` and `currency` are escaped HERE, in the
+    /// module's own escaper, exactly as the Node handler escapes them before
+    /// the template sees them. `quoteEnabled` adds the model-upload widget,
+    /// which needs the estimate route — a host without it passes false.
+    public func lanIntakePage(store: JSONValue, quoteEnabled: Bool) throws -> String {
+        try runtime.call2("""
+            (function (s, q) {
+              var L = globalThis.KhaytLanAuth, st = (s && s.settings) || {};
+              return globalThis.KhaytLanIntake.formPage(L.lanEscapeHtml(st.shopName || 'Khayt'),
+                                                        L.lanEscapeHtml(st.currency || ''), !!q);
+            })(ARG0, ARG1)
+            """, [store, .bool(quoteEnabled)], as: String.self)
+    }
+    public func lanIntakeTooManyPage() throws -> String {
+        try runtime.call2("globalThis.KhaytLanIntake.tooManyPage()", [], as: String.self)
+    }
+
+    /// What a posted form became, or why it was refused.
+    public struct LanIntakeOutcome: Decodable, Sendable {
+        public let ok: Bool
+        public let status: Double?
+        public let error: String?
+        public let entry: JSONValue?
+    }
+    /// `body` is the parsed JSON the customer posted; `shopName` is the shop's
+    /// own (unescaped) for the consent record; `id` the host minted; `nowIso`
+    /// the shop's clock as JavaScript prints it.
+    public func lanIntakeSubmission(body: JSONValue, shopName: String, id: String, nowIso: String) throws -> LanIntakeOutcome {
+        try runtime.call2("globalThis.KhaytLanIntake.submission(ARG0, { shopName: ARG1, id: ARG2, nowIso: ARG3 })",
+                          [body, .string(shopName), .string(id), .string(nowIso)], as: LanIntakeOutcome.self)
+    }
+
+    /// One per-address bucket advanced — the server's `bumpRate`. The record
+    /// has the failures' shape (count, resetAt) so one struct serves both.
+    public struct LanRateStep: Decodable, Sendable {
+        public let allowed: Bool
+        public let rec: LanFailures
+    }
+    public func lanIntakeRate(_ prev: LanFailures?, now: Date, limit: Int) throws -> LanRateStep {
+        try runtime.call2("globalThis.KhaytLanIntake.bumpRate(ARG0, ARG1, ARG2)",
+                          [prev?.json ?? .null, .number(now.timeIntervalSince1970 * 1000), .number(Double(limit))],
+                          as: LanRateStep.self)
+    }
+    /// The module's constants, so the host and the rule cannot drift apart.
+    public struct LanIntakeLimits: Decodable, Sendable {
+        public let SESSION_GRANT_LIMIT: Double
+        public let SUBMIT_LIMIT: Double
+        public let SESSION_MS: Double
+        public let COOKIE: String
+    }
+    public func lanIntakeLimits() throws -> LanIntakeLimits {
+        try runtime.call2("""
+            ({ SESSION_GRANT_LIMIT: globalThis.KhaytLanIntake.SESSION_GRANT_LIMIT,
+               SUBMIT_LIMIT: globalThis.KhaytLanIntake.SUBMIT_LIMIT,
+               SESSION_MS: globalThis.KhaytLanIntake.SESSION_MS,
+               COOKIE: globalThis.KhaytLanIntake.COOKIE })
+            """, [], as: LanIntakeLimits.self)
     }
 
     // MARK: - Break-even

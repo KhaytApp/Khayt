@@ -87,6 +87,7 @@ test('the callers that show this to a customer check the flag', () => {
     'the intake form no longer warns on an unreliable estimate');
   assert.match(code('lib/public-quote.js'), /est\.reliable !== false/,
     'the public quote no longer reads the flag');
-  assert.match(code('lib/lan-server.js'), /j\.reliable===false/,
+  // The page moved out of the server into the shared module the Mac serves too.
+  assert.match(code('lib/lan-intake.js'), /j\.reliable===false/,
     'the LAN intake page no longer reads the flag');
 });

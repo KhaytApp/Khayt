@@ -73,6 +73,10 @@ struct OnlinePane: View {
                             .font(.body.monospaced())
                             .textSelection(.enabled)
                             .accessibilityIdentifier("lan-url")
+                        // "…Customer form: /intake" — true here now.
+                        Text(shop.words.callIt("lan.same_wifi_hint"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     } else {
                         Text(shop.words.callIt("lan.not_running")).foregroundStyle(.secondary)
                     }

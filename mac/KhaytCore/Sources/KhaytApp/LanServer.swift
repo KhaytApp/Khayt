@@ -55,6 +55,17 @@ final class LanServer {
         var nowText: () -> String = { LanServer.clockText(Date()) }
         /// A PWA icon by file name, or nil.
         var icon: (String) -> Data? = { LanServer.bundledIcon($0) }
+        /// The legacy intake token (`settings.lanApi.intakeToken`), opened.
+        /// Empty means the header route is closed; the cookie route is open.
+        var intakeToken: String = ""
+        /// Write one intake entry into the book's `waitingList`. Throws when
+        /// the book cannot be written, which the customer is told is OUR
+        /// failure, not theirs.
+        var record: (JSONValue) async throws -> Void = { _ in throw CocoaError(.fileWriteUnknown) }
+        /// The id an entry is minted with — the Node server's `uniqueLanId`.
+        var mintId: () -> String = { LanServer.uniqueId("intake") }
+        /// Random bytes for a session token, hex. Injectable for a test.
+        var token: () -> String = { LanServer.randomToken() }
     }
 
     struct Request {
@@ -77,6 +88,18 @@ final class LanServer {
         static func redirect(_ location: String) -> Response {
             Response(status: 302, headers: ["Location": location, "Cache-Control": "no-cache"])
         }
+        /// JSON a customer's browser may read from any origin — the intake
+        /// routes, which the Node server answers with `Access-Control-Allow-Origin: *`.
+        static func open(_ status: Int, _ body: String) -> Response {
+            Response(status: status,
+                     headers: ["Content-Type": "application/json", "Access-Control-Allow-Origin": "*"],
+                     body: Data(body.utf8))
+        }
+        static func html(_ status: Int, _ html: String, extra: [String: String] = [:]) -> Response {
+            var headers = ["Content-Type": "text/html; charset=utf-8"]
+            for (k, v) in extra { headers[k] = v }
+            return Response(status: status, headers: headers, body: Data(html.utf8))
+        }
     }
 
     let host: Host
@@ -85,6 +108,11 @@ final class LanServer {
     private(set) var running = false
     /// Failed PINs by address — the Node server's `failedAttempts` map.
     private var failures: [String: KhaytEngine.LanFailures] = [:]
+    /// Intake form sessions by token — the Node server's `intakeSessions`.
+    private var sessions: [String: (created: Date, ip: String)] = [:]
+    /// Form opens and form submissions per address, each its own bucket.
+    private var grants: [String: KhaytEngine.LanFailures] = [:]
+    private var submits: [String: KhaytEngine.LanFailures] = [:]
     static let maxFailureKeys = 5000
     static let maxBody = 1_048_576
 
@@ -156,6 +184,8 @@ final class LanServer {
             guard let request = try await readRequest(connection, remote: remote) else { return }
             let response = await respond(to: request)
             try await write(response, method: request.method, to: connection)
+        } catch let error as URLError where error.code == .dataLengthExceedsMaximum {
+            try? await write(.open(413, #"{"error":"Request too large"}"#), method: "POST", to: connection)
         } catch {
             // A client that hung up mid-request, or a listener being stopped.
         }
@@ -275,6 +305,12 @@ final class LanServer {
                             headers: ["Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache"],
                             body: Data(html.utf8))
 
+        case ("/intake", true):
+            return await intakePage(request, store: store)
+
+        case ("/api/intake", false) where request.method == "POST":
+            return await intakeSubmit(request, store: store)
+
         case ("/manifest.json", true):
             let body = (try? await engine.lanManifestBody(store: store)) ?? "{}"
             return Response(status: 200, headers: ["Content-Type": "application/manifest+json"], body: Data(body.utf8))
@@ -297,6 +333,132 @@ final class LanServer {
             let body = (try? await engine.lanNotFoundBody()) ?? #"{"error":"Not found"}"#
             return .json(404, body)
         }
+    }
+
+    // MARK: - The intake form
+
+    /// `GET /intake`. A visitor with a live session gets the form; one without
+    /// gets the form AND a session cookie, unless this address has opened the
+    /// form too often, which gets the "too many requests" page.
+    private func intakePage(_ request: Request, store: JSONValue) async -> Response {
+        let engine = host.engine
+        let now = host.now()
+        // The estimate route is not served here, so the form never offers the
+        // upload — a widget whose request would 404 is worse than no widget.
+        let page = (try? await engine.lanIntakePage(store: store, quoteEnabled: false)) ?? ""
+        let limits = try? await engine.lanIntakeLimits()
+        if hasSession(request, now: now, sessionMs: limits?.SESSION_MS ?? 14_400_000) {
+            return .html(200, page, extra: ["Cache-Control": "no-cache"])
+        }
+        let step = try? await engine.lanIntakeRate(grants[request.remote], now: now,
+                                                   limit: Int(limits?.SESSION_GRANT_LIMIT ?? 40))
+        if let step { grants[request.remote] = step.rec; sweep(&grants, now: now) }
+        guard step?.allowed != false else {
+            let tooMany = (try? await engine.lanIntakeTooManyPage()) ?? ""
+            return .html(429, tooMany)
+        }
+        let token = grantSession(ip: request.remote, now: now, sessionMs: limits?.SESSION_MS ?? 14_400_000)
+        let cookie = "\(limits?.COOKIE ?? "khayt_intake")=\(token); HttpOnly; Path=/; SameSite=Lax; Max-Age=\(Int((limits?.SESSION_MS ?? 14_400_000) / 1000))"
+        return .html(200, page, extra: ["Cache-Control": "no-cache", "Set-Cookie": cookie])
+    }
+
+    /// `POST /api/intake`. The gate is the session cookie (or the legacy
+    /// intake token header); then the submission rate; then the rule; then
+    /// the book. The answers, in that order, are the Node server's.
+    private func intakeSubmit(_ request: Request, store: JSONValue) async -> Response {
+        let engine = host.engine
+        let now = host.now()
+        let limits = try? await engine.lanIntakeLimits()
+        guard hasSession(request, now: now, sessionMs: limits?.SESSION_MS ?? 14_400_000) || hasIntakeToken(request) else {
+            return .open(401, #"{"error":"Unauthorized"}"#)
+        }
+        let step = try? await engine.lanIntakeRate(submits[request.remote], now: now,
+                                                   limit: Int(limits?.SUBMIT_LIMIT ?? 20))
+        if let step { submits[request.remote] = step.rec; sweep(&submits, now: now) }
+        guard step?.allowed != false else {
+            return .open(429, #"{"error":"Too many submissions — try again later"}"#)
+        }
+        guard let body = try? JSONDecoder().decode(JSONValue.self, from: request.body), case .object = body else {
+            return .open(400, #"{"error":"Invalid request — please check your submission and try again"}"#)
+        }
+        var shopName = "this shop"
+        if case .object(let settings)? = host.store()["settings"], case .string(let name)? = settings["shopName"],
+           !name.isEmpty { shopName = name }
+        guard let outcome = try? await engine.lanIntakeSubmission(body: body, shopName: shopName, id: host.mintId(),
+                                                                  nowIso: Self.isoNow(now)) else {
+            return .open(500, #"{"error":"The shop could not record your request right now. Please try again shortly."}"#)
+        }
+        guard outcome.ok, let entry = outcome.entry else {
+            let error = outcome.error ?? "Invalid request"
+            let escaped = (try? String(decoding: JSONEncoder().encode(error), as: UTF8.self)) ?? "\"Invalid request\""
+            return .open(Int(outcome.status ?? 400), "{\"error\":\(escaped)}")
+        }
+        do { try await host.record(entry) } catch {
+            return .open(500, #"{"error":"The shop could not record your request right now. Please try again shortly."}"#)
+        }
+        return .open(200, #"{"ok":true}"#)
+    }
+
+    private func hasSession(_ request: Request, now: Date, sessionMs: Double) -> Bool {
+        let cookies = Self.cookies(request.headers["cookie"] ?? "")
+        guard let token = cookies["khayt_intake"], let session = sessions[token] else { return false }
+        if now.timeIntervalSince(session.created) * 1000 > sessionMs {
+            sessions.removeValue(forKey: token)
+            return false
+        }
+        if !session.ip.isEmpty, session.ip != request.remote { return false }
+        return true
+    }
+
+    private func hasIntakeToken(_ request: Request) -> Bool {
+        guard !host.intakeToken.isEmpty else { return false }
+        let provided = (request.headers["x-khayt-intake-token"] ?? "").trimmingCharacters(in: .whitespaces)
+        return !provided.isEmpty && Self.constantTimeEqual(provided, host.intakeToken)
+    }
+
+    private func grantSession(ip: String, now: Date, sessionMs: Double) -> String {
+        // Sessions only ever expired when their own token came back; sweep on
+        // grant, as the Node server learned to.
+        sessions = sessions.filter { now.timeIntervalSince($0.value.created) * 1000 <= sessionMs }
+        let token = host.token()
+        sessions[token] = (created: now, ip: ip)
+        return token
+    }
+
+    private func sweep(_ map: inout [String: KhaytEngine.LanFailures], now: Date) {
+        guard map.count > Self.maxFailureKeys else { return }
+        let ms = now.timeIntervalSince1970 * 1000
+        map = map.filter { $0.value.resetAt > ms }
+        while map.count > Self.maxFailureKeys, let any = map.keys.first { map.removeValue(forKey: any) }
+    }
+
+    nonisolated static func cookies(_ header: String) -> [String: String] {
+        var out: [String: String] = [:]
+        for part in header.split(separator: ";") {
+            let pair = part.trimmingCharacters(in: .whitespaces)
+            guard let eq = pair.firstIndex(of: "=") else { continue }
+            out[String(pair[..<eq])] = String(pair[pair.index(after: eq)...])
+        }
+        return out
+    }
+
+    /// The shop's clock as JavaScript's `toISOString()` prints it.
+    nonisolated static func isoNow(_ date: Date) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f.string(from: date)
+    }
+
+    /// `prefix-<ms since epoch>-<4 hex>` — the Node server's `uniqueLanId`.
+    nonisolated static func uniqueId(_ prefix: String) -> String {
+        let ms = Int(Date().timeIntervalSince1970 * 1000)
+        let hex = String(format: "%04x", Int(UInt16.random(in: 0...UInt16.max)))
+        return "\(prefix)-\(ms)-\(hex)"
+    }
+
+    nonisolated static func randomToken() -> String {
+        (0..<32).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined()
     }
 
     // MARK: - The PIN
@@ -478,10 +640,15 @@ extension Shop {
         // Sealed on disk by whichever app wrote it; opened here, once, and
         // handed to the server — never read back out of the book per request.
         let pin = (try? await Secrets.open(config.pin, for: source)) ?? ""
-        let server = LanServer(host: LanServer.Host(
-            store: { [weak self] in self?.lanBook ?? [:] },
-            pin: pin,
-            engine: engine))
+        let lan = SettingsReader(settings: SettingsReader(settings: settingsDict).object("lanApi"))
+        let intakeToken = (try? await Secrets.open(lan.text("intakeToken"), for: source)) ?? ""
+        var host = LanServer.Host(store: { [weak self] in self?.lanBook ?? [:] }, pin: pin, engine: engine)
+        host.intakeToken = intakeToken
+        host.record = { [weak self] entry in
+            guard let self else { throw CocoaError(.fileWriteUnknown) }
+            try await self.recordIntake(entry)
+        }
+        let server = LanServer(host: host)
         do {
             _ = try await server.start(port: config.port, bind: config.bindLan ? .lan : .loopback)
             lanServer = server
@@ -489,6 +656,24 @@ extension Shop {
         } catch {
             lanProblem = words.callIt("mac.lan_failed", ["error": .string(String(describing: error))])
         }
+    }
+
+    /// A customer's request, into the book's waiting list — the entry the
+    /// shared rule built, appended inside the write, then the window reloads
+    /// from the file so the request is on the Waiting screen at once.
+    func recordIntake(_ entry: JSONValue) async throws {
+        guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
+        try await StoreWriter.update(
+            storeURL: build.storeURL,
+            owns: { StoreLock.weOwnIt(build) },
+            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+        ) { root in
+            var list: [JSONValue] = []
+            if case .array(let had)? = root["waitingList"] { list = had }
+            list.append(entry)
+            root["waitingList"] = .array(list)
+        }
+        await load(source)
     }
 
     func stopLanServer() {
