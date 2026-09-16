@@ -818,6 +818,21 @@ final class Activator: NSObject, NSApplicationDelegate {
             captureSheet(named: "14-new-job", into: dir)
             shop.takingAJob = false
             await settle()
+            // And the sheet as the catalogue opens it: a product's parts,
+            // costed, and its price. This is the path that opened at nothing
+            // twice, and a photograph is how the second time was found.
+            for row in shop.catalogueRows {
+                guard let product = await shop.productForEditing(row.id),
+                      case .array(let parts)? = product.rest["parts"],
+                      parts.compactMap(NewJobSheet.Draft.from).contains(where: \.isComplete) else { continue }
+                shop.takeJob(from: product)
+                await settle()
+                await settle()
+                captureSheet(named: "14b-new-job-from-product", into: dir)
+                shop.takingAJob = false
+                await settle()
+                break
+            }
 
             // The menu bar's panel, which no window shot can reach.
             doing("27-menu-bar")

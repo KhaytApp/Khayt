@@ -1250,6 +1250,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) A job taken from the catalogue opens priced — this time with the
+  parts costed.** The earlier fix repaired the number parsing on this path
+  and added the "nothing to cost" notice, but nothing ever asked the cost
+  model what the product's parts cost: a part added by hand was costed, a
+  part copied from a product was not, so the cart arrived at nothing and the
+  total with it. The parts are costed on the way in now, exactly as a typed
+  part is, and a product priced by hand or rounded to a step opens the job
+  priced the same way.
+
 - **The monthly revenue-against-expenses and margin charts disagreed with
   the P&L beside them.** They summed `completed` only (a legacy delivered job
   vanished), skipped the trade check, booked the customer's VAT as revenue

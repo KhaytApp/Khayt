@@ -2589,6 +2589,53 @@ final class Shop {
     /// What a part costs, where it went, and what it was costed AT — one
     /// crossing, because all three are wanted at the same moment and the third
     /// has to be written down with the job.
+    /// The parts of a product, COSTED, as the new-job sheet takes them.
+    ///
+    /// `Draft.from` carries the figures — grams, hours, the spool — and
+    /// nothing else: what a part costs is the shared cost model's answer,
+    /// asked here exactly as `addPart` asks it for a part typed by hand. It
+    /// was not asked at all on this path, so a job taken from the catalogue
+    /// arrived with every part at nothing and a total of nothing. That is the
+    /// report behind #1254 ("I click create a job for an item in catalogue
+    /// but the price is zero?"), which fixed the number parsing beside it and
+    /// left the costing out. A part with nothing to cost stays at nothing and
+    /// the sheet says so.
+    func jobParts(from product: Product) async -> [NewJobSheet.Draft] {
+        guard case .array(let rows)? = product.rest["parts"] else { return [] }
+        var out: [NewJobSheet.Draft] = []
+        for row in rows {
+            guard var draft = NewJobSheet.Draft.from(row) else { continue }
+            if draft.isComplete,
+               let costed = await costedPart(spoolId: draft.spoolId,
+                                             grams: Double(draft.grams) ?? 0,
+                                             hours: Double(draft.hours) ?? 0,
+                                             qty: draft.qty) {
+                draft.cost = costed.cost
+                draft.parts = costed.parts
+                draft.rates = costed.rates
+            }
+            out.append(draft)
+        }
+        return out
+    }
+
+    /// How a product's own price reaches the job taken for it.
+    ///
+    /// A product priced by hand ("Your own price") sells for that figure, so
+    /// the job opens with it typed in; a product rounded to a step opens
+    /// rounded the same way. A product priced by its parts and margin brings
+    /// only the margin, which `NewJobSheet` already takes.
+    static func priceRule(of product: Product) -> PriceRule {
+        var rule = PriceRule()
+        if let typed = plainNumber(product.rest["priceOverride"]), typed >= 0 { rule.override = typed }
+        if case .object(let r)? = product.rest["priceRound"],
+           let step = plainNumber(r["step"]), step > 0 {
+            rule.step = step
+            rule.mode = plainString(r["mode"]) ?? "nearest"
+        }
+        return rule
+    }
+
     func costedPart(spoolId: String?, grams: Double, hours: Double, qty: Int,
                     machineId: String? = nil) async -> KhaytEngine.CostedPart? {
         guard let engine else { return nil }
@@ -2649,7 +2696,9 @@ final class Shop {
         var mode: String = "nearest"
         var override: Double?
 
-        static let steps: [Double] = [0, 1, 5, 10]
+        /// The product editor's own list (`lib/product-price.js` STEPS), so a
+        /// product rounded to 25 opens a job the picker can show.
+        static let steps: [Double] = [0, 0.5, 1, 5, 10, 25, 50, 100]
         static let modes = ["nearest", "up", "down"]
 
         var isPlain: Bool { step <= 0 && override == nil }

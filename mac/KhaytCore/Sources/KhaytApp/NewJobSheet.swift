@@ -160,11 +160,16 @@ struct NewJobSheet: View {
             if let taken = shop.jobFromProduct {
                 product = taken
                 project = taken.anyName()
-                if case .array(let rows)? = taken.rest["parts"] {
-                    parts = rows.compactMap(Draft.from)
-                }
                 if let own = taken.margin { margin = own }
+                // The product's own price — typed, or rounded to a step —
+                // is the job's, so the total that opens is the catalogue's.
+                rule = Shop.priceRule(of: taken)
+                if let typed = rule.override { overrideText = Money.fieldValue(typed) }
                 shop.jobFromProduct = nil
+                // COSTED, not just measured: see `Shop.jobParts`. The engine
+                // is asked once per part, so the cart fills in a beat later
+                // than the name — and the total with it.
+                Task { parts = await shop.jobParts(from: taken) }
             }
             focused = true
         }
@@ -443,25 +448,29 @@ struct NewJobSheet: View {
             // says which of the three reached the figure.
             GridRow {
                 Text(shop.words.callIt("pe.round_to")).gridColumnAlignment(.trailing)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondary).fixedSize()
+                // FIXED WIDTHS AND ONE LINE EACH. Photographed with a product's
+                // rounding in force, this row let its labels wrap — "Or set the
+                // price" stood four words tall — and the Total below it left the
+                // sheet. A control row is measured, not negotiated.
                 HStack(spacing: 8) {
                     Picker("", selection: $rule.step) {
                         ForEach(Shop.PriceRule.steps, id: \.self) { step in
                             Text(step == 0 ? shop.words.callIt("pe.round_off") : Money.quantity(step)).tag(step)
                         }
                     }
-                    .labelsHidden().frame(width: 130)
-                    if rule.step > 0 {
-                        Picker("", selection: $rule.mode) {
-                            ForEach(Shop.PriceRule.modes, id: \.self) { mode in
-                                Text(shop.words.callIt("pe.round_\(mode)")).tag(mode)
-                            }
+                    .labelsHidden().frame(width: 120)
+                    Picker("", selection: $rule.mode) {
+                        ForEach(Shop.PriceRule.modes, id: \.self) { mode in
+                            Text(shop.words.callIt("pe.round_\(mode)")).tag(mode)
                         }
-                        .labelsHidden().frame(width: 110)
                     }
-                    Text(shop.words.callIt("pe.price_override")).foregroundStyle(.secondary)
+                    .labelsHidden().frame(width: 96)
+                    .disabled(rule.step <= 0)
+                    Text(shop.words.callIt("pe.price_override"))
+                        .foregroundStyle(.secondary).lineLimit(1).fixedSize()
                     TextField(shop.words.callIt("pe.price_override_ph"), text: $overrideText)
-                        .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
+                        .textFieldStyle(.roundedBorder).frame(width: 84).monospacedDigit()
                         .onChange(of: overrideText) { _, typed in
                             let cleaned = typed.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
                             rule.override = cleaned.isEmpty ? nil : max(0, Double(cleaned) ?? 0)
