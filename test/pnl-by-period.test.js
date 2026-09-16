@@ -329,3 +329,64 @@ test('a legacy `delivered` row is revenue — finished work by the older spellin
   assert.equal(rows[0].orders, 2);
   assert.equal(rows[0].revenue, 1500, 'and a voided one is still not, whichever spelling');
 });
+
+/* ── Months, and the margin (2026-09-16) ─────────────────────────────────── */
+
+test('by month: the same arithmetic per calendar month, with a month of overhead', () => {
+  const orders = [
+    { id: 'A', status: 'completed', date: '2026-08-10', price: 1000, costBasis: 400 },
+    { id: 'B', status: 'completed', date: '2026-07-02', price: 500, costBasis: 100 },
+  ];
+  const settings = { fixedCosts: [{ amount: 300 }] };
+  const now = new Date('2026-09-16T10:00:00');
+  const months = pnlByPeriod(orders, [{ date: '2026-08-20', amount: 90 }], { settings, now, granularity: 'month' });
+  assert.deepEqual(months.map((r) => r.period), ['2026-08', '2026-07'], 'newest first, YYYY-MM');
+  assert.equal(months[0].fixed, 300, 'a month of overhead, not a quarter');
+  assert.equal(months[0].net, 1000 - 90 - 300);
+  assert.equal(months[1].fixed, 300);
+  // The quarters are what they always were.
+  const quarters = pnlByPeriod(orders, [], { settings, now });
+  assert.deepEqual(quarters.map((r) => r.period), ['2026-Q3']);
+  assert.ok(Math.abs(quarters[0].fixed - 900 * (78 / 92)) < 0.5, 'the quarter in progress is pro-rated');
+});
+
+test('the month in progress is charged for the days so far, not the whole month', () => {
+  const now = new Date('2026-09-16T10:00:00');   // day 16 of 30
+  const rows = pnlByPeriod([{ id: 'A', status: 'completed', date: '2026-09-01', price: 100 }], [],
+                           { settings: { fixedCosts: [{ amount: 300 }] }, now, granularity: 'month' });
+  assert.equal(rows[0].fixed, 160);
+});
+
+test('the margin is blended — money divided once — and null where nothing was billed', () => {
+  const now = new Date('2026-09-16T10:00:00');
+  const rows = pnlByPeriod([
+    { id: 'A', status: 'completed', date: '2026-08-10', price: 100, costBasis: 20 },     // 80% on its own
+    { id: 'B', status: 'completed', date: '2026-08-11', price: 10000, costBasis: 9000 }, // 10% on its own
+  ], [{ date: '2026-07-05', amount: 50 }], { settings: {}, now, granularity: 'month' });
+  const aug = rows.find((r) => r.period === '2026-08');
+  assert.equal(aug.cogs, 9020);
+  assert.equal(aug.marginPct, 10.7, 'the mean of 80 and 10 would have said 45');
+  const jul = rows.find((r) => r.period === '2026-07');
+  assert.equal(jul.marginPct, null, 'expenses and no billing is not a margin of anything');
+  assert.equal(jul.cogs, 0);
+});
+
+test('a legacy `delivered` job and a voided one, in the margin as in the revenue', () => {
+  const now = new Date('2026-09-16T10:00:00');
+  const [q] = pnlByPeriod([
+    { id: 'A', status: 'completed', date: '2026-08-10', price: 100, costBasis: 50 },
+    { id: 'B', status: 'delivered', date: '2026-08-11', price: 100, costBasis: 30 },
+    { id: 'C', status: 'delivered', date: '2026-08-12', price: 100, costBasis: 1, voidedAt: 'x' },
+  ], [], { settings: {}, now });
+  assert.equal(q.cogs, 80);
+  assert.equal(q.marginPct, 60);
+});
+
+test('the margin is on what the shop kept: revenue net of tax, cost in the shop\'s currency', () => {
+  const now = new Date('2026-09-16T10:00:00');
+  // Inclusive VAT at 15%: 1150 charged is 1000 kept; cost 400 → 60%, not 65.2%.
+  const [q] = pnlByPeriod([{ id: 'A', status: 'completed', date: '2026-08-10', price: 1150, costBasis: 400 }], [],
+                          { settings: { currency: 'SAR', enableVat: true, vatRate: 15 }, now, currencies: CURRENCIES });
+  assert.equal(q.revenue, 1000);
+  assert.equal(q.marginPct, 60);
+});

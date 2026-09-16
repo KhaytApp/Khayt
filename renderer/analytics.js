@@ -687,6 +687,7 @@ function renderQuoteFunnelChart() {
 function renderMonthlyTrendChart() {
   const el = $('#monthlyTrendChart');
   if (!el) return;
+  if (typeof KhaytPnl === 'undefined') { el.innerHTML = ''; return; }
 
   // Build last 6 months (YYYY-MM strings, oldest first)
   const today = new Date();
@@ -696,19 +697,19 @@ function renderMonthlyTrendChart() {
     months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
 
+  // The P&L rule by month — lib/pnl-report.js, the one the Mac draws from too.
+  // This used to sum `completed` only (a legacy delivered job vanished), skip
+  // the trade check, and book the customer's VAT as revenue; the rule does
+  // none of those. Expenses here are what the shop paid, net of the tax it
+  // reclaims, without the fixed overhead — the bar is spending, not the P&L.
+  const rows = KhaytPnl.pnlByPeriod(printLog, expenses, {
+    settings, clients, currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
+    now: today, granularity: 'month',
+  });
+  const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
   const revByMonth = {};
   const expByMonth = {};
-  months.forEach(m => { revByMonth[m] = 0; expByMonth[m] = 0; });
-
-  for (const o of printLog) {
-    if (o.status !== 'completed' || o.voidedAt) continue;
-    const m = (o.date || '').slice(0, 7);
-    if (revByMonth[m] !== undefined) revByMonth[m] += orderNetRevenueBase(o);
-  }
-  for (const e of expenses) {
-    const m = (e.date || '').slice(0, 7);
-    if (expByMonth[m] !== undefined) expByMonth[m] += +e.amount || 0;
-  }
+  months.forEach(m => { revByMonth[m] = byKey[m] ? byKey[m].revenue : 0; expByMonth[m] = byKey[m] ? byKey[m].expenses : 0; });
 
   const maxVal = Math.max(...months.map(m => Math.max(revByMonth[m], expByMonth[m])), 1);
 
@@ -877,6 +878,7 @@ function renderMachineRevenueChart() {
 function renderProfitMarginChart() {
   const el = $('#profitMarginChart');
   if (!el) return;
+  if (typeof KhaytPnl === 'undefined') { el.innerHTML = ''; return; }
 
   const today = new Date();
   const months = [];
@@ -885,31 +887,16 @@ function renderProfitMarginChart() {
     months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
 
-  // Blended, not the mean of per-order percentages. Averaging the percentages
-  // let one tiny job dominate: a 100 order at 80% margin beside a 10,000 order
-  // at 10% read as 45% (and coloured green) when the month's real margin was
-  // 10.7%. Accumulate money, divide once.
-  const marginByMonth = {};
-  months.forEach(m => { marginByMonth[m] = { revenue: 0, cost: 0, count: 0 }; });
-  for (const o of printLog) {
-    // _countsForBusiness for the same reason every other revenue figure has it:
-    // a print the shop marked as not business must not appear in a margin
-    // report. This was the one money loop over printLog without the gate.
-    if (o.status !== 'completed' || o.voidedAt || !_countsForBusiness(o) || !o.costBasis || !+o.price) continue;
-    const m = (o.date || '').slice(0, 7);
-    if (!marginByMonth[m]) continue;
-    // Net of credit notes, in the ORDER's currency to stay paired with costBasis
-    // (which is summed from part baseCost). Converting only one side would skew
-    // the ratio for multi-currency orders.
-    marginByMonth[m].revenue += Math.max(0, (+o.price || 0) - orderCreditedRaw(o));
-    marginByMonth[m].cost += +o.costBasis;
-    marginByMonth[m].count++;
-  }
-
-  const vals = months.map(m => {
-    const b = marginByMonth[m];
-    return (b.count > 0 && b.revenue > 0) ? (b.revenue - b.cost) / b.revenue * 100 : null;
+  // Blended, from the P&L rule by month (lib/pnl-report.js): money accumulated
+  // and divided once, never the mean of per-job percentages. The margin is on
+  // revenue NET OF TAX now, in the shop's currency, and a legacy `delivered`
+  // job counts — three things this function used to do differently.
+  const rows = KhaytPnl.pnlByPeriod(printLog, expenses, {
+    settings, clients, currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
+    now: today, granularity: 'month',
   });
+  const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
+  const vals = months.map(m => (byKey[m] && byKey[m].marginPct != null) ? byKey[m].marginPct : null);
 
   const hasData = vals.some(v => v !== null);
   if (!hasData) { el.innerHTML = ''; return; }

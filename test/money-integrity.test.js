@@ -142,14 +142,17 @@ test('archived orders release their stock reservation', () => {
 });
 
 test('monthly margin is blended, not a mean of percentages', () => {
+  // 2026-09-16: the margin moved into lib/pnl-report.js's `pnlByPeriod`, the
+  // one rule both apps draw from. The SHAPE is pinned there — money
+  // accumulates per period and the ratio is taken once — and the renderer is
+  // pinned to asking it by month rather than keeping arithmetic of its own.
+  const rule = read('lib/pnl-report.js');
+  assert.match(rule, /row\.cogs \+= /, 'cost accumulates alongside revenue');
+  assert.match(rule, /\(row\.revenue - row\.cogs\) \/ row\.revenue/, 'and the ratio is taken once, at the end');
   const src = read('renderer/analytics.js');
-  assert.equal(/marginByMonth\[m\]\.total \+= margin;/.test(src), false,
-    'summing per-order percentages lets one tiny job dominate the month');
-  // Pin the SHAPE (money accumulates into .revenue/.cost, the ratio is taken
-  // once at the end) rather than the exact price expression — that expression
-  // now nets credit notes, see the credit-note tests below.
-  assert.match(src, /marginByMonth\[m\]\.revenue \+=/, 'accumulate money, divide once');
-  assert.match(src, /marginByMonth\[m\]\.cost \+= \+o\.costBasis;/, 'cost accumulates alongside revenue');
+  assert.equal(/marginByMonth/.test(src), false, 'the renderer keeps no margin arithmetic of its own');
+  const at = src.indexOf('function renderProfitMarginChart');
+  assert.match(src.slice(at, at + 1600), /KhaytPnl\.pnlByPeriod\([\s\S]*granularity: 'month'/, 'it asks the P&L rule by month');
 
   // The arithmetic, with the case that exposed it.
   const rows = [{ price: 100, cost: 20 }, { price: 10000, cost: 9000 }];
@@ -362,9 +365,14 @@ test('margin figures net credit notes in the order\'s own currency', () => {
   // numerator by an unconverted denominator, so they use orderCreditedRaw.
   // (The pre-existing currency mismatch between price and costBasis is a
   // separate defect and is deliberately left alone here.)
-  assert.match(read('renderer/analytics.js'),
-    /marginByMonth\[m\]\.revenue \+= Math\.max\(0, \(\+o\.price \|\| 0\) - orderCreditedRaw\(o\)\);/,
-    'the monthly margin chart must net credit notes');
+  // The monthly margin chart draws from the P&L rule, whose revenue is
+  // `orderNetRevenueBase` — net of credit notes — with the cost converted to
+  // the same currency beside it (2026-09-16; the mismatch this note once
+  // left alone is gone with it).
+  assert.match(read('lib/pnl-report.js'), /money\.orderNetRevenueBase\(o, moneyCtx, known\)/,
+    'the P&L rule nets credit notes');
+  assert.match(read('lib/pnl-report.js'), /money\.convertToBase\(cost, money\.orderCurrency\(o, moneyCtx, known\), moneyCtx\)/,
+    'and prices the cost in the same currency');
   assert.match(read('renderer/analytics.js'),
     /const rev = Math\.max\(0, \(\+o\.price \|\| 0\) - orderCreditedRaw\(o\)\);/,
     'the exported average margin must net credit notes');

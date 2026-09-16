@@ -690,6 +690,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **The P&L by month as well as by quarter, with the margin on each.** On the
+  Mac the Reports P&L page has a "By quarter / By month" switch and a Margin
+  column; the rule (`lib/pnl-report.js`) gained a month grain — the same
+  arithmetic per calendar month, a month of overhead, the month in progress
+  pro-rated — and a blended margin: money accumulated and divided once, on
+  revenue net of tax, never the mean of per-job percentages. The other app's
+  monthly revenue-against-expenses and margin charts draw from it now.
+
 - **(Mac) Whether the shop keeps its promises, on Reports → Best.** Of the
   finished jobs that had a due date, how many were done by it, how many were
   not and by how many days — and the promises missed, worst first, which the
@@ -1241,6 +1249,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **The monthly revenue-against-expenses and margin charts disagreed with
+  the P&L beside them.** They summed `completed` only (a legacy delivered job
+  vanished), skipped the trade check, booked the customer's VAT as revenue
+  (the margin chart, in the order's currency), and the margin was the mean
+  of per-job percentages — one small job at 80% coloured a 10% month green.
+  Both draw from the P&L rule by month now, so a month's revenue, spending
+  and margin are one set of figures wherever they are shown.
 
 - **A job finished under the older `delivered` status was missing from eight
   rules — the quarterly P&L among them.** Khayt's own rule keeps a handed-over

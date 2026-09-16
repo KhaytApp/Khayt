@@ -99,6 +99,13 @@ struct ScreenActions: View {
                 plus("issueGiftCard", enabled: true) { shop.issuingGiftCard = true }
             } else if shop.showingReports, shop.reportPage == .best {
                 period
+            } else if shop.showingReports, shop.reportPage == .profit {
+                // The P&L's grain: by quarter, the table's word, or by month.
+                Picker("", selection: $shop.pnlByMonth) {
+                    Text(shop.words.callIt("mac.by_quarter")).tag(false)
+                    Text(shop.words.callIt("mac.by_month")).tag(true)
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
             }
 
             // THE PANEL'S SWITCH, on every screen that has a panel.

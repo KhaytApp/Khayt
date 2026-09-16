@@ -103,12 +103,16 @@ test('another client\'s orders are not counted', () => {
 });
 
 test('the margin report excludes a personal print', () => {
+  // The margin is the P&L rule's now (lib/pnl-report.js, 2026-09-16), and the
+  // P&L's own guard covers the trade gate for every figure it produces; what
+  // is pinned here is that the renderer draws from it rather than looping
+  // over the order book with a gate of its own to forget.
   const src = code('renderer/analytics.js');
-  const at = src.indexOf('marginByMonth[m] = { revenue: 0');
+  const at = src.indexOf('function renderProfitMarginChart');
   assert.ok(at > 0, 'the margin-by-month report is gone');
-  const body = src.slice(at, at + 900);
-  assert.match(body, /_countsForBusiness\(o\)/,
-    'the margin report is the one money loop over printLog with no business gate');
+  const body = src.slice(at, at + 1600);
+  assert.match(body, /KhaytPnl\.pnlByPeriod\(/, 'the margin report asks the P&L rule');
+  assert.doesNotMatch(body, /for \(const o of printLog\)/, 'and keeps no money loop of its own');
 });
 
 test('no money loop over the order book is left ungated', () => {

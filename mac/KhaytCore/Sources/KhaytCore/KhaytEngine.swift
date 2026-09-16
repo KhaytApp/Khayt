@@ -4652,14 +4652,16 @@ public actor KhaytEngine {
             [.array(wasteLog), .string(id), .array(inventory)], as: WasteRemoved.self)
     }
 
-    /// The shop's quarters: what it earned, what it spent, what it kept.
+    /// The shop's quarters — or months: what it earned, what it spent, what
+    /// it kept, and the margin on it.
     public func pnlByPeriod(orders: [JSONValue], expenses: [JSONValue],
                             settings: [String: JSONValue], clients: [JSONValue],
-                            currencies: [String: JSONValue], now: Date) throws -> [PnlPeriod] {
+                            currencies: [String: JSONValue], now: Date,
+                            granularity: String = "quarter") throws -> [PnlPeriod] {
         try runtime.call2(
-            "KhaytPnl.pnlByPeriod(ARG0, ARG1, {settings: ARG2, clients: ARG3, currencies: ARG4, now: new Date(ARG5)})",
+            "KhaytPnl.pnlByPeriod(ARG0, ARG1, {settings: ARG2, clients: ARG3, currencies: ARG4, now: new Date(ARG5), granularity: ARG6})",
             [.array(orders), .array(expenses), .object(settings), .array(clients),
-             .object(currencies), .number(now.timeIntervalSince1970 * 1000)],
+             .object(currencies), .number(now.timeIntervalSince1970 * 1000), .string(granularity)],
             as: [PnlPeriod].self)
     }
 

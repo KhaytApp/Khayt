@@ -128,8 +128,20 @@ struct Reports: View {
             if shop.reportPage == .best {
                 ToolbarItem { PeriodMenu(shop: shop) }
             }
+            // Quarter or month, on the one page that has a grain to choose.
+            if shop.reportPage == .profit {
+                ToolbarItem {
+                    Picker("", selection: $shop.pnlByMonth) {
+                        Text(shop.words.callIt("mac.by_quarter")).tag(false)
+                        Text(shop.words.callIt("mac.by_month")).tag(true)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                }
+            }
         }
         .task(id: shop.orderRows.count + shop.expenseRows.count) { await recompute() }
+        // The P&L's grain is a view preference; only the rows it draws move.
+        .task(id: shop.pnlByMonth) { await recompute() }
         // The period is the Best page's alone — the P&L reports every quarter
         // at once and the receivables age themselves — so recomputing all three
         // when it changes would be three answers to a question one asked.
@@ -186,6 +198,18 @@ struct Reports: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .width(min: 120, ideal: 160, max: 240)
+            // The margin on what the shop kept. Blended by the rule, so one
+            // small job at a high margin cannot colour a month green.
+            TableColumn(shop.words.callIt("an.margin_col"), value: \.marginSort) { r in
+                if let pct = r.marginPct {
+                    Text(Money.quantity(pct, decimals: pct == pct.rounded() ? 0 : 1) + "%")
+                        .monospacedDigit()
+                        .foregroundStyle(pct < 10 ? Khayt.late : pct < 25 ? Khayt.attention : .primary)
+                } else {
+                    Text("—").foregroundStyle(.tertiary)
+                }
+            }
+            .width(min: 70, ideal: 90, max: 120)
             TableColumn(shop.words.callIt("an.pnl_vat"), value: \.vatCollected) { r in
                 Text(Money.text(r.vatCollected, shop.currency))
                     .monospacedDigit().foregroundStyle(.secondary)
@@ -261,7 +285,8 @@ struct Reports: View {
         rows = (try? await engine.pnlByPeriod(
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
-            currencies: Invoice.currencyTable(shop), now: Date())) ?? []
+            currencies: Invoice.currencyTable(shop), now: Date(),
+            granularity: shop.pnlByMonth ? "month" : "quarter")) ?? []
         await recomputeBreakEven()
         await recomputeCashFlow()
         await recomputeTrends()
