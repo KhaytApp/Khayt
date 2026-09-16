@@ -73,6 +73,8 @@ function loadAnalyticsStack() {
   require('../lib/waste-trend.js');  // globalThis.KhaytWasteTrend
   require('../lib/on-time.js');      // globalThis.KhaytOnTime
   require('../lib/client-value.js'); // globalThis.KhaytClientValue
+  // The machine charts ask it whether a job is finished — both spellings.
+  require('../lib/order-status.js'); // globalThis.KhaytOrderStatus
   require('../lib/capacity.js');     // globalThis.KhaytCapacity
   require('../lib/quote-funnel.js'); // globalThis.KhaytQuoteFunnel
   require('../lib/product-profit.js'); // globalThis.KhaytProductProfit

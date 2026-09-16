@@ -1341,6 +1341,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **A delivered job was missing from what its printer had earned, in both
+  apps.** Khayt wrote `delivered` before it wrote `completed` with a
+  `deliveredAt` beside it, and both are still in shops' books — thirteen of
+  them in the sample. So "is this job finished" is a two-value test, written
+  out by hand in eight modules and got wrong in three places: the machine
+  P&L in both apps, and the machine revenue chart. Each filtered `completed`
+  alone, so a shop that marks work delivered saw its printers' earnings
+  computed on a subset, with nothing to say so. `lib/order-status.js` —
+  which already says in its own header that it exists so the two apps cannot
+  disagree about whether a job is finished — now names the test once, and
+  the three callers ask it. A test holds the Mac's copy of the list to the
+  rule's own, and another checks the charts have not gone back to comparing
+  by hand.
 - **A multi-colour print weighed nothing, so anything made from it cost
   nothing.** A one-material slice reports a single filament weight, and that
   is the only figure this read. A toolchanger does not produce one: a U1, an

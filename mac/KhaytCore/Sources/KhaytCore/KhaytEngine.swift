@@ -6632,6 +6632,12 @@ public actor KhaytEngine {
                           [printStats, virtualSdcard, displayStatus], as: String.self)
     }
 
+    /// The statuses `lib/order-status.js` counts as finished — so a Swift
+    /// filter can be held to the rule's own vocabulary instead of restating it.
+    public func finishedStatuses() throws -> [String] {
+        try runtime.call2("globalThis.KhaytOrderStatus.FINISHED_STATUSES", [], as: [String].self)
+    }
+
     /// The seven figures a part is costed at, as `lib/print-rates.js` starts
     /// them — the same numbers the other app's calculator form carries before
     /// a shop touches it. A product part made here must arrive with them, or

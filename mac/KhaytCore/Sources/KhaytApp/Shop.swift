@@ -3671,12 +3671,22 @@ final class Shop {
     ///
     /// `lib/machine-pl.js` does not know what a range is, deliberately. It is
     /// decided once, here.
+    /// The two spellings of finished, as `lib/order-status.js` names them.
+    ///
+    /// Held here rather than asked per row — this filters every order in the
+    /// book — and `FinishedStatusTests` holds the list to the rule's own, so
+    /// it cannot drift from the shared vocabulary the way the comparison it
+    /// replaces did. That comparison was `status == "completed"` alone, which
+    /// left every job a shop had marked delivered out of what its printers had
+    /// earned, in this app and the other one both.
+    static let finishedStatuses: Set<String> = ["completed", "delivered"]
+
     func completedInPeriod() async -> (orders: [JSONValue],
                                        expenses: [JSONValue],
                                        maintenance: [JSONValue]) {
         let orders = orderRows.filter { row in
             guard case .object(let o) = row,
-                  case .string(let status)? = o["status"], status == "completed",
+                  case .string(let status)? = o["status"], Self.finishedStatuses.contains(status),
                   case .string(let date)? = o["date"] else { return false }
             return inPeriod(date)
         }
