@@ -591,6 +591,8 @@ public actor KhaytEngine {
         "carriers",
         "lan-order-page",
         "lan-calendar",
+        "public-quote",
+        "gcode-parse",
         // Which customers are worth keeping.
         "client-value",
         // Whether the shop can take another job, and when it would start.
@@ -4404,9 +4406,17 @@ public actor KhaytEngine {
     /// `body` is the parsed JSON the customer posted; `shopName` is the shop's
     /// own (unescaped) for the consent record; `id` the host minted; `nowIso`
     /// the shop's clock as JavaScript prints it.
-    public func lanIntakeSubmission(body: JSONValue, shopName: String, id: String, nowIso: String) throws -> LanIntakeOutcome {
-        try runtime.call2("globalThis.KhaytLanIntake.submission(ARG0, { shopName: ARG1, id: ARG2, nowIso: ARG3 })",
-                          [body, .string(shopName), .string(id), .string(nowIso)], as: LanIntakeOutcome.self)
+    /// `quoted` is the figure THIS server produced, recalled by the reference
+    /// the browser holds — never a number taken off the wire. A visitor can
+    /// post any price they like; the shop must see what it actually said.
+    public func lanIntakeSubmission(body: JSONValue, shopName: String, id: String, nowIso: String,
+                                    quoted: JSONValue? = nil) throws -> LanIntakeOutcome {
+        try runtime.call2("""
+            globalThis.KhaytLanIntake.submission(ARG0,
+              { shopName: ARG1, id: ARG2, nowIso: ARG3, quoted: ARG4 })
+            """,
+            [body, .string(shopName), .string(id), .string(nowIso), quoted ?? .null],
+            as: LanIntakeOutcome.self)
     }
 
     /// One per-address bucket advanced — the server's `bumpRate`. The record
@@ -4480,6 +4490,62 @@ public actor KhaytEngine {
         public let order: JSONValue?
         public let printLog: JSONValue?
     }
+    /// A sliced file's own figures, in the shape `publicQuote` takes.
+    ///
+    /// The slicer wrote what it is about to do into the G-code's comments, and
+    /// those are worth more than any estimate this app could make from a mesh
+    /// — so a customer who uploads a sliced file is quoted on the slicer's own
+    /// numbers. `usable` is `lib/model-intake.js`'s: both a time AND a weight,
+    /// or the file has told us nothing.
+    ///
+    /// Nil when the file carries neither, which the caller reports as
+    /// `no-numbers` rather than guessing.
+    public func gcodeIntake(text: String) throws -> JSONValue? {
+        let answer = try runtime.call2("""
+            (function (text) {
+              var p = globalThis.KhaytGcodeParse.parseGcodeText(text);
+              if (!(p && p.printTimeMins > 0 && p.filamentGrams > 0)) return null;
+              return { exact: true, source: 'slicer',
+                       printTimeMins: p.printTimeMins, filamentGrams: p.filamentGrams,
+                       filamentType: p.filamentType, filamentCost: p.filamentCost,
+                       slicer: p.slicer };
+            })(ARG0)
+            """, [.string(text)], as: JSONValue.self)
+        if case .null = answer { return nil }
+        return answer
+    }
+
+    /// What a stranger's uploaded model may be quoted at: `lib/public-quote.js`.
+    ///
+    /// `intake` is the parsed file — `{ exact, printTimeMins, filamentGrams }`
+    /// off a sliced G-code, or `{ source: 'geometry', geometry: {...} }` off a
+    /// mesh this app measured itself. The rule is the reluctant one: it
+    /// refuses far more often than it answers, and every refusal says why.
+    ///
+    /// The four dependencies are wired HERE rather than passed in, because
+    /// they are the shop's own calculator and its own pricing rule: a customer
+    /// must not be quoted on different maths from the one the shop would reach
+    /// for the same part.
+    public func publicQuote(intake: JSONValue, store: JSONValue, qty: Int) throws -> JSONValue {
+        try runtime.call2("""
+            (function (intake, store, qty) {
+              var s = (store && store.settings) || {};
+              var cal = KhaytEstimateCalibration.calibrate((store && store.printLog) || [],
+                                                   { allocate: KhaytOrderFileLink.allocateActuals }, {});
+              var opts = KhaytEstimateCalibration.applyCalibration(KhaytStl.fromSettings(s), cal);
+              return globalThis.KhaytPublicQuote.publicQuote({
+                intake: intake, store: store, qty: qty,
+                deps: {
+                  computePartBaseCost: KhaytCalculatorCost.computePartBaseCost,
+                  quoteTotal: KhaytPricing.quoteTotal,
+                  estimate: KhaytStl.estimateFromStl,
+                  estimatorOpts: opts,
+                },
+              });
+            })(ARG0, ARG1, ARG2)
+            """, [intake, store, .number(Double(qty))], as: JSONValue.self)
+    }
+
     /// The shop's due dates as a calendar: `lib/lan-calendar.js`.
     public func lanCalendarFeed(store: JSONValue) throws -> String {
         try runtime.call2("globalThis.KhaytLanCalendar.feed(ARG0)", [store], as: String.self)

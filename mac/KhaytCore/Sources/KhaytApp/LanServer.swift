@@ -80,6 +80,12 @@ final class LanServer {
         /// be written.
         var survey: (_ token: String, _ rating: Double, _ comment: String?, _ nowIso: String) async throws -> Bool
             = { _, _, _, _ in throw CocoaError(.fileWriteUnknown) }
+        /// Measure an uploaded mesh. The bytes are written to a scratch file,
+        /// read, and deleted — Khayt does not keep a stranger's model on the
+        /// shop's disk, which keeps retention and consent simple.
+        var measure: (Data, String) throws -> JSONValue? = { data, ext in
+            try LanServer.measureUpload(data, ext: ext)
+        }
     }
 
     struct Request {
@@ -128,6 +134,19 @@ final class LanServer {
     private var grants: [String: KhaytEngine.LanFailures] = [:]
     private var submits: [String: KhaytEngine.LanFailures] = [:]
     private var surveys: [String: KhaytEngine.LanFailures] = [:]
+    private var estimates: [String: KhaytEngine.LanFailures] = [:]
+    /// What was quoted, by reference — so a submitted form is attached to the
+    /// figure THIS server produced and not to whatever the browser posts back.
+    private var quoted: [String: (quote: JSONValue, at: Date, ip: String)] = [:]
+    /// Meshes being measured right now. Reading a 32 MB model is not free, and
+    /// three at once is a shop's machine given over to strangers.
+    private var measuring = 0
+    nonisolated static let maxMeasuring = 3
+    nonisolated static let maxUpload = 32 * 1024 * 1024
+    /// Above this a model is measured but not walked for risk — the walk is
+    /// the expensive half, and the shop can re-check it on a real printer.
+    nonisolated static let maxRiskBytes = 8 * 1024 * 1024
+    nonisolated static let quoteTTL: TimeInterval = 2 * 60 * 60
     static let maxFailureKeys = 5000
     static let maxBody = 1_048_576
 
@@ -338,6 +357,9 @@ final class LanServer {
         case ("/calendar.ics", true):
             return await calendar(request, store: store)
 
+        case ("/api/intake/estimate", false) where request.method == "POST":
+            return await estimate(request, store: store)
+
         case ("/api/intake", false) where request.method == "POST":
             return await intakeSubmit(request, store: store)
 
@@ -373,9 +395,11 @@ final class LanServer {
     private func intakePage(_ request: Request, store: JSONValue) async -> Response {
         let engine = host.engine
         let now = host.now()
-        // The estimate route is not served here, so the form never offers the
-        // upload — a widget whose request would 404 is worse than no widget.
-        let page = (try? await engine.lanIntakePage(store: store, quoteEnabled: false)) ?? ""
+        // The upload widget is offered exactly when the shop turned public
+        // pricing on — which is also exactly when `/api/intake/estimate` will
+        // answer. A widget whose request would be refused is worse than none.
+        let page = (try? await engine.lanIntakePage(store: store,
+                                                    quoteEnabled: Self.quotingIsOn(host.store()))) ?? ""
         let limits = try? await engine.lanIntakeLimits()
         if hasSession(request, now: now, sessionMs: limits?.SESSION_MS ?? 14_400_000) {
             return .html(200, page, extra: ["Cache-Control": "no-cache"])
@@ -414,8 +438,11 @@ final class LanServer {
         var shopName = "this shop"
         if case .object(let settings)? = host.store()["settings"], case .string(let name)? = settings["shopName"],
            !name.isEmpty { shopName = name }
+        var estimateRef: String?
+        if case .object(let posted) = body, case .string(let ref)? = posted["estimateRef"] { estimateRef = ref }
+        let priced = recallQuote(estimateRef, ip: request.remote, now: now)
         guard let outcome = try? await engine.lanIntakeSubmission(body: body, shopName: shopName, id: host.mintId(),
-                                                                  nowIso: Self.isoNow(now)) else {
+                                                                  nowIso: Self.isoNow(now), quoted: priced) else {
             return .open(500, #"{"error":"The shop could not record your request right now. Please try again shortly."}"#)
         }
         guard outcome.ok, let entry = outcome.entry else {
@@ -648,6 +675,145 @@ final class LanServer {
             return .open(400, #"{"error":"The shop could not record your feedback right now. Please try again shortly."}"#)
         }
         return .open(200, #"{"ok":true}"#)
+    }
+
+    // MARK: - Pricing a model the customer uploaded
+
+    /// `POST /api/intake/estimate` — a stranger's file, in, and a number out.
+    ///
+    /// The order of the refusals is the Node route's, and the order matters:
+    /// the off switch is answered BEFORE a single byte is read, because
+    /// accepting 32 MB and then saying no turns an off switch into an upload
+    /// target.
+    private func estimate(_ request: Request, store: JSONValue) async -> Response {
+        let engine = host.engine
+        let now = host.now()
+        let limits = try? await engine.lanIntakeLimits()
+        guard hasSession(request, now: now, sessionMs: limits?.SESSION_MS ?? 14_400_000) || hasIntakeToken(request) else {
+            return .open(401, #"{"error":"Unauthorized"}"#)
+        }
+        // The shop's own ceiling on estimates per visitor per hour.
+        var perHour = 12
+        if case .object(let settings)? = host.store()["settings"],
+           case .object(let lan)? = settings["lanApi"], case .object(let cfg)? = lan["intakeQuote"],
+           let typed = Shop.plainNumber(cfg["hourlyLimit"]), typed >= 1 {
+            perHour = min(10_000, Int(typed))
+        }
+        let step = try? await engine.lanIntakeRate(estimates[request.remote], now: now, limit: perHour)
+        if let step { estimates[request.remote] = step.rec; sweep(&estimates, now: now) }
+        guard step?.allowed != false else {
+            return .open(429, #"{"error":"Too many estimates — try again later"}"#)
+        }
+        guard Self.quotingIsOn(host.store()) else {
+            return .open(403, #"{"ok":false,"reason":"off"}"#)
+        }
+        // The name is only ever used to pick a reader — never to open, write or
+        // serve anything — so its extension is all that is kept.
+        let ext = Self.uploadExtension(request.query["name"] ?? "")
+        guard Self.readableUploads.contains(ext) else {
+            return .open(400, #"{"ok":false,"reason":"unsupported"}"#)
+        }
+        guard request.body.count <= Self.maxUpload else {
+            return .open(413, #"{"ok":false,"reason":"too-large"}"#)
+        }
+        guard !request.body.isEmpty else {
+            return .open(400, #"{"ok":false,"reason":"no-numbers"}"#)
+        }
+        guard measuring < Self.maxMeasuring else {
+            return .open(503, #"{"ok":false,"reason":"busy"}"#)
+        }
+        measuring += 1
+        defer { measuring -= 1 }
+
+        // What the file says it is: a sliced file is taken at the slicer's own
+        // figures, a mesh is measured here.
+        let intake: JSONValue?
+        if ext == "gcode" || ext == "gco" {
+            intake = try? await engine.gcodeIntake(text: String(decoding: request.body, as: UTF8.self))
+        } else {
+            intake = try? host.measure(request.body, ext)
+        }
+        guard let intake else {
+            return .open(400, #"{"ok":false,"reason":"no-numbers"}"#)
+        }
+        let qty = max(1, min(1000, Int(request.query["qty"] ?? "1") ?? 1))
+        guard let quote = try? await engine.publicQuote(intake: intake, store: store, qty: qty),
+              case .object(let q) = quote else {
+            return .open(500, #"{"ok":false,"reason":"no-price"}"#)
+        }
+        guard q["ok"] == .bool(true) else {
+            let reason = Shop.plainString(q["reason"]) ?? "no-price"
+            let escaped = (try? String(decoding: JSONEncoder().encode(reason), as: UTF8.self)) ?? "\"no-price\""
+            return .open(200, "{\"ok\":false,\"reason\":\(escaped)}")
+        }
+        // A reference, not just a number: when the form is submitted the entry
+        // is attached to what THIS server said, never to what a browser posts.
+        let ref = Self.randomToken(bytes: 12)
+        sweepQuotes(now: now)
+        quoted[ref] = (quote: quote, at: now, ip: request.remote)
+        var answer: [String: JSONValue] = ["ok": .bool(true), "ref": .string(ref), "binding": .bool(false)]
+        for key in ["price", "currency", "qty", "grams", "hours", "exact", "slicer", "reliable"] {
+            if let value = q[key] { answer[key] = value }
+        }
+        let body = (try? String(decoding: JSONEncoder().encode(JSONValue.object(answer)), as: UTF8.self)) ?? "{}"
+        return .open(200, body)
+    }
+
+    /// The figure this server quoted, for a reference the same visitor holds.
+    /// Nil for a reference that has expired, was never issued, or belongs to
+    /// somebody else — in every case the request is simply taken unpriced.
+    func recallQuote(_ ref: String?, ip: String, now: Date) -> JSONValue? {
+        guard let ref, !ref.isEmpty, let held = quoted[ref] else { return nil }
+        guard now.timeIntervalSince(held.at) <= Self.quoteTTL, held.ip == ip else { return nil }
+        return held.quote
+    }
+
+    private func sweepQuotes(now: Date) {
+        quoted = quoted.filter { now.timeIntervalSince($0.value.at) <= Self.quoteTTL }
+    }
+
+    nonisolated static func quotingIsOn(_ store: [String: JSONValue]) -> Bool {
+        guard case .object(let settings)? = store["settings"],
+              case .object(let lan)? = settings["lanApi"],
+              case .object(let cfg)? = lan["intakeQuote"] else { return false }
+        return cfg["enabled"] == .bool(true)
+    }
+
+    /// The readers this app has. G-code is read as text; the three mesh
+    /// formats are measured by `Mesh`.
+    nonisolated static let readableUploads: Set<String> = ["stl", "obj", "3mf", "gcode", "gco"]
+
+    nonisolated static func uploadExtension(_ name: String) -> String {
+        let tail = name.split(separator: ".").last.map(String.init) ?? ""
+        return tail.lowercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+    }
+
+    /// Measure an uploaded mesh, in the shape `publicQuote` reads.
+    ///
+    /// Written to a scratch file because every reader here takes a URL — a
+    /// 3MF is a zip and is read by seeking, not streaming — and deleted on the
+    /// way out whatever happens. `areaMm2` comes from the same walk that
+    /// produces the risk analysis, and only under the risk cap: without it the
+    /// estimator falls back to its constant, which it says it supports.
+    nonisolated static func measureUpload(_ data: Data, ext: String) throws -> JSONValue? {
+        let scratch = FileManager.default.temporaryDirectory
+            .appending(path: "khayt-intake-\(UUID().uuidString).\(ext)")
+        try data.write(to: scratch, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        guard let measured = try Mesh.readGeometry(scratch, ext: ext), measured.volumeMm3 > 0 else { return nil }
+        var geometry: [String: JSONValue] = [
+            "volumeMm3": .number(measured.volumeMm3),
+            "triangleCount": .number(Double(measured.triangleCount)),
+            "bbox": .object(["x": .number(measured.x), "y": .number(measured.y), "z": .number(measured.z)]),
+        ]
+        if data.count <= maxRiskBytes,
+           let walked = try? Mesh.overhangs(of: scratch),
+           case .number(let area)? = walked["totalAreaMm2"], area > 0 {
+            geometry["areaMm2"] = .number(area)
+        }
+        return .object(["source": .string("geometry"), "exact": .bool(false),
+                        "geometry": .object(geometry)])
     }
 
     // MARK: - The calendar
