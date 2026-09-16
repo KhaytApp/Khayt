@@ -345,6 +345,11 @@ final class Shop {
             if let forced = ProcessInfo.processInfo.environment["KHAYT_LANG"] { wanted = forced }
             await words.load(wanted, engine: engine)
             settingsValue = root["settings"] ?? .object([:])
+            lanBook = ["printLog": root["printLog"] ?? .array([]),
+                       "waitingList": root["waitingList"] ?? .array([]),
+                       "settings": root["settings"] ?? .object([:]),
+                       "machines": root["machines"] ?? .array([])]
+            await syncLanServer()
             // AFTER the words, because the name is read in the shop's language.
             // It is `bizEn`/`bizAr`, the fields Khayt's own Settings page
             // writes and every document prints — not `shopName`, which nothing
@@ -2829,6 +2834,16 @@ final class Shop {
 
     /// `printFiles` as written. See `setups(for:)` and `versions(for:)`.
     private(set) var fileRows: [JSONValue] = []
+
+    /// The book as the LAN server's shared pages read it — `printLog`,
+    /// `waitingList`, `settings` and `machines`, raw. See `LanServer`.
+    private(set) var lanBook: [String: JSONValue] = [:]
+    /// The phone's way in, while the settings say it should be running.
+    var lanServer: LanServer?
+    /// What the running server was started with, so a save that changed the
+    /// port or the PIN restarts it and one that did not leaves it be.
+    var lanRunning: LanConfig?
+    var lanProblem: String?
 
     var settingsDict: [String: JSONValue] {
         if case .object(let s) = settingsValue { return s }

@@ -581,6 +581,10 @@ public actor KhaytEngine {
         "waste-trend",
         // Whether the shop keeps its promises: finished by the due date, or by how many days not.
         "on-time",
+        // The LAN server's rules and pages: the lockout in front of it, and what
+        // the phone is shown — the same bytes the other app serves.
+        "lan-auth",
+        "lan-pages",
         // Which customers are worth keeping.
         "client-value",
         // Whether the shop can take another job, and when it would start.
@@ -4315,6 +4319,54 @@ public actor KhaytEngine {
           },
         })
         """#, [.array(orders)], as: OnTime.self)
+    }
+
+    // MARK: - The LAN server: what the phone is shown, and the gate in front
+
+    /// Each of these returns the BODY as the Node server writes it —
+    /// `JSON.stringify` on the JavaScript side, not a Swift re-encoding —
+    /// because a phone that gets a slightly different page from the Mac than
+    /// from the PC is a phone whose shop cannot tell which one is wrong.
+    public func lanStatusBody(store: JSONValue, today: String) throws -> String {
+        try runtime.call2("JSON.stringify(globalThis.KhaytLanPages.statusJson(ARG0, ARG1))",
+                          [store, .string(today)], as: String.self)
+    }
+    public func lanQueueBody(store: JSONValue) throws -> String {
+        try runtime.call2("JSON.stringify(globalThis.KhaytLanPages.queueJson(ARG0))", [store], as: String.self)
+    }
+    public func lanManifestBody(store: JSONValue) throws -> String {
+        try runtime.call2("JSON.stringify(globalThis.KhaytLanPages.manifest(ARG0))", [store], as: String.self)
+    }
+    public func lanServiceWorker() throws -> String {
+        try runtime.call2("globalThis.KhaytLanPages.serviceWorker()", [], as: String.self)
+    }
+    public func lanQueuePage(store: JSONValue, now: String) throws -> String {
+        try runtime.call2("globalThis.KhaytLanPages.queuePage(ARG0, { now: ARG1 })",
+                          [store, .string(now)], as: String.self)
+    }
+    public func lanNotFoundBody() throws -> String {
+        try runtime.call2("JSON.stringify(globalThis.KhaytLanPages.notFound())", [], as: String.self)
+    }
+    /// The four headers every response carries, JSON included.
+    public func lanSecurityHeaders() throws -> [String: String] {
+        try runtime.call2("globalThis.KhaytLanPages.SECURITY_HEADERS", [], as: [String: String].self)
+    }
+
+    /// A failed PIN, recorded: the same bucket rule the Node server keeps.
+    public struct LanFailures: Decodable, Sendable, Equatable {
+        public let count: Double
+        public let resetAt: Double
+        public init(count: Double, resetAt: Double) { self.count = count; self.resetAt = resetAt }
+        public var json: JSONValue { .object(["count": .number(count), "resetAt": .number(resetAt)]) }
+    }
+    public func lanBumpFailure(_ prev: LanFailures?, now: Date, lockoutMs: Double = 60_000) throws -> LanFailures {
+        try runtime.call2("globalThis.KhaytLanAuth.bumpFailure(ARG0, ARG1, { lockoutMs: ARG2 })",
+                          [prev?.json ?? .null, .number(now.timeIntervalSince1970 * 1000), .number(lockoutMs)],
+                          as: LanFailures.self)
+    }
+    public func lanIsLockedOut(_ rec: LanFailures?, now: Date) throws -> Bool {
+        try runtime.call2("globalThis.KhaytLanAuth.isLockedOut(ARG0, ARG1)",
+                          [rec?.json ?? .null, .number(now.timeIntervalSince1970 * 1000)], as: Bool.self)
     }
 
     // MARK: - Break-even

@@ -690,6 +690,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) The phone's live queue, served by the Mac.** A new Online tab in
+  Settings carries the LAN block the Windows and Linux app keeps under
+  "Advanced": enable the server, listen on the shop's Wi‑Fi, set the owner
+  PIN. Switch it on and a phone on the same network gets the same live queue
+  page, status API, queue API and installable home-screen icon that app
+  serves — the same bytes, from one shared module (`lib/lan-pages.js`), behind
+  the same PIN and the same lockout rules (`lib/lan-auth.js`), with the same
+  security headers on every response. Saving restarts the server when the
+  port or the PIN changed. The intake form, quote approval, the calendar feed
+  and the webhooks are still the other app's; they follow.
+- The shared settings save (`lib/settings-edit.js`) now takes the LAN block
+  from a form and merges it the way the Electron page always did: the fields
+  shown over the stored block, a blank PIN keeps the current one, a port that
+  is not a port is 3219. The Electron page is unchanged.
+
 - **The P&L by month as well as by quarter, with the margin on each.** On the
   Mac the Reports P&L page has a "By quarter / By month" switch and a Margin
   column; the rule (`lib/pnl-report.js`) gained a month grain — the same
