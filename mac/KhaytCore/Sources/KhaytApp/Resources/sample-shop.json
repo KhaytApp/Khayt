@@ -3963,6 +3963,18 @@
  ],
  "expenses": [
   {
+   "id": "EXP-0010",
+   "date": "2026-08-15",
+   "category": "tools",
+   "amount": 16100,
+   "note": "Second machine — Prusa CORE One, with enclosure",
+   "orderId": null,
+   "receiptPath": null,
+   "recurring": null,
+   "nextDue": null,
+   "vatAmount": 2100
+  },
+  {
    "id": "EXP-0009",
    "date": "2026-09-02",
    "category": "filament",
@@ -5230,21 +5242,21 @@
    "machineId": "MACH-x1c",
    "name": "Replace nozzle",
    "intervalHours": 100,
-   "lastDoneHours": 0
+   "lastDoneHours": 100
   },
   {
    "id": "MT-02",
    "machineId": "MACH-x1c",
    "name": "Clean build plate",
    "intervalHours": 50,
-   "lastDoneHours": 0
+   "lastDoneHours": 96
   },
   {
    "id": "MT-03",
    "machineId": "MACH-core-one",
    "name": "Lubricate linear rails",
    "intervalHours": 40,
-   "lastDoneHours": 0
+   "lastDoneHours": 25
   },
   {
    "id": "MT-04",

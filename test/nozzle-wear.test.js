@@ -282,3 +282,13 @@ test('attention still works for callers that pass no wear function', () => {
     orders: [], statusCache: {}, nozzleWear: () => { throw new Error('boom'); } }),
     'and a wear function that throws must not take the whole bar down');
 });
+
+test('a legacy `delivered` job wore the nozzle too', () => {
+  const log = [
+    job('M1', '2026-08-10', [{ printWeight: 100, material: 'PLA' }]),
+    job('M1', '2026-08-11', [{ printWeight: 50, material: 'PLA' }], 'delivered'),
+    job('M1', '2026-08-12', [{ printWeight: 999, material: 'PLA' }], 'cancelled'),
+  ];
+  const r = NW.nozzleWear(log, { id: 'M1', nozzle: { installedAt: '2026-08-01', material: 'brass' } });
+  assert.equal(r.grams, 150, 'the delivered job counts; the cancelled one does not');
+});

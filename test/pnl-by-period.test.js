@@ -315,3 +315,17 @@ test('a receipt cannot reclaim more tax than it cost', () => {
               `reclaimed ${row.vatReclaimable} from a 100 receipt`);
   }
 });
+
+test('a legacy `delivered` row is revenue — finished work by the older spelling', () => {
+  // order-status keeps a handed-over job at `completed` + deliveredAt; books
+  // written before that rule hold `status: 'delivered'`, and the sample shop
+  // has thirteen of them. Skipping them under-reported every quarter.
+  const rows = pnlByPeriod([
+    { id: 'A', status: 'completed', date: '2026-08-10', price: 1000 },
+    { id: 'B', status: 'delivered', date: '2026-08-11', price: 500 },
+    { id: 'C', status: 'delivered', date: '2026-08-12', price: 9999, voidedAt: '2026-08-13' },
+  ], [], { settings: {}, now: new Date('2026-09-16T10:00:00') });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].orders, 2);
+  assert.equal(rows[0].revenue, 1500, 'and a voided one is still not, whichever spelling');
+});

@@ -105,6 +105,8 @@ function machineState(machine, entry, opts) {
 function isOpenOrder(o) {
   return !!o
     && o.status !== 'completed'
+    // A legacy `delivered` row is finished too; it cannot be overdue.
+    && o.status !== 'delivered'
     && o.status !== 'quote'
     && !o.voidedAt;
 }

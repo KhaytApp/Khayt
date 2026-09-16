@@ -153,17 +153,20 @@ struct LateTests {
         #expect(late.isEmpty, "a job that is done was being badged as late work")
     }
 
-    @Test("a delivered job past its date IS flagged, and that is Khayt's answer")
-    func deliveredIsFlagged() async throws {
-        // Recorded rather than argued with. `attention` treats an unpaid
-        // delivery past its date as wanting attention and a completed one as
-        // not, which reads oddly beside the case above — but it is the shared
-        // rule, both apps now say the same thing, and changing what a shop is
-        // shown to chase is not a change to make on the way past.
+    @Test("a job under the older `delivered` status is finished, and not late either")
+    func deliveredIsNotLate() async throws {
+        // This used to pin the opposite — "recorded rather than argued with":
+        // `attention` treated a legacy `delivered` row as open work past its
+        // date while treating `completed` as not, which read oddly beside the
+        // case above. It WAS odd: `delivered` is the older spelling of the
+        // same finished state (`order-status.js` keeps a handed-over job at
+        // `completed` + deliveredAt), and a job handed over months ago was
+        // badged late for ever. Changed deliberately on 2026-09-16 with seven
+        // other rules that treated the older spelling as unfinished.
         let late = try await KhaytEngine().lateOrders(
             [Self.job("O-3", status: "delivered", due: "2026-08-20")],
             machines: [], settings: [:], now: Self.now)
-        #expect(late.contains("O-3"))
+        #expect(late.isEmpty, "a job the shop handed over is not late work")
     }
 
     @Test("a quote has no deadline to miss")

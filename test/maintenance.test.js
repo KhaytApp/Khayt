@@ -328,3 +328,12 @@ test('the meter is what taskStatus measures against', () => {
   assert.equal(st.status, 'overdue');
   assert.equal(st.hoursRemaining, -60);
 });
+
+test('a legacy `delivered` job ran the machine too', () => {
+  // order-status keeps a handed-over job at `completed`; older books hold
+  // `status: 'delivered'` outright, and those hours were real.
+  assert.equal(hoursMeter([
+    { machineId: 'M1', status: 'completed', printTime: 12 },
+    { machineId: 'M1', status: 'delivered', printTime: 8 },
+  ], 'M1'), 20);
+});

@@ -163,7 +163,8 @@
       if (!order || !order.productId) continue;
       // Revenue only from what was actually made and billed. The COUNT is every
       // order — see the note at the top.
-      if (order.status !== 'completed' || order.voidedAt || !countsForBusiness(order)) continue;
+      // Finished by either spelling: a legacy `delivered` row is billed work.
+      if ((order.status !== 'completed' && order.status !== 'delivered') || order.voidedAt || !countsForBusiness(order)) continue;
       agg.get(order.productId).revenue += revenueOf(order, ctx);
     }
     const products = (ctx && ctx.products) || [];
