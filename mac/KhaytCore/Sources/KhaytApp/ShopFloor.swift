@@ -1206,7 +1206,15 @@ private struct Live: View {
                 // "by file position" would be a claim about somebody else's
                 // firmware.
                 if let source = status.progressSource {
-                    Text(shop.words.callIt(source == "layers" ? "mac.by_layers" : "mac.by_bytes"))
+                    // `m73` is the machine's own screen figure, so it is named
+                    // as such: a shop comparing the two should be able to see
+                    // at a glance that they are the same number.
+                    let caption = switch source {
+                    case "m73": "mac.by_printer"
+                    case "layers": "mac.by_layers"
+                    default: "mac.by_bytes"
+                    }
+                    Text(shop.words.callIt(caption))
                         .font(.caption2).foregroundStyle(.tertiary)
                 }
             }
