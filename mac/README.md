@@ -1091,8 +1091,8 @@ failed.
 
 The rest of analytics, the cloud portal, and most of the LAN server — the
 phone's live queue, the status API, the customer intake form, quote approval
-the order tracking page and the calendar feed are here; the webhooks, the kiosk
-and pricing an uploaded model are not. `KhaytCore` came first
+the order tracking page, the calendar feed and pricing a customer's uploaded
+model are here; the webhooks and the kiosk are not. `KhaytCore` came first
 because the alternative, screens against a half-trusted engine, is how the two
 apps come to disagree about a shop's money.
 

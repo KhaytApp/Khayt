@@ -689,6 +689,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) A customer can price their own model on the intake form.** With
+  public pricing switched on, the form offers an upload: the file is measured
+  in memory, priced on the shop's own preset, spool cost, margin and waste
+  allowance, and the figure is shown as an indication rather than a quote. A
+  sliced file is taken at the slicer's own weight and time; an STL, OBJ or
+  3MF is measured by this app's own reader. Nothing is written to disk — the
+  model is read and dropped, so there is no stranger's file on the shop's
+  machine to keep or explain. When the request is submitted, the price
+  attached to it is the one THIS server produced, recalled by reference, so
+  a browser cannot post a figure of its own. The rules are the shared ones
+  (`lib/public-quote.js`, `lib/gcode-parse.js`), which the other app already
+  quotes through, so a customer is never shown a different sum from the one
+  the shop would reach for the same part.
 - **(Mac) The shop's due dates as a calendar subscription.** With the LAN
   server on, Settings → Online shows the same `/calendar.ics` link the
   Windows and Linux app offers: one all-day event per open job with a due

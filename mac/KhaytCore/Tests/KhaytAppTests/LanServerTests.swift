@@ -33,7 +33,7 @@ struct LanServerTests {
         var tokens = 0
 
         init(pin: String = "2468", intakeToken: String = "", recordFails: Bool = false,
-             calendarToken: String = "") async throws {
+             calendarToken: String = "", measures: Bool = true) async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -53,6 +53,9 @@ struct LanServerTests {
             host.intakeToken = intakeToken
             host.calendarToken = calendarToken
             host.mintId = { "intake-fixed" }
+            // The reader is Swift and file-backed; the bench stands in for it
+            // so these tests are about the ROUTE, not about mesh arithmetic.
+            host.measure = { _, _ in measures ? LanServerTests.measuredCube : nil }
             host.record = { entry in
                 if recordFails { throw CocoaError(.fileWriteUnknown) }
                 recorded.entries.append(entry)
@@ -679,6 +682,160 @@ struct LanServerTests {
         #expect(LanServer.trackingPath("/order/") == nil)
         // The quote and approve routes take theirs first; this one never sees them.
         #expect(LanServer.quotePath("/order/T-5/quote") == "T-5")
+    }
+
+    // MARK: - Pricing a model the customer uploaded
+
+    /// A cube 50mm on a side, as this app's own reader measures one.
+    static let measuredCube: JSONValue = .object([
+        "source": .string("geometry"), "exact": .bool(false),
+        "geometry": .object([
+            "volumeMm3": .number(125_000), "areaMm2": .number(15_000),
+            "triangleCount": .number(12),
+            "bbox": .object(["x": .number(50), "y": .number(50), "z": .number(50)]),
+        ]),
+    ])
+
+    /// A shop that has switched public pricing on and chosen a preset.
+    static func quotingBook(_ base: [String: JSONValue]) -> [String: JSONValue] {
+        var book = base
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = book["settings"] { settings = s }
+        settings["currency"] = .string("SAR")
+        var lan: [String: JSONValue] = [:]
+        if case .object(let l)? = settings["lanApi"] { lan = l }
+        lan["intakeQuote"] = .object([
+            "enabled": .bool(true), "presetId": .string("PRESET-1"),
+            "spoolCost": .number(75), "spoolWeight": .number(1000),
+            "marginPct": .number(30), "minPrice": .number(0), "wastePct": .number(0.05),
+            "hourlyLimit": .number(12),
+        ])
+        settings["lanApi"] = .object(lan)
+        book["settings"] = .object(settings)
+        book["printers"] = .array([.object([
+            "id": .string("PRESET-1"), "name": .string("U1"),
+            "wearRate": .number(0.75), "powerDraw": .number(150), "elecRate": .number(0.18),
+            "laborRate": .number(90), "failureRate": .number(10),
+            "prepTime": .number(0.1), "postTime": .number(0.1),
+        ])])
+        return book
+    }
+
+    @Test("a measured model comes back priced, and the form offers the upload")
+    func estimatePrices() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        // The widget appears exactly when the route would answer.
+        let (form, cookie) = try await bench.openForm()
+        #expect(form.text.contains(#"id="modelFile""#), "the form did not offer the upload")
+
+        let reply = try await bench.post("/api/intake/estimate?name=cube.stl", json: "MESH", headers: ["Cookie": cookie])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        guard case .object(let q) = try JSONDecoder().decode(JSONValue.self, from: reply.body) else {
+            Issue.record("not an object: \(reply.text)"); return
+        }
+        #expect(q["ok"] == .bool(true), Comment(rawValue: reply.text))
+        guard case .number(let price)? = q["price"] else { Issue.record("no price: \(reply.text)"); return }
+        #expect(price > 0)
+        #expect(q["currency"] == .string("SAR"))
+        #expect(q["binding"] == .bool(false), "a public figure must never be a promise")
+        guard case .string(let ref)? = q["ref"] else { Issue.record("no reference"); return }
+
+        // And the SHOP's figure is what lands on the request, by reference.
+        let body = #"{"name":"Sara","description":"the cube","consent":true,"estimateRef":"\#(ref)"}"#
+        let sent = try await bench.post("/api/intake", json: body, headers: ["Cookie": cookie])
+        #expect(sent.status == 200, Comment(rawValue: sent.text))
+        guard case .object(let entry)? = bench.recorded.entries.first else { Issue.record("no entry"); return }
+        #expect(entry["estValue"] == .number(price), Comment(rawValue: "\(entry["estValue"] ?? .null)"))
+        if case .object(let model)? = entry["modelQuote"] {
+            #expect(model["binding"] == .bool(false))
+            #expect(model["price"] == .number(price))
+        } else { Issue.record("the quote was not attached to the request") }
+    }
+
+    @Test("a price the browser makes up is not the price the shop sees")
+    func postedPriceIsIgnored() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let (_, cookie) = try await bench.openForm()
+        // A reference that was never issued, and a price posted beside it.
+        let body = #"{"name":"A","description":"B","consent":true,"estimateRef":"made-up","price":9999}"#
+        let sent = try await bench.post("/api/intake", json: body, headers: ["Cookie": cookie])
+        #expect(sent.status == 200)
+        guard case .object(let entry)? = bench.recorded.entries.first else { Issue.record("no entry"); return }
+        #expect(entry["estValue"] == .number(0), Comment(rawValue: "\(entry["estValue"] ?? .null)"))
+        #expect(entry["modelQuote"] == nil, "a made-up reference produced a quote")
+    }
+
+    @Test("the refusals come before the bytes, and in the Node route's order")
+    func estimateRefusals() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        // Off: answered before a single byte is read, so an off switch is not
+        // an upload target.
+        let off = try await bench.post("/api/intake/estimate?name=cube.stl", json: "MESH", headers: ["Cookie": cookie])
+        #expect(off.status == 403)
+        #expect(off.text == #"{"ok":false,"reason":"off"}"#)
+        // And the form does not offer a widget whose request would be refused.
+        let (form, _) = try await bench.openForm()
+        #expect(!form.text.contains(#"id="modelFile""#))
+
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let noSession = try await bench.post("/api/intake/estimate?name=cube.stl", json: "MESH")
+        #expect(noSession.status == 401)
+        let odd = try await bench.post("/api/intake/estimate?name=drawing.pdf", json: "X", headers: ["Cookie": cookie])
+        #expect(odd.status == 400)
+        #expect(odd.text == #"{"ok":false,"reason":"unsupported"}"#)
+        let empty = try await bench.post("/api/intake/estimate?name=cube.stl", json: "", headers: ["Cookie": cookie])
+        #expect(empty.status == 400)
+        #expect(empty.text == #"{"ok":false,"reason":"no-numbers"}"#)
+    }
+
+    @Test("a file this app cannot measure is refused rather than guessed at")
+    func unmeasurable() async throws {
+        let bench = try await Bench(measures: false)
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let (_, cookie) = try await bench.openForm()
+        let reply = try await bench.post("/api/intake/estimate?name=cube.stl", json: "NOT A MESH", headers: ["Cookie": cookie])
+        #expect(reply.status == 400)
+        #expect(reply.text == #"{"ok":false,"reason":"no-numbers"}"#)
+    }
+
+    @Test("a sliced file is quoted on the slicer's own figures")
+    func slicedUpload() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let (_, cookie) = try await bench.openForm()
+        let gcode = "; estimated printing time (normal mode) = 4h 32m 11s\n; filament used [g] = 140.91\n"
+        let reply = try await bench.post("/api/intake/estimate?name=part.gcode", json: gcode, headers: ["Cookie": cookie])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        guard case .object(let q) = try JSONDecoder().decode(JSONValue.self, from: reply.body) else {
+            Issue.record("not an object"); return
+        }
+        #expect(q["ok"] == .bool(true), Comment(rawValue: reply.text))
+        #expect(q["exact"] == .bool(true), "a sliced file was estimated instead of read")
+        // The slicer's 140.91 g plus the shop's own 5% purge and brim slack,
+        // which the rule adds because the customer's file does not account
+        // for it. The shop's allowance, not this app's.
+        #expect(q["grams"] == .number(148), Comment(rawValue: "\(q["grams"] ?? .null)"))
+    }
+
+    @Test("what a name is allowed to mean, and what the readers are")
+    func uploadNames() {
+        #expect(LanServer.uploadExtension("cube.STL") == "stl")
+        #expect(LanServer.uploadExtension("a/../b.3mf") == "3mf")
+        // A name with no extension yields whatever is left after the filter,
+        // which is not a reader this app has — so it is refused.
+        #expect(LanServer.uploadExtension("no-dot") == "nodot")
+        #expect(!LanServer.readableUploads.contains(LanServer.uploadExtension("no-dot")))
+        #expect(LanServer.uploadExtension("odd.st l;") == "stl")
+        #expect(LanServer.readableUploads == ["stl", "obj", "3mf", "gcode", "gco"])
+        #expect(!LanServer.quotingIsOn([:]))
     }
 
     // MARK: - The calendar
