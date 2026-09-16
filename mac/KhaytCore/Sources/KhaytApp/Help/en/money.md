@@ -38,7 +38,9 @@ the difference.
   electricity, maintenance, tools, shipping.
 - **Waste** — a print that failed, what it was made of, what went wrong, and
   what it cost. Optionally taking the material off the spool, because a failed
-  print consumed it just as surely as a good one.
+  print consumed it just as surely as a good one. The pane beside the list
+  draws six months of wasted grams stacked by what went wrong, so the failure
+  that keeps coming back is a stripe you can point at.
 
 Both screens are searchable by note, category, material or the job a cost was
 booked to.

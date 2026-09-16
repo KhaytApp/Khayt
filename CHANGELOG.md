@@ -1258,6 +1258,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Both draw from the P&L rule by month now, so a month's revenue, spending
   and margin are one set of figures wherever they are shown.
 
+- **(Mac) The help caught up with the Reports and Waste screens.** The Reports
+  article lists cost and revenue trends, how long a job takes and on-time
+  delivery; the Money article says what the Waste pane draws.
+
 - **A job finished under the older `delivered` status was missing from eight
   rules — the quarterly P&L among them.** Khayt's own rule keeps a handed-over
   job at `completed` and stamps it `deliveredAt`; books written before that
