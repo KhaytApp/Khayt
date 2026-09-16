@@ -897,6 +897,34 @@ final class PrinterWatch {
         return "<1m"
     }
 
+    /// Which signal a percentage came from, as a word key — or nothing.
+    ///
+    /// ── ONLY FROM THE ADAPTER THAT ACTUALLY CHOOSES ───────────────────────
+    ///
+    /// Moonraker is the one that picks between signals, so it is the one whose
+    /// choice is worth naming. OctoPrint's `completion` and PrusaLink's
+    /// `progress` are percentages their own servers computed, and calling
+    /// either "by file position" would be inventing a fact about someone
+    /// else's firmware.
+    ///
+    /// The screen said it did this and did not. `lib/sdcp.js` sets
+    /// `progressSource` as well — to `time` or `none` — and the view captioned
+    /// anything it did not recognise as "by file position", so a resin printer
+    /// reporting its own elapsed ticks was described in terms of a file it
+    /// does not have. Nothing threw and no test failed, because the producer's
+    /// tests assert `time` and the view had none. So: the TYPE decides whether
+    /// to caption at all, and an unknown source is not described rather than
+    /// described wrongly.
+    static func progressCaption(type: String, source: String?) -> String? {
+        guard type == "moonraker", let source else { return nil }
+        switch source {
+        case "m73": return "mac.by_printer"
+        case "layers": return "mac.by_layers"
+        case "bytes": return "mac.by_bytes"
+        default: return nil
+        }
+    }
+
     static func degrees(_ value: Double) -> String { "\(Int(value.rounded()))°" }
 
     /// A failure in the vocabulary of the person who has to fix it.

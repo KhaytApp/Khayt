@@ -183,3 +183,51 @@ struct CataloguePriceFidelityTests {
         #expect(part["wearRate"] == .number(0.75))
     }
 }
+
+/// What the shop floor says a percentage was measured by.
+///
+/// The caption existed to make one distinction — layers against file position
+/// on a Moonraker printer — and quietly made a claim about every other
+/// protocol as well, because `lib/sdcp.js` sets `progressSource` too.
+@MainActor
+struct ProgressCaptionTests {
+
+    @Test("only the adapter that chooses between signals is captioned")
+    func onlyMoonraker() {
+        #expect(PrinterWatch.progressCaption(type: "moonraker", source: "m73") == "mac.by_printer")
+        #expect(PrinterWatch.progressCaption(type: "moonraker", source: "layers") == "mac.by_layers")
+        #expect(PrinterWatch.progressCaption(type: "moonraker", source: "bytes") == "mac.by_bytes")
+        // A resin printer's own words, which are not about a file at all.
+        for source in ["time", "none", "layers"] {
+            #expect(PrinterWatch.progressCaption(type: "sdcp", source: source) == nil,
+                    Comment(rawValue: "sdcp/\(source) was captioned"))
+        }
+        for type in ["octoprint", "prusalink", "bambu", "duet", "repetier"] {
+            #expect(PrinterWatch.progressCaption(type: type, source: "layers") == nil,
+                    Comment(rawValue: "\(type) was captioned"))
+        }
+        #expect(PrinterWatch.progressCaption(type: "moonraker", source: nil) == nil)
+        // A signal this app has not been taught is not described at all.
+        #expect(PrinterWatch.progressCaption(type: "moonraker", source: "whatever") == nil)
+    }
+
+    @Test("every source the Moonraker rule can emit has a caption")
+    func everySourceIsNamed() async throws {
+        // The producer's own vocabulary, so a new signal cannot be added on
+        // one side and read as nothing on the other.
+        let engine = try KhaytEngine()
+        for (source, layers, bytes, display) in [
+            ("m73", true, 0.5, 0.7), ("layers", true, 0.5, 0.5), ("bytes", false, 0.5, 0.5),
+        ] as [(String, Bool, Double, Double)] {
+            var stats: [String: JSONValue] = [:]
+            if layers { stats["info"] = .object(["current_layer": .number(5), "total_layer": .number(10)]) }
+            let got = try await engine.moonrakerProgressSource(
+                printStats: .object(stats),
+                virtualSdcard: .object(["progress": .number(bytes)]),
+                displayStatus: .object(["progress": .number(display)]))
+            #expect(got == source, Comment(rawValue: "expected \(source), got \(got)"))
+            #expect(PrinterWatch.progressCaption(type: "moonraker", source: got) != nil,
+                    Comment(rawValue: "the rule emits \(got) and the screen has no word for it"))
+        }
+    }
+}
