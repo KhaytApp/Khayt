@@ -381,7 +381,28 @@
     out.printerApi = s.printerApi || {};
     out.locations = s.locations || [];
     // The host migrates the legacy webhook secrets into this BEFORE calling.
-    out.lanApi = s.lanApi || { enabled: false, port: 3219, pin: '' };
+    //
+    // The LAN block is merged the way the Electron page's own
+    // `saveLanApiSettingsFromForm` merges it: the fields the pane shows over
+    // whatever was stored, so a webhook token the pane never displays survives
+    // the save. A blank PIN keeps the stored one — "leave blank to keep
+    // current" is that page's rule for every secret field — and a port that is
+    // not a port falls back to 3219, as its `parseInt(...) || 3219` does.
+    const storedLan = s.lanApi || { enabled: false, port: 3219, pin: '' };
+    if (has(f, 'lanApi') && f.lanApi && typeof f.lanApi === 'object') {
+      const l = f.lanApi;
+      const port = Math.floor(num(l.port, 0));
+      const typedPin = l.pin == null ? '' : String(l.pin).trim();
+      out.lanApi = {
+        ...storedLan,
+        enabled: has(l, 'enabled') ? !!l.enabled : !!storedLan.enabled,
+        port: has(l, 'port') ? (port >= 1 && port <= 65535 ? port : 3219) : (storedLan.port || 3219),
+        bindLan: has(l, 'bindLan') ? !!l.bindLan : !!storedLan.bindLan,
+        pin: typedPin || storedLan.pin || '',
+      };
+    } else {
+      out.lanApi = storedLan;
+    }
     out.onlineEnabled = !!s.onlineEnabled;
     out.securityEnabled = !!s.securityEnabled;
     out.recoveryCodeHash = s.recoveryCodeHash || '';

@@ -1089,9 +1089,11 @@ failed.
 
 ## Not yet built
 
-The rest of analytics, the cloud portal, and the LAN server. `KhaytCore` came
-first because the alternative, screens against a half-trusted engine, is how the
-two apps come to disagree about a shop's money.
+The rest of analytics, the cloud portal, and most of the LAN server — the
+phone's live queue and the status API are here; the intake form, quote
+approval, the calendar feed and the webhooks are not. `KhaytCore` came first
+because the alternative, screens against a half-trusted engine, is how the two
+apps come to disagree about a shop's money.
 
 THE PARAGRAPH ABOVE IS THE LIST, and `NotYetBuiltTests` reads exactly it — the
 first paragraph of this section and nothing after it. That is the guard, and it

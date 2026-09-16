@@ -2005,6 +2005,28 @@ final class Words {
         "mac.saved_to":      ["en": "Saved as",     "ar": "حُفظ باسم"],
         "mac.no_document":   ["en": "This job's invoice could not be built.",
                               "ar": "تعذّر إنشاء فاتورة هذا العمل."],
+        // ── The LAN server ───────────────────────────────────────────────
+        // The TAB name, as with Integrations and Slicers: Khayt's own heading
+        // for this block is `lan.settings_intro`, a sentence. The words inside
+        // the pane are the shared `lan.*` ones the Electron page reads, so the
+        // two apps call the same switch the same thing.
+        "mac.nav_online":    ["en": "Online", "ar": "الشبكة"],
+        "mac.online_title":  ["en": "The phone's live queue", "ar": "قائمة الانتظار على الهاتف"],
+        "mac.online_desc":   ["en": "This Mac serves the live queue to phones on the shop's Wi‑Fi, "
+                                    + "and the same status API the Windows and Linux app serves. "
+                                    + "The customer intake form, quote approval and the calendar feed "
+                                    + "run in that app for now.",
+                              "ar": "يقدّم هذا الماك قائمة الانتظار المباشرة للهواتف على شبكة Wi‑Fi الخاصة بالمحل، "
+                                    + "ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس. "
+                                    + "أما نموذج طلبات العملاء واعتماد عروض الأسعار وتقويم المواعيد فتعمل في ذلك التطبيق حالياً."],
+        "mac.lan_open":      ["en": "Open on a phone on the same Wi‑Fi:",
+                              "ar": "افتحه على هاتف متصل بنفس شبكة Wi‑Fi:"],
+        "mac.lan_pin_missing": ["en": "Set an owner PIN — the queue shows customers' names.",
+                                "ar": "عيّن رمز PIN للمالك — فالقائمة تعرض أسماء العملاء."],
+        "mac.lan_failed":    ["en": "The server could not start: {error}",
+                              "ar": "تعذّر تشغيل الخادم: {error}"],
+        "mac.lan_restart_note": ["en": "Saved settings take effect at once: the server restarts on Save.",
+                                 "ar": "تسري الإعدادات فور حفظها: يُعاد تشغيل الخادم عند الحفظ."],
     ]
 
     /// The Khayt keys this app leans on. Listed so a test can prove every one of
@@ -2121,5 +2143,8 @@ final class Words {
         "set.tax_mode_inclusive", "set.use_arabic_nums", "set.use_hijri", "set.vat",
         "set.vat_rate", "set.wh_hint", "set.wip_enforce_hard", "set.wip_limits",
         "set.working_hours", "set.worldwide_section",
+        // The LAN server's pane, in the Electron page's own words.
+        "lan.enabled", "lan.port", "lan.pin", "lan.bind_lan", "lan.bind_lan_hint",
+        "lan.loopback_warn", "lan.not_running", "common.secret_unchanged",
     ]
 }
