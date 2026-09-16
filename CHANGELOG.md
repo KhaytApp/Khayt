@@ -714,6 +714,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   is held byte-identical to its old handlers. Not yet on the Mac: pricing an
   uploaded model on the form (the form does not offer the upload here) and
   the legacy intake PIN route.
+- **(Mac) A customer approves a quote from their phone.** On a job that is a
+  quote, the inspector has "Copy quote link": the link points at this Mac,
+  carries the job's own approval token (minted into the job the first time,
+  as the Windows and Linux app mints it), and opens the same quote page that
+  app serves — the parts, the total in the shop's currency, the expiry, and
+  one button. Approving moves the job to pending inside the write on the
+  newest book; a quote that expired, or was already approved, gets the same
+  answer the other app gives. The page's small companions (not found, bad
+  link, expired, cannot approve, approved) are lifted out of the Node routes
+  into `lib/lan-quote-page.js`, verbatim, and the Node server draws from
+  them; the rule's clock is injectable so both hosts can be held to it. Not
+  yet on the Mac: the order tracking page and the legacy POST /order/:id.
 
 - **The P&L by month as well as by quarter, with the margin on each.** On the
   Mac the Reports P&L page has a "By quarter / By month" switch and a Margin
