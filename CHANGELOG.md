@@ -1371,6 +1371,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **(Mac) The shop's mode was ignored here, so a Simple shop saw the whole
+  Professional surface.** Khayt has two modes and `lib/feature-tiers.js` is
+  the single source of truth for what each includes — and this app read
+  `settings.mode` nowhere at all. Of the nine Professional features it has
+  built four, and all four were shown to everybody: full analytics, expense
+  tracking, machine maintenance and ZATCA e-invoicing. They are gated now,
+  so the two apps agree about what a shop has. A shop that switches to
+  Simple while looking at Reports or Expenses is moved to the Dashboard
+  rather than left on a screen that is no longer theirs. Only those four are
+  gated: a screen added later and never classified stays visible rather than
+  quietly disappearing. An enthusiast book — Bed Ready's mode, retired on
+  this side — is read as Simple exactly as `applyMode()` migrates it, so
+  opening one here does not strip its customers and invoices.
 - **The mode comparison was short of two things a shop actually gets.** The
   product catalogue and the portfolio are both hidden from the commerce-free
   flavour by a `.biz-only` class in the markup, but neither appeared in

@@ -406,7 +406,12 @@ private struct Card: View {
                 }
             }
         }
-        .task(id: upkeepInputs) { upkeep = await shop.maintenance(for: machine) }
+        // Machine maintenance and downtime is a Professional feature; the
+        // other app hides the whole of it from a Simple shop. Not asked for
+        // rather than asked and hidden — the answer costs a walk of the book.
+        .task(id: upkeepInputs) {
+            upkeep = shop.has("maintenance") ? await shop.maintenance(for: machine) : nil
+        }
         .card(rail: running ? Khayt.hot : nil, padding: 14, fills: true)
     }
 

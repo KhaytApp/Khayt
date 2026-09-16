@@ -592,6 +592,7 @@ public actor KhaytEngine {
         "lan-order-page",
         "lan-calendar",
         "upload-scan",
+        "feature-tiers",
         "public-quote",
         "gcode-parse",
         // Which customers are worth keeping.
@@ -6645,6 +6646,30 @@ public actor KhaytEngine {
                                         displayStatus: JSONValue) throws -> String {
         try runtime.call2("KhaytPrinterStatus.moonrakerProgress(ARG0, ARG1, ARG2).source",
                           [printStats, virtualSdcard, displayStatus], as: String.self)
+    }
+
+    /// Which features a shop's chosen mode includes: `lib/feature-tiers.js`.
+    ///
+    /// ── AND WHY THE MODE IS RESOLVED HERE ─────────────────────────────────
+    ///
+    /// `enthusiast` is a stored value this app must handle and must not
+    /// honour. It is Bed Ready's only mode and was retired as a Khayt one:
+    /// `applyMode()` in `renderer/shell.js` migrates any Khayt book carrying
+    /// it to `simple`. This app is Khayt, so it reads it the same way — an
+    /// enthusiast book opened here would otherwise lose every commerce
+    /// surface, which is the opposite of what that migration decided.
+    ///
+    /// An absent mode is `professional`, which is what a book written before
+    /// modes existed means and what `settings-edit` writes.
+    public func featureEnabled(_ key: String, mode: String?) throws -> Bool {
+        try runtime.call2("""
+            (function (key, mode) {
+              var T = globalThis.KhaytTiers;
+              var m = mode || 'professional';
+              if (T.isEnthusiast(m)) m = 'simple';
+              return T.isFeatureEnabled(key, m);
+            })(ARG0, ARG1)
+            """, [.string(key), mode.map { JSONValue.string($0) } ?? .null], as: Bool.self)
     }
 
     /// Is a stranger's uploaded model safe to write down and hand to a slicer?

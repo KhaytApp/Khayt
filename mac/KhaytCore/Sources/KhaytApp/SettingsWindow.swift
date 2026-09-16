@@ -290,7 +290,11 @@ struct InvoicePane: View {
                     // exclusive both look plausible and differ by the tax on
                     // every order.
                     Text(example).font(.callout).foregroundStyle(.secondary)
-                    Toggle(shop.words.callIt("set.enable_zatca"), isOn: $draft.enableZatca)
+                    // ZATCA Phase 2 e-invoicing is a Professional feature, and the
+                    // other app hides it from a Simple shop.
+                    if shop.has("zatca") {
+                        Toggle(shop.words.callIt("set.enable_zatca"), isOn: $draft.enableZatca)
+                    }
                 }
                 Section(shop.words.callIt("set.invoice_section")) {
                     row(shop.words.callIt("set.invoice_prefix")) { TextField("", text: $draft.invPrefix).frame(width: 120) }
