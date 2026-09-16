@@ -690,6 +690,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **A job's price can be adjusted after it is taken — in both apps.** The
+  Mac's edit-job sheet and the order editor on Windows and Linux both take a
+  typed total ("we agreed 1,800 in the end"). The shared edit rule writes it,
+  keeps what the arithmetic said beside it, marks the job's price as the
+  shop's own, clamps what has been paid to the new total, re-derives the
+  payment status, and records the change in the job's history with what it
+  was and what it became — the same trace a due-date change leaves.
+
 - **A job's total gets its last word: round it, or type it.** Cost plus margin
   is where a price starts, not where it ends. On the new-job sheet (Mac) and the
   calculator (Windows and Linux) the total can be rounded to the nearest 1, 5
@@ -1212,6 +1220,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **An invoice line for a part the customer agreed a price for printed the
+  wrong amount.** The document shared the job's price among its parts by cost,
+  so a bracket agreed at 50 printed at whatever its cost share came to — the
+  one line a customer can check against what they were told. An agreed part
+  now prints its agreed figure, and the other parts share the rest by cost, as
+  before. Every existing invoice fixture is byte-identical.
 
 - **A standing order made the same job differently depending on the day the
   app was opened.** Two copies of the recurring-orders rule ran at every boot,

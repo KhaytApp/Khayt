@@ -4259,15 +4259,19 @@ public actor KhaytEngine {
     /// `dueDate` nil clears it — a job with no due date is a real answer.
     /// Returns the order unchanged and no effects when nothing actually moved,
     /// so an editor opened and closed again writes no revision.
+    /// `price` is a typed total — the last word on what the job costs the
+    /// customer, after it was taken. Nil leaves the price alone; the rule
+    /// writes how the price was reached and what follows for the money.
     public func editJob(order: JSONValue, dueDate: String?, priorityLevel: String,
-                        now: Date, editId: String) throws -> JobEdited {
+                        price: Double? = nil, now: Date, editId: String) throws -> JobEdited {
         try runtime.call2(
             "(function(){ var o = ARG0;"
-          + " var r = KhaytOrderEdit.applyEdit(o, { dueDate: ARG1, priorityLevel: ARG2 },"
+          + " var r = KhaytOrderEdit.applyEdit(o, { dueDate: ARG1, priorityLevel: ARG2, price: ARG5 },"
           + "                                 { now: ARG3, id: ARG4 });"
           + " return { order: o, changed: Object.keys(r.changes).length > 0 }; })()",
             [order, dueDate.map(JSONValue.string) ?? .null, .string(priorityLevel),
-             .number(now.timeIntervalSince1970 * 1000), .string(editId)],
+             .number(now.timeIntervalSince1970 * 1000), .string(editId),
+             price.map(JSONValue.number) ?? .null],
             as: JobEdited.self)
     }
 

@@ -916,6 +916,29 @@ struct EditJobTests {
         #expect(MoveJobTests.string(entry["at"])?.hasSuffix("Z") == true)
     }
 
+    @Test("a typed price is written with what the arithmetic said, and the money follows")
+    func typedPrice() async throws {
+        let engine = try KhaytEngine()
+        let order: JSONValue = .object([
+            "id": .string("J1"), "price": .number(1847.37), "paidAmount": .number(1847.37),
+            "paymentStatus": .string("paid"), "dueDate": .string("2026-09-20"),
+            "priority": .bool(false), "priorityLevel": .string("normal"),
+        ])
+        let out = try await engine.editJob(order: order, dueDate: "2026-09-20", priorityLevel: "normal",
+                                           price: 1800, now: Date(), editId: "e1")
+        #expect(out.changed)
+        guard case .object(let after) = out.order else { Issue.record("not an order"); return }
+        #expect(MoveJobTests.number(after["price"]) == 1800)
+        #expect(MoveJobTests.number(after["computedPrice"]) == 1847.37)
+        #expect(MoveJobTests.string(after["priceSource"]) == "override")
+        #expect(MoveJobTests.number(after["paidAmount"]) == 1800, "paid never exceeds the price")
+        #expect(MoveJobTests.string(after["paymentStatus"]) == "paid")
+        // Nil is "leave it": the sheet's empty box is not a free job.
+        let same = try await engine.editJob(order: order, dueDate: "2026-09-20", priorityLevel: "normal",
+                                            price: nil, now: Date(), editId: "e2")
+        #expect(!same.changed)
+    }
+
     @Test("a due date can be cleared, because no due date is a real answer")
     func clearsTheDueDate() async throws {
         let engine = try KhaytEngine()

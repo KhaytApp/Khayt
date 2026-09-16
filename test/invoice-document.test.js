@@ -254,3 +254,21 @@ test('a whole number of hours does not grow a decimal point', () => {
   assert.match(doc, /6 hrs/, '"6 hrs" is what a person writes');
   assert.doesNotMatch(doc, /6\.0 hrs/, '"6.0 hrs" is what a spreadsheet writes');
 });
+
+/* ── A part the customer agreed a price for ───────────────────────────────────
+   The pool of the price was shared among the parts by cost, so an agreed
+   bracket at 50 would have printed at whatever its cost share came to — the
+   one line on the document the customer can check against what they were told,
+   wrong. The agreed part prints its agreed figure; the rest share the rest. */
+test('an agreed part is billed at its agreed figure and the others share what is left', () => {
+  const agreed = CASES.find((c) => c.name === 'agreed-part');
+  const html = render(agreed.order, agreed.opts, agreed.money);
+  const amounts = [...html.matchAll(/class="amount">([0-9.]+) /g)].map((m) => m[1]);
+  assert.deepEqual(amounts.slice(0, 2), ['100.00', '32.50'], '2 × 50 agreed, and 132.50 − 100 for the lid');
+  // No agreed part: every other fixture is byte-identical, which the first test
+  // proves; here the two sums are shown to be the old ones.
+  const plain = CASES.find((c) => c.name === 'plain-en');
+  const before = [...render(plain.order, plain.opts).matchAll(/class="amount">([0-9.]+) /g)].map((m) => m[1]);
+  // The fixture's parts carry no baseCost, so the pool is split equally — as it always was.
+  assert.deepEqual(before.slice(0, 2), ['575.00', '575.00']);
+});

@@ -43,6 +43,12 @@ Select a job and use the **Job** menu, or right-click it in the table. From
 there you can edit it, record a payment, put it on hold, mark it delivered,
 raise an invoice, or record what a print actually took.
 
+Editing a job changes its due date, its urgency, and — when the number changed
+on the phone — its price. A price typed there is the price; what the arithmetic
+said is kept on the job, what has been paid can never exceed the new total, and
+the payment status follows. Each change is written into the job's history with
+what it was and what it became.
+
 ## What it actually took
 
 When a print finishes you can record the real weight and the real time, rather

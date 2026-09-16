@@ -153,3 +153,65 @@ test('the same value typed two ways is not a change', () => {
   assert.deepEqual(E.changesBetween(blank, { dueDate: '' }), {},
     'null, undefined and empty are all "not set"');
 });
+
+/* ── A typed price, after the job is taken (2026-09-16) ─────────────────────── */
+require('../lib/order-payment.js');
+
+test('a typed price is the price, and the record says the arithmetic it replaced', () => {
+  const order = { id: 'J1', price: 1847.37, paidAmount: 0, paymentStatus: 'unpaid' };
+  const r = E.applyEdit(order, { price: 1800 }, { now: NOW, id: 'e1' });
+  assert.equal(order.price, 1800);
+  assert.equal(order.priceSource, 'override');
+  assert.equal(order.priceOverride, 1800);
+  assert.equal(order.computedPrice, 1847.37, 'what the arithmetic said is kept beside the typed figure');
+  assert.deepEqual(r.changes, { price: { from: 1847.37, to: 1800 } });
+  assert.deepEqual(order.editHistory[0].fields, { price: { from: 1847.37, to: 1800 } });
+  assert.deepEqual(r.effects.map((e) => e.type), ['save', 'render', 'toast_saved']);
+  // A second adjustment keeps the ORIGINAL arithmetic, not the first typed figure.
+  E.applyEdit(order, { price: 1750 }, { now: NOW, id: 'e2' });
+  assert.equal(order.computedPrice, 1847.37);
+  assert.equal(order.priceOverride, 1750);
+  // A job that was rounded already knows its arithmetic; it is not overwritten.
+  const rounded = { id: 'J2', price: 1850, computedPrice: 1847.37, priceSource: 'rounded', priceRound: { step: 5, mode: 'up' } };
+  E.applyEdit(rounded, { price: 1800 }, { now: NOW, id: 'e3' });
+  assert.equal(rounded.computedPrice, 1847.37);
+  assert.equal(rounded.priceSource, 'override');
+  assert.deepEqual(rounded.priceRound, { step: 5, mode: 'up' }, 'the rounding rule it had is left on the record');
+});
+
+test('the money follows the price: paid never exceeds it, and the status is re-derived', () => {
+  const paidUp = { id: 'J1', price: 500, paidAmount: 500, paymentStatus: 'paid' };
+  E.applyEdit(paidUp, { price: 450 }, { now: NOW, id: 'e1' });
+  assert.equal(paidUp.paidAmount, 450, 'clamped, as the editor always clamped');
+  assert.equal(paidUp.paymentStatus, 'paid');
+  const partly = { id: 'J2', price: 500, paidAmount: 200, paymentStatus: 'partial' };
+  E.applyEdit(partly, { price: 200 }, { now: NOW, id: 'e2' });
+  assert.equal(partly.paymentStatus, 'paid', 'the deposit now covers the whole job');
+  const unpaid = { id: 'J3', price: 500, paidAmount: 0, paymentStatus: 'unpaid' };
+  E.applyEdit(unpaid, { price: 600 }, { now: NOW, id: 'e3' });
+  assert.equal(unpaid.paymentStatus, 'unpaid');
+  const wasPaid = { id: 'J4', price: 500, paidAmount: 500, paymentStatus: 'paid' };
+  E.applyEdit(wasPaid, { price: 600 }, { now: NOW, id: 'e4' });
+  assert.equal(wasPaid.paymentStatus, 'partial', 'a raised price reopens a settled job');
+});
+
+test('an empty, absent, garbage or negative price leaves the price alone', () => {
+  for (const absent of [null, undefined, '', 'abc', -5]) {
+    const order = { id: 'J1', price: 100, dueDate: '2026-09-20' };
+    const r = E.applyEdit(order, { price: absent, dueDate: '2026-09-20' }, { now: NOW, id: 'e1' });
+    assert.equal(order.price, 100, `${JSON.stringify(absent)} changed the price`);
+    assert.equal(order.priceSource, undefined);
+    assert.deepEqual(r.changes, {});
+  }
+  // The same figure typed again is not a change, and zero is a price.
+  const same = { id: 'J1', price: 100 };
+  assert.deepEqual(E.applyEdit(same, { price: '100.00' }, { now: NOW }).changes, {});
+  const free = { id: 'J1', price: 100, paidAmount: 0 };
+  E.applyEdit(free, { price: 0 }, { now: NOW });
+  assert.equal(free.price, 0);
+  assert.equal(free.priceSource, 'override');
+  // Two decimals: money.
+  const cents = { id: 'J1', price: 100 };
+  E.applyEdit(cents, { price: 12.345 }, { now: NOW });
+  assert.equal(cents.price, 12.35);
+});

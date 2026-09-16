@@ -1478,6 +1478,11 @@ function openOrderEditor(orderId) {
         <label style="margin-top:0;">${escapeHtml(t('oe.shipping'))} (${currencySymbol()})</label>
         <input type="number" data-f="shippingCost" value="${draft.shippingCost}" min="0" step="0.01">
       </div>
+      <div>
+        <label style="margin-top:0;">${escapeHtml(t('pe.price_override'))} (${currencySymbol()})</label>
+        <input type="number" data-f="priceOverride" min="0" step="0.01" placeholder="${escapeHtml(fmtMoney(+order.price || 0))}"
+               title="${escapeHtml(t('pe.price_override_hint') || '')}">
+      </div>
     </div>
 
     <div style="margin-top:14px;">
@@ -2151,6 +2156,13 @@ function openOrderEditor(orderId) {
             order.paymentStatus = 'paid';
           }
         }
+      }
+      // A typed total is the last word, after the arithmetic above. The shared
+      // rule writes it, how the price was reached, and what follows for the
+      // money — lib/order-edit.js.
+      const typedPrice = String(document.querySelector('[data-f="priceOverride"]')?.value ?? '').trim();
+      if (typedPrice !== '') {
+        EditRules().applyEdit(order, { price: Math.max(0, +typedPrice || 0) }, { now: Date.now(), id: uid('edit') });
       }
       // Persist extra lines (after price recalculation to use correct prev values)
       order.extraLines = draft.extraLines.length > 0 ? draft.extraLines.map(l => ({ ...l })) : undefined;
