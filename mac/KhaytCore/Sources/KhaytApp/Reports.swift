@@ -41,6 +41,9 @@ struct Reports: View {
     /// When work actually finishes — which day, which hour, and how much of it
     /// on days the shop is shut.
     @State private var when: KhaytEngine.Throughput?
+    /// How long a job takes, by month and by product. See `CycleTimeCard`.
+    @State private var cycle: KhaytEngine.CycleTime?
+    @State private var lead: KhaytEngine.LeadTime?
     /// How much passes inspection, and how much first time.
     @State private var quality: KhaytEngine.QcMetrics?
     /// How far each machine runs from its quote, and the shop's own figure.
@@ -71,7 +74,7 @@ struct Reports: View {
                 Owing(shop: shop, owed: owed)
             } else if shop.reportPage == .best {
                 Best(shop: shop, best: best, worth: worth, earns: earns, mix: mix,
-                     when: when, quality: quality)
+                     when: when, quality: quality, cycle: cycle, lead: lead)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice, funnel: funnel)
             } else if shop.reportPage == .machines {
@@ -264,6 +267,7 @@ struct Reports: View {
         await recomputeProductProfit()
         await recomputeCustomerMix()
         await recomputeThroughput()
+        await recomputeCycleTime()
         await recomputeQuality()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
@@ -383,6 +387,16 @@ struct Reports: View {
             orders: shop.orderRows, openDays: open, minimum: 10)
     }
 
+    private func recomputeCycleTime() async {
+        guard let engine = shop.engine else { return }
+        // Six months, the other app's window, and NOT the chosen period: how
+        // long a job takes is a property of the shop, not of a quarter. The
+        // table is every finished job — four prints of one product across a
+        // year is the evidence that it always runs late.
+        cycle = try? await engine.cycleTime(orders: shop.orderRows, now: Date(), months: 6)
+        lead = try? await engine.leadTimeByProduct(orders: shop.orderRows, top: 10)
+    }
+
     private func recomputeQuality() async {
         guard let engine = shop.engine else { return }
         // The whole book. A first-pass yield over one quarter of a small shop
@@ -458,6 +472,8 @@ struct Reports: View {
         let mix: KhaytEngine.CustomerMix?
         let when: KhaytEngine.Throughput?
         let quality: KhaytEngine.QcMetrics?
+        let cycle: KhaytEngine.CycleTime?
+        let lead: KhaytEngine.LeadTime?
 
         var body: some View {
             // Two cards rather than two halves of one pane divided by a rule.
@@ -496,6 +512,9 @@ struct Reports: View {
                     ProductProfitTable(shop: shop, report: earns)
                         .card(rail: Khayt.brand, padding: 14)
                     ThroughputCard(shop: shop, report: when)
+                        .card(rail: Khayt.brand, padding: 14)
+                    // WHEN work finishes, above; how LONG it took, here.
+                    CycleTimeCard(shop: shop, cycle: cycle, lead: lead)
                         .card(rail: Khayt.brand, padding: 14)
                     // Beside what the shop MADE, because work done twice was
                     // billed once — the gap between the two figures on this

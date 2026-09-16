@@ -1019,34 +1019,14 @@ function renderWasteTrendChart() {
 function renderCycleTimeChart() {
   const el = $('#cycleTimeChart');
   if (!el) return;
-
-  const today = new Date();
-  const months = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    months.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(2)}`
-    });
-  }
-
-  const byMonth = {};
-  months.forEach(m => { byMonth[m.key] = { total: 0, count: 0 }; });
-
-  for (const o of (printLog || [])) {
-    if (o.status !== 'completed' || !o.date || !o.completedAt) continue;
-    const mk = localMonthStr(new Date(o.completedAt));
-    if (!byMonth[mk]) continue;
-    const days = (new Date(o.completedAt) - new Date(o.date)) / 86400000;
-    if (days < 0) continue;
-    byMonth[mk].total += days;
-    byMonth[mk].count++;
-  }
-
-  const vals = months.map(m => {
-    const b = byMonth[m.key];
-    return b.count > 0 ? b.total / b.count : null;
+  if (typeof KhaytCycleTime === 'undefined') { el.innerHTML = ''; return; }
+  // The arithmetic is lib/cycle-time.js — the same rule the Mac app draws —
+  // and it counts a DELIVERED job, which this function used to leave out.
+  const cycle = KhaytCycleTime.cycleTime(printLog, {
+    now: Date.now(), months: 6, countsForBusiness: (o) => _countsForBusiness(o),
   });
+  const months = cycle.months.map((m) => ({ key: m.key, label: `${m.key.slice(5, 7)}/${m.key.slice(2, 4)}` }));
+  const vals = cycle.months.map((m) => m.avgDays);
 
   const hasData = vals.some(v => v !== null);
   if (!hasData) {
@@ -1194,29 +1174,17 @@ function renderExpenseCategoryChart() {
 function renderLeadTimeChart() {
   const el = $('#leadTimeTable');
   if (!el) return;
-
-  const completed = (printLog || []).filter(o => o.status === 'completed' && o.date && o.completedAt);
-  if (completed.length < 3) {
+  if (typeof KhaytCycleTime === 'undefined') { el.innerHTML = ''; return; }
+  // lib/cycle-time.js: a delivered job counts, and a job taken from the
+  // catalogue joins its PRODUCT rather than a row of its own spelling.
+  const lead = KhaytCycleTime.leadTimeByProduct(printLog, {
+    top: 10, countsForBusiness: (o) => _countsForBusiness(o),
+  });
+  if (lead.jobs < 3) {
     el.innerHTML = `<div class="card" style="margin-bottom:16px;"><h3 class="card-head"><span class="swatch"></span>${escapeHtml(t('an.lead_time') || 'Lead Time by Product')}</h3><p style="color:var(--text-muted);padding:12px 0;font-size:13px;">${escapeHtml(t('an.no_data') || 'No data yet')}</p></div>`;
     return;
   }
-
-  const byProduct = {};
-  for (const o of completed) {
-    const key = o.project || o.name || 'Unknown';
-    const days = (new Date(o.completedAt) - new Date(o.date)) / 86400000;
-    if (days < 0) continue;
-    if (!byProduct[key]) byProduct[key] = { total: 0, count: 0, min: Infinity, max: -Infinity };
-    byProduct[key].total += days;
-    byProduct[key].count++;
-    if (days < byProduct[key].min) byProduct[key].min = days;
-    if (days > byProduct[key].max) byProduct[key].max = days;
-  }
-
-  const rows = Object.entries(byProduct)
-    .map(([name, d]) => ({ name, avg: d.total / d.count, fastest: d.min, slowest: d.max, count: d.count }))
-    .sort((a, b) => b.avg - a.avg)
-    .slice(0, 10);
+  const rows = lead.rows.map((r) => ({ name: r.name, avg: r.avgDays, fastest: r.fastest, slowest: r.slowest, count: r.jobs }));
 
   const daysLabel = escapeHtml(t('an.days') || 'days');
   const tableRows = rows.map(r => `<tr>

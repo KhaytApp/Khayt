@@ -950,6 +950,43 @@ import KhaytCore
                    "47-quote-funnel", size: CGSize(width: 600, height: 540))
     }
 
+    /// How long a job takes: six months of the average, and the products that
+    /// take longest — and the empty state a shop that has finished nothing sees.
+    @Test("the cycle-time card, by month and by product")
+    func cycleTimeCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let cycle = try await engine.cycleTime(orders: shop.orderRows, now: Date(), months: 6)
+        let lead = try await engine.leadTimeByProduct(orders: shop.orderRows, top: 10)
+        #expect(cycle.jobs >= 3, "the sample cannot reach this card")
+
+        try render(VStack(spacing: 16) {
+            CycleTimeCard(shop: shop, cycle: cycle, lead: lead)
+                .card(rail: Khayt.brand, padding: 14)
+            CycleTimeCard(shop: shop, cycle: nil, lead: nil)
+                .card(rail: Khayt.brand, padding: 14)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "54-cycle-time", size: CGSize(width: 600, height: 620))
+    }
+
+    /// What an hour earned and what a gram cost, month by month — with the
+    /// gaps where a month had no reading.
+    @Test("the trends card, both rows, gaps included")
+    func trendsChart() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let trends = try await engine.costTrends(
+            orders: shop.orderRows, spools: shop.inventoryRows,
+            settings: shop.settingsDict, clients: shop.clientRows, now: Date(), months: 12)
+        #expect(trends.anyReading, "the sample cannot reach this card")
+        try render(TrendsChart(shop: shop, trends: trends)
+                       .frame(width: 720).padding(Metric.screen).background(Khayt.ground),
+                   "55-trends", size: CGSize(width: 760, height: 260))
+    }
+
     /// Which of the things the shop sells actually earns.
     ///
     /// The sentence at the top is the point: the best use of a machine hour is

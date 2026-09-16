@@ -69,6 +69,7 @@ function loadAnalyticsStack() {
   require('../lib/break-even.js');   // globalThis.KhaytBreakEven
   require('../lib/cash-flow.js');    // globalThis.KhaytCashFlow
   require('../lib/cost-trends.js');  // globalThis.KhaytCostTrends
+  require('../lib/cycle-time.js');   // globalThis.KhaytCycleTime
   require('../lib/client-value.js'); // globalThis.KhaytClientValue
   require('../lib/capacity.js');     // globalThis.KhaytCapacity
   require('../lib/quote-funnel.js'); // globalThis.KhaytQuoteFunnel
