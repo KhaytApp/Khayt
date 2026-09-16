@@ -2114,11 +2114,12 @@ final class Shop {
     /// apps computing it separately is two prices for one product, with the one
     /// the customer sees decided by which app last saved it.
     func priceProduct(parts: [JSONValue], margin: Double?,
-                      components: JSONValue?) async -> KhaytEngine.ProductPricing? {
+                      components: JSONValue?, rule: PriceRule = PriceRule()) async -> KhaytEngine.ProductPricing? {
         guard let engine else { return nil }
         var record: [String: JSONValue] = ["parts": .array(parts)]
         if let margin { record["defaultMargin"] = .number(margin) }
         if let components { record["components"] = components }
+        for (key, value) in rule.fields { record[key] = value }
         return try? await engine.priceProduct(.object(record),
                                               inventory: inventoryRows,
                                               settings: settingsDict,
@@ -2458,11 +2459,7 @@ final class Shop {
         var partFields: [String: JSONValue] = [:]
         if let parts {
             partFields["parts"] = .array(parts)
-            var forPricing: [String: JSONValue] = ["parts": .array(parts)]
-            if let margin = product.margin { forPricing["defaultMargin"] = .number(margin) }
-            if let components = product.rest["components"] {
-                forPricing["components"] = components
-            }
+            let forPricing = Self.pricingInput(for: product, parts: parts)
             if let engine,
                let priced = try? await engine.productPricingFields(
                 .object(forPricing), inventory: inventoryRows,
@@ -2553,13 +2550,24 @@ final class Shop {
     ///
     /// The spool supplies the material and what it cost — the shelf already
     /// knows, and asking a shop to retype it is asking twice.
-    private func partFor(spoolId: String?, grams: Double, hours: Double, qty: Int) -> JSONValue {
-        var part: [String: JSONValue] = [
-            "printWeight": .number(max(0, grams)),
-            "printTime": .number(max(0, hours)),
-            "qty": .number(Double(max(1, qty))),
-        ]
-        if let spoolId, let spool = spools.first(where: { $0.id == spoolId }) {
+    private func partFor(spoolId: String?, grams: Double, hours: Double, qty: Int,
+                         extra: [String: JSONValue] = [:]) -> JSONValue {
+        Self.costInput(spool: spoolId.flatMap { id in spools.first { $0.id == id } },
+                       grams: grams, hours: hours, qty: qty, extra: extra)
+    }
+
+    /// The part the shared cost model is handed. `extra` is the part as the
+    /// book holds it — its own labour, power, wear and failure figures beat
+    /// the machine's defaults inside `costPart`, exactly as they do when the
+    /// other app costs the same part — and the four measured fields are
+    /// written over it. Static so a test can hold it to a record.
+    static func costInput(spool: Spool?, grams: Double, hours: Double, qty: Int,
+                          extra: [String: JSONValue] = [:]) -> JSONValue {
+        var part = extra
+        part["printWeight"] = .number(max(0, grams))
+        part["printTime"] = .number(max(0, hours))
+        part["qty"] = .number(Double(max(1, qty)))
+        if let spool {
             part["filamentId"] = .string(spool.id)
             part["material"] = .string(spool.material)
             part["spoolCost"] = .number(spool.cost ?? 0)
@@ -2610,11 +2618,15 @@ final class Shop {
         var out: [NewJobSheet.Draft] = []
         for row in rows {
             guard var draft = NewJobSheet.Draft.from(row) else { continue }
+            // AT THE PRODUCT'S OWN RATES. The part carries the labour, power,
+            // wear and failure figures it was priced with in the catalogue;
+            // costing it from grams and hours alone priced a 35.91 part at
+            // 10.57 and opened the job at 15 where the catalogue said 50.
             if draft.isComplete,
                let costed = await costedPart(spoolId: draft.spoolId,
                                              grams: Double(draft.grams) ?? 0,
                                              hours: Double(draft.hours) ?? 0,
-                                             qty: draft.qty) {
+                                             qty: draft.qty, extra: draft.raw) {
                 draft.cost = costed.cost
                 draft.parts = costed.parts
                 draft.rates = costed.rates
@@ -2642,10 +2654,10 @@ final class Shop {
     }
 
     func costedPart(spoolId: String?, grams: Double, hours: Double, qty: Int,
-                    machineId: String? = nil) async -> KhaytEngine.CostedPart? {
+                    machineId: String? = nil, extra: [String: JSONValue] = [:]) async -> KhaytEngine.CostedPart? {
         guard let engine else { return nil }
         return try? await engine.costPart(partFor(spoolId: spoolId, grams: grams,
-                                                  hours: hours, qty: qty),
+                                                  hours: hours, qty: qty, extra: extra),
                                           inventory: inventoryRows, settings: settingsDict,
                                           machine: machineRow(machineId))
     }
@@ -5914,6 +5926,22 @@ final class Shop {
         taxPresets = (try? await engine.taxPresets()) ?? [:]
         taxProfile = try? await engine.taxProfile(settings: settings)
         contentLanguages = (try? await engine.contentLanguages(settings: settings)) ?? ["en", "ar"]
+    }
+
+    /// What the shared product-pricing rule is handed on a save: the parts,
+    /// the margin, the components — AND the shop's rounding and typed price,
+    /// which `lib/product-price.js` reads off the same record. Without those
+    /// two a product rounded up to 5 saved here as its unrounded base, and a
+    /// typed price was replaced by cost plus margin. Pulled out so a test can
+    /// hold it to the record without a store.
+    static func pricingInput(for product: Product, parts: [JSONValue]) -> [String: JSONValue] {
+        var forPricing: [String: JSONValue] = ["parts": .array(parts)]
+        if let margin = product.margin { forPricing["defaultMargin"] = .number(margin) }
+        if let components = product.rest["components"] { forPricing["components"] = components }
+        for key in ["priceRound", "priceOverride"] {
+            if let value = product.rest[key] { forPricing[key] = value }
+        }
+        return forPricing
     }
 
     /// Save what one Settings pane showed.

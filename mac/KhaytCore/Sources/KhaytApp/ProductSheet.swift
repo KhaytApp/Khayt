@@ -51,6 +51,11 @@ struct ProductSheet: View {
     @State private var pickNote: String?
     /// What those parts cost, priced by the shared rule.
     @State private var pricing: KhaytEngine.ProductPricing?
+    /// The shop's own rounding and typed price for this product — the two
+    /// fields `lib/product-price.js` reads. Held here and written into the
+    /// draft's record as they change, so the preview and the save agree.
+    @State private var rule = Shop.PriceRule()
+    @State private var overrideText = ""
     @State private var pictures: [StagedPicture] = []
     /// Files to unlink, acted on only if this sheet is saved.
     @State private var removedPictures: [String] = []
@@ -100,31 +105,45 @@ struct ProductSheet: View {
         /// part" be answered later. Kept through a save, or the link a shop
         /// made by choosing a model is gone the first time it edits the price.
         var printFileId: String?
+        /// The part AS THE BOOK HOLDS IT, every field. This sheet edits five of
+        /// them; the other app's editor writes a dozen more — the labour rate,
+        /// prep and post time, power draw, wear and failure rate the cost is
+        /// built from, the slicer profile, the file it was sliced from. A save
+        /// that rebuilt the part from the five dropped all of those, and a
+        /// portrait that cost 35.91 to make came back costing 10.57 — material
+        /// only — and re-priced itself from 50 to 13.74 on the shop's own
+        /// catalogue. What this sheet does not edit, it keeps.
+        var raw: [String: JSONValue] = [:]
 
         var isComplete: Bool { (Double(grams) ?? 0) > 0 || (Double(hours) ?? 0) > 0 }
 
-        /// The record shape a product's `parts` list holds.
+        /// The record shape a product's `parts` list holds: what was there,
+        /// with this sheet's five fields written over it.
         func record(spools: [Spool]) -> JSONValue {
-            var o: [String: JSONValue] = [
-                "name": .string(name),
-                "printWeight": .number(max(0, Double(grams) ?? 0)),
-                "supportWeight": .number(0),
-                "printTime": .number(max(0, Double(hours) ?? 0)),
-                "qty": .number(Double(max(1, qty))),
-            ]
+            var o = raw
+            o["name"] = .string(name)
+            o["printWeight"] = .number(max(0, Double(grams) ?? 0))
+            if o["supportWeight"] == nil { o["supportWeight"] = .number(0) }
+            o["printTime"] = .number(max(0, Double(hours) ?? 0))
+            o["qty"] = .number(Double(max(1, qty)))
             if let spoolId, let spool = spools.first(where: { $0.id == spoolId }) {
                 o["filamentId"] = .string(spool.id)
                 o["material"] = .string(spool.material)
                 o["spoolCost"] = .number(spool.cost ?? 0)
                 o["spoolWeight"] = .number(max(1, spool.weight ?? 1000))
+            } else if spoolId == nil {
+                // The shop took the filament off: the part is not made of it any more.
+                for key in ["filamentId", "material", "spoolCost", "spoolWeight"] { o.removeValue(forKey: key) }
             }
             if let printFileId, !printFileId.isEmpty { o["printFileId"] = .string(printFileId) }
+            else { o.removeValue(forKey: "printFileId") }
             return .object(o)
         }
 
         @MainActor static func from(_ value: JSONValue) -> PartRow? {
             guard case .object(let o) = value else { return nil }
             var row = PartRow()
+            row.raw = o
             row.name = Shop.plainString(o["name"]) ?? ""
             row.spoolId = Shop.plainString(o["filamentId"])
             // `fieldValue`, NOT `quantity`: a part of a kilo or more read
@@ -197,6 +216,50 @@ struct ProductSheet: View {
                         Spacer()
                     }
                 }
+                // ── THE PRICE THE SHOP ACTUALLY CHARGES ───────────────────
+                //
+                // Cost plus margin is where a product's price starts. The other
+                // app's editor lets the shop round it to a step or type its own
+                // figure, and the book already carried both — but this sheet
+                // showed neither, so a shop that had set "round up to 5" and a
+                // price of 50 watched a save here drop them to 13.74 with no
+                // way back. The same two controls, the same two fields.
+                GridRow {
+                    Text(shop.words.callIt("pe.round_to")).gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Picker("", selection: $rule.step) {
+                            ForEach(Shop.PriceRule.steps, id: \.self) { step in
+                                Text(step == 0 ? shop.words.callIt("pe.round_off") : Money.quantity(step)).tag(step)
+                            }
+                        }
+                        .labelsHidden().frame(width: 110)
+                        if rule.step > 0 {
+                            Picker("", selection: $rule.mode) {
+                                ForEach(Shop.PriceRule.modes, id: \.self) { mode in
+                                    Text(shop.words.callIt("pe.round_\(mode)")).tag(mode)
+                                }
+                            }
+                            .labelsHidden().frame(width: 120)
+                        }
+                        Spacer()
+                    }
+                }
+                GridRow {
+                    Text(shop.words.callIt("pe.price_override")).gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        TextField(shop.words.callIt("pe.price_override_ph"), text: $overrideText)
+                            .textFieldStyle(.roundedBorder).frame(width: 110).monospacedDigit()
+                            .onChange(of: overrideText) { _, typed in
+                                let cleaned = typed.replacingOccurrences(of: ",", with: "")
+                                    .trimmingCharacters(in: .whitespaces)
+                                rule.override = cleaned.isEmpty ? nil : max(0, Double(cleaned) ?? 0)
+                            }
+                        Text(shop.currency).foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                }
                 GridRow {
                     Text(shop.words.callIt("plib.group")).gridColumnAlignment(.trailing)
                         .foregroundStyle(.secondary)
@@ -263,6 +326,8 @@ struct ProductSheet: View {
             if case .array(let list)? = existing.rest["parts"] {
                 parts = list.compactMap(PartRow.from)
             }
+            rule = Shop.priceRule(of: existing)
+            overrideText = rule.override.map { Money.fieldValue($0) } ?? ""
             tiers = Shop.tiers(of: existing).map { TierRow(label: $0.label, margin: $0.margin) }
             if case .array(let list)? = existing.rest["docs"] {
                 docs = list.compactMap(ProductDocs.Attached.from)
@@ -272,6 +337,18 @@ struct ProductSheet: View {
         // Re-priced when the margin changes, because the margin is above the
         // parts on this sheet and a shop typing one is watching the total.
         .task(id: draft.margin) { await reprice() }
+        // And when the rounding or the typed price changes — written into the
+        // record at the same moment, so what the preview says is what saves.
+        .task(id: rule) {
+            // `null`, not absent: a save merges every key the sheet did not
+            // write forward from the record that was there, so clearing a
+            // typed price by removing the key would resurrect it. Khayt's own
+            // editor writes null for both, and so does this.
+            draft.rest["priceOverride"] = rule.override.map { JSONValue.number($0) } ?? .null
+            draft.rest["priceRound"] = rule.step > 0
+                ? .object(["step": .number(rule.step), "mode": .string(rule.mode)]) : .null
+            await reprice()
+        }
         .sheet(isPresented: $pickingModel) {
             PickModelSheet(shop: shop) { file in
                 Task {
@@ -548,7 +625,8 @@ struct ProductSheet: View {
     private func reprice() async {
         pricing = await shop.priceProduct(parts: parts.map { $0.record(spools: shop.spools) },
                                           margin: draft.margin,
-                                          components: draft.rest["components"])
+                                          components: draft.rest["components"],
+                                          rule: rule)
     }
 
     private func written(_ code: String) -> Bool {

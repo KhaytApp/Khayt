@@ -107,6 +107,9 @@ struct NewJobSheet: View {
         /// own editor reads these back and a part without them re-costs to
         /// nothing the next time somebody presses save there.
         var rates: KhaytEngine.Rates?
+        /// The product part this came from, whole — so it is costed at the
+        /// rates the catalogue priced it with, not the machine's defaults.
+        var raw: [String: JSONValue] = [:]
 
         var isComplete: Bool { (Double(grams) ?? 0) > 0 || (Double(hours) ?? 0) > 0 }
 
@@ -119,6 +122,7 @@ struct NewJobSheet: View {
         @MainActor static func from(_ value: JSONValue) -> Draft? {
             guard case .object(let o) = value else { return nil }
             var row = Draft()
+            row.raw = o
             row.name = Shop.plainString(o["name"]) ?? ""
             row.spoolId = Shop.plainString(o["filamentId"])
             // `fieldValue`, NOT `quantity` — see the note there. The

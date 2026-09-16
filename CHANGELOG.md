@@ -689,6 +689,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) Rounding and "Your own price" on the product sheet.** The two
+  controls Khayt's product editor has had all along — round to a step (up,
+  down or nearest) and a typed price that wins over everything — with the
+  price preview following them as they change. Until now a shop on the Mac
+  could see a catalogue price move and had no way to set it back.
 
 - **(Mac) The phone's live queue, served by the Mac.** A new Online tab in
   Settings carries the LAN block the Windows and Linux app keeps under
@@ -1286,6 +1291,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **(Mac) Saving a product no longer throws away its cost inputs or its
+  price.** The Mac product sheet rebuilt every part from the five fields it
+  shows, so the labour rate, prep and post time, power draw, wear and failure
+  rate the other app had priced the part with were dropped on save — a
+  portrait that cost 35.91 to make came back costing 10.57, and the product
+  re-priced itself from 50 to 13.74. The save also ignored the product's own
+  rounding and typed price. Now a part keeps every field the sheet does not
+  edit, and the product is priced through the shared rule with its rounding
+  and override, so the same product saves to the same price in both apps.
+- **(Mac) "New job from this" prices the job at the product's own rates.**
+  The job's parts were costed from grams and hours alone, so the same
+  portrait opened at 15 where the catalogue said 50. A part taken from a
+  product now carries the product's rates into the cost, and the job opens at
+  the catalogue price.
 
 - **(Mac) A job taken from the catalogue opens priced — this time with the
   parts costed.** The earlier fix repaired the number parsing on this path
