@@ -26,7 +26,11 @@ struct LanServerTests {
         var clock: Date
         static let start = Date(timeIntervalSince1970: 1_800_000_000)   // 2027-01-15
 
-        init(pin: String = "2468") async throws {
+        /// What `/api/intake` wrote into the book.
+        let recorded = Recorded()
+        var tokens = 0
+
+        init(pin: String = "2468", intakeToken: String = "", recordFails: Bool = false) async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -36,15 +40,44 @@ struct LanServerTests {
             self.clock = clock
             let box = ClockBox(clock)
             self.box = box
-            let server = LanServer(host: LanServer.Host(
+            let recorded = self.recorded
+            var host = LanServer.Host(
                 store: { shop.lanBook }, pin: pin, engine: engine,
                 now: { box.now }, nowText: { "09:16" },
-                icon: { LanServer.bundledIcon($0) }))
+                icon: { LanServer.bundledIcon($0) })
+            host.intakeToken = intakeToken
+            host.mintId = { "intake-fixed" }
+            host.record = { entry in
+                if recordFails { throw CocoaError(.fileWriteUnknown) }
+                recorded.entries.append(entry)
+            }
+            let server = LanServer(host: host)
             self.server = server
             port = try await server.start(port: 0, bind: .loopback)
             clock = Self.start
         }
         let box: ClockBox
+
+        func post(_ path: String, json: String, headers: [String: String] = [:]) async throws -> Reply {
+            var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
+            request.httpMethod = "POST"
+            request.httpBody = Data(json.utf8)
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
+            let (data, response) = try await NoRedirect.session.data(for: request)
+            let http = try #require(response as? HTTPURLResponse)
+            var out: [String: String] = [:]
+            for (k, v) in http.allHeaderFields { out[String(describing: k).lowercased()] = String(describing: v) }
+            return Reply(status: http.statusCode, headers: out, body: data)
+        }
+
+        /// Open the form and come back with its session cookie.
+        func openForm() async throws -> (Reply, cookie: String) {
+            let reply = try await get("/intake")
+            let setCookie = reply.headers["set-cookie"] ?? ""
+            let cookie = String(setCookie.split(separator: ";").first ?? "")
+            return (reply, cookie)
+        }
         func advance(seconds: TimeInterval) { box.now = box.now.addingTimeInterval(seconds) }
 
         struct Reply { let status: Int; let headers: [String: String]; let body: Data
@@ -67,12 +100,17 @@ struct LanServerTests {
         var now: Date
         init(_ d: Date) { now = d }
     }
+    final class Recorded: @unchecked Sendable {
+        var entries: [JSONValue] = []
+    }
 
     /// URLSession follows a 302 by itself; the test wants to see the 302.
     final class NoRedirect: NSObject, URLSessionTaskDelegate, Sendable {
         static let session: URLSession = {
             let config = URLSessionConfiguration.ephemeral
             config.timeoutIntervalForRequest = 10
+            config.httpShouldSetCookies = false
+            config.httpCookieAcceptPolicy = .never
             return URLSession(configuration: config, delegate: NoRedirect(), delegateQueue: nil)
         }()
         func urlSession(_ session: URLSession, task: URLSessionTask,
@@ -240,6 +278,148 @@ struct LanServerTests {
         #expect(!LanServer.constantTimeEqual("246", "2468"))
         #expect(!LanServer.constantTimeEqual("", "2468"))
         #expect(LanServer.constantTimeEqual("", ""))
+    }
+
+    // MARK: - The intake form
+
+    @Test("the intake form is the module's page, and the first visit sets the session cookie")
+    func intakeForm() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (first, cookie) = try await bench.openForm()
+        #expect(first.status == 200)
+        #expect(first.headers["content-type"] == "text/html; charset=utf-8")
+        #expect(first.headers["cache-control"] == "no-cache")
+        let expected = try await bench.engine.lanIntakePage(store: .object(bench.shop.lanBook), quoteEnabled: false)
+        #expect(first.text == expected)
+        #expect(first.text.contains("Order Intake"))
+        // No upload widget: the estimate route is not served here.
+        #expect(!first.text.contains(#"id="modelFile""#))
+        #expect(cookie.hasPrefix("khayt_intake="), Comment(rawValue: cookie))
+        #expect(first.headers["set-cookie"]?.contains("HttpOnly") == true)
+        #expect(first.headers["set-cookie"]?.contains("Max-Age=14400") == true)
+        // A visitor with a live session is not handed a second cookie.
+        let again = try await bench.get("/intake", headers: ["Cookie": cookie])
+        #expect(again.status == 200)
+        #expect(again.headers["set-cookie"] == nil)
+        // The public status route sends browsers here, and now there is a here.
+        #expect(try await bench.get("/api/status").headers["location"] == "/intake")
+    }
+
+    @Test("a submission with the session cookie lands in the book as the module's entry")
+    func intakeSubmission() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        let body = #"{"name":"Sara","description":"Two brackets in PETG","email":"s@example.com","consent":true,"referenceLink":"https://example.com/x"}"#
+        let reply = try await bench.post("/api/intake", json: body, headers: ["Cookie": cookie])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text == #"{"ok":true}"#)
+        #expect(reply.headers["access-control-allow-origin"] == "*")
+        #expect(bench.recorded.entries.count == 1)
+        // The SAME entry the rule builds, from the same inputs.
+        let parsed = try JSONDecoder().decode(JSONValue.self, from: Data(body.utf8))
+        let expected = try await bench.engine.lanIntakeSubmission(body: parsed, shopName: "this shop", id: "intake-fixed",
+                                                                  nowIso: LanServer.isoNow(Bench.start))
+        #expect(bench.recorded.entries.first == expected.entry)
+        guard case .object(let entry)? = bench.recorded.entries.first else { Issue.record("no entry"); return }
+        #expect(entry["clientName"] == .string("Sara"))
+        #expect(entry["source"] == .string("intake_form"))
+        #expect(entry["status"] == .string("active"))
+        #expect(entry["submittedAt"] == .string("2027-01-15T08:00:00.000Z"))
+        if case .object(let consent)? = entry["consent"] { #expect(consent["agreed"] == .bool(true)) }
+        else { Issue.record("no consent record") }
+    }
+
+    @Test("without a session or the intake token a submission is refused; with the token it is taken")
+    func intakeGate() async throws {
+        let bench = try await Bench(intakeToken: "tok-9")
+        defer { bench.stop() }
+        let body = #"{"name":"A","description":"B","consent":true}"#
+        let none = try await bench.post("/api/intake", json: body)
+        #expect(none.status == 401)
+        #expect(none.text == #"{"error":"Unauthorized"}"#)
+        let wrong = try await bench.post("/api/intake", json: body, headers: ["x-khayt-intake-token": "tok-8"])
+        #expect(wrong.status == 401)
+        let right = try await bench.post("/api/intake", json: body, headers: ["x-khayt-intake-token": "tok-9"])
+        #expect(right.status == 200, Comment(rawValue: right.text))
+        // A cookie from another address does not travel: the session is bound to the ip that opened it.
+        #expect(bench.recorded.entries.count == 1)
+    }
+
+    @Test("the rule's refusals and a bad body come back as the Node server's answers")
+    func intakeRefusals() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        let noName = try await bench.post("/api/intake", json: #"{"description":"B","consent":true}"#, headers: ["Cookie": cookie])
+        #expect(noName.status == 400)
+        #expect(noName.text == #"{"error":"name is required"}"#)
+        let noConsent = try await bench.post("/api/intake", json: #"{"name":"A","description":"B"}"#, headers: ["Cookie": cookie])
+        #expect(noConsent.status == 400)
+        #expect(noConsent.text == #"{"error":"Please agree to the privacy notice to submit your request."}"#)
+        let garbage = try await bench.post("/api/intake", json: "not json", headers: ["Cookie": cookie])
+        #expect(garbage.status == 400)
+        #expect(garbage.text.contains("Invalid request"))
+        #expect(bench.recorded.entries.isEmpty)
+    }
+
+    @Test("a book that cannot be written is OUR failure, told as a 500, not the customer's")
+    func intakeWriteFailure() async throws {
+        let bench = try await Bench(recordFails: true)
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        let reply = try await bench.post("/api/intake", json: #"{"name":"A","description":"B","consent":true}"#,
+                                         headers: ["Cookie": cookie])
+        #expect(reply.status == 500)
+        #expect(reply.text.contains("could not record your request"))
+    }
+
+    @Test("opening the form too often gets the module's too-many page; submitting too often a 429")
+    func intakeRates() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let limits = try await bench.engine.lanIntakeLimits()
+        for _ in 0..<Int(limits.SESSION_GRANT_LIMIT) {
+            let ok = try await bench.get("/intake")
+            #expect(ok.status == 200)
+        }
+        let tooMany = try await bench.get("/intake")
+        #expect(tooMany.status == 429)
+        #expect(tooMany.text == (try await bench.engine.lanIntakeTooManyPage()))
+        // Submissions have their own bucket, so the last cookie still submits — up to its limit.
+        bench.advance(seconds: 3601)
+        let (_, cookie) = try await bench.openForm()
+        for _ in 0..<Int(limits.SUBMIT_LIMIT) {
+            let ok = try await bench.post("/api/intake", json: #"{"name":"A","description":"B","consent":true}"#,
+                                          headers: ["Cookie": cookie])
+            #expect(ok.status == 200, Comment(rawValue: ok.text))
+        }
+        let over = try await bench.post("/api/intake", json: #"{"name":"A","description":"B","consent":true}"#,
+                                        headers: ["Cookie": cookie])
+        #expect(over.status == 429)
+        #expect(over.text.contains("Too many submissions"))
+    }
+
+    @Test("a session expires after four hours, and an expired cookie is refused")
+    func intakeSessionExpiry() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        bench.advance(seconds: 4 * 3600 + 1)
+        let reply = try await bench.post("/api/intake", json: #"{"name":"A","description":"B","consent":true}"#,
+                                         headers: ["Cookie": cookie])
+        #expect(reply.status == 401)
+    }
+
+    @Test("the clock prints as JavaScript's toISOString and the id as uniqueLanId")
+    func intakeSmallThings() {
+        #expect(LanServer.isoNow(Date(timeIntervalSince1970: 1_800_000_000)) == "2027-01-15T08:00:00.000Z")
+        #expect(LanServer.isoNow(Date(timeIntervalSince1970: 1_800_000_000.5)) == "2027-01-15T08:00:00.500Z")
+        let id = LanServer.uniqueId("intake")
+        #expect(id.range(of: #"^intake-\d{13}-[0-9a-f]{4}$"#, options: .regularExpression) != nil, Comment(rawValue: id))
+        #expect(LanServer.randomToken().count == 64)
+        #expect(LanServer.cookies("a=1; khayt_intake=abc; c=x=y") == ["a": "1", "khayt_intake": "abc", "c": "x=y"])
     }
 
     // MARK: - The shop's side
