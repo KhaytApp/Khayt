@@ -62,7 +62,24 @@
       || [...setups].sort((a, b) => (b.ok || 0) - (a.ok || 0))[0]
       || null;
 
-    const grams = num(parsed.filamentGrams);
+    // ── A MULTI-COLOUR FILE WEIGHS WHAT ITS COLOURS WEIGH ─────────────────
+    //
+    // `parsed.filamentGrams` is the single figure a one-material slice
+    // reports. A toolchanger does not produce one: the U1, the XL and an AMS
+    // slice write a weight PER FILAMENT, which the library keeps as
+    // `colors[].grams` and leaves `parsed` empty.
+    //
+    // So the rule reported "no weight" for every multi-colour file, and a
+    // product made from one came out costing nothing. Measured on the shop's
+    // own library, 2026-09-16: of 152 files, three carried a weight and ALL
+    // THREE carried it this way — the single-figure branch had never once
+    // matched there, and a 57.18 g dragon read as zero.
+    //
+    // The sum is the slicer's own arithmetic, not an estimate, so it is
+    // labelled `slicer` exactly as the single figure is.
+    const colourGrams = (Array.isArray(rec.colors) ? rec.colors : [])
+      .reduce((sum, c) => sum + Math.max(0, num(c && c.grams) || 0), 0);
+    const grams = num(parsed.filamentGrams) || (colourGrams > 0 ? colourGrams : null);
     if (grams) { fields.printWeight = grams; from.printWeight = 'slicer'; }
     else missing.push('printWeight');
 
