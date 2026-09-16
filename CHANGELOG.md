@@ -1341,6 +1341,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **A multi-colour print weighed nothing, so anything made from it cost
+  nothing.** A one-material slice reports a single filament weight, and that
+  is the only figure this read. A toolchanger does not produce one: a U1, an
+  XL or an AMS slice writes a weight per filament, which the library keeps
+  per colour. So every multi-colour file reported "no weight", and a product
+  or job made from one came out costing nothing — a 57 g dragon read as zero.
+  On the shop's own library, three of 152 files carried a weight and all
+  three carried it this way, so the branch that was read had never once
+  matched. The colours are summed now, and labelled as the slicer's own
+  arithmetic rather than an estimate, because that is what it is. A file that
+  genuinely knows no weight still says so.
 - **Public pricing settings were dropped on the way to the book.** The shared
   settings save merges the LAN block by naming the fields it knows, and the
   model-pricing block was not among them — so a pane that set a margin and a

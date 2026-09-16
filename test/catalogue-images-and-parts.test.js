@@ -513,3 +513,46 @@ test('the send-side ceiling is the server\'s ceiling', () => {
   // and the whole feature silently reverts to thumbnails. 262 KB measured.
   assert.ok(262_415 < PI.PUBLISH_PHOTO_BYTES, 'a 1000px square photograph must fit');
 });
+
+/**
+ * ── A TOOLCHANGER'S WEIGHT IS PER FILAMENT ─────────────────────────────────
+ *
+ * `parsed.filamentGrams` is what a one-material slice reports. A U1, an XL or
+ * an AMS slice writes a weight per filament instead, which the library keeps
+ * as `colors[].grams` and leaves `parsed` empty — so this rule reported "no
+ * weight", and a product made from such a file cost nothing and priced at
+ * nothing.
+ *
+ * Measured on a real shop's library, 2026-09-16: of 152 files, three carried a
+ * weight and ALL THREE carried it this way. The single-figure branch had never
+ * once matched there.
+ */
+test('a multi-colour file weighs what its colours weigh', () => {
+  const dragon = {
+    id: 'PF-1',
+    parsed: {},
+    colors: [{ grams: 28.93 }, { grams: 1.85 }, { grams: 15.41 }, { grams: 10.99 }],
+  };
+  const { fields, from, missing } = PF.partPatch(dragon);
+  assert.equal(fields.printWeight, 57.18);
+  // The slicer's own arithmetic, not an estimate — labelled as such.
+  assert.equal(from.printWeight, 'slicer');
+  assert.ok(!missing.includes('printWeight'));
+  // What genuinely is unknown is still reported as unknown.
+  assert.ok(missing.includes('printTime'));
+});
+
+test('the slicer total still wins, and nonsense in a colour cannot subtract', () => {
+  const both = PF.partPatch({ parsed: { filamentGrams: 100 }, colors: [{ grams: 5 }] });
+  assert.equal(both.fields.printWeight, 100, "the slicer's own total was overridden by the colours");
+
+  const odd = PF.partPatch({ parsed: {}, colors: [{ grams: 10 }, { grams: -5 }, { grams: 'x' }, {}, null] });
+  assert.equal(odd.fields.printWeight, 10);
+
+  // No weight anywhere stays no weight — never a zero that looks typed.
+  for (const colors of [[], [{ grams: 0 }, { grams: 0 }], undefined]) {
+    const none = PF.partPatch({ parsed: {}, colors });
+    assert.ok(none.missing.includes('printWeight'), JSON.stringify(colors));
+    assert.equal(none.fields.printWeight, undefined);
+  }
+});
