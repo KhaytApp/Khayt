@@ -83,4 +83,48 @@ struct ProductToJobTests {
         #expect(Double(part.grams) == 140.91)
         #expect(Double(part.hours) == 5.25)
     }
+
+    /// THE REPORT, AGAIN. #1254 fixed the number parsing on this path and left
+    /// the costing out, so the price was still zero: `Draft.from` measures a
+    /// part and nothing costs it. `Shop.jobParts` does, the way `addPart`
+    /// does for a part typed by hand.
+    @Test("a product's parts arrive COSTED, not just measured")
+    func partsArriveCosted() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        // A sample product with something to cost — grams or hours on a part.
+        var costable: Product?
+        for row in shop.catalogueRows {
+            guard let p = await shop.productForEditing(row.id),
+                  case .array(let parts)? = p.rest["parts"],
+                  parts.compactMap(NewJobSheet.Draft.from).contains(where: \.isComplete) else { continue }
+            costable = p; break
+        }
+        let product = try #require(costable, "no sample product has a part worth costing")
+        let drafts = await shop.jobParts(from: product)
+        let complete = drafts.filter(\.isComplete)
+        #expect(!complete.isEmpty)
+        for part in complete {
+            #expect(part.cost > 0, "\(part.name) came in at nothing — the total would be nothing")
+            #expect(part.rates != nil, "and without its rates the other app re-costs it to nothing on save")
+        }
+        // The cart's base cost, which the total is worked up from.
+        #expect(drafts.reduce(0) { $0 + $1.cost * Double($1.qty) } > 0)
+    }
+
+    @Test("a product's own price and rounding travel onto the job")
+    func productPriceTravels() {
+        let typed = Product(id: "P", names: [:], descriptions: [:], margin: nil, group: "", category: "",
+                            createdAt: "2026-09-16", rest: ["priceOverride": .number(120)])
+        #expect(Shop.priceRule(of: typed).override == 120)
+        let rounded = Product(id: "P", names: [:], descriptions: [:], margin: 30, group: "", category: "",
+                              createdAt: "2026-09-16",
+                              rest: ["priceRound": .object(["step": .number(25), "mode": .string("up")])])
+        let rule = Shop.priceRule(of: rounded)
+        #expect(rule.step == 25 && rule.mode == "up" && rule.override == nil)
+        #expect(Shop.PriceRule.steps.contains(25), "or the picker shows a blank for the product's own step")
+        let plain = Product(id: "P", names: [:], descriptions: [:], margin: 30, group: "", category: "",
+                            createdAt: "2026-09-16", rest: ["priceOverride": .null])
+        #expect(Shop.priceRule(of: plain).isPlain, "a null override is no override")
+    }
 }
