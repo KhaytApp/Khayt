@@ -950,39 +950,21 @@ function renderProfitMarginChart() {
 function renderWasteTrendChart() {
   const el = $('#wasteTrendChart');
   if (!el) return;
-
-  const today = new Date();
-  const months = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    months.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(2)}`
-    });
-  }
-
-  const failureColors = { warping: '#f59e0b', adhesion: '#ef4444', stringing: '#f97316' };
-  const topTypes = ['warping', 'adhesion', 'stringing'];
-
-  // Build data: {month -> {failureType -> weight}}
+  if (typeof KhaytWasteTrend === 'undefined') { el.innerHTML = ''; return; }
+  // The arithmetic is lib/waste-trend.js — the same rule the Mac app draws.
+  // The three named types come from the DATA now: this function named
+  // `adhesion` by hand while the log says `bed_adhesion`, so every failed
+  // first layer landed in "other".
+  const trend = KhaytWasteTrend.wasteTrend(wasteLog, { now: Date.now(), months: 6, named: 3 });
+  const months = trend.months.map((m) => ({ key: m.key, label: `${m.key.slice(5, 7)}/${m.key.slice(2, 4)}` }));
+  const allTypes = trend.types;
+  const palette = ['#f59e0b', '#ef4444', '#f97316'];
+  const typeColors = {};
+  allTypes.forEach((ft, i) => { typeColors[ft] = ft === 'other' ? '#6b7280' : palette[i % palette.length]; });
   const data = {};
-  months.forEach(m => { data[m.key] = {}; topTypes.forEach(t2 => { data[m.key][t2] = 0; }); data[m.key]['other'] = 0; });
-
-  for (const w of (wasteLog || [])) {
-    if (!w.date) continue;
-    const mk = localMonthStr(new Date(w.date));
-    if (!data[mk]) continue;
-    const ft = topTypes.includes(w.failureType) ? w.failureType : 'other';
-    data[mk][ft] = (data[mk][ft] || 0) + (+w.weight || 0);
-  }
-
-  const allTypes = [...topTypes, 'other'];
-  const typeColors = { ...failureColors, other: '#6b7280' };
-  const allVals = months.flatMap(m => allTypes.map(ft => data[m.key][ft]));
-  const hasData = allVals.some(v => v > 0);
-
-  if (!hasData) {
-    el.innerHTML = `<div class="card" style="margin-bottom:16px;"><h3 class="card-head"><span class="swatch"></span>${escapeHtml(t('an.waste_trend') || 'Waste by Failure Type')}</h3><p style="color:var(--text-muted);padding:12px 0;font-size:13px;">${escapeHtml(t('an.no_data') || 'No data yet')}</p></div>`;
+  trend.months.forEach((m) => { data[m.key] = {}; allTypes.forEach((ft) => { data[m.key][ft] = m.byType[ft] || 0; }); });
+  if (trend.total <= 0) {
+    el.innerHTML = '';
     return;
   }
 

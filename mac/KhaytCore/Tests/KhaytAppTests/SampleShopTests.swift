@@ -602,6 +602,20 @@ extension SampleShopTests {
         #expect(lead.rows.contains { $0.jobs > 1 }, "no product was made twice, so fastest and slowest are one number")
     }
 
+    /// The waste-trend card stacks the heaviest three types and an "other",
+    /// and draws a baseline for a month with nothing thrown away.
+    @Test("the sample waste reaches three named types, an other, and a month with nothing")
+    func wasteTrendSpan() async throws {
+        let engine = try KhaytEngine()
+        let trend = try await engine.wasteTrend(wasteLog: Shop.rows(try Self.book(), "wasteLog"),
+                                                now: Date(), months: 6, named: 3)
+        #expect(trend.total > 0)
+        #expect(trend.types.count == 4 && trend.types.last == "other",
+                "the sample needs more than three failure types so the fourth column is drawn: \(trend.types)")
+        #expect(trend.months.contains { $0.total == 0 }, "every month threw something away — the baseline is never drawn")
+        #expect(trend.months.contains { $0.byType.count >= 2 }, "no month has two types stacked")
+    }
+
     // MARK: - The customers
 
     /// The customer pane draws a price list, a standing order (running, paused,

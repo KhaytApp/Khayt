@@ -2047,6 +2047,8 @@ final class Words {
         // The trends card on Reports, in the other app's own words for it.
         "an.cost_trends", "an.rev_per_hour", "an.cost_per_gram",
         // The cycle-time card, in the other app's words for its two charts.
+        // The waste trend card, in the other app's word for the chart.
+        "an.waste_trend",
         "an.cycle_time", "an.days", "an.lead_time", "an.lead_time_avg",
         "an.lead_time_fastest", "an.lead_time_slowest", "ord.project",
         "pe.round_to", "pe.round_off", "pe.round_nearest", "pe.round_up", "pe.round_down",

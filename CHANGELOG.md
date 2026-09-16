@@ -690,6 +690,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) What was thrown away, by month and by why, on the Waste screen.**
+  Six months of wasted grams stacked by failure type — the heaviest three by
+  name, the rest as "other" — with a key that says each type's grams. The same
+  rule as the other app's chart (`lib/waste-trend.js`), which now draws from it.
+
 - **(Mac) How long a job takes, on Reports → Best.** Six months of the
   average from the day a job was taken to the day it was done, and under it
   the products that take longest — average, fastest, slowest. The same rule as
@@ -1230,6 +1235,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **The waste-by-failure-type chart could not name the commonest failure.**
+  It named its three types by hand — `warping`, `adhesion`, `stringing` — and
+  the waste log's own vocabulary has no `adhesion`; it has `bed_adhesion`. So
+  every failed first layer a shop ever logged landed in "other", on a chart
+  whose point is what keeps going wrong. The named types are now the heaviest
+  three in the window, whatever they are.
 
 - **The cycle-time and lead-time charts left delivered jobs out, and the
   lead-time table split one product by its spelling.** Both counted only
