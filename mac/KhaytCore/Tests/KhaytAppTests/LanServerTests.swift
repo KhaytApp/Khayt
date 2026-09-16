@@ -32,7 +32,8 @@ struct LanServerTests {
         let book = Book()
         var tokens = 0
 
-        init(pin: String = "2468", intakeToken: String = "", recordFails: Bool = false) async throws {
+        init(pin: String = "2468", intakeToken: String = "", recordFails: Bool = false,
+             calendarToken: String = "") async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -50,6 +51,7 @@ struct LanServerTests {
                 now: { box.now }, nowText: { "09:16" },
                 icon: { LanServer.bundledIcon($0) })
             host.intakeToken = intakeToken
+            host.calendarToken = calendarToken
             host.mintId = { "intake-fixed" }
             host.record = { entry in
                 if recordFails { throw CocoaError(.fileWriteUnknown) }
@@ -677,6 +679,44 @@ struct LanServerTests {
         #expect(LanServer.trackingPath("/order/") == nil)
         // The quote and approve routes take theirs first; this one never sees them.
         #expect(LanServer.quotePath("/order/T-5/quote") == "T-5")
+    }
+
+    // MARK: - The calendar
+
+    @Test("the calendar feed is the module's, for the subscription token or the owner PIN")
+    func calendarFeed() async throws {
+        let bench = try await Bench(calendarToken: "cal-token-1")
+        defer { bench.stop() }
+        bench.book.put(["id": .string("D-1"), "project": .string("Bracket"), "client": .string("Sara"),
+                        "status": .string("printing"), "dueDate": .string("2027-02-01")])
+        let none = try await bench.get("/calendar.ics")
+        #expect(none.status == 401)
+        #expect(none.headers["content-type"] == "text/plain; charset=utf-8")
+        #expect(none.text.contains("calendar subscription link"))
+        let wrong = try await bench.get("/calendar.ics?token=cal-token-2")
+        #expect(wrong.status == 401)
+        let byToken = try await bench.get("/calendar.ics?token=cal-token-1")
+        #expect(byToken.status == 200)
+        #expect(byToken.headers["content-type"] == "text/calendar; charset=utf-8")
+        #expect(byToken.headers["content-disposition"]?.contains("khayt-orders.ics") == true)
+        let expected = try await bench.engine.lanCalendarFeed(store: .object(bench.book.value))
+        #expect(byToken.text == expected)
+        #expect(byToken.text.contains("BEGIN:VCALENDAR") && byToken.text.contains("UID:khayt-D-1@khaytapp.com"))
+        #expect(byToken.text.contains("DTSTART;VALUE=DATE:20270201"))
+        #expect(byToken.text.contains("SUMMARY:Bracket (Sara)"))
+        let byPin = try await bench.get("/calendar.ics", headers: ["x-khayt-pin": "2468"])
+        #expect(byPin.status == 200)
+        #expect(byPin.text == expected)
+    }
+
+    @Test("with no calendar token the feed opens only to the PIN")
+    func calendarNeedsAToken() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let empty = try await bench.get("/calendar.ics?token=")
+        #expect(empty.status == 401)
+        let byPin = try await bench.get("/calendar.ics?pin=2468")
+        #expect(byPin.status == 200)
     }
 
     // MARK: - The shop's side

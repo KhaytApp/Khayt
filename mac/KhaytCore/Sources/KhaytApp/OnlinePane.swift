@@ -77,6 +77,14 @@ struct OnlinePane: View {
                         Text(shop.words.callIt("lan.same_wifi_hint"))
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        // The calendar subscription, in the other app's words.
+                        if let calendar = shop.calendarLink {
+                            Text(shop.words.callIt("icalDescription")).font(.callout).padding(.top, 6)
+                            Text(calendar)
+                                .font(.caption.monospaced())
+                                .textSelection(.enabled)
+                                .accessibilityIdentifier("calendar-url")
+                        }
                     } else {
                         Text(shop.words.callIt("lan.not_running")).foregroundStyle(.secondary)
                     }
