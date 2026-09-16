@@ -2,6 +2,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 require('../renderer/util.js');
+// `renderer/index.html` loads this; `suggestedFailureRate` asks it whether a
+// job is finished, in either of the two spellings.
+require('../lib/order-status.js');
 
 test('suggestedFailureRate returns null with insufficient completed jobs', () => {
   global.printLog = [

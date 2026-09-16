@@ -1371,6 +1371,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **Twenty-two more figures were computed from part of the book.** Khayt
+  wrote `delivered` before it wrote `completed` with a `deliveredAt` beside
+  it, and both spellings are still in shops' books. Three callers were fixed
+  earlier; an audit of every remaining `status === 'completed'` found
+  twenty-two more, and every one of them was wrong. Among them: this month's
+  revenue, the analytics header, the twelve-month revenue series, printer
+  utilisation, per-location profit, client retention, per-operator figures,
+  the P&L export, break-even, client lifetime value in three places, and the
+  Bed Ready maker stats. One report disagreed with ITSELF — its completed
+  count knew one spelling and the revenue on the very next line knew both.
+  Two more were the mirror image, counting a finished job as still in
+  progress or still active. And the suggested failure rate, which feeds what
+  a customer is quoted, divided waste by a denominator missing every
+  delivered job, so it read high. All of them ask `isFinished` now.
 - **Expenses by category disagreed with the P&L about the same money.** For a
   registered shop the tax on a purchase is not a cost — it is reclaimed from
   the authority — and `lib/pnl-report.js` has always charged `paid` less what

@@ -40,7 +40,7 @@ function clientCompare(col, dir, rowOf) {
 
 function getClientStats(clientId) {
   const orders = printLog.filter(o => o.clientId === clientId);
-  const completed = orders.filter(o => o.status === 'completed');
+  const completed = orders.filter(o => KhaytOrderStatus.isFinished(o));
   const sorted = [...orders].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   return {
     count: orders.length,
@@ -81,7 +81,7 @@ function renderClients() {
     let s = clientStatsMap.get(o.clientId);
     if (!s) { s = { count: 0, completedCount: 0, revenue: 0, lastDate: null }; clientStatsMap.set(o.clientId, s); }
     s.count++;
-    if (o.status === 'completed') { s.completedCount++; s.revenue += orderNetRevenueBase(o); }
+    if (KhaytOrderStatus.isFinished(o)) { s.completedCount++; s.revenue += orderNetRevenueBase(o); }
     if (!s.lastDate || o.date > s.lastDate) s.lastDate = o.date;
     // Survey ratings
     if (o.survey?.rating) {
@@ -1246,7 +1246,7 @@ function exportClientsCsv() {
     let s = clientStatsMap.get(o.clientId);
     if (!s) { s = { count: 0, revenue: 0, lastDate: null }; clientStatsMap.set(o.clientId, s); }
     s.count++;
-    if (o.status === 'completed') s.revenue += orderNetRevenueBase(o);
+    if (KhaytOrderStatus.isFinished(o)) s.revenue += orderNetRevenueBase(o);
     if (!s.lastDate || o.date > s.lastDate) s.lastDate = o.date;
   }
 
@@ -1288,8 +1288,10 @@ function exportClientPortal(clientId) {
   const displayName = localName(c);
   const orders = printLog.filter(o => o.clientId === clientId)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  const activeOrders = orders.filter(o => !['completed','quote'].includes(o.status));
-  const completedOrders = orders.filter(o => o.status === 'completed');
+  // Both spellings, both ways round: a delivered order is finished, so it is
+  // not still active and it does belong in the finished count.
+  const activeOrders = orders.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+  const completedOrders = orders.filter(o => KhaytOrderStatus.isFinished(o));
   const outstanding = orders
     .filter(o => payStatus(o) !== 'paid')
     .reduce((s, o) => s + orderOwedBase(o), 0);

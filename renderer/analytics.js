@@ -42,7 +42,7 @@ function renderSimpleReports() {
    * Machine HOURS deliberately keep counting them: the printer really ran,
    * and a utilisation figure that ignored half a machine's work would be the
    * same mistake as reading a printer's state from the order book. */
-  const monthOrders = printLog.filter(o => o.status === 'completed' && !o.voidedAt && _countsForBusiness(o) && (o.date || '').startsWith(thisMonthStr));
+  const monthOrders = printLog.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && (o.date || '').startsWith(thisMonthStr));
   const monthRevenue = monthOrders.reduce((s, o) => s + orderNetRevenueBase(o), 0);
   const monthCount   = monthOrders.length;
 
@@ -138,7 +138,7 @@ function analyticsRangeDays(range, ctx, dates) {
 }
 
 function computeHandoffMachineRows() {
-  const orders = printLog.filter(o => inRange(o.date, analyticsRange, 'analytics') && o.status === 'completed' && !o.voidedAt && _countsForBusiness(o));
+  const orders = printLog.filter(o => inRange(o.date, analyticsRange, 'analytics') && KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o));
   const machMap = {};
   for (const m of machines) {
     machMap[m.id] = { name: m.name, profit: 0, hours: 0, util: null };
@@ -166,7 +166,7 @@ function computeHandoffMachineRows() {
 
 function buildHandoffHeatmapCells() {
   const completed = printLog.filter(o =>
-    o.status === 'completed' && o.completedAt && inRange(o.date, analyticsRange, 'analytics'),
+    KhaytOrderStatus.isFinished(o) && o.completedAt && inRange(o.date, analyticsRange, 'analytics'),
   );
   const matrix = Array.from({ length: 7 }, () => Array(12).fill(0));
   completed.forEach(o => {
@@ -307,10 +307,10 @@ function renderHandoffAnalyticsOverview(ctx) {
 
 function renderAnalytics() {
   const orders = printLog.filter(o => inRange(o.date, analyticsRange, 'analytics'));
-  const completed = orders.filter(o => o.status === 'completed' && !o.voidedAt && _countsForBusiness(o));
+  const completed = orders.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o));
   const revenue = completed.reduce((s, o) => s + orderNetRevenueBase(o), 0);
   const hours   = orders.reduce((s, o) => s + (+o.printTime || 0), 0);
-  const inProgress = orders.filter(o => o.status !== 'completed' && o.status !== 'pending').length;
+  const inProgress = orders.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'pending').length;
   // Receivables — outstanding amount across all unpaid/partial orders, regardless of status
   const receivables = printLog
     .filter(o => (payStatus(o)) !== 'paid')
@@ -322,7 +322,7 @@ function renderAnalytics() {
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const mRev = printLog.filter(o => o.status === 'completed' && !o.voidedAt && _countsForBusiness(o) && (o.date || '').startsWith(key))
+      const mRev = printLog.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && (o.date || '').startsWith(key))
         .reduce((s, o) => s + orderNetRevenueBase(o), 0);
       months.push(mRev);
     }
@@ -1549,7 +1549,7 @@ function renderPrinterUtilizationChart() {
   const el = $('#printerUtilSection');
   if (!el || machines.length === 0) { if (el) el.innerHTML = ''; return; }
 
-  const orders = printLog.filter(o => inRange(o.date, analyticsRange, 'analytics') && o.status === 'completed' && !o.voidedAt && _countsForBusiness(o));
+  const orders = printLog.filter(o => inRange(o.date, analyticsRange, 'analytics') && KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o));
   const machMap = {};
   for (const m of machines) machMap[m.id] = { name: m.name, color: m.color, hours: 0, revenue: 0, cost: 0, count: 0 };
   for (const o of orders) {
@@ -1989,7 +1989,7 @@ function renderLocationPL() {
   const getD = id => { if (!locTotals[id]) locTotals[id] = { revenue: 0, matCost: 0, expenses: 0, orders: 0 }; return locTotals[id]; };
 
   // Orders
-  printLog.filter(o => o.status === 'completed' && !o.voidedAt && _countsForBusiness(o) && inRange(o.date || (o.timestamp || '').slice(0,10), analyticsRange, 'analytics')).forEach(o => {
+  printLog.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && inRange(o.date || (o.timestamp || '').slice(0,10), analyticsRange, 'analytics')).forEach(o => {
     const lid = (o.machineId && machLocById[o.machineId]) || (o.machine && machLocByName[o.machine]) || '__none__';
     const d = getD(lid);
     d.revenue += orderNetRevenueBase(o);
@@ -2307,7 +2307,7 @@ function renderRevenueChart() {
 function renderClientRetention() {
   const el = $('#clientRetentionSection');
   if (!el) return;
-  const completed = printLog.filter(o => o.status === 'completed' && o.clientId && o.date);
+  const completed = printLog.filter(o => KhaytOrderStatus.isFinished(o) && o.clientId && o.date);
   // Group by client, sorted by date
   const clientOrders = {};
   for (const o of completed) {
@@ -2443,7 +2443,7 @@ function renderOperatorAnalytics() {
   if (!el) return;
   if (operators.length === 0) { el.innerHTML = ''; return; }
 
-  const completed = printLog.filter(o => o.status === 'completed' && o.operatorId);
+  const completed = printLog.filter(o => KhaytOrderStatus.isFinished(o) && o.operatorId);
   if (completed.length === 0) {
     el.innerHTML = `<h3 class="card-head"><span class="swatch"></span><span>${escapeHtml(t('an.operator_title'))}</span></h3><p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.accuracy_none'))}</p>`;
     return;
@@ -2793,7 +2793,7 @@ function exportPnlCsv() {
   }
   const _taxProfile = KhaytTax.profileFromSettings(settings);
   const orders = (printLog || [])
-    .filter(o => o.status === 'completed' && !o.voidedAt && _countsForBusiness(o) && inRange(o.date, analyticsRange, 'analytics'))
+    .filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && inRange(o.date, analyticsRange, 'analytics'))
     .map(o => {
       const revenue = orderNetRevenueBase(o);
       const cogs = (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0)
@@ -2870,8 +2870,10 @@ async function exportAnalyticsReport() {
 
   // 3. KPI summary
   const pl = printLog || [];
-  const completedOrders = pl.filter(o => o.status === 'completed' && !o.voidedAt && _countsForBusiness(o));
-  const totalRev = pl.filter(o => (o.status === 'completed' || o.status === 'delivered') && !o.voidedAt)
+  const completedOrders = pl.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o));
+  // The line below already knew both spellings and the one above did not, so
+  // one report disagreed with itself about how many jobs made its own revenue.
+  const totalRev = pl.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt)
     .reduce((s, o) => s + orderNetRevenueBase(o), 0);
   const totalOrders = pl.length;
   const avgMargin = (() => {
@@ -3242,7 +3244,7 @@ function computeBreakEven() {
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
   const r = KhaytBreakEven.breakEven({
     fixedCosts: fixed,
-    completed: printLog.filter(o => o.status === 'completed' && !o.voidedAt && _countsForBusiness(o)),
+    completed: printLog.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o)),
     since: localDateStr(cutoff),
     month: localMonthStr(new Date()),
   }, { revenueOf: orderNetRevenueBase, partCostOf: partTotalCost });
@@ -3264,7 +3266,7 @@ function renderBreakEvenCard() {
   const today = new Date();
   const thisMonthStr = localMonthStr(today);
   const monthRev = printLog
-    .filter(o => o.status === 'completed' && !o.voidedAt && _countsForBusiness(o) && (o.date || '').startsWith(thisMonthStr))
+    .filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && (o.date || '').startsWith(thisMonthStr))
     .reduce((s, o) => s + orderNetRevenueBase(o), 0);
 
   if (fixedCosts.length === 0) {
