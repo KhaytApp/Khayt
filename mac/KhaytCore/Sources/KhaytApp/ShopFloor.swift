@@ -1205,15 +1205,16 @@ private struct Live: View {
                 // percentage their own server computed, and captioning that
                 // "by file position" would be a claim about somebody else's
                 // firmware.
-                if let source = status.progressSource {
-                    // `m73` is the machine's own screen figure, so it is named
-                    // as such: a shop comparing the two should be able to see
-                    // at a glance that they are the same number.
-                    let caption = switch source {
-                    case "m73": "mac.by_printer"
-                    case "layers": "mac.by_layers"
-                    default: "mac.by_bytes"
-                    }
+                //
+                // AND ONLY FROM THE ADAPTER THAT CHOOSES. The paragraph above
+                // was true of the intent and false of the code: `lib/sdcp.js`
+                // sets `progressSource` too, to `time` or `none`, and this
+                // read anything it did not recognise as "by file position" —
+                // so a resin printer reporting its own elapsed ticks was
+                // captioned with a claim about a file it does not have. The
+                // type is what settles it, not the spelling of the source.
+                if let caption = PrinterWatch.progressCaption(type: status.type,
+                                                              source: status.progressSource) {
                     Text(shop.words.callIt(caption))
                         .font(.caption2).foregroundStyle(.tertiary)
                 }
