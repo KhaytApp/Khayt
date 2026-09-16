@@ -1830,6 +1830,45 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.17] - 2026-09-16
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **(Mac) The shop's due dates as a calendar subscription.** With the LAN
+  server on, Settings → Online shows the same `/calendar.ics` link the
+  Windows and Linux app offers: one all-day event per open job with a due
+  date, tentative until it is printing, for any calendar app on the shop's
+  Wi‑Fi. The feed is one shared module now (`lib/lan-calendar.js`), lifted
+  verbatim out of the Node route and held byte-identical to it; the
+  subscription token is minted into the book the first time the Mac serves.
+- **(Mac) "Where is my order": the customer's tracking page, served by the
+  Mac.** On a job under way or done, the inspector has "Copy tracking link":
+  the link points at this Mac, carries the job's own tracking token (minted
+  the first time, as the other app mints it) and opens the same page that
+  app serves — the stage of the order, its details, the shipping, and once it
+  is complete a short survey the customer can answer from the page. The page
+  is lifted verbatim out of the Node route into `lib/lan-order-page.js`, the
+  Node server draws from it, and the carriers directory moved from the
+  renderer into `lib/` so both hosts read the same carrier names and links.
+
+### Fixed
+
+- **Time left on a Klipper printer is the figure the machine itself shows.**
+  Khayt worked the number out from the layer count, and a layer count assumes
+  every layer costs the same. Measured on a U1 printing a part whose lower
+  half held three quarters of the work: layers said 53% done and Khayt
+  extrapolated 7h19m left, while the machine's own screen said under three
+  hours. Both numbers were in front of the shop at once. Klipper relays the
+  slicer's `M73` percentage — the only one of the three signals that is about
+  time rather than geometry or file layout — as `display_status.progress`,
+  and Khayt was not asking Moonraker for it at all. It asks now, and prefers
+  it, captioned "as the printer shows it" so the two can be checked against
+  each other. Layers stay the fallback: a file with no `M73` behaves exactly
+  as before, including the relief whose byte position read 0.7% at 19% done.
+
 ## [4.0.0-alpha.16] - 2026-09-16
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
