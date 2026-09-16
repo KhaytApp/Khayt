@@ -591,6 +591,7 @@ public actor KhaytEngine {
         "carriers",
         "lan-order-page",
         "lan-calendar",
+        "upload-scan",
         "public-quote",
         "gcode-parse",
         // Which customers are worth keeping.
@@ -2428,6 +2429,20 @@ public actor KhaytEngine {
     /// Shared because the name a shop is offered when Khayt finds a slicer and
     /// the name the Mac offers must be the same name, or one shop's settings
     /// read differently in its two apps.
+    /// The argv a slicer is launched with: `lib/slicers.js` splits the shop's
+    /// own argument template and fills the placeholders in, in that order.
+    ///
+    /// Asked rather than reimplemented. The template is untrusted — it travels
+    /// in backups and cloud sync — and how it is split decides what the slicer
+    /// is actually run with. A Swift copy of that decision is the divergence
+    /// `lib/` exists to prevent.
+    public func sliceArgv(template: String, model: String, output: String, outdir: String) throws -> [String] {
+        try runtime.call2("""
+            KhaytSlicers.sliceArgv(ARG0, { model: ARG1, output: ARG2, outdir: ARG3 })
+            """,
+            [.string(template), .string(model), .string(output), .string(outdir)], as: [String].self)
+    }
+
     public func slicerDisplayName(path: String) throws -> String {
         try runtime.call2("KhaytSlicers.slicerDisplayName(ARG0)", [.string(path)], as: String.self)
     }
@@ -6630,6 +6645,27 @@ public actor KhaytEngine {
                                         displayStatus: JSONValue) throws -> String {
         try runtime.call2("KhaytPrinterStatus.moonrakerProgress(ARG0, ARG1, ARG2).source",
                           [printStats, virtualSdcard, displayStatus], as: String.self)
+    }
+
+    /// Is a stranger's uploaded model safe to write down and hand to a slicer?
+    ///
+    /// The FACTS are gathered by the host — the size, the opening bytes, and
+    /// an archive's member list — because thirty-two megabytes of somebody
+    /// else's file has no business crossing into JavaScriptCore to be judged.
+    /// The judgement is `lib/upload-scan.js`, so both apps refuse the same
+    /// files for the same reasons.
+    public struct UploadVerdict: Decodable, Sendable {
+        public let ok: Bool
+        public let reason: String?
+    }
+    public func scanUpload(ext: String, size: Int, header: String,
+                           entries: [JSONValue]? = nil) throws -> UploadVerdict {
+        var facts: [String: JSONValue] = [
+            "ext": .string(ext), "size": .number(Double(size)), "header": .string(header),
+        ]
+        if let entries { facts["entries"] = .array(entries) }
+        return try runtime.call2("globalThis.KhaytUploadScan.verdict(ARG0)", [.object(facts)],
+                                 as: UploadVerdict.self)
     }
 
     /// The statuses `lib/order-status.js` counts as finished — so a Swift

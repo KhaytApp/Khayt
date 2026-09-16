@@ -113,3 +113,87 @@ test('main.js launches slicers through the shared allowlist, and keeps no second
   assert.doesNotMatch(main, /SLICER_APP_RE\s*=/,
     'the scanner must not keep a second token list');
 });
+
+/**
+ * ── THE ARGV A SLICER IS ACTUALLY LAUNCHED WITH ────────────────────────────
+ *
+ * `settings.slicers[].args` is untrusted — it arrives in a restored backup or
+ * a cloud sync, like the path beside it that `isAllowedSlicerBinary` guards.
+ * `spawn` runs with `shell:false`, so metacharacters cannot reach a shell, but
+ * the SPLIT still decides what becomes a separate argument.
+ *
+ * This lived in `main.js` with no test and no second reader. The Mac needs the
+ * same split to launch the same slicer, and a Swift copy of a security
+ * decision is the divergence `lib/` exists to prevent. Copied here verbatim
+ * from where it stood, and compared.
+ */
+const S = require('../lib/slicers');
+
+function originalTokenize(template) {
+  const out = []; let cur = ''; let q = null; let has = false;
+  for (const ch of String(template || '')) {
+    if (q) { if (ch === q) q = null; else { cur += ch; has = true; } }
+    else if (ch === '"' || ch === "'") { q = ch; has = true; }
+    else if (/\s/.test(ch)) { if (has) { out.push(cur); cur = ''; has = false; } }
+    else { cur += ch; has = true; }
+  }
+  if (has) out.push(cur);
+  return out;
+}
+
+test('the split is the one main.js used, character for character', () => {
+  const templates = [
+    '--export-gcode -o {output} {model}',
+    '', null, undefined, '   ',
+    '--load "my profile.ini" -o {output} {model}',
+    "--load 'a b.ini' {model}",
+    '--single   --spaced\t--tabbed\n--newlined',
+    '"" -o {output}',
+    'unclosed "quote {model}',
+    "mixed'quotes\"here",
+    '--flag={model}',
+  ];
+  for (const t of templates) {
+    assert.deepEqual(S.tokenizeSliceArgs(t), originalTokenize(t), JSON.stringify(t));
+  }
+});
+
+test('placeholders are filled AFTER the split, so a path with a space stays one argument', () => {
+  const argv = S.sliceArgv('-o {output} {model}', {
+    model: '/Users/x/My Models/dragon.stl',
+    output: '/tmp/out dir/out.gcode',
+  });
+  assert.deepEqual(argv, ['-o', '/tmp/out dir/out.gcode', '/Users/x/My Models/dragon.stl']);
+
+  // A path chosen to look like an argument cannot become one: it is filled
+  // into an already-final token.
+  const nasty = S.sliceArgv('-o {output} {model}', {
+    model: 'a.stl --load /etc/evil.ini',
+    output: '/tmp/o.gcode',
+  });
+  assert.equal(nasty.length, 3);
+  assert.equal(nasty[2], 'a.stl --load /etc/evil.ini');
+
+  // A quote in a path cannot close one either.
+  const quoted = S.sliceArgv('{model}', { model: 'x" --foo "y.stl' });
+  assert.deepEqual(quoted, ['x" --foo "y.stl']);
+});
+
+test('no template is the documented default, and every placeholder is understood', () => {
+  assert.equal(S.DEFAULT_SLICE_ARGS, '--export-gcode -o {output} {model}');
+  assert.deepEqual(S.sliceArgv(null, { model: 'm.stl', output: 'o.gcode' }),
+    ['--export-gcode', '-o', 'o.gcode', 'm.stl']);
+  assert.deepEqual(S.sliceArgv('{outdir} {model} {output}', { model: 'm', output: 'o', outdir: 'd' }),
+    ['d', 'm', 'o']);
+  // An unsupplied placeholder becomes empty rather than staying a literal
+  // `{model}` that a slicer would try to open.
+  assert.deepEqual(S.sliceArgv('{model}', {}), ['']);
+});
+
+test('main.js builds its argv from the shared rule, not its own copy', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  assert.ok(src.includes('sliceArgv(args, {'), 'runSlice no longer asks the shared rule');
+  assert.ok(!src.includes('function tokenizeSliceArgs'), 'main.js has its own tokenizer again');
+});

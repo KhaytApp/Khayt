@@ -33,7 +33,7 @@ struct LanServerTests {
         var tokens = 0
 
         init(pin: String = "2468", intakeToken: String = "", recordFails: Bool = false,
-             calendarToken: String = "", measures: Bool = true) async throws {
+             calendarToken: String = "", measures: Bool = true, sliced: Bool = false) async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -56,6 +56,10 @@ struct LanServerTests {
             // The reader is Swift and file-backed; the bench stands in for it
             // so these tests are about the ROUTE, not about mesh arithmetic.
             host.measure = { _, _ in measures ? LanServerTests.measuredCube : nil }
+            // A slicer is not on a test machine, so the slice is stood in for
+            // — what is proved here is that the route PREFERS it and falls
+            // back cleanly when it is not there.
+            host.sliceUpload = { _, _ in sliced ? LanServerTests.slicedFigures : nil }
             host.record = { entry in
                 if recordFails { throw CocoaError(.fileWriteUnknown) }
                 recorded.entries.append(entry)
@@ -686,6 +690,20 @@ struct LanServerTests {
 
     // MARK: - Pricing a model the customer uploaded
 
+    /// A payload the scan will accept as a binary STL: the 80-byte header
+    /// every one carries, then a count, then something. The scan refuses
+    /// anything shorter, which is right — and which the four-byte "MESH" these
+    /// tests used to post was not.
+    static let stlBytes = String(repeating: "s", count: 120)
+
+    /// What a slicer says about the same model — the figures the shape cannot
+    /// reach, because geometry knows nothing about purge.
+    static let slicedFigures: JSONValue = .object([
+        "exact": .bool(true), "source": .string("slicer"),
+        "printTimeMins": .number(272), "filamentGrams": .number(57.18),
+        "slicer": .string("SnapmakerOrca"),
+    ])
+
     /// A cube 50mm on a side, as this app's own reader measures one.
     static let measuredCube: JSONValue = .object([
         "source": .string("geometry"), "exact": .bool(false),
@@ -730,7 +748,8 @@ struct LanServerTests {
         let (form, cookie) = try await bench.openForm()
         #expect(form.text.contains(#"id="modelFile""#), "the form did not offer the upload")
 
-        let reply = try await bench.post("/api/intake/estimate?name=cube.stl", json: "MESH", headers: ["Cookie": cookie])
+        let reply = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                         headers: ["Cookie": cookie])
         #expect(reply.status == 200, Comment(rawValue: reply.text))
         guard case .object(let q) = try JSONDecoder().decode(JSONValue.self, from: reply.body) else {
             Issue.record("not an object: \(reply.text)"); return
@@ -769,6 +788,45 @@ struct LanServerTests {
         #expect(entry["modelQuote"] == nil, "a made-up reference produced a quote")
     }
 
+    @Test("a file that is not what it claims is refused before it is measured")
+    func scanRefusesImposters() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let (_, cookie) = try await bench.openForm()
+
+        // A PNG called a 3MF. The reader would have been handed it.
+        let png = "\u{89}PNG\r\n\u{1A}\n" + String(repeating: "x", count: 200)
+        let fake = try await bench.post("/api/intake/estimate?name=model.3mf", json: png, headers: ["Cookie": cookie])
+        #expect(fake.status == 400)
+        #expect(fake.text.contains("not-what-it-says"), Comment(rawValue: fake.text))
+        // And nothing was measured: the stand-in reader was never reached.
+        #expect(bench.recorded.entries.isEmpty)
+
+        // Too short to be a binary STL and not ASCII either.
+        let stub = try await bench.post("/api/intake/estimate?name=tiny.stl", json: "\u{FF}\u{FE}",
+                                        headers: ["Cookie": cookie])
+        #expect(stub.status == 400)
+        #expect(stub.text.contains("not-what-it-says"))
+
+        // An honest STL of a believable size still gets through to the reader.
+        let real = try await bench.post("/api/intake/estimate?name=cube.stl",
+                                        json: String(repeating: "m", count: 200), headers: ["Cookie": cookie])
+        #expect(real.status == 200, Comment(rawValue: real.text))
+    }
+
+    @Test("what the facts are read from a file, without unpacking it")
+    func uploadFacts() throws {
+        // The opening bytes, as the scan wants them.
+        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        #expect(LanServer.uploadFacts(png, ext: "stl").header.hasPrefix("89504e47"))
+        // A non-archive is not asked for members at all.
+        #expect(LanServer.uploadFacts(png, ext: "stl").entries == nil)
+        // Something calling itself a 3MF that is not a zip yields no members,
+        // which the rule reads as "not what it says" rather than as cleared.
+        #expect(LanServer.uploadFacts(png, ext: "3mf").entries?.isEmpty == true)
+    }
+
     @Test("the refusals come before the bytes, and in the Node route's order")
     func estimateRefusals() async throws {
         let bench = try await Bench()
@@ -776,7 +834,8 @@ struct LanServerTests {
         let (_, cookie) = try await bench.openForm()
         // Off: answered before a single byte is read, so an off switch is not
         // an upload target.
-        let off = try await bench.post("/api/intake/estimate?name=cube.stl", json: "MESH", headers: ["Cookie": cookie])
+        let off = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                       headers: ["Cookie": cookie])
         #expect(off.status == 403)
         #expect(off.text == #"{"ok":false,"reason":"off"}"#)
         // And the form does not offer a widget whose request would be refused.
@@ -784,7 +843,7 @@ struct LanServerTests {
         #expect(!form.text.contains(#"id="modelFile""#))
 
         bench.book.value = Self.quotingBook(bench.book.value)
-        let noSession = try await bench.post("/api/intake/estimate?name=cube.stl", json: "MESH")
+        let noSession = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes)
         #expect(noSession.status == 401)
         let odd = try await bench.post("/api/intake/estimate?name=drawing.pdf", json: "X", headers: ["Cookie": cookie])
         #expect(odd.status == 400)
@@ -800,9 +859,60 @@ struct LanServerTests {
         defer { bench.stop() }
         bench.book.value = Self.quotingBook(bench.book.value)
         let (_, cookie) = try await bench.openForm()
-        let reply = try await bench.post("/api/intake/estimate?name=cube.stl", json: "NOT A MESH", headers: ["Cookie": cookie])
+        let reply = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                         headers: ["Cookie": cookie])
         #expect(reply.status == 400)
         #expect(reply.text == #"{"ok":false,"reason":"no-numbers"}"#)
+    }
+
+    @Test("where the shop slices uploads, the slicer's figures beat the shape's")
+    func slicingBeatsGeometry() async throws {
+        let bench = try await Bench(sliced: true)
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        let (_, cookie) = try await bench.openForm()
+        let reply = try await bench.post("/api/intake/estimate?name=dragon.stl", json: Self.stlBytes,
+                                         headers: ["Cookie": cookie])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        guard case .object(let q) = try JSONDecoder().decode(JSONValue.self, from: reply.body) else {
+            Issue.record("not an object"); return
+        }
+        #expect(q["ok"] == .bool(true), Comment(rawValue: reply.text))
+        // The slicer's own weight, not an estimate from the shape — and said
+        // to be exact, which the geometric answer never is.
+        #expect(q["exact"] == .bool(true))
+        #expect(q["slicer"] == .string("SnapmakerOrca"))
+        // 57.18 g plus the shop's 5% slack, where the shape would have given
+        // a far smaller number.
+        #expect(q["grams"] == .number(60), Comment(rawValue: "\(q["grams"] ?? .null)"))
+    }
+
+    @Test("with slicing off, or a slice that produced nothing, the shape still answers")
+    func slicingFallsBack() async throws {
+        // Off: the default, and the same answer the route always gave.
+        let off = try await Bench()
+        defer { off.stop() }
+        off.book.value = Self.quotingBook(off.book.value)
+        let (_, cookie) = try await off.openForm()
+        let reply = try await off.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                       headers: ["Cookie": cookie])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        guard case .object(let q) = try JSONDecoder().decode(JSONValue.self, from: reply.body) else {
+            Issue.record("not an object"); return
+        }
+        #expect(q["ok"] == .bool(true))
+        // Measured, not sliced: an estimate is never called exact.
+        #expect(q["exact"] != .bool(true))
+    }
+
+    @Test("a shop that has not asked for slicing does not get it, whatever else is set")
+    func slicingIsOffUntilAsked() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        // Nothing is written and no slicer is consulted: the switch decides
+        // first, before the slicer, the file or anything else is looked at.
+        let answer = await shop.sliceCustomerUpload(Data("x".utf8), ext: "stl")
+        #expect(answer == nil, "a sample book with no setting sliced a stranger's file")
     }
 
     @Test("a sliced file is quoted on the slicer's own figures")

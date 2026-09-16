@@ -971,17 +971,6 @@ ipcMain.handle('hub:pick-file', async (event, opts = {}) => {
 //     filament estimate (accurate quoting). We never bundle a slicer engine
 //     (keeps the license clean); we shell out to one the user installed and parse
 //     its G-code summary via lib/gcode-parse. spawn(shell:false) — no injection. ---
-function tokenizeSliceArgs(template) {
-  const out = []; let cur = ''; let q = null; let has = false;
-  for (const ch of String(template || '')) {
-    if (q) { if (ch === q) q = null; else { cur += ch; has = true; } }
-    else if (ch === '"' || ch === "'") { q = ch; has = true; }
-    else if (/\s/.test(ch)) { if (has) { out.push(cur); cur = ''; has = false; } }
-    else { cur += ch; has = true; }
-  }
-  if (has) out.push(cur);
-  return out;
-}
 
 // Slice a model with the user's installed slicer. Returns { ok, gcodePath, outDir,
 // meta, error } WITHOUT cleaning up outDir — the caller decides (parse only, or
@@ -1007,7 +996,7 @@ function tokenizeSliceArgs(template) {
 // all three call sites here kept the denylist, so every one of the binaries
 // above was accepted as a slicer for as long as it existed. Measured, not
 // assumed — the denylist said yes to all ten.
-const { isAllowedSlicerBinary } = require('./lib/slicers');
+const { isAllowedSlicerBinary, sliceArgv } = require('./lib/slicers');
 
 async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
   const { spawn } = require('node:child_process');
@@ -1017,8 +1006,9 @@ async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
   if (!modelPath || !fs.existsSync(modelPath)) return { ok: false, error: 'Model file not found.' };
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-slice-'));
   const outPath = path.join(outDir, 'out.gcode');
-  const argv = tokenizeSliceArgs(args || '--export-gcode -o {output} {model}')
-    .map((a) => a.replace(/\{model\}/g, modelPath).replace(/\{output\}/g, outPath).replace(/\{outdir\}/g, outDir));
+  // Split then fill, in `lib/slicers.js` — the same argv the Mac builds, and
+  // the reason substitution never happens before the split.
+  const argv = sliceArgv(args, { model: modelPath, output: outPath, outdir: outDir });
   const result = await new Promise((resolve) => {
     let stderr = '';
     let child;
