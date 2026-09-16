@@ -21,6 +21,13 @@ spreadsheet somebody keeps by hand.
   and what the reprints cost.
 - **Material cost** — what you are paying per unit, and whether it has moved.
 - **Capacity** — whether you can take the next job.
+- **Cost and revenue trends** — twelve months of what an hour of printing
+  earned and what a gram of material cost, under the cash flow. A month with
+  no reading is a gap, not a zero.
+- **How long a job takes** — six months of the average from the day a job was
+  taken to the day it was done, and the products that take longest.
+- **On-time delivery** — of the finished jobs that had a due date, how many
+  were done by it, and the promises missed, worst first.
 
 ## Custom reports
 
