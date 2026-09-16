@@ -71,6 +71,12 @@ final class LanServer {
         /// is NOW (it moved underneath the phone). Throws when the book cannot
         /// be written.
         var approve: (String, String) async throws -> JSONValue? = { _, _ in throw CocoaError(.fileWriteUnknown) }
+        /// Write a customer's survey onto the order that holds `token`, inside
+        /// the write. Returns false when no order holds it any more (spent by
+        /// a concurrent submit, or never issued). Throws when the book cannot
+        /// be written.
+        var survey: (_ token: String, _ rating: Double, _ comment: String?, _ nowIso: String) async throws -> Bool
+            = { _, _, _, _ in throw CocoaError(.fileWriteUnknown) }
     }
 
     struct Request {
@@ -118,6 +124,7 @@ final class LanServer {
     /// Form opens and form submissions per address, each its own bucket.
     private var grants: [String: KhaytEngine.LanFailures] = [:]
     private var submits: [String: KhaytEngine.LanFailures] = [:]
+    private var surveys: [String: KhaytEngine.LanFailures] = [:]
     static let maxFailureKeys = 5000
     static let maxBody = 1_048_576
 
@@ -318,6 +325,12 @@ final class LanServer {
 
         case (_, false) where request.method == "POST" && Self.approvePath(path) != nil:
             return await quoteApprove(request, id: Self.approvePath(path)!, store: store)
+
+        case (_, true) where Self.trackingPath(path) != nil:
+            return await trackingPage(request, id: Self.trackingPath(path)!, store: store)
+
+        case ("/api/survey", false) where request.method == "POST":
+            return await surveySubmit(request)
 
         case ("/api/intake", false) where request.method == "POST":
             return await intakeSubmit(request, store: store)
@@ -565,6 +578,72 @@ final class LanServer {
         return .html(200, page)
     }
 
+    // MARK: - The customer's order page
+
+    /// `/order/<id>`, `/order/<id>/status`, with or without a trailing slash —
+    /// the id as the Node route keeps it. Not `/quote` or `/approve`.
+    nonisolated static func trackingPath(_ path: String) -> String? {
+        guard path.hasPrefix("/order/") else { return nil }
+        var raw = String(path.dropFirst("/order/".count))
+        if raw.hasSuffix("/") { raw.removeLast() }
+        if raw.hasSuffix("/status") { raw = String(raw.dropLast("/status".count)) }
+        guard !raw.isEmpty, !raw.contains("/") else { return nil }
+        return raw.filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-") }
+    }
+
+    /// `GET /order/:id`: a quote is sent to its quote page; anything else is
+    /// the tracking page behind the order's tracking token.
+    private func trackingPage(_ request: Request, id: String, store: JSONValue) async -> Response {
+        let engine = host.engine
+        let html: (Int, String) -> Response = { status, body in
+            .html(status, body, extra: ["Cache-Control": "no-cache"])
+        }
+        guard case .object(let order)? = order(id) else {
+            return html(404, (try? await engine.lanOrderNotice("order_not_found")) ?? "")
+        }
+        if Shop.plainString(order["status"]) == "quote" {
+            return Response(status: 302, headers: ["Location": "/order/\(id)/quote", "Cache-Control": "no-cache"])
+        }
+        let token = (request.query["token"] ?? "").trimmingCharacters(in: .whitespaces)
+        guard case .string(let expected)? = order["trackingToken"], !expected.isEmpty, !token.isEmpty,
+              Self.constantTimeEqual(token, expected) else {
+            return html(403, (try? await engine.lanOrderNotice("invalid_tracking_link")) ?? "")
+        }
+        let page = (try? await engine.lanTrackingPage(order: .object(order), store: store)) ?? ""
+        return html(200, page)
+    }
+
+    /// `POST /api/survey`: the one public write without a PIN, so it is
+    /// rate-limited per address and finds its order by token alone.
+    private func surveySubmit(_ request: Request) async -> Response {
+        let engine = host.engine
+        let now = host.now()
+        let limit = (try? await engine.lanSurveyLimit()) ?? 30
+        let step = try? await engine.lanIntakeRate(surveys[request.remote], now: now, limit: limit)
+        if let step { surveys[request.remote] = step.rec; sweep(&surveys, now: now) }
+        guard step?.allowed != false else {
+            return .open(429, #"{"error":"Too many attempts — try again later"}"#)
+        }
+        guard let body = try? JSONDecoder().decode(JSONValue.self, from: request.body), case .object = body else {
+            return .open(400, #"{"error":"Invalid request"}"#)
+        }
+        guard let check = try? await engine.lanSurveyCheck(body: body) else {
+            return .open(400, #"{"error":"Invalid request"}"#)
+        }
+        guard check.ok, let token = check.token, let rating = check.rating else {
+            let error = check.error ?? "Invalid payload"
+            let escaped = (try? String(decoding: JSONEncoder().encode(error), as: UTF8.self)) ?? "\"Invalid payload\""
+            return .open(Int(check.status ?? 400), "{\"error\":\(escaped)}")
+        }
+        do {
+            let written = try await host.survey(token, rating, check.comment, Self.isoNow(now))
+            guard written else { return .open(404, #"{"error":"Invalid or expired survey token"}"#) }
+        } catch {
+            return .open(400, #"{"error":"The shop could not record your feedback right now. Please try again shortly."}"#)
+        }
+        return .open(200, #"{"ok":true}"#)
+    }
+
     // MARK: - The PIN
 
     /// Nil when the caller may pass; the refusal to send otherwise. The same
@@ -756,6 +835,10 @@ extension Shop {
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             return try await self.approveQuote(id, nowIso: nowIso)
         }
+        host.survey = { [weak self] token, rating, comment, nowIso in
+            guard let self else { throw CocoaError(.fileWriteUnknown) }
+            return try await self.recordSurvey(token: token, rating: rating, comment: comment, nowIso: nowIso)
+        }
         let server = LanServer(host: host)
         do {
             _ = try await server.start(port: config.port, bind: config.bindLan ? .lan : .loopback)
@@ -827,6 +910,53 @@ extension Shop {
         }
         await load(source)
         return approved
+    }
+
+    /// The link a customer follows their order from: this Mac's address, the
+    /// job, and the job's own tracking token — minted into the job the first
+    /// time, as the Electron renderer's `ensureTrackingToken` mints it.
+    func trackingLink(for jobId: String) async -> String? {
+        guard let base = lanURL, let build = source.build else { return nil }
+        var token = ""
+        do {
+            try StoreWriter.updateRecord(build, collection: "printLog", id: jobId) { record in
+                if case .string(let had)? = record["trackingToken"], !had.isEmpty {
+                    token = had
+                } else {
+                    token = LanServer.randomToken(bytes: 16)
+                    record["trackingToken"] = .string(token)
+                }
+            }
+        } catch { return nil }
+        await load(source)
+        let id = jobId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? jobId
+        let tok = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token
+        return "\(base)order/\(id)?token=\(tok)"
+    }
+
+    /// A customer's survey, onto the order that holds the token — found inside
+    /// the write, by constant-time compare, so a token spent by a concurrent
+    /// submit is not spent twice. False when no order holds it.
+    func recordSurvey(token: String, rating: Double, comment: String?, nowIso: String) async throws -> Bool {
+        guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
+        var written = false
+        try await StoreWriter.update(
+            storeURL: build.storeURL,
+            owns: { StoreLock.weOwnIt(build) },
+            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+        ) { root in
+            guard case .array(var log)? = root["printLog"] else { return }
+            for i in log.indices {
+                guard case .object(let order) = log[i], case .string(let held)? = order["surveyToken"],
+                      !held.isEmpty, LanServer.constantTimeEqual(token, held) else { continue }
+                log[i] = try await engine.lanSurveyPatch(order: .object(order), rating: rating, comment: comment, nowIso: nowIso)
+                written = true
+                break
+            }
+            if written { root["printLog"] = .array(log) }
+        }
+        if written { await load(source) }
+        return written
     }
 
     func stopLanServer() {

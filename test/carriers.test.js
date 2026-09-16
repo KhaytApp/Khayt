@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const C = require('../renderer/carriers.js');
+const C = require('../lib/carriers.js');
 
 test('registry exposes manual + the three Saudi carriers', () => {
   assert.deepEqual(Object.keys(C.CARRIERS).sort(), ['aramex', 'manual', 'smsa', 'spl']);

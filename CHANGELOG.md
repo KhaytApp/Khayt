@@ -689,6 +689,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) "Where is my order": the customer's tracking page, served by the
+  Mac.** On a job under way or done, the inspector has "Copy tracking link":
+  the link points at this Mac, carries the job's own tracking token (minted
+  the first time, as the other app mints it) and opens the same page that
+  app serves — the stage of the order, its details, the shipping, and once it
+  is complete a short survey the customer can answer from the page. The page
+  is lifted verbatim out of the Node route into `lib/lan-order-page.js`, the
+  Node server draws from it, and the carriers directory moved from the
+  renderer into `lib/` so both hosts read the same carrier names and links.
 - **(Mac) Rounding and "Your own price" on the product sheet.** The two
   controls Khayt's product editor has had all along — round to a step (up,
   down or nearest) and a typed price that wins over everything — with the
