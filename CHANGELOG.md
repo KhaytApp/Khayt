@@ -1735,6 +1735,108 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.15] - 2026-09-16
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **The P&L by month as well as by quarter, with the margin on each.** On the
+  Mac the Reports P&L page has a "By quarter / By month" switch and a Margin
+  column; the rule (`lib/pnl-report.js`) gained a month grain — the same
+  arithmetic per calendar month, a month of overhead, the month in progress
+  pro-rated — and a blended margin: money accumulated and divided once, on
+  revenue net of tax, never the mean of per-job percentages. The other app's
+  monthly revenue-against-expenses and margin charts draw from it now.
+
+- **Whether the shop keeps its promises, on Reports → Best.** Of the
+  finished jobs that had a due date, how many were done by it, how many were
+  not and by how many days — and the promises missed, worst first, which the
+  other app's section never named. The same rule (`lib/on-time.js`), which the
+  other app's section now draws from.
+
+- **What was thrown away, by month and by why, on the Waste screen.**
+  Six months of wasted grams stacked by failure type — the heaviest three by
+  name, the rest as "other" — with a key that says each type's grams. The same
+  rule as the other app's chart (`lib/waste-trend.js`), which now draws from it.
+
+- **How long a job takes, on Reports → Best.** Six months of the
+  average from the day a job was taken to the day it was done, and under it
+  the products that take longest — average, fastest, slowest. The same rule as
+  the other app's two charts (`lib/cycle-time.js`), which now draw from it.
+
+- **Cost and revenue trends, on the Reports screen.** Twelve months of
+  what an hour of printing earned and what a gram of material cost, under the
+  cash flow. The same rule as the other app's chart (`lib/cost-trends.js`),
+  which it now also draws from.
+
+### Fixed
+
+- **A job taken from the catalogue opens priced — this time with the
+  parts costed.** The earlier fix repaired the number parsing on this path
+  and added the "nothing to cost" notice, but nothing ever asked the cost
+  model what the product's parts cost: a part added by hand was costed, a
+  part copied from a product was not, so the cart arrived at nothing and the
+  total with it. The parts are costed on the way in now, exactly as a typed
+  part is, and a product priced by hand or rounded to a step opens the job
+  priced the same way.
+
+- **The monthly revenue-against-expenses and margin charts disagreed with
+  the P&L beside them.** They summed `completed` only (a legacy delivered job
+  vanished), skipped the trade check, booked the customer's VAT as revenue
+  (the margin chart, in the order's currency), and the margin was the mean
+  of per-job percentages — one small job at 80% coloured a 10% month green.
+  Both draw from the P&L rule by month now, so a month's revenue, spending
+  and margin are one set of figures wherever they are shown.
+
+- **The help caught up with the Reports and Waste screens.** The Reports
+  article lists cost and revenue trends, how long a job takes and on-time
+  delivery; the Money article says what the Waste pane draws.
+
+- **A job finished under the older `delivered` status was missing from eight
+  rules — the quarterly P&L among them.** Khayt's own rule keeps a handed-over
+  job at `completed` and stamps it `deliveredAt`; books written before that
+  rule hold `status: 'delivered'` outright, and eight rules treated those rows
+  as not finished. The P&L and the best-sellers revenue left them out (the
+  sample shop's Q3 by thirteen jobs); a customer's spend for campaigns did too;
+  a machine's hours since service and the grams through its nozzle stopped at
+  the older rows; and the attention list, the new-job due-date estimate and
+  the phone's queue counted them as still OPEN — overdue for ever, and queued
+  work that pushed every new due date out. Both spellings are finished now,
+  everywhere; a shop on the current rule sees no change.
+
+- **The on-time delivery rate left delivered jobs out of the delivery
+  record.** The section had been fixed once already — for counting voided jobs
+  and the shop's own prints as promises — and still counted `completed` only,
+  so the jobs a shop had finished AND handed over were the ones missing from
+  its record. Eighth chart with the fault. A delivered job is a promise kept
+  or missed like any other.
+
+- **The waste-by-failure-type chart could not name the commonest failure.**
+  It named its three types by hand — `warping`, `adhesion`, `stringing` — and
+  the waste log's own vocabulary has no `adhesion`; it has `bed_adhesion`. So
+  every failed first layer a shop ever logged landed in "other", on a chart
+  whose point is what keeps going wrong. The named types are now the heaviest
+  three in the window, whatever they are.
+
+- **The cycle-time and lead-time charts left delivered jobs out, and the
+  lead-time table split one product by its spelling.** Both counted only
+  `completed`, so a job finished AND handed over vanished; a job marked
+  delivered without passing through completed had no finish day at all. And
+  the table keyed on the job's typed name, so "Bracket" and "bracket" were two
+  products and a job taken from the catalogue did not join its product. A
+  delivered job counts, its finish is its completion or else its delivery, and
+  a job with a product joins it.
+
+- **The cost and revenue trends chart left delivered jobs out and priced a
+  gram by what was left of the spool.** Revenue per print-hour counted only
+  `completed`, so a job finished AND handed over vanished from its month. And
+  "average material cost per gram" divided each spool's cost by its remaining
+  weight — a spool got dearer per gram as it was used — and read today's shelf
+  for every one of the twelve months, so the trend was one number repeated. A
+  delivered job counts; a gram costs the spool's price over its NEW weight; and
+  each month shows the spools opened in it, or nothing when none were.
 ## [4.0.0-alpha.14] - 2026-09-16
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
