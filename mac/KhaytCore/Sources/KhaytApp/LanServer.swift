@@ -86,6 +86,12 @@ final class LanServer {
         var measure: (Data, String) throws -> JSONValue? = { data, ext in
             try LanServer.measureUpload(data, ext: ext)
         }
+        /// Slice a CLEARED upload with the shop's own slicer and take the
+        /// slicer's own figures. Nil when the shop has not turned this on, has
+        /// no slicer, or the slice produced nothing usable — in every case the
+        /// caller falls back to measuring the shape, which is what it did
+        /// before this existed.
+        var sliceUpload: (Data, String) async -> JSONValue? = { _, _ in nil }
     }
 
     struct Request {
@@ -722,6 +728,25 @@ final class LanServer {
         guard measuring < Self.maxMeasuring else {
             return .open(503, #"{"ok":false,"reason":"busy"}"#)
         }
+        // ── LOOKED AT BEFORE IT IS USED ───────────────────────────────────
+        //
+        // The file is about to be measured, and where the shop has turned
+        // slicing on it will be written down and handed to a native binary.
+        // So it is inspected first: is it the kind of file its name claims,
+        // does an archive name members outside where it would be opened, does
+        // it expand out of all proportion. The judgement is the shared rule's.
+        //
+        // What this does NOT promise is stated where the shop reads it: a
+        // parser bug in somebody else's C++ is not something a structural
+        // check can see.
+        let facts = Self.uploadFacts(request.body, ext: ext)
+        if let verdict = try? await engine.scanUpload(ext: ext, size: request.body.count,
+                                                      header: facts.header, entries: facts.entries),
+           !verdict.ok {
+            let reason = verdict.reason ?? "refused"
+            let escaped = (try? String(decoding: JSONEncoder().encode(reason), as: UTF8.self)) ?? "\"refused\""
+            return .open(400, "{\"ok\":false,\"reason\":\(escaped)}")
+        }
         measuring += 1
         defer { measuring -= 1 }
 
@@ -730,6 +755,12 @@ final class LanServer {
         let intake: JSONValue?
         if ext == "gcode" || ext == "gco" {
             intake = try? await engine.gcodeIntake(text: String(decoding: request.body, as: UTF8.self))
+        } else if let sliced = await host.sliceUpload(request.body, ext) {
+            // THE SLICER'S OWN FIGURES, where the shop has asked for them.
+            // Geometry cannot know about purge — on the shop's four-colour
+            // dragon the slicer said 57 g where the shape said 13 — so when
+            // there is a real answer to be had, it wins.
+            intake = sliced
         } else {
             intake = try? host.measure(request.body, ext)
         }
@@ -786,6 +817,29 @@ final class LanServer {
     nonisolated static func uploadExtension(_ name: String) -> String {
         let tail = name.split(separator: ".").last.map(String.init) ?? ""
         return tail.lowercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+    }
+
+    /// What a stranger's file looks like from the outside, for the scan.
+    ///
+    /// The opening bytes and — for an archive — its member list, read from the
+    /// central directory without unpacking anything. Nothing here decides;
+    /// `lib/upload-scan.js` does, on these facts.
+    nonisolated static func uploadFacts(_ data: Data, ext: String) -> (header: String, entries: [JSONValue]?) {
+        let header = data.prefix(16).map { String(format: "%02x", $0) }.joined()
+        guard ext == "3mf" else { return (header, nil) }
+        // A zip is read from a file, so this is the one point the bytes touch
+        // disk before they have been cleared — in a directory of our own, and
+        // removed on the way out whatever happens.
+        guard let scratch = try? SlicerRun.scratch() else { return (header, []) }
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let file = scratch.appending(path: "upload.3mf")
+        guard (try? data.write(to: file, options: .atomic)) != nil,
+              let entries = try? Zip.entries(of: file) else { return (header, []) }
+        return (header, entries.map {
+            .object(["name": .string($0.name),
+                     "size": .number(Double($0.size)),
+                     "compressedSize": .number(Double($0.compressedSize))])
+        })
     }
 
     /// Measure an uploaded mesh, in the shape `publicQuote` reads.
@@ -1031,6 +1085,10 @@ extension Shop {
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             return try await self.approveQuote(id, nowIso: nowIso)
         }
+        host.sliceUpload = { [weak self] data, ext in
+            guard let self else { return nil }
+            return await self.sliceCustomerUpload(data, ext: ext)
+        }
         host.survey = { [weak self] token, rating, comment, nowIso in
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             return try await self.recordSurvey(token: token, rating: rating, comment: comment, nowIso: nowIso)
@@ -1107,6 +1165,42 @@ extension Shop {
         }
         await load(source)
         return approved
+    }
+
+    /// Price a customer's cleared upload by slicing it.
+    ///
+    /// Everything here is conditional on the shop having said so: the switch
+    /// is off in a fresh book, and without it this returns nil and the caller
+    /// estimates from the shape exactly as before. The slicer is the one the
+    /// shop chose for this, else its default.
+    ///
+    /// The bytes go to a scratch directory and the whole directory is removed
+    /// on the way out, whatever happened — a stranger's model is not something
+    /// to leave lying on a shop's disk.
+    func sliceCustomerUpload(_ data: Data, ext: String) async -> JSONValue? {
+        let lan = SettingsReader(settings: SettingsReader(settings: settingsDict).object("lanApi"))
+        let quote = SettingsReader(settings: lan.object("intakeQuote"))
+        guard quote.flag("sliceUploads"), let engine else { return nil }
+
+        // The one the shop chose for this, else its default. A chosen slicer
+        // that has since been removed falls back rather than failing: the
+        // customer gets the estimate, not an error about the shop's settings.
+        let chosen = quote.text("sliceWithId")
+        var slicer = chosen.isEmpty ? nil : slicers.first { $0.id == chosen }
+        if slicer == nil { slicer = try? await engine.defaultSlicer(settings: settingsDict) }
+        guard let slicer, (try? await engine.mayLaunchAsSlicer(path: slicer.path)) == true else { return nil }
+
+        guard let dir = try? SlicerRun.scratch() else { return nil }
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let model = dir.appending(path: "upload.\(ext)")
+        let output = dir.appending(path: "out.gcode")
+        guard (try? data.write(to: model, options: .atomic)) != nil else { return nil }
+        guard let argv = try? await engine.sliceArgv(template: slicer.args, model: model.path,
+                                                     output: output.path, outdir: dir.path) else { return nil }
+        guard (try? SlicerRun.slice(model, with: slicer, argv: argv, allowed: true)) != nil,
+              let gcode = SlicerRun.gcode(in: dir, expected: output),
+              let text = try? SlicerRun.totalsText(of: gcode) else { return nil }
+        return try? await engine.gcodeIntake(text: text)
     }
 
     /// The link a customer follows their order from: this Mac's address, the

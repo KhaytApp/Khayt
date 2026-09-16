@@ -94,7 +94,55 @@
     return SLICER_NAME_RE.test(stem);
   }
 
-  const api = { listSlicers, defaultSlicer, getSlicer, slicerDisplayName, isAllowedSlicerBinary };
+  /**
+   * The argument template, split into an argv the way a shell would — and then
+   * the placeholders filled in.
+   *
+   * ── WHY THE ORDER MATTERS, AND WHY THIS IS HERE ───────────────────────────
+   *
+   * `settings.slicers[].args` is untrusted: it arrives in a restored backup or
+   * a cloud sync, like the path beside it that `isAllowedSlicerBinary` already
+   * guards. `spawn` runs with `shell:false`, so metacharacters cannot reach a
+   * shell — but the SPLIT still decides what becomes a separate argument.
+   *
+   * Substitution happens AFTER the split, never before. A model path with a
+   * space in it — `~/My Models/dragon.stl`, which is most shops — would
+   * otherwise be torn into two arguments by the tokenizer, and a path chosen
+   * to contain a quote could close one and open another. Filling a placeholder
+   * inside an already-final argument cannot add arguments at all.
+   *
+   * It lived in `main.js` with no test and no second reader. The Mac app needs
+   * the same split to run the same slicer, and a Swift copy of a security
+   * decision is the divergence this whole `lib` exists to prevent.
+   */
+  const DEFAULT_SLICE_ARGS = '--export-gcode -o {output} {model}';
+
+  function tokenizeSliceArgs(template) {
+    const out = []; let cur = ''; let q = null; let has = false;
+    for (const ch of String(template || '')) {
+      if (q) { if (ch === q) q = null; else { cur += ch; has = true; } }
+      else if (ch === '"' || ch === "'") { q = ch; has = true; }
+      else if (/\s/.test(ch)) { if (has) { out.push(cur); cur = ''; has = false; } }
+      else { cur += ch; has = true; }
+    }
+    if (has) out.push(cur);
+    return out;
+  }
+
+  /** The finished argv: split first, then fill in. */
+  function sliceArgv(template, paths) {
+    const p = paths || {};
+    const model = p.model == null ? '' : String(p.model);
+    const output = p.output == null ? '' : String(p.output);
+    const outdir = p.outdir == null ? '' : String(p.outdir);
+    return tokenizeSliceArgs(template || DEFAULT_SLICE_ARGS)
+      .map((a) => a.replace(/\{model\}/g, model)
+                   .replace(/\{output\}/g, output)
+                   .replace(/\{outdir\}/g, outdir));
+  }
+
+  const api = { listSlicers, defaultSlicer, getSlicer, slicerDisplayName, isAllowedSlicerBinary,
+                tokenizeSliceArgs, sliceArgv, DEFAULT_SLICE_ARGS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytSlicers = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

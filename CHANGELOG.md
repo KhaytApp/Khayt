@@ -5,6 +5,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 ### Changed
+- **(Maintainers) How a slicer is launched is one rule now, and it has tests.**
+  `settings.slicers[].args` is untrusted — it travels in backups and cloud
+  sync, like the path beside it that `isAllowedSlicerBinary` already guards —
+  and how that template is split into arguments decides what the slicer is
+  actually run with. The splitter lived in `main.js` alone, with no test and
+  no second reader, and the Mac needs the same split to run the same slicer.
+  It is in `lib/slicers.js` now as `sliceArgv`, which splits first and fills
+  the placeholders in afterwards, so a model at `My Models/dragon.stl` stays
+  one argument and a path chosen to look like a flag cannot become one. The
+  test compares it against the original character for character.
 
 - **A customer's agreed price is the price of that part — not a cost the
   margin sits on.** Choosing a customer with a price agreement used to write
@@ -689,6 +699,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) A customer's model can be priced by slicing it, not by guessing at
+  its shape.** The estimate from geometry is honest but blunt: it cannot know
+  about purge, and on a real four-colour dragon the shape said 13 g where the
+  slicer said 57. With this on, a cleared upload is sliced by the shop's own
+  slicer — the one it picks for this, or its default — and the slicer's own
+  weight and time are what the customer is shown. Off in a fresh book,
+  because it is the only setting in Khayt that writes a stranger's file down
+  and points a native binary at it. Anything missing — no slicer, a slicer
+  since removed, a slice that produced nothing — falls back to measuring the
+  shape rather than failing.
+- **A customer's upload is inspected before it is used.** Is it the kind of
+  model its name claims; does an archive name a member outside the folder it
+  would be opened in; does it expand out of all proportion to what arrived. A
+  file that fails is refused with the reason and never reaches the reader.
+  The judgement is one shared rule (`lib/upload-scan.js`) so both apps refuse
+  the same files for the same reasons, and the host gathers the facts —
+  thirty-two megabytes of somebody else's file has no business crossing into
+  the rules engine to be judged. What it cannot promise is said where the
+  shop reads it: a parser bug in somebody else's C++ is not something a
+  structural check can see.
 - **(Mac) A listing can be taken off the catalogue.** There was no way to
   delete a product here at all — the words for it had been sitting in the app
   unused. Right-click a product in the grid or the table and it asks, in

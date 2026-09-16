@@ -2043,6 +2043,22 @@ final class Words {
         "mac.iq_no_preset":  ["en": "No printer preset yet, and a price cannot be worked out without one. Make one below.",
                               "ar": "لا يوجد إعداد طابعة بعد، ولا يمكن حساب السعر بدونه. أنشئ واحداً أدناه."],
         "mac.iq_new_preset": ["en": "New printer preset", "ar": "إعداد طابعة جديد"],
+        // Pricing a customer's upload by slicing it.
+        "mac.iq_slice":      ["en": "Price it by slicing it, not by its shape",
+                              "ar": "احسب السعر بتقطيع الملف، لا من شكله"],
+        "mac.iq_slice_hint": ["en": "Far more accurate — the shape cannot know about purge, which on a "
+                                    + "four-colour print is most of the filament. The file is checked first "
+                                    + "(that it is the kind of model it claims, names nothing outside its "
+                                    + "own folder, and does not expand out of all proportion), then written "
+                                    + "to a scratch folder and sliced, then deleted. That check cannot "
+                                    + "vouch for what a slicer does with a well-formed file.",
+                              "ar": "أدق بكثير — فالشكل لا يعرف كمية التنظيف بين الألوان، وهي معظم الخيط في "
+                                    + "الطباعة رباعية الألوان. يُفحص الملف أولاً (أنه من النوع الذي يدّعيه، "
+                                    + "ولا يسمّي شيئاً خارج مجلده، ولا يتمدد بصورة غير متناسبة)، ثم يُكتب في "
+                                    + "مجلد مؤقت ويُقطّع ثم يُحذف. وهذا الفحص لا يضمن ما يفعله برنامج التقطيع "
+                                    + "بملف سليم البنية."],
+        "mac.iq_slice_with": ["en": "Slice with", "ar": "قطّع باستخدام"],
+        "mac.iq_slice_default": ["en": "— The default slicer —", "ar": "— برنامج التقطيع الافتراضي —"],
         // What a part costs besides its filament.
         "mac.part_rates":    ["en": "Labour, power and wear",
                               "ar": "العمالة والكهرباء والاستهلاك"],
@@ -2178,6 +2194,6 @@ final class Words {
         "pe.delete_q", "pe.deleted",
         "lan.iq_enable", "lan.iq_enable_hint", "lan.iq_printer", "lan.iq_pick", "lan.iq_filament",
         "lan.iq_flat", "lan.iq_spool_cost", "lan.iq_spool_weight", "lan.iq_margin",
-        "lan.iq_min", "lan.iq_waste", "lan.iq_limit", "lan.iq_note",
+        "lan.iq_min", "lan.iq_waste", "lan.iq_limit", "lan.iq_note", "slicer.none",
     ]
 }

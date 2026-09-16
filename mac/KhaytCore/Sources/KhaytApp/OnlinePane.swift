@@ -43,6 +43,13 @@ struct OnlinePane: View {
         var quoteOn = false
         var presetId = ""
         var filamentId = ""
+        /// Price a customer's upload by SLICING it, rather than estimating
+        /// from its shape. Off unless the shop turns it on: it is the only
+        /// setting in Khayt that writes a stranger's file down and points a
+        /// native binary at it.
+        var sliceUploads = false
+        /// Which slicer does that. Empty means the shop's default.
+        var sliceWithId = ""
         var spoolCost = "", spoolWeight = "", margin = "", minPrice = "", waste = "", limit = ""
 
         @MainActor static func readQuote(_ settings: [String: JSONValue], into d: inout Draft) {
@@ -60,6 +67,8 @@ struct OnlinePane: View {
             // multiply every shop's waste allowance by a hundred.
             d.waste = Money.fieldValue(q.number("wastePct", 0) * 100)
             d.limit = Money.fieldValue(q.number("hourlyLimit", 12))
+            d.sliceUploads = q.flag("sliceUploads")
+            d.sliceWithId = q.text("sliceWithId")
         }
 
         func quoteForm() -> [String: JSONValue] {
@@ -76,6 +85,8 @@ struct OnlinePane: View {
                 "minPrice": .number(max(0, n(minPrice, 0))),
                 "wastePct": .number(min(0.5, max(0, n(waste, 0) / 100))),
                 "hourlyLimit": .number(min(10_000, max(1, n(limit, 12)))),
+                "sliceUploads": .bool(sliceUploads),
+                "sliceWithId": .string(sliceWithId),
             ]
         }
     }
@@ -164,6 +175,41 @@ struct OnlinePane: View {
                         Text(shop.words.callIt("lan.iq_note"))
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+
+                        // ── PRICED BY THE SLICER, NOT BY THE SHAPE ────────
+                        //
+                        // The estimate above is worked out from the model's
+                        // geometry, and geometry cannot know about purge: on
+                        // the shop's own four-colour dragon the slicer said
+                        // 57 g where the shape said 13. Asking the slicer is
+                        // the only way to close that.
+                        //
+                        // It is also the only setting here that writes a
+                        // stranger's file down and points a native binary at
+                        // it, so it is off until the shop says otherwise and
+                        // the sentence beside it says what the check before
+                        // it does and does not promise.
+                        Divider()
+                        Toggle(shop.words.callIt("mac.iq_slice"), isOn: $draft.sliceUploads)
+                        Text(shop.words.callIt("mac.iq_slice_hint"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if draft.sliceUploads {
+                            LabeledContent(shop.words.callIt("mac.iq_slice_with")) {
+                                Picker("", selection: $draft.sliceWithId) {
+                                    Text(shop.words.callIt("mac.iq_slice_default")).tag("")
+                                    ForEach(shop.slicers) { slicer in
+                                        Text(slicer.name).tag(slicer.id)
+                                    }
+                                }
+                                .labelsHidden().frame(maxWidth: 220)
+                            }
+                            if shop.slicers.isEmpty {
+                                Label(shop.words.callIt("slicer.none"), systemImage: "exclamationmark.triangle")
+                                    .font(.caption).foregroundStyle(Khayt.attention)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
                         presetMaker
                     } label: {
                         Text(shop.words.callIt("lan.iq_enable")).font(.callout)
