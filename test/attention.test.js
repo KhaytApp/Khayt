@@ -208,3 +208,14 @@ test('a spool warning never outranks a machine that has stopped', () => {
   assert.equal(items[0].severity, 'crit');
   assert.ok(items.some(i => i.kind === 'stock' && i.severity === 'warn'));
 });
+
+test('a legacy `delivered` job cannot be overdue', () => {
+  // Finished by the older spelling. It was flagged as late for ever, because
+  // the openness test knew only `completed`.
+  const late = order({ status: 'delivered', dueDate: ymd(-10) });
+  const stillOpen = order({ id: 'O2', status: 'printing', dueDate: ymd(-10) });
+  const items = selectAttention({ orders: [late, stillOpen], machines: [], now: NOW });
+  const flagged = JSON.stringify(items);
+  assert.ok(!flagged.includes('"O1"'), 'the delivered job is not a problem');
+  assert.ok(flagged.includes('"O2"'), 'the printing one still is');
+});

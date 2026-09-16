@@ -90,3 +90,12 @@ test('a campaign greets a customer by name whatever language the shop writes in'
   // A client with no name at all is the one case a blank is honest.
   assert.equal(C.fillTemplate('Hi {{name}}!', { client: {}, stats: {} }, null, shop), 'Hi !');
 });
+
+test('a legacy `delivered` order is money the customer spent', () => {
+  const s = C.clientStats('z', [
+    { clientId: 'z', status: 'completed', price: 100, date: ymd(5 * DAY) },
+    { clientId: 'z', status: 'delivered', price: 40, date: ymd(3 * DAY) },
+  ]);
+  assert.equal(s.completedCount, 2);
+  assert.equal(s.totalSpend, 140);
+});

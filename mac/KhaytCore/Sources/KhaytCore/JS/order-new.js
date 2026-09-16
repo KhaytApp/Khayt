@@ -109,7 +109,9 @@
    */
   function estimateDueDate(orders, addedHours, settings, now) {
     const queued = arrayOf(orders)
-      .filter(o => o && o.status !== 'completed' && o.status !== 'quote' && o.status !== 'on_hold')
+      // A legacy `delivered` row is finished, not queued: counting it pushed
+      // every new due date out by work that was handed over months ago.
+      .filter(o => o && o.status !== 'completed' && o.status !== 'delivered' && o.status !== 'quote' && o.status !== 'on_hold')
       .reduce((s, o) => s + positive(o.printTime), 0);
     const total = queued + positive(addedHours);
     const daily = avgDailyWorkingHours(settings);

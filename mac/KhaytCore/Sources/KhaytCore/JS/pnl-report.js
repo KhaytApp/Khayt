@@ -6,6 +6,8 @@
  */
 (function (global) {
   const round2 = (n) => Math.round((+n || 0) * 100) / 100;
+  /** Finished work, in both spellings a book can hold. */
+  const FINISHED = new Set(['completed', 'delivered']);
 
   /**
    * @param {object} input
@@ -142,7 +144,12 @@
     };
 
     for (const o of orders || []) {
-      if (!o || o.status !== 'completed' || o.voidedAt) continue;
+      // FINISHED BY EITHER SPELLING. `order-status.js` keeps a handed-over
+      // job at `completed` and sets `deliveredAt`; books written before that
+      // rule hold `status: 'delivered'` outright, and those are finished work
+      // too. A P&L that skipped them under-reported every quarter of an
+      // older book — the sample shop's own Q3 by thirteen jobs.
+      if (!o || !FINISHED.has(o.status) || o.voidedAt) continue;
       const key = quarterOf(o.date);
       if (!key) continue;
       const row = at(key);

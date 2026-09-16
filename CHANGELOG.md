@@ -1242,6 +1242,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **A job finished under the older `delivered` status was missing from eight
+  rules — the quarterly P&L among them.** Khayt's own rule keeps a handed-over
+  job at `completed` and stamps it `deliveredAt`; books written before that
+  rule hold `status: 'delivered'` outright, and eight rules treated those rows
+  as not finished. The P&L and the best-sellers revenue left them out (the
+  sample shop's Q3 by thirteen jobs); a customer's spend for campaigns did too;
+  a machine's hours since service and the grams through its nozzle stopped at
+  the older rows; and the attention list, the new-job due-date estimate and
+  the phone's queue counted them as still OPEN — overdue for ever, and queued
+  work that pushed every new due date out. Both spellings are finished now,
+  everywhere; a shop on the current rule sees no change.
+
 - **The on-time delivery rate left delivered jobs out of the delivery
   record.** The section had been fixed once already — for counting voided jobs
   and the shop's own prints as promises — and still counted `completed` only,

@@ -461,3 +461,12 @@ test('a rounded or typed total says so on the record; a plain one carries nothin
   const paid = N.newOrder({ ...base, priceOverride: 120, depositAmount: 120 }, { settings, orders: [], now: NOW, tokens: TOKENS });
   assert.equal(paid.paymentStatus, 'paid');
 });
+
+test('a legacy `delivered` row is not queued work', () => {
+  // It pushed every new due date out by work handed over months ago.
+  const settings = { workingHours: { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 8, sun: 8 } };
+  const queue = [{ status: 'delivered', printTime: 400 }, { status: 'printing', printTime: 20 }];
+  const order = N.newOrder(base(), ctx(settings, queue));
+  // 20 queued + 4 this job = 24 hours ÷ 8 a day = 3 days.
+  assert.equal(order.dueDate, '2026-09-07');
+});

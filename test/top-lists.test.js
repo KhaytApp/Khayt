@@ -62,7 +62,9 @@ function originalTopProducts(orders, { products, clients, settings, language }) 
     if (!o.productId) return;
     productAgg[o.productId] = productAgg[o.productId] || { count: 0, revenue: 0 };
     productAgg[o.productId].count++;
-    if (o.status === 'completed' && !o.voidedAt && _countsForBusiness(o)) productAgg[o.productId].revenue += orderNetRevenueBase(o);
+    // DELIBERATE CHANGE, on both sides (2026-09-16): a legacy `delivered` row
+    // is finished, billed work. The renderer counted `completed` only.
+    if ((o.status === 'completed' || o.status === 'delivered') && !o.voidedAt && _countsForBusiness(o)) productAgg[o.productId].revenue += orderNetRevenueBase(o);
   });
   return Object.entries(productAgg)
     .map(([id, agg]) => {
@@ -178,4 +180,17 @@ test('an empty book is an empty list, not a throw', () => {
   assert.deepEqual(T.topClients([], ctx), []);
   assert.deepEqual(T.topProducts(undefined, ctx), []);
   assert.deepEqual(T.topClients(null, ctx), []);
+});
+
+test('a legacy `delivered` row is billed work, in the products revenue as in the count', () => {
+  // order-status keeps a handed-over job at `completed` + deliveredAt; older
+  // books hold `status: 'delivered'` outright. Both are finished.
+  const ctx = { settings: {}, clients: [], products: [{ id: 'P1', name: 'Bracket' }], currencies: CURRENCIES, language: 'en' };
+  const rows = T.topProducts([
+    { productId: 'P1', status: 'completed', price: 100, paidAmount: 100 },
+    { productId: 'P1', status: 'delivered', price: 50, paidAmount: 50 },
+    { productId: 'P1', status: 'delivered', price: 999, paidAmount: 0, voidedAt: 'x' },
+  ], ctx, { limit: 5 });
+  assert.equal(rows[0].count, 3);
+  assert.equal(rows[0].revenue, 150, 'the delivered row counts; the voided one still does not');
 });

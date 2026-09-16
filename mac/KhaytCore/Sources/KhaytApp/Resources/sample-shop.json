@@ -5230,21 +5230,21 @@
    "machineId": "MACH-x1c",
    "name": "Replace nozzle",
    "intervalHours": 100,
-   "lastDoneHours": 0
+   "lastDoneHours": 100
   },
   {
    "id": "MT-02",
    "machineId": "MACH-x1c",
    "name": "Clean build plate",
    "intervalHours": 50,
-   "lastDoneHours": 0
+   "lastDoneHours": 96
   },
   {
    "id": "MT-03",
    "machineId": "MACH-core-one",
    "name": "Lubricate linear rails",
    "intervalHours": 40,
-   "lastDoneHours": 0
+   "lastDoneHours": 25
   },
   {
    "id": "MT-04",
