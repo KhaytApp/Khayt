@@ -826,7 +826,10 @@ function renderMachineRevenueChart() {
   const el = $('#machineRevenueChart');
   if (!el) return;
 
-  const completed = printLog.filter(o => o.status === 'completed' && o.machineId);
+  // Both spellings of finished — see `KhaytOrderStatus.isFinished`. This read
+  // `completed` alone, so every job a shop had marked delivered was missing
+  // from what its printers had earned.
+  const completed = printLog.filter(o => KhaytOrderStatus.isFinished(o) && o.machineId);
   if (completed.length === 0) { el.innerHTML = ''; return; }
 
   const machMap = {};
@@ -1886,7 +1889,8 @@ function renderMachinePL() {
   if (!el) return;
   if (machines.length === 0) { el.innerHTML = ''; return; }
 
-  const completed = printLog.filter(o => o.status === 'completed' && inRange(o.date, analyticsRange, 'analytics'));
+  // Both spellings of finished; this fed the shared rule a subset.
+  const completed = printLog.filter(o => KhaytOrderStatus.isFinished(o) && inRange(o.date, analyticsRange, 'analytics'));
   if (completed.length === 0) {
     el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.no_data'))}</p>`;
     return;

@@ -844,3 +844,40 @@ test('the handover reaches the activity log and the dashboard', () => {
   const types = S.markDelivered(order, { now: NOW_MS }).effects.map(e => e.type);
   assert.deepEqual(types, ['activity_log', 'save', 'render', 'toast_delivered']);
 });
+
+/**
+ * ── THE TWO SPELLINGS OF FINISHED ──────────────────────────────────────────
+ *
+ * Khayt wrote `delivered` before it wrote `completed` with a `deliveredAt`
+ * beside it, and both are still in shops' books. The test was written out by
+ * hand in at least eight modules, and two callers got it wrong: the machine
+ * P&L and the machine revenue chart filtered `completed` alone, so every job
+ * a shop had marked delivered was missing from what its printers had earned.
+ */
+test('finished means either spelling, and nothing else', () => {
+  const S = require('../lib/order-status.js');
+  assert.deepEqual([...S.FINISHED_STATUSES].sort(), ['completed', 'delivered']);
+  assert.equal(S.isFinished({ status: 'completed' }), true);
+  assert.equal(S.isFinished({ status: 'delivered' }), true);
+  for (const st of ['printing', 'quote', 'pending', 'post', 'qc', 'on_hold', 'cancelled', '', null, undefined]) {
+    assert.equal(S.isFinished({ status: st }), false, String(st));
+  }
+  // A missing order is not a finished one.
+  assert.equal(S.isFinished(null), false);
+  assert.equal(S.isFinished(undefined), false);
+  assert.equal(S.isFinished({}), false);
+});
+
+test('the machine charts ask the rule rather than comparing by hand', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'analytics.js'), 'utf8');
+  for (const fn of ['renderMachineRevenueChart', 'renderMachinePL']) {
+    const at = src.indexOf('function ' + fn);
+    assert.ok(at > 0, fn + ' has moved');
+    const body = src.slice(at, at + 1200);
+    assert.ok(!/o\.status === 'completed'/.test(body),
+      fn + ' compares the status by hand again — delivered jobs will go missing');
+    assert.ok(/KhaytOrderStatus\.isFinished/.test(body), fn + ' no longer asks the rule');
+  }
+});
