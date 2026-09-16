@@ -238,10 +238,15 @@ struct Waste: View {
     /// Entries, grams, cost — and which failures the shop keeps having.
     private struct Summary: View {
         let shop: Shop
+        /// Six months of grams by failure type. Every entry, not the chosen
+        /// period: a trend is the point, and a period is one column of it.
+        @State private var trend: KhaytEngine.WasteTrend?
 
         var body: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    WasteTrendCard(shop: shop, trend: trend)
+                    LayerRule()
                     let shown = shop.shownWaste
                     let grams = shown.reduce(0) { $0 + $1.weight }
                     let cost = shown.reduce(0) { $0 + $1.cost }
@@ -262,6 +267,10 @@ struct Waste: View {
                     }
                 }
                 .padding(Metric.pane)
+            }
+            .task(id: shop.wasteRows.count) {
+                guard let engine = shop.engine else { return }
+                trend = try? await engine.wasteTrend(wasteLog: shop.wasteRows, now: Date(), months: 6, named: 3)
             }
         }
     }

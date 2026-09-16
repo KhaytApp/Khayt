@@ -987,6 +987,22 @@ import KhaytCore
                    "55-trends", size: CGSize(width: 760, height: 260))
     }
 
+    /// What was thrown away, stacked by why — and the empty state.
+    @Test("the waste trend card, stacked, with its key")
+    func wasteTrendCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let trend = try await engine.wasteTrend(wasteLog: shop.wasteRows, now: Date(), months: 6, named: 3)
+        #expect(trend.total > 0, "the sample cannot reach this card")
+        try render(VStack(spacing: 16) {
+            WasteTrendCard(shop: shop, trend: trend).card(rail: Khayt.brand, padding: 14)
+            WasteTrendCard(shop: shop, trend: nil).card(rail: Khayt.brand, padding: 14)
+        }
+        .frame(width: 320).padding(Metric.screen).background(Khayt.ground),
+                   "56-waste-trend", size: CGSize(width: 360, height: 360))
+    }
+
     /// Which of the things the shop sells actually earns.
     ///
     /// The sentence at the top is the point: the best use of a machine hour is

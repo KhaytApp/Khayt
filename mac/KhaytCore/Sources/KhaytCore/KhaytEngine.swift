@@ -577,6 +577,8 @@ public actor KhaytEngine {
         "cost-trends",
         // How long a job takes, by month and by product.
         "cycle-time",
+        // What was thrown away, by month and by why.
+        "waste-trend",
         // Which customers are worth keeping.
         "client-value",
         // Whether the shop can take another job, and when it would start.
@@ -4251,6 +4253,34 @@ public actor KhaytEngine {
           },
         })
         """#, [.array(orders), .number(Double(top))], as: LeadTime.self)
+    }
+
+    // MARK: - What was thrown away
+
+    /// Six months of wasted grams, stacked by failure type — `lib/waste-trend.js`.
+    /// `types` are the columns in stacking order, heaviest first, `other` last
+    /// only when something fell in it.
+    public struct WasteTrend: Decodable, Sendable {
+        public let types: [String]
+        public let months: [Month]
+        public let total: Double
+        public let entries: Int
+        public let byType: [String: Double]
+
+        public struct Month: Decodable, Sendable, Identifiable, Hashable {
+            public let key: String
+            public let total: Double
+            public let byType: [String: Double]
+            public let entries: Int
+            public var id: String { key }
+        }
+    }
+
+    public func wasteTrend(wasteLog: [JSONValue], now: Date, months: Int = 6, named: Int = 3) throws -> WasteTrend {
+        try runtime.call2("globalThis.KhaytWasteTrend.wasteTrend(ARG0, { now: ARG1, months: ARG2, named: ARG3 })",
+                          [.array(wasteLog), .number(now.timeIntervalSince1970 * 1000),
+                           .number(Double(months)), .number(Double(named))],
+                          as: WasteTrend.self)
     }
 
     // MARK: - Break-even
