@@ -2044,6 +2044,8 @@ final class Words {
         "ce.comm_wa", "ce.comm_meeting", "ce.comm_note", "common.add",
         // The last word on a job's total — rounding and a typed price — in the
         // words the product editor already uses for the same two things.
+        // The trends card on Reports, in the other app's own words for it.
+        "an.cost_trends", "an.rev_per_hour", "an.cost_per_gram",
         "pe.round_to", "pe.round_off", "pe.round_nearest", "pe.round_up", "pe.round_down",
         "pe.price_override", "pe.price_override_ph", "pe.price_is_override",
         "pe.price_is_rounded", "pe.price_is_base",

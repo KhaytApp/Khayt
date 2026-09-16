@@ -2458,35 +2458,24 @@ function renderClientRetention() {
 function renderCostTrends() {
   const el = $('#costTrendsSection');
   if (!el) return;
-  // Build last 12 months
-  const now = new Date();
-  const months = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({
-      year: d.getFullYear(),
-      month: d.getMonth(),
-      label: d.toLocaleString('en', { month: 'short' }) + ' ' + d.getFullYear().toString().slice(2),
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-    });
-  }
-
-  // Revenue per print-hour for completed orders
-  const revPerHour = months.map(m => {
-    const orders = printLog.filter(o =>
-      o.status === 'completed' && !o.voidedAt && _countsForBusiness(o) && (o.date || '').startsWith(m.key)
-    );
-    const totalRev = orders.reduce((s, o) => s + orderNetRevenueBase(o), 0);
-    const totalHrs = orders.reduce((s, o) => s + (+o.printTime || 0), 0);
-    return totalHrs > 0 ? totalRev / totalHrs : 0;
+  if (typeof KhaytCostTrends === 'undefined') { el.innerHTML = ''; return; }
+  // The arithmetic is lib/cost-trends.js — the same rule the Mac app draws —
+  // and it fixed two things this function used to get wrong: a DELIVERED job
+  // now counts (it is past completed, not outside it), and a gram costs what
+  // the spool cost over what it weighed NEW, by the month the spool was
+  // opened, rather than today's shelf divided by what is left of it, twelve
+  // times over.
+  const trends = KhaytCostTrends.costTrends(printLog, inventory, {
+    now: Date.now(), months: 12,
+    revenueOf: orderNetRevenueBase,
+    countsForBusiness: (o) => _countsForBusiness(o),
   });
-
-  // Average material cost per gram from inventory (simple average)
-  const avgCostPerGram = months.map(() => {
-    const items = inventory.filter(i => i.cost > 0 && i.weight > 0);
-    if (items.length === 0) return 0;
-    return items.reduce((s, i) => s + (i.cost / i.weight), 0) / items.length;
+  const months = trends.months.map((m) => {
+    const d = new Date(+m.key.slice(0, 4), +m.key.slice(5, 7) - 1, 1);
+    return { label: d.toLocaleString('en', { month: 'short' }) + ' ' + d.getFullYear().toString().slice(2), key: m.key };
   });
+  const revPerHour = trends.months.map((m) => m.perHour ?? 0);
+  const avgCostPerGram = trends.months.map((m) => m.costPerGram ?? 0);
 
   const maxRev = Math.max(...revPerHour, 1);
   const maxCost = Math.max(...avgCostPerGram, 0.001);
