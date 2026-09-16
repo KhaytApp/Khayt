@@ -1307,6 +1307,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **Time left on a Klipper printer is the figure the machine itself shows.**
+  Khayt worked the number out from the layer count, and a layer count assumes
+  every layer costs the same. Measured on a U1 printing a part whose lower
+  half held three quarters of the work: layers said 53% done and Khayt
+  extrapolated 7h19m left, while the machine's own screen said under three
+  hours. Both numbers were in front of the shop at once. Klipper relays the
+  slicer's `M73` percentage — the only one of the three signals that is about
+  time rather than geometry or file layout — as `display_status.progress`,
+  and Khayt was not asking Moonraker for it at all. It asks now, and prefers
+  it, captioned "as the printer shows it" so the two can be checked against
+  each other. Layers stay the fallback: a file with no `M73` behaves exactly
+  as before, including the relief whose byte position read 0.7% at 19% done.
 - **(Mac) Saving a product no longer throws away its cost inputs or its
   price.** The Mac product sheet rebuilt every part from the five fields it
   shows, so the labour rate, prep and post time, power draw, wear and failure

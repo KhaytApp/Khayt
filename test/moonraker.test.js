@@ -138,7 +138,71 @@ test('the query asks for every object the reading needs, and no more', () => {
   // fields are optional in the parse on purpose, because a starting Klipper
   // omits them.
   assert.deepEqual(M.QUERY.split('&').sort(),
-    ['extruder', 'heater_bed', 'print_stats', 'toolhead', 'virtual_sdcard']);
+    ['display_status', 'extruder', 'heater_bed', 'print_stats', 'toolhead', 'virtual_sdcard']);
+});
+
+/**
+ * ── THE NUMBER ON THE MACHINE'S OWN SCREEN ─────────────────────────────────
+ *
+ * Measured on the shop's U1, 2026-09-16, printing a part the slicer had named
+ * `11h51m`, eight hours twenty in:
+ *
+ *     layers                    570 of 1067   53.4%   →  Khayt said 7h19m left
+ *     byte position                           76.9%
+ *     display_status (M73 P)                  74%     →  the printer said <3h
+ *
+ * Both numbers were on screen at the same time, one in Khayt and one on the
+ * machine. `M73 P` is the slicer's own TIME percentage; the other two are
+ * geometry and file layout. Khayt had never asked Moonraker for it.
+ */
+const withM73 = () => ({
+  result: {
+    status: {
+      print_stats: {
+        state: 'printing',
+        filename: 'Bottom  Body RH_PETG_11h51m.gcode',
+        print_duration: 30048.198167495,
+        info: { total_layer: 1067, current_layer: 568 },
+      },
+      virtual_sdcard: { progress: 0.7661135930968701 },
+      display_status: { progress: 0.73 },
+      toolhead: { extruder: 'extruder2' },
+    },
+  },
+});
+
+test("the printer's own figure wins over layers and bytes", () => {
+  const status = M.readStatus(withM73(), null, null, [], { estimated_time: 42682 });
+  assert.equal(status.progress, 73);
+  assert.equal(status.progressSource, 'm73');
+  // Under three hours, as the machine's display said — not the 7h19m the
+  // layer count extrapolated.
+  const hours = status.timeRemaining / 3600;
+  assert.ok(hours > 2.5 && hours < 3.5, `${hours.toFixed(2)}h left`);
+});
+
+test('Klipper echoing the byte position is not an M73', () => {
+  // display_status.progress IS virtual_sdcard.progress whenever no M73 has
+  // arrived — Klipper returns the same number. Treating that as the printer's
+  // own figure would drop the layer preference on every file without M73,
+  // which is the relief whose bytes read 0.7% at 19% done.
+  const echoed = withM73();
+  echoed.result.status.display_status.progress = echoed.result.status.virtual_sdcard.progress;
+  const status = M.readStatus(echoed, null, null);
+  assert.equal(status.progressSource, 'layers');
+  assert.equal(status.progress, 53);
+});
+
+test('no display_status at all still reads layers, then bytes', () => {
+  const none = withM73();
+  delete none.result.status.display_status;
+  assert.equal(M.readStatus(none, null, null).progressSource, 'layers');
+  const noLayers = withM73();
+  delete noLayers.result.status.display_status;
+  delete noLayers.result.status.print_stats.info;
+  const status = M.readStatus(noLayers, null, null);
+  assert.equal(status.progressSource, 'bytes');
+  assert.equal(status.progress, 77);
 });
 
 /**

@@ -46,7 +46,11 @@
    * One request rather than five: Moonraker takes them together and a printer
    * on a shop's wifi is the slowest link in this app.
    */
-  const QUERY = 'print_stats&virtual_sdcard&extruder&heater_bed&toolhead';
+  // `display_status` carries the slicer's own `M73 P` — the percentage the
+  // machine shows on its screen, and the only progress signal here that is
+  // about time. See `moonrakerProgress`: without it Khayt told a shop seven
+  // hours where the printer said three.
+  const QUERY = 'print_stats&virtual_sdcard&extruder&heater_bed&toolhead&display_status';
 
   /**
    * The query with this machine's filament sensors added.
@@ -136,7 +140,7 @@
       if (Number.isFinite(Number(t))) nozzle = Number(t);
     }
 
-    const prog = S ? S.moonrakerProgress(ps, vs) : { percent: 0, source: 'bytes' };
+    const prog = S ? S.moonrakerProgress(ps, vs, o.display_status) : { percent: 0, source: 'bytes' };
     return {
       state: ps.state || 'Unknown',
       progress: prog.percent,
