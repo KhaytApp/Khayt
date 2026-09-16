@@ -590,6 +590,7 @@ public actor KhaytEngine {
         "lan-quote-page",
         "carriers",
         "lan-order-page",
+        "lan-calendar",
         // Which customers are worth keeping.
         "client-value",
         // Whether the shop can take another job, and when it would start.
@@ -4479,6 +4480,11 @@ public actor KhaytEngine {
         public let order: JSONValue?
         public let printLog: JSONValue?
     }
+    /// The shop's due dates as a calendar: `lib/lan-calendar.js`.
+    public func lanCalendarFeed(store: JSONValue) throws -> String {
+        try runtime.call2("globalThis.KhaytLanCalendar.feed(ARG0)", [store], as: String.self)
+    }
+
     // The customer's order page and its survey: `lib/lan-order-page.js`.
 
     public func lanTrackingPage(order: JSONValue, store: JSONValue) throws -> String {

@@ -689,6 +689,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) The shop's due dates as a calendar subscription.** With the LAN
+  server on, Settings → Online shows the same `/calendar.ics` link the
+  Windows and Linux app offers: one all-day event per open job with a due
+  date, tentative until it is printing, for any calendar app on the shop's
+  Wi‑Fi. The feed is one shared module now (`lib/lan-calendar.js`), lifted
+  verbatim out of the Node route and held byte-identical to it; the
+  subscription token is minted into the book the first time the Mac serves.
 - **(Mac) "Where is my order": the customer's tracking page, served by the
   Mac.** On a job under way or done, the inspector has "Copy tracking link":
   the link points at this Mac, carries the job's own tracking token (minted
