@@ -579,6 +579,8 @@ public actor KhaytEngine {
         "cycle-time",
         // What was thrown away, by month and by why.
         "waste-trend",
+        // Whether the shop keeps its promises: finished by the due date, or by how many days not.
+        "on-time",
         // Which customers are worth keeping.
         "client-value",
         // Whether the shop can take another job, and when it would start.
@@ -4281,6 +4283,38 @@ public actor KhaytEngine {
                           [.array(wasteLog), .number(now.timeIntervalSince1970 * 1000),
                            .number(Double(months)), .number(Double(named))],
                           as: WasteTrend.self)
+    }
+
+    // MARK: - Whether the shop keeps its promises
+
+    /// Of the finished jobs that had a due date, how many were done by it —
+    /// `lib/on-time.js`. `rate` is nil when nothing was promised.
+    public struct OnTime: Decodable, Sendable {
+        public let promised: Int
+        public let onTime: Int
+        public let late: Int
+        public let rate: Double?
+        public let avgDelayDays: Double?
+        public let worstDelayDays: Double?
+        public let lateJobs: [LateJob]
+
+        public struct LateJob: Decodable, Sendable, Identifiable, Hashable {
+            public let id: String
+            public let project: String
+            public let dueDate: String
+            public let finishedDay: String
+            public let delayDays: Double
+        }
+    }
+
+    public func onTime(orders: [JSONValue]) throws -> OnTime {
+        try runtime.call2(#"""
+        globalThis.KhaytOnTime.onTime(ARG0, {
+          countsForBusiness: function (o) {
+            return globalThis.KhaytBusinessScope ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
+          },
+        })
+        """#, [.array(orders)], as: OnTime.self)
     }
 
     // MARK: - Break-even

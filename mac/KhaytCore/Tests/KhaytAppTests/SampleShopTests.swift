@@ -616,6 +616,19 @@ extension SampleShopTests {
         #expect(trend.months.contains { $0.byType.count >= 2 }, "no month has two types stacked")
     }
 
+    /// The on-time card draws a rate, a late count, an average delay and the
+    /// promises missed worst first. A sample where every promise was kept is a
+    /// card whose lower half was never drawn — which is what it was.
+    @Test("the sample promises reach kept AND missed, with two different delays")
+    func onTimeSpan() async throws {
+        let engine = try KhaytEngine()
+        let report = try await engine.onTime(orders: Shop.rows(try Self.book(), "printLog"))
+        #expect(report.promised >= 5)
+        #expect(report.onTime > 0 && report.late >= 2, "both sides of the record")
+        #expect((report.worstDelayDays ?? 0) > (report.avgDelayDays ?? 0),
+                "the worst miss and the average are the same figure, so the list has no order")
+    }
+
     // MARK: - The customers
 
     /// The customer pane draws a price list, a standing order (running, paused,

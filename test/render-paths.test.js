@@ -71,6 +71,7 @@ function loadAnalyticsStack() {
   require('../lib/cost-trends.js');  // globalThis.KhaytCostTrends
   require('../lib/cycle-time.js');   // globalThis.KhaytCycleTime
   require('../lib/waste-trend.js');  // globalThis.KhaytWasteTrend
+  require('../lib/on-time.js');      // globalThis.KhaytOnTime
   require('../lib/client-value.js'); // globalThis.KhaytClientValue
   require('../lib/capacity.js');     // globalThis.KhaytCapacity
   require('../lib/quote-funnel.js'); // globalThis.KhaytQuoteFunnel

@@ -1776,48 +1776,23 @@ function renderProductProfitability() {
 function renderSLASection() {
   const el = $('#slaSection');
   if (!el) return;
-
-  /* On-time delivery is a promise KEPT OR MISSED, so only orders that were
-   * actually a promise to a customer belong in it.
-   *
-   * This counted voided orders — every other completed-order filter that reports
-   * on trade excludes them, and this one silently did not, so a cancelled job
-   * counted against (or for) the shop's delivery record. It also counted prints
-   * the shop marked as its own; a calibration cube is not a promise to anybody.
-   *
-   * Found by sweeping every `status === 'completed'` filter rather than the
-   * single-line idiom — this one is spread over four lines, so the earlier pass
-   * that added the trade check to thirteen of them walked straight past it. */
-  const completed = printLog.filter(o =>
-    o.status === 'completed' &&
-    !o.voidedAt &&
-    _countsForBusiness(o) &&
-    o.dueDate &&
-    inRange(o.date, analyticsRange, 'analytics')
-  );
-
+  if (typeof KhaytOnTime === 'undefined') { el.innerHTML = ''; return; }
+  // The arithmetic is lib/on-time.js — the same rule the Mac app draws — and
+  // it counts a DELIVERED job, which this section used to leave out of the
+  // shop's delivery record. Which jobs are promises (finished, unvoided, in
+  // trade, with a due date) and which day counts as finished are its answer.
+  const report = KhaytOnTime.onTime(printLog.filter(o => inRange(o.date, analyticsRange, 'analytics')), {
+    countsForBusiness: (o) => _countsForBusiness(o),
+  });
+  const completed = { length: report.promised };
   if (completed.length === 0) {
-    el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.sla_no_data'))}</p>`;
+    el.innerHTML = `<div class="card" style="margin-bottom:16px;"><h3 class="card-head"><span class="swatch"></span>${escapeHtml(t('an.sla_title') || 'On-Time Delivery Rate')}</h3><p style="color:var(--text-muted);padding:12px 0;font-size:13px;">${escapeHtml(t('an.sla_no_data') || 'No completed orders with due dates in this period.')}</p></div>`;
     return;
   }
-
-  // Delivered date in LOCAL time, comparable with the local dueDate. completedAt/
-  // deliveredAt are ISO timestamps (UTC) — slicing them flips on-time vs late near
-  // the day boundary; o.date is already a local YYYY-MM-DD.
-  const deliveredDate = (o) => {
-    const v = o.completedAt || o.deliveredAt || o.date || '';
-    if (!v) return '';
-    return v.length > 10 ? localDateStr(new Date(v)) : v;
-  };
-  const onTime = completed.filter(o => deliveredDate(o) <= o.dueDate);
-  const late = completed.filter(o => deliveredDate(o) > o.dueDate);
-
-  const rate = Math.round(onTime.length / completed.length * 100);
-  const avgDelay = late.length > 0 ? Math.round(
-    late.reduce((s, o) =>
-      s + Math.round((new Date(deliveredDate(o) + 'T00:00:00') - new Date(o.dueDate + 'T00:00:00')) / 86400000)
-    , 0) / late.length
-  ) : 0;
+  const onTime = { length: report.onTime };
+  const late = { length: report.late };
+  const rate = Math.round(report.rate);
+  const avgDelay = report.avgDelayDays == null ? 0 : Math.round(report.avgDelayDays);
 
   const rateColor = rate >= 90 ? 'var(--success)' : rate >= 70 ? 'var(--warning)' : 'var(--danger)';
 

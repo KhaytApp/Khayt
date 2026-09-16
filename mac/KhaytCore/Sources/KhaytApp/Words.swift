@@ -2049,6 +2049,9 @@ final class Words {
         // The cycle-time card, in the other app's words for its two charts.
         // The waste trend card, in the other app's word for the chart.
         "an.waste_trend",
+        // The on-time delivery card, in the other app's words for its section.
+        "an.sla_title", "an.sla_with_due", "an.sla_on_time", "an.sla_late", "an.sla_avg_delay",
+        "an.sla_no_data",
         "an.cycle_time", "an.days", "an.lead_time", "an.lead_time_avg",
         "an.lead_time_fastest", "an.lead_time_slowest", "ord.project",
         "pe.round_to", "pe.round_off", "pe.round_nearest", "pe.round_up", "pe.round_down",

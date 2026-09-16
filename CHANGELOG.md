@@ -690,6 +690,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Whether the shop keeps its promises, on Reports → Best.** Of the
+  finished jobs that had a due date, how many were done by it, how many were
+  not and by how many days — and the promises missed, worst first, which the
+  other app's section never named. The same rule (`lib/on-time.js`), which the
+  other app's section now draws from.
+
 - **(Mac) What was thrown away, by month and by why, on the Waste screen.**
   Six months of wasted grams stacked by failure type — the heaviest three by
   name, the rest as "other" — with a key that says each type's grams. The same
@@ -1235,6 +1241,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **The on-time delivery rate left delivered jobs out of the delivery
+  record.** The section had been fixed once already — for counting voided jobs
+  and the shop's own prints as promises — and still counted `completed` only,
+  so the jobs a shop had finished AND handed over were the ones missing from
+  its record. Eighth chart with the fault. A delivered job is a promise kept
+  or missed like any other.
 
 - **The waste-by-failure-type chart could not name the commonest failure.**
   It named its three types by hand — `warping`, `adhesion`, `stringing` — and

@@ -1003,6 +1003,22 @@ import KhaytCore
                    "56-waste-trend", size: CGSize(width: 360, height: 360))
     }
 
+    /// Whether the shop keeps its promises — and the empty state.
+    @Test("the on-time card, with the promises missed")
+    func onTimeCard() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let report = try await engine.onTime(orders: shop.orderRows)
+        #expect(report.late > 0, "the sample cannot reach the lower half of this card")
+        try render(VStack(spacing: 16) {
+            OnTimeCard(shop: shop, report: report).card(rail: Khayt.brand, padding: 14)
+            OnTimeCard(shop: shop, report: nil).card(rail: Khayt.brand, padding: 14)
+        }
+        .frame(width: 560).padding(Metric.screen).background(Khayt.ground),
+                   "57-on-time", size: CGSize(width: 600, height: 420))
+    }
+
     /// Which of the things the shop sells actually earns.
     ///
     /// The sentence at the top is the point: the best use of a machine hour is
