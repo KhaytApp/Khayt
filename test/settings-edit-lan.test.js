@@ -61,3 +61,28 @@ test('a shop that never had the block gets the default shape', () => {
   const out = apply({}, { lanApi: { enabled: true } });
   assert.deepEqual(out.lanApi, { enabled: true, port: 3219, pin: '', bindLan: false });
 });
+
+test('public model pricing is merged whole, and a field the pane never showed survives', () => {
+  const had = {
+    lanApi: {
+      enabled: true, port: 3219, pin: 'p',
+      intakeQuote: { enabled: false, marginPct: 30, presetId: 'OLD', somethingNewer: 7 },
+    },
+  };
+  const out = apply(had, { lanApi: { enabled: true, intakeQuote: { enabled: true, presetId: 'P1', marginPct: 40 } } });
+  assert.equal(out.lanApi.intakeQuote.enabled, true);
+  assert.equal(out.lanApi.intakeQuote.presetId, 'P1');
+  assert.equal(out.lanApi.intakeQuote.marginPct, 40);
+  // Written by a build this pane has never heard of.
+  assert.equal(out.lanApi.intakeQuote.somethingNewer, 7);
+  // And the rest of the LAN block is untouched.
+  assert.equal(out.lanApi.pin, 'p');
+});
+
+test('a form with no pricing block leaves the stored one exactly as it was', () => {
+  const had = { lanApi: { enabled: false, intakeQuote: { enabled: true, marginPct: 30 } } };
+  const out = apply(had, { lanApi: { enabled: true } });
+  assert.deepEqual(out.lanApi.intakeQuote, { enabled: true, marginPct: 30 });
+  const none = apply({ lanApi: { enabled: false } }, { lanApi: { enabled: true } });
+  assert.equal(none.lanApi.intakeQuote, undefined, 'a block the shop never had was invented');
+});

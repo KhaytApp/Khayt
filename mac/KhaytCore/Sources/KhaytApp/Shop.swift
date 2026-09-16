@@ -366,6 +366,11 @@ final class Shop {
             } else {
                 consumableRows = []
             }
+            // The calculator's saved printer presets — a name and the seven
+            // figures a part is costed at. `lib/public-quote.js` builds a
+            // customer's price from one of these, so a shop with none cannot
+            // quote publicly at all.
+            if case .array(let saved)? = root["printers"] { presetRows = saved } else { presetRows = [] }
             // The print files as written. `files` above is the decoded model;
             // this is what the setups and versions rules read, which is a wider
             // set of fields than the model carries.
@@ -2851,6 +2856,67 @@ final class Shop {
 
     /// `consumables` as written. See `consumableNeeds`.
     private(set) var consumableRows: [JSONValue] = []
+
+    /// `printers` as written: the calculator's saved presets.
+    private(set) var presetRows: [JSONValue] = []
+
+    /// One saved preset, as a screen reads it.
+    struct Preset: Identifiable, Hashable, Sendable {
+        let id: String
+        var name: String
+        /// The seven figures, keyed as the book keys them.
+        var rates: [String: Double] = [:]
+
+        static let rateKeys = ["wearRate", "powerDraw", "elecRate",
+                               "laborRate", "failureRate", "prepTime", "postTime"]
+
+        @MainActor static func from(_ value: JSONValue) -> Preset? {
+            guard case .object(let o) = value, case .string(let id)? = o["id"], !id.isEmpty else { return nil }
+            var p = Preset(id: id, name: Shop.plainString(o["name"]) ?? id)
+            for key in rateKeys { if let v = Shop.plainNumber(o[key]) { p.rates[key] = v } }
+            return p
+        }
+
+        var record: JSONValue {
+            var o: [String: JSONValue] = ["id": .string(id), "name": .string(name)]
+            for key in Self.rateKeys { o[key] = .number(rates[key] ?? 0) }
+            return .object(o)
+        }
+    }
+
+    var presets: [Preset] { presetRows.compactMap(Preset.from) }
+
+    /// Save a preset, matching the other app's rule: a name already in use is
+    /// REPLACED rather than duplicated, compared without case, and the id is
+    /// kept so anything pointing at it still does.
+    func savePreset(name: String, rates: [String: Double]) async -> String? {
+        let wanted = name.trimmingCharacters(in: .whitespaces)
+        guard !wanted.isEmpty, let build = source.build else {
+            moveProblem = words.callIt(source.build == nil ? "mac.move_sample" : "mac.product_need_name")
+            return nil
+        }
+        let existing = presets.first { $0.name.lowercased() == wanted.lowercased() }
+        let id = existing?.id ?? "PRNTR-\(UUID().uuidString.prefix(8))"
+        var preset = Preset(id: id, name: wanted)
+        preset.rates = rates
+        do {
+            try StoreWriter.update(build) { root in
+                var rows: [JSONValue] = []
+                if case .array(let had)? = root["printers"] { rows = had }
+                rows.removeAll {
+                    if case .object(let o) = $0, case .string(let had)? = o["id"] { return had == id }
+                    return false
+                }
+                rows.append(preset.record)
+                root["printers"] = .array(rows)
+            }
+            await load(source)
+            return id
+        } catch {
+            moveProblem = String(describing: error)
+            return nil
+        }
+    }
 
     /// `printFiles` as written. See `setups(for:)` and `versions(for:)`.
     private(set) var fileRows: [JSONValue] = []

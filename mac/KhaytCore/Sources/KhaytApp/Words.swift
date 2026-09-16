@@ -2038,6 +2038,10 @@ final class Words {
         "mac.quote_link_no_server": ["en": "Switch the server on in Settings → Online first; the link points at this Mac.",
                                      "ar": "شغّل الخادم من الإعدادات ← الشبكة أولاً؛ فالرابط يشير إلى هذا الماك."],
         "mac.copy_tracking_link": ["en": "Copy tracking link", "ar": "نسخ رابط متابعة الطلب"],
+        // Letting a customer price their own model.
+        "mac.iq_no_preset":  ["en": "No printer preset yet, and a price cannot be worked out without one. Make one below.",
+                              "ar": "لا يوجد إعداد طابعة بعد، ولا يمكن حساب السعر بدونه. أنشئ واحداً أدناه."],
+        "mac.iq_new_preset": ["en": "New printer preset", "ar": "إعداد طابعة جديد"],
         // What a part costs besides its filament.
         "mac.part_rates":    ["en": "Labour, power and wear",
                               "ar": "العمالة والكهرباء والاستهلاك"],
@@ -2169,5 +2173,9 @@ final class Words {
         "calc.labor.rate", "calc.labor.prep", "calc.labor.post", "calc.labor.failure",
         "calc.machine.wear", "calc.machine.power", "calc.machine.elec",
         "calc.machine.watts", "calc.machine.per_kwh",
+        "calc.machine.preset_name_ph", "calc.machine.save_preset",
+        "lan.iq_enable", "lan.iq_enable_hint", "lan.iq_printer", "lan.iq_pick", "lan.iq_filament",
+        "lan.iq_flat", "lan.iq_spool_cost", "lan.iq_spool_weight", "lan.iq_margin",
+        "lan.iq_min", "lan.iq_waste", "lan.iq_limit", "lan.iq_note",
     ]
 }
