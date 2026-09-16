@@ -510,6 +510,13 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// real position — the quarter a shop buys a printer, the authority owes it.
     public let vatDue: Double
     public let net: Double
+    /// What the finished work cost to make, in the shop's currency. Optional
+    /// because the rule gained it in September 2026 and an older bundle must
+    /// still decode.
+    public let cogs: Double?
+    /// (revenue − cogs) / revenue, blended over the period; nil where nothing
+    /// was billed.
+    public let marginPct: Double?
     public var id: String { period }
 }
 

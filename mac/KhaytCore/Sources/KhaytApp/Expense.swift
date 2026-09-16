@@ -110,3 +110,10 @@ enum ReportPage: String, CaseIterable, Identifiable {
         }
     }
 }
+
+
+extension PnlPeriod {
+    /// `Table` sorts on a comparable value, and `Double?` is not one. A period
+    /// with nothing billed sorts below every real margin.
+    var marginSort: Double { marginPct ?? -.infinity }
+}

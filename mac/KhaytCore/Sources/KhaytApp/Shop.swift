@@ -5831,6 +5831,9 @@ final class Shop {
     var settingsPane: SettingsPane = .business
     /// Which half of the Reports screen is showing.
     var reportPage: ReportPage = .profit
+    /// The P&L by quarter (the table's word for it) or by month. A view
+    /// preference, not the book's.
+    var pnlByMonth = false
 
     /// The tables a Settings window is built from, read once per load.
     private(set) var currencies: [String: Currency] = [:]

@@ -503,6 +503,10 @@ final class Words {
         // key for it, `rec.enable`, is the checkbox's sentence — "Recurring
         // order (auto-create on schedule)" — and a heading is not a sentence.
         "mac.standing_order": ["en": "Standing order", "ar": "طلب دوري"],
+        // The P&L's grain. Khayt's own title names the quarter and has no
+        // word for the other choice.
+        "mac.by_quarter":     ["en": "By quarter", "ar": "بالربع"],
+        "mac.by_month":       ["en": "By month",   "ar": "بالشهر"],
         "mac.edit_customer": ["en": "Edit Customer",  "ar": "تعديل العميل"],
         "mac.no_record":     ["en": "Not written down yet",
                               "ar": "غير مسجّل بعد"],
@@ -2052,6 +2056,8 @@ final class Words {
         // The on-time delivery card, in the other app's words for its section.
         "an.sla_title", "an.sla_with_due", "an.sla_on_time", "an.sla_late", "an.sla_avg_delay",
         "an.sla_no_data",
+        // The margin column on the P&L, in the other app's word for it.
+        "an.margin_col",
         "an.cycle_time", "an.days", "an.lead_time", "an.lead_time_avg",
         "an.lead_time_fastest", "an.lead_time_slowest", "ord.project",
         "pe.round_to", "pe.round_off", "pe.round_nearest", "pe.round_up", "pe.round_down",
