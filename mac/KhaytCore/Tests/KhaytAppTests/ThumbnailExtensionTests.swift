@@ -194,8 +194,15 @@ struct ExtensionBundleTests {
             path: "Contents/PlugIns/KhaytPreview.appex/Contents/Resources/KhaytCore_KhaytCore.bundle")
         #expect(FileManager.default.fileExists(atPath: rules.path),
                 "KhaytPreview has no copy of the JavaScript; every preview will be blank")
-        let one = rules.appending(path: "JS/print-facts.js")
-        #expect(FileManager.default.fileExists(atPath: one.path),
+        // Two layouts, both real. SwiftPM's own build writes a flat bundle
+        // (`JS/…`); Xcode 26's build engine, which `make-app.sh` has used since
+        // #1253, writes a versioned one (`Contents/Resources/JS/…`). Foundation
+        // resolves either, and so must this — the flat path alone failed on an
+        // app that previewed perfectly well.
+        let flat = rules.appending(path: "JS/print-facts.js")
+        let versioned = rules.appending(path: "Contents/Resources/JS/print-facts.js")
+        #expect(FileManager.default.fileExists(atPath: flat.path)
+                    || FileManager.default.fileExists(atPath: versioned.path),
                 "the resource bundle is there and the rule is not")
     }
 
