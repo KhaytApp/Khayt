@@ -508,6 +508,7 @@ final class Shop {
             refreshSyncStatus()
             await readSlicers()
             remeasureIfDue()
+            createRecurringIfDue()
         } catch {
             orders = []
             files = []
@@ -745,6 +746,118 @@ final class Shop {
         await load(source)
         importNote = words.callIt("mac.remeasured", ["n": .number(Double(report.changed.count))])
     }
+
+    // MARK: - Standing orders
+
+    /// The books whose standing orders this launch has already made.
+    private var recurringBooks: Set<String> = []
+
+    /// Make today's standing orders, once per book per launch.
+    ///
+    /// The other app does this at boot and every six hours; this one does it
+    /// when the book opens, which for a shop is once a morning. The rule is
+    /// idempotent — a cycle that already has its job asks for nothing — so a
+    /// Mac and a PC opening the same book both run it and one job results.
+    /// Nothing for the sample book, and nothing while another app owns the
+    /// book: the same jobs are due at the next launch.
+    func createRecurringIfDue() {
+        guard case .store(let build) = source, let engine,
+              !recurringBooks.contains(build.rawValue) else { return }
+        recurringBooks.insert(build.rawValue)
+        Task { [weak self] in
+            guard let self else { return }
+            var created: [String] = []
+            do {
+                try await StoreWriter.update(
+                    storeURL: build.storeURL,
+                    owns: { StoreLock.weOwnIt(build) },
+                    whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+                ) { root in
+                    let outcome = try await RecurringOrders.run(&root, engine: engine)
+                    guard outcome.changed else { throw RecurringOrders.NothingDue() }
+                    created = outcome.created
+                }
+            } catch {
+                return
+            }
+            await load(source)
+            if !created.isEmpty {
+                importNote = words.callIt("rec.created", ["n": .number(Double(created.count))])
+            }
+        }
+    }
+
+    /// One cycle on from a day, by the shared rule. Nil with no engine.
+    func nextCycle(after day: String, interval: String) async -> String? {
+        guard let engine else { return nil }
+        return try? await engine.nextCycle(after: day, interval: interval)
+    }
+
+    // MARK: - A customer's communications log
+
+    /// Write a line in a customer's log NOW, not on Save.
+    ///
+    /// A note about a phone call is a fact the moment the call ends, and the
+    /// other app writes it to the record straight away for the same reason —
+    /// so that closing the sheet with the × does not lose it. Only the log is
+    /// touched: the rest of the record stays as it is on disk, whatever a
+    /// sheet somewhere else is holding.
+    func addCommunication(_ entry: CommEntry, to clientId: String) async {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        do {
+            try StoreWriter.updateRecord(build, collection: "clients", id: clientId) { record in
+                var log: [JSONValue] = []
+                if case .array(let had)? = record["commLog"] { log = had }
+                log.append(.object(entry.raw))
+                // Khayt keeps two hundred. The NEWEST two hundred: the other
+                // app's editor appended and then cut the tail, which threw
+                // away the note just written the moment the log was full.
+                if log.count > 200 { log = Array(log.suffix(200)) }
+                record["commLog"] = .array(log)
+            }
+            await load(source)
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
+    /// Take one line out of a customer's log. The FIRST line equal to it: two
+    /// identical quick notes are two lines, and deleting one deletes one.
+    func removeCommunication(_ entry: CommEntry, from clientId: String) async {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        do {
+            try StoreWriter.updateRecord(build, collection: "clients", id: clientId) { record in
+                guard case .array(var log)? = record["commLog"],
+                      let at = log.firstIndex(of: .object(entry.raw)) else { return }
+                log.remove(at: at)
+                record["commLog"] = .array(log)
+            }
+            await load(source)
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
+    // MARK: - What a customer has agreed to pay
+
+    /// The agreed price for each named part, or nil. Empty answers — no
+    /// customer, no record, no agreements, no engine — are all "nothing
+    /// applies", so a caller never has to tell them apart.
+    func agreedPrices(for names: [String], clientId: String?) async -> [Double?] {
+        let none = names.map { _ in Double?.none }
+        guard let clientId, let engine,
+              let client = clients.first(where: { $0.id == clientId }),
+              !client.priceList.isEmpty else { return none }
+        let list = client.priceList.map { JSONValue.object($0.raw) }
+        return (try? await engine.agreedPrices(names: names, priceList: list)) ?? none
+    }
+
     func open(_ next: Source) { Task { await load(next) } }
 
     var canEditSelection: Bool { canWrite && !fileSelection.isEmpty }

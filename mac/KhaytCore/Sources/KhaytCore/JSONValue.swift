@@ -53,3 +53,9 @@ public extension JSONValue {
         }
     }
 }
+
+/// Synthesised: every case holds a `Hashable`. Here so a record that keeps
+/// the fields it does not understand as `[String: JSONValue]` — a customer's
+/// price list, say — can still be a value a `Table` selects or a `ForEach`
+/// walks.
+extension JSONValue: Hashable {}

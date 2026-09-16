@@ -565,6 +565,48 @@ extension SampleShopTests {
         }
     }
 
+    // MARK: - The customers
+
+    /// The customer pane draws a price list, a standing order (running, paused,
+    /// or set up and switched off) and a log written by two different screens
+    /// of the other app. A sample shop where no customer had any of them is a
+    /// pane whose lower half was never once drawn.
+    @Test("the sample customers reach every state the pane draws")
+    func customersSpan() throws {
+        let clients = try Self.rows("clients").map {
+            try JSONDecoder().decode(Client.self, from: JSONEncoder().encode(JSONValue.object($0)))
+        }
+        #expect(clients.contains { $0.priceList.count > 1 }, "no customer has more than one agreed price")
+        #expect(clients.contains { $0.priceList.contains { !$0.note.isEmpty } }, "no agreed price carries a note")
+        #expect(clients.contains { $0.standingOrder.map { !$0.paused } == true }, "no running schedule")
+        #expect(clients.contains { $0.standingOrder?.paused == true }, "no paused schedule")
+        #expect(clients.contains { $0.recurring != nil && $0.standingOrder == nil },
+                "no schedule that was set up and switched off")
+        #expect(clients.contains { $0.recurring?.leadDays ?? 0 > 0 }, "no schedule with a lead time")
+        let lines = clients.flatMap(\.commLog)
+        #expect(lines.contains { $0.raw["type"] != nil }, "no log line in the editor's shape")
+        #expect(lines.contains { $0.raw["channel"] != nil }, "no log line in the quick note's shape")
+        #expect(Set(lines.map(\.kind)).count >= 3, "the log shows one kind of contact")
+        #expect(clients.count { !$0.commLog.isEmpty } >= 2, "only one customer has ever been spoken to")
+    }
+
+    /// A running schedule in the sample is due, and stays due: the sample book
+    /// is read-only, so nothing ever advances it, and a date that was "next
+    /// week" when the file was written would be "last week" a fortnight later
+    /// and read as a shop that forgot. Far in the past, it reads as what it
+    /// is — a schedule the sample never runs.
+    @Test("a running sample schedule cannot drift out of the case it covers")
+    func schedulesAreStable() throws {
+        let clients = try Self.rows("clients").map {
+            try JSONDecoder().decode(Client.self, from: JSONEncoder().encode(JSONValue.object($0)))
+        }
+        for schedule in clients.compactMap(\.standingOrder) where !schedule.paused {
+            let due = try #require(schedule.nextDue.flatMap(Recurring.day))
+            #expect(Date().timeIntervalSince(due) > 30 * 86_400,
+                    "a running sample schedule must be well past due to stay due")
+        }
+    }
+
     @Test("the sample library reaches every print-risk state the inspector draws")
     func riskStatesAreReachable() async throws {
         // FOUR STATES, and three of them are invisible without a summary on a

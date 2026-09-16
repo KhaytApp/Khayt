@@ -319,6 +319,14 @@ public actor KhaytEngine {
         "print-rates",
         "calculator-cost",
         "order-new",
+        // A customer's standing order and their agreed prices. The recurrence
+        // engine is what the schedule advances by (the 31st of January to the
+        // 28th of February, not the 3rd of March), and the recurring rule
+        // reaches it and `order-new` through globals at call time, so the
+        // order here is only that all three are present.
+        "subscriptions",
+        "recurring-orders",
+        "price-agreements",
         // Which language a shop writes its customers' names in, and which of
         // them to show. Not the interface language: a shop that writes only
         // Arabic must not be shown the stale English name left over from setup.
@@ -2307,6 +2315,49 @@ public actor KhaytEngine {
     /// keys, so a record from an older reader can be told apart and read
     /// again after a fault is fixed. The number lives in `lib/geometry-key.js`
     /// because both apps write it and both compare against it.
+    // MARK: - A customer's standing order, and what they have agreed to pay
+
+    /// What `lib/recurring-orders.js` did to the book: the three collections
+    /// as they are afterwards, and the ids of the jobs it made.
+    public struct RecurringRun: Decodable, Sendable {
+        public let orders: [JSONValue]
+        public let clients: [JSONValue]
+        public let settings: [String: JSONValue]
+        public let created: [String]
+    }
+
+    /// Create every standing order that is due today and move its schedule on.
+    ///
+    /// The rule mutates what it is handed — the client's schedule, the order
+    /// list (new jobs at the front) and the settings (the invoice counter) —
+    /// and those are COPIES on this side of the bridge, so all three come
+    /// back and the caller writes all three. `now` is a local instant: the
+    /// rule turns it into the shop's own day, in this Mac's timezone.
+    public func recurringOrders(clients: [JSONValue], orders: [JSONValue],
+                                settings: [String: JSONValue], now: Date) throws -> RecurringRun {
+        try runtime.call2(RECURRING_SCRIPT,
+                          [.array(clients), .array(orders), .object(settings),
+                           .number(now.timeIntervalSince1970 * 1000)],
+                          as: RecurringRun.self)
+    }
+
+    /// One cycle on from a day — what "Skip next cycle" does to a schedule.
+    public func nextCycle(after day: String, interval: String) throws -> String {
+        try runtime.call2("KhaytRecurringOrders.advance(ARG0, ARG1)",
+                          [.string(day), .string(interval)], as: String.self)
+    }
+
+    /// The price a customer has agreed for each named part — nil where they
+    /// have none. One crossing for the whole cart.
+    public func agreedPrices(names: [String], priceList: [JSONValue]) throws -> [Double?] {
+        try runtime.call2("""
+            ARG0.map(function (name) {
+              var entry = KhaytPriceAgreements.find(ARG1, name);
+              return entry ? +entry.price : null;
+            })
+            """, [.array(names.map(JSONValue.string)), .array(priceList)], as: [Double?].self)
+    }
+
     public func geometryReader() throws -> Int {
         try runtime.call2("globalThis.KhaytGeometryKey.READER", [], as: Int.self)
     }
@@ -7324,6 +7375,16 @@ private let NEW_ORDER_SCRIPT = """
   var order = KhaytOrderNew.newOrder(ARG0,
     { settings: settings, orders: ARG1, now: ARG3, tokens: ARG4 });
   return { order: order, settings: settings };
+})()
+"""
+
+/// Today's standing orders, and the book's three collections afterwards.
+private let RECURRING_SCRIPT = """
+(function () {
+  var clients = ARG0, orders = ARG1, settings = ARG2;
+  var r = KhaytRecurringOrders.run(clients, orders, { settings: settings, now: ARG3 });
+  return { orders: orders, clients: clients, settings: settings,
+           created: r.created.map(function (o) { return o.id; }) };
 })()
 """
 

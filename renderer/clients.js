@@ -905,85 +905,27 @@ function openClientEditor(clientId = null) {
 }
 
 /* ============================================================
-   Recurring orders — auto-create on boot when overdue
+   Recurring orders — the rule is lib/recurring-orders.js; this is its host
    ============================================================ */
-/** Advance a recurring nextDue by one cycle. Never throws — KhaytSubscriptions
- *  rejects unknown intervals, so we validate first and fall back to day math. */
-function advanceRecurringDate(nextDue, interval, intervalDays) {
-  const VALID = ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'];
-  if (typeof KhaytSubscriptions !== 'undefined' && VALID.includes(interval)) {
-    try { return KhaytSubscriptions.nextRunDate(nextDue, interval); } catch (e) { /* fall through */ }
-  }
-  const next = new Date(nextDue + 'T00:00:00');
-  next.setDate(next.getDate() + ((intervalDays && intervalDays[interval]) || 30));
-  return localDateStr(next);
-}
-
+/**
+ * Create every standing order that is due and move its schedule on.
+ *
+ * Runs at boot and every six hours (`wire-events.js`). This used to be two
+ * functions — one for the due day, one that knew about lead days — each
+ * guarding against the other and each making a slightly different job. The
+ * rule is one now and the same in both apps; it is idempotent (a cycle that
+ * already has its job asks for nothing), so running it twice creates nothing
+ * twice. It mutates `printLog`, the client's schedule and `settings` (the
+ * invoice counter) in place, which is why the one saveAll() here is enough
+ * and also why it is required.
+ */
 function checkRecurringOrders() {
-  const today = localDateStr();
-  const INTERVAL_DAYS = { weekly: 7, biweekly: 14, monthly: 30, quarterly: 91 };
-  let created = 0;
-
-  clients.forEach(client => {
-    const rec = client.recurring;
-    if (!rec?.enabled || rec.paused || !rec.nextDue || rec.nextDue > today) return;
-    // Stop after the end date (if set): disable so it no longer recurs.
-    if (rec.endDate && rec.nextDue > rec.endDate) { rec.enabled = false; return; }
-
-    // Use most recent completed order for this client as a template
-    const template = printLog.find(o => o.clientId === client.id && o.status === 'completed');
-    if (!template) return;
-
-    // Check if an order was already created for this cycle — prevents duplicates
-    // when patchRecurringOrdersWithLeadDays also runs on boot
-    // Must happen BEFORE consuming the invoice number to avoid wasting sequence numbers
-    const alreadyCreated = printLog.some(o =>
-      o.clientId === client.id && o.recurringCycle === rec.nextDue);
-    if (alreadyCreated) return;
-
-    const now = new Date();
-    const invoiceNum = nextInvoiceNumber();
-    const seq = String(settings.invNumNext - 1).padStart(4, '0');
-    const id = `${settings.invPrefix || 'INV'}-${now.getFullYear()}-${seq}`;
-
-    printLog.unshift({
-      ...template,
-      parts: template.parts ? template.parts.map(p => ({ ...p })) : [],
-      id,
-      invoiceNum,
-      invoiceNumber: invoiceNum,
-      date: today,
-      timestamp: now.toISOString(),
-      status: 'pending',
-      paymentStatus: 'unpaid',
-      paidAmount: 0,
-      paymentMethod: null,
-      paidAt: null,
-      printPhotos: [],
-      notes: '',
-      dueDate: null,
-      priority: false,
-      materialDeducted: false,
-      actualPrintTime: null,
-      actualWeight: null,
-      quoteSentAt: null,
-      quoteExpiresAt: null,
-      quoteAcceptedAt: null,
-      deliveredAt: null,
-      attachedFiles: [],
-      recurringCycle: rec.nextDue,
-    });
-    created++;
-
-    // Advance one cycle (calendar-safe; never throws on a bad interval).
-    rec.nextDue = advanceRecurringDate(rec.nextDue, rec.interval, INTERVAL_DAYS);
-    if (rec.endDate && rec.nextDue > rec.endDate) rec.enabled = false;
-  });
-
-  if (created > 0) {
+  if (typeof KhaytRecurringOrders === 'undefined') return;
+  const { created } = KhaytRecurringOrders.run(clients, printLog, { settings, now: new Date() });
+  if (created.length > 0) {
     saveAll();
     renderKanban(); renderLogs(); renderDashboard();
-    toast(t('rec.created', { n: created }), 'success', 4500);
+    toast(t('rec.created', { n: created.length }), 'success', 4500);
   }
 }
 
@@ -1296,83 +1238,6 @@ function getClientTier(clientId) {
   })[0];
 }
 
-function patchRecurringOrdersWithLeadDays() {
-  // Wrap the existing checkRecurringOrders to also respect leadDays
-  // This runs at startup after loadAll() to check for orders due within leadDays
-  const today = localDateStr();
-  const INTERVAL_DAYS = { weekly: 7, biweekly: 14, monthly: 30, quarterly: 91 };
-  let created = 0;
-
-  clients.forEach(client => {
-    const rec = client.recurring;
-    if (!rec?.enabled || rec.paused || !rec.nextDue) return;
-    if (rec.endDate && rec.nextDue > rec.endDate) { rec.enabled = false; return; }
-    // Don't double-create: checkRecurringOrders() runs just before this on boot and
-    // may have already created today's recurring order for this client (a different
-    // cycle key), so skip any client that already got a recurring order today.
-    if (printLog.some(o => o.clientId === client.id && o.recurringCycle && o.date === today)) return;
-    const leadDays = rec.leadDays || 0;
-    const triggerDate = new Date(rec.nextDue + 'T00:00:00');
-    triggerDate.setDate(triggerDate.getDate() - leadDays);
-    const triggerStr = localDateStr(triggerDate);
-    if (triggerStr > today) return;
-
-    // Check if an order was already created for this cycle (any status — prevents duplicate on re-completion)
-    const alreadyCreated = printLog.some(o =>
-      o.clientId === client.id && o.recurringCycle === rec.nextDue);
-    if (alreadyCreated) return;
-
-    // Find template: use specific templateOrderId or last completed order
-    const template = rec.templateOrderId
-      ? printLog.find(o => o.id === rec.templateOrderId)
-      : printLog.find(o => o.clientId === client.id && o.status === 'completed');
-    if (!template) return;
-
-    const now = new Date();
-    const invoiceNum = nextInvoiceNumber();
-    const seq = String(settings.invNumNext - 1).padStart(4, '0');
-    const id = `${settings.invPrefix || 'INV'}-${now.getFullYear()}-${seq}`;
-    printLog.unshift({
-      ...template,
-      parts: template.parts ? template.parts.map(p => ({ ...p })) : [],
-      id,
-      invoiceNum,
-      invoiceNumber: invoiceNum,
-      date: today,
-      timestamp: now.toISOString(),
-      status: rec.cloneStatus || 'pending',
-      paymentStatus: 'unpaid',
-      paidAmount: 0,
-      paymentMethod: null,
-      paidAt: null,
-      printPhotos: [],
-      notes: '',
-      dueDate: rec.nextDue,
-      priority: false,
-      materialDeducted: false,
-      actualPrintTime: null,
-      actualWeight: null,
-      quoteSentAt: null,
-      quoteExpiresAt: null,
-      quoteAcceptedAt: null,
-      deliveredAt: null,
-      attachedFiles: [],
-      comments: [],
-      recurringCycle: rec.nextDue,
-    });
-    created++;
-
-    // Advance one cycle (calendar-safe; never throws on a bad interval).
-    rec.nextDue = advanceRecurringDate(rec.nextDue, rec.interval, INTERVAL_DAYS);
-    if (rec.endDate && rec.nextDue > rec.endDate) rec.enabled = false;
-  });
-
-  if (created > 0) {
-    saveAll(); renderKanban(); renderLogs(); renderDashboard();
-    toast(t('rec.created', { n: created }), 'success', 4500);
-  }
-}
-
 function exportClientsCsv() {
   // Build stats map (same as renderClients uses)
   const clientStatsMap = new Map();
@@ -1676,7 +1541,6 @@ function openCampaignModal() {
     clientsOverRedeemed,
     clientLoyaltyAvailable,
     redeemLoyaltyPoints,
-    patchRecurringOrdersWithLeadDays,
     exportClientsCsv,
     exportClientPortal,
     clientCompare,

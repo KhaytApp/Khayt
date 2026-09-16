@@ -680,6 +680,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A customer's price agreements, standing order and communications
+  log.** The three things that follow a customer into every job were stored,
+  carried through a save untouched, and shown nowhere on the Mac — the help
+  said to edit them in the other app. The customer sheet now edits what they
+  have agreed to pay for particular things (a product word, a price, a note;
+  "bracket" covers "Wall bracket, steel") and their standing order (weekly to
+  quarterly, next date, paused, end date, skip a cycle). Choosing the customer
+  on a new job applies their discount and their agreed prices to the cart, and
+  a part added afterwards takes them too. The log of calls, messages and
+  meetings is in the customer's pane, newest first, and a line is written the
+  moment it is added — not when a sheet is saved. Both shapes the other app
+  writes are read.
+
+- **(Mac) Standing orders are made on the Mac.** When the book opens, every
+  schedule that is due produces its job — a copy of the customer's last
+  completed job with the previous run's payment, photos, actuals and dates
+  reset, the cycle's date as its due date and the cycle written on it — and the
+  toolbar says how many. The same rule the other app runs, so a book opened on
+  a Mac and a PC gets one job per cycle, not two.
+
 - **The Mac app can say what a model IS, and tag it.** It could already file
   models into a project; category and tags were readable, filterable and
   impossible to set, so filling them meant opening the other app. There is now
@@ -1173,6 +1193,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **A standing order made the same job differently depending on the day the
+  app was opened.** Two copies of the recurring-orders rule ran at every boot,
+  one for the due day and one that knew about lead days, each guarding against
+  the other. The due-day copy gave the job NO due date, always started it as
+  pending, and ignored the template the shop had chosen; the early copy did all
+  three. One rule now (`lib/recurring-orders.js`), the richer shape on both
+  days, proven against both originals over six hundred generated books — and
+  it is the rule the Mac runs.
+
+- **A communications note added to a full log was thrown away.** The customer
+  editor appended the new line and then cut the log to two hundred from the
+  end — dropping the note just written. The Mac keeps the newest two hundred;
+  the other app's editor is unchanged and is noted here.
+
+- **(Mac) The help said parts, price tiers, pictures and documents are edited
+  in the other app.** All four have been edited on the Mac since the product
+  sheet gained them; the catalogue and welcome articles now say what is
+  actually still elsewhere — most of the analytics, the storefront and portal,
+  and the LAN server.
 
 - **A model can be deleted from the library on the Mac.** There was no way to:
   the menu offered Quick Look, Reveal, Open, Convert and Copy name, and a model

@@ -27,7 +27,9 @@ When you have a real book, pick it from that same menu in the top-left. See
 
 ## What is still only in the other app
 
-The Mac app is newer. A few things are still done in Khayt for Windows and
-Linux, and the screens here say so where it matters — the product photo and its
-parts, the price tiers, the storefront. Your book is the same file either way,
-so you can do one thing there and the rest here.
+The Mac app is newer. Three things are still done in Khayt for Windows and
+Linux: most of the analytics (the money itself is here, under Reports; the
+thirty-odd ways of looking at it are not yet), the storefront and customer
+portal, and the local server that lets a phone on the shop's Wi-Fi see the
+floor. Your book is the same file either way, so you can do one thing there
+and the rest here.

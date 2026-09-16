@@ -137,6 +137,10 @@ extension Customer {
 struct CustomerInspector: View {
     let shop: Shop
 
+    /// The line being written in the communications log.
+    @State private var newKind = "call"
+    @State private var newNote = ""
+
     var body: some View {
         if let person = shop.selectedCustomer {
             ScrollView {
@@ -212,6 +216,45 @@ struct CustomerInspector: View {
                         }
                     }
                     LayerRule()
+                    // What follows this customer into every job, and what has
+                    // been said to them. Only for someone written down: a
+                    // name on old jobs has no record to hold any of it.
+                    if let record = person.record {
+                        if !record.priceList.isEmpty {
+                            DetailSection(shop.words.callIt("ce.price_list")) {
+                                ForEach(record.priceList) { agreed in
+                                    DetailLine(agreed.product, Money.text(agreed.price, shop.currency))
+                                    if !agreed.note.isEmpty {
+                                        Text(agreed.note).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            LayerRule()
+                        }
+                        if let schedule = record.standingOrder {
+                            DetailSection(shop.words.callIt("mac.standing_order")) {
+                                DetailLine(shop.words.callIt("rec.interval"),
+                                           shop.words.callIt("rec.interval.\(schedule.interval)",
+                                                             fallback: schedule.interval))
+                                if let next = schedule.nextDue {
+                                    DetailLine(shop.words.callIt("rec.next_due"), next, dim: schedule.paused)
+                                }
+                                if schedule.paused {
+                                    Text(shop.words.callIt("rec.paused"))
+                                        .font(.caption).foregroundStyle(Khayt.attention)
+                                }
+                            }
+                            LayerRule()
+                        }
+                        // The log, when there is one — or when a line can be
+                        // added. An empty heading over "nothing yet" on a book
+                        // that cannot be written is a section that says
+                        // nothing, twice.
+                        if !record.commLog.isEmpty || shop.canMoveJobs {
+                            communications(record)
+                            LayerRule()
+                        }
+                    }
                     DetailSection(shop.words.callIt("mac.jobs_count")) {
                         ForEach(person.orders.sorted { ($0.day ?? .distantPast) > ($1.day ?? .distantPast) }) { job in
                             HStack(alignment: .firstTextBaseline) {
@@ -243,5 +286,68 @@ struct CustomerInspector: View {
         } else {
             EmptyHere(title: shop.words.callIt("mac.no_customer"), message: shop.words.callIt("mac.no_customer_hint"), mark: .clients)
         }
+    }
+
+    /// Calls, messages and meetings — newest first, and a line to add one.
+    ///
+    /// Written the moment it is added, not on a Save button: a note about a
+    /// call is a fact when the call ends, and the other app writes it to the
+    /// record straight away for the same reason. Two shapes are read (see
+    /// `CommEntry`); one is written.
+    @ViewBuilder
+    private func communications(_ record: Client) -> some View {
+        DetailSection(shop.words.callIt("ce.comm_log"), count: record.commLog.isEmpty ? nil : record.commLog.count) {
+            if record.commLog.isEmpty {
+                Text(shop.words.callIt("ce.comm_empty"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            // Positions, not ids: a quick note has no id of its own, and two
+            // written in one second would share the stand-in.
+            let lines = record.commLog.sorted { $0.at > $1.at }
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 6) {
+                            Text(shop.words.callIt(line.wordKey)).font(.callout.weight(.medium))
+                            Text(line.day).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                        }
+                        Text(line.note).font(.callout).textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    if shop.canMoveJobs {
+                        Button {
+                            Task { await shop.removeCommunication(line, from: record.id) }
+                        } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.plain)
+                            .help(shop.words.callIt("common.delete"))
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            if shop.canMoveJobs {
+                HStack(spacing: 6) {
+                    Picker("", selection: $newKind) {
+                        ForEach(CommEntry.kinds, id: \.self) { kind in
+                            Text(shop.words.callIt(CommEntry.wordKey(for: kind))).tag(kind)
+                        }
+                    }
+                    .labelsHidden().frame(width: 110)
+                    TextField(shop.words.callIt("ce.comm_note_ph"), text: $newNote)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { addNote(to: record) }
+                    Button(shop.words.callIt("common.add")) { addNote(to: record) }
+                        .disabled(newNote.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func addNote(to record: Client) {
+        let note = newNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !note.isEmpty else { return }
+        let line = CommEntry(id: Shop.uid("CMM"), kind: newKind, note: note, at: Date())
+        newNote = ""
+        Task { await shop.addCommunication(line, to: record.id) }
     }
 }

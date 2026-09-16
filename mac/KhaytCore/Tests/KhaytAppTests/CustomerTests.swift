@@ -122,9 +122,13 @@ struct CustomerTests {
         for (key, value) in was where edited[key] == nil { edited[key] = value }
 
         #expect(edited["nameEn"] == .string("Acme Ltd"), "the edit landed")
-        #expect(edited["priceList"] != nil, "and the price list survived")
         #expect(edited["recurring"] != nil)
-        #expect(edited["commLog"] != nil)
+        #expect(edited["commLog"] != nil, "the log is never the sheet's to write, so the merge keeps it")
+        // The sheet edits the price list now, so a record that came from the
+        // book carries the book's rows through its own `record` — including
+        // a field this app has never heard of.
+        let fromBook = try JSONDecoder().decode(Client.self, from: JSONEncoder().encode(JSONValue.object(existing)))
+        #expect(fromBook.record["priceList"] == .array([.object(["sku": .string("A")])]))
     }
 }
 

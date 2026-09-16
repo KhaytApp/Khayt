@@ -15,9 +15,31 @@ Saudi invoice carries, and notes.
 **Job → New customer**. You can also create a customer while taking a job, which
 is usually when you learn they exist.
 
-## What this app does not show
+## Price agreements
 
-A customer may also carry a price list, a recurring schedule and a
-communications log, kept in Khayt for Windows and Linux. This app does not show
-those — and does not touch them. Editing a customer here leaves every field this
-screen does not offer exactly as it was.
+What this customer pays for particular things: a product word, a price, a note.
+The word is matched against a part's name when you take a job for them —
+"bracket" covers "Wall bracket, steel" — and the figure becomes what that part
+costs on the job, with the job's margin on top. You see the total before you
+save it. The same rule applies in both apps, so a job taken here and one taken
+on the shop's PC come to the same number.
+
+## A standing order
+
+The same job again, on a schedule: weekly, every two weeks, monthly or
+quarterly, from a date you choose. When the day comes, the app makes a copy of
+the customer's last completed job — the parts, the price, the machine — with
+everything that belonged to the previous run reset, and puts it in the queue
+with the cycle's date as its due date. It says so in the toolbar. A schedule
+can be paused, given an end date, or skipped one cycle.
+
+The check runs when the book opens, and the other app runs the same check.
+Each cycle is written on the job it produced, so a book opened on two machines
+still gets one job per cycle.
+
+## The communications log
+
+Calls, emails, messages and meetings, with the date and what was said. A line
+is written the moment you add it, in the customer's pane — not when a sheet is
+saved — so closing the window does not lose it. The other app's notes appear
+here and yours appear there.
