@@ -1655,6 +1655,226 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.14] - 2026-09-16
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **A job's price can be adjusted after it is taken — in both apps.** The
+  Mac's edit-job sheet and the order editor on Windows and Linux both take a
+  typed total ("we agreed 1,800 in the end"). The shared edit rule writes it,
+  keeps what the arithmetic said beside it, marks the job's price as the
+  shop's own, clamps what has been paid to the new total, re-derives the
+  payment status, and records the change in the job's history with what it
+  was and what it became — the same trace a due-date change leaves.
+
+- **A job's total gets its last word: round it, or type it.** Cost plus margin
+  is where a price starts, not where it ends. On the new-job sheet (Mac) and the
+  calculator (Windows and Linux) the total can be rounded to the nearest 1, 5
+  or 10 — nearest, up or down, the same rule and words a product's price already
+  uses — or typed outright. A rounded or typed total shows "Calculated" and the
+  arithmetic beside it, so it is never mistaken for one, and the job records
+  which of the three reached its price (`computedPrice`, `priceSource`,
+  `priceRound` or `priceOverride`; a plain job carries none of them).
+
+- **A customer's price agreements, standing order and communications
+  log.** The three things that follow a customer into every job were stored,
+  carried through a save untouched, and shown nowhere on the Mac — the help
+  said to edit them in the other app. The customer sheet now edits what they
+  have agreed to pay for particular things (a product word, a price, a note;
+  "bracket" covers "Wall bracket, steel") and their standing order (weekly to
+  quarterly, next date, paused, end date, skip a cycle). Choosing the customer
+  on a new job applies their discount and their agreed prices to the cart, and
+  a part added afterwards takes them too. The log of calls, messages and
+  meetings is in the customer's pane, newest first, and a line is written the
+  moment it is added — not when a sheet is saved. Both shapes the other app
+  writes are read.
+
+- **Standing orders are made on the Mac.** When the book opens, every
+  schedule that is due produces its job — a copy of the customer's last
+  completed job with the previous run's payment, photos, actuals and dates
+  reset, the cycle's date as its due date and the cycle written on it — and the
+  toolbar says how many. The same rule the other app runs, so a book opened on
+  a Mac and a PC gets one job per cycle, not two.
+
+### Changed
+
+- **A customer's agreed price is the price of that part — not a cost the
+  margin sits on.** Choosing a customer with a price agreement used to write
+  the agreed figure INTO the part's cost, so the job's margin went on top (a
+  part agreed at 50 on a 30% job billed 65) and the profit report then showed
+  the part sold at cost. The figure is now the part's price per unit
+  (`agreedPrice`), not marked up and not cut by the customer's standing
+  discount; the rest of the job is priced as before, and the part still knows
+  what it cost. Both apps, one rule (`lib/price-agreements.js`, through
+  `lib/pricing.js`). Jobs already saved are not re-priced.
+
+### Fixed
+
+- **An invoice line for a part the customer agreed a price for printed the
+  wrong amount.** The document shared the job's price among its parts by cost,
+  so a bracket agreed at 50 printed at whatever its cost share came to — the
+  one line a customer can check against what they were told. An agreed part
+  now prints its agreed figure, and the other parts share the rest by cost, as
+  before. Every existing invoice fixture is byte-identical.
+
+- **A standing order made the same job differently depending on the day the
+  app was opened.** Two copies of the recurring-orders rule ran at every boot,
+  one for the due day and one that knew about lead days, each guarding against
+  the other. The due-day copy gave the job NO due date, always started it as
+  pending, and ignored the template the shop had chosen; the early copy did all
+  three. One rule now (`lib/recurring-orders.js`), the richer shape on both
+  days, proven against both originals over six hundred generated books — and
+  it is the rule the Mac runs.
+
+- **The help said parts, price tiers, pictures and documents are edited
+  in the other app.** All four have been edited on the Mac since the product
+  sheet gained them; the catalogue and welcome articles now say what is
+  actually still elsewhere — most of the analytics, the storefront and portal,
+  and the LAN server.
+
+- **A model can be deleted from the library on the Mac.** There was no way to:
+  the menu offered Quick Look, Reveal, Open, Convert and Copy name, and a model
+  stayed forever. Delete asks first, in the words the other app asks in, takes
+  the record and the files, and says so if a file would not go rather than
+  showing "File deleted" over bytes still on disk.
+
+- **A product's part can be filled from a model in the library.** The product
+  sheet could only be typed into — grams and hours by hand — while the library
+  already knew both for every model the shop had sliced and could estimate them
+  for the rest. "From your print library…" beside Add part opens a picker in
+  the library's own order; the part keeps the link to its model through a save.
+  Same rule as making a product from a selected model, so both price alike.
+
+- **What a model could and could not answer for is now said.** The sentences
+  a product-from-model produced — "the weight is an estimate", "material is
+  still missing" — were written and shown nowhere, so an estimated figure
+  looked typed. The product sheet shows them.
+
+- **A multi-plate project is the size of its largest plate, not of every
+  plate laid side by side.** A slicer sets plates out in one coordinate space,
+  and both apps boxed the lot: a two-plate file whose widest plate is 80 mm
+  read as 295 mm across — the gap between the plates — and would not have "fit"
+  a 256 mm bed. The count and volume stay totals, because every plate gets
+  printed. Both apps, the same rule, checked file for file.
+
+- **The Mac reads a 3MF the way the file says.** Three faults, each producing a
+  plausible size no part of the file has: an object built from several
+  components was read with every component at the last one's position; a root
+  part over 8 MB — every scanned model that keeps its mesh inline — was refused
+  and then measured at identity, un-rotated and un-placed; and a zip64
+  container was refused outright, however small. Thirteen of one shop's files
+  were zip64 at 34 KB and had no thumbnail, no size and no key in either app.
+
+- **`Khayt --import --remeasure` rewrites the measurements the old reader
+  wrote.** Seventy-four of that shop's eighty-five measured 3MFs carried a key
+  from one of the faults above; nothing re-reads a file that already has one.
+  `--dry-run` lists what would change.
+
+- **A book measured by an older reader measures itself again.** The fix
+  above reached only files imported after it. Every library record now names
+  the reader that keyed it, in both apps, and the Mac app reads again — once
+  per book after it opens, below the screen's priority — every 3MF an older
+  reader measured, rewriting only the keys that come out different and saying
+  how many. A due file that was right is marked and not read twice; a file
+  whose folder is not mounted is left for the day it is. `--remeasure` is the
+  same pass, on demand, for every file.
+
+- **A job taken from the catalogue is priced.** Any part weighing a kilo or
+  more came into the sheet as nothing at all, so nothing was costed and the job
+  opened at zero — a product the catalogue prices at 3,250 became a job priced
+  at 0.00, with no error anywhere. The figures were being written into the
+  editable field by the DISPLAY formatter, which groups thousands: "1,234.6",
+  which the app then cannot read back. A shop's biggest prints are exactly the
+  ones over a kilo.
+
+- **And when a product genuinely has nothing to price, the sheet says so.** A
+  product with no weight, print time or filament recorded costs nothing,
+  correctly; the product editor has always said that, and a shop taking a job
+  from the catalogue never opens the product editor.
+
+- **The "Your prices" setting is switched off with the tax it belongs to.**
+  With VAT off it was the one control in that block still live — a picker a
+  shop could change and watch every figure in the app stay where it was.
+
+- **The Quick Look extensions build again on Xcode 26.x.** Its SwiftPM makes
+  `swiftbuild` the default engine, and that one links an executable for the
+  ordinary `_main` where the old engine used the target's own name — so the
+  thumbnail and preview extensions stopped linking, on a Mac that had simply
+  taken an Xcode update. The manifest names the entry symbol out loud now.
+
+- **One header at the top of every screen, not two.** The redesigned window
+  draws its own navy strip, and the Mac's own title bar was still drawn above
+  it — on Jobs and the Board with a stray "+" in it, because those screens
+  declared a toolbar and a toolbar has nowhere to go but the window's bar. The
+  window's bar is off now and the traffic lights sit in Khayt's strip, which is
+  where the design put them.
+
+- **The buttons that screen used to have are in the strip.** Take a job, new
+  product, add a machine, suggest a schedule, issue a gift card, log an expense
+  or waste, import models, the list-or-grid switch and the period picker all
+  moved out of the toolbar and into the navy strip, on the screen that owns
+  them.
+
+- **Selecting a model, a job or a customer opens its details again.** The
+  detail panel was attached to the old window only, so in the redesigned one it
+  never appeared — a selected tile and nothing beside it. Its switch is back in
+  the strip too.
+
+- **The search field searches again.** It had become a picture of a search
+  field: the real one lived in the old window's toolbar. It narrows the screen
+  you are on, and says what it narrows in that screen's own words.
+
+- **Every editor opens.** Take a job, edit a product, record a payment, add a
+  spool and the rest were attached to the old window and did nothing at all in
+  the new one. Creating an order from the catalogue is one of these.
+
+- **Prices show the riyal mark.** The redesigned screens were writing "SAR"
+  while the tables beside them drew the mark, because the mark was waiting on a
+  font Khayt does not yet ship. macOS carries the official mark — checked with
+  the system, not assumed — so the whole app says the same thing.
+
+- **The Appearance switch showed the wrong position.** `@AppStorage` takes its
+  default per declaration, and the window said "new shell" while Settings said
+  "old" — so before the switch had ever been touched it read OFF on a window
+  drawing the new shell, and getting back to the old one meant turning it on
+  and off again.
+
+- **A grid puts more on a big display, not bigger things.** The catalogue's
+  grid and the portfolio grew their tiles with the window instead of fitting
+  more in — a 260-point photograph is the same picture with the row half as
+  useful. Both use the library's arithmetic now.
+
+- **The Machine sheet is three panes instead of one long scroll.** Printer ·
+  Connection · Upkeep. It was the only editor in the app that asked more than
+  twelve questions, and on a 13-inch screen its Save button sat below the
+  bottom of it. A laser cutter, which asks seven, still gets one column — tabs
+  over a short form hide work rather than organise it.
+
+- **Gift cards lost their Status column and gained a filter.** Active, Used and
+  Expired were a coloured word restating what the row already said three times
+  over; a spent card now reads `closed` where its balance was and fades the way
+  every other settled row in the app does. The three words became the way to
+  ask instead — chips above the table — and each row says its state to
+  VoiceOver.
+
+- **The Dashboard and the nozzle are no longer the same icon.** Both were the
+  nozzle laying a bead. The sidebar is permanently on screen, so that shape is
+  learned as "dashboard" and then contradicted in a machine row.
+
+- **One currency, one spelling, on the payment sheet.** It drew the riyal mark
+  beside the total and wrote "SAR" beside the box the amount is typed into —
+  the same money, two ways, two rows apart.
+
+- **Opening a library folder says which folder you are in.** The title kept
+  reading "All models", the sidebar row stayed on Library, and nothing on the
+  screen named the folder — a place a shop could be without being able to tell.
+  A chosen stage on the Jobs screen says which stage the same way.
+
+- **The sidebar's card says which book is open.** On the sample shop it says
+  so, and the card is the menu that switches back to the shop's own.
 ## [4.0.0-alpha.12] - 2026-09-15
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
