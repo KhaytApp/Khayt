@@ -1307,6 +1307,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **(Mac) A product made on the Mac was priced on its filament alone.** The
+  other app's calculator puts a labour rate, prep and post time, power draw,
+  electricity, wear and a failure allowance on every part it writes; this
+  sheet wrote none of them, and the shared pricing rule injects none on
+  purpose. So a product added here cost whatever its filament cost and
+  nothing else — on a real portrait, 10.57 where the true cost is 35.91,
+  because those seven figures are seven tenths of what it takes to make.
+  The part being added now carries the same starting figures the other app's
+  form carries, folded away under "Labour, power and wear" so they can be
+  changed before the part goes in, and a part already in the list that has
+  none of them says so instead of quietly costing less.
 - **Time left on a Klipper printer is the figure the machine itself shows.**
   Khayt worked the number out from the layer count, and a layer count assumes
   every layer costs the same. Measured on a U1 printing a part whose lower

@@ -6558,6 +6558,14 @@ public actor KhaytEngine {
     /// blank, and the next save re-costs it at nothing. So a job taken on this
     /// Mac and edited in Khayt would have lost its price, quietly, on somebody
     /// else's machine.
+    /// The seven figures a part is costed at, as `lib/print-rates.js` starts
+    /// them — the same numbers the other app's calculator form carries before
+    /// a shop touches it. A product part made here must arrive with them, or
+    /// it is priced at material cost and nothing else.
+    public func printRateDefaults() throws -> [String: Double] {
+        try runtime.call2("KhaytPrintRates.DEFAULTS", [], as: [String: Double].self)
+    }
+
     public func costPart(_ part: JSONValue, inventory: [JSONValue],
                          settings: [String: JSONValue],
                          machine: JSONValue? = nil, preset: JSONValue? = nil) throws -> CostedPart {
