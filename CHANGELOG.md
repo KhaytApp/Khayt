@@ -1371,6 +1371,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **The mode comparison was short of two things a shop actually gets.** The
+  product catalogue and the portfolio are both hidden from the commerce-free
+  flavour by a `.biz-only` class in the markup, but neither appeared in
+  `lib/feature-tiers.js` — the file that calls itself the single source of
+  truth for that boundary and that builds the table a shop reads when it
+  chooses a mode. Both are listed now, and a test joins the two halves: every
+  gated navigation tab must name a feature the registry knows. It also pins
+  what the two gates MEAN, which is not the same thing — a `pro-only` tab is
+  Professional whole, while a `biz-only` tab may still be a Pro feature when
+  what Professional unlocks is the depth inside it. Analytics is that case,
+  with fourteen gated elements within a tab a simple shop can open, and the
+  test now requires such a tab to really gate something rather than quietly
+  giving away the whole of it.
 - **A delivered job was missing from what its printer had earned, in both
   apps.** Khayt wrote `delivered` before it wrote `completed` with a
   `deliveredAt` beside it, and both are still in shops' books — thirteen of
