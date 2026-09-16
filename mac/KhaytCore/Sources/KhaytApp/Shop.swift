@@ -5867,6 +5867,152 @@ final class Shop {
         }
     }
 
+    // MARK: - Taking a product off the catalogue
+
+    /// Delete a product, and everything that pointed at it.
+    ///
+    /// ── WHAT A DELETE HAS TO DO BESIDES DELETING ──────────────────────────
+    ///
+    /// Dropping the row is the easy quarter of it. `renderer/inventory.js`
+    /// also unlinks the jobs that named the product, drops it from any quote
+    /// bundle, and removes its pictures from disk — and offers all of that
+    /// back as one undo. A Mac delete that only dropped the row would leave a
+    /// job pointing at a product that is not there, which is the shape of bug
+    /// that shows up months later as a screen that cannot draw.
+    ///
+    /// PAST INVOICES ARE UNTOUCHED, and the sentence the shop is shown says
+    /// so: an invoice is what was actually charged, and a catalogue tidy-up is
+    /// not permission to rewrite it.
+    func deleteProduct(_ id: String) async {
+        productProblem = nil
+        productNote = nil
+        guard let build = source.build else {
+            productProblem = words.callIt("mac.move_sample"); return
+        }
+        // The pictures, read BEFORE the record goes: afterwards there is
+        // nothing left to read their names off.
+        let pictureNames = await pictures(of: id).compactMap(\.path)
+        var removed: [String: JSONValue]?
+        var unlinked: [String] = []
+        var bundles: [String] = []
+        do {
+            try StoreWriter.update(build) { root in
+                var rows = Self.rows(root, "products")
+                guard let at = rows.firstIndex(where: { Self.recordId($0) == id }),
+                      case .object(let was) = rows[at] else { return }
+                removed = was
+                rows.remove(at: at)
+                root["products"] = .array(rows)
+
+                // A job that named this product keeps everything else it has;
+                // only the pointer goes.
+                var log = Self.rows(root, "printLog")
+                for i in log.indices {
+                    guard case .object(var order) = log[i],
+                          case .string(let named)? = order["productId"], named == id else { continue }
+                    order["productId"] = .null
+                    StoreWriter.stamp(&order)
+                    if case .string(let orderId)? = order["id"] { unlinked.append(orderId) }
+                    log[i] = .object(order)
+                }
+                if !unlinked.isEmpty { root["printLog"] = .array(log) }
+
+                // And out of any quote bundle that listed it.
+                var settings = Self.settings(root)
+                if case .array(var list)? = settings["bundles"] {
+                    var touched = false
+                    for i in list.indices {
+                        guard case .object(var bundle) = list[i],
+                              case .array(let ids)? = bundle["productIds"] else { continue }
+                        let kept = ids.filter { $0 != .string(id) }
+                        guard kept.count != ids.count else { continue }
+                        bundle["productIds"] = .array(kept)
+                        if case .string(let bundleId)? = bundle["id"] { bundles.append(bundleId) }
+                        list[i] = .object(bundle)
+                        touched = true
+                    }
+                    if touched {
+                        settings["bundles"] = .array(list)
+                        root["settings"] = .object(settings)
+                    }
+                }
+            }
+            guard let removed else {
+                productProblem = words.callIt("mac.move_gone"); return
+            }
+            // The bytes go LAST, and only once the record is gone: a picture
+            // deleted beside a record that survived is a broken thumbnail on
+            // every screen that draws the catalogue.
+            for name in pictureNames where !name.isEmpty {
+                ProductPhotos.delete(name, in: build)
+            }
+            registerProductUndo(removed, unlinked: unlinked, bundles: bundles, pictures: pictureNames)
+            await load(source)
+            productNote = words.callIt("pe.deleted")
+        } catch {
+            productProblem = String(describing: error)
+        }
+    }
+
+    /// Put a deleted product back, with the jobs and bundles that named it.
+    ///
+    /// The pictures do NOT come back: their bytes were deleted, and an undo
+    /// that silently restored a record naming files that are gone would put a
+    /// broken thumbnail on the catalogue. The record is restored without them,
+    /// which is honest and which the shop can see.
+    private func registerProductUndo(_ record: [String: JSONValue], unlinked: [String],
+                                     bundles: [String], pictures: [String]) {
+        guard let undoManager, let build = source.build,
+              case .string(let id)? = record["id"] else { return }
+        var restored = record
+        if !pictures.isEmpty {
+            for key in ["images", "imagePath", "thumbnail"] { restored.removeValue(forKey: key) }
+        }
+        undoManager.setActionName(words.callIt("pe.deleted"))
+        undoManager.registerUndo(withTarget: self) { shop in
+            do {
+                try StoreWriter.update(build) { root in
+                    var rows = Self.rows(root, "products")
+                    guard !rows.contains(where: { Self.recordId($0) == id }) else { return }
+                    rows.append(.object(restored))
+                    root["products"] = .array(rows)
+
+                    var log = Self.rows(root, "printLog")
+                    var touchedLog = false
+                    for i in log.indices {
+                        guard case .object(var order) = log[i],
+                              case .string(let orderId)? = order["id"], unlinked.contains(orderId) else { continue }
+                        order["productId"] = .string(id)
+                        StoreWriter.stamp(&order)
+                        log[i] = .object(order)
+                        touchedLog = true
+                    }
+                    if touchedLog { root["printLog"] = .array(log) }
+
+                    var settings = Self.settings(root)
+                    if case .array(var list)? = settings["bundles"], !bundles.isEmpty {
+                        for i in list.indices {
+                            guard case .object(var bundle) = list[i],
+                                  case .string(let bundleId)? = bundle["id"], bundles.contains(bundleId) else { continue }
+                            var ids: [JSONValue] = []
+                            if case .array(let had)? = bundle["productIds"] { ids = had }
+                            guard !ids.contains(.string(id)) else { continue }
+                            ids.append(.string(id))
+                            bundle["productIds"] = .array(ids)
+                            list[i] = .object(bundle)
+                        }
+                        settings["bundles"] = .array(list)
+                        root["settings"] = .object(settings)
+                    }
+                }
+                Task { await shop.deleteProduct(id) }   // redo
+                Task { await shop.load(shop.source) }
+            } catch {
+                shop.productProblem = String(describing: error)
+            }
+        }
+    }
+
     /// Put a deleted spool back, and make THAT undoable.
     ///
     /// `registerMoveUndo` restores fields onto records that are still there; a

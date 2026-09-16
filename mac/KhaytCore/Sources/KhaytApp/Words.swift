@@ -2004,6 +2004,7 @@ final class Words {
                                 "ar": "الصورة الأولى هي التي يستخدمها الكتالوج والمتجر والفاتورة."],
         "mac.picture_caption": ["en": "Caption", "ar": "تعليق"],
         "mac.delete_product": ["en": "Delete product", "ar": "حذف المنتج"],
+        "mac.delete_product_q": ["en": "Delete “{name}”?", "ar": "حذف «{name}»؟"],
         // The document a customer is handed
         "mac.save_pdf":      ["en": "Save PDF",     "ar": "حفظ PDF"],
         "mac.saved_to":      ["en": "Saved as",     "ar": "حُفظ باسم"],
@@ -2174,6 +2175,7 @@ final class Words {
         "calc.machine.wear", "calc.machine.power", "calc.machine.elec",
         "calc.machine.watts", "calc.machine.per_kwh",
         "calc.machine.preset_name_ph", "calc.machine.save_preset",
+        "pe.delete_q", "pe.deleted",
         "lan.iq_enable", "lan.iq_enable_hint", "lan.iq_printer", "lan.iq_pick", "lan.iq_filament",
         "lan.iq_flat", "lan.iq_spool_cost", "lan.iq_spool_weight", "lan.iq_margin",
         "lan.iq_min", "lan.iq_waste", "lan.iq_limit", "lan.iq_note",

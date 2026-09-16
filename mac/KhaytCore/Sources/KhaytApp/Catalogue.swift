@@ -110,6 +110,25 @@ struct Catalogue: View {
         }
         .background(Khayt.ground)
         .overlay { emptyState }
+        .confirmationDialog(
+            shop.words.callIt("mac.delete_product_q", ["name": .string(deleting?.name ?? "")]),
+            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.delete_product"), role: .destructive) {
+                guard let row = deleting else { return }
+                deleting = nil
+                Task {
+                    if selection == row.id { selection = nil }
+                    await shop.deleteProduct(row.id)
+                }
+            }
+        } message: {
+            // Khayt's own sentence, which names what SURVIVES as well as what
+            // goes: the photo is removed, past invoices are kept. That second
+            // half is the one a shop actually worries about.
+            Text(shop.words.callIt("pe.delete_q"))
+        }
         }
     }
 
@@ -118,7 +137,18 @@ struct Catalogue: View {
             .disabled(!shop.canMoveJobs)
         Button(shop.words.callIt("mac.job_from_product") + "\u{2026}") { take(row.id) }
             .disabled(!shop.canMoveJobs)
+        Divider()
+        // Asked for, and answered, on the row the shop pressed — never on a
+        // selection that might have moved under them.
+        Button(shop.words.callIt("mac.delete_product") + "\u{2026}", role: .destructive) {
+            deleting = row
+        }
+        .disabled(!shop.canMoveJobs)
     }
+
+    /// The product the shop has asked to delete, held until they say yes.
+    @State private var deleting: KhaytEngine.CatalogueRow?
+
 
     /// Take a job from one, rather than typing out what the shop already makes.
     ///
@@ -217,11 +247,35 @@ struct Catalogue: View {
                     .disabled(!shop.canMoveJobs)
                 Button(shop.words.callIt("mac.job_from_product") + "\u{2026}") { take(id) }
                     .disabled(!shop.canMoveJobs)
+                Divider()
+                Button(shop.words.callIt("mac.delete_product") + "\u{2026}", role: .destructive) {
+                    deleting = shop.catalogueRows.first { $0.id == id }
+                }
+                .disabled(!shop.canMoveJobs)
             }
         } primaryAction: { ids in
             if let id = ids.first { edit(id) }
         }
         .overlay { emptyState }
+        .confirmationDialog(
+            shop.words.callIt("mac.delete_product_q", ["name": .string(deleting?.name ?? "")]),
+            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.delete_product"), role: .destructive) {
+                guard let row = deleting else { return }
+                deleting = nil
+                Task {
+                    if selection == row.id { selection = nil }
+                    await shop.deleteProduct(row.id)
+                }
+            }
+        } message: {
+            // Khayt's own sentence, which names what SURVIVES as well as what
+            // goes: the photo is removed, past invoices are kept. That second
+            // half is the one a shop actually worries about.
+            Text(shop.words.callIt("pe.delete_q"))
+        }
     }
 
     /// Khayt's own words for where a price came from.

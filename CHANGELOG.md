@@ -689,6 +689,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) A listing can be taken off the catalogue.** There was no way to
+  delete a product here at all — the words for it had been sitting in the app
+  unused. Right-click a product in the grid or the table and it asks, in
+  Khayt's own sentence, which names what survives as well as what goes: the
+  photo is removed, past invoices are kept. Deleting also unlinks every job
+  that named the product and drops it from any quote bundle, because a job
+  pointing at a product that is not there is the kind of fault that surfaces
+  months later as a screen that cannot draw. All of it comes back with one
+  undo, except the pictures, whose bytes are gone — the record is restored
+  without them rather than naming files that no longer exist.
 - **(Mac) Settings → Online can switch public pricing on, and make the
   printer preset it needs.** The customer-facing price is built from a saved
   preset — a name and the seven figures a part is costed at — and the shared
