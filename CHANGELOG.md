@@ -690,6 +690,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) How long a job takes, on Reports → Best.** Six months of the
+  average from the day a job was taken to the day it was done, and under it
+  the products that take longest — average, fastest, slowest. The same rule as
+  the other app's two charts (`lib/cycle-time.js`), which now draw from it.
+
 - **(Mac) Cost and revenue trends, on the Reports screen.** Twelve months of
   what an hour of printing earned and what a gram of material cost, under the
   cash flow. The same rule as the other app's chart (`lib/cost-trends.js`),
@@ -1225,6 +1230,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **The cycle-time and lead-time charts left delivered jobs out, and the
+  lead-time table split one product by its spelling.** Both counted only
+  `completed`, so a job finished AND handed over vanished; a job marked
+  delivered without passing through completed had no finish day at all. And
+  the table keyed on the job's typed name, so "Bracket" and "bracket" were two
+  products and a job taken from the catalogue did not join its product. A
+  delivered job counts, its finish is its completion or else its delivery, and
+  a job with a product joins it.
 
 - **The cost and revenue trends chart left delivered jobs out and priced a
   gram by what was left of the spool.** Revenue per print-hour counted only

@@ -586,6 +586,22 @@ extension SampleShopTests {
         #expect(trends.perHour != nil && trends.costPerGram != nil)
     }
 
+    /// The cycle-time card draws a column where a month finished something and
+    /// a gap where it did not, and a table only when three jobs are measured.
+    @Test("the sample cycle time reaches a month with a figure, a month without, and a table")
+    func cycleTimeSpan() async throws {
+        let engine = try KhaytEngine()
+        let orders = Shop.rows(try Self.book(), "printLog")
+        let cycle = try await engine.cycleTime(orders: orders, now: Date(), months: 6)
+        #expect(cycle.jobs >= 3)
+        #expect(cycle.months.contains { $0.avgDays != nil }, "no month finished anything")
+        #expect(cycle.months.contains { $0.avgDays == nil }, "every month finished something — the gap is never drawn")
+        let lead = try await engine.leadTimeByProduct(orders: orders, top: 10)
+        #expect(lead.jobs >= 3 && lead.rows.count >= 2, "the table needs rows to rank")
+        #expect(lead.rows.contains { $0.productId != nil }, "no job joined its product")
+        #expect(lead.rows.contains { $0.jobs > 1 }, "no product was made twice, so fastest and slowest are one number")
+    }
+
     // MARK: - The customers
 
     /// The customer pane draws a price list, a standing order (running, paused,

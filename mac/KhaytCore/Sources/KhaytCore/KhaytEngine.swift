@@ -575,6 +575,8 @@ public actor KhaytEngine {
         "cash-flow",
         // Twelve months of revenue per print-hour and material cost per gram.
         "cost-trends",
+        // How long a job takes, by month and by product.
+        "cycle-time",
         // Which customers are worth keeping.
         "client-value",
         // Whether the shop can take another job, and when it would start.
@@ -4192,6 +4194,63 @@ public actor KhaytEngine {
                           [.array(orders), .array(spools), .object(settings), .array(clients),
                            .number(now.timeIntervalSince1970 * 1000), .number(Double(months))],
                           as: CostTrends.self)
+    }
+
+    // MARK: - How long a job takes
+
+    /// Days from the day a job was taken to the day it was finished —
+    /// `lib/cycle-time.js`. By month, and by product. Nulls where a month
+    /// finished nothing.
+    public struct CycleTime: Decodable, Sendable {
+        public let months: [Month]
+        public let avgDays: Double?
+        public let jobs: Int
+
+        public struct Month: Decodable, Sendable, Identifiable, Hashable {
+            public let key: String
+            public let avgDays: Double?
+            public let jobs: Int
+            public var id: String { key }
+        }
+    }
+
+    public struct LeadTime: Decodable, Sendable {
+        public let rows: [Row]
+        public let jobs: Int
+
+        public struct Row: Decodable, Sendable, Identifiable, Hashable {
+            public let key: String
+            public let productId: String?
+            public let name: String
+            public let avgDays: Double
+            public let fastest: Double
+            public let slowest: Double
+            public let jobs: Int
+            public var id: String { key }
+        }
+    }
+
+    public func cycleTime(orders: [JSONValue], now: Date, months: Int = 6) throws -> CycleTime {
+        try runtime.call2(#"""
+        globalThis.KhaytCycleTime.cycleTime(ARG0, {
+          now: ARG1, months: ARG2,
+          countsForBusiness: function (o) {
+            return globalThis.KhaytBusinessScope ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
+          },
+        })
+        """#, [.array(orders), .number(now.timeIntervalSince1970 * 1000), .number(Double(months))],
+                          as: CycleTime.self)
+    }
+
+    public func leadTimeByProduct(orders: [JSONValue], top: Int = 10) throws -> LeadTime {
+        try runtime.call2(#"""
+        globalThis.KhaytCycleTime.leadTimeByProduct(ARG0, {
+          top: ARG1,
+          countsForBusiness: function (o) {
+            return globalThis.KhaytBusinessScope ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
+          },
+        })
+        """#, [.array(orders), .number(Double(top))], as: LeadTime.self)
     }
 
     // MARK: - Break-even
