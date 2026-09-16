@@ -2904,12 +2904,14 @@ final class Shop {
     /// Two fields, not thirty: the ones a shop floor actually adjusts. Every
     /// other field the order editor writes is left exactly as it was, which the
     /// shared rule guarantees rather than this app promising it.
-    func editJob(_ id: Order.ID, dueDate: Date?, priorityLevel: String) async {
+    func editJob(_ id: Order.ID, dueDate: Date?, priorityLevel: String,
+                 price: Double? = nil) async {
         await writeToOneOrder(id, named: words.callIt("mac.edit_job")) { order, engine, _ in
             let out = try await engine.editJob(
                 order: order,
                 dueDate: dueDate.map(Self.localDay),
                 priorityLevel: priorityLevel,
+                price: price,
                 now: Date(), editId: Self.uid("edit"))
             // Nothing moved: return the order untouched so the write path finds
             // no change, stamps nothing and syncs nothing.

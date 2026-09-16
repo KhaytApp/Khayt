@@ -1,12 +1,14 @@
 import SwiftUI
 import KhaytCore
 
-/// A job's due date and how urgent it is.
+/// A job's due date, how urgent it is, and — when the number changed on the
+/// phone — what it costs.
 ///
-/// Two fields, not thirty. These are the two a shop floor actually adjusts —
-/// "it slipped a week", "this one first" — and the two whose changes Khayt
-/// writes into the job's edit history, because they are what a customer can be
-/// told a different answer about later.
+/// Three fields, not thirty. These are the ones a shop floor actually adjusts
+/// — "it slipped a week", "this one first", "we agreed 1,800 in the end" — and
+/// the ones whose changes Khayt writes into the job's edit history, because
+/// they are what a customer can be told a different answer about later. The
+/// price box is empty until typed in: empty means the price stands.
 ///
 /// Everything else the order editor writes is left exactly as it was. That is
 /// the shared rule's guarantee, not this sheet's promise: `applyEdit` touches
@@ -32,6 +34,8 @@ struct EditJobSheet: View {
     @State private var hasDueDate = false
     @State private var dueDate = Date()
     @State private var priority = "normal"
+    /// A new total, as typed. Empty is "leave it".
+    @State private var priceText = ""
     @State private var started = false
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
@@ -67,6 +71,18 @@ struct EditJobSheet: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
+                }
+                GridRow {
+                    Text(shop.words.callIt("common.total")).foregroundStyle(.secondary)
+                        .fixedSize()
+                    HStack(spacing: 8) {
+                        if let job {
+                            Text(Money.text(job.price, shop.currency)).monospacedDigit()
+                        }
+                        Text(shop.words.callIt("pe.price_override")).foregroundStyle(.secondary)
+                        TextField(shop.words.callIt("pe.price_override_ph"), text: $priceText)
+                            .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
+                    }
                 }
             }
 
@@ -105,7 +121,9 @@ struct EditJobSheet: View {
         let id = subject.id
         let when = hasDueDate ? dueDate : nil
         let level = priority
+        let typed = priceText.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
+        let price = typed.isEmpty ? nil : Double(typed).map { max(0, $0) }
         shop.clearQuestion()
-        Task { await shop.editJob(id, dueDate: when, priorityLevel: level) }
+        Task { await shop.editJob(id, dueDate: when, priorityLevel: level, price: price) }
     }
 }

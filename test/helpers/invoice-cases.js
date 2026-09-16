@@ -53,6 +53,17 @@ const CASES = [
     money: { shipping: 60, subtotalShown: '1150.00' },
   },
   {
+    // One part at the price the customer agreed, the other at cost plus
+    // margin. 2 × 50 for the brackets, whatever the arithmetic said; the lid
+    // takes the rest of the pool.
+    name: 'agreed-part',
+    order: Object.assign({}, ORDER, {
+      price: 132.5, agreedAmount: 100,
+      parts: [Object.assign({}, PARTS[0], { agreedPrice: 50 }), PARTS[1]],
+    }),
+    opts: { settings: SHOP },
+  },
+  {
     name: 'paid-with-bank',
     order: Object.assign({}, ORDER, { paidAmount: 1150, paymentStatus: 'paid' }),
     opts: {

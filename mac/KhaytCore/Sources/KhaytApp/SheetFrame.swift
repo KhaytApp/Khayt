@@ -50,6 +50,31 @@ enum SheetMetrics {
     }
 
     static var ceiling: CGFloat { max(320, screenHeight() - chrome) }
+
+}
+
+/// Lay a `SheetFrame`'s content flat instead of in its ScrollView, for a
+/// photograph.
+///
+/// `ImageRenderer` draws NOTHING inside a `ScrollView`: the picture comes back
+/// fully transparent and reads as a white page. Three sheets in this frame
+/// photographed as blank pages for weeks with nothing failing, because the
+/// check that would have said so runs only with a snapshot directory set.
+///
+/// AN ENVIRONMENT VALUE, NOT A STATIC. The first cut was a process-wide flag
+/// like `SheetMetrics.screenHeight`, and Swift Testing runs suites in
+/// parallel: the snapshot run set it while the sheets-fit measurement was
+/// measuring, and a frame that must cap its height did not. Scoped to the
+/// view being rendered, it can reach nothing else. The app never sets it.
+private struct PhotographFlatKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var photographFlat: Bool {
+        get { self[PhotographFlatKey.self] }
+        set { self[PhotographFlatKey.self] = newValue }
+    }
 }
 
 struct SheetFrame<Content: View, Footer: View>: View {
@@ -58,22 +83,28 @@ struct SheetFrame<Content: View, Footer: View>: View {
     @ViewBuilder let footer: Footer
 
     private var ceiling: CGFloat { SheetMetrics.ceiling }
+    @Environment(\.photographFlat) private var flat
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ScrollView(.vertical) {
+            if flat {
                 VStack(alignment: .leading, spacing: 14) { content }
-                    // The scroll view is as wide as the sheet; without this the
-                    // content collapses to its ideal width inside it.
                     .frame(width: width, alignment: .leading)
+            } else {
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 14) { content }
+                        // The scroll view is as wide as the sheet; without this the
+                        // content collapses to its ideal width inside it.
+                        .frame(width: width, alignment: .leading)
+                }
+                .scrollBounceBehavior(.basedOnSize)
             }
-            .scrollBounceBehavior(.basedOnSize)
 
             footer
                 .frame(width: width, alignment: .leading)
         }
         .padding(18)
-        .frame(maxHeight: ceiling)
+        .frame(maxHeight: flat ? nil : ceiling)
         .fixedSize(horizontal: true, vertical: false)
     }
 }

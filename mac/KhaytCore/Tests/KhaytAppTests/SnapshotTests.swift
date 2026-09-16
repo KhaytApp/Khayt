@@ -49,6 +49,10 @@ import KhaytCore
             view.frame(width: size.width, height: size.height)
                 .environment(\.colorScheme, .light)
                 .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+                // A photograph cannot see inside a ScrollView, and six sheets
+                // sit in one (`SheetFrame`). Laid flat for the picture only —
+                // see `photographFlat`.
+                .environment(\.photographFlat, true)
         )
         renderer.scale = 2
         guard let image = renderer.nsImage,
@@ -206,7 +210,7 @@ import KhaytCore
         try render(PaymentSheet(shop: shop, subject: subject),
                    "20-payment-words", size: CGSize(width: PaymentSheet.width, height: 281))
         try render(EditJobSheet(shop: shop, subject: subject),
-                   "21-edit-job-words", size: CGSize(width: EditJobSheet.width, height: 276))
+                   "21-edit-job-words", size: CGSize(width: EditJobSheet.width, height: 330))
         try render(QcFailSheet(shop: shop, subject: subject),
                    "22-qc-fail-words", size: CGSize(width: QcFailSheet.width, height: 228))
         // The paper rather than the whole sheet: `ImageRenderer` draws nothing
@@ -216,7 +220,7 @@ import KhaytCore
         try render(NewJobSheet(shop: shop).paper,
                    "23-new-job-words", size: CGSize(width: NewJobSheet.width, height: 420))
         try render(CustomerSheet(shop: shop, existing: Shop.newCustomer()),
-                   "24-new-customer-words", size: CGSize(width: CustomerSheet.width, height: 350))
+                   "24-new-customer-words", size: CGSize(width: CustomerSheet.width, height: 640))
         try render(ExpenseSheet(shop: shop),
                    "26-expense-words", size: CGSize(width: ExpenseSheet.width, height: 380))
         try render(WasteSheet(shop: shop),
