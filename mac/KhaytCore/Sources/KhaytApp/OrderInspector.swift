@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import KhaytCore
 
 /// The selected job, in detail.
@@ -168,6 +169,28 @@ private struct Detail: View {
             Button(shop.words.callIt("doc.invoice")) { shop.showInvoice(job.id) }
                 .buttonStyle(.link)
                 .font(.callout)
+            // The customer's way to say yes. Only on a quote, only on a real
+            // book (the link is minted into the job), and only while the
+            // server is up — the link points at this Mac.
+            if job.status == "quote", shop.canMoveJobs {
+                Button(shop.words.callIt("mac.copy_quote_link")) {
+                    Task {
+                        if let link = await shop.quoteLink(for: job.id) {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(link, forType: .string)
+                            shop.quoteLinkNote = shop.words.callIt("mac.quote_link_copied")
+                        } else {
+                            shop.quoteLinkNote = shop.words.callIt("mac.quote_link_no_server")
+                        }
+                    }
+                }
+                .buttonStyle(.link)
+                .font(.callout)
+                if let note = shop.quoteLinkNote {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             if let due = Order.day(job.dueDate) {
                 DetailLine(shop.words.callIt("doc.due"), due.formatted(date: .abbreviated, time: .omitted),
                      warn: job.isOverdue())

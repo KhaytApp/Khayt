@@ -2027,6 +2027,12 @@ final class Words {
                               "ar": "تعذّر تشغيل الخادم: {error}"],
         "mac.lan_restart_note": ["en": "Saved settings take effect at once: the server restarts on Save.",
                                  "ar": "تسري الإعدادات فور حفظها: يُعاد تشغيل الخادم عند الحفظ."],
+        // The customer's quote link, from the job
+        "mac.copy_quote_link": ["en": "Copy quote link", "ar": "نسخ رابط عرض السعر"],
+        "mac.quote_link_copied": ["en": "Quote link copied. Send it to the customer on the same Wi‑Fi; they approve from it.",
+                                  "ar": "نُسخ رابط عرض السعر. أرسله للعميل على نفس شبكة Wi‑Fi ليعتمده منه."],
+        "mac.quote_link_no_server": ["en": "Switch the server on in Settings → Online first; the link points at this Mac.",
+                                     "ar": "شغّل الخادم من الإعدادات ← الشبكة أولاً؛ فالرابط يشير إلى هذا الماك."],
     ]
 
     /// The Khayt keys this app leans on. Listed so a test can prove every one of

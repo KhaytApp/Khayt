@@ -28,6 +28,8 @@ struct LanServerTests {
 
         /// What `/api/intake` wrote into the book.
         let recorded = Recorded()
+        /// The book the server reads — mutable, so an approval shows on the next read.
+        let book = Book()
         var tokens = 0
 
         init(pin: String = "2468", intakeToken: String = "", recordFails: Bool = false) async throws {
@@ -41,8 +43,10 @@ struct LanServerTests {
             let box = ClockBox(clock)
             self.box = box
             let recorded = self.recorded
+            let book = self.book
+            book.value = shop.lanBook
             var host = LanServer.Host(
-                store: { shop.lanBook }, pin: pin, engine: engine,
+                store: { book.value }, pin: pin, engine: engine,
                 now: { box.now }, nowText: { "09:16" },
                 icon: { LanServer.bundledIcon($0) })
             host.intakeToken = intakeToken
@@ -50,6 +54,13 @@ struct LanServerTests {
             host.record = { entry in
                 if recordFails { throw CocoaError(.fileWriteUnknown) }
                 recorded.entries.append(entry)
+            }
+            host.approve = { id, nowIso in
+                if recordFails { throw CocoaError(.fileWriteUnknown) }
+                let result = try await engine.lanQuoteApply(store: .object(book.value), orderId: id, nowIso: nowIso)
+                guard result.found, result.error == nil, let log = result.printLog else { return nil }
+                book.value["printLog"] = log
+                return result.order
             }
             let server = LanServer(host: host)
             self.server = server
@@ -102,6 +113,22 @@ struct LanServerTests {
     }
     final class Recorded: @unchecked Sendable {
         var entries: [JSONValue] = []
+    }
+    final class Book: @unchecked Sendable {
+        var value: [String: JSONValue] = [:]
+        /// Put one job into the book, replacing any with the same id.
+        func put(_ job: [String: JSONValue]) {
+            var log: [JSONValue] = []
+            if case .array(let had)? = value["printLog"] { log = had }
+            log.removeAll { if case .object(let o) = $0 { return o["id"] == job["id"] } else { return false } }
+            log.append(.object(job))
+            value["printLog"] = .array(log)
+        }
+        func job(_ id: String) -> [String: JSONValue]? {
+            guard case .array(let log)? = value["printLog"] else { return nil }
+            for row in log { if case .object(let o) = row, o["id"] == .string(id) { return o } }
+            return nil
+        }
     }
 
     /// URLSession follows a 302 by itself; the test wants to see the 302.
@@ -420,6 +447,113 @@ struct LanServerTests {
         #expect(id.range(of: #"^intake-\d{13}-[0-9a-f]{4}$"#, options: .regularExpression) != nil, Comment(rawValue: id))
         #expect(LanServer.randomToken().count == 64)
         #expect(LanServer.cookies("a=1; khayt_intake=abc; c=x=y") == ["a": "1", "khayt_intake": "abc", "c": "x=y"])
+    }
+
+    // MARK: - The customer's quote
+
+    static let quoteJob: [String: JSONValue] = [
+        "id": .string("Q-77"), "project": .string("Bracket <v2>"), "client": .string("Sara"),
+        "status": .string("quote"), "price": .number(140), "date": .string("2027-01-10"),
+        "quoteExpiresAt": .string("2027-01-31"), "quoteApprovalToken": .string("abcdef0123456789abcdef0123456789"),
+        "parts": .array([.object(["name": .string("Bracket"), "qty": .number(2)])]),
+    ]
+
+    @Test("the quote page is the module's, behind the job's own token")
+    func quotePage() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.quoteJob)
+        let missing = try await bench.get("/order/NOPE/quote?token=x")
+        #expect(missing.status == 404)
+        #expect(missing.text == (try await bench.engine.lanQuoteNotice("quote_not_found")))
+        let noToken = try await bench.get("/order/Q-77/quote")
+        #expect(noToken.status == 403)
+        #expect(noToken.text == (try await bench.engine.lanQuoteNotice("invalid_link")))
+        let wrong = try await bench.get("/order/Q-77/quote?token=abcdef0123456789abcdef0123456789ff")
+        #expect(wrong.status == 403)
+        let page = try await bench.get("/order/Q-77/quote?token=abcdef0123456789abcdef0123456789")
+        #expect(page.status == 200)
+        #expect(page.headers["content-type"] == "text/html; charset=utf-8")
+        #expect(page.headers["cache-control"] == "no-cache")
+        #expect(page.headers["x-frame-options"] == "DENY")
+        let shopName = try await bench.engine.lanQuoteShopName(store: .object(bench.book.value))
+        let expected = try await bench.engine.lanQuotePage(
+            order: .object(Self.quoteJob), shopName: shopName, approvePath: "/order/Q-77/approve",
+            approvalToken: "abcdef0123456789abcdef0123456789", alreadyApproved: false, expired: false,
+            currencyLabel: Shop.plainString(bench.shop.settingsDict["currency"]) ?? "")
+        #expect(page.text == expected)
+        #expect(page.text.contains("Approve Quote"))
+        #expect(page.text.contains("Bracket &lt;v2&gt;"), "the project name was not escaped")
+        #expect(!shopName.isEmpty && shopName != "Khayt", Comment(rawValue: "the sample shop's name did not come through: \(shopName)"))
+    }
+
+    @Test("approving from the page moves the job to pending, once")
+    func approve() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.quoteJob)
+        let body = #"{"action":"approve","approvalToken":"abcdef0123456789abcdef0123456789"}"#
+        let reply = try await bench.post("/order/Q-77/approve", json: body)
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text == (try await bench.engine.lanQuoteNotice("approved", project: "Bracket <v2>")))
+        #expect(reply.text.contains("Bracket &lt;v2&gt;"))
+        let job = try #require(bench.book.job("Q-77"))
+        #expect(job["status"] == .string("pending"))
+        #expect(job["clientApprovedAt"] == .string(LanServer.isoNow(Bench.start)))
+        #expect(job["quoteAcceptedAt"] == .string("2027-01-15"))
+        // The page now says approved rather than offering the button.
+        let page = try await bench.get("/order/Q-77/quote?token=abcdef0123456789abcdef0123456789")
+        #expect(page.text.contains("Quote approved"))
+        #expect(!page.text.contains("approveBtn"))
+        // A second approval is refused: the job is no longer awaiting one.
+        let again = try await bench.post("/order/Q-77/approve", json: body)
+        #expect(again.status == 409)
+        #expect(again.text == (try await bench.engine.lanQuoteNotice("cannot_approve")))
+    }
+
+    @Test("the approve route's refusals are the Node route's: bad link, expired, wrong action, missing")
+    func approveRefusals() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.quoteJob)
+        let bad = try await bench.post("/order/Q-77/approve", json: #"{"approvalToken":"nope"}"#)
+        #expect(bad.status == 403)
+        #expect(bad.text == (try await bench.engine.lanQuoteNotice("invalid_link_approve")))
+        let action = try await bench.post("/order/Q-77/approve", json: #"{"action":"decline","approvalToken":"abcdef0123456789abcdef0123456789"}"#)
+        #expect(action.status == 400)
+        let missing = try await bench.post("/order/NOPE/approve", json: "")
+        #expect(missing.status == 404)
+        // The token may travel in the query, as the page's link does.
+        var expired = Self.quoteJob
+        expired["id"] = .string("Q-78"); expired["quoteExpiresAt"] = .string("2027-01-01")
+        bench.book.put(expired)
+        let gone = try await bench.post("/order/Q-78/approve?token=abcdef0123456789abcdef0123456789", json: "")
+        #expect(gone.status == 410)
+        #expect(gone.text == (try await bench.engine.lanQuoteNotice("expired")))
+        // And the page for it says so, without a button.
+        let page = try await bench.get("/order/Q-78/quote?token=abcdef0123456789abcdef0123456789")
+        #expect(page.text.contains("This quote has expired"))
+        #expect(bench.book.job("Q-78")?["status"] == .string("quote"))
+    }
+
+    @Test("a book that cannot take the approval is a 500, and the job is untouched")
+    func approveWriteFailure() async throws {
+        let bench = try await Bench(recordFails: true)
+        defer { bench.stop() }
+        bench.book.put(Self.quoteJob)
+        let reply = try await bench.post("/order/Q-77/approve", json: #"{"approvalToken":"abcdef0123456789abcdef0123456789"}"#)
+        #expect(reply.status == 500)
+        #expect(bench.book.job("Q-77")?["status"] == .string("quote"))
+    }
+
+    @Test("the order path keeps only the characters the Node route keeps")
+    func orderPaths() {
+        #expect(LanServer.quotePath("/order/Q-77/quote") == "Q-77")
+        #expect(LanServer.quotePath("/order/a b%2F..;/quote") == "ab2F")
+        #expect(LanServer.quotePath("/order//quote") == nil)
+        #expect(LanServer.quotePath("/order/x/y/quote") == nil)
+        #expect(LanServer.approvePath("/order/Q-77/approve") == "Q-77")
+        #expect(LanServer.approvePath("/order/Q-77/quote") == nil)
     }
 
     // MARK: - The shop's side
