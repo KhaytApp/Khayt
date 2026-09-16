@@ -106,6 +106,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   one argument and a path chosen to look like a flag cannot become one. The
   test compares it against the original character for character.
 
+- **The snapshot runner can be pinned to the sample book.** It opens whichever
+  book is on the machine and swaps back to it partway through — right for
+  reviewing a build, wrong for anything published. Taking the website's
+  screenshots from it photographed this machine's real shop: its name, its
+  customers, its job figures, in 26 of the frames. `KHAYT_BOOK=sample` now
+  pins the whole run to the invented book, so every frame says
+  `sample-shop.json` in the corner. Unset, nothing changes.
+
 - **A customer's agreed price is the price of that part — not a cost the
   margin sits on.** Choosing a customer with a price agreement used to write
   the agreed figure INTO the part's cost, so the job's margin went on top (a
