@@ -2856,6 +2856,8 @@ final class Shop {
     /// port or the PIN restarts it and one that did not leaves it be.
     var lanRunning: LanConfig?
     var lanProblem: String?
+    /// What the last "Copy quote link" did, shown beside the button.
+    var quoteLinkNote: String?
 
     var settingsDict: [String: JSONValue] {
         if case .object(let s) = settingsValue { return s }

@@ -587,6 +587,7 @@ public actor KhaytEngine {
         "lan-pages",
         "privacy",
         "lan-intake",
+        "lan-quote-page",
         // Which customers are worth keeping.
         "client-value",
         // Whether the shop can take another job, and when it would start.
@@ -4430,6 +4431,62 @@ public actor KhaytEngine {
                SESSION_MS: globalThis.KhaytLanIntake.SESSION_MS,
                COOKIE: globalThis.KhaytLanIntake.COOKIE })
             """, [], as: LanIntakeLimits.self)
+    }
+
+    // The customer's quote page: `lib/lan-quote-page.js`.
+
+    /// The shop's name as the quote route reads it: `settings.shopName`, else
+    /// the business name in the book's own language, else "Khayt".
+    public func lanQuoteShopName(store: JSONValue) throws -> String {
+        try runtime.call2("""
+            (function (s) {
+              var st = (s && s.settings) || {};
+              return st.shopName
+                || globalThis.KhaytContentLanguages.read(st, 'biz', st.lang || 'en', st)
+                || 'Khayt';
+            })(ARG0)
+            """, [store], as: String.self)
+    }
+    /// `YYYY-MM-DD` in the shop's own calendar, as the rule compares it.
+    public func lanQuoteExpired(order: JSONValue, today: String) throws -> Bool {
+        try runtime.call2("globalThis.KhaytLanQuotePage.isQuoteExpired(ARG0, ARG1)",
+                          [order, .string(today)], as: Bool.self)
+    }
+    public func lanQuotePage(order: JSONValue, shopName: String, approvePath: String, approvalToken: String,
+                             alreadyApproved: Bool, expired: Bool, currencyLabel: String) throws -> String {
+        try runtime.call2("""
+            globalThis.KhaytLanQuotePage.renderLanQuoteApprovalPage({
+              order: ARG0, shopName: ARG1, approvePath: ARG2, approvalToken: ARG3,
+              alreadyApproved: ARG4, expired: ARG5, currencyLabel: ARG6 })
+            """, [order, .string(shopName), .string(approvePath), .string(approvalToken),
+                  .bool(alreadyApproved), .bool(expired), .string(currencyLabel)], as: String.self)
+    }
+    /// One of the small pages around the quote: `quote_not_found`,
+    /// `invalid_link`, `order_not_found`, `invalid_link_approve`, `expired`,
+    /// `cannot_approve`, `approved` — the Node route's inline HTML, verbatim.
+    public func lanQuoteNotice(_ kind: String, project: String = "", shopName: String = "") throws -> String {
+        try runtime.call2("globalThis.KhaytLanQuotePage.notice(ARG0, { project: globalThis.KhaytLanQuotePage.lanEscapeHtml(ARG1), shopName: ARG2 })",
+                          [.string(kind), .string(project), .string(shopName)], as: String.self)
+    }
+
+    /// The approval applied to a book. `printLog` is the list to write back
+    /// when `error` is nil and `found`; `order` the approved record.
+    public struct LanQuoteApproval: Decodable, Sendable {
+        public let found: Bool
+        public let error: String?
+        public let order: JSONValue?
+        public let printLog: JSONValue?
+    }
+    public func lanQuoteApply(store: JSONValue, orderId: String, nowIso: String) throws -> LanQuoteApproval {
+        try runtime.call2("""
+            (function (s, id, now) {
+              var data = Object.assign({}, s, { printLog: (s.printLog || []).slice() });
+              var r = globalThis.KhaytLanQuotePage.applyQuoteApprovalToStore(data, id, now);
+              if (!r) return { found: false, error: null, order: null, printLog: null };
+              return { found: true, error: r.error || null, order: r.order || null,
+                       printLog: r.error ? null : data.printLog };
+            })(ARG0, ARG1, ARG2)
+            """, [store, .string(orderId), .string(nowIso)], as: LanQuoteApproval.self)
     }
 
     // MARK: - Break-even

@@ -66,6 +66,11 @@ final class LanServer {
         var mintId: () -> String = { LanServer.uniqueId("intake") }
         /// Random bytes for a session token, hex. Injectable for a test.
         var token: () -> String = { LanServer.randomToken() }
+        /// Apply a customer's approval to the book, inside the write. Returns
+        /// the approved record, or nil when the rule refused on the book as it
+        /// is NOW (it moved underneath the phone). Throws when the book cannot
+        /// be written.
+        var approve: (String, String) async throws -> JSONValue? = { _, _ in throw CocoaError(.fileWriteUnknown) }
     }
 
     struct Request {
@@ -308,6 +313,12 @@ final class LanServer {
         case ("/intake", true):
             return await intakePage(request, store: store)
 
+        case (_, true) where Self.quotePath(path) != nil:
+            return await quotePage(request, id: Self.quotePath(path)!, store: store)
+
+        case (_, false) where request.method == "POST" && Self.approvePath(path) != nil:
+            return await quoteApprove(request, id: Self.approvePath(path)!, store: store)
+
         case ("/api/intake", false) where request.method == "POST":
             return await intakeSubmit(request, store: store)
 
@@ -457,8 +468,101 @@ final class LanServer {
         return "\(prefix)-\(ms)-\(hex)"
     }
 
-    nonisolated static func randomToken() -> String {
-        (0..<32).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined()
+    nonisolated static func randomToken(bytes: Int = 32) -> String {
+        (0..<bytes).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined()
+    }
+
+    // MARK: - The customer's quote
+
+    /// `/order/<id>/quote` → the id, with only the characters the Node route keeps.
+    nonisolated static func quotePath(_ path: String) -> String? { orderPath(path, suffix: "/quote") }
+    nonisolated static func approvePath(_ path: String) -> String? { orderPath(path, suffix: "/approve") }
+    nonisolated static func orderPath(_ path: String, suffix: String) -> String? {
+        guard path.hasPrefix("/order/"), path.hasSuffix(suffix) else { return nil }
+        let raw = String(path.dropFirst("/order/".count).dropLast(suffix.count))
+        guard !raw.isEmpty, !raw.contains("/") else { return nil }
+        return raw.filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-") }
+    }
+
+    private func order(_ id: String) -> JSONValue? {
+        guard case .array(let log)? = host.store()["printLog"] else { return nil }
+        return log.first { if case .object(let o) = $0, o["id"] == .string(id) { return true } else { return false } }
+    }
+
+    /// `GET /order/:id/quote`: the page a customer approves from, behind the
+    /// job's own token — the same four answers as the Node route.
+    private func quotePage(_ request: Request, id: String, store: JSONValue) async -> Response {
+        let engine = host.engine
+        let html: (Int, String) -> Response = { status, body in
+            .html(status, body, extra: ["Cache-Control": "no-cache"])
+        }
+        guard case .object(let order)? = order(id) else {
+            return html(404, (try? await engine.lanQuoteNotice("quote_not_found")) ?? "")
+        }
+        let token = (request.query["token"] ?? "").trimmingCharacters(in: .whitespaces)
+        guard case .string(let expected)? = order["quoteApprovalToken"], !expected.isEmpty, !token.isEmpty,
+              Self.constantTimeEqual(token, expected) else {
+            return html(403, (try? await engine.lanQuoteNotice("invalid_link")) ?? "")
+        }
+        let status = Shop.plainString(order["status"]) ?? ""
+        let hasQuote = Shop.plainBool(order["hasQuote"]) ?? false
+        let alreadyApproved = status != "quote" && !(status == "on_hold" && hasQuote)
+        let today = Self.localDay(host.now())
+        var expired = false
+        if !alreadyApproved {
+            expired = (try? await engine.lanQuoteExpired(order: .object(order), today: today)) ?? false
+        }
+        let shopName = (try? await engine.lanQuoteShopName(store: store)) ?? "Khayt"
+        var currency = ""
+        if case .object(let settings)? = host.store()["settings"], case .string(let c)? = settings["currency"] { currency = c }
+        let page = (try? await engine.lanQuotePage(order: .object(order), shopName: shopName,
+                                                    approvePath: "/order/\(id)/approve", approvalToken: expected,
+                                                    alreadyApproved: alreadyApproved, expired: expired,
+                                                    currencyLabel: currency)) ?? ""
+        return html(200, page)
+    }
+
+    /// `POST /order/:id/approve`: the customer's yes. Decided on the book as
+    /// it is, then applied inside the write on the newest book.
+    private func quoteApprove(_ request: Request, id: String, store: JSONValue) async -> Response {
+        let engine = host.engine
+        var parsed: [String: JSONValue] = [:]
+        let trimmed = String(decoding: request.body, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            guard let body = try? JSONDecoder().decode(JSONValue.self, from: request.body), case .object(let o) = body else {
+                return .json(400, #"{"error":"Invalid JSON"}"#)
+            }
+            parsed = o
+        }
+        if case .string(let action)? = parsed["action"], action != "approve" {
+            return .json(400, #"{"error":"Invalid action"}"#)
+        }
+        guard case .object(let order)? = order(id) else {
+            return .html(404, (try? await engine.lanQuoteNotice("order_not_found")) ?? "")
+        }
+        var token = (request.query["token"] ?? "")
+        if token.isEmpty, case .string(let t)? = parsed["approvalToken"] { token = t }
+        token = token.trimmingCharacters(in: .whitespaces)
+        guard case .string(let expected)? = order["quoteApprovalToken"], !expected.isEmpty, !token.isEmpty,
+              Self.constantTimeEqual(token, expected) else {
+            return .html(403, (try? await engine.lanQuoteNotice("invalid_link_approve")) ?? "")
+        }
+        let nowIso = Self.isoNow(host.now())
+        guard let probe = try? await engine.lanQuoteApply(store: store, orderId: id, nowIso: nowIso), probe.found else {
+            return .html(404, (try? await engine.lanQuoteNotice("order_not_found")) ?? "")
+        }
+        if probe.error == "expired" { return .html(410, (try? await engine.lanQuoteNotice("expired")) ?? "") }
+        if probe.error != nil { return .html(409, (try? await engine.lanQuoteNotice("cannot_approve")) ?? "") }
+        // Inside the write, on the newest book. A refusal there means the job
+        // moved underneath the phone; the page the customer sees is still the
+        // one the probe decided, as on the Node server.
+        do { _ = try await host.approve(id, nowIso) } catch {
+            return .json(500, #"{"error":"The shop could not record your approval right now. Please try again shortly."}"#)
+        }
+        var project = id
+        if case .object(let approved)? = probe.order, let p = Shop.plainString(approved["project"]), !p.isEmpty { project = p }
+        let page = (try? await engine.lanQuoteNotice("approved", project: project)) ?? ""
+        return .html(200, page)
     }
 
     // MARK: - The PIN
@@ -648,6 +752,10 @@ extension Shop {
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             try await self.recordIntake(entry)
         }
+        host.approve = { [weak self] id, nowIso in
+            guard let self else { throw CocoaError(.fileWriteUnknown) }
+            return try await self.approveQuote(id, nowIso: nowIso)
+        }
         let server = LanServer(host: host)
         do {
             _ = try await server.start(port: config.port, bind: config.bindLan ? .lan : .loopback)
@@ -674,6 +782,51 @@ extension Shop {
             root["waitingList"] = .array(list)
         }
         await load(source)
+    }
+
+    /// The link a customer approves a quote from: this Mac's address, the job,
+    /// and the job's own approval token — minted now if the job has none, the
+    /// way the Electron renderer's `ensureQuoteApprovalToken` mints it — and
+    /// written into the book so the server recognises it. Nil while the
+    /// server is off: a link nobody can open is worse than none.
+    func quoteLink(for jobId: String) async -> String? {
+        guard let base = lanURL, let build = source.build else { return nil }
+        var token = ""
+        do {
+            try StoreWriter.updateRecord(build, collection: "printLog", id: jobId) { record in
+                if case .string(let had)? = record["quoteApprovalToken"], !had.isEmpty {
+                    token = had
+                } else {
+                    token = LanServer.randomToken(bytes: 16)
+                    record["quoteApprovalToken"] = .string(token)
+                }
+            }
+        } catch { return nil }
+        await load(source)
+        let id = jobId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? jobId
+        let tok = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token
+        return "\(base)order/\(id)/quote?token=\(tok)"
+    }
+
+    /// Approve a quote from the customer's page: the shared rule applied
+    /// inside the write, on the newest book, so a job that moved underneath
+    /// the phone is left alone. Returns the approved record, or nil when the
+    /// rule refused on the book as it is now.
+    func approveQuote(_ jobId: String, nowIso: String) async throws -> JSONValue? {
+        guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
+        var approved: JSONValue?
+        try await StoreWriter.update(
+            storeURL: build.storeURL,
+            owns: { StoreLock.weOwnIt(build) },
+            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+        ) { root in
+            let result = try await engine.lanQuoteApply(store: .object(root), orderId: jobId, nowIso: nowIso)
+            guard result.found, result.error == nil, let printLog = result.printLog else { return }
+            root["printLog"] = printLog
+            approved = result.order
+        }
+        await load(source)
+        return approved
     }
 
     func stopLanServer() {
