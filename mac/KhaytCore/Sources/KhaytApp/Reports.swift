@@ -44,6 +44,8 @@ struct Reports: View {
     /// How long a job takes, by month and by product. See `CycleTimeCard`.
     @State private var cycle: KhaytEngine.CycleTime?
     @State private var lead: KhaytEngine.LeadTime?
+    /// Whether the shop keeps its promises. See `OnTimeCard`.
+    @State private var promises: KhaytEngine.OnTime?
     /// How much passes inspection, and how much first time.
     @State private var quality: KhaytEngine.QcMetrics?
     /// How far each machine runs from its quote, and the shop's own figure.
@@ -74,7 +76,8 @@ struct Reports: View {
                 Owing(shop: shop, owed: owed)
             } else if shop.reportPage == .best {
                 Best(shop: shop, best: best, worth: worth, earns: earns, mix: mix,
-                     when: when, quality: quality, cycle: cycle, lead: lead)
+                     when: when, quality: quality, cycle: cycle, lead: lead,
+                     promises: promises)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice, funnel: funnel)
             } else if shop.reportPage == .machines {
@@ -395,6 +398,9 @@ struct Reports: View {
         // year is the evidence that it always runs late.
         cycle = try? await engine.cycleTime(orders: shop.orderRows, now: Date(), months: 6)
         lead = try? await engine.leadTimeByProduct(orders: shop.orderRows, top: 10)
+        // Every promise the shop has made, not the chosen period: a delivery
+        // record is a record.
+        promises = try? await engine.onTime(orders: shop.orderRows)
     }
 
     private func recomputeQuality() async {
@@ -474,6 +480,7 @@ struct Reports: View {
         let quality: KhaytEngine.QcMetrics?
         let cycle: KhaytEngine.CycleTime?
         let lead: KhaytEngine.LeadTime?
+        let promises: KhaytEngine.OnTime?
 
         var body: some View {
             // Two cards rather than two halves of one pane divided by a rule.
@@ -516,6 +523,10 @@ struct Reports: View {
                     // WHEN work finishes, above; how LONG it took, here.
                     CycleTimeCard(shop: shop, cycle: cycle, lead: lead)
                         .card(rail: Khayt.brand, padding: 14)
+                    // How long it took, above; whether that was in time, here.
+                    OnTimeCard(shop: shop, report: promises)
+                        .card(rail: (promises?.rate ?? 100) < 70 ? Khayt.attention : Khayt.brand,
+                              padding: 14)
                     // Beside what the shop MADE, because work done twice was
                     // billed once — the gap between the two figures on this
                     // card is time the shop was not paid for.

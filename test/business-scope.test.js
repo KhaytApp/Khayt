@@ -116,10 +116,19 @@ test('the on-time delivery rate counts only promises to customers', () => {
    * filter is spread over four lines. Found by sweeping every
    * `status === 'completed'` in the file instead.
    */
+  /* 2026-09-16: the filter moved into lib/on-time.js, the one rule both apps
+   * draw from — so the promise is pinned there, and the renderer is pinned to
+   * asking it, with the trade check handed in. A renderer that filtered on its
+   * own again would be a second opinion about what a promise is. */
+  const rule = fs.readFileSync(path.join(ROOT, 'lib', 'on-time.js'), 'utf8');
+  assert.match(rule, /job\.voidedAt/, 'a cancelled order is not a delivery promise');
+  assert.match(rule, /!counts\(job\)/, 'and a calibration cube is not one either');
+  assert.match(rule, /\['completed', 'delivered'\]/, 'and a delivered job is one — it is past completed');
   const src = fs.readFileSync(path.join(ROOT, 'renderer', 'analytics.js'), 'utf8');
   const at = src.indexOf('function renderSLASection');
   assert.ok(at > -1);
-  const filter = src.slice(at, src.indexOf('if (completed.length === 0)', at));
-  assert.match(filter, /!o\.voidedAt/, 'a cancelled order is not a delivery promise');
-  assert.match(filter, /_countsForBusiness\(o\)/, 'and a calibration cube is not one either');
+  const host = src.slice(at, src.indexOf('if (completed.length === 0)', at));
+  assert.match(host, /KhaytOnTime\.onTime\(/, 'the section asks the rule');
+  assert.match(host, /countsForBusiness: \(o\) => _countsForBusiness\(o\)/, 'and hands it the trade check');
+  assert.doesNotMatch(host, /status === 'completed'/, 'and keeps no filter of its own');
 });
