@@ -2038,6 +2038,11 @@ final class Words {
         "mac.quote_link_no_server": ["en": "Switch the server on in Settings → Online first; the link points at this Mac.",
                                      "ar": "شغّل الخادم من الإعدادات ← الشبكة أولاً؛ فالرابط يشير إلى هذا الماك."],
         "mac.copy_tracking_link": ["en": "Copy tracking link", "ar": "نسخ رابط متابعة الطلب"],
+        // What a part costs besides its filament.
+        "mac.part_rates":    ["en": "Labour, power and wear",
+                              "ar": "العمالة والكهرباء والاستهلاك"],
+        "mac.part_no_rates": ["en": "A part here carries no labour, power or wear, so it is costed at its filament alone. Add it again with the figures above to price it in full.",
+                              "ar": "أحد الأجزاء لا يحمل عمالة أو كهرباء أو استهلاكاً، فتُحتسب كلفته من الخيط وحده. أضفه من جديد بالأرقام أعلاه لتسعيره بالكامل."],
         "mac.tracking_link_copied": ["en": "Tracking link copied. The customer sees the stage, the shipping and, once done, a short survey.",
                                      "ar": "نُسخ رابط المتابعة. يرى العميل المرحلة والشحن، وبعد الإنجاز استبياناً قصيراً."],
     ]
@@ -2160,5 +2165,9 @@ final class Words {
         "lan.enabled", "lan.port", "lan.pin", "lan.bind_lan", "lan.bind_lan_hint",
         "lan.loopback_warn", "lan.not_running", "common.secret_unchanged", "lan.same_wifi_hint",
         "icalDescription",
+        // The seven cost rates, in the calculator's own words.
+        "calc.labor.rate", "calc.labor.prep", "calc.labor.post", "calc.labor.failure",
+        "calc.machine.wear", "calc.machine.power", "calc.machine.elec",
+        "calc.machine.watts", "calc.machine.per_kwh",
     ]
 }

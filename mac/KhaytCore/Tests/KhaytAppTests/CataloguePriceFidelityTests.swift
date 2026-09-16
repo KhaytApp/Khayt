@@ -68,6 +68,52 @@ struct CataloguePriceFidelityTests {
         #expect(bare["laborRate"] == .number(90))
     }
 
+    // MARK: - A part made here is costed at more than its filament
+
+    @Test("a new part carries the shared rates, so a Mac-made product is not priced on material alone")
+    func newPartCarriesRates() async throws {
+        let engine = try KhaytEngine()
+        let defaults = try await engine.printRateDefaults()
+        #expect(defaults["laborRate"] == 90 && defaults["failureRate"] == 10 && defaults["wearRate"] == 0.75)
+
+        var row = ProductSheet.PartRow()
+        row.grams = "140.91"; row.hours = "5.25"
+        row.rates = defaults.mapValues { Money.fieldValue($0) }
+        guard case .object(let made) = row.record(spools: [Self.spool]) else { Issue.record("no object"); return }
+        for key in ProductSheet.PartRow.rateKeys {
+            #expect(made[key] != nil, Comment(rawValue: "\(key) is missing from a part made on the Mac"))
+        }
+        // And it prices to more than its filament: 10.57 is material alone.
+        let product = Product.from(["id": .string("P"), "nameEn": .string("P"),
+                                    "defaultMargin": .number(30)], keys: [])
+        let priced = try await engine.productPricingFields(
+            .object(Shop.pricingInput(for: product, parts: [.object(made)])),
+            inventory: Self.shelf, settings: [:], consumables: [])
+        guard case .number(let cost)? = priced["baseCost"] else { Issue.record("no cost"); return }
+        #expect(cost > 20, Comment(rawValue: "a part with the standard rates costed \(cost) — material alone is 10.57"))
+    }
+
+    @Test("a blank rate is absent, not zero, and an existing part keeps what it has")
+    func blankIsNotZero() throws {
+        var row = ProductSheet.PartRow()
+        row.grams = "10"; row.rates = ["laborRate": "", "prepTime": "  ", "wearRate": "0.75"]
+        guard case .object(let made) = row.record(spools: []) else { Issue.record("no object"); return }
+        #expect(made["laborRate"] == nil, "a cleared rate became a zero")
+        #expect(made["prepTime"] == nil)
+        #expect(made["wearRate"] == .number(0.75))
+        // Read back from a part that has them, they survive a save untouched.
+        let existing = try #require(ProductSheet.PartRow.from(.object(Self.portraitPart)))
+        #expect(existing.hasRates)
+        #expect(existing.rates["laborRate"] == "90" && existing.rates["prepTime"] == "0.1")
+        guard case .object(let again) = existing.record(spools: [Self.spool]) else { Issue.record("no object"); return }
+        #expect(again["laborRate"] == .number(90) && again["prepTime"] == .number(0.1))
+        // A part with none of them says so.
+        var bare = Self.portraitPart
+        for key in ProductSheet.PartRow.rateKeys { bare.removeValue(forKey: key) }
+        let stripped = try #require(ProductSheet.PartRow.from(.object(bare)))
+        #expect(!stripped.hasRates, "a part with no rates claimed to have some")
+    }
+
     // MARK: - The product is priced with its own rounding and typed price
 
     @Test("the save prices the product with its rounding: the portrait comes to 50, not 46.69")

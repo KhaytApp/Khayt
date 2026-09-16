@@ -2113,6 +2113,14 @@ final class Shop {
     /// per-part cost, the components, the margin, the shop's rounding — and two
     /// apps computing it separately is two prices for one product, with the one
     /// the customer sees decided by which app last saved it.
+    /// What a part is costed at before anybody types anything — the shared
+    /// rule's own figures, so a product made here is priced the way the other
+    /// app would price it. See `ProductSheet.PartRow.rates`.
+    func printRateDefaults() async -> [String: String]? {
+        guard let engine, let defaults = try? await engine.printRateDefaults() else { return nil }
+        return defaults.mapValues { Money.fieldValue($0) }
+    }
+
     func priceProduct(parts: [JSONValue], margin: Double?,
                       components: JSONValue?, rule: PriceRule = PriceRule()) async -> KhaytEngine.ProductPricing? {
         guard let engine else { return nil }

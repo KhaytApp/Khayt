@@ -44,6 +44,10 @@ struct ProductSheet: View {
     @State private var removedDocs: [String] = []
     @State private var docProblem: String?
     @State private var newPart = PartRow()
+    /// `lib/print-rates.js`'s own starting figures, so a part added here
+    /// arrives costed the way the other app's calculator would cost it.
+    @State private var rateDefaults: [String: String] = [:]
+    @State private var showRates = false
     /// The library picker for the part being added — see `PickModelSheet`.
     @State private var pickingModel = false
     /// What the chosen model could and could not answer for, from
@@ -114,6 +118,24 @@ struct ProductSheet: View {
         /// only — and re-priced itself from 50 to 13.74 on the shop's own
         /// catalogue. What this sheet does not edit, it keeps.
         var raw: [String: JSONValue] = [:]
+        /// The seven figures the part is COSTED at, as text.
+        ///
+        /// Text and not numbers because BLANK IS NOT ZERO: a part that never
+        /// carried a labour rate must not quietly gain one of nought, and a
+        /// shop that clears a field means "not this", not "none of it".
+        ///
+        /// Until now this sheet wrote none of them, and `product-pricing.js`
+        /// injects none on purpose — so every product made on the Mac was
+        /// priced at MATERIAL COST AND NOTHING ELSE. On the shop's own
+        /// portrait that is 10.57 where the full cost is 35.91: the labour,
+        /// the power, the wear and the failure allowance are seven tenths of
+        /// what it costs to make, and they were simply missing.
+        var rates: [String: String] = [:]
+        static let rateKeys = ["laborRate", "prepTime", "postTime",
+                               "wearRate", "powerDraw", "elecRate", "failureRate"]
+
+        /// Whether this part is costed at anything beyond its filament.
+        var hasRates: Bool { Self.rateKeys.contains { !(rates[$0] ?? "").isEmpty } }
 
         var isComplete: Bool { (Double(grams) ?? 0) > 0 || (Double(hours) ?? 0) > 0 }
 
@@ -137,6 +159,13 @@ struct ProductSheet: View {
             }
             if let printFileId, !printFileId.isEmpty { o["printFileId"] = .string(printFileId) }
             else { o.removeValue(forKey: "printFileId") }
+            for key in Self.rateKeys {
+                let typed = (rates[key] ?? "").replacingOccurrences(of: ",", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                // Cleared means gone, not nought — see `rates`.
+                if typed.isEmpty { o.removeValue(forKey: key) }
+                else { o[key] = .number(max(0, Double(typed) ?? 0)) }
+            }
             return .object(o)
         }
 
@@ -153,6 +182,9 @@ struct ProductSheet: View {
             row.hours = Money.fieldValue(Shop.plainNumber(o["printTime"]))
             row.qty = Int(Shop.plainNumber(o["qty"]) ?? 1)
             row.printFileId = Shop.plainString(o["printFileId"])
+            for key in rateKeys {
+                if let value = Shop.plainNumber(o[key]) { row.rates[key] = Money.fieldValue(value) }
+            }
             return row
         }
     }
@@ -328,6 +360,13 @@ struct ProductSheet: View {
             }
             rule = Shop.priceRule(of: existing)
             overrideText = rule.override.map { Money.fieldValue($0) } ?? ""
+            if let defaults = await shop.printRateDefaults() {
+                rateDefaults = defaults
+                // Only the part being composed. An existing part keeps what it
+                // has, blanks included: filling those in here would move the
+                // price of a product the shop only opened to look at.
+                if !newPart.hasRates { newPart.rates = defaults }
+            }
             tiers = Shop.tiers(of: existing).map { TierRow(label: $0.label, margin: $0.margin) }
             if case .array(let list)? = existing.rest["docs"] {
                 docs = list.compactMap(ProductDocs.Attached.from)
@@ -550,11 +589,40 @@ struct ProductSheet: View {
                     .disabled(shop.files.isEmpty)
                 Button(shop.words.callIt("mac.add_part")) {
                     parts.append(newPart)
-                    newPart = PartRow()
+                    var next = PartRow()
+                    next.rates = rateDefaults
+                    newPart = next
                     pickNote = nil
                     Task { await reprice() }
                 }
                 .disabled(!newPart.isComplete)
+            }
+            // ── WHAT THE PART COSTS BESIDES ITS FILAMENT ──────────────────
+            //
+            // Folded away because seven figures are the last thing a shop
+            // wants between naming a part and adding it, and folded away
+            // rather than absent because they are most of what it costs.
+            DisclosureGroup(isExpanded: $showRates) {
+                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                    rateRow("calc.labor.rate", "laborRate", unit: shop.currency)
+                    rateRow("calc.labor.prep", "prepTime", unit: shop.words.callIt("common.hours"))
+                    rateRow("calc.labor.post", "postTime", unit: shop.words.callIt("common.hours"))
+                    rateRow("calc.machine.wear", "wearRate", unit: shop.currency)
+                    rateRow("calc.machine.power", "powerDraw", unit: shop.words.callIt("calc.machine.watts"))
+                    rateRow("calc.machine.elec", "elecRate", unit: shop.words.callIt("calc.machine.per_kwh"))
+                    rateRow("calc.labor.failure", "failureRate", unit: "%")
+                }
+                .padding(.top, 4)
+            } label: {
+                Text(shop.words.callIt("mac.part_rates")).font(.caption)
+            }
+            // A part already in the list that carries none of them is costed
+            // at its filament and nothing else, and says so — the same shape
+            // as the two notices below, and for the same reason.
+            if parts.contains(where: { !$0.hasRates }) {
+                Text(shop.words.callIt("mac.part_no_rates"))
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             // ── WHAT THE FIGURES ARE, WHEN THEY CAME FROM A MODEL ────────────
             //
@@ -611,6 +679,22 @@ struct ProductSheet: View {
             }
         }
         .card(padding: 10)
+    }
+
+    /// One rate, labelled in the other app's own words and carrying its unit.
+    private func rateRow(_ key: String, _ field: String, unit: String) -> some View {
+        GridRow {
+            Text(shop.words.callIt(key)).gridColumnAlignment(.trailing)
+                .font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                TextField("", text: Binding(
+                    get: { newPart.rates[field] ?? "" },
+                    set: { newPart.rates[field] = $0 }))
+                    .textFieldStyle(.roundedBorder).frame(width: 70).monospacedDigit()
+                Text(unit).font(.caption2).foregroundStyle(.tertiary)
+                Spacer()
+            }
+        }
     }
 
     private func partSummary(_ part: PartRow) -> String {
