@@ -1307,6 +1307,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **(Mac) A resin printer's progress was captioned with a claim about a file
+  it does not have.** The machine card names which signal a percentage came
+  from, so that "by layer" and "by file position" can be told apart on a
+  Moonraker printer. It was meant to say that only for Moonraker, which is
+  the one adapter that chooses between two signals — but `lib/sdcp.js` sets
+  the same field, to `time` or `none`, and anything the card did not
+  recognise was captioned "by file position". So an Elegoo resin printer
+  reporting its own elapsed ticks was described in terms of a file it never
+  had. The adapter now decides whether to caption at all, and a signal this
+  app has not been taught is left undescribed rather than described wrongly.
 - **(Mac) A product made on the Mac was priced on its filament alone.** The
   other app's calculator puts a labour rate, prep and post time, power draw,
   electricity, wear and a failure allowance on every part it writes; this
