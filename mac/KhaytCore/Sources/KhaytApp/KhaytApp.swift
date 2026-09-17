@@ -107,7 +107,7 @@ struct KhaytApp: App {
                     // there is not. Reading is safe, the source is named in the
                     // toolbar, and an app that opens on invented data when real
                     // data exists is answering a question nobody asked.
-                    await shop.load(Shop.available.first(where: \.isReal) ?? .sample)
+                    await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
                 }
 
         }
@@ -511,6 +511,13 @@ final class Activator: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// KHAYT_BOOK=sample pins the whole run to the invented book. The runner
+    /// deliberately swaps back to the shop's real book for some screens, which
+    /// is right for reviewing a build and wrong for anything published.
+    static var forcedSample: Bool {
+        ProcessInfo.processInfo.environment["KHAYT_BOOK"] == "sample"
+    }
+
     /// Which parts of the run KHAYT_SNAPSHOT_SKIP asks to leave out.
     ///
     /// A comma-separated list. Nothing is skipped by default, and a skipped
@@ -714,7 +721,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             shop.fileSelection = []
             await settle()
 
-            await shop.load(Shop.available.first(where: \.isReal) ?? .sample)
+            await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
             await settle()
             shop.shelf = .jobs(nil)
             await settle()
@@ -1070,7 +1077,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             // sample's printers are somebody else's addresses on somebody
             // else's network, so this app never knocks on them. The poll needs
             // longer than a settle — it is a request to a machine on the wifi.
-            await shop.load(Shop.available.first(where: \.isReal) ?? .sample)
+            await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
             shop.shelf = .machines
             await settle()
             try? await Task.sleep(for: .seconds(3))
