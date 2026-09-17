@@ -743,16 +743,15 @@ function qcFailOrder(orderId) {
     bodyHtml: `
       ${qcInspectorFieldHtml(order.inspector)}
       <label>${escapeHtml(t('waste.failure_type') || 'Failure type')}</label>
+      <!-- From the rule's own list. Typed out here, this was the fourth copy of
+           the same nine strings, and the one a new failure type would be
+           forgotten in: the analytics defect chart reads a key off whatever
+           was saved, so a type this offered and the rule did not know would
+           have reached a customer-facing report as a raw translation key. -->
       <select id="qcFailType" style="margin-bottom:10px;">
-        <option value="bed_adhesion">${escapeHtml(t('waste.ft.bed_adhesion'))}</option>
-        <option value="nozzle_jam">${escapeHtml(t('waste.ft.nozzle_jam'))}</option>
-        <option value="warping">${escapeHtml(t('waste.ft.warping'))}</option>
-        <option value="stringing">${escapeHtml(t('waste.ft.stringing'))}</option>
-        <option value="operator_error">${escapeHtml(t('waste.ft.operator_error'))}</option>
-        <option value="design_issue">${escapeHtml(t('waste.ft.design_issue'))}</option>
-        <option value="power_failure">${escapeHtml(t('waste.ft.power_failure'))}</option>
-        <option value="material_quality">${escapeHtml(t('waste.ft.material_quality'))}</option>
-        <option value="other" selected>${escapeHtml(t('waste.ft.other'))}</option>
+        ${KhaytQcFailure.FAILURE_TYPES.map(k =>
+          `<option value="${escapeHtml(k)}"${k === 'other' ? ' selected' : ''}>${escapeHtml(t('waste.ft.' + k))}</option>`
+        ).join('')}
       </select>
       <label>${escapeHtml(t('qc.severity') || 'Severity')}</label>
       <select id="qcFailSeverity" style="margin-bottom:10px;">
