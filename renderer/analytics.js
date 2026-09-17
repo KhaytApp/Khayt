@@ -2083,69 +2083,52 @@ function renderSupplierPriceHistory() {
   const container = document.getElementById('supplierPriceHistoryChart');
   if (!container) return;
 
-  // Aggregate all purchases by materialType
-  const byMat = {}; // materialType → [{ date, unitPrice, supplier, total }]
-  suppliers.forEach(sup => {
-    (sup.purchases || []).forEach(p => {
-      const mt = (p.materialType || '').trim() || t('sup.untagged');
-      if (!byMat[mt]) byMat[mt] = [];
-      byMat[mt].push({ date: p.date || '', unitPrice: computeUnitPrice(p), supplier: sup.name, total: +p.amount || 0, unit: p.unit || 'spool' });
-    });
-  });
-
-  const allMats = Object.keys(byMat).sort();
-  if (!allMats.length) {
+  // One group per material AND unit family: prices in different units are not
+  // comparable, so they are never plotted or ranked against each other.
+  const groups = KhaytSupplierPrices.groups(suppliers, { untagged: t('sup.untagged') });
+  if (!groups.length) {
     container.innerHTML = `<p style="color:var(--text-muted);font-size:13px;padding:12px 0;">${t('sup.no_price_data')}</p>`;
     return;
   }
 
   const cur = currencySymbol();
+  const label = g => `${escapeHtml(g.material)} <span style="font-weight:400;color:var(--text-muted);">/${escapeHtml(g.unit)}</span>`;
 
   // Price trend sparklines
-  const sparks = allMats.map(mat => {
-    const entries = byMat[mat].filter(e => e.date).sort((a,b) => a.date.localeCompare(b.date));
+  const sparks = groups.map(g => {
+    const entries = g.entries;
     if (!entries.length) return '';
-    const prices = entries.map(e => e.unitPrice);
+    const prices = entries.map(e => e.price);
     const minP = Math.min(...prices), maxP = Math.max(...prices), rangeP = maxP - minP || 1;
     const W = 120, H = 36;
-    const pts = entries.map((e, i) => {
-      const x = entries.length > 1 ? (i / (entries.length - 1)) * W : W / 2;
-      const y = H - ((e.unitPrice - minP) / rangeP) * H;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
-    const last = entries[entries.length - 1];
-    const prev = entries[entries.length - 2];
-    const pctChange = prev ? ((last.unitPrice - prev.unitPrice) / prev.unitPrice * 100) : 0;
+    const at = i => entries.length > 1 ? (i / (entries.length - 1)) * W : W / 2;
+    const pts = entries.map((e, i) => `${at(i).toFixed(1)},${(H - ((e.price - minP) / rangeP) * H).toFixed(1)}`).join(' ');
+    const last = g.latest;
+    const pctChange = g.pctChange;
     const badge = Math.abs(pctChange) >= 5
       ? `<span style="font-size:10px;padding:1px 5px;border-radius:10px;background:${pctChange > 0 ? '#fee2e2' : '#dcfce7'};color:${pctChange > 0 ? '#ef4444' : '#16a34a'};">${pctChange > 0 ? '▲' : '▼'}${Math.abs(pctChange).toFixed(1)}%</span>`
       : '';
     return `<div style="padding:10px 12px;background:var(--bg-elev);border-radius:var(--radius);min-width:180px;">
-      <div style="font-weight:600;font-size:12px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
-        <span>${escapeHtml(mat)}</span>${badge}
+      <div style="font-weight:600;font-size:12px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
+        <span>${label(g)}</span>${badge}
       </div>
       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:36px;overflow:visible;">
         <polyline points="${pts}" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-linejoin="round"/>
-        ${entries.map((e,i) => { const x = entries.length > 1 ? (i / (entries.length - 1)) * W : W/2; const y = H - ((e.unitPrice - minP) / rangeP) * H; return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="#6366f1"><title>${escapeHtml(e.supplier)}: ${cur}${e.unitPrice.toFixed(2)}/${escapeHtml(e.unit||'unit')} (${e.date})</title></circle>`; }).join('')}
+        ${entries.map((e,i) => `<circle cx="${at(i).toFixed(1)}" cy="${(H - ((e.price - minP) / rangeP) * H).toFixed(1)}" r="2.5" fill="#6366f1"><title>${escapeHtml(e.supplier)}: ${cur}${e.price.toFixed(2)}/${escapeHtml(e.unit)} (${e.date})</title></circle>`).join('')}
       </svg>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
-        ${t('sup.latest')}: <strong>${cur}${last.unitPrice.toFixed(2)}/${last.unit||'unit'}</strong> · ${escapeHtml(last.supplier)}
+        ${t('sup.latest')}: <strong>${cur}${last.price.toFixed(2)}/${escapeHtml(last.unit)}</strong> · ${escapeHtml(last.supplier)}
       </div>
     </div>`;
   }).join('');
 
-  // Best-price comparison table (one row per material)
-  const tableRows = allMats.map(mat => {
-    const entries = byMat[mat].sort((a,b) => a.unitPrice - b.unitPrice);
-    const best = entries[0];
-    const worst = entries[entries.length - 1];
-    const count = entries.length;
-    return `<tr>
-      <td>${escapeHtml(mat)}</td>
-      <td style="color:var(--success);text-align:right;">${cur}${best.unitPrice.toFixed(2)} <span style="font-size:10px;color:var(--text-muted);">${escapeHtml(best.supplier)}</span></td>
-      <td style="color:var(--danger);text-align:right;">${cur}${worst.unitPrice.toFixed(2)} <span style="font-size:10px;color:var(--text-muted);">${escapeHtml(worst.supplier)}</span></td>
-      <td style="text-align:right;">${count}</td>
-    </tr>`;
-  }).join('');
+  // Best-price comparison table (one row per material and unit)
+  const tableRows = groups.map(g => `<tr>
+      <td>${label(g)}</td>
+      <td style="color:var(--success);text-align:right;">${cur}${g.best.price.toFixed(2)} <span style="font-size:10px;color:var(--text-muted);">${escapeHtml(g.best.supplier)}</span></td>
+      <td style="color:var(--danger);text-align:right;">${cur}${g.worst.price.toFixed(2)} <span style="font-size:10px;color:var(--text-muted);">${escapeHtml(g.worst.supplier)}</span></td>
+      <td style="text-align:right;">${g.count}</td>
+    </tr>`).join('');
 
   container.innerHTML = `
     <h4 style="font-size:13px;margin-bottom:10px;">${t('sup.price_trend')}</h4>

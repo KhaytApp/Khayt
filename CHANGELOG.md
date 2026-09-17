@@ -5,6 +5,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 ### Changed
+- **Supplier price history compares like with like now.** A purchase records
+  the unit it was bought in — spool, kg, g, L, piece, roll, box — but the
+  price trend and the "best price" table grouped only by material type, so a
+  kilogram of PLA and a spool of PLA were plotted on one line and ranked
+  against each other. Three things came out wrong: the sparkline was a shape
+  made of incomparable numbers, switching from kilos to grams was badged as
+  the price collapsing 99.9%, and the cheapest supplier was whichever one
+  sold in the smallest unit. Prices are now grouped by material **and** unit
+  family, converted to the family's base unit first (grams into kilograms),
+  so a shop that buys PLA both ways sees two honest cards instead of one
+  wrong one. A spool is deliberately not converted to a weight: spools hold
+  different amounts, and guessing would put an invented number in front of a
+  buying decision. The rule is `lib/supplier-prices.js`.
+
 - **(Maintainers) How a slicer is launched is one rule now, and it has tests.**
   `settings.slicers[].args` is untrusted — it travels in backups and cloud
   sync, like the path beside it that `isAllowedSlicerBinary` already guards —
