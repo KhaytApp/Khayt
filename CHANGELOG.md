@@ -6,7 +6,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
-- **(Mac) Five of Khayt's shared rules now run natively, with tests that will
+- **(Mac) Seven of Khayt's shared rules now run natively, with tests that will
   not let them drift.** The Mac app has always run Khayt's business rules —
   pricing, tax, costing, identity — as the same JavaScript the Windows app runs,
   so that both apps could not disagree. Those rules are being rewritten in
@@ -20,7 +20,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   because a rack labelled half from each app has to fit one holder — and doing
   that turned up a fault worth fixing: a malformed label entry used to print
   `function sub() { [native code] }` onto the label, which the native version
-  cannot do.
+  cannot do. Since then: the shop's working week, the period filter behind
+  every "this month" picker, and the expense-category chart. Two more faults
+  the side-by-side comparison caught before anybody saw them — a working week
+  stored in a shape one app read as "closed all week" and the other as "open
+  every day", and a day index of half a day answering with Sunday's hours. And
+  one more the port fixes outright: a shop with an expense category recorded
+  as a number, rather than as text, used to make the whole spending panel
+  disappear with nothing said.
 
 - **The machine figures at the top of Reports disagreed with the P&L table
   below them.** The overview worked out a machine's profit as revenue less what
