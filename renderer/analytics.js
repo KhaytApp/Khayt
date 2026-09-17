@@ -154,35 +154,26 @@ function computeHandoffMachineRows() {
     expenses: expenses.filter(e => e.orderId),
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
     unassigned: t('dash.unassigned'),
+    days: analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date)),
   }, {
     revenueOf: orderNetRevenueBase,
     partCostOf: partTotalCost,
   });
 
-  const hours = {};
-  for (const o of orders) {
-    if (!o.machineId) continue;
-    hours[o.machineId] = (hours[o.machineId] || 0) + (+o.printTime || 0);
-  }
-  const rangeDays = analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date));
-  const targetOf = {};
-  for (const m of machines) targetOf[m.id] = +(m.targetHoursPerDay || 0);
-
-  return pl.map((row) => {
-    const target = targetOf[row.machineId] || 0;
-    const ran = hours[row.machineId] || 0;
-    return {
-      name: row.name,
-      profit: row.net,
-      hours: ran,
-      // NOT CLAMPED TO 100, for the reason `lib/capacity.js` gives about its
-      // own gauge: a machine that ran half as much again as it was meant to
-      // and one that hit its target exactly are different facts, and capping
-      // draws them identically. A caller with a bar clamps the WIDTH; the
-      // number beside it stays true.
-      util: (target > 0 && ran > 0) ? Math.round((ran / (target * rangeDays)) * 100) : null,
-    };
-  }).filter(r => r.hours > 0 || r.profit !== 0);
+  // ── AND THE HOURS FROM THE SAME RULE ──────────────────────────────────
+  //
+  // These were counted here too, off `printTime` — the figure a job was
+  // QUOTED at rather than what it took, so a shop whose prints run over read
+  // as under-worked. `machine-pl` reads the measured duration where there is
+  // one, and it does the target arithmetic once for every screen that asks.
+  // Uncapped there, for the reason `lib/capacity.js` gives about its own
+  // gauge: a caller with a bar clamps the WIDTH, never the number.
+  return pl.map((row) => ({
+    name: row.name,
+    profit: row.net,
+    hours: row.hours,
+    util: row.utilisationPct === null ? null : Math.round(row.utilisationPct),
+  })).filter(r => r.hours > 0 || r.profit !== 0);
 }
 
 function buildHandoffHeatmapCells() {
@@ -1540,46 +1531,63 @@ function renderPrinterUtilizationChart() {
   const el = $('#printerUtilSection');
   if (!el || machines.length === 0) { if (el) el.innerHTML = ''; return; }
 
+  // ── THREE FIGURES, ONE RULE ───────────────────────────────────────────
+  //
+  // This counted its own hours, its own costs and its own utilisation, and
+  // was wrong about all three:
+  //
+  //   * The margin was `(revenue - materialCost) / revenue`, while the
+  //     machine P&L table on this same screen subtracts the linked expenses
+  //     and the machine's maintenance too. One machine, two margins, one
+  //     screen — and this is the figure an owner retires a printer on.
+  //   * The hours came off `printTime`, the estimate a job was QUOTED at,
+  //     even where the printer had measured what it really took. A shop
+  //     whose prints run over read as under-worked from its own book.
+  //   * Utilisation was `Math.min(100, …)`, so a printer running half as much
+  //     again as it is meant to and one hitting its target exactly drew
+  //     identically — hiding the machine worth buying a second of.
+  //
+  // All three come from `lib/machine-pl.js` now, the same rule the table
+  // below and the overview above already use.
   const orders = printLog.filter(o => inRange(o.date, analyticsRange, 'analytics') && KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o));
-  const machMap = {};
-  for (const m of machines) machMap[m.id] = { name: m.name, color: m.color, hours: 0, revenue: 0, cost: 0, count: 0 };
-  for (const o of orders) {
-    const key = o.machineId || '__none__';
-    if (!machMap[key]) continue;
-    machMap[key].hours += +o.printTime || 0;
-    machMap[key].revenue += orderNetRevenueBase(o);
-    machMap[key].count++;
-    // Estimate material + machine cost from order parts
-    const orderCost = (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0);
-    machMap[key].cost += orderCost;
-  }
-  // Determine date range for utilization calculation
-  const now2 = new Date();
-  const rangeDays = analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date));
+  const { rows: pl } = KhaytMachinePL.machineProfit({
+    machines,
+    completed: orders,
+    expenses: expenses.filter(e => e.orderId),
+    maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
+    unassigned: t('dash.unassigned'),
+    days: analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date)),
+  }, {
+    revenueOf: orderNetRevenueBase,
+    partCostOf: partTotalCost,
+  });
 
-  // Attach targetHoursPerDay from machines array to machMap
-  for (const m of machines) {
-    if (machMap[m.id]) machMap[m.id].targetHoursPerDay = m.targetHoursPerDay || null;
-  }
-
-  const rows = Object.values(machMap).filter(m => m.hours > 0).sort((a, b) => b.revenue - a.revenue);
+  const colorOf = {};
+  for (const m of machines) colorOf[m.id] = m.color;
+  const rows = pl.filter(r => r.hours > 0)
+    .map(r => ({
+      name: r.name,
+      color: colorOf[r.machineId] || '#5b9cf0',
+      hours: r.hours,
+      count: r.jobs,
+      revenue: r.revenue,
+      margin: r.marginPct,
+      utilPct: r.utilisationPct,
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
   if (rows.length === 0) { el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.no_utilization'))}</p>`; return; }
 
   const maxRev = Math.max(...rows.map(r => r.revenue), 1);
   el.innerHTML = rows.map(r => {
     const pct = (r.revenue / maxRev) * 100;
-    const margin = r.cost > 0 && r.revenue > 0 ? ((r.revenue - r.cost) / r.revenue * 100) : null;
-    const marginStr = margin !== null ? `${margin.toFixed(1)}%` : '—';
-    const marginCol = margin !== null ? (margin >= 30 ? 'var(--success)' : margin >= 10 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-muted)';
-    // Utilization %
+    const marginStr = r.margin !== null ? `${r.margin.toFixed(1)}%` : '—';
+    const marginCol = r.margin !== null ? (r.margin >= 30 ? 'var(--success)' : r.margin >= 10 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-muted)';
     let utilStr = '';
-    if (r.targetHoursPerDay) {
-      const targetTotal = r.targetHoursPerDay * rangeDays;
-      const utilPct = targetTotal > 0 ? Math.min(100, (r.hours / targetTotal) * 100) : null;
-      if (utilPct !== null) {
-        const utilCol = utilPct >= 80 ? 'var(--success)' : utilPct >= 50 ? 'var(--warning)' : 'var(--danger)';
-        utilStr = ` · <span style="color:${utilCol};font-weight:600;">${escapeHtml(t('an.utilization_pct'))}: ${utilPct.toFixed(0)}%</span>`;
-      }
+    if (r.utilPct !== null) {
+      // Over target is its own reading, and it was unreachable before because
+      // the figure could not exceed 100.
+      const utilCol = r.utilPct > 105 ? 'var(--warning)' : r.utilPct >= 80 ? 'var(--success)' : r.utilPct >= 50 ? 'var(--warning)' : 'var(--danger)';
+      utilStr = ` · <span style="color:${utilCol};font-weight:600;">${escapeHtml(t('an.utilization_pct'))}: ${r.utilPct.toFixed(0)}%</span>`;
     }
     return `<div style="margin-bottom:14px;">
       <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; flex-wrap:wrap; gap:4px;">

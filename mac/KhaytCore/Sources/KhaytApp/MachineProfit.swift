@@ -172,6 +172,38 @@ struct MachineProfitPage: View {
                     Figure(label: words.callIt("an.maint_cost_col"), amount: row.maintenance,
                            shop: shop, negative: true)
                     Spacer()
+                    // ── AND HOW HARD IT WORKED FOR IT ─────────────────────
+                    //
+                    // Beside the money because the two together are the
+                    // reading: a printer that earned little in three hours and
+                    // one that earned little in three hundred are the same
+                    // figure on the left and completely different machines.
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(words.callIt("mac.mpl_hours")).font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(Money.quantity(row.hours, decimals: 1)
+                             + words.callIt("common.hours_short"))
+                            .font(.callout.monospacedDigit())
+                        // Only when some of it was estimated rather than
+                        // measured — a figure built from quotes should not
+                        // imply the machine was timed.
+                        if row.measured < row.jobs {
+                            Text(words.callIt("mac.mpl_estimated",
+                                              ["n": .number(Double(row.jobs - row.measured))]))
+                                .font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    }
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(words.callIt("an.utilization_pct")).font(.caption)
+                            .foregroundStyle(.secondary)
+                        // NOT CAPPED. A machine running half as much again as
+                        // it is meant to is the finding — it is how a shop
+                        // learns which printer to buy a second of. An em dash
+                        // where no target is set, because zero reads as idle.
+                        Text(row.utilisationPct.map { Money.quantity($0, decimals: 0) + "%" } ?? "—")
+                            .font(.callout.monospacedDigit())
+                            .foregroundStyle(Self.utilisationTint(row.utilisationPct))
+                    }
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(words.callIt("an.margin")).font(.caption).foregroundStyle(.secondary)
                         // AN EM DASH, NOT 0%. A machine that earned nothing has
@@ -184,6 +216,18 @@ struct MachineProfitPage: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .card(padding: 14)
+        }
+
+        /// Over target is amber, not green: a printer past what the shop wanted
+        /// it to run is not a success to celebrate, it is a queue forming on one
+        /// machine. Well-used is green, and a quiet machine is stated plainly
+        /// rather than alarmed about — nobody needs a red number to notice a
+        /// printer that is not running.
+        static func utilisationTint(_ pct: Double?) -> Color {
+            guard let pct else { return .secondary }
+            if pct > 105 { return Khayt.attention }
+            if pct >= 60 { return Khayt.done }
+            return .primary
         }
 
         /// Green at a healthy margin, amber at a thin one, red below — the same

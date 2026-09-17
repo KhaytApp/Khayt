@@ -867,6 +867,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) A machine row says how hard the printer worked, not just what it
+  earned.** Hours run and utilisation beside the money, because a printer that
+  earned little in three hours and one that earned little in three hundred are
+  the same figure on the left and completely different machines. The hours are
+  what the prints TOOK where the printer measured them, and the row says how
+  many were estimates rather than implying it was all timed.
+
 - **(Mac) The rating chart says what full height means.** Its bars are drawn
   against a fixed five rather than against the best month in the data, so a
   bar's height means something absolute — and nothing on the card said what. A
@@ -1656,6 +1663,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **A printer's utilisation was capped at 100%, so the machine worth buying a
+  second of was invisible.** "Printer utilisation" on Reports clamped the
+  figure, and a machine running half as much again as the shop wanted drew
+  exactly like one hitting its target. The same chart also worked out its own
+  margin from material cost alone, while the machine P&L table on the same
+  screen subtracts the linked expenses and the machine's servicing too — one
+  machine with two margins on one screen, and that is the figure an owner
+  retires a printer on. And it counted hours off `printTime`, the estimate a
+  job was QUOTED at, even where the printer had measured what the print really
+  took, so a shop whose prints run over read as under-worked from its own book.
+  All three now come from `lib/machine-pl.js`, which is what the table below
+  and the overview above already use, and the cap is a committed test rather
+  than a comment.
+
 - **(Mac) A live print's percentage was captioned "as the printer shows it",
   beside a number the printer was not showing.** Khayt reads the slicer's own
   M73 figure, which counts elapsed TIME. A Snapmaker U1's panel counts file

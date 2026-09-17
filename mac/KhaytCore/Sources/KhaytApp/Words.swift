@@ -632,6 +632,10 @@ final class Words {
                               "ar": "رِبح هذه الآلة مخصوم منه أصلاً تكلفة صيانتها، لذا تسجيل الإصلاح كمصروف أيضاً يحتسب المبلغ مرتين. علِّم هذا فقط إن كنت تُدرج الصيانة ضمن مصروفاتك."],
         "mac.dt_none":       ["en": "No machine has been booked out of action in these months.",
                               "ar": "لم تُسجَّل أي آلة خارج الخدمة في هذه الأشهر."],
+        "mac.mpl_hours":     ["en": "Hours run",
+                              "ar": "ساعات التشغيل"],
+        "mac.mpl_estimated": ["en": "{n} estimated",
+                              "ar": "{n} تقديري"],
         "mac.ec_reclaimed":  ["en": "{amount} of tax on these is reclaimable, so it is not charged as a cost.",
                               "ar": "{amount} من الضريبة على هذه قابلة للاسترداد، لذا لا تُحتسب تكلفةً."],
         // Report builder — the shared catalogue has the screen's own words

@@ -1170,6 +1170,36 @@ import KhaytCore
                    "53-quality", size: CGSize(width: 560, height: 420))
     }
 
+    /// The machine P&L row, which gained the two figures the money alone
+    /// cannot carry: how many hours the printer actually ran, and how that
+    /// compares with what the shop wanted of it.
+    @Test("a machine row shows what it earned AND how hard it worked")
+    func machineRowWithHours() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let done = await shop.completedInPeriod()
+        let report = try await engine.machineProfit(
+            machines: shop.machineRows, completed: done.orders,
+            expenses: done.expenses, maintenance: done.maintenance,
+            settings: shop.settingsDict, clients: shop.clientRows,
+            unassigned: shop.words.callIt("dash.unassigned"),
+            days: shop.periodDays(dates: done.orders.compactMap { row in
+                if case .object(let o) = row, case .string(let d)? = o["date"] { return d }
+                return nil
+            }))
+        #expect(!report.rows.isEmpty, "no machine finished anything — the page draws its empty state")
+        #expect(report.totals.hours > 0, "every sample machine ran for no time at all")
+        #expect(report.rows.contains { $0.utilisationPct != nil },
+                "no sample machine has a target, so utilisation is always a dash")
+        // The ROWS, not the page: `ImageRenderer` draws nothing inside a
+        // `ScrollView` and does not say so, which is exactly why the page
+        // already splits them out. The blankness guard caught this.
+        try render(MachineProfitPage(shop: shop, report: report).rows(report)
+                    .frame(width: 900).background(Khayt.ground),
+                   "59-machine-pl-hours", size: CGSize(width: 900, height: 420))
+    }
+
     /// The five cards Reports gained, drawn from the sample book.
     ///
     /// These exist to be LOOKED AT. The arithmetic has its own tests and the
