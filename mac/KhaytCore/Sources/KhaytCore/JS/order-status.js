@@ -415,8 +415,98 @@
   function stageOf(order) {
     if (!order) return null;
     const status = order.status;
+    // Delivered is asked first because it is the later of the two: a job that
+    // was shipped and has since arrived is delivered, not still in transit.
     if (status === 'completed' && order.deliveredAt) return 'delivered';
+    if (status === 'completed' && order.shippedAt) return 'shipped';
     return status || null;
+  }
+
+  /**
+   * The shipping statuses that mean the parcel has left the shop.
+   *
+   * `label_created` is NOT one of them. A printed label is a parcel still on
+   * the bench, and a shop that prints labels in the morning would otherwise
+   * see every one of them move to Shipped before anything was collected.
+   */
+  const IN_THE_POST = ['in_transit', 'out_for_delivery', 'delivered'];
+
+  /**
+   * What a carrier's tracking says, written onto the job.
+   *
+   * Three places stamped `deliveredAt` from a carrier event by hand — the
+   * shipping dialog, and the webhook handler twice, once before its write and
+   * once inside it. Adding `shippedAt` to each of them would have made six
+   * copies of a rule with no test, so it is one function with one.
+   *
+   * A parcel that has arrived was also, at some point, posted: a job that
+   * reaches `delivered` without ever reporting `in_transit` gets both stamps,
+   * because a delivered job that was never shipped is a hole in its own
+   * history. Neither stamp is ever moved once written — the first time the
+   * shop heard it is the answer, and a later event is the carrier catching up.
+   *
+   * Returns true when something changed, so a caller can skip a write.
+   */
+  function stampFromShipping(order, shippingStatus, nowIso) {
+    if (!order || order.status !== 'completed') return false;
+    const at = nowIso || new Date().toISOString();
+    let changed = false;
+    if (IN_THE_POST.indexOf(shippingStatus) !== -1 && !order.shippedAt) {
+      order.shippedAt = at;
+      changed = true;
+    }
+    if (shippingStatus === 'delivered' && !order.deliveredAt) {
+      order.deliveredAt = at;
+      changed = true;
+    }
+    return changed;
+  }
+
+  /**
+   * Send a finished job out.
+   *
+   * SHIPPED IS NOT A STATUS EITHER, for the same reason `delivered` is not. A
+   * job in the post is finished work: it has been made, it cost what it cost,
+   * and it earned what it earned. Giving it a status of its own would take it
+   * out of every "finished" set in both apps — revenue, the P&L, the VAT
+   * return, a customer's lifetime spend — and each of those would have to be
+   * taught the new word separately. That is roughly forty places, and the one
+   * that got missed would be a shop's money quietly going somewhere.
+   *
+   * So a shipped job stays `completed` and carries a `shippedAt`, exactly as a
+   * delivered one carries a `deliveredAt`, and `stageOf` reads the pair. The
+   * board gets its column, the money stays where it was, and nothing had to be
+   * told twice.
+   *
+   * Only from `completed`, and not once it has arrived: posting a job that is
+   * already with the customer is the clock running backwards.
+   *
+   * This is the shop's own record of the parcel leaving. `order.shippingStatus`
+   * is a different thing — what a carrier's tracking says — and a shop with no
+   * carrier wired up still needs to be able to say a job went out.
+   */
+  function markShipped(order, ctx) {
+    const c = ctxOfStatus(ctx);
+    const nowMs = typeof c.now === 'number' ? c.now : Date.now();
+    if (!order || order.status !== 'completed') {
+      return { ok: false, block: { code: 'not_completed', params: {} }, effects: [] };
+    }
+    if (order.deliveredAt) {
+      return { ok: false, block: { code: 'already_delivered', params: {} }, effects: [] };
+    }
+    const nowIso = new Date(nowMs).toISOString();
+    order.shippedAt = nowIso;
+    pushHistory(order, 'shipped', nowIso);
+    return {
+      ok: true,
+      block: null,
+      effects: [
+        { type: 'activity_log', text: `${order.id} \u2192 shipped` },
+        { type: 'save' },
+        { type: 'render', dashboard: true },
+        { type: 'toast_shipped' },
+      ],
+    };
   }
 
   /**
@@ -563,7 +653,7 @@
 
   const api = {
     HISTORY_CAP, SURVEY_TOKEN_BYTES, FINISHED_STATUSES, isFinished,
-    wouldExceedWipLimit, gate, apply, outboundFor, stageOf, markDelivered,
+    wouldExceedWipLimit, gate, apply, outboundFor, stageOf, markDelivered, markShipped, stampFromShipping, IN_THE_POST,
     resumeFromHold, makeSurveyToken,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

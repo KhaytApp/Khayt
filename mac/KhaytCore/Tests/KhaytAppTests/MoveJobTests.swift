@@ -566,10 +566,11 @@ struct MoveJobTests {
                                       "save", "ensure_survey_token"]
         let cosmetic: Set<String> = ["render", "toast_updated", "toast_updated_undoable",
                                      "tier_check", "export_status_page",
-                                     // markDelivered's, not apply's: the app has
-                                     // its own sentence for a handover and the
-                                     // record is the deliveredAt stamp.
-                                     "toast_delivered"]
+                                     // markDelivered's and markShipped's, not
+                                     // apply's: the app has its own sentence for
+                                     // each, and the record is the stamp on the
+                                     // order rather than the toast.
+                                     "toast_delivered", "toast_shipped"]
         let outbound: Set<String> = ["webhook", "order_webhook", "telegram", "email", "republish_portal"]
         let classified = performed.union(cosmetic).union(outbound)
 

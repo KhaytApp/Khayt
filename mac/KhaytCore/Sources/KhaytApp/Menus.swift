@@ -324,6 +324,13 @@ private struct JobMenu: View {
         // Delivered sits with the stages because that is what it answers —
         // where the job is — even though it is not one. Everything below the
         // divider is something you DO to a job rather than somewhere you put it.
+        // In the post, then arrived. Both stamp a date on a completed job
+        // rather than moving its status — see lib/order-status.js.
+        Button(Words.upfront("queue.mark_shipped")) {
+            if let id = shop.selection { Task { await shop.markShipped(id) } }
+        }
+        .disabled(!canMove || job?.status != "completed"
+                  || job?.shippedAt != nil || job?.deliveredAt != nil)
         Button(Words.upfront("queue.delivered")) {
             if let id = shop.selection { Task { await shop.markDelivered(id) } }
         }

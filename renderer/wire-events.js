@@ -1344,6 +1344,7 @@ function wireEvents() {
     const i  = e.target.closest('[data-act="invoice"]');
     const wa = e.target.closest('[data-act="wa-quick"]');
     const md = e.target.closest('[data-act="mark-delivered"]');
+    const ms = e.target.closest('[data-act="mark-shipped"]');
     const shipBtn = e.target.closest('[data-act="ship-order"]');
     const asmBtn2 = e.target.closest('[data-act="assembly"]');
     const wo = e.target.closest('[data-act="wo-kanban"]');
@@ -1392,6 +1393,7 @@ function wireEvents() {
     if (i)  generateInvoice(i.dataset.id);
     if (wa) openWaSendModal(wa.dataset.id);
     if (md) markDelivered(md.dataset.id);
+    if (ms) markShipped(ms.dataset.id);
     if (shipBtn) openShipModal(shipBtn.dataset.id);
     if (asmBtn2) openAssemblyModal(asmBtn2.dataset.id);
     if (wo) generateWorkOrder(wo.dataset.id);

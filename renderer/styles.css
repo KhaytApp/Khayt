@@ -799,6 +799,7 @@ tbody tr:hover { background: var(--surface-2); }
 .badge.post      { background: rgba(245,166,35,0.18); color: var(--warning); }
 .badge.completed { background: rgba(43,182,115,0.18); color: var(--success); }
 .badge.qc        { background: rgba(138,125,240,0.18); color: var(--info); }
+.badge.shipped { background: rgba(6,182,212,0.15); color: #06b6d4; }
 
 /* Highlight-flash for search navigation */
 @keyframes highlight-flash {

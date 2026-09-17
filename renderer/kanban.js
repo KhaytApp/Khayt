@@ -317,7 +317,8 @@ function renderStudioKanbanCard(b) {
 function studioKanbanDecorateColumns() {
   const stageColors = {
     pending: 'var(--info)', on_hold: 'var(--warn)', printing: 'var(--ok)',
-    post: 'var(--accent)', qc: '#a78bfa', completed: 'var(--text-muted)', delivered: 'var(--ok)',
+    post: 'var(--accent)', qc: '#a78bfa', completed: 'var(--text-muted)',
+    shipped: '#06b6d4', delivered: 'var(--ok)',
   };
   $$('.kanban-col[data-status]').forEach(col => {
     const status = col.dataset.status;
@@ -443,7 +444,7 @@ function renderKanban() {
 
   // --- Production columns (exclude quotes) ---
   const kanTerm = (kanSearchTerm || '').toLowerCase().trim();
-  const cols = { pending: [], on_hold: [], printing: [], post: [], qc: [], completed: [], delivered: [] };
+  const cols = { pending: [], on_hold: [], printing: [], post: [], qc: [], completed: [], shipped: [], delivered: [] };
   printLog.filter(o => {
     if (o.status === 'quote') return false;
     if (!locMatch(o)) return false;
@@ -642,12 +643,26 @@ function renderKanban() {
       // state (label reflects current shipping status once shipped).
       const shipBtn = biz ? `<button class="btn ghost small" data-act="ship-order" data-id="${log.id}" title="${escapeHtml(t('ship.title') || 'Ship order')}">${_kIco('box', '📦')} ${escapeHtml(log.shippingStatus ? (t('ship.st.' + log.shippingStatus) || log.shippingStatus) : (t('ship.ship') || 'Ship'))}</button>` : '';
       if (status === 'completed') {
+        // Out the door but not yet arrived. Shipped is a stamp on a completed
+        // job, exactly as delivered is — see lib/order-status.js.
+        // Business only, like the Ship action beside it: a shop posting
+        // parcels has a use for "in the post"; someone printing for themselves
+        // hands the thing over.
+        const shippedBtn = biz ? `<button class="btn small" data-act="mark-shipped" data-id="${log.id}">${escapeHtml(t('queue.mark_shipped'))}</button>` : '';
         const deliverBtn = `<button class="btn small success" data-act="mark-delivered" data-id="${log.id}">${escapeHtml(t('queue.mark_delivered'))}</button>`;
         const wasteBtn = `<button class="btn ghost small" data-act="log-waste-card" data-id="${log.id}" title="${escapeHtml(t('waste.log_from_card'))}">${_kIco('trash', '🗑')}</button>`;
         const isPaidCard = payStatus(log) === 'paid';
         const payBtn = (biz && !isPaidCard) ? `<button class="btn small primary" data-act="pay" data-id="${log.id}" title="${escapeHtml(t('pay.mark_paid'))}">💳 ${escapeHtml(t('pay.mark_paid'))}</button>` : '';
         const invoiceBtn = biz ? `<button class="btn small" data-act="invoice" data-id="${log.id}">${escapeHtml(t('queue.invoice'))}</button>` : '';
-        actions = `${invoiceBtn}${payBtn}${bnplBtn}${deliverBtn}${shipBtn}${asmBtn}${wasteBtn}${notifyBtn}${labelBtn}`;
+        actions = `${invoiceBtn}${payBtn}${bnplBtn}${shippedBtn}${deliverBtn}${shipBtn}${asmBtn}${wasteBtn}${notifyBtn}${labelBtn}`;
+      }
+      if (status === 'shipped') {
+        const deliverBtn = `<button class="btn small success" data-act="mark-delivered" data-id="${log.id}">${escapeHtml(t('queue.mark_delivered'))}</button>`;
+        const isPaidCard = payStatus(log) === 'paid';
+        const payBtn = (biz && !isPaidCard) ? `<button class="btn small primary" data-act="pay" data-id="${log.id}" title="${escapeHtml(t('pay.mark_paid'))}">💳 ${escapeHtml(t('pay.mark_paid'))}</button>` : '';
+        const wasteBtn = `<button class="btn ghost small" data-act="log-waste-card" data-id="${log.id}" title="${escapeHtml(t('waste.log_from_card'))}">${_kIco('trash', '🗑')}</button>`;
+        const invoiceBtn = biz ? `<button class="btn small" data-act="invoice" data-id="${log.id}">${escapeHtml(t('queue.invoice'))}</button>` : '';
+        actions = `${invoiceBtn}${payBtn}${bnplBtn}${deliverBtn}${shipBtn}${wasteBtn}${notifyBtn}${labelBtn}`;
       }
       if (status === 'delivered') {
         const isPaidCard = payStatus(log) === 'paid';

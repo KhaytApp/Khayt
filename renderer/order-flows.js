@@ -459,6 +459,7 @@ function runStatusEffects(order, effects, { prevTier, undo, toastText } = {}) {
         break;
       case 'toast_updated': toast(toastText || t('toast.status_updated'), 'success'); break;
       case 'toast_delivered': toast(toastText || t('toast.status_updated'), 'success'); break;
+      case 'toast_shipped': toast(toastText || t('toast.status_updated'), 'success'); break;
       case 'toast_updated_undoable':
         toast(toastText || t('toast.status_updated'), 'success', 5000, undo ? { undo } : {});
         break;
@@ -946,6 +947,23 @@ function markDelivered(orderId) {
   runStatusEffects(order, out.effects, { toastText: t('queue.delivered_toast', { id: order.id }) });
 }
 
+/**
+ * Out the door, not yet arrived.
+ *
+ * Like `markDelivered`, this does NOT move the status, and for a bigger reason
+ * than the column: a job in the post is finished work, and giving it a status
+ * of its own would take it out of every "finished" set in both apps — revenue,
+ * the P&L, the VAT return, a customer's lifetime spend. See
+ * `lib/order-status.js`, which owns the rule.
+ */
+function markShipped(orderId) {
+  const order = printLog.find(o => o.id === orderId);
+  if (!order) return;
+  const out = StatusRules().markShipped(order, { now: Date.now() });
+  if (!out.ok) return;   // not finished, or already arrived
+  runStatusEffects(order, out.effects, { toastText: t('queue.shipped_toast', { id: order.id }) });
+}
+
 /* ============================================================
    Assembly production tracking — per-part status, the "Assembled"
    gate, and a per-part reprint. See docs/KHAYT-3.0-BOM-SPEC.md §5.
@@ -1051,9 +1069,11 @@ function applyShippingStatus(order, next, source) {
   if (advanced === order.shippingStatus) return false;
   order.shippingStatus = advanced;
   pushShippingHistory(order, advanced, source);
-  if (advanced === 'delivered' && order.status === 'completed' && !order.deliveredAt) {
-    order.deliveredAt = new Date().toISOString();
-  }
+  // `shippedAt` and `deliveredAt` both, from one rule — see
+  // KhaytOrderStatus.stampFromShipping. This stamped only the delivery, so a
+  // job tracked by a carrier jumped from Completed to Delivered and was never
+  // once seen in the post.
+  KhaytOrderStatus.stampFromShipping(order, advanced, new Date().toISOString());
   return true;
 }
 
@@ -3217,6 +3237,7 @@ async function captureFailurePhoto(orderId) {
     resinCompletePost,
     deleteLog,
     markDelivered,
+    markShipped,
     openShipModal,
     applyShippingStatus,
     openAssemblyModal,

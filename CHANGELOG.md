@@ -846,6 +846,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **A job can be marked shipped.** Between finishing a job and handing it over
+  there was nowhere to say it had gone in the post, so a parcel sitting with a
+  courier looked exactly like one still on the bench. The board has a Shipped
+  column now, between Completed and Delivered, and a completed job can be
+  marked shipped from the card, from the Job menu and by right-clicking it on
+  the Mac. A shop that tracks parcels with a carrier gets it for free: the
+  first tracking event that says the parcel is moving stamps it, and a job that
+  reaches "delivered" without ever reporting in transit is stamped with both,
+  because a delivered job that was never shipped is a hole in its own history.
+  A printed label is deliberately not enough — that is a parcel still on the
+  bench.
+
+  **Shipped is not a status, and that is the point.** Like delivered, it is a
+  date stamped on a job that stays `completed`. A job in the post is finished
+  work: it has been made, it cost what it cost and it earned what it earned. A
+  status of its own would have taken it out of every figure that counts
+  finished work — revenue, the P&L, the VAT return, a customer's lifetime
+  spend — in about forty places, and the one that got missed would have been a
+  shop's money quietly going somewhere.
+
 - **(Mac) A customer's model can be priced by slicing it, not by guessing at
   its shape.** The estimate from geometry is honest but blunt: it cannot know
   about purge, and on a real four-colour dragon the shape said 13 g where the
