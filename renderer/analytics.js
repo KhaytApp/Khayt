@@ -139,29 +139,50 @@ function analyticsRangeDays(range, ctx, dates) {
 
 function computeHandoffMachineRows() {
   const orders = printLog.filter(o => inRange(o.date, analyticsRange, 'analytics') && KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o));
-  const machMap = {};
-  for (const m of machines) {
-    machMap[m.id] = { name: m.name, profit: 0, hours: 0, util: null };
-  }
-  const now = new Date();
-  const rangeDays = analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date));
 
+  // ── THE SAME RULE THE MACHINE P&L TABLE USES ──────────────────────────
+  //
+  // This computed `revenue - materialCost` and called it profit. The table
+  // further down the same screen computes `revenue - materialCost -
+  // linkedExpenses - maintenance` through `lib/machine-pl.js`, so the two
+  // disagreed about one machine — and this is the figure an owner uses to
+  // decide whether to RETIRE a printer. A belt change and a courier bill were
+  // simply missing from the one at the top.
+  const { rows: pl } = KhaytMachinePL.machineProfit({
+    machines,
+    completed: orders,
+    expenses: expenses.filter(e => e.orderId),
+    maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
+    unassigned: t('dash.unassigned'),
+  }, {
+    revenueOf: orderNetRevenueBase,
+    partCostOf: partTotalCost,
+  });
+
+  const hours = {};
   for (const o of orders) {
-    const key = o.machineId && machMap[o.machineId] ? o.machineId : null;
-    if (!key) continue;
-    const rev = orderNetRevenueBase(o);
-    const cost = (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0);
-    machMap[key].profit += rev - cost;
-    machMap[key].hours += +o.printTime || 0;
+    if (!o.machineId) continue;
+    hours[o.machineId] = (hours[o.machineId] || 0) + (+o.printTime || 0);
   }
-  for (const m of machines) {
-    if (!machMap[m.id]) continue;
-    const target = +(m.targetHoursPerDay || 0);
-    if (target > 0 && machMap[m.id].hours > 0) {
-      machMap[m.id].util = Math.min(100, Math.round((machMap[m.id].hours / (target * rangeDays)) * 100));
-    }
-  }
-  return Object.values(machMap).filter(r => r.hours > 0 || r.profit > 0).sort((a, b) => b.profit - a.profit);
+  const rangeDays = analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date));
+  const targetOf = {};
+  for (const m of machines) targetOf[m.id] = +(m.targetHoursPerDay || 0);
+
+  return pl.map((row) => {
+    const target = targetOf[row.machineId] || 0;
+    const ran = hours[row.machineId] || 0;
+    return {
+      name: row.name,
+      profit: row.net,
+      hours: ran,
+      // NOT CLAMPED TO 100, for the reason `lib/capacity.js` gives about its
+      // own gauge: a machine that ran half as much again as it was meant to
+      // and one that hit its target exactly are different facts, and capping
+      // draws them identically. A caller with a bar clamps the WIDTH; the
+      // number beside it stays true.
+      util: (target > 0 && ran > 0) ? Math.round((ran / (target * rangeDays)) * 100) : null,
+    };
+  }).filter(r => r.hours > 0 || r.profit !== 0);
 }
 
 function buildHandoffHeatmapCells() {
@@ -3318,6 +3339,8 @@ function renderBreakEvenCard() {
     renderTimeAnalytics,
     renderThroughputHeatmap,
     computeCapacityForecast,
+    // Exported so a test can hold it to the P&L table it must agree with.
+    computeHandoffMachineRows,
     renderCapacityGauge,
     renderAgedReceivables,
     renderSurveyAnalytics,

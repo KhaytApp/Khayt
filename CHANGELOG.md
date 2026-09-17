@@ -5,6 +5,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 ### Changed
+- **The machine figures at the top of Reports disagreed with the P&L table
+  below them.** The overview worked out a machine's profit as revenue less what
+  the parts cost, while the table underneath goes through the shared rule and
+  also subtracts the expenses linked to those jobs and the machine's own
+  maintenance. So a belt change and a courier bill were missing from the figure
+  at the top, and one screen gave two answers about one printer — the figure an
+  owner uses to decide whether to retire it. Both come from
+  `lib/machine-pl.js` now. The utilisation beside it was also capped at 100%,
+  so a machine that ran half as much again as it was meant to and one that hit
+  its target exactly were drawn identically; the cap is gone, for the same
+  reason `lib/capacity.js` gives about its own gauge.
+
 - **The custom report's "Delivered" box returned nothing at all.** It filtered
   on the raw status field, and a handed-over job does not carry `delivered`
   there — it stays `completed` with a `deliveredAt` beside it, which is what
