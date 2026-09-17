@@ -147,3 +147,26 @@ final class JSContextBox {
         return -1
     }
 }
+
+/// Any module, any expression — for ports whose surface is small enough that a
+/// bespoke box would be more ceremony than it is worth.
+@MainActor
+final class JSModule {
+    private let context: JSContext
+    init(_ modules: [String]) throws { context = try Parity.context(loading: modules) }
+    func value(_ expression: String, _ args: [JSONValue] = []) throws -> JSONValue {
+        try Parity.run(context, expression, args)
+    }
+    func int(_ expression: String, _ args: [JSONValue] = []) throws -> Int? {
+        if case .number(let n) = try value(expression, args) { return Int(n) }
+        return nil
+    }
+    func bool(_ expression: String, _ args: [JSONValue] = []) throws -> Bool? {
+        if case .bool(let b) = try value(expression, args) { return b }
+        return nil
+    }
+    func strings(_ expression: String, _ args: [JSONValue] = []) throws -> [String] {
+        guard case .array(let items) = try value(expression, args) else { return [] }
+        return items.compactMap { if case .string(let s) = $0 { return s } else { return nil } }
+    }
+}

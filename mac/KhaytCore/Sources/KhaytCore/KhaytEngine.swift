@@ -39,8 +39,7 @@ public actor KhaytEngine {
         "payment-plan",
         "split-order",
         "business-scope",
-        "order-progress",
-        // Which printer should take which job, and in what order.
+                // Which printer should take which job, and in what order.
         //
         // The Electron kanban has had this since 3.0 — `renderer/kanban.js`
         // calls `proposeSchedule` for its "Suggest assignments" panel — and the
@@ -386,8 +385,7 @@ public actor KhaytEngine {
         // saved. The save was a 240-line literal inside the Electron settings
         // page, which is why only that page could change a setting; lifted so
         // the Mac's Settings window writes the same record by the same clamps.
-        "currencies",
-        "settings-edit",
+                "settings-edit",
         // The expense book, a failed print written down by hand, and which
         // records fall in "this month". The three rules the Expenses, Waste
         // and Reports screens are built on; each was inline in a renderer
@@ -450,6 +448,12 @@ public actor KhaytEngine {
         // a consumable is undefined, and NaN <= threshold is false, so an empty
         // shelf reads as "not low" and never appears).
         "consumable-reorder",
+        // PORTED to `Currencies`, and still bundled: `lib/portal-refresh.js`
+        // reads `KhaytCurrencies` through `sibling()` at run time, so removing
+        // it from the bundle would leave the portal printing "EUR" where the
+        // document prints "€" — silently, and only for shops not using riyals.
+        // It leaves the bundle when its last JavaScript reader does.
+        "currencies",
         "consumable-categories",
         // What a print file has been printed WITH, and what it has been
         // printed AS. Two different relationships and the library needs both:
@@ -2642,7 +2646,7 @@ public actor KhaytEngine {
     /// How far along an order is, for the tracker a customer sees. An unknown
     /// status reports "started" rather than "nothing has happened".
     public func progressIndex(status: String) throws -> Int {
-        try runtime.call("KhaytOrderProgress", "progressIndex", [status], as: Int.self)
+        OrderProgress.index(of: status)
     }
 
     /// Escape hatch for logic not yet given a typed method. Deliberately
@@ -4961,9 +4965,10 @@ public actor KhaytEngine {
         try runtime.value("KhaytTax", "PRESETS", as: [String: TaxProfile].self)
     }
 
-    /// The currencies a shop can price in.
+    /// The currencies a shop can price in. NATIVE — see `Currencies`, whose
+    /// every row is compared against the JavaScript table.
     public func currencies() throws -> [String: Currency] {
-        try runtime.value("KhaytCurrencies", "CURRENCIES", as: [String: Currency].self)
+        Currencies.all.mapValues { Currency(symbol: $0.symbol, label: $0.label, pos: $0.pos) }
     }
 
     /// The languages the shop writes its own text in — one or two, never none.
@@ -5184,8 +5189,12 @@ public actor KhaytEngine {
             KhaytTelegramMessage.forStatus(ARG0, ARG1, {
               settings: ARG2,
               fmtPrice: function (n) {
-                var table = (globalThis.KhaytCurrencies || {}).CURRENCIES || {};
-                var cur = table[ARG3] || table.SAR || { symbol: ARG3, pos: 'after' };
+                // The symbol and its side come from SWIFT now — `Currencies`
+                // is native, so this no longer reaches for a global that the
+                // app may not be loading. Passed in rather than looked up, so
+                // un-bundling the table cannot quietly turn "€" back into
+                // "EUR" here.
+                var cur = { symbol: ARG4, pos: ARG5 };
                 var num = (Math.round((+n || 0) * 100) / 100).toFixed(2);
                 // U+202F, the narrow no-break space renderer/currency.js uses:
                 // it keeps the symbol against the figure across a line break.
@@ -5195,7 +5204,9 @@ public actor KhaytEngine {
               }
             })
             """,
-            [order, .string(newStatus), .object(settings), .string(currency)],
+            [order, .string(newStatus), .object(settings), .string(currency),
+             .string(Currencies.all[currency]?.symbol ?? Currencies.all["SAR"]?.symbol ?? currency),
+             .string(Currencies.all[currency]?.pos ?? "after")],
             as: TelegramMessage?.self)
     }
 
