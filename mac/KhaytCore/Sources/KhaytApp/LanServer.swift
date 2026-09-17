@@ -156,6 +156,26 @@ final class LanServer {
     static let maxFailureKeys = 5000
     static let maxBody = 1_048_576
 
+    /// How long a client may take to finish sending its request.
+    ///
+    /// ── A HAND-ROLLED LISTENER GETS NO DEFAULTS ───────────────────────────
+    ///
+    /// Node's http server applies `headersTimeout` and `requestTimeout` on its
+    /// own, so the other app has always been covered by machinery it never had
+    /// to ask for. `NWListener` gives nothing: a client that connected and said
+    /// nothing, or sent a `Content-Length` and then no body, was waited on for
+    /// ever — no answer, no close, the connection and its task held until the
+    /// app quit.
+    ///
+    /// That is a shop's Wi-Fi, so anyone on it could hold as many as they
+    /// liked. Fifteen seconds is far longer than a phone on the same network
+    /// needs and far shorter than "never".
+    ///
+    /// A `var` only so the tests can shorten it: a regression test for this
+    /// that waited fifteen real seconds per connection would be a test people
+    /// stop running.
+    static var readTimeout: TimeInterval = 15
+
     init(host: Host) { self.host = host }
 
     // MARK: - Listening
@@ -220,14 +240,41 @@ final class LanServer {
             if case .hostPort(let h, _) = connection.endpoint { return "\(h)" }
             return "?"
         }()
+        // ── THE READ IS BOUNDED, BY CANCELLING THE CONNECTION ─────────────
+        //
+        // A watchdog rather than a race between two tasks, and the difference
+        // is the whole reason this works. `readRequest` parks in a
+        // `withCheckedThrowingContinuation` waiting on `NWConnection.receive`,
+        // and CANCELLING THAT TASK DOES NOT RESUME IT — only the connection's
+        // own callback does. A task group would therefore wait for a child
+        // that can never finish, and the `defer` that cancels the connection
+        // cannot run until the group returns: a deadlock that holds the
+        // connection exactly as long as having no timeout at all did. Measured,
+        // not reasoned about — the first version of this fix was that deadlock
+        // and the stalled connection was still open twenty seconds later.
+        //
+        // Cancelling the CONNECTION is what unblocks the read: the pending
+        // receive fires with an error, `readRequest` throws, and this function
+        // unwinds normally. The client sees the connection close, which is what
+        // a read timeout looks like on the wire.
+        let watchdog = Task { [connection] in
+            try? await Task.sleep(nanoseconds: UInt64(Self.readTimeout * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            connection.cancel()
+        }
+        defer { watchdog.cancel() }
         do {
             guard let request = try await readRequest(connection, remote: remote) else { return }
+            // The head and body are in; the clock stops. A slow READER must not
+            // be killed halfway through the response it asked for.
+            watchdog.cancel()
             let response = await respond(to: request)
             try await write(response, method: request.method, to: connection)
         } catch let error as URLError where error.code == .dataLengthExceedsMaximum {
             try? await write(.open(413, #"{"error":"Request too large"}"#), method: "POST", to: connection)
         } catch {
-            // A client that hung up mid-request, or a listener being stopped.
+            // A client that hung up mid-request, a read that ran out of time,
+            // or a listener being stopped.
         }
     }
 
