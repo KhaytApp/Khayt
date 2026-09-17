@@ -82,6 +82,7 @@ function loadAnalyticsStack() {
   require('../lib/customer-mix.js'); // globalThis.KhaytCustomerMix
   require('../lib/throughput.js');   // globalThis.KhaytThroughput
   require('../lib/working-week.js'); // globalThis.KhaytWorkingWeek, which it reads the open days from
+  require('../lib/supplier-prices.js'); // globalThis.KhaytSupplierPrices
   require('../renderer/dashboard.js'); // renderMaterialUsageChart / renderFilamentAnalytics
   require('../renderer/analytics.js');
 }
