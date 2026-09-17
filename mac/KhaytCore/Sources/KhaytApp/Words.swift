@@ -801,6 +801,16 @@ final class Words {
         "mac.spotlight_note": ["en": "Model names, projects and tags only — never jobs or customers.",
                                "ar": "أسماء النماذج والمشاريع والوسوم فقط — لا الطلبات ولا العملاء."],
 
+        // The shop's own saved messages.
+        "mac.send_a_message": ["en": "Send a message", "ar": "إرسال رسالة"],
+        "mac.message_template": ["en": "Message",      "ar": "الرسالة"],
+        "mac.open_whatsapp":  ["en": "Open WhatsApp",  "ar": "فتح واتساب"],
+        "mac.no_phone_for_whatsapp": ["en": "This customer has no phone number on file.",
+                                      "ar": "لا يوجد رقم هاتف مسجّل لهذا العميل."],
+        "mac.replace_edited_message": ["en": "Replace what you have typed?",
+                                       "ar": "استبدال ما كتبته؟"],
+        "mac.replace":        ["en": "Replace",        "ar": "استبدال"],
+
         "mac.reading_file":   ["en": "Reading the file…", "ar": "جارٍ قراءة الملف…"],
         // The library's grouping menu.
         "mac.pick_a_model":  ["en": "Select a model first", "ar": "اختر نموذجًا أولًا"],

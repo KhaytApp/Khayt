@@ -241,8 +241,8 @@
    "date": "2026-08-16",
    "status": "printing",
    "project": "Museum replica — Kings",
-   "client": "Turki Al-Otaibi",
-   "clientId": "CLI-418DAE",
+   "client": "",
+   "clientId": "",
    "machineId": "MACH-x1c",
    "parts": [
     {
@@ -4224,12 +4224,34 @@
    "spoolId": "sp-3"
   }
  ],
+ "waTemplates": [
+  {
+   "id": "tpl-ready",
+   "name": "Order Ready",
+   "body": "Hi {{client}}, your order {{id}} is ready! Total: {{price}} {{currency}}. Please arrange pickup or delivery. Thank you!"
+  },
+  {
+   "id": "tpl-confirm",
+   "name": "Order Confirmed",
+   "body": "Hi {{client}}, we've received order {{id}} and it's now in our production queue. We'll notify you when it's ready."
+  },
+  {
+   "id": "tpl-payment",
+   "name": "Payment Reminder",
+   "body": "Hi {{client}}, gentle reminder: payment of {{price}} {{currency}} is outstanding for order {{id}}. Thank you!"
+  },
+  {
+   "id": "tpl-due",
+   "name": "Due Date",
+   "body": "Hi {{client}}, order {{id}} is {{status}} and due {{due}}."
+  }
+ ],
  "clients": [
   {
    "id": "CLI-8A5045",
    "nameEn": "KAUST Prototyping Lab",
    "nameAr": "مختبر النماذج — كاوست",
-   "phone": "",
+   "phone": "+966 50 123 4567",
    "email": "",
    "cr": "",
    "vat": "",

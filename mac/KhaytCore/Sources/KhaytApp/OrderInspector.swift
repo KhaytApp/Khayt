@@ -59,6 +59,19 @@ private struct Detail: View {
                     .buttonStyle(.link)
                     .font(.callout)
                 }
+                // The shop's OWN messages, which need no key, no connection
+                // and nobody's agreement to send a customer's details to a
+                // service. Offered whenever the book has any — a job with no
+                // customer record still gets a message the shop can copy, and
+                // the sheet says why the WhatsApp button is unavailable.
+                if !shop.messageTemplates.isEmpty {
+                    Divider()
+                    Button(shop.words.callIt("mac.send_a_message")) {
+                        shop.messagingFor = job
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                }
                 if shop.kit(of: job.id) != nil || !shop.kits.isEmpty || shop.canWrite {
                     Divider()
                     KitSection(shop: shop, job: job)

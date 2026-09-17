@@ -437,17 +437,28 @@ let kanbanSortByPriority = false;
 
 (function (global) {
 
+/**
+ * A saved template with this job's facts in it.
+ *
+ * The SUBSTITUTION is `lib/wa-template.js` — which placeholders exist, and
+ * what stands in for a blank — because a template a shop writes here is sent
+ * from the Mac app too, and two lists of placeholder names means a message
+ * going to a real customer with `{{due}}` printed in it.
+ *
+ * The FORMATTING stays here: what a price looks like is a currency, a locale
+ * and a digit system, and this app's answer is the one the rest of its screen
+ * already agrees with.
+ */
 function fillWaTemplate(body, order, client) {
-  const name = client
-    ? (localName(client))
-    : (order.project || '');
-  return body
-    .replace(/\{\{client\}\}/g, name || '...')
-    .replace(/\{\{id\}\}/g,     order.id || '')
-    .replace(/\{\{price\}\}/g,    fmtMoney(order.price))
-    .replace(/\{\{currency\}\}/g, currencySymbol())
-    .replace(/\{\{due\}\}/g,      order.dueDate || '—')
-    .replace(/\{\{status\}\}/g,   t('queue.' + order.status));
+  const name = client ? localName(client) : (order.project || '');
+  return KhaytWaTemplate.fillTemplate(body, {
+    client:   name,
+    id:       order.id,
+    price:    fmtMoney(order.price),
+    currency: currencySymbol(),
+    due:      order.dueDate,
+    status:   t('queue.' + order.status),
+  });
 }
 
 function sanitiseForAssign(obj) {

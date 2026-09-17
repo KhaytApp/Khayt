@@ -892,6 +892,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) The shop's own saved messages can be sent from the Mac.** Khayt has
+  always let a shop write its own WhatsApp messages — "Hi {{client}}, your
+  order {{id}} is ready!" — and this shop wrote three. Nothing on the Mac could
+  read them. The only way to write to a customer here asked a model to compose
+  something, which needs a key, a connection and an agreement to send a
+  customer's details to a service; most shops have none of those and all of
+  them already have their own words. Now: pick one on a job, see it filled in,
+  change anything, and WhatsApp opens with the number and the message ready to
+  send. Nothing is sent without a person pressing send.
+
+  Both apps fill the message through one rule now, so a template written in
+  either goes out of the other with the same fields filled — and that fixed a
+  fault in the original, where a customer whose name happened to contain a
+  field name, or a `$` pattern, could rewrite the rest of the message.
+
 - **(Mac) The print library is in Spotlight.** This shop keeps 209 models in 13
   projects, and finding one meant opening Khayt, going to the library and
   typing. A Mac already has a search box one keystroke from anywhere, and an
