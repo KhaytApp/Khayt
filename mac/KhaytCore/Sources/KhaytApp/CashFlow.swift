@@ -105,7 +105,7 @@ struct CashFlowChart: View {
                         Column(value: row.collected, peak: peak, colour: Khayt.done, up: true)
                         Rectangle().fill(Khayt.hairline).frame(height: 1)
                         Column(value: row.paidOut, peak: peak, colour: Khayt.late, up: false)
-                        Text(Self.shortMonth(row.month))
+                        Text(MonthLabel.short(row.month))
                             .font(.caption2).monospacedDigit()
                             .foregroundStyle(.secondary)
                             .padding(.top, 4)
@@ -113,15 +113,6 @@ struct CashFlowChart: View {
                     .frame(maxWidth: .infinity)
                 }
             }
-        }
-
-        /// `2026-08` → `08/26`. Not a localised month name: these sit under
-        /// narrow columns and a name that fits in one language does not fit in
-        /// nine, and digits read the same in all of them.
-        static func shortMonth(_ key: String) -> String {
-            let parts = key.split(separator: "-")
-            guard parts.count == 2 else { return key }
-            return "\(parts[1])/\(parts[0].suffix(2))"
         }
 
         private struct Column: View {

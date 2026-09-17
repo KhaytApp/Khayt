@@ -599,6 +599,27 @@ final class Words {
         // Cash flow — money paid on a day nobody wrote down.
         "mac.cf_undated":    ["en": "{amount} was collected on days that were never recorded, so it is not on the chart.",
                               "ar": "حُصِّل {amount} في أيام لم تُسجَّل، لذا لا يظهر في الرسم."],
+        // Three reports this app could not draw until it bundled their rules,
+        // and the sentences each needs that the shared catalogue has no key
+        // for — every one of them says something about what the chart above
+        // is NOT, which is why none of them existed for the other app's
+        // version of the same chart.
+        "mac.rt_all_time":   ["en": "{n} ratings in total, including months before this chart.",
+                              "ar": "{n} تقييماً إجمالاً، بما فيها أشهر سابقة لهذا الرسم."],
+        "mac.rt_thin":       ["en": "Too few ratings yet to read this as a score.",
+                              "ar": "التقييمات أقل من أن تُقرأ كدرجة بعد."],
+        "mac.rt_none":       ["en": "No ratings yet. Customers are asked when you send them the job's page.",
+                              "ar": "لا توجد تقييمات بعد. يُسأل العملاء عند إرسال صفحة الطلب إليهم."],
+        "mac.cs_unrecorded": ["en": "No customer has a source recorded yet — set one on a customer to see where your work comes from.",
+                              "ar": "لم يُسجَّل مصدر لأي عميل بعد — حدِّد مصدراً لعميل لتعرف من أين يأتي عملك."],
+        "mac.cs_unset":      ["en": "Not recorded",
+                              "ar": "غير مسجَّل"],
+        "mac.mc_no_service": ["en": "No servicing was logged against a machine in {year}.",
+                              "ar": "لم تُسجَّل صيانة على أي آلة في {year}."],
+        "mac.mc_sold":       ["en": "This machine is no longer in the fleet — the cost is kept because the money still left the shop.",
+                              "ar": "لم تعد هذه الآلة ضمن الأسطول — أُبقيت التكلفة لأن المال خرج فعلاً."],
+        "mac.ec_reclaimed":  ["en": "{amount} of tax on these is reclaimable, so it is not charged as a cost.",
+                              "ar": "{amount} من الضريبة على هذه قابلة للاسترداد، لذا لا تُحتسب تكلفةً."],
         // Report builder — the shared catalogue has the screen's own words
         // but not the sentence that says which knob to turn.
         // The shape of a typed day. Translated rather than left as the ISO

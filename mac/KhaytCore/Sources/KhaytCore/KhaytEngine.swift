@@ -273,6 +273,32 @@ public actor KhaytEngine {
         // implementations of it is the one thing the shared rules exist to
         // prevent.
         "machine-pl",
+        // ── REPORTS THE MAC COULD NOT DRAW ────────────────────────────────
+        //
+        // Each was written and tested while fixing a real arithmetic fault in
+        // the Electron screen it belongs to, and stayed behind because the Mac
+        // had no screen to put it on. A rule the other app has and this one
+        // does not is the gap [[khayt-mac-is-the-product]] says not to leave.
+        //
+        // None of them reads another module, so none needs an ordering note —
+        // unlike `nozzle-wear` and `printer-catalog` above.
+        //
+        // ONE MORE WAS CONSIDERED AND IS DELIBERATELY NOT HERE, because
+        // bundling a rule nothing can call is how a module ends up correct,
+        // shipped and dead:
+        //
+        //   `supplier-prices` — the Mac already answers this, and better.
+        //   It wants a suppliers list with purchase records inside it, which
+        //   no book in this repo has: not the sample shop, not the live one.
+        //   `MaterialCostCard` asks the same question of the SPOOLS, which
+        //   every shop does have, and groups by unit for the same reason.
+        //   A second card sourced from nothing would be empty in every shop
+        //   that has ever opened this app.
+        //
+        "maintenance-cost",
+        "rating-trend",
+        "client-sources",
+        "expense-categories",
         // What a finished job takes off the shelf: the grams, the hourly
         // consumables, the bought-in components, the packaging. Lifted out of
         // renderer/inventory.js because the move being shared is not enough —
@@ -6660,6 +6686,134 @@ public actor KhaytEngine {
     /// blank, and the next save re-costs it at nothing. So a job taken on this
     /// Mac and edited in Khayt would have lost its price, quietly, on somebody
     /// else's machine.
+    // MARK: - Reports the Mac could not draw
+
+    /// What the shop spent keeping each machine running, in one year.
+    ///
+    /// The entries are the book's own service log — the list this app already
+    /// reads as `Shop.maintenanceRows` for the machine P&L, stored under the
+    /// key `renderer/app-state.js` writes it to. The chart in the other app
+    /// read `machine.machMaintLog`, a per-machine property nothing has ever
+    /// written, so it totalled zero for every machine and printed "No data
+    /// yet" however many services a shop had logged.
+    public struct MaintenanceCostRow: Decodable, Sendable {
+        public let machineId: String
+        public let name: String
+        /// The machine has been deleted, and the row is labelled by the id the
+        /// entry carries. The money still left the shop.
+        public let orphan: Bool
+        public let total: Double
+    }
+    public func maintenanceCost(machines: [JSONValue], entries: [JSONValue], year: Int)
+        throws -> [MaintenanceCostRow] {
+        try runtime.call2("globalThis.KhaytMaintenanceCost.byMachine(ARG0, ARG1, { year: ARG2 })",
+                          [.array(machines), .array(entries), .number(Double(year))],
+                          as: [MaintenanceCostRow].self)
+    }
+
+    /// What customers have said, month by month.
+    public struct RatingTrend: Decodable, Sendable {
+        public struct Point: Decodable, Sendable {
+            public let month: String
+            public let responses: Int
+            public let average: Double?
+        }
+        public let points: [Point]
+        public let responses: Int
+        public let average: Double?
+        public let allTimeResponses: Int
+        public let enough: Bool
+    }
+    public func ratingTrend(orders: [JSONValue], months: [String]) throws -> RatingTrend {
+        try runtime.call2("globalThis.KhaytRatingTrend.trend(ARG0, ARG1)",
+                          [.array(orders), .array(months.map(JSONValue.string))],
+                          as: RatingTrend.self)
+    }
+
+    /// Where the shop's customers came from, and what they have spent.
+    ///
+    /// The three filters match what every other money figure on the Reports
+    /// screen counts: finished, unvoided, the shop's own business.
+    public struct ClientSourceRow: Decodable, Sendable {
+        public let source: String
+        public let count: Int
+        public let revenue: Double
+    }
+    /// The rows AND what they are a share OF.
+    ///
+    /// `totalClients` counts every customer in the book; the rows only cover
+    /// sources at least one customer carries. A screen that added the rows up
+    /// itself would get the same number today and a different one the moment
+    /// the rule starts leaving a row out, and then there would be two answers.
+    public struct ClientSources: Decodable, Sendable {
+        public let rows: [ClientSourceRow]
+        public let totalClients: Int
+        public let totalRevenue: Double
+    }
+    /// Every source a customer record can carry, in the order a form offers
+    /// them.
+    ///
+    /// ASKED OF THE RULE, never written down here. A second copy in Swift is a
+    /// second list to forget to update, and this one broke before for exactly
+    /// that reason: the chart iterated six sources while the intake form
+    /// stamped a seventh, so every customer who arrived through the shop's own
+    /// form fell out of the report. `test/client-sources-agree.test.js` keeps
+    /// the JS writers honest; asking keeps this app honest.
+    public func clientSourceNames() throws -> [String] {
+        try runtime.call2("globalThis.KhaytClientSources.SOURCES", [], as: [String].self)
+    }
+
+    public func clientSources(clients: [JSONValue], orders: [JSONValue],
+                              settings: [String: JSONValue]) throws -> ClientSources {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG2, clients: ARG0 };
+          return globalThis.KhaytClientSources.byClient(
+            { clients: ARG0, orders: ARG1 },
+            {
+              revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+              isFinished: function (o) { return globalThis.KhaytOrderStatus.isFinished(o); },
+              countsForBusiness: function (o) {
+                return globalThis.KhaytBusinessScope
+                  ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
+              },
+            });
+        })()
+        """#, [.array(clients), .array(orders), .object(settings)], as: ClientSources.self)
+    }
+
+    /// What the shop spent, by category.
+    ///
+    /// `reclaimsTax` nets the reclaimable VAT off each expense — the figure a
+    /// registered shop actually bore, which is what made this disagree with the
+    /// P&L before it was lifted.
+    public struct ExpenseCategoryRow: Decodable, Sendable {
+        public let category: String
+        /// What the shop BORE under this category — already net of any tax it
+        /// reclaimed, which is the whole point of the rule.
+        public let amount: Double
+        /// The part of it the shop claims back. Zero unless it is registered.
+        public let reclaimed: Double
+        /// Of `Spending.total`, not of the gross. The rule divides by its own
+        /// denominator so a fully-reclaimable book divides by one, not zero.
+        public let share: Double
+    }
+    /// The categories AND the two figures that go above them. The envelope is
+    /// kept whole on purpose: a screen that draws the bars and then adds them
+    /// up itself would get a different total the first time a book nets
+    /// negative, and then there would be two answers to one question.
+    public struct Spending: Decodable, Sendable {
+        public let rows: [ExpenseCategoryRow]
+        public let total: Double
+        public let reclaimed: Double
+        public let biggest: Double
+    }
+    public func expenseCategories(_ expenses: [JSONValue], reclaimsTax: Bool)
+        throws -> Spending {
+        try runtime.call2("globalThis.KhaytExpenseCategories.byCategory(ARG0, { reclaimsTax: ARG1 })",
+                          [.array(expenses), .bool(reclaimsTax)], as: Spending.self)
+    }
+
     /// Which signal `moonrakerProgress` chose — so a test can hold the screen's
     /// vocabulary to the rule's own rather than to a list typed twice.
     public func moonrakerProgressSource(printStats: JSONValue, virtualSdcard: JSONValue,

@@ -89,7 +89,7 @@ struct WasteTrendCard: View {
                         } else {
                             Rectangle().fill(Khayt.hairline).frame(height: 1)
                         }
-                        Text(Self.shortMonth(month.key))
+                        Text(MonthLabel.short(month.key))
                             .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
                             .padding(.top, 4)
                     }
@@ -97,12 +97,6 @@ struct WasteTrendCard: View {
                     .padding(.horizontal, 6)
                 }
             }
-        }
-
-        static func shortMonth(_ key: String) -> String {
-            let parts = key.split(separator: "-")
-            guard parts.count == 2 else { return key }
-            return "\(parts[1])/\(parts[0].suffix(2))"
         }
     }
 }
