@@ -1744,6 +1744,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   timeout belongs to a server now rather than to the whole app, so there is
   nothing shared to race on — and the same search found one more test with the
   same shape, in a different file, which is now fixed too.
+- **(Mac) Every repair typed into the Mac went into a field nothing reads, and
+  the machine P&L charged no maintenance at all.** The service log was written
+  under the name the other app keeps it under *in the browser's own storage* —
+  not the name it uses in the shop's book. The book has only ever had the
+  second. So a nozzle change logged on the Mac never appeared in Khayt, and the
+  figure that decides whether a printer is worth keeping was missing every
+  riyal a shop had spent servicing it, silently and on every real book.
+
+  Every test passed throughout, because the sample book had been written to
+  match the mistake. The key is checked against the other app's own source
+  now, so a fixture and a constant cannot agree with each other while both are
+  wrong. Repairs already typed into a Mac alpha are moved into the right place
+  the next time the book is opened — they are a shop's own work, not something
+  to drop.
 
 - **(Mac) The invoice and label sheets are laid out with everything they do not
   need switched off.** Both are drawn by WebKit, because the document is the

@@ -34,9 +34,80 @@ struct ServiceEntry: Identifiable, Hashable, Sendable {
 /// without a book on disk to write to.
 enum ServiceLogEdit {
 
-    /// The key the log lives under. `renderer/app-state.js` chose it; this is
-    /// not free to differ.
-    static let collection = "hub_maint_log_v1"
+    /// The key the log lives under in the STORE FILE.
+    ///
+    /// ── AND IT WAS THE WRONG ONE ──────────────────────────────────────────
+    ///
+    /// This was `hub_maint_log_v1`, with a comment saying
+    /// `renderer/app-state.js` chose it. The instinct was right and the key
+    /// was not: `hub_maint_log_v1` is that app's **localStorage** key, from
+    /// the legacy fallback path, and `app-state.js` translates it into
+    /// `machMaintLog` on the way in. `collectStoreCollections` — the snapshot
+    /// that IS the store file — writes `machMaintLog`, and `loadAll` reads
+    /// `store.machMaintLog`.
+    ///
+    /// So the store file has never held a `hub_maint_log_v1`. Checked against
+    /// a real book rather than reasoned about: `machMaintLog` present,
+    /// `hub_maint_log_v1` absent.
+    ///
+    /// Two consequences, both silent. A service typed in here went to a key
+    /// the other app does not read, so it was invisible there. And the read
+    /// found nothing on any real book, so **the machine P&L charged zero
+    /// maintenance however much a shop had spent** — which is the figure that
+    /// decides whether a printer is worth keeping.
+    ///
+    /// Every test passed throughout, because `sample-shop.json` had been
+    /// written to match the mistake. That is why `ServiceLogKeyTests` reads
+    /// the other app's source instead of trusting a fixture.
+    static let collection = "machMaintLog"
+
+    /// Where a Mac alpha put the log before the key was corrected.
+    ///
+    /// Left as a constant rather than spelled inline because the migration and
+    /// its test both need it, and a repair somebody typed into this app is
+    /// theirs — it is moved, not dropped.
+    static let strandedCollection = "hub_maint_log_v1"
+
+    /// Move a log written under the old key into the right one.
+    ///
+    /// Merged rather than replaced: a shop that used both apps has rows in
+    /// each, and the Mac's are the ones nobody else can see. Returns whether
+    /// anything moved, so the caller only writes when there is a reason to.
+    ///
+    /// Sorted newest-first afterwards, which is the order the log is kept in
+    /// — two lists concatenated would interleave wrongly and the machine card
+    /// would show June above September.
+    static func rescueStranded(_ root: inout [String: JSONValue]) -> Bool {
+        guard case .array(let stranded)? = root[strandedCollection], !stranded.isEmpty
+        else {
+            // An empty stray key is still a stray key, and leaving it means
+            // every future book carries a field nothing reads.
+            if root[strandedCollection] != nil {
+                root[strandedCollection] = nil
+                return true
+            }
+            return false
+        }
+        var log: [JSONValue] = []
+        if case .array(let had)? = root[collection] { log = had }
+        // By id, so running this twice cannot double a shop's repair bill.
+        var seen = Set<String>()
+        for row in log { if case .object(let r) = row, case .string(let id)? = r["id"] { seen.insert(id) } }
+        for row in stranded {
+            guard case .object(let r) = row else { continue }
+            if case .string(let id)? = r["id"], !seen.insert(id).inserted { continue }
+            log.append(row)
+        }
+        root[collection] = .array(log.sorted { lhs, rhs in
+            func day(_ v: JSONValue) -> String {
+                if case .object(let o) = v, case .string(let d)? = o["date"] { return d }
+                return ""
+            }
+            return day(lhs) > day(rhs)
+        })
+        root[strandedCollection] = nil
+        return true
+    }
 
     /// A service, in the shape the other app writes and reads.
     ///

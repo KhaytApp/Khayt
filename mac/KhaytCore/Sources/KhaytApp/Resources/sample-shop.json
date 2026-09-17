@@ -5418,7 +5418,7 @@
    "unitCost": 0.15
   }
  ],
- "hub_maint_log_v1": [
+ "machMaintLog": [
   {
    "id": "MAINT-01",
    "machineId": "MACH-x1c",
