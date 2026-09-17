@@ -330,6 +330,11 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
     /// Delivered and cancelled are off it on purpose: they are where work goes
     /// to stop being work, and a column of two hundred delivered jobs buries the
     /// four that need doing.
+    ///
+    /// SHIPPED IS ON IT, and the difference is whether anyone might still have
+    /// to do something. A parcel in the post can go missing, sit at a depot, or
+    /// need chasing; a delivered one is finished with. The board is for work in
+    /// flight, and a job with a courier still is.
     static let boardColumns: [Stage] = [.quote, .pending, .on_hold, .printing, .post, .qc, .completed, .shipped]
 
     /// The stage a job is in, or nil for a status this app has no column for.
