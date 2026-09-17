@@ -18,7 +18,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   that has not loaded and for a month with nothing in it, where it means
   "nothing to show yet" rather than "nothing we are willing to say".
 
-- **(Mac) Seven of Khayt's shared rules now run natively, with tests that will
+- **(Mac) Ten of Khayt's shared rules now run natively, with tests that will
   not let them drift.** The Mac app has always run Khayt's business rules —
   pricing, tax, costing, identity — as the same JavaScript the Windows app runs,
   so that both apps could not disagree. Those rules are being rewritten in
@@ -39,7 +39,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   every day", and a day index of half a day answering with Sunday's hours. And
   one more the port fixes outright: a shop with an expense category recorded
   as a number, rather than as text, used to make the whole spending panel
-  disappear with nothing said.
+  disappear with nothing said. Since then: the saved customer messages, what a
+  catalogue product is made of, and what a Bambu printer says it is doing — the
+  last of those written down because a printer reported as idle in one app and
+  printing in the other is exactly the disagreement this work exists to
+  prevent.
 
 - **The machine figures at the top of Reports disagreed with the P&L table
   below them.** The overview worked out a machine's profit as revenue less what
