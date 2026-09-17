@@ -2328,6 +2328,56 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.22] - 2026-09-17
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Reports answers five questions it had no screen for.** Where your customers
+  came from, what you spend by category, what customers thought of the work,
+  what servicing each machine cost, and how long each machine stood out of
+  action. The arithmetic behind all five was written for the Windows app and
+  had stayed there — and every one of them carried a real fault, fixed here
+  rather than copied over:
+  - the customer-source chart never counted anyone who arrived through your own
+    intake form, and counted voided and personal jobs as money a source brought
+    in;
+  - the expense breakdown added up the gross while the Profit & Loss above it
+    charged the net, so for a registered shop the parts did not add up to the
+    whole they were a breakdown of;
+  - the rating caption counted every rating you had ever collected while the
+    chart under it covered six months, so a good year went on describing a bad
+    quarter;
+  - the maintenance chart read a field nothing has ever written, so it said "no
+    data" however many services you had logged;
+  - downtime added overlapping windows together, so a belt change booked Monday
+    to Wednesday and "waiting for the part" booked Tuesday to Thursday read as
+    96 hours out of action instead of 72.
+
+- **A customer can be given a lead source.** Reports counts customers by where
+  they came from and there was no way to set one, so a Mac-only shop read
+  "Other" for every customer it had.
+
+- **A service can be written down: what was done to a machine, when, and what
+  it cost.** Khayt could show what each printer was due for and let you tick a
+  task off, and none of that reached the record — so a shop servicing its
+  machines here had no history of it, and every maintenance figure in both apps
+  counted none of it. Ticking a task off now records the service too, and each
+  machine has a log you can add to and delete from. Recording a repair as an
+  expense as well is offered and off by default, because a machine's profit
+  already has its servicing taken off it and doing both counts the money twice.
+
+- **A machine row says how hard the printer worked, not just what it earned.**
+  Hours run and utilisation beside the money, because a printer that earned
+  little in three hours and one that earned little in three hundred are the
+  same figure on the left and completely different machines. The hours are what
+  the prints took where the printer measured them, and the row says how many
+  were estimates rather than implying it was all timed. Utilisation is never
+  capped at 100%: a printer running half as much again as you wanted is the
+  finding, not an overflow to hide.
+
 ## [4.0.0-alpha.21] - 2026-09-17
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
