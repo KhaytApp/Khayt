@@ -18,6 +18,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   away. It falls back to the job's own date. The rule is
   `lib/rating-trend.js`.
 
+- **(Maintainers) The list of QC failure types was written out four times.**
+  The nine reasons a print can fail — bed adhesion, nozzle jam, warping and the
+  rest — lived in `lib/qc-failure.js`, in `lib/waste-entry.js`, as nine
+  typed-out `<option>` tags in the QC fail dialog, and in Bed Ready's own copy.
+  The QC dialog now builds its options from the rule's list, and a test holds
+  the remaining two lists together along with every locale that has to name
+  them. The consequence being guarded against is not symmetrical: a type the
+  dialog offered and the rule did not know would still be saved onto the order,
+  and the analytics defect chart would label it `t('waste.ft.' + type)` — which
+  does not fall back, so a customer-facing report would print the literal
+  string "waste.ft.whatever". Nothing is wrong today; this keeps it that way.
+
 - **(Mac) The Reports target was measured against a different set of jobs than
   the figure beside it.** The monthly target on the Reports screen said it
   counted finished, unvoided business — and filtered `completed` alone. The
