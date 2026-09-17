@@ -1690,6 +1690,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) Looking for a moved printer said nothing at all unless it worked.**
+  "Find it on the network" either found the printer and offered the move, or
+  left the screen exactly as it was — no "nothing answered", no "that could not
+  be saved", not even "moved to .56" when it had just done it. The messages were
+  being written the whole time and nothing drew them. On a screen a shop only
+  visits when something is already wrong, silence is the worst of the answers,
+  and the new sweep made the wait before it much longer.
+
+
 - **(Mac) An empty Utilisation column said nothing about why it was empty.**
   Hours run against hours wanted needs somebody to have said what was wanted,
   and a machine has no target hours a day until you fill one in — so every row
