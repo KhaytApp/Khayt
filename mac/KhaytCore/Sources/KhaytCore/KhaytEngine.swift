@@ -677,7 +677,6 @@ public actor KhaytEngine {
         "mdns",
         "printer-discovery",
         "printer-sweep",
-        "bambu-report",
         // Elegoo resin. `sdcp` is pure — framing and status mapping;
         // `sdcp-reply` decides which frame is the answer. The socket is
         // Swift's, because `lib/sdcp-client.js` cannot leave Node.
@@ -744,7 +743,6 @@ public actor KhaytEngine {
         // summed its parts. A product's price is COMPUTED, not typed, and two
         // apps computing it separately is two prices for one product.
         "product-pricing",
-        "product-specs",
         // Which papers travel with an order. It is a two-audience rule and
         // that is the whole of it: the work order lists everything, the
         // delivery note only what the shop marked to ship, and "not marked"
@@ -5770,8 +5768,9 @@ public actor KhaytEngine {
     /// regardless would report a printer as Idle on the strength of a message
     /// that said nothing about what it was doing.
     public func bambuStatus(report payload: String) throws -> PrinterStatus? {
-        try runtime.call2("globalThis.KhaytBambuReport.parseBambuReport(ARG0)",
-                          [.string(payload)], as: PrinterStatus?.self)
+        guard let parsed = BambuReport.parse(payload) else { return nil }
+        let data = try JSONEncoder().encode(parsed)
+        return try JSONDecoder().decode(PrinterStatus?.self, from: data)
     }
 
     // MARK: - SDCP (Elegoo resin)
@@ -6375,10 +6374,16 @@ public actor KhaytEngine {
 
     /// What a product's parts add up to: hours, grams and the materials.
     public func productSpecs(_ product: JSONValue) throws -> ProductSpecs {
-        try runtime.call2("KhaytProductSpecs.productSpecs(ARG0)", [product], as: ProductSpecs.self)
+        let specs = CatalogueSpecs.specs(of: product)
+        return ProductSpecs(printHours: specs.printHours, weightGrams: specs.weightGrams,
+                            material: specs.material)
     }
 
     public struct ProductSpecs: Decodable, Sendable, Hashable {
+        public init(printHours: Double?, weightGrams: Double?, material: String) {
+            self.printHours = printHours; self.weightGrams = weightGrams
+            self.material = material
+        }
         public let printHours: Double?
         public let weightGrams: Double?
         public let material: String
@@ -6390,11 +6395,20 @@ public actor KhaytEngine {
     /// reason `customerNames` exists.
     public func catalogue(_ products: [JSONValue], language: String,
                           settings: [String: JSONValue]) throws -> [CatalogueRow] {
-        try runtime.call2("""
-            (function (rows, lang, settings) {
-              return rows.map(function (p) {
+        // THE SPECS ARE WORKED OUT HERE, in `CatalogueSpecs`, and handed in
+        // beside each row — which is what lets the module leave the bundle.
+        // Price and the language pick stay where they are; one rule each.
+        let specs: [JSONValue] = products.map { product in
+            let s = CatalogueSpecs.specs(of: product)
+            return .object(["printHours": s.printHours.map(JSONValue.number) ?? .null,
+                            "weightGrams": s.weightGrams.map(JSONValue.number) ?? .null,
+                            "material": .string(s.material)])
+        }
+        return try runtime.call2("""
+            (function (rows, lang, settings, allSpecs) {
+              return rows.map(function (p, i) {
                 var price = KhaytProductPrice.finalPrice(p, +p.basePrice || 0);
-                var specs = KhaytProductSpecs.productSpecs(p);
+                var specs = allSpecs[i];
                 return {
                   id: String(p.id || ''),
                   name: KhaytContentLanguages.read(p, 'name', lang, settings) || '',
@@ -6418,9 +6432,10 @@ public actor KhaytEngine {
                   group: String(p.group || '')
                 };
               });
-            })(ARG0, ARG1, ARG2)
+            })(ARG0, ARG1, ARG2, ARG3)
             """,
-                          [.array(products), .string(language), .object(settings)],
+                          [.array(products), .string(language), .object(settings),
+                           .array(specs)],
                           as: [CatalogueRow].self)
     }
 
