@@ -230,8 +230,15 @@ private struct Card: View {
                 .controlSize(.small)
                 .disabled(!shop.canMoveJobs)
             } else {
-                Button(shop.words.callIt(shop.lookingForMoved ? "mac.moved_looking"
-                                                              : "mac.moved_find")) {
+                // ── THREE STATES, BECAUSE THE SECOND ONE IS SLOW ──────
+                //
+                // Listening for an announcement answers in about a second.
+                // Asking a whole /24 takes up to twenty-five, and a button
+                // that has said "Looking…" for twenty of them reads as hung.
+                // So the slow half says what it is doing.
+                Button(shop.words.callIt(shop.sweeping ? "mac.moved_asking"
+                                         : shop.lookingForMoved ? "mac.moved_looking"
+                                                                : "mac.moved_find")) {
                     Task { await shop.findMovedPrinters() }
                 }
                 .controlSize(.small)

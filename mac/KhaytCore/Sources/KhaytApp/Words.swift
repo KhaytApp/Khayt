@@ -1859,6 +1859,9 @@ final class Words {
         "mac.est_rate_hint": ["en": "How fast your printers run is not asked for — Khayt learns it from jobs whose real weight and duration were recorded.",
                               "ar": "لا نسأل عن سرعة طابعاتك — يتعلّمها خيط من الأعمال التي سُجّل وزنها ومدّتها الحقيقية."],
         "mac.moved_looking": ["en": "Looking…", "ar": "جارٍ البحث…"],
+        // The slow half: listening found nothing, so the addresses around the
+        // one it used to be on are being asked one at a time.
+        "mac.moved_asking": ["en": "Asking the network…", "ar": "جارٍ سؤال الشبكة…"],
         "mac.moved_here": ["en": "It answers at {host} now",
                            "ar": "يستجيب الآن على {host}"],
         // The two cases the rule separates, said differently on purpose: one is
