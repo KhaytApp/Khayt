@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The calendar subscription is served natively, and it serves exactly
+  what it used to.** A shop that has added Khayt's due-date feed to its
+  calendar sees the same events, to the byte — including two oddities the
+  original has always had and which a port is not the place to change: a job
+  dated only with a year appears on New Year's Day, and a year-and-month one
+  appears on the first of that month.
+
 - **(Mac) The biggest figure on the main screen was a permanent dash.** The
   masthead's largest slot is labelled with the month and the word NET, and it
   printed an em dash on every shop, every month, with a note under it saying
