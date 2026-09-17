@@ -2203,6 +2203,89 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.20] - 2026-09-17
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **A job can be marked shipped.** Between finishing a job and handing it over
+  there was nowhere to say it had gone in the post, so a parcel sitting with a
+  courier looked exactly like one still on the bench. The board has a Shipped
+  column now, between Completed and Delivered, and a completed job can be
+  marked shipped from the card, from the Job menu and by right-clicking it on
+  the Mac. A shop that tracks parcels with a carrier gets it for free: the
+  first tracking event that says the parcel is moving stamps it, and a job that
+  reaches "delivered" without ever reporting in transit is stamped with both,
+  because a delivered job that was never shipped is a hole in its own history.
+  A printed label is deliberately not enough — that is a parcel still on the
+  bench.
+- **(Mac) A converted model goes into the library, and can put the original
+  aside.** A conversion used to end at a file in a folder. The shop then had to
+  go and import the thing it had just made — in the one app whose whole job is
+  knowing what models it has — so the converted file was the only model in the
+  building Khayt did not know about. It is added to the library now, and it
+  still lands in the folder the save panel asked about, because that is where
+  the shop just said to put it.
+
+### Changed
+
+- **(Mac) A job can be moved by right-clicking it.** Moving a job along is the
+  thing a shop does most, and it was the one thing only the menu bar could do.
+  The right-click menu on the orders table had edit, payment, hold, delivered
+  and the invoice, and no stages — so changing a status meant selecting the row
+  and going up to the menu bar for a decision already made about the row under
+  the pointer. A card on the board was worse: it had no right-click menu at
+  all, so moving a job two columns meant dragging it past the ones in between.
+  Both offer the stages now, and a card on the board offers everything the
+  table's menu does. It is one list in one place, and a move started from any
+  of the three asks the same questions and leaves the same record.
+- **Two overlapping maintenance windows counted as twice the downtime.** A shop
+  books a printer out for a belt change on Monday to Wednesday, then adds
+  "waiting for the part" for Tuesday to Thursday. Both are true and both get
+  recorded, and the machine is unavailable for 72 hours. Three separate places
+  added the two windows up and reported 96: the scheduler, where the total goes
+  into a machine's load and decides which printer takes the next job; the lead
+  times published to customers; and the Reports downtime chart, which with
+  enough overlaps could report more downtime in a month than the month has
+  hours. Elapsed time is the union of the windows, not the sum of their
+  lengths, and `lib/downtime.js` is the one place that knows it. The windows a
+  shop has stored are not touched: merging happens when the hours are counted,
+  so "belt change" and "waiting for the part" both survive as written.
+- **The snapshot runner can be pinned to the sample book.** It opens whichever
+  book is on the machine and swaps back to it partway through — right for
+  reviewing a build, wrong for anything published. Taking the website's
+  screenshots from it photographed this machine's real shop: its name, its
+  customers, its job figures, in 26 of the frames. `KHAYT_BOOK=sample` now
+  pins the whole run to the invented book, so every frame says
+  `sample-shop.json` in the corner. Unset, nothing changes.
+
+### Fixed
+
+- **(Mac) Dragging a card onto the new Shipped column would have written an
+  invalid status.** The board draws a column per stage and every column is a
+  drop target, so the moment Shipped got a column, dropping a card on it asked
+  to set `status: 'shipped'` — the exact thing the stage was designed as a
+  stamp to avoid, because a job with a status no "finished" set knows about
+  drops out of revenue, the P&L, the VAT return and a customer's lifetime
+  spend without anything reporting an error. The shared rules refuse the move
+  now, so no app can make it, and the board performs the stamp instead. Only
+  `shipped` is refused: `delivered` is derived the same way but is a status
+  older books really carry, and it has always been an allowed destination.
+- **(Maintainers) Nothing proved that Simple mode actually hides anything.**
+  Every test loaded the sample book, which carries no mode at all and is
+  therefore Professional, and asserted that every gated screen was present — so
+  the one thing the feature exists to do was the one thing untested. When
+  somebody set the sample to Simple, photographed the Mac sidebar and saw
+  Expenses and Reports still on it, there was no test to say whether the app
+  was wrong or the experiment was. Measured through the real load path, a
+  Simple shop loses all four gated features and the engine loads cleanly; the
+  photograph came from a stale resource bundle, so the running binary never
+  read the edited book. Three tests now cover it: Simple loses what its mode
+  excludes and keeps what is not gated, an enthusiast book reads as Simple but
+  keeps its customers, and a book with no mode keeps everything.
+
 ## [4.0.0-alpha.19] - 2026-09-17
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
