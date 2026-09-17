@@ -247,6 +247,19 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// The stages a job can be sent to from a menu, in the order work moves
+    /// through them.
+    ///
+    /// `on_hold` is not among them because it asks a question first, and
+    /// `delivered` is not because it is not a stage: handing a job over stamps
+    /// a date on a completed one. Both have their own item wherever this list
+    /// is offered.
+    ///
+    /// One list, read by the Job menu in the menu bar, the right-click menu on
+    /// the orders table, and the right-click menu on a board card. Which of
+    /// them a move was started from must not change where a job can go.
+    static let destinations: [Stage] = [.quote, .pending, .printing, .post, .qc, .completed]
+
     /// SF Symbols, not emoji. The Electron app puts a coloured emoji next to
     /// almost every label, and it is a large part of why it reads as a web page:
     /// emoji do not take the text colour, do not thin at small sizes, and do not

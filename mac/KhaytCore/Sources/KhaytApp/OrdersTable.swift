@@ -233,6 +233,29 @@ struct JobActions: View {
     let job: Order
 
     var body: some View {
+        // WHERE THE JOB GOES, ON THE JOB ITSELF.
+        //
+        // This menu had every other thing you do to a job and not the one thing
+        // a shop does most: move it along. Changing a status meant selecting the
+        // row, going to the menu bar and finding Job ▸ — for a decision already
+        // made about the row under the pointer. The board was worse: a card
+        // could only be DRAGGED, so a stage change needed a drag across as many
+        // as six columns.
+        //
+        // `Stage.destinations`, `questionFor` and `moveJob` are the menu bar's
+        // own, so a move made from here leaves exactly the record a move made
+        // from there leaves.
+        Menu(shop.words.callIt("mac.move_to")) {
+            ForEach(Stage.destinations) { stage in
+                Button(shop.words.callIt(stage.key)) {
+                    if let ask = shop.questionFor(job.id, moving: stage) { ask(); return }
+                    Task { await shop.moveJob(job.id, to: stage) }
+                }
+                .disabled(!shop.canMoveJobs || Stage.of(job) == stage)
+            }
+        }
+        .disabled(!shop.canMoveJobs)
+        Divider()
         Button(shop.words.callIt("mac.edit_job")) {
             shop.pendingEdit = Shop.PendingHold(id: job.id, project: job.project)
         }

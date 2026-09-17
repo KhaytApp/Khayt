@@ -18,6 +18,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   shop has stored are not touched: merging happens when the hours are counted,
   so "belt change" and "waiting for the part" both survive as written.
 
+- **(Mac) A job can be moved by right-clicking it.** Moving a job along is the
+  thing a shop does most, and it was the one thing only the menu bar could do.
+  The right-click menu on the orders table had edit, payment, hold, delivered
+  and the invoice, and no stages — so changing a status meant selecting the row
+  and going up to the menu bar for a decision already made about the row under
+  the pointer. A card on the board was worse: it had no right-click menu at
+  all, so moving a job two columns meant dragging it past the ones in between.
+  Both offer the stages now, and a card on the board offers everything the
+  table's menu does. It is one list in one place, and a move started from any
+  of the three asks the same questions and leaves the same record.
+
 - **Every customer who came in through the intake form was missing from the
   chart that says where customers come from.** Importing an order request
   stamps the new customer's source as `online`. The chart drew six sources and
