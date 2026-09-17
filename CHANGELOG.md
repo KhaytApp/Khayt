@@ -1690,6 +1690,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) The invoice and label sheets are laid out with everything they do not
+  need switched off.** Both are drawn by WebKit, because the document is the
+  same html Khayt prints and laying it out any other way would mean a second
+  answer to what an invoice looks like. It is still a browser handed a page
+  built out of a shop's own data, and it could run scripts and follow links —
+  so a link in an invoice note could have put a web page inside Khayt's own
+  window. Neither is possible now. The content was already escaped, so nothing
+  was getting through; these are the second and third locks.
+
+
 - **(Mac) Looking for a moved printer said nothing at all unless it worked.**
   "Find it on the network" either found the printer and offered the move, or
   left the screen exactly as it was — no "nothing answered", no "that could not

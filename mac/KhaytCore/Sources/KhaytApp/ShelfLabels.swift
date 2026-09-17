@@ -82,7 +82,7 @@ enum ShelfLabels {
 /// and a sheet of labels has the same problem for the same reason.
 @MainActor
 final class LabelPaper: NSObject, ObservableObject, WKNavigationDelegate {
-    let webView = WKWebView()
+    let webView = DocumentWeb.view()
     @Published private(set) var drawn = false
 
     init(html: String) {
@@ -92,6 +92,18 @@ final class LabelPaper: NSObject, ObservableObject, WKNavigationDelegate {
     }
 
     func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) { drawn = true }
+
+    /// Nothing but the document itself is allowed to load.
+    ///
+    /// Without this an absolute link, a `<meta refresh>` or a redirect inside
+    /// a shop's own invoice could put a remote page in the app's window. The
+    /// other app refuses the same thing in `will-navigate`; this had no
+    /// equivalent until now.
+    func webView(_ view: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        decisionHandler(DocumentWeb.allows(action.request.url, alreadyLoaded: drawn)
+                        ? .allow : .cancel)
+    }
 
     /// The shared stylesheet, and the `#label-print-area` id its rules hang off.
     ///

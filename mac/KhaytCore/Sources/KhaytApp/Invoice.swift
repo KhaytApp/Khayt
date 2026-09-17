@@ -182,7 +182,7 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
 
     init(document: InvoiceDocument) {
         self.document = document
-        self.webView = WKWebView()
+        self.webView = DocumentWeb.view()
         super.init()
         webView.navigationDelegate = self
         webView.loadHTMLString(Self.page(document), baseURL: nil)
@@ -190,6 +190,18 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
 
     func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
         drawn = true
+    }
+
+    /// Nothing but the document itself is allowed to load.
+    ///
+    /// Without this an absolute link, a `<meta refresh>` or a redirect inside
+    /// a shop's own invoice could put a remote page in the app's window. The
+    /// other app refuses the same thing in `will-navigate`; this had no
+    /// equivalent until now.
+    func webView(_ view: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        decisionHandler(DocumentWeb.allows(action.request.url, alreadyLoaded: drawn)
+                        ? .allow : .cancel)
     }
 
     /// The document as a PDF, on A4, drawn by the engine that drew the window.
