@@ -13,11 +13,25 @@ import KhaytCore
 @MainActor
 struct ServiceLogTests {
 
-    @Test("the log lives under the key the other app writes it to")
+    /// ── THIS TEST HELD THE BUG IN PLACE ───────────────────────────────────
+    ///
+    /// It asserted `hub_maint_log_v1`, with a comment saying
+    /// `renderer/app-state.js` chose the name. It had — as that app's
+    /// **localStorage** key, in the legacy fallback path, which `app-state.js`
+    /// translates into `machMaintLog` before anything reads it. The store file
+    /// has only ever held `machMaintLog`.
+    ///
+    /// So the test was green, the sample book had been written to match, and
+    /// on a real book every service typed in here went into a field nothing
+    /// reads — while the machine P&L charged zero maintenance however much a
+    /// shop had spent.
+    ///
+    /// A literal is now checked against the other app's SOURCE, in
+    /// `StoreKeysAreTheOtherAppsTests`, because a literal and a fixture can
+    /// agree with each other while both are wrong.
+    @Test("the log lives under the key the other app's STORE writes it to")
     func sameCollection() {
-        // Not free to differ. `renderer/app-state.js` chose this name, and a
-        // second spelling is a second log neither app can see all of.
-        #expect(ServiceLogEdit.collection == "hub_maint_log_v1")
+        #expect(ServiceLogEdit.collection == "machMaintLog")
     }
 
     @Test("an entry carries the five fields the other app reads back")

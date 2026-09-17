@@ -424,12 +424,21 @@ final class Shop {
             // into the cache, so anything it wrote would be a guess overwriting
             // a measurement.
             printerCompletions = root["printerCompletions"] ?? .object([:])
-            // What the shop has spent SERVICING its machines. `hub_maint_log_v1`
-            // is the key `renderer/app-state.js` writes it under; it is read
-            // here and nowhere else, by the machine P&L.
-            if case .array(let serviced)? = root[ServiceLogEdit.collection] {
-                maintenanceRows = serviced
-            } else { maintenanceRows = [] }
+            // What the shop has spent SERVICING its machines. `machMaintLog` is
+            // the key the other app's store snapshot writes it under; it is
+            // read here and nowhere else, by the machine P&L.
+            //
+            // A Mac alpha wrote this log under `hub_maint_log_v1` — that app's
+            // localStorage key, not its store key — so those rows are read
+            // here too, and moved on the next write. See
+            // `ServiceLogEdit.rescueStranded`.
+            var serviceLog: [JSONValue] = []
+            if case .array(let serviced)? = root[ServiceLogEdit.collection] { serviceLog = serviced }
+            rawHasStrandedLog = root[ServiceLogEdit.strandedCollection] != nil
+            if case .array(let stranded)? = root[ServiceLogEdit.strandedCollection] {
+                serviceLog += stranded
+            }
+            maintenanceRows = serviceLog
             clients = Self.decodeClients(root)
             clientNames = (try? await engine?.customerNames(
                 clientRows, language: words.language, settings: Self.settings(root))) ?? [:]
@@ -535,6 +544,11 @@ final class Shop {
             // whose cloud settings belong to nobody.
             if next.build != nil { startPublishingLeadTime() } else { stopPublishingLeadTime() }
             refreshSyncStatus()
+            // Move a service log a Mac alpha wrote under the wrong key. Inside
+            // the write chain, because anything that reads and writes the store
+            // outside it races whatever is in flight — and only for a real
+            // book, which is the only kind that can have one.
+            rescueStrandedServiceLog(next.build)
             await readSlicers()
             remeasureIfDue()
             createRecurringIfDue()
@@ -8675,6 +8689,31 @@ final class Shop {
     /// point: the next interval is counted from this moment, and writing the
     /// figure the card happened to be showing would count any job that finished
     /// while the card was open twice.
+    /// Move a service log written under the old key into the right one.
+    ///
+    /// ── WHY THIS RUNS AT ALL, AND WHY IT RUNS ONCE ────────────────────────
+    ///
+    /// A fix verified only on newly-created data strands what a shop already
+    /// has. Alphas 21 through 23 wrote every repair into `hub_maint_log_v1`,
+    /// which nothing reads, so those rows are a shop's own work sitting in a
+    /// field that has no meaning. They are moved, not dropped.
+    ///
+    /// It is a no-op the second time: the stray key is removed by the same
+    /// write, so there is nothing left to find.
+    func rescueStrandedServiceLog(_ build: StoreReader.Build?) {
+        guard let build, canWrite else { return }
+        // Asked before writing, so an ordinary load of an ordinary book does
+        // not open the store for writing at all.
+        guard rawHasStrandedLog else { return }
+        try? StoreWriter.update(build) { root in
+            _ = ServiceLogEdit.rescueStranded(&root)
+        }
+    }
+
+    /// Whether the book on disk still carries the old key. Read from the copy
+    /// this load decoded, so it costs nothing.
+    private(set) var rawHasStrandedLog = false
+
     func markMaintenanceDone(_ taskId: String, on machine: Machine) async {
         guard let engine, let build = source.build, canMoveJobs else { return }
         guard let task = maintTaskRows.first(where: {

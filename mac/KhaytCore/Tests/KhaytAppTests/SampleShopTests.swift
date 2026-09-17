@@ -631,7 +631,9 @@ extension SampleShopTests {
         let engine = try KhaytEngine()
         let book = try Self.book()
         let machines = Shop.rows(book, "machines")
-        let log = Shop.rows(book, "hub_maint_log_v1")
+        // Through the constant, not a literal: a literal here is how the
+        // sample and the app agreed on a key no real book has.
+        let log = Shop.rows(book, ServiceLogEdit.collection)
         #expect(!log.isEmpty, "nothing was ever serviced — the card draws its empty state only")
         let year = MachineProfitPage.thisYear()
         let rows = try await engine.maintenanceCost(machines: machines, entries: log, year: year)
