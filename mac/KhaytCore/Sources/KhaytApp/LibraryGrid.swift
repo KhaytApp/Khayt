@@ -23,6 +23,19 @@ struct LibraryGrid: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // THE WAY BACK OUT OF A GROUP.
+            //
+            // Tapping a folder put the whole grid inside it and left nothing on
+            // screen to get out again: the only routes were the sidebar's
+            // Library row and the Go menu, neither of which is where somebody
+            // who has just tapped into a folder is looking.
+            //
+            // It cannot live in the filter bar below, which draws NOTHING when
+            // there are no chips — and a group with one category and no tags has
+            // none, so exactly the plainest folder would have had no way back.
+            if case .library(let group?) = shop.shelf {
+                GroupCrumb(shop: shop, group: group)
+            }
             // Above the grid rather than in the sidebar, where the group filter
             // used to live: the chips describe what is on screen and change it,
             // and a control that narrows a grid from another column is a
@@ -195,6 +208,48 @@ struct LibraryGrid: View {
 /// of text — so a library of folders and files reads as one grid rather than
 /// two. What differs is what it says: a folder has no size and no print count,
 /// it has how many things are in it.
+/// Which folder the library is showing, and the way out of it.
+///
+/// Reads as a path rather than a button: "Library / Saudi Kings", with the
+/// first half doing the work. A bare back arrow says where it goes and not
+/// where you are, and a shop three folders into a hundred and fifty models
+/// wants both.
+private struct GroupCrumb: View {
+    @Bindable var shop: Shop
+    let group: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button {
+                shop.shelf = .library(nil)
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "chevron.backward").font(.caption2.weight(.semibold))
+                    Text(shop.words.callIt("mac.all_models"))
+                }
+            }
+            .buttonStyle(.link)
+            // ⌘[ is what every other Mac app uses to go back, and the bracket
+            // keys were free. Not Escape: this screen's search field takes that,
+            // and a key that sometimes clears a search and sometimes leaves the
+            // folder is worse than no key at all.
+            .keyboardShortcut("[", modifiers: .command)
+            .help(shop.words.callIt("mac.leave_group"))
+
+            Text(verbatim: "/").foregroundStyle(.quaternary)
+            Text(group).fontWeight(.medium).lineLimit(1)
+            // What is in it, so the count a shop tapped is still on screen.
+            Text(verbatim: "\(shop.shownFiles.count)")
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+            Spacer(minLength: 0)
+        }
+        .font(.callout)
+        .padding(.horizontal, Metric.screen)
+        .padding(.vertical, 7)
+    }
+}
+
 private struct FolderCell: View {
     let name: String
     let count: Int

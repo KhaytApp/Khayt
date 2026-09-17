@@ -867,6 +867,32 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) A zip of models can be added to the library.** A shop downloads a
+  model as a zip because that is how every model site hands one over, and
+  dropping one on the library did nothing at all — the import walks for `stl`,
+  `3mf`, `obj` and gcode, and a `.zip` is none of those, so it was skipped in
+  silence with no error and no model. Khayt reads the archive now, takes the
+  models out of it and leaves the readme and the render previews behind, and
+  groups what came out by the archive's own name the way a folder of models is
+  grouped by its folder. The zip itself is never consumed; it stays where you
+  put it.
+
+  Expanding an archive writes someone else's bytes onto the shop's disk, so it
+  goes through the same rule that guards a customer's upload
+  (`lib/upload-scan.js`): an archive naming a file outside itself, one that
+  expands to far more than it weighs, one with too many members, or one that is
+  not really a zip is refused with the reason said plainly. A shop's own
+  download came from a stranger too.
+
+- **(Mac) There is a way back out of a library folder.** Tapping a folder put
+  the whole grid inside it and left nothing on screen to get out again — the
+  routes were the sidebar's Library row and the Go menu, neither of which is
+  where somebody who has just tapped a folder is looking. There is a path at
+  the top now, "Library / Saudi Kings", with the first half doing the work, and
+  ⌘[ does it from the keyboard. It could not live in the filter bar below: that
+  draws nothing when there are no chips, so the plainest folder would have had
+  no way back at all.
+
 - **(Mac) A converted model goes into the library, and can put the original
   aside.** A conversion used to end at a file in a folder. The shop then had to
   go and import the thing it had just made — in the one app whose whole job is
