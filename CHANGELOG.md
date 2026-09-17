@@ -5,6 +5,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 ### Changed
+- **(Maintainers) The invoice-language smoke test passed and reported failure.**
+  Every assertion printed, then Playwright's `electronApp.close()` never
+  returned, so `npm run test:e2e:all` killed the suite and counted it as the one
+  failure out of forty-six — for long enough that a real failure there would
+  have been read as the usual one. The close has a ten-second deadline now, and
+  `process.exit` ends the run as it always did. What keeps the app from quitting
+  after that suite's fifteen renders has not been found: launching, rendering
+  one document and closing takes 142ms, so it is something it accumulates.
+
 - **The customer rating chart was captioned with a different set of ratings
   than it drew.** The line covers the last six months; the count and average
   underneath were computed from every rating the shop had ever collected. A
