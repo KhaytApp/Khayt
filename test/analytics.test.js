@@ -48,6 +48,7 @@ test('computeBreakEven estimates revenue target from recent margin', () => {
   require('../renderer/currency.js');
   require('../lib/calculator-cost.js');
   require('../lib/order-money.js');
+  require('../lib/order-status.js'); // globalThis.KhaytOrderStatus
   const prev = {
     settings: global.settings,
     printLog: global.printLog,

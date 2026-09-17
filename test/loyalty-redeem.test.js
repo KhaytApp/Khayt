@@ -15,6 +15,7 @@ beforeEach(() => {
   require('../renderer/format.js');
   require('../renderer/currency.js');
   require('../lib/tax.js');          // sets globalThis.KhaytTax — money paths need it
+  require('../lib/order-status.js'); // globalThis.KhaytOrderStatus — both spellings of finished
   require('../renderer/app-helpers.js'); // payStatus, orderOwedBase, etc. (renderClients deps)
   clients = require('../renderer/clients.js');
   global.localName = (c) => (c && (c.nameEn || c.nameAr || c.name)) || '';

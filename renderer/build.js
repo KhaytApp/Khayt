@@ -219,7 +219,10 @@ function suggestedFailureRate(machineId, material) {
   const mat = material.toLowerCase();
   const completed = printLog.filter(o =>
     o.machineId === machineId &&
-    o.status === 'completed' &&
+    // A delivered job is a job this machine finished. Leaving it out shrank
+    // the denominator and inflated the failure rate this suggests — which is
+    // a figure that goes straight into what a customer is quoted.
+    KhaytOrderStatus.isFinished(o) &&
     ((o.material || '').toLowerCase() === mat ||
      (o.parts || []).some(p => (p.material || '').toLowerCase() === mat))
   );

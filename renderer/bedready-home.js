@@ -78,7 +78,7 @@
   function makerStatsHtml() {
     var log = (typeof printLog !== 'undefined' && Array.isArray(printLog)) ? printLog : [];
     var inv = (typeof inventory !== 'undefined' && Array.isArray(inventory)) ? inventory : [];
-    var done = log.filter(function (o) { return o && o.status === 'completed'; });
+    var done = log.filter(function (o) { return KhaytOrderStatus.isFinished(o); });
     if (done.length === 0) return '';
 
     var grams = 0, spend = 0;
@@ -137,7 +137,7 @@
   // no new inputs. Hidden until there's something to show.
   function energyStatsHtml() {
     var log = (typeof printLog !== 'undefined' && Array.isArray(printLog)) ? printLog : [];
-    var done = log.filter(function (o) { return o && o.status === 'completed'; });
+    var done = log.filter(function (o) { return KhaytOrderStatus.isFinished(o); });
     var kwh = 0, energyCost = 0;
     done.forEach(function (o) {
       (o.parts || []).forEach(function (p) {
@@ -288,7 +288,7 @@
     var log = (typeof printLog !== 'undefined' && Array.isArray(printLog)) ? printLog : [];
     var defs = (typeof settings !== 'undefined' && settings && Array.isArray(settings.kits)) ? settings.kits : [];
     var g = KhaytPrintKits.groupByKit(log, defs);
-    var done = g.ungrouped.filter(function (o) { return o && o.status === 'completed'; });
+    var done = g.ungrouped.filter(function (o) { return KhaytOrderStatus.isFinished(o); });
     // The tray has to appear for a SINGLE unfiled print once a kit exists, or a
     // part finished after the kit was made can never be added to it — which is
     // the ordinary case: you group what you have, then the last part finishes.
