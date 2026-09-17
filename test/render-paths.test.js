@@ -86,6 +86,7 @@ function loadAnalyticsStack() {
   require('../lib/maintenance-cost.js'); // globalThis.KhaytMaintenanceCost
   require('../lib/rating-trend.js'); // globalThis.KhaytRatingTrend
   require('../lib/client-sources.js'); // globalThis.KhaytClientSources
+  require('../lib/downtime.js'); // globalThis.KhaytDowntime
   // Both are reached only once a book has an expense in it, which is why they
   // were missing here until a test seeded one.
   require('../lib/expense-categories.js'); // globalThis.KhaytExpenseCategories
@@ -367,6 +368,35 @@ test('renderClientSourceChart: an unrecognised source is filed, not lost', () =>
   const html = $('#clientSourceChart').innerHTML;
   assert.ok(html.includes('Other'), 'the customer still appears');
   assert.ok(!html.includes('tiktok'), 'but never under a name nothing can translate');
+});
+
+test('renderMachineDowntimeChart: overlapping windows are one stretch, not two', () => {
+  loadAnalyticsStack();
+  const now = new Date();
+  const y = now.getFullYear(), mo = String(now.getMonth() + 1).padStart(2, '0');
+  // Down for a belt change, then waiting for the part. Both true, and they
+  // overlap: 72 hours of machine unavailable, which used to report as 96.
+  dom.seedState({
+    settings: { currency: 'SAR', fixedCosts: [] },
+    machines: [{ id: 'm1', name: 'U1', downtimeBlocks: [
+      { from: `${y}-${mo}-10T00:00`, to: `${y}-${mo}-12T00:00`, reason: 'belt change' },
+      { from: `${y}-${mo}-11T00:00`, to: `${y}-${mo}-13T00:00`, reason: 'waiting for the part' },
+    ] }],
+  });
+  assert.doesNotThrow(() => global.renderMachineDowntimeChart());
+  const html = $('#machineDowntimeChart').innerHTML;
+  assert.ok(!html.includes('No data yet'), 'the machine has downtime and should be drawn');
+  assert.ok(html.includes('U1'), 'and named in the legend');
+
+  // The figure itself, through the rule the chart now uses.
+  const periods = [{ from: new Date(y, now.getMonth(), 1).getTime(),
+                     to: new Date(y, now.getMonth() + 1, 0, 23, 59, 59, 999).getTime() }];
+  const hours = KhaytDowntime.hoursByPeriod(
+    { downtimeBlocks: [
+      { from: `${y}-${mo}-10T00:00`, to: `${y}-${mo}-12T00:00` },
+      { from: `${y}-${mo}-11T00:00`, to: `${y}-${mo}-13T00:00` },
+    ] }, periods);
+  assert.equal(hours[0], 72, 'the union, not the sum of the two lengths');
 });
 
 // --- Arg-taking HTML builders -------------------------------------------------

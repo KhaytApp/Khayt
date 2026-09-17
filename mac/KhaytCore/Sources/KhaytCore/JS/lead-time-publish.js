@@ -72,23 +72,25 @@ function usableMachines(machines) {
  * OUT for a belt change on Thursday is the same case, said in advance — and
  * until now it was the case nothing acted on.
  */
+/** The downtime rule: a global in the browser, a require in Node. */
+function downtimeRules() {
+  const g = typeof globalThis !== 'undefined' ? globalThis : {};
+  if (typeof g.KhaytDowntime !== 'undefined') return g.KhaytDowntime;
+  try { return require('./downtime.js'); } catch (e) { return { hoursBetween: () => 0 }; }
+}
+
 function downtimeByMachine(machines, nowIso, days) {
   const from = new Date(String(nowIso || '')).getTime();
   if (!Number.isFinite(from)) return {};
   const to = from + Math.max(1, days) * 86400000;
   const out = {};
+  const rules = downtimeRules();
   for (const m of Array.isArray(machines) ? machines : []) {
     if (!m || !m.id) continue;
-    let hours = 0;
-    for (const b of Array.isArray(m.downtimeBlocks) ? m.downtimeBlocks : []) {
-      if (!b || !b.from || !b.to) continue;
-      const bFrom = new Date(b.from).getTime();
-      const bTo = new Date(b.to).getTime();
-      if (!Number.isFinite(bFrom) || !Number.isFinite(bTo) || bTo <= bFrom) continue;
-      const start = Math.max(from, bFrom);
-      const end = Math.min(to, bTo);
-      if (end > start) hours += (end - start) / 3600000;
-    }
+    // The UNION of the windows, not the sum of their lengths. Two overlapping
+    // maintenance windows are one stretch the machine is unavailable, and
+    // adding them told a customer a longer wait than the shop actually faced.
+    const hours = rules.hoursBetween(m, from, to);
     if (hours > 0) out[String(m.id)] = hours;
   }
   return out;

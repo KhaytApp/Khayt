@@ -5,6 +5,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 ### Changed
+- **Two overlapping maintenance windows counted as twice the downtime.** A shop
+  books a printer out for a belt change on Monday to Wednesday, then adds
+  "waiting for the part" for Tuesday to Thursday. Both are true and both get
+  recorded, and the machine is unavailable for 72 hours. Three separate places
+  added the two windows up and reported 96: the scheduler, where the total goes
+  into a machine's load and decides which printer takes the next job; the lead
+  times published to customers; and the Reports downtime chart, which with
+  enough overlaps could report more downtime in a month than the month has
+  hours. Elapsed time is the union of the windows, not the sum of their
+  lengths, and `lib/downtime.js` is the one place that knows it. The windows a
+  shop has stored are not touched: merging happens when the hours are counted,
+  so "belt change" and "waiting for the part" both survive as written.
+
 - **Every customer who came in through the intake form was missing from the
   chart that says where customers come from.** Importing an order request
   stamps the new customer's source as `online`. The chart drew six sources and
