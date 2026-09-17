@@ -82,8 +82,11 @@ struct MoneyParityTests {
         // The quote engine, order of operations intact.
         "KhaytPricing.quoteTotal({baseCost:100,qty:2,margin:40,discountPct:10,rushEnabled:true,rushPct:25,shippingCost:30,business:true})",
         "KhaytPricing.quoteTotal({baseCost:0,qty:1,margin:0,business:false})",
-        // Pass 22: the customer tracker, including the statuses that showed nothing.
-        "['quote','pending','printing','post','qc','completed','delivered','on_hold','split','unknown'].map(KhaytOrderProgress.progressIndex)",
+        // The customer tracker moved to Swift — `OrderProgress` — so the check
+        // that it agrees moved with it, to `OrderProgressParityTests`, which
+        // asks about more statuses than this line did and about the names that
+        // only break one language. This comparison is Swift against NODE; a
+        // rule that no longer runs in the engine has nothing to compare here.
         // Pass 6: what counts as trade.
         "[{},{nonBusiness:true},{status:'split',splitInto:['a']}].map(function(o){return [KhaytBusinessScope.countsForBusiness(o),KhaytBusinessScope.isSuperseded(o)];})",
         // Floating point at the edges — where two engines are likeliest to part company.

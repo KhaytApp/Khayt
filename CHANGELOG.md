@@ -6,8 +6,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
-- **(Mac) The first of Khayt's shared rules now runs natively, with a test that
-  will not let it drift.** The Mac app has always run Khayt's business rules —
+- **(Mac) Three of Khayt's shared rules now run natively, with tests that will
+  not let them drift.** The Mac app has always run Khayt's business rules —
   pricing, tax, costing, identity — as the same JavaScript the Windows app runs,
   so that both apps could not disagree. Those rules are being rewritten in
   Swift. The thing that makes that safe is a parity harness: every rewritten
