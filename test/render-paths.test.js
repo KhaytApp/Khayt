@@ -136,6 +136,43 @@ test('renderAnalytics: quote conversion stays within the created cohort, never >
   assert.equal($('#stat-conv-rate').textContent, '50%', '1 of 2 created quotes converted; the unsent-but-accepted order is excluded');
 });
 
+test('renderSupplierPriceHistory: a material bought in two units draws two cards', () => {
+  loadAnalyticsStack();
+  dom.seedState({
+    settings: { currency: 'SAR', fixedCosts: [] },
+    suppliers: [{
+      name: 'Acme',
+      purchases: [
+        { materialType: 'PLA', unit: 'spool', unitPrice: 75, date: '2026-01-01' },
+        { materialType: 'PLA', unit: 'kg', unitPrice: 22, date: '2026-02-01' },
+        { materialType: 'PLA', unit: 'g', unitPrice: 0.02, date: '2026-03-01' },
+      ],
+    }],
+  });
+  global.renderSupplierPriceHistory();
+  const html = $('#supplierPriceHistoryChart').innerHTML;
+
+  // Two comparable sets, so two sparkline cards and two table rows.
+  assert.equal(html.match(/<svg /g).length, 2, 'one sparkline per unit family');
+  assert.equal(html.match(/<tr>/g).length, 2, 'one best-price row per unit family');
+
+  // The by-the-gram purchase is shown as what it is per kilogram, beside the
+  // kilogram purchase it can actually be compared with.
+  assert.ok(html.includes('20.00/kg'), 'the gram price is converted, not plotted raw');
+  assert.ok(!html.includes('0.02'), 'and never shown against a per-spool price');
+
+  // The move from 22/kg to 20/kg is a 9.1% fall. Before the split it was read
+  // as 22 → 0.02 and badged as the price collapsing.
+  assert.ok(html.includes('9.1%'), 'the trend badge compares like with like');
+  assert.ok(!html.includes('99.9%'), 'and no longer reports a unit change as a price change');
+
+  // The spool stands alone: in its own row it is both the best and the worst,
+  // so it can never be undercut by a supplier that merely sells smaller.
+  const spoolRow = html.match(/<tr>(?:(?!<\/tr>)[\s\S])*\/spool[\s\S]*?<\/tr>/)[0];
+  assert.equal(spoolRow.match(/75\.00/g).length, 2, 'the spool is its own best and worst');
+  assert.ok(!spoolRow.includes('20.00'), 'the per-kilogram price is not in the spool row');
+});
+
 // --- Arg-taking HTML builders -------------------------------------------------
 // Self-contained render helpers that build HTML from explicit arguments — the
 // same class as renderInvoice (where C1 lived). A render-path sweep across all
