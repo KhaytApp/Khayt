@@ -2638,7 +2638,10 @@ function openExecutiveSummary() {
  *  CSV, and save report definitions for re-use. */
 function openReportBuilder() {
   if (typeof KhaytReportBuilder === 'undefined') { toast(t('common.feature_missing'), 'error'); return; }
-  const STATUSES = ['quote', 'pending', 'printing', 'post', 'qc', 'completed', 'delivered', 'on_hold'];
+  // STAGES, in the order work moves through them — `lib/report-records.js`
+  // reports the stage, so these are what the boxes actually match. Shipped and
+  // delivered are stages rather than statuses; see lib/order-status.js.
+  const STATUSES = ['quote', 'pending', 'on_hold', 'printing', 'post', 'qc', 'completed', 'shipped', 'delivered'];
   // The shape `report-builder.js` asks its caller for, built by
   // `lib/report-records.js` rather than here. It was twenty lines inline, and
   // they are not twenty lines of formatting: `price` is revenue in the shop's
