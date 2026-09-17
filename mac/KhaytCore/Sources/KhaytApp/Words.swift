@@ -652,6 +652,19 @@ final class Words {
         "mac.converting":    ["en": "Converting…",     "ar": "جارٍ التحويل…"],
         "mac.converted":     ["en": "Saved {name} for {target}.",
                               "ar": "حُفظ {name} لـ {target}."],
+        // The same, when it also reached the library — which is the ordinary
+        // case. The two are separate sentences because a conversion that saved
+        // and failed to import is a real outcome and must not claim the library
+        // has it.
+        // The checkbox in the save panel. "Put aside", not "delete": the
+        // original stays in the book and on disk, so a job printed from it
+        // still points at the file it really used.
+        "mac.replace_original":
+                             ["en": "Put the original aside in the library",
+                              "ar": "أبعد الأصل في المكتبة"],
+        "mac.converted_into_library":
+                             ["en": "Saved {name} for {target}, and added it to the library.",
+                              "ar": "حُفظ {name} لـ {target}، وأُضيف إلى المكتبة."],
         "mac.no_customers_hint": ["en": "A customer appears here once a job is billed to them.",
                                   "ar": "يظهر العميل هنا بعد أن يُحرَّر له حساب على عمل."],
         "mac.past_due":      ["en": "Past due",        "ar": "متأخر السداد"],

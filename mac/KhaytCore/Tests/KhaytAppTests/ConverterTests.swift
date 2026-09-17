@@ -12,6 +12,92 @@ import KhaytCore
 @MainActor
 struct ConverterTests {
 
+    /// A conversion has to END somewhere the shop can find it.
+    ///
+    /// It used to end at a file in a folder. The shop then had to go and import
+    /// the thing it had just made — in the one app whose whole job is knowing
+    /// what models it has — so the converted file was the only model in the
+    /// building Khayt did not know about.
+    ///
+    /// Read as source because the conversion opens an NSSavePanel, which a test
+    /// cannot answer. What is checked is the three things that would each have
+    /// left the feature half-done: that the import is called at all, that it
+    /// does not take the file away from the folder the shop just chose, and
+    /// that a failed import does not report itself as a failed conversion.
+    @Test("a converted file is put into the library, not only into a folder")
+    func conversionReachesTheLibrary() {
+        let shop = MenuCoverageTests.source("Shop.swift")
+        #expect(!shop.isEmpty, "Shop.swift moved")
+
+        #expect(shop.contains("LibraryImport.add(destination, shop: self, keepOriginal: true)"),
+                "a conversion still ends at a file nothing in the app knows about")
+        #expect(shop.contains("mac.converted_into_library"),
+                "the shop is not told the library has it")
+        // The save panel put the file where the shop asked. An import that moves
+        // it would take it away again.
+        #expect(!shop.contains("LibraryImport.add(destination, shop: self)"),
+                "the import would MOVE the converted file out of the folder the shop chose")
+    }
+
+    /// Replacing the original PUTS IT ASIDE. It does not delete it.
+    ///
+    /// A job printed six months ago was printed from the original's bytes.
+    /// Deleting them so the converted file could take the record's place would
+    /// make that job appear to have been printed from a file it never saw, and
+    /// a book that misreports its own history is worse than a library with one
+    /// extra thing in it.
+    @Test("replacing the original archives it rather than deleting it")
+    func replacingArchives() {
+        let shop = MenuCoverageTests.source("Shop.swift")
+        #expect(shop.contains("func supersede("), "there is no way to put a model aside")
+        #expect(shop.contains("record[\"archivedAt\"] = .string(now)"))
+        #expect(shop.contains("record[\"supersededBy\"] = .string(replacement)"),
+                "a put-aside model does not say what replaced it")
+        // Nothing removes the record or the file.
+        #expect(!shop.contains("removeItem(at: source)"),
+                "replacing an original must not delete anything")
+        // And it can be undone.
+        #expect(shop.contains("func unarchive("), "a one-way door")
+    }
+
+    @Test("a model is only put aside once its replacement is really in the library")
+    func asideOnlyAfterTheReplacementLands() {
+        let shop = MenuCoverageTests.source("Shop.swift")
+        #expect(shop.contains("if replaceOriginal, landed,"),
+                "the original could be put aside for a file the library does not have")
+    }
+
+    @Test("a put-aside model leaves the library list but not the book")
+    func archivedIsHiddenNotGone() {
+        let shop = MenuCoverageTests.source("Shop.swift")
+        #expect(shop.contains("if !libraryShowArchived { rows = rows.filter { !$0.isArchived } }"),
+                "the library still offers a model that has been replaced")
+        // `files` itself keeps them: the import dedupe, the product links and
+        // the job records all read it, and a model vanishing from there would
+        // let the same bytes be imported again as a new model.
+        #expect(shop.contains("private(set) var files: [LibraryFile] = []"))
+        #expect(shop.contains("var archivedCount: Int"),
+                "nothing can tell the shop where a model went")
+    }
+
+    @Test("the choice is made before the work, not after")
+    func askedInTheSavePanel() {
+        let shop = MenuCoverageTests.source("Shop.swift")
+        #expect(shop.contains("panel.accessoryView = holder"),
+                "the question is asked somewhere other than the panel that asks where it goes")
+        #expect(shop.contains("replace.state = .off"),
+                "replacing must not be the default; keeping both is what loses nothing")
+    }
+
+    @Test("a failed import is not reported as a failed conversion")
+    func aFailedImportIsItsOwnSentence() {
+        let shop = MenuCoverageTests.source("Shop.swift")
+        // The note is chosen by whether the import landed, so a conversion that
+        // saved and failed to import cannot claim the library has it.
+        #expect(shop.contains("words.callIt(landed ? \"mac.converted_into_library\" : \"mac.converted\""),
+                "a conversion that saved but did not import says the wrong thing")
+    }
+
     static let model = "<?xml version=\"1.0\"?><model unit=\"millimeter\">"
         + "<resources><object id=\"1\"/></resources></model>"
 
