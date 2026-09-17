@@ -271,7 +271,7 @@ function renderStudioKanbanCard(b) {
         <span>${log.printTime} ${escapeHtml(t('common.hours'))}</span><span>·</span>
         <span>${escapeHtml(partsLabel)}</span>
       </div>
-      <div class="order-meta-row">${biz ? paymentBadge(log) : ''}${log.dueDate && status !== 'completed' ? ' ' + formatDueDateBadge(log.dueDate) : ''}${timerBadge}${etaBadge}</div>`;
+      <div class="order-meta-row">${biz ? paymentBadge(log) : ''}${log.dueDate && !KhaytOrderStatus.isFinished(log) ? ' ' + formatDueDateBadge(log.dueDate) : ''}${timerBadge}${etaBadge}</div>`;
 
   return `
     <div class="kanban-card khayt-kcard${_pl === 'urgent' ? ' kanban-priority-urgent' : _pl === 'high' ? ' kanban-priority-high' : ''}${pausedClass}${cardClientAccent ? ' has-client-accent' : ''}" draggable="true" data-order-id="${log.id}" style="${cardClientAccent}">
@@ -802,7 +802,7 @@ function renderKanban() {
   (() => {
     if (typeof KhaytTiers === 'undefined' || !KhaytTiers.isProMode(settings.mode)) return;
     if (!renderKanban._fepAlerted) renderKanban._fepAlerted = new Map();
-    const resinCompleted = printLog.filter(o => o.isResin && o.status === 'completed');
+    const resinCompleted = printLog.filter(o => o.isResin && KhaytOrderStatus.isFinished(o));
     machines.forEach(m => {
       const count = resinCompleted.filter(o => o.machineId === m.id).length;
       const threshold = Math.floor(count / 50) * 50;

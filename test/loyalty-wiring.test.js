@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 
 function setup(extra = {}) {
   require('../lib/loyalty.js');           // sets global.KhaytLoyalty
+  require('../lib/order-status.js'); // globalThis.KhaytOrderStatus — 'delivered' is finished too
   require('../renderer/currency.js');     // orderRevenueBase etc. for getClientTier
   require('../lib/tax.js');          // sets globalThis.KhaytTax — money paths need it
   const clients = require('../renderer/clients.js');

@@ -406,7 +406,7 @@
     const mach = (typeof machines !== 'undefined' && Array.isArray(machines)) ? machines : [];
     const inv = (typeof inventory !== 'undefined' && Array.isArray(inventory)) ? inventory : [];
 
-    const queue = log.filter((o) => o.status !== 'completed' && o.status !== 'quote').length;
+    const queue = log.filter((o) => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote').length;
     // "printers active" — reuse the dashboard's single source of truth so the
     // status bar and the KPI always agree (offline/error/100% handled there).
     const printing = (global.KhaytCommand && typeof global.KhaytCommand.activePrinterCount === 'function')
@@ -417,9 +417,9 @@
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const todayStr = (typeof localDateStr === 'function') ? localDateStr(today) : localDateStr(today);
-    const dueToday = log.filter((o) => o.status !== 'completed' && o.status !== 'quote' && o.dueDate === todayStr).length;
+    const dueToday = log.filter((o) => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && o.dueDate === todayStr).length;
     const todayRev = (typeof orderNetRevenueBase === 'function')
-      ? log.filter((o) => o.status === 'completed' && o.date === todayStr).reduce((s, o) => s + orderNetRevenueBase(o), 0)
+      ? log.filter((o) => KhaytOrderStatus.isFinished(o) && o.date === todayStr).reduce((s, o) => s + orderNetRevenueBase(o), 0)
       : 0;
     const ccy = (typeof currencySymbol === 'function') ? currencySymbol() : 'SAR';
     const revStr = (typeof fmtMoney === 'function') ? fmtMoney(todayRev) : String(Math.round(todayRev));

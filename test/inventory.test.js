@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 require('../renderer/util.js');
 require('../renderer/format.js');
+require('../lib/order-status.js'); // globalThis.KhaytOrderStatus — 'delivered' is finished too
 
 test('computeMaterialForecast flags overcommitted spools', () => {
   global.inventory = [{ id: 'S1', material: 'PLA', weight: 100 }];

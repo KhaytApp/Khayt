@@ -30,7 +30,12 @@
    * ("completed" is never limited).
    */
   function wouldBeOverWip(status) {
-    if (status === 'completed') return false;
+    // The rule this mirrors (KhaytOrderStatus.wouldExceedWipLimit) exempts
+    // every status a job can END in: both spellings of finished, and a quote,
+    // which is not work in progress at all. This checked only `completed`, so
+    // a column limit could block a shop from filing a quote or from marking a
+    // job delivered.
+    if (KhaytOrderStatus.FINISHED_STATUSES.includes(status) || status === 'quote') return false;
     const limit = +((typeof settings !== 'undefined' && settings.wipLimits) || {})[status] || 0;
     if (!limit) return false;
     const all = (typeof printLog !== 'undefined' && Array.isArray(printLog)) ? printLog : [];

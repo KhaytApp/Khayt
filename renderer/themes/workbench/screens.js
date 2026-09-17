@@ -255,7 +255,7 @@
     //                     it is the only one of these you must act on, and it
     //                     was the only one Analytics had no home for.
     const nowPrinting = log.filter((o) => o.status === 'printing');
-    const openOrders = log.filter((o) => o.status !== 'completed' && o.status !== 'quote');
+    const openOrders = log.filter((o) => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
 
     /* ---- Today's work (real active orders) ---- */
     const ACTIVE_ORDER = ['printing', 'pending', 'post', 'qc', 'on_hold'];
@@ -341,7 +341,7 @@
     });
     // Overdue receivables (completed but unpaid past due) as a fallback signal (business only).
     if (biz && attention.length < 5) {
-      log.filter((o) => o.status === 'completed' && payStatus(o) !== 'paid' && payStatus(o) !== 'voided' && orderOwedBase(o) > 0)
+      log.filter((o) => KhaytOrderStatus.isFinished(o) && payStatus(o) !== 'paid' && payStatus(o) !== 'voided' && orderOwedBase(o) > 0)
         .slice(0, 5 - attention.length).forEach((o) => {
           const client = findClient(o.clientId);
           const bits = [`${fmtMoneyVal(orderOwedBase(o))} ${ccy()}`];

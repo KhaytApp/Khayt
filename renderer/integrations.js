@@ -763,7 +763,7 @@ function exportAccountingCSV() {
   const cur = currencySymbol(); // base currency — used by the expense rows below
 
   // Revenue entries (completed invoices)
-  printLog.filter(o => o.status === 'completed').forEach(o => {
+  printLog.filter(o => KhaytOrderStatus.isFinished(o)).forEach(o => {
     // A journal must balance, so the split has to match how the shop prices:
     // under exclusive pricing the debit to receivables is price + tax, not price.
     const _t = KhaytTax.computeTax(+o.price || 0, KhaytTax.profileFromSettings(settings));
@@ -911,7 +911,7 @@ async function exportOrderStatusPage(orderId) {
     : s
   ).join('');
 
-  const isReady = order.status === 'completed';
+  const isReady = KhaytOrderStatus.isFinished(order);
   const msg = isReady
     ? 'Your order is ready for pickup / delivery!'
     : order.status === 'on_hold'
@@ -1004,7 +1004,7 @@ async function autoExportStatusPage(order) {
       ? s + `<div style="flex:0 0 24px;height:2px;background:${curIdx > i ? accentColor : '#e5e7eb'};margin-top:15px;"></div>`
       : s
     ).join('');
-    const isReady = order.status === 'completed';
+    const isReady = KhaytOrderStatus.isFinished(order);
     const msg = isReady
       ? 'Your order is ready for pickup / delivery!'
       : order.status === 'on_hold'

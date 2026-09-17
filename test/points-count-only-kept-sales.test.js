@@ -28,6 +28,7 @@ const path = require('path');
 const vm = require('vm');
 const KhaytTax = require('../lib/tax.js');
 const KhaytLoyalty = require('../lib/loyalty.js');
+require('../lib/order-status.js'); // globalThis.KhaytOrderStatus — 'delivered' is finished too
 
 const ROOT = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -52,6 +53,9 @@ function loadPoints(printLog) {
   // there is no require, so the dependency has to be run in here too.
   vm.runInContext(read('lib/order-money.js'), sandbox, { filename: 'order-money.js' });
   vm.runInContext(read('renderer/currency.js'), sandbox, { filename: 'currency.js' });
+  // The loyalty count asks whether a sale is finished, and 'delivered' is the
+  // legacy spelling of that — so the rule has to be in the sandbox too.
+  vm.runInContext(read('lib/order-status.js'), sandbox, { filename: 'order-status.js' });
   Object.assign(sandbox, {
     KhaytTax,
     KhaytLoyalty,

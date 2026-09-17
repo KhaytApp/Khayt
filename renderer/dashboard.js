@@ -19,15 +19,15 @@ function buildFarmLocationOverview() {
     const printing = locOrders.filter(o => o.status === 'printing').length;
     const pending = locOrders.filter(o => o.status === 'pending').length;
     const activeHrs = locOrders
-      .filter(o => o.status !== 'completed' && o.status !== 'quote')
+      .filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote')
       .reduce((s, o) => s + (+o.printTime || 0), 0);
     const todayRev = locOrders
-      .filter(o => o.status === 'completed' && o.date === todayStr)
+      .filter(o => KhaytOrderStatus.isFinished(o) && o.date === todayStr)
       .reduce((s, o) => s + orderNetRevenueBase(o), 0);
     return { loc, printers: locMachines.length, printing, pending, activeHrs, todayRev };
   });
 
-  const unassigned = printLog.filter(o => !orderLocationId(o) && o.status !== 'completed' && o.status !== 'quote');
+  const unassigned = printLog.filter(o => !orderLocationId(o) && !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
   const unassignedHrs = unassigned.reduce((s, o) => s + (+o.printTime || 0), 0);
 
   const cards = rows.map((r) => `
@@ -262,14 +262,14 @@ function renderDashboard() {
   // Monthly goal
   const thisMonthStr = localMonthStr(today);
   const monthlyRev   = printLog
-    .filter(o => o.status === 'completed' && (o.date || '').startsWith(thisMonthStr))
+    .filter(o => KhaytOrderStatus.isFinished(o) && (o.date || '').startsWith(thisMonthStr))
     .reduce((s, o) => s + orderNetRevenueBase(o), 0);
 
   // QW8: Previous month revenue for delta chip
   const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   const prevMonthStr = localMonthStr(prevMonthDate);
   const prevMonthRev = printLog
-    .filter(o => o.status === 'completed' && (o.date || '').startsWith(prevMonthStr))
+    .filter(o => KhaytOrderStatus.isFinished(o) && (o.date || '').startsWith(prevMonthStr))
     .reduce((s, o) => s + orderNetRevenueBase(o), 0);
   const revDeltaPct = prevMonthRev > 0 ? ((monthlyRev - prevMonthRev) / prevMonthRev * 100) : null;
   const revDeltaHtml = revDeltaPct !== null
@@ -293,7 +293,7 @@ function renderDashboard() {
     const dd = new Date(today); dd.setDate(dd.getDate() - d);
     const ds = localDateStr(dd);
     const dayRev = printLog
-      .filter(o => o.status === 'completed' && o.date === ds)
+      .filter(o => KhaytOrderStatus.isFinished(o) && o.date === ds)
       .reduce((s, o) => s + orderNetRevenueBase(o), 0);
     sparkData.push(dayRev);
   }
@@ -314,10 +314,10 @@ function renderDashboard() {
     </div>`;
 
   // Stats
-  const active   = printLog.filter(o => o.status !== 'completed' && o.status !== 'quote');
-  const todayDone = printLog.filter(o => o.status === 'completed' && o.date === todayStr);
+  const active   = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+  const todayDone = printLog.filter(o => KhaytOrderStatus.isFinished(o) && o.date === todayStr);
   const todayRev  = todayDone.reduce((s, o) => s + orderNetRevenueBase(o), 0);
-  const todayNew = printLog.filter(o => o.date === todayStr && o.status !== 'completed');
+  const todayNew = printLog.filter(o => o.date === todayStr && !KhaytOrderStatus.isFinished(o));
   const todayMatG = inventory.reduce((s, item) =>
     s + (item.usageHistory || [])
       .filter(h => h.date === todayStr)
@@ -341,7 +341,7 @@ function renderDashboard() {
     : []);
 
   // Due-date buckets (non-completed only)
-  const withDue = printLog.filter(o => o.dueDate && o.status !== 'completed');
+  const withDue = printLog.filter(o => o.dueDate && !KhaytOrderStatus.isFinished(o));
   const overdue  = withDue.filter(o => new Date(o.dueDate + 'T00:00:00') < today).sort((a,b) => a.dueDate.localeCompare(b.dueDate));
   const dueSoon  = withDue.filter(o => {
     const d = new Date(o.dueDate + 'T00:00:00');
@@ -350,7 +350,7 @@ function renderDashboard() {
   }).sort((a,b) => a.dueDate.localeCompare(b.dueDate));
 
   // Unpaid orders
-  const unpaid = printLog.filter(o => (payStatus(o)) !== 'paid' && o.status === 'completed')
+  const unpaid = printLog.filter(o => (payStatus(o)) !== 'paid' && KhaytOrderStatus.isFinished(o))
     .slice(0, 5);
 
   // Receivables aging (all non-fully-paid orders)
@@ -519,7 +519,7 @@ function renderDashboard() {
     ${renderDashFilament()}
 
     ${machines.length > 0 ? (() => {
-      const activeOrds = printLog.filter(o => o.status !== 'completed' && o.status !== 'quote');
+      const activeOrds = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
       const WORK_HRS_PER_DAY = Math.max(1, avgDailyWorkingHours()); // use configured working hours
       // Feature 1: Per-machine clearance forecast
       const machRows = machines.map(m => {
@@ -841,7 +841,7 @@ function renderFilamentAnalytics() {
 
   const agg = {};
   printLog
-    .filter(o => o.status === 'completed')
+    .filter(o => KhaytOrderStatus.isFinished(o))
     .forEach(o => {
       const parts = o.parts || [];
       if (parts.length === 0) return;

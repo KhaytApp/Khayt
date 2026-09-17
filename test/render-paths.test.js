@@ -198,6 +198,40 @@ test('renderMaintenanceCostChart: draws the services the shop actually logged', 
   assert.ok(!html.includes('500'), 'last year is not counted against this one');
 });
 
+test('renderAnalytics: a delivered job is finished revenue, like a completed one', () => {
+  // `delivered` is the other spelling of finished. The revenue bar chart, the
+  // client-source split and the machine charts counted only `completed`, so a
+  // shop that marked its work delivered saw part of its own takings vanish.
+  const month = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const book = status => ({
+    settings: { currency: 'SAR', fixedCosts: [] },
+    printLog: [
+      { id: 'a', status: 'completed', date: `${month}-02`, price: 100, printTime: 1, clientId: null },
+      { id: 'b', status, date: `${month}-03`, price: 300, printTime: 2, clientId: null },
+    ],
+  });
+
+  loadAnalyticsStack();
+  dom.seedState(book('delivered'));
+  global.renderAnalytics();
+  const withDelivered = $('#revenueChartWrap').innerHTML;
+
+  loadAnalyticsStack();
+  dom.seedState(book('completed'));
+  global.renderAnalytics();
+  const withCompleted = $('#revenueChartWrap').innerHTML;
+
+  assert.equal(withDelivered, withCompleted,
+    'the revenue chart must not care which spelling of finished a job carries');
+
+  // And an unfinished job is still not revenue.
+  loadAnalyticsStack();
+  dom.seedState(book('printing'));
+  global.renderAnalytics();
+  assert.notEqual($('#revenueChartWrap').innerHTML, withCompleted,
+    'a job still on the printer has not earned anything yet');
+});
+
 // --- Arg-taking HTML builders -------------------------------------------------
 // Self-contained render helpers that build HTML from explicit arguments — the
 // same class as renderInvoice (where C1 lived). A render-path sweep across all

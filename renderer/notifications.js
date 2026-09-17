@@ -6,7 +6,7 @@ function getStaleOrders() {
   const thresholds = settings.staleHours || { printing: 48, post: 24, qc: 12, pending: 72 };
   const now = Date.now();
   return printLog.filter(o => {
-    if (['completed', 'quote', 'on_hold'].includes(o.status)) return false;
+    if (KhaytOrderStatus.isFinished(o) || o.status === 'quote' || o.status === 'on_hold') return false;
     const threshold = thresholds[o.status];
     if (!threshold) return false;
     // Find the last status change time
@@ -55,7 +55,7 @@ function buildNotifications() {
 
   // 1. Overdue orders
   const overdue = printLog.filter(o =>
-    o.dueDate && o.status !== 'completed' && o.status !== 'quote' &&
+    o.dueDate && !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' &&
     new Date(o.dueDate + 'T00:00:00') < today
   );
   for (const o of overdue.slice(0, 8)) {
@@ -376,7 +376,7 @@ function openNotifPanel() {
 
 function updateTabBadges() {
   // Queue tab: count all active (non-completed, non-quote) orders
-  const activeCount = printLog.filter(o => o.status !== 'completed' && o.status !== 'quote').length;
+  const activeCount = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote').length;
   const queueTabBtn = document.querySelector('.tab-btn[data-tab="queue-tab"]');
   if (queueTabBtn) {
     let badge = queueTabBtn.querySelector('.tab-badge');
@@ -391,7 +391,7 @@ function updateTabBadges() {
   }
   // Overdue orders badge on logs tab
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const overdueCount = printLog.filter(o => o.dueDate && o.status !== 'completed' && new Date(o.dueDate + 'T00:00:00') < today).length;
+  const overdueCount = printLog.filter(o => o.dueDate && !KhaytOrderStatus.isFinished(o) && new Date(o.dueDate + 'T00:00:00') < today).length;
   const logsTabBtn = document.querySelector('.tab-btn[data-tab="logs-tab"]');
   if (logsTabBtn) {
     let badge = logsTabBtn.querySelector('.tab-badge');
@@ -419,7 +419,7 @@ async function checkDueDateNotifications() {
   if (Notification.permission !== 'granted') return;
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const active = printLog.filter(o => o.dueDate && o.status !== 'completed');
+  const active = printLog.filter(o => o.dueDate && !KhaytOrderStatus.isFinished(o));
 
   const overdue = active.filter(o => new Date(o.dueDate + 'T00:00:00') < today);
   const dueToday = active.filter(o => {

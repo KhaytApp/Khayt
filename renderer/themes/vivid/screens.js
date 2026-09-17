@@ -260,14 +260,14 @@
 
     /* ---- KPI figures (real) — Revenue (month), Active orders, Fleet util, Filament ---- */
     const thisMonthStr = (typeof localMonthStr === 'function') ? localMonthStr(today) : todayStr.slice(0, 7);
-    const monthDone = log.filter((o) => o.status === 'completed' && (o.date || '').startsWith(thisMonthStr));
+    const monthDone = log.filter((o) => KhaytOrderStatus.isFinished(o) && (o.date || '').startsWith(thisMonthStr));
     const monthRev = monthDone.reduce((s, o) => s + orderNetRevenueBase(o), 0);
     const printsMonth = monthDone.length;
     // Previous month delta.
     const prevMonth = new Date(today); prevMonth.setMonth(prevMonth.getMonth() - 1);
     const prevMonthStr = (typeof localMonthStr === 'function') ? localMonthStr(prevMonth) : '';
     const prevRev = prevMonthStr
-      ? log.filter((o) => o.status === 'completed' && (o.date || '').startsWith(prevMonthStr))
+      ? log.filter((o) => KhaytOrderStatus.isFinished(o) && (o.date || '').startsWith(prevMonthStr))
         .reduce((s, o) => s + orderNetRevenueBase(o), 0)
       : 0;
     const revDeltaPct = prevRev > 0 ? Math.round((monthRev - prevRev) / prevRev * 100) : null;
@@ -275,7 +275,7 @@
       ? `${revDeltaPct >= 0 ? '▲' : '▼'} ${Math.abs(revDeltaPct)}% ${tr('dash.vs_prev_month', 'vs last month')}`
       : '';
 
-    const openOrders = log.filter((o) => o.status !== 'completed' && o.status !== 'quote');
+    const openOrders = log.filter((o) => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
     const nowPrinting = log.filter((o) => o.status === 'printing');
     const queued = openOrders.filter((o) => o.status === 'pending').length;
     const activeDelta = tr('dash.vv_active_sub', `${queued} in queue · ${nowPrinting.length} printing`)
@@ -320,7 +320,7 @@
     for (let i = 6; i >= 0; i -= 1) {
       const d = new Date(today); d.setDate(d.getDate() - i);
       const ds = (typeof localDateStr === 'function') ? localDateStr(d) : localDateStr(d);
-      const doneThatDay = log.filter((o) => o.status === 'completed' && o.date === ds);
+      const doneThatDay = log.filter((o) => KhaytOrderStatus.isFinished(o) && o.date === ds);
       const v = biz ? doneThatDay.reduce((s, o) => s + orderNetRevenueBase(o), 0) : doneThatDay.length;
       const cap = d.toLocaleDateString(localeTag(), { weekday: 'short' });
       barData.push({ cap, v });
@@ -335,7 +335,11 @@
       { key: 'completed', label: tr('queue.completed', 'Done'), color: 'var(--vv-green)' },
     ].map((s) => ({
       ...s,
-      v: log.filter((o) => o.status === s.key && (s.key !== 'completed' || (o.date || '').startsWith(thisMonthStr))).length,
+      // The "Done" segment counts both spellings of finished: the donut has no
+      // delivered bucket, so a delivered job used to appear in no segment at all.
+      v: log.filter((o) => (s.key === 'completed'
+        ? KhaytOrderStatus.isFinished(o) && (o.date || '').startsWith(thisMonthStr)
+        : o.status === s.key)).length,
     })).filter((s) => s.v > 0);
     const donutTotal = statusCounts.reduce((a, s) => a + s.v, 0);
     const dn = donut(statusCounts, donutTotal);

@@ -205,7 +205,7 @@
     if (!bar || !isOn()) return;
 
     const log = (typeof printLog !== 'undefined' && Array.isArray(printLog)) ? printLog : [];
-    const openOrders = log.filter((o) => o.status !== 'completed' && o.status !== 'quote').length;
+    const openOrders = log.filter((o) => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote').length;
     const printing = log.filter((o) => o.status === 'printing').length;
 
     // Filament used today (kg) — sum of grams on today's orders, if present.

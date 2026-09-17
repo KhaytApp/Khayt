@@ -192,7 +192,7 @@ test('Meridian will not let a running job be dragged to another printer', () => 
   const src = fs.readFileSync(path.join(root, 'renderer/themes/meridian/screens.js'), 'utf8');
   assert.match(src, /const movable = b\.state !== 'run' && b\.state !== 'done';/,
     'running and finished blocks must not be draggable');
-  assert.match(src, /if \(order\.status === 'printing' \|\| order\.status === 'completed'\) return false;/,
+  assert.match(src, /if \(order\.status === 'printing' \|\| KhaytOrderStatus\.isFinished\(order\)\) return false;/,
     'assignToMachine must refuse a running job even if the drag attribute is bypassed');
   // Both fields, not just the id: analytics resolves a machine by NAME too.
   assert.match(src, /order\.machineId = machineId;\s*\n\s*order\.machine = machine\.name \|\| machineId;/,

@@ -208,7 +208,7 @@ function renderLogs() {
     const isPaid = ps === 'paid';
     const photoCount = (log.printPhotos || []).length;
     const fileCount  = (log.attachedFiles || []).length;
-    const isOverdue = log.dueDate && log.status !== 'completed' && new Date(log.dueDate + 'T00:00:00') < new Date(new Date().setHours(0,0,0,0));
+    const isOverdue = log.dueDate && !KhaytOrderStatus.isFinished(log) && new Date(log.dueDate + 'T00:00:00') < new Date(new Date().setHours(0,0,0,0));
     const isSel = selectedOrders.has(log.id);
     const logOperator = log.operatorId ? operators.find(o => o.id === log.operatorId) : null;
     const logSplitBadge = log.splitInto && log.splitInto.length > 0 ? `<span class="split-badge">🔀 ${escapeHtml(t('ord.split_badge', { n: log.splitInto.length }))}</span>` : '';
@@ -232,14 +232,14 @@ function renderLogs() {
       <td style="width:32px;padding:8px 6px;"><input type="checkbox" class="log-sel" data-id="${log.id}" style="width:auto;" ${isSel ? 'checked' : ''}></td>
       <td style="font-family: var(--font-num); font-size: 12px; color: var(--text-dim); white-space:nowrap;">${escapeHtml(log.date)}</td>
       <td>
-        ${getPriorityLevel(log) !== 'normal' ? priorityBadgeHtml(log) + ' ' : ''}<strong>${escapeHtml(log.project)}</strong>${log.dueDate && log.status !== 'completed' ? ' ' + formatDueDateBadge(log.dueDate) : ''}${logSplitBadge}${logSubBadge}${logKitBadge}
+        ${getPriorityLevel(log) !== 'normal' ? priorityBadgeHtml(log) + ' ' : ''}<strong>${escapeHtml(log.project)}</strong>${log.dueDate && !KhaytOrderStatus.isFinished(log) ? ' ' + formatDueDateBadge(log.dueDate) : ''}${logSplitBadge}${logSubBadge}${logKitBadge}
         ${logOperator ? `<span class="operator-badge">👤 ${escapeHtml(logOperator.name)}</span>` : ''}
         ${(log.tags && log.tags.length > 0) ? `<div style="margin-top:3px;">${renderTagChips(log.tags, true)}</div>` : ''}
         <div style="font-family: var(--font-num); font-size: 11.5px; color: var(--text-muted);">${escapeHtml(log.id)}${photoCount ? ` · ${photoCount}📷` : ''}${fileCount ? ` · ${fileCount}📎` : ''}${log.notes ? ' · 📝' : ''}</div>
       </td>
       <td>
         <span class="badge ${escapeHtml(log.status)}">${escapeHtml(t('queue.' + log.status))}</span>${log.deliveredAt ? ` <span style="font-size:10px; color:var(--success);">✓ ${escapeHtml(t('queue.delivered'))}</span>` : ''}
-        ${log.status === 'completed' && log.completedAt ? `<div style="font-size:10.5px; color:var(--text-muted); margin-top:2px;">✓ ${escapeHtml(t('ord.completed_at'))}: ${escapeHtml(new Date(log.completedAt).toLocaleDateString(localeTag()))}</div>` : ''}
+        ${KhaytOrderStatus.isFinished(log) && log.completedAt ? `<div style="font-size:10.5px; color:var(--text-muted); margin-top:2px;">✓ ${escapeHtml(t('ord.completed_at'))}: ${escapeHtml(new Date(log.completedAt).toLocaleDateString(localeTag()))}</div>` : ''}
         ${log.qcPassedAt ? `<div style="margin-top:2px;"><span class="qc-badge">✅ ${escapeHtml(t('ord.qc_passed'))}</span>${log.qcNotes ? `<span style="font-size:11px;color:var(--text-muted);margin-inline-start:5px;">${escapeHtml(log.qcNotes)}</span>` : ''}</div>` : ''}
         ${(log.milestoneInvoices && log.milestoneInvoices.length > 0) ? `<div style="margin-top:2px;font-size:10.5px;color:var(--primary);">📄 ${log.milestoneInvoices.length} ${escapeHtml(t('ord.milestone_invoices'))}</div>` : ''}
         ${(() => {
@@ -311,8 +311,8 @@ function renderLogs() {
             <button class="menu-item" data-act="log-time"      data-id="${log.id}">⏱ ${escapeHtml(t('time.log_title') || 'Log time')}</button>
             <button class="menu-item" data-act="order-timeline" data-id="${log.id}">🕐 ${escapeHtml(t('ord.timeline'))}</button>
             ${(log.parts || []).length > 1 && log.status !== 'split' ? `<button class="menu-item pro-only" data-act="split-order" data-id="${log.id}">⚡ ${escapeHtml(t('ord.split'))}</button>` : ''}
-            ${log.status !== 'completed' && (log.parts || []).length > 1 ? `<button class="menu-item" data-act="partial-delivery" data-id="${log.id}">📦 ${escapeHtml(t('ord.partial_delivery'))}</button>` : ''}
-            ${log.status !== 'completed' && (log.parts || []).some(p => p.spoolId) ? `<button class="menu-item" data-act="log-spool-switch" data-id="${log.id}">🔄 ${escapeHtml(t('ord.spool_switch'))}</button>` : ''}
+            ${!KhaytOrderStatus.isFinished(log) && (log.parts || []).length > 1 ? `<button class="menu-item" data-act="partial-delivery" data-id="${log.id}">📦 ${escapeHtml(t('ord.partial_delivery'))}</button>` : ''}
+            ${!KhaytOrderStatus.isFinished(log) && (log.parts || []).some(p => p.spoolId) ? `<button class="menu-item" data-act="log-spool-switch" data-id="${log.id}">🔄 ${escapeHtml(t('ord.spool_switch'))}</button>` : ''}
             <button class="menu-item" data-act="change-order"  data-id="${log.id}">🔀 ${escapeHtml(t('ord.change_order') || 'Change Order')}</button>
             ${!isPaid ? `<button class="menu-item" data-act="pay-remind" data-id="${log.id}">💰 ${escapeHtml(t('pay.remind_btn'))}</button>` : ''}
             <div class="menu-sep"></div>
@@ -331,9 +331,9 @@ function renderLogs() {
             ${log.status === 'quote' ? `<button class="menu-item" data-act="revise-quote" data-id="${log.id}">📝 ${escapeHtml(t('ord.revise_quote'))}</button>` : ''}
             ${log.status === 'quote' && (log.quoteRevisions || []).length > 0 ? `<button class="menu-item" data-act="quote-revisions" data-id="${log.id}">🕐 ${escapeHtml(t('ord.quote_revisions'))} v${log.quoteVersion || 1}</button>` : ''}
             <!-- Engagement -->
-            ${log.status === 'completed' ? `<div class="menu-sep"></div><div class="menu-label">${escapeHtml(t('menu.engagement') || 'Engagement')}</div>` : ''}
-            ${log.status === 'completed' ? `<button class="menu-item" data-act="gen-survey" data-id="${log.id}">📊 ${escapeHtml(t('ord.gen_survey') || 'Generate survey')}</button>` : ''}
-            ${log.status === 'completed' && !log.survey?.rating ? `<button class="menu-item" data-act="record-survey" data-id="${log.id}">⭐ ${escapeHtml(t('ord.record_survey') || 'Record rating')}</button>` : ''}
+            ${KhaytOrderStatus.isFinished(log) ? `<div class="menu-sep"></div><div class="menu-label">${escapeHtml(t('menu.engagement') || 'Engagement')}</div>` : ''}
+            ${KhaytOrderStatus.isFinished(log) ? `<button class="menu-item" data-act="gen-survey" data-id="${log.id}">📊 ${escapeHtml(t('ord.gen_survey') || 'Generate survey')}</button>` : ''}
+            ${KhaytOrderStatus.isFinished(log) && !log.survey?.rating ? `<button class="menu-item" data-act="record-survey" data-id="${log.id}">⭐ ${escapeHtml(t('ord.record_survey') || 'Record rating')}</button>` : ''}
             ${log.survey?.rating ? `<span class="menu-item" style="cursor:default;">⭐ ${escapeHtml(t('ord.survey_rating') || 'Rating')}: ${log.survey.rating}/5</span>` : ''}
             <!-- History & admin -->
             <div class="menu-sep"></div>
