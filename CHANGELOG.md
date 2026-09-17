@@ -1664,6 +1664,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) A device on the shop's Wi-Fi could hold the LAN server's connections
+  open indefinitely.** A client that connected and then said nothing — or
+  announced a body and never sent it — was waited on for ever: no answer, no
+  close, the connection held until the app quit. Open enough of them and the
+  shop's own phones cannot get through. The Windows app never had this because
+  Node's web server applies its own time limits; this one is built directly on
+  the system's networking and had none. A request now has fifteen seconds to
+  arrive, after which the connection is let go. The clock stops the moment the
+  request is complete, so a slow connection is never cut off partway through
+  the answer it asked for.
+
+
 - **(iOS companion) A shipped order showed the English word "shipped" to an
   Arabic shop.** The phone's status list is a closed set and `shipped` was
   added to the desktop without it, so every badge fell back to the raw status
