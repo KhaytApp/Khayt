@@ -570,6 +570,59 @@ extension SampleShopTests {
     /// The trends card draws a column where a month has a reading and a gap
     /// where it has none, for two figures. A sample where every month had a
     /// reading — or none did — is a card whose gap was never drawn.
+    /// The downtime card needs a fleet where some machines went down and some
+    /// did not, and — the reason `lib/downtime.js` exists at all — a machine
+    /// with two OVERLAPPING windows. Without that pair the merge is never
+    /// exercised by anything a person looks at, and summing the windows
+    /// instead of merging them would draw a plausible wrong answer.
+    @Test("the sample fleet reaches a machine that went down, one that did not, and an overlap")
+    func downtimeSpan() async throws {
+        let engine = try KhaytEngine()
+        let machines = Shop.rows(try Self.book(), "machines")
+        let calendar = Calendar.current
+        var periods: [(from: Date, to: Date)] = []
+        for back in stride(from: 2, through: 0, by: -1) {
+            guard let day = calendar.date(byAdding: .month, value: -back, to: Date()),
+                  let month = calendar.dateInterval(of: .month, for: day) else { continue }
+            periods.append((from: month.start, to: month.end))
+        }
+        let rows = try await engine.downtimeHours(machines: machines, months: periods)
+        #expect(rows.count >= 2, "too few machines went down to rank any of them")
+        #expect(rows.count < machines.count,
+                "every machine went down — the card never draws a fleet member that simply ran")
+        #expect(rows.contains { $0.hours.contains { $0 > 0 } && $0.hours.contains { $0 == 0 } },
+                "no machine has a quiet month beside a bad one")
+
+        // The overlap, checked against what summing would have said. One
+        // machine's windows must merge to strictly less than their total.
+        var foundAnOverlap = false
+        for row in machines {
+            guard case .object(let m) = row,
+                  case .array(let blocks)? = m["downtimeBlocks"], blocks.count > 1 else { continue }
+            let merged = try await engine.downtimeHours(
+                machines: [row],
+                months: [(from: Date(timeIntervalSince1970: 0),
+                          to: Date(timeIntervalSince1970: 4_102_444_800))])
+            // WITH FRACTIONAL SECONDS. The book writes `...T08:00:00.000Z`,
+            // and the default formatter refuses those silently — it returns
+            // nil, the sum comes out zero, and the comparison below then
+            // "passes" for every machine by accident.
+            let reader = ISO8601DateFormatter()
+            reader.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let summed = blocks.reduce(0.0) { total, block in
+                guard case .object(let b) = block,
+                      case .string(let from)? = b["from"], case .string(let to)? = b["to"],
+                      let a = reader.date(from: from), let z = reader.date(from: to)
+                else { return total }
+                return total + z.timeIntervalSince(a) / 3600
+            }
+            #expect(summed > 0, "the sample's downtime dates did not parse at all")
+            if let total = merged.first?.total, total < summed - 0.001 { foundAnOverlap = true }
+        }
+        #expect(foundAnOverlap,
+                "no sample machine has overlapping windows — the merge is never exercised")
+    }
+
     /// The maintenance card ranks machines by what servicing cost, keeps a
     /// sold machine's spending, and covers ONE year. A sample with one entry
     /// on one machine draws a single bar and proves none of that.

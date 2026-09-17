@@ -6688,6 +6688,47 @@ public actor KhaytEngine {
     /// else's machine.
     // MARK: - Reports the Mac could not draw
 
+    /// How long each machine was out of action, month by month.
+    ///
+    /// ── THE UNION, NOT THE SUM ────────────────────────────────────────────
+    ///
+    /// A shop books a printer out for a belt change on Monday to Wednesday,
+    /// then adds "waiting for the part" for Tuesday to Thursday. Both are true,
+    /// both get recorded, and the machine is unavailable for 72 hours — not 96.
+    /// `lib/downtime.js` merges the windows before it counts them, and this
+    /// app already relies on that for scheduling; it simply never drew it.
+    public struct DowntimeRow: Decodable, Sendable {
+        public let machineId: String
+        public let name: String
+        /// Hours out of action, one per month asked for, in the same order.
+        public let hours: [Double]
+        public let total: Double
+    }
+    /// `months` are the periods to count, as `(from, to)` instants.
+    public func downtimeHours(machines: [JSONValue],
+                              months: [(from: Date, to: Date)]) throws -> [DowntimeRow] {
+        let periods = JSONValue.array(months.map { m in
+            .object(["from": .number(m.from.timeIntervalSince1970 * 1000),
+                     "to": .number(m.to.timeIntervalSince1970 * 1000)])
+        })
+        return try runtime.call2(#"""
+        (function () {
+          return (ARG0 || []).map(function (m) {
+            var hours = globalThis.KhaytDowntime.hoursByPeriod(m, ARG1);
+            return {
+              machineId: String(m && m.id || ''),
+              name: String((m && (m.name || m.id)) || ''),
+              hours: hours,
+              total: hours.reduce(function (s, h) { return s + h; }, 0),
+            };
+          // A machine that has never been out of action is not a row of zeros
+          // on a chart of downtime; it is a machine with nothing to say here.
+          }).filter(function (r) { return r.total > 0; })
+            .sort(function (a, b) { return b.total - a.total; });
+        })()
+        """#, [.array(machines), periods], as: [DowntimeRow].self)
+    }
+
     /// What the shop spent keeping each machine running, in one year.
     ///
     /// The entries are the book's own service log — the list this app already

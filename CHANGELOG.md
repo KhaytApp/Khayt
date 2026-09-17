@@ -867,6 +867,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) Machine downtime is drawn.** How long each printer stood out of
+  action, over three months, beside what its servicing cost — a repair costs
+  money and it costs time, and the second is usually the larger number. The
+  rule behind it has been in this app since the scheduler started using it to
+  decide which machine takes the next job; nothing ever showed it to the shop.
+  It counts the union of the booked-out windows rather than their sum, so a
+  belt change booked Monday to Wednesday and "waiting for the part" booked
+  Tuesday to Thursday are the 72 hours the machine was really unavailable, not
+  96. Machines that never went down are left off rather than drawn as rows of
+  zeros.
+
 - **(Mac) A service can be written down: what was done to a machine, when, and
   what it cost.** This app could show what each printer was due for and let you
   tick a task off, and none of that reached the record. Marking a nozzle change

@@ -32,6 +32,11 @@ struct MachineProfitPage: View {
     /// range either: the rule buckets by calendar year, and a year is the
     /// period a shop budgets maintenance over.
     var maintenance: [KhaytEngine.MaintenanceCostRow] = []
+    /// How long each machine stood idle, over the last three months. Beside
+    /// what servicing cost, because a repair costs money AND time and the
+    /// second is usually the larger number.
+    var downtime: [KhaytEngine.DowntimeRow] = []
+    var downtimeMonths: [String] = []
 
     var body: some View {
         let words = shop.words
@@ -48,6 +53,9 @@ struct MachineProfitPage: View {
                                         year: Self.thisYear())
                         .card(rail: Khayt.brand, padding: 14)
                         .padding(Metric.screen)
+                    DowntimeCard(shop: shop, rows: downtime, months: downtimeMonths)
+                        .card(rail: Khayt.brand, padding: 14)
+                        .padding(Metric.screen)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -58,6 +66,9 @@ struct MachineProfitPage: View {
             ScrollView {
                 Accuracy(shop: shop, rows: accuracy, all: shopAccuracy)
                 MaintenanceCostCard(shop: shop, rows: maintenance, year: Self.thisYear())
+                    .card(rail: Khayt.brand, padding: 14)
+                    .padding(Metric.screen)
+                DowntimeCard(shop: shop, rows: downtime, months: downtimeMonths)
                     .card(rail: Khayt.brand, padding: 14)
                     .padding(Metric.screen)
             }
