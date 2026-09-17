@@ -601,6 +601,9 @@ struct WindowSheets: ViewModifier {
             .sheet(item: $shop.draftingFor) { job in
                 DraftMessageSheet(shop: shop, job: job)
             }
+            .sheet(item: $shop.messagingFor) { job in
+                MessageSheet(shop: shop, job: job)
+            }
             .sheet(isPresented: $shop.askingTheBook) {
                 VStack(spacing: 0) {
                     AskTheBook(shop: shop)

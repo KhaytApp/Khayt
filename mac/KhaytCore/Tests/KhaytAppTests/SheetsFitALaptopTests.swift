@@ -97,6 +97,13 @@ private let laptopScreenHeight: CGFloat = 875
                 measured.append(("QcFailSheet", Self.height(of:
                     QcFailSheet(shop: shop, subject: subject))))
             }
+            // These two take a whole job rather than the lightweight subject.
+            if let job = shop.orders.first {
+                measured.append(("MessageSheet", Self.height(of:
+                    MessageSheet(shop: shop, job: job))))
+                measured.append(("DraftMessageSheet", Self.height(of:
+                    DraftMessageSheet(shop: shop, job: job))))
+            }
         }
 
         let tall = measured.filter { $0.1 > Self.ceiling }

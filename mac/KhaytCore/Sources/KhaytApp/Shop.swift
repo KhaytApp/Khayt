@@ -439,6 +439,12 @@ final class Shop {
                 serviceLog += stranded
             }
             maintenanceRows = serviceLog
+            // The shop's own saved messages. Written in the other app's
+            // settings and, until now, readable only there — three of them on
+            // this shop's book, in its own words.
+            if case .array(let saved)? = root[MessageTemplate.collection] {
+                messageTemplates = MessageTemplate.from(saved)
+            } else { messageTemplates = [] }
             clients = Self.decodeClients(root)
             clientNames = (try? await engine?.customerNames(
                 clientRows, language: words.language, settings: Self.settings(root))) ?? [:]
@@ -569,6 +575,7 @@ final class Shop {
             tagsInUse = []
             machines = []
             spools = []
+            messageTemplates = []
             wear = [:]
             libraryRoots = nil
             owner = nil
@@ -2287,6 +2294,45 @@ final class Shop {
 
     /// The job a message is being drafted about, while the sheet is up.
     var draftingFor: Order?
+
+    /// The job whose customer is being written to from a saved message.
+    var messagingFor: Order?
+
+    /// The shop's own saved messages, in the order it keeps them.
+    private(set) var messageTemplates: [MessageTemplate] = []
+
+    /// The number to open WhatsApp on, or empty.
+    ///
+    /// From the CUSTOMER RECORD, never from the job: a job carries a name, and
+    /// a name is not something to dial. A job with no customer record has no
+    /// number, which the sheet says out loud rather than showing a dead button.
+    func customerPhone(for job: Order) -> String {
+        guard let id = job.clientId, !id.isEmpty else { return "" }
+        return clients.first { $0.id == id }?.phone ?? ""
+    }
+
+    /// One of the shop's messages, with this job's facts in it.
+    ///
+    /// The SUBSTITUTION is `WaTemplate` — which placeholders exist and what
+    /// stands in for a blank — shared with the other app, because a template
+    /// written there is sent from here and a placeholder this app did not know
+    /// would go out with braces in it, to a customer.
+    ///
+    /// The FORMATTING is this app's: a price is written the way every other
+    /// figure on this screen is written, and the status is the word this app
+    /// uses for that stage rather than the raw field.
+    func fillMessage(_ template: MessageTemplate, for job: Order) -> String {
+        let name = job.client.isEmpty ? job.project : job.client
+        let stage = Stage.of(job)
+        return WaTemplate.fill(template.body, values: [
+            "client": name,
+            "id": job.id,
+            "price": Money.figure(job.price),
+            "currency": Money.mark(currency),
+            "due": job.dueDate ?? "",
+            "status": stage.map { words.callIt("queue." + $0.rawValue, fallback: $0.rawValue) } ?? "",
+        ])
+    }
 
     /// Draft one, or say why not.
     ///
