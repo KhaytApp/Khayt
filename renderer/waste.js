@@ -58,7 +58,7 @@ function renderWasteLog() {
       WASTE_FAILURE_TYPES.map(ft => `<option value="${escapeHtml(ft)}"${ft === wasteFailureFilter ? ' selected' : ''}>${escapeHtml(t('waste.ft.' + ft))}</option>`).join('');
   }
   if (statEl) {
-    const completedRevenue = printLog.filter(o => o.status === 'completed').reduce((s, o) => s + orderNetRevenueBase(o), 0);
+    const completedRevenue = printLog.filter(o => KhaytOrderStatus.isFinished(o)).reduce((s, o) => s + orderNetRevenueBase(o), 0);
     const wastePct = completedRevenue > 0 ? (totalWasteCost / completedRevenue * 100) : null;
     const maxFt = Object.values(ftCounts).reduce((a, b) => Math.max(a, b), 1);
     const ftBars = WASTE_FAILURE_TYPES.filter(ft => ftCounts[ft] > 0).sort((a, b) => (ftCounts[b] || 0) - (ftCounts[a] || 0)).map(ft => {

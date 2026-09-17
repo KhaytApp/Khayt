@@ -481,12 +481,12 @@ function buildDigestEmailHtml() {
 
   // Stats
   const completedThisPeriod = printLog.filter(o =>
-    o.status === 'completed' &&
+    KhaytOrderStatus.isFinished(o) &&
     o.completedAt && o.completedAt >= fromIso && o.completedAt <= toIso
   );
   const revenueThisPeriod = completedThisPeriod.reduce((s, o) => s + orderNetRevenueBase(o), 0);
   const outstanding = printLog
-    .filter(o => o.status === 'completed' && payStatus(o) !== 'paid')
+    .filter(o => KhaytOrderStatus.isFinished(o) && payStatus(o) !== 'paid')
     .reduce((s, o) => s + orderOwedBase(o), 0);
 
   // Low-stock spools

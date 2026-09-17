@@ -102,7 +102,7 @@ function renderClients() {
     if (tiers.length > 0) {
       const tierSpend  = new Map(); // clientId -> { completedCount, totalSpend }
       for (const o of printLog) {
-        if (!o.clientId || o.status !== 'completed') continue;
+        if (!o.clientId || !KhaytOrderStatus.isFinished(o)) continue;
         let ts = tierSpend.get(o.clientId);
         if (!ts) { ts = { completedCount: 0, totalSpend: 0 }; tierSpend.set(o.clientId, ts); }
         ts.completedCount++; ts.totalSpend += orderNetRevenueBase(o);
@@ -1118,7 +1118,7 @@ function clientLoyaltyPoints(clientId) {
   const _tp = KhaytTax.profileFromSettings(settings);
   let pts = 0;
   for (const o of printLog) {
-    if (o.clientId !== clientId || o.status !== 'completed') continue;
+    if (o.clientId !== clientId || !KhaytOrderStatus.isFinished(o)) continue;
     // A voided order is not a sale, and neither is a print the shop marked as
     // not business. Both earned points anyway — this loop checked only the
     // status — and so did an order refunded in full by a credit note, because
@@ -1219,7 +1219,7 @@ function getClientTier(clientId) {
   let completedCount = 0;
   let totalSpend = 0;
   for (const o of printLog) {
-    if (o.clientId !== clientId || o.status !== 'completed') continue;
+    if (o.clientId !== clientId || !KhaytOrderStatus.isFinished(o)) continue;
     completedCount++;
     totalSpend += orderNetRevenueBase(o);
   }
@@ -1337,7 +1337,7 @@ function exportClientPortal(clientId) {
     return `<tr style="border-bottom:1px solid #2a2a2a;">
       <td style="padding:8px;font-size:12px;white-space:nowrap;color:#888;">${escapeHtml(o.date || '')}</td>
       <td style="padding:8px;font-size:12px;"><strong style="color:#e2e8f0;">${escapeHtml(o.project || o.id)}</strong><div style="font-size:10px;color:#666;">${escapeHtml(o.id)}</div>
-        ${!['completed','quote'].includes(o.status) ? stepperHtml(o) : ''}
+        ${!KhaytOrderStatus.isFinished(o) && o.status !== 'quote' ? stepperHtml(o) : ''}
       </td>
       <td style="padding:8px;"><span style="background:${statusColors[o.status]||'#555'};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">${escapeHtml(o.status)}</span></td>
       <td style="padding:8px;text-align:right;font-weight:600;color:#4ade80;">${fmtPrice(o.price)}</td>

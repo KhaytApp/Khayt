@@ -265,7 +265,7 @@ function renderExpenses() {
   // Summary
   const totalExpenses = filtered.reduce((s, e) => s + e.amount, 0);
   const revenue = printLog
-    .filter(o => o.status === 'completed' && inRange(o.date, expRangeFilter, 'expenses'))
+    .filter(o => KhaytOrderStatus.isFinished(o) && inRange(o.date, expRangeFilter, 'expenses'))
     .reduce((s, o) => s + orderNetRevenueBase(o), 0);
   const profit = revenue - totalExpenses;
 
@@ -677,7 +677,7 @@ function _doExportTaxSummary(periodLabel, fromDate, toDate) {
   // Group completed orders by YYYY-MM
   const monthMap = {};
   for (const o of printLog) {
-    if (o.status !== 'completed') continue;
+    if (!KhaytOrderStatus.isFinished(o)) continue;
     const ds = (o.date || '').slice(0, 10);
     if (!inPeriod(ds)) continue;
     const month = ds.slice(0, 7);

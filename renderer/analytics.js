@@ -577,7 +577,7 @@ function renderClientSourceChart() {
   // clients.find inside the per-source loop; now O(orders) using the clientById index).
   const revBySrc = {};
   for (const o of printLog) {
-    if (o.status !== 'completed' || !o.clientId) continue;
+    if (!KhaytOrderStatus.isFinished(o) || !o.clientId) continue;
     const c = clientById(o.clientId);
     if (!c) continue;
     const src = c.source || 'other';
@@ -2192,7 +2192,7 @@ function renderRevenueChart() {
 
   const isDay = months[0]?.isDay;
   for (const o of printLog) {
-    if (o.status !== 'completed' || o.voidedAt) continue;
+    if (!KhaytOrderStatus.isFinished(o) || o.voidedAt) continue;
     if (!inRange(o.date, analyticsRange, 'analytics')) continue;
     const key = isDay ? (o.date || '').slice(0, 10) : (o.date || '').slice(0, 7);
     const m = months.find(x => x.key === key);

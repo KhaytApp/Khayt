@@ -162,14 +162,14 @@
     const owedBase = (o) => (typeof orderOwedBase === 'function') ? orderOwedBase(o) : 0;
     const pay = (o) => (typeof payStatus === 'function') ? payStatus(o) : (o.paid ? 'paid' : 'unpaid');
 
-    const todayRev = log.filter((o) => o.status === 'completed' && o.date === todayStr).reduce((s, o) => s + revBase(o), 0);
-    const yestRev = log.filter((o) => o.status === 'completed' && o.date === yestStr).reduce((s, o) => s + revBase(o), 0);
+    const todayRev = log.filter((o) => KhaytOrderStatus.isFinished(o) && o.date === todayStr).reduce((s, o) => s + revBase(o), 0);
+    const yestRev = log.filter((o) => KhaytOrderStatus.isFinished(o) && o.date === yestStr).reduce((s, o) => s + revBase(o), 0);
     const revDeltaPct = yestRev > 0 ? Math.round((todayRev - yestRev) / yestRev * 100) : null;
     const revDelta = revDeltaPct != null
       ? `${revDeltaPct >= 0 ? '▲' : '▼'} ${Math.abs(revDeltaPct)}% ${tr('dash.vs_yest', 'vs yest')}` : '';
     const revDeltaCls = revDeltaPct == null ? '' : revDeltaPct >= 0 ? 'up' : 'down';
 
-    const openOrders = log.filter((o) => o.status !== 'completed' && o.status !== 'quote');
+    const openOrders = log.filter((o) => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
     const dueToday = openOrders.filter((o) => o.dueDate === todayStr).length;
 
     const nowPrinting = log.filter((o) => o.status === 'printing');
@@ -184,7 +184,7 @@
 
     // Average margin across completed orders that expose cost (best-effort, real).
     let marginPct = null;
-    const withCost = log.filter((o) => o.status === 'completed' && +o.cost > 0 && revBase(o) > 0);
+    const withCost = log.filter((o) => KhaytOrderStatus.isFinished(o) && +o.cost > 0 && revBase(o) > 0);
     if (withCost.length) {
       const totRev = withCost.reduce((s, o) => s + revBase(o), 0);
       const totCost = withCost.reduce((s, o) => s + (+o.cost || 0), 0);
@@ -192,7 +192,7 @@
     }
 
     // Personal stats (enthusiast substitutes for the revenue/unpaid money tiles).
-    const doneToday = log.filter((o) => o.status === 'completed' && o.date === todayStr);
+    const doneToday = log.filter((o) => KhaytOrderStatus.isFinished(o) && o.date === todayStr);
     const printHoursToday = doneToday.reduce((s, o) => s + (+o.printTime || 0), 0);
 
     const revenueTile = biz
@@ -305,7 +305,7 @@
         act: tr('command.alert.open', 'Open'), tab: 'logs-tab' });
     });
     if (biz) {
-      unpaidOrders.filter((o) => o.status === 'completed').slice(0, Math.max(0, 5 - alerts.length)).forEach((o) => {
+      unpaidOrders.filter((o) => KhaytOrderStatus.isFinished(o)).slice(0, Math.max(0, 5 - alerts.length)).forEach((o) => {
         const oid = esc(o.id);
         const amt = `${esc(fmtMoneyVal(owedBase(o)))} ${esc(ccy())}`;
         alerts.push({ cls: 'cmd-b-blue', ico: '❖',
@@ -326,7 +326,7 @@
 
     /* ---- Today's activity (recent completed / picked-up) ---- */
     const recent = log
-      .filter((o) => o.status === 'completed' && o.date === todayStr)
+      .filter((o) => KhaytOrderStatus.isFinished(o) && o.date === todayStr)
       .slice(-4).reverse();
     const activityBody = recent.map((o) => {
       const client = biz ? findClient(o.clientId) : null;

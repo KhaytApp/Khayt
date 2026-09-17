@@ -7,7 +7,7 @@ let portfolioSearchTerm = '';
 function renderScheduleView() {
   const el = $('#scheduleView');
   if (!el) return;
-  const activeOrders = printLog.filter(o => !['completed', 'quote'].includes(o.status));
+  const activeOrders = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
   if (activeOrders.length === 0) {
     el.innerHTML = `<div class="card"><p style="color:var(--text-muted); font-size:13px; text-align:center; padding:20px 0;">${escapeHtml(t('queue.empty'))}</p></div>`;
     return;
@@ -130,7 +130,7 @@ function renderCalendarView() {
   // Build a map: "YYYY-MM-DD" -> orders[]
   const dayMap = {};
   printLog.forEach(o => {
-    if (!o.dueDate || o.status === 'completed' || o.status === 'quote') return;
+    if (!o.dueDate || KhaytOrderStatus.isFinished(o) || o.status === 'quote') return;
     const d = (o.dueDate || '').slice(0, 10);
     if (!dayMap[d]) dayMap[d] = [];
     dayMap[d].push(o);
@@ -232,7 +232,7 @@ function renderKioskView() {
 
   // Build a map: machineId → current active order
   const activeMachines = machines.filter(m => !m.deleted);
-  const activeOrders = printLog.filter(o => o.status !== 'completed' && o.status !== 'quote');
+  const activeOrders = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
 
   const cards = activeMachines.map(m => {
     const job = activeOrders.filter(o => o.machineId === m.id)

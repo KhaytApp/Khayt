@@ -28,6 +28,8 @@ const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
 const KhaytTax = require(path.join(ROOT, 'lib/tax.js'));
+// 'delivered' is finished too — the return counts both spellings of a sale.
+const KhaytOrderStatus = require(path.join(ROOT, 'lib/order-status.js'));
 
 /**
  * Run exportGaztVatReturn with the globals it reads, and capture the HTML it
@@ -39,6 +41,7 @@ function runReturn({ orders, expenses = [], settings = { enableVat: true, vatRat
   let captured = null;
   const sandbox = {
     KhaytTax,
+    KhaytOrderStatus,
     settings,
     printLog: orders,
     expenses,
@@ -101,6 +104,27 @@ test('a VAT-registered shop declares the VAT it actually owes', () => {
   assert.equal(box(html, 1), '347826.08', 'Box 1 still reports the VAT-inclusive price as sales');
   assert.equal(box(html, 3), '52173.92', 'Box 3 declared no VAT due');
   assert.equal(box(html, 2), '0.00', 'a registered shop has no zero-rated sales in this model');
+});
+
+test('a delivered sale is declared, exactly like a completed one', () => {
+  // `delivered` is the other spelling of finished. The return counted only
+  // `completed`, so a shop that had marked its jobs delivered declared less
+  // tax than it owed — and under-declaring is not a rounding error.
+  const completed = runReturn({ orders: [sale(200000), sale(150000)] });
+  const delivered = runReturn({
+    orders: [sale(200000, { status: 'delivered' }), sale(150000, { status: 'delivered' })],
+  });
+  assert.equal(box(delivered, 1), box(completed, 1));
+  assert.equal(box(delivered, 3), box(completed, 3));
+  assert.equal(box(delivered, 3), '45652.18');
+});
+
+test('a job that is not finished is still not declared', () => {
+  for (const status of ['quote', 'pending', 'printing', 'post', 'qc', 'on_hold']) {
+    const html = runReturn({ orders: [sale(200000, { status })] });
+    assert.equal(box(html, 1), '0.00', status);
+    assert.equal(box(html, 3), '0.00', status);
+  }
 });
 
 test('Box 1 and Box 3 add back up to what was charged', () => {

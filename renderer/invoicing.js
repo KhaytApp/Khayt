@@ -165,7 +165,7 @@ async function exportClientInvoices(clientId) {
   const c = clients.find(x => x.id === clientId);
   if (!c) return;
   const orders = printLog
-    .filter(o => o.clientId === clientId && o.status === 'completed')
+    .filter(o => o.clientId === clientId && KhaytOrderStatus.isFinished(o))
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   if (orders.length === 0) {
     toast(t('cl.no_invoices'), 'info');

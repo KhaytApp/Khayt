@@ -116,7 +116,7 @@ function renderMachines() {
     return;
   }
   list.innerHTML = machines.map(m => {
-    const active = printLog.filter(o => o.machineId === m.id && !['completed','quote'].includes(o.status)).length;
+    const active = printLog.filter(o => o.machineId === m.id && !KhaytOrderStatus.isFinished(o) && o.status !== 'quote').length;
     const svc = machineServiceStatus(m);
     const svcBadge = svc.due
       ? `<span class="machine-jobs-badge" style="background:var(--danger); color:#fff;">⚠ ${escapeHtml(t('mach.service_due'))}</span>`
@@ -1062,7 +1062,7 @@ function logNozzleChange(machineId) {
 }
 
 async function deleteMachine(machineId) {
-  const inUse = printLog.some(o => o.machineId === machineId && o.status !== 'completed');
+  const inUse = printLog.some(o => o.machineId === machineId && !KhaytOrderStatus.isFinished(o));
   const msg = inUse ? t('mach.delete_active_q') : t('mach.delete_q');
   const ok = await confirmModal(msg, { danger: true });
   if (!ok) return;
@@ -1267,7 +1267,7 @@ function machineServiceStatus(machine) {
       totalHours,
       lastServiceHours: machine.lastServiceHours,
       lastServiceAt: machine.lastServiceAt,
-      jobs: printLog.filter((o) => o && o.machineId === machine.id && o.status === 'completed'),
+      jobs: printLog.filter((o) => o && o.machineId === machine.id && KhaytOrderStatus.isFinished(o)),
     })
     : Math.max(0, totalHours - (machine.lastServiceHours || 0));
   if (machine.serviceInterval > 0) {
@@ -1426,7 +1426,7 @@ function estimateMachineQueueClearDate(machineId, excludeOrderId) {
   let queueHours = 0;
   for (const o of printLog) {
     if (o.id === excludeOrderId) continue;
-    if (o.status === 'completed' || o.status === 'quote') continue;
+    if (KhaytOrderStatus.isFinished(o) || o.status === 'quote') continue;
     if (o.machineId !== machineId) continue;
     const hrs = +(o.printTime || 0);
     queueHours += hrs;

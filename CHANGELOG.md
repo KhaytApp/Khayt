@@ -18,6 +18,25 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rather than dropped, because the money left the shop either way. The rule is
   `lib/maintenance-cost.js`.
 
+- **Forty-seven more figures were computed from part of the book.** A finished
+  job in Khayt is `completed`, or `delivered` — the spelling an older book uses
+  and the one the delivery step writes. Both mean the work is done. A first
+  sweep moved twenty-two places onto the shared rule and, because it was done by
+  reading, missed roughly twice that many: the revenue bar chart itself, the
+  revenue-by-customer-source split, the accounting journal a shop hands its
+  accountant, the VAT return, client lifetime spend and loyalty points, the
+  month and today figures on the Dashboard, product and material statistics, and
+  the same again in all six alternative dashboards. Counting the other way was
+  wrong too, so a delivered job showed as active work, sat in the queue, counted
+  against a WIP limit and carried an overdue badge. Every one of them asks
+  `KhaytOrderStatus.isFinished(order)` now. Two more came out of it: the Vivid
+  dashboard's status donut had no delivered segment, so a delivered job appeared
+  in none of them, and the Flow board's work-in-progress check had drifted from
+  the rule it documents and could block a shop from filing a quote or marking a
+  job delivered. A test now scans every renderer file and fails on a bare
+  `status === 'completed'` unless the site is listed with a reason, so the next
+  one cannot be missed by reading.
+
 - **Supplier price history compares like with like now.** A purchase records
   the unit it was bought in — spool, kg, g, L, piece, roll, box — but the
   price trend and the "best price" table grouped only by material type, so a

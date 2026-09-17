@@ -144,7 +144,7 @@
       : (typeof settings === 'undefined' || settings.mode !== 'enthusiast');
     if (showsMoney && typeof payStatus === 'function') {
       for (const o of orders) {
-        if (o.status !== 'completed' || o.voidedAt) continue;
+        if (!KhaytOrderStatus.isFinished(o) || o.voidedAt) continue;
         if (payStatus(o) === 'paid') continue;
         const owed = (typeof orderOwedBase === 'function') ? orderOwedBase(o) : 0;
         if (!(owed > 0)) continue;
@@ -179,7 +179,7 @@
     // something. Four idle machines emitting four near-identical rows padded a
     // list whose whole promise is that every row needs an action from you, and
     // pushed the genuinely urgent rows off the screen.
-    const waiting = orders.filter((o) => o && o.status !== 'completed' && o.status !== 'quote'
+    const waiting = orders.filter((o) => o && !KhaytOrderStatus.isFinished(o) && o.status !== 'quote'
       && o.status !== 'printing' && !o.archived).length;
     if (waiting > 0 && global.KhaytAttention?.machineState) {
       const idle = [];

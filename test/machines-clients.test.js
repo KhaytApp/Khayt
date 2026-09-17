@@ -10,6 +10,7 @@ test('machineServiceStatus marks service due when interval exceeded', () => {
   // hour meter reads. Requiring it here does the same thing, so the test
   // exercises the shared rule rather than a stand-in for it.
   require('../lib/maintenance.js');
+  require('../lib/order-status.js'); // globalThis.KhaytOrderStatus — 'delivered' is finished too
   const { machineServiceStatus } = require('../renderer/machines.js');
   const svc = machineServiceStatus(global.machines[0]);
   assert.equal(svc.due, true);

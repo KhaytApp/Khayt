@@ -70,7 +70,7 @@
   const hoursBetween = (a, b) => (b.getTime() - a.getTime()) / 3600000;
 
   function stateOf(order, now) {
-    if (order.status === 'completed') return 'done';
+    if (KhaytOrderStatus.isFinished(order)) return 'done';
     if (order.status === 'printing') return 'run';
     const due = order.dueDate ? new Date(order.dueDate + 'T23:59:59') : null;
     if (due && due < now) return 'late';
@@ -97,7 +97,7 @@
     const byId = new Map(lanes.map((l) => [l.machine.id, l]));
     const staged = [];
 
-    const active = orders.filter((o) => o.status !== 'completed' && o.status !== 'quote' && !o.archived);
+    const active = orders.filter((o) => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.archived);
 
     // Anchor the running work first — it is the only thing with a real start.
     for (const o of active.filter((x) => x.status === 'printing')) {
@@ -154,7 +154,7 @@
     const order = log.find((o) => o && o.id === orderId);
     const machine = (typeof machines !== 'undefined' ? machines : []).find((m) => m && m.id === machineId);
     if (!order || !machine) return false;
-    if (order.status === 'printing' || order.status === 'completed') return false;
+    if (order.status === 'printing' || KhaytOrderStatus.isFinished(order)) return false;
     if (order.machineId === machineId) return false;
 
     order.machineId = machineId;

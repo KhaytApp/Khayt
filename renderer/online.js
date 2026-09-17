@@ -97,7 +97,7 @@
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
       .slice(0, 5);
     const trackable = printLog
-      .filter((o) => o.status !== 'quote' && o.status !== 'completed')
+      .filter((o) => o.status !== 'quote' && !KhaytOrderStatus.isFinished(o))
       .slice()
       .sort((a, b) => (a.dueDate || a.date || '').localeCompare(b.dueDate || b.date || ''))
       .slice(0, 5);

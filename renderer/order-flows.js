@@ -1640,7 +1640,7 @@ function openOrderEditor(orderId) {
           // settings.workingHours is an object ({mon:8,…}); use the numeric helper
           // (raw object * 60 → NaN → setDate(NaN) → toISOString() RangeError).
           const workingHoursPerDay = Math.max(1, avgDailyWorkingHours());
-          const recentMins = printLog.filter(o => o.status === 'completed' && o.printTimeMins != null)
+          const recentMins = printLog.filter(o => KhaytOrderStatus.isFinished(o) && o.printTimeMins != null)
             .slice(-20).map(o => o.printTimeMins).filter(Boolean);
           const avgPrintMins = recentMins.length > 0 ? recentMins.reduce((s, v) => s + v, 0) / recentMins.length : 120;
           const totalMinsQueued = queueDepth * avgPrintMins;
@@ -2194,7 +2194,7 @@ function openOrderEditor(orderId) {
 
 /* ── Batch Print Planner ────────────────────────────────── */
 function openBatchPlannerModal() {
-  const candidates = printLog.filter(o => o.status !== 'completed' && o.status !== 'quote' && !o.voidedAt);
+  const candidates = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.voidedAt);
   if (candidates.length === 0) {
     toast(t('batch.no_orders') || 'No pending orders to plan', 'info');
     return;

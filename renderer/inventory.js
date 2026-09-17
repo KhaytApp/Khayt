@@ -1192,7 +1192,7 @@ function openPriceHistory(itemId) {
 
 function getQueuedWeight(itemId) {
   return printLog
-    .filter(o => o.status !== 'completed' && o.status !== 'quote' && !o.archived)
+    .filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.archived)
     .reduce((s, o) =>
       s + (o.parts || [])
         .filter(p => p.filamentId === itemId)
@@ -1444,7 +1444,7 @@ function getSpoolReservedGrams(spoolId) {
   // Key on the same id the deduction uses: the explicitly chosen spool when set,
   // otherwise the part's filament (most parts only carry filamentId).
   return printLog
-    .filter(o => o.status !== 'completed' && o.status !== 'quote' && !o.archived)
+    .filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.archived)
     .reduce((s, o) =>
       s + (o.parts || [])
         .reduce((ps, p) => ps + partGramsForSpool(p, spoolId), 0)
@@ -1483,7 +1483,7 @@ function checkSpoolOvercommit(parts, excludeOrderId) {
     const alreadyReserved = printLog
       // !archived: renderPipelineDemand already excludes archived orders, so a
       // reservation that survives archiving contradicts the demand view beside it.
-      .filter(o => o.status !== 'completed' && o.status !== 'quote' && !o.archived && o.id !== excludeOrderId)
+      .filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.archived && o.id !== excludeOrderId)
       .reduce((s, o) =>
         s + (o.parts || []).reduce((ps, p) => ps + partGramsForSpool(p, key), 0)
       , 0);
@@ -1503,7 +1503,7 @@ function renderPipelineDemand() {
   const el = $('#pipelineDemand');
   if (!el) return;
 
-  const activeOrders = printLog.filter(o => o.status !== 'completed' && o.status !== 'quote' && !o.archived);
+  const activeOrders = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.archived);
   if (activeOrders.length === 0) {
     el.innerHTML = '';
     return;
@@ -2780,7 +2780,7 @@ async function deleteSupplier(id) {
    ============================================================ */
 function getProductStats(productId) {
   const orders = printLog.filter(o => o.productId === productId);
-  const completed = orders.filter(o => o.status === 'completed');
+  const completed = orders.filter(o => KhaytOrderStatus.isFinished(o));
   return {
     count: orders.length,
     completedCount: completed.length,
@@ -2842,7 +2842,7 @@ function renderCatalog() {
     let s = productStatsMap.get(o.productId);
     if (!s) { s = { count: 0, completedCount: 0, revenue: 0, lastDate: null }; productStatsMap.set(o.productId, s); }
     s.count++;
-    if (o.status === 'completed') { s.completedCount++; s.revenue += orderNetRevenueBase(o); }
+    if (KhaytOrderStatus.isFinished(o)) { s.completedCount++; s.revenue += orderNetRevenueBase(o); }
     if (!s.lastDate || o.date > s.lastDate) s.lastDate = o.date;
   }
 
@@ -4059,7 +4059,7 @@ function computeMaterialForecast() {
     // Sum weight queued (non-completed, non-quote orders using this material)
     let queued = 0;
     for (const o of printLog) {
-      if (o.status === 'completed' || o.status === 'quote') continue;
+      if (KhaytOrderStatus.isFinished(o) || o.status === 'quote') continue;
       for (const p of (o.parts || [])) {
         queued += partGramsForSpool(p, item.id); // colour-aware: splits multicolour parts per spool
       }
@@ -4070,7 +4070,7 @@ function computeMaterialForecast() {
     const available = (item.weight || 0) - queued;
 
     // Daily usage from last 30 days of completed orders
-    const recentCompleted = printLog.filter(o => o.status === 'completed' && (o.date || '') >= thirtyAgoStr);
+    const recentCompleted = printLog.filter(o => KhaytOrderStatus.isFinished(o) && (o.date || '') >= thirtyAgoStr);
     let recentGrams = 0;
     for (const o of recentCompleted) {
       for (const p of (o.parts || [])) {

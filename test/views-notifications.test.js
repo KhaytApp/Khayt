@@ -1,5 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+// Every 'is this job finished' question in the renderer goes through this, and
+// 'delivered' is the legacy spelling of finished. In the app it is a script tag.
+require('../lib/order-status.js'); // globalThis.KhaytOrderStatus
 
 test('getStaleOrders finds printing jobs past stale threshold', () => {
   const old = new Date(Date.now() - 72 * 3600000).toISOString();

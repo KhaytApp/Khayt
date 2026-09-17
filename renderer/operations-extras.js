@@ -51,14 +51,14 @@ function openShiftChecklistModal() {
 /* ── Feature 3: End-of-Day Report Modal ─────────────────────── */
 function openEndOfDayReport() {
   const today = localDateStr();
-  const completedToday = printLog.filter(o => o.status === 'completed' && (o.completedAt || o.date || '').startsWith(today));
+  const completedToday = printLog.filter(o => KhaytOrderStatus.isFinished(o) && (o.completedAt || o.date || '').startsWith(today));
   const revenueToday   = completedToday.reduce((s, o) => s + orderNetRevenueBase(o), 0);
   const inProgress     = printLog.filter(o => ['pending','printing','post','qc'].includes(o.status));
   const wasteToday     = wasteLog.filter(w => (w.date || '').startsWith(today));
   const wasteTotalG    = wasteToday.reduce((s, w) => s + (+w.weight || 0), 0);
   const timeToday      = timeEntries.filter(te => (te.date || te.startedAt || '').startsWith(today));
   const timeTotal      = timeToday.reduce((s, te) => s + (+te.durationMins || 0), 0);
-  const overdueOrders  = printLog.filter(o => o.dueDate === today && o.status !== 'completed' && o.status !== 'quote');
+  const overdueOrders  = printLog.filter(o => o.dueDate === today && !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
 
   const overdueHtml = overdueOrders.length > 0 ? `
     <div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.35);border-radius:6px;padding:10px;margin-top:12px;">
@@ -441,7 +441,7 @@ function exportGaztVatReturn(period) {
   else { fromDate = `${now.getFullYear()}-01-01`; toDate = `${now.getFullYear()}-12-31`; }
 
   const periodOrders = printLog.filter(o =>
-    o.status === 'completed' && o.date >= fromDate && o.date <= toDate
+    KhaytOrderStatus.isFinished(o) && o.date >= fromDate && o.date <= toDate
   );
   // Boxes 1-3 used to read `o.vatAmount` and `o.vatRate`. NEITHER FIELD IS EVER
   // WRITTEN — not by the order form, not by the invoice, not by any importer.
