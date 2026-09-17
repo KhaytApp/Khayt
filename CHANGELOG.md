@@ -5,6 +5,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 ### Changed
+- **The customer rating chart was captioned with a different set of ratings
+  than it drew.** The line covers the last six months; the count and average
+  underneath were computed from every rating the shop had ever collected. A
+  shop two years in, whose work has got better, saw six dots at 4.8 above the
+  words "Avg 3.2 / 5" — a figure that contradicts every point above it. The
+  caption describes the window now, and the "not enough responses yet" check
+  counts the window too, so three ratings from two years ago no longer unlock
+  an empty chart. Separately, a rated job was counted only if it carried
+  `completedAt`: a book written before that timestamp existed, an imported one,
+  or a job that went straight to delivered had its customer's rating thrown
+  away. It falls back to the job's own date. The rule is
+  `lib/rating-trend.js`.
+
 - **(Mac) The Reports target was measured against a different set of jobs than
   the figure beside it.** The monthly target on the Reports screen said it
   counted finished, unvoided business — and filtered `completed` alone. The

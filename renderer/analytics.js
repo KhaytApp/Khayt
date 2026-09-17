@@ -1198,39 +1198,24 @@ function renderNpsTrendChart() {
     });
   }
 
-  const ratedOrders = (printLog || []).filter(o => o.survey?.rating && o.completedAt);
-  if (ratedOrders.length < 3) {
+  // Count, average and line all describe the SAME six months now. The caption
+  // used to be computed over every rating the shop had ever collected, which
+  // could contradict every dot above it.
+  const report = KhaytRatingTrend.trend(printLog || [], months.map(m => m.key));
+  if (!report.enough) {
     el.innerHTML = `<div class="card" style="margin-bottom:16px;"><h3 class="card-head"><span class="swatch"></span>${escapeHtml(t('an.nps_trend') || 'Customer Rating Trend')}</h3><p style="color:var(--text-muted);padding:12px 0;font-size:13px;">${escapeHtml(t('an.no_data') || 'No data yet')}</p></div>`;
     return;
   }
 
-  const byMonth = {};
-  months.forEach(m => { byMonth[m.key] = { total: 0, count: 0 }; });
-  for (const o of ratedOrders) {
-    const mk = localMonthStr(new Date(o.completedAt));
-    if (!byMonth[mk]) continue;
-    byMonth[mk].total += +o.survey.rating;
-    byMonth[mk].count++;
-  }
-
-  const totalResponses = ratedOrders.length;
-  const globalAvg = ratedOrders.reduce((s, o) => s + +o.survey.rating, 0) / totalResponses;
-
-  const vals = months.map(m => {
-    const b = byMonth[m.key];
-    return b.count > 0 ? b.total / b.count : null;
-  });
-
   const H = 120, W_PER = 60;
   const chartW = months.length * W_PER;
-  const MIN_R = 1, MAX_R = 5;
+  const MIN_R = KhaytRatingTrend.MIN_RATING, MAX_R = KhaytRatingTrend.MAX_RATING;
 
-  const points = months.map((m, i) => {
-    const v = vals[i];
-    if (v === null) return null;
+  const points = report.points.map((pt, i) => {
+    if (pt.average === null) return null;
     const x = i * W_PER + W_PER / 2;
-    const y = Math.round(H - 24 - ((v - MIN_R) / (MAX_R - MIN_R)) * (H - 40));
-    return { x, y, v };
+    const y = Math.round(H - 24 - ((pt.average - MIN_R) / (MAX_R - MIN_R)) * (H - 40));
+    return { x, y, v: pt.average };
   }).filter(Boolean);
 
   const polyline = points.length >= 2
@@ -1248,7 +1233,7 @@ function renderNpsTrendChart() {
       <div style="overflow-x:auto;">
         <svg width="${chartW}" height="${H}" style="display:block;min-width:200px;">${polyline}${dots}${labels}</svg>
       </div>
-      <p style="font-size:12px;color:var(--text-muted);margin-top:6px;">${escapeHtml(String(totalResponses))} ${escapeHtml(t('an.nps_responses') || 'responses · Avg')} ${globalAvg.toFixed(1)} / 5</p>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:6px;">${escapeHtml(String(report.responses))} ${escapeHtml(t('an.nps_responses') || 'responses · Avg')} ${report.average.toFixed(1)} / ${MAX_R}</p>
     </div>`;
 }
 
