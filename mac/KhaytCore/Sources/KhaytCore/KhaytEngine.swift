@@ -3371,6 +3371,56 @@ public actor KhaytEngine {
     /// real filament and duration on the edge out of printing, and the counters
     /// reset when the next job starts. Every print that finishes while the
     /// address is stale is a measurement that no longer exists.
+    // MARK: - Finding a printer that announces nothing
+
+    /// One protocol worth asking, and where to ask it.
+    public struct SweepProbe: Decodable, Sendable {
+        /// `moonraker`, `octoprint`, … — what to hand back to `identifySweep`.
+        public let type: String
+        public let port: Int
+        /// Unauthenticated on every one of these, deliberately: identification
+        /// has to work before credentials are known, or a moved printer with a
+        /// password stays lost, which is the case that needs help most.
+        public let path: String
+    }
+
+    /// The protocols a sweep asks, with their ports and paths.
+    public func sweepProbes() throws -> [SweepProbe] {
+        try runtime.call2(#"""
+        (function () {
+          return globalThis.KhaytPrinterSweep.SWEEPABLE.map(function (t) {
+            var p = globalThis.KhaytPrinterSweep.PROBES[t];
+            return { type: t, port: p.port, path: p.path };
+          });
+        })()
+        """#, [], as: [SweepProbe].self)
+    }
+
+    /// The addresses to try, nearest to the last known one first.
+    ///
+    /// ONLY THE /24 THE MACHINE WAS ALREADY ON. A re-leased address is almost
+    /// always in the same subnet, and wandering further would be a network scan
+    /// rather than looking for one's own printer — `lib/printer-sweep.js` says
+    /// so and this does not widen it.
+    public func sweepCandidates(lastKnownHost: String, limit: Int) throws -> [String] {
+        try runtime.call2("globalThis.KhaytPrinterSweep.candidateHosts(ARG0, { limit: ARG1 })",
+                          [.string(lastKnownHost), .number(Double(limit))], as: [String].self)
+    }
+
+    /// What answered, as a discovery record — or nil when it was not a printer.
+    ///
+    /// The shape matches `lib/printer-discovery.js` on purpose, so
+    /// `planRelocations` cannot tell a swept printer from an announced one.
+    public func identifySweep(type: String, host: String,
+                              status: Int, body: JSONValue) throws -> JSONValue? {
+        let answer = try runtime.call2(
+            "globalThis.KhaytPrinterSweep.identifyResponse(ARG0, ARG1, ARG2, ARG3)",
+            [.string(type), .string(host), .number(Double(status)), body],
+            as: JSONValue.self)
+        if case .null = answer { return nil }
+        return answer
+    }
+
     public func planRelocations(machines: [JSONValue],
                                 discovered: [JSONValue],
                                 statusCache: [String: JSONValue] = [:],

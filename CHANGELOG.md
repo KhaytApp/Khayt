@@ -868,6 +868,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Khayt can find a printer that moved and never announced itself.**
+  "Find moved printers" listened for printers advertising themselves on the
+  network, which is how most of them are found — and a Snapmaker U1 advertises
+  nothing at all. On the very network it was printing on, the answer was "no
+  printers found", while the printer sat two addresses away answering every
+  question put to it directly. So when listening turns up nothing, Khayt now
+  asks instead: the addresses around the one the machine used to be on, nearest
+  first, on the ports Khayt already speaks. Only the machines that have actually
+  gone quiet, only their own corner of the network, a short question each, and
+  never on a timer — it happens when you press the button and not otherwise.
+
+
 - **(Mac) A machine's maintenance schedule can be set up here.** Khayt could
   already show what each printer was due for and let you tick a task off, but
   the tasks themselves could only be created in the Windows app — so a shop
