@@ -1170,4 +1170,77 @@ import KhaytCore
                    "53-quality", size: CGSize(width: 560, height: 420))
     }
 
+    /// The five cards Reports gained, drawn from the sample book.
+    ///
+    /// These exist to be LOOKED AT. The arithmetic has its own tests and the
+    /// spread has its own tests; what neither can tell you is whether the card
+    /// reads — and the rating card's bars were drawn against a fixed scale of
+    /// five with nothing on the card saying so until one of these pictures
+    /// made it obvious. The `#expect`s here only guard against photographing
+    /// an empty card and calling it reviewed.
+    @Test("the five reports Reports gained")
+    func newCards() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let cal = Calendar.current
+
+        let spending = try await engine.expenseCategories(shop.expenseRows,
+                                                          reclaimsTax: shop.reclaimsTax)
+        #expect(shop.reclaimsTax, "an unregistered sample never draws the reclaimed-tax line")
+        #expect(spending.reclaimed > 0)
+        try render(ExpenseCategoriesCard(shop: shop, report: spending)
+                    .card(rail: Khayt.brand, padding: 14)
+                    .frame(width: 490).padding(Metric.screen).background(Khayt.ground),
+                   "54-expenses-by-category", size: CGSize(width: 530, height: 270))
+
+        let sources = try await engine.clientSources(clients: shop.clientRows,
+                                                     orders: shop.orderRows,
+                                                     settings: shop.settingsDict)
+        #expect(sources.rows.count > 1, "one source draws the prompt, not the chart")
+        try render(ClientSourcesCard(shop: shop, report: sources)
+                    .card(rail: Khayt.brand, padding: 14)
+                    .frame(width: 490).padding(Metric.screen).background(Khayt.ground),
+                   "55-clients-by-source", size: CGSize(width: 530, height: 250))
+
+        var months: [String] = []
+        for back in stride(from: 5, through: 0, by: -1) {
+            guard let d = cal.date(byAdding: .month, value: -back, to: Date()),
+                  let y = cal.dateComponents([.year], from: d).year,
+                  let m = cal.dateComponents([.month], from: d).month else { continue }
+            months.append(String(format: "%04d-%02d", y, m))
+        }
+        let ratings = try await engine.ratingTrend(orders: shop.orderRows, months: months)
+        #expect(ratings.responses > 0, "no ratings draws the empty state, not the chart")
+        try render(RatingTrendCard(shop: shop, trend: ratings)
+                    .card(rail: Khayt.brand, padding: 14)
+                    .frame(width: 490).padding(Metric.screen).background(Khayt.ground),
+                   "56-rating-trend", size: CGSize(width: 530, height: 210))
+
+        let year = MachineProfitPage.thisYear()
+        let maint = try await engine.maintenanceCost(machines: shop.machineRows,
+                                                     entries: shop.maintenanceRows, year: year)
+        #expect(!maint.isEmpty, "nothing serviced this year draws the empty state")
+        try render(MaintenanceCostCard(shop: shop, rows: maint, year: year)
+                    .card(rail: Khayt.brand, padding: 14)
+                    .frame(width: 490).padding(Metric.screen).background(Khayt.ground),
+                   "57-maintenance-cost", size: CGSize(width: 530, height: 230))
+
+        var periods: [(from: Date, to: Date)] = []
+        var keys: [String] = []
+        for back in stride(from: 2, through: 0, by: -1) {
+            guard let d = cal.date(byAdding: .month, value: -back, to: Date()),
+                  let iv = cal.dateInterval(of: .month, for: d) else { continue }
+            periods.append((from: iv.start, to: iv.end))
+            let p = cal.dateComponents([.year, .month], from: d)
+            if let y = p.year, let m = p.month { keys.append(String(format: "%04d-%02d", y, m)) }
+        }
+        let down = try await engine.downtimeHours(machines: shop.machineRows, months: periods)
+        #expect(!down.isEmpty, "no machine out of action draws the empty state")
+        try render(DowntimeCard(shop: shop, rows: down, months: keys)
+                    .card(rail: Khayt.brand, padding: 14)
+                    .frame(width: 540).padding(Metric.screen).background(Khayt.ground),
+                   "58-machine-downtime", size: CGSize(width: 580, height: 200))
+    }
+
 }

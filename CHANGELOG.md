@@ -867,6 +867,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) The rating chart says what full height means.** Its bars are drawn
+  against a fixed five rather than against the best month in the data, so a
+  bar's height means something absolute — and nothing on the card said what. A
+  marked line at five, so a half-height bar is legibly two and a half.
+
 - **(Mac) Machine downtime is drawn.** How long each printer stood out of
   action, over three months, beside what its servicing cost — a repair costs
   money and it costs time, and the second is usually the larger number. The
