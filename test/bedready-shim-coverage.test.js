@@ -110,6 +110,8 @@ const KANBAN_ACTS = {
   'kanban-slice-print': 'live', 'wo-kanban': 'live', 'assembly': 'live',
   // `biz`-gated in kanban.js — never rendered in enthusiast mode, so a stub is fine.
   'invoice': 'biz', 'pay': 'biz', 'bnpl-pay': 'biz', 'ship-order': 'biz', 'wa-quick': 'biz',
+  // In the post: a business posts parcels, and it sits beside ship-order.
+  'mark-shipped': 'biz',
   'approve-quote': 'biz', 'reject-quote': 'biz', 'share-quote': 'biz',
   'quote-approval-link': 'biz', 'share-tracking-link': 'biz',
   // Resin post-processing: rendered only for resin jobs, and still on the shim. Recorded

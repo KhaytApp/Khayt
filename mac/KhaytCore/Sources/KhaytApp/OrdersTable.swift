@@ -269,6 +269,11 @@ struct JobActions: View {
         }
         .disabled(!shop.canMoveJobs || job.status == "on_hold")
         Divider()
+        Button(shop.words.callIt("queue.mark_shipped")) {
+            Task { await shop.markShipped(job.id) }
+        }
+        .disabled(!shop.canMoveJobs || job.status != "completed"
+                  || job.shippedAt != nil || job.deliveredAt != nil)
         Button(shop.words.callIt("queue.delivered")) {
             Task { await shop.markDelivered(job.id) }
         }

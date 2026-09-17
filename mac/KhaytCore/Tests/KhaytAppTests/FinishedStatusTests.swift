@@ -84,6 +84,8 @@ struct FinishedStatusTests {
     static let allowed: [(snippet: String, why: String)] = [
         ("if order.status == \"completed\", order.deliveredAt != nil { return .delivered }",
          "This is what DECIDES a job is delivered: a modern book says so with a date beside completed."),
+        ("if order.status == \"completed\", order.shippedAt != nil { return .shipped }",
+         "The same, for the post: a shipped job IS completed, and the stamp beside it is the stage."),
         ("state == \"completed\" { total += 1 }",
          "A cache key. It has to change when the answer would, which moving a job in or out of completed does."),
         ("case .string(let state)? = job[\"status\"], state == \"completed\",",

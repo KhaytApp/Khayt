@@ -60,13 +60,16 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     let productId: String?
     let completedAt: String?
     let deliveredAt: String?
+    /// When the parcel left the shop. A shipped job is still `completed`;
+    /// see `Stage.of` and `lib/order-status.js`.
+    let shippedAt: String?
     let dueDate: String?
     let parts: [Part]
 
     private enum CodingKeys: String, CodingKey {
         case id, date, status, project, client, currency, price, paidAmount, costBasis
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
-        case machineId, clientId, productId, completedAt, deliveredAt, dueDate, parts
+        case machineId, clientId, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
     }
 
     /// THREE FIELDS A NEW JOB HAS NOT GOT YET.
@@ -107,6 +110,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         productId = try c.decodeIfPresent(String.self, forKey: .productId)
         completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
         deliveredAt = try c.decodeIfPresent(String.self, forKey: .deliveredAt)
+        shippedAt = try c.decodeIfPresent(String.self, forKey: .shippedAt)
         dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate)
         parts = try c.decodeIfPresent([Part].self, forKey: .parts) ?? []
     }
@@ -226,7 +230,7 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
     // In the order work moves through them, which is also the order the board
     // and the sidebar draw. `on_hold` sits between pending and printing because
     // that is where a job stops: nothing is held before it is accepted.
-    case quote, pending, on_hold, printing, post, qc, completed, delivered, cancelled
+    case quote, pending, on_hold, printing, post, qc, completed, shipped, delivered, cancelled
 
     var id: String { rawValue }
 
@@ -242,6 +246,7 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
         case .post: "queue.post"
         case .qc: "queue.qc"
         case .completed: "queue.completed"
+        case .shipped: "queue.shipped"
         case .delivered: "queue.delivered"
         case .cancelled: "mac.cancelled"
         }
@@ -275,6 +280,9 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
         // Inspection, not approval: a job in QC is being looked at.
         case .qc: "magnifyingglass"
         case .completed: "checkmark.circle"
+        // In the post: the parcel is moving, and that is the whole difference
+        // between this and the box sitting finished on the bench.
+        case .shipped: "box.truck"
         case .delivered: "shippingbox"
         case .cancelled: "xmark.circle"
         }
@@ -303,8 +311,9 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
         // "Wants a person, and will keep working if it does not get one" — a
         // held job is precisely that, and nothing else on this list is.
         case .on_hold: Khayt.attention
-        // "Finished, paid, sent, agreed."
-        case .completed, .delivered: Khayt.done
+        // "Finished, paid, sent, agreed." — the palette's own sentence names
+        // sent, so a shipped job belongs here rather than in a fifth colour.
+        case .completed, .shipped, .delivered: Khayt.done
         // "Late, failed, refused."
         case .cancelled: Khayt.late
         case .quote, .pending, .post, .qc: nil
@@ -321,7 +330,7 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
     /// Delivered and cancelled are off it on purpose: they are where work goes
     /// to stop being work, and a column of two hundred delivered jobs buries the
     /// four that need doing.
-    static let boardColumns: [Stage] = [.quote, .pending, .on_hold, .printing, .post, .qc, .completed]
+    static let boardColumns: [Stage] = [.quote, .pending, .on_hold, .printing, .post, .qc, .completed, .shipped]
 
     /// The stage a job is in, or nil for a status this app has no column for.
     ///
@@ -337,7 +346,10 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
     /// away. `split` reaches here: a parent order replaced by the sub-orders
     /// that carry its price between them.
     static func of(_ order: Order) -> Stage? {
+        // Delivered first: it is the later of the two, so a parcel that has
+        // arrived is delivered rather than still in the post.
         if order.status == "completed", order.deliveredAt != nil { return .delivered }
+        if order.status == "completed", order.shippedAt != nil { return .shipped }
         return Stage(rawValue: order.status)
     }
 }

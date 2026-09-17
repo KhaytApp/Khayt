@@ -3224,6 +3224,22 @@ final class Shop {
         }
     }
 
+    /// The parcel left the shop.
+    ///
+    /// Like `markDelivered`, this does not move the status — a job in the post
+    /// is finished work, and giving it a status of its own would take it out of
+    /// every figure that counts finished work. `lib/order-status.js` owns the
+    /// rule; this is the same call Khayt makes.
+    func markShipped(_ id: Order.ID) async {
+        await writeToOneOrder(id, named: words.callIt("queue.shipped")) { order, engine, _ in
+            let out = try await engine.markShipped(order: order, now: Date())
+            guard out.ok, let changed = out.order else {
+                throw MoveRefused(sentence: self.words.callIt("mac.not_finished_yet"))
+            }
+            return OneOrderEdit(order: changed, activity: "\(id) → shipped")
+        }
+    }
+
     /// Undo a payment: the money was never received, or was recorded against
     /// the wrong job. Nothing leaves the shop, so nothing is refused.
     func clearPayment(_ id: Order.ID) async {

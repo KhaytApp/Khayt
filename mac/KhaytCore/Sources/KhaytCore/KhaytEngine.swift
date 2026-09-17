@@ -4734,6 +4734,19 @@ public actor KhaytEngine {
             [order, .number(now.timeIntervalSince1970 * 1000)], as: Handover.self)
     }
 
+    /// Send a finished job out: stamps `shippedAt` and leaves the status alone.
+    ///
+    /// Refused for a job that is not finished, and for one that has already
+    /// arrived — posting something the customer already has is the clock
+    /// running backwards. `ok` false is the rule's answer, not an error.
+    public func markShipped(order: JSONValue, now: Date) throws -> Handover {
+        try runtime.call2(
+            "(function(){ var o = ARG0;"
+          + " var r = KhaytOrderStatus.markShipped(o, { now: ARG1 });"
+          + " return { ok: r.ok, order: r.ok ? o : null }; })()",
+            [order, .number(now.timeIntervalSince1970 * 1000)], as: Handover.self)
+    }
+
     /// Change a job's due date and priority, and write the edit down.
     ///
     /// `dueDate` nil clears it — a job with no due date is a real answer.

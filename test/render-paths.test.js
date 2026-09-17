@@ -399,6 +399,53 @@ test('renderMachineDowntimeChart: overlapping windows are one stretch, not two',
   assert.equal(hours[0], 72, 'the union, not the sum of the two lengths');
 });
 
+test('the board has a Shipped column, and a posted job belongs in it', () => {
+  // `renderKanban` pulls in the waiting list, the location banner and more, so
+  // running it here would mean a list of stubs that rots. The three things that
+  // must be true are each checked where they live.
+  const fs = require('fs');
+  const path = require('path');
+  const root = path.join(__dirname, '..');
+
+  // 1. Both entry points draw the column.
+  for (const page of ['renderer/index.html', 'renderer/bedready.html']) {
+    const html = fs.readFileSync(path.join(root, page), 'utf8');
+    assert.ok(html.includes('data-status="shipped"'), `${page} has no Shipped column`);
+    assert.ok(html.includes('id="list-shipped"'), `${page} has nowhere to put the cards`);
+  }
+
+  // 2. The board has a bucket to sort them into. Without it the cards fall
+  //    through `if (cols[stage])` and vanish from the board entirely.
+  const kanban = fs.readFileSync(path.join(root, 'renderer/kanban.js'), 'utf8');
+  assert.match(kanban, /const cols = \{[^}]*shipped: \[\][^}]*\}/,
+    'renderKanban has no shipped bucket, so a posted job would be drawn nowhere');
+
+  // 3. The rule puts a posted job there, and an arrived one past it.
+  const OS = require('../lib/order-status.js');
+  assert.equal(OS.stageOf({ status: 'completed', shippedAt: 'A' }), 'shipped');
+  assert.equal(OS.stageOf({ status: 'completed', shippedAt: 'A', deliveredAt: 'B' }), 'delivered');
+  assert.equal(OS.stageOf({ status: 'completed' }), 'completed');
+});
+
+test('a posted job is still finished work, so it still counts as revenue', () => {
+  loadAnalyticsStack();
+  const month = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const book = extra => ({
+    settings: { currency: 'SAR', fixedCosts: [] },
+    printLog: [{ id: 'a', status: 'completed', date: `${month}-02`, price: 300,
+                 printTime: 1, clientId: null, ...extra }],
+  });
+  dom.seedState(book({ shippedAt: `${month}-03T00:00:00.000Z` }));
+  global.renderAnalytics();
+  const posted = $('#revenueChartWrap').innerHTML;
+
+  loadAnalyticsStack();
+  dom.seedState(book({}));
+  global.renderAnalytics();
+  assert.equal(posted, $('#revenueChartWrap').innerHTML,
+    'putting a job in the post must not change what the shop earned');
+});
+
 // --- Arg-taking HTML builders -------------------------------------------------
 // Self-contained render helpers that build HTML from explicit arguments — the
 // same class as renderInvoice (where C1 lived). A render-path sweep across all

@@ -16,9 +16,15 @@ struct StageTests {
     /// Every status a job in Khayt can hold, from `renderer/kanban.js` and
     /// `lib/order-progress.js`. If Khayt gains one, this list is where the Mac
     /// app finds out.
+    /// The stages, in the order work moves through them.
+    ///
+    /// `shipped` and `delivered` are not statuses a job carries — both are a
+    /// date stamped on a COMPLETED job, and `Stage.of` derives them from the
+    /// pair. They are stages all the same: they are what the board draws and
+    /// what the sidebar lists, which is what this enum is for.
     static let khaytStatuses = [
         "quote", "pending", "on_hold", "printing", "post", "qc",
-        "completed", "delivered", "cancelled",
+        "completed", "shipped", "delivered", "cancelled",
     ]
 
     @Test("every stage Khayt's own queue shows has a column here")

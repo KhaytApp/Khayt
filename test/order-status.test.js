@@ -881,3 +881,99 @@ test('the machine charts ask the rule rather than comparing by hand', () => {
     assert.ok(/KhaytOrderStatus\.isFinished/.test(body), fn + ' no longer asks the rule');
   }
 });
+
+/* ------------------------------------------------------------------
+   Shipped: a stamp on a completed job, never a status of its own.
+   ------------------------------------------------------------------ */
+
+test('a shipped job is still completed, so it is still finished work', () => {
+  const o = { id: 'J1', status: 'completed' };
+  const out = S.markShipped(o, { now: Date.parse('2026-09-17T10:00:00Z') });
+  assert.equal(out.ok, true);
+  assert.equal(o.status, 'completed', 'giving it a status would take it out of every finished set');
+  assert.equal(o.shippedAt, '2026-09-17T10:00:00.000Z');
+  assert.equal(S.isFinished(o), true);
+  assert.equal(S.stageOf(o), 'shipped');
+});
+
+test('a job that is not finished cannot be posted', () => {
+  for (const status of ['quote', 'pending', 'printing', 'post', 'qc', 'on_hold']) {
+    const out = S.markShipped({ id: 'J', status }, {});
+    assert.equal(out.ok, false, status);
+    assert.equal(out.block.code, 'not_completed');
+  }
+});
+
+test('a job that has arrived cannot then be posted', () => {
+  const o = { id: 'J1', status: 'completed', deliveredAt: '2026-09-18T00:00:00.000Z' };
+  const out = S.markShipped(o, {});
+  assert.equal(out.ok, false);
+  assert.equal(out.block.code, 'already_delivered');
+  assert.equal(o.shippedAt, undefined, 'nothing is stamped on a refusal');
+});
+
+test('delivered wins over shipped, because it is the later of the two', () => {
+  const o = { id: 'J1', status: 'completed', shippedAt: 'A', deliveredAt: 'B' };
+  assert.equal(S.stageOf(o), 'delivered');
+});
+
+test('a shipped job can still be handed over', () => {
+  const o = { id: 'J1', status: 'completed' };
+  S.markShipped(o, { now: Date.parse('2026-09-17T10:00:00Z') });
+  const out = S.markDelivered(o, { now: Date.parse('2026-09-19T10:00:00Z') });
+  assert.equal(out.ok, true);
+  assert.equal(S.stageOf(o), 'delivered');
+  assert.equal(o.shippedAt, '2026-09-17T10:00:00.000Z', 'and the posting date survives');
+});
+
+test('posting is written into the job\'s own history', () => {
+  const o = { id: 'J1', status: 'completed' };
+  S.markShipped(o, { now: Date.parse('2026-09-17T10:00:00Z') });
+  const last = o.statusHistory[o.statusHistory.length - 1];
+  assert.equal(last.status, 'shipped');
+  assert.equal(last.at, '2026-09-17T10:00:00.000Z');
+});
+
+/* ------------------------------------------------------------------
+   What a carrier's tracking writes onto the job.
+   ------------------------------------------------------------------ */
+
+test('a printed label is not a posted parcel', () => {
+  const o = { id: 'J1', status: 'completed' };
+  assert.equal(S.stampFromShipping(o, 'label_created', 'T'), false);
+  assert.equal(o.shippedAt, undefined, 'a label is a parcel still on the bench');
+  assert.ok(!S.IN_THE_POST.includes('label_created'));
+});
+
+test('in transit means it has left the shop', () => {
+  const o = { id: 'J1', status: 'completed' };
+  assert.equal(S.stampFromShipping(o, 'in_transit', 'T'), true);
+  assert.equal(o.shippedAt, 'T');
+  assert.equal(o.deliveredAt, undefined);
+  assert.equal(S.stageOf(o), 'shipped');
+});
+
+test('a parcel that arrived was also posted, even if nothing said so', () => {
+  const o = { id: 'J1', status: 'completed' };
+  assert.equal(S.stampFromShipping(o, 'delivered', 'T'), true);
+  assert.equal(o.shippedAt, 'T', 'a delivered job that was never shipped is a hole in its history');
+  assert.equal(o.deliveredAt, 'T');
+});
+
+test('a stamp is never moved once written', () => {
+  const o = { id: 'J1', status: 'completed', shippedAt: 'FIRST' };
+  S.stampFromShipping(o, 'out_for_delivery', 'LATER');
+  assert.equal(o.shippedAt, 'FIRST', 'the first time the shop heard it is the answer');
+});
+
+test('an unfinished job is not stamped by a carrier event', () => {
+  const o = { id: 'J1', status: 'printing' };
+  assert.equal(S.stampFromShipping(o, 'delivered', 'T'), false);
+  assert.equal(o.shippedAt, undefined);
+  assert.equal(o.deliveredAt, undefined);
+});
+
+test('an event that changes nothing reports no change', () => {
+  const o = { id: 'J1', status: 'completed', shippedAt: 'A', deliveredAt: 'B' };
+  assert.equal(S.stampFromShipping(o, 'delivered', 'T'), false);
+});
