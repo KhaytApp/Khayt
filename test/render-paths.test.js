@@ -85,6 +85,7 @@ function loadAnalyticsStack() {
   require('../lib/supplier-prices.js'); // globalThis.KhaytSupplierPrices
   require('../lib/maintenance-cost.js'); // globalThis.KhaytMaintenanceCost
   require('../lib/rating-trend.js'); // globalThis.KhaytRatingTrend
+  require('../lib/machine-pl.js'); // globalThis.KhaytMachinePL
   require('../lib/client-sources.js'); // globalThis.KhaytClientSources
   require('../lib/downtime.js'); // globalThis.KhaytDowntime
   // Both are reached only once a book has an expense in it, which is why they
@@ -444,6 +445,57 @@ test('a posted job is still finished work, so it still counts as revenue', () =>
   global.renderAnalytics();
   assert.equal(posted, $('#revenueChartWrap').innerHTML,
     'putting a job in the post must not change what the shop earned');
+});
+
+test('the machine figures at the top agree with the P&L table below them', () => {
+  // The overview computed `revenue - materialCost` and called it profit; the
+  // table computes `revenue - materialCost - linkedExpenses - maintenance`
+  // through lib/machine-pl.js. Two answers about one machine, on one screen,
+  // and this is the figure an owner uses to decide whether to retire a printer.
+  loadAnalyticsStack();
+  const month = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  dom.seedState({
+    settings: { currency: 'SAR', mode: 'professional', fixedCosts: [] },
+    machines: [{ id: 'm1', name: 'U1', targetHoursPerDay: 8 }],
+    printLog: [{
+      id: 'J1', machineId: 'm1', status: 'completed', date: `${month}-02`,
+      price: 1000, printTime: 4, clientId: null, parts: [{ qty: 1, filamentCost: 200 }],
+    }],
+    // A courier bill against that job, and a belt change on that machine.
+    expenses: [{ id: 'e1', orderId: 'J1', date: `${month}-03`, amount: 120, category: 'Shipping' }],
+    machMaintLog: [{ id: 'x1', machineId: 'm1', date: `${month}-04`, cost: 80, note: 'belts' }],
+  });
+
+  const rows = global.computeHandoffMachineRows();
+  assert.equal(rows.length, 1);
+  // 1000 revenue, less the 120 courier bill and the 80 belt change. Material
+  // costs nothing HERE because `partTotalCost` needs a costing context (rates,
+  // spools, settings) this harness does not set up — which is fine: what this
+  // test is about is the two subtractions the overview was missing, and they
+  // are the whole difference between 1000 and 800.
+  assert.equal(rows[0].profit, 800,
+    'the overview is still leaving out the linked expense and the maintenance');
+  assert.notEqual(rows[0].profit, 1000, 'that is revenue with nothing taken off');
+});
+
+test('a machine that ran over its target is not drawn as exactly full', () => {
+  // The clamp lib/capacity.js removed from its own gauge, for the reason it
+  // gives: a machine booked half as much again as it was meant to and one that
+  // hit its target exactly are different facts.
+  loadAnalyticsStack();
+  const month = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  dom.seedState({
+    settings: { currency: 'SAR', mode: 'professional', fixedCosts: [] },
+    analyticsRange: 'month',
+    machines: [{ id: 'm1', name: 'U1', targetHoursPerDay: 1 }],
+    printLog: [{
+      id: 'J1', machineId: 'm1', status: 'completed', date: `${month}-02`,
+      price: 100, printTime: 500, clientId: null, parts: [],
+    }],
+  });
+  const rows = global.computeHandoffMachineRows();
+  assert.ok(rows[0].util > 100,
+    `a machine far over its target read as ${rows[0].util}% — the clamp is back`);
 });
 
 // --- Arg-taking HTML builders -------------------------------------------------
