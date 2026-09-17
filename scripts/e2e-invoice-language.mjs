@@ -174,6 +174,21 @@ try {
   failed = true;
   console.error('\n' + (err && err.message ? err.message : String(err)));
 } finally {
-  await electronApp.close();
+  // A DEADLINE, not politeness for its own sake.
+  //
+  // Every assertion above printed "all assertions passed" and then this close
+  // never returned, so `npm run test:e2e:all` killed the suite and reported it
+  // FAILED — a suite that passes and reports failure teaches people to ignore
+  // it, and it cost ten minutes of every full run.
+  //
+  // It is not the invoice render: launching the app, rendering one document
+  // and closing takes 142ms. Something this suite accumulates over its fifteen
+  // renders keeps the app from quitting, and what that is has not been found.
+  // Since `process.exit` on the next line is what actually ends the run, the
+  // close gets ten seconds to be tidy and then the run ends anyway.
+  await Promise.race([
+    electronApp.close().catch(() => {}),
+    new Promise((resolve) => setTimeout(resolve, 10_000)),
+  ]);
 }
 process.exit(failed ? 1 : 0);
