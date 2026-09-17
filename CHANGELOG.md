@@ -1734,6 +1734,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) The sample book expired overnight and took two tests with it.** The
+  demo shop's dates are written into a file and the calendar is not, so the
+  last job in its queue fell past due and the "at risk" projection — which only
+  reports work that will miss its date but has not yet — had nothing left to
+  say. Nobody changed anything; the day changed. The queue has been run forward
+  and there is now a check that fails a week before it can happen again,
+  saying what to move and why, so it lands as a chore rather than as a stranger's
+  branch breaking for no reason they can see.
+
 - **A Mac test accused the tablet server of holding connections open when it
   was not.** The read-timeout tests lowered a shared setting, ran, and put it
   back — and the test runner runs them side by side, so one test's restore
