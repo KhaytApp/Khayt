@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The biggest figure on the main screen was a permanent dash.** The
+  masthead's largest slot is labelled with the month and the word NET, and it
+  printed an em dash on every shop, every month, with a note under it saying
+  the number lives in Reports. The reason was sound — revenue net of tax
+  depends on whether a shop prices tax-inclusive, and a figure divided by a tax
+  rate that may not apply is exactly the kind of quietly-wrong number that
+  section exists to prevent — but the mode was never actually unavailable, only
+  unasked for. The figure now comes from the same rule Reports prints, given
+  the same settings, so the two cannot disagree; the dash is kept for a book
+  that has not loaded and for a month with nothing in it, where it means
+  "nothing to show yet" rather than "nothing we are willing to say".
+
 - **(Mac) Seven of Khayt's shared rules now run natively, with tests that will
   not let them drift.** The Mac app has always run Khayt's business rules —
   pricing, tax, costing, identity — as the same JavaScript the Windows app runs,

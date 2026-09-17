@@ -159,20 +159,39 @@ extension Shop {
         return month + " · " + words.callIt("mac.net")
     }
 
-    /// Revenue this month, net of tax. Nil until the book has been read, so
-    /// the masthead draws a dash rather than a confident zero on a shop whose
-    /// file simply has not loaded yet.
-    /// Deliberately nil.
+    /// Revenue this month, net of tax.
     ///
-    /// §5: "Reports is the only place they are reconciled." Net of tax depends
-    /// on whether the shop prices tax-inclusive, which is a mode this reading
-    /// is not given — and a figure divided by a VAT rate that may not apply is
-    /// the subtly-wrong number the whole section is about. The masthead draws
-    /// the dash and names Reports.
-    var monthNet: Double? { nil }
+    /// ── THIS WAS A PERMANENT DASH, AND WHAT CHANGED ───────────────────────
+    ///
+    /// It read `nil`, always, citing §5 — "Reports is the only place they are
+    /// reconciled" — on the grounds that net-of-tax depends on whether the
+    /// shop prices tax-inclusive, "a mode this reading is not given", and a
+    /// figure divided by a VAT rate that may not apply is the subtly-wrong
+    /// number the whole section is about.
+    ///
+    /// The reasoning was right and the conclusion had an unexamined premise:
+    /// the mode was not unavailable, it simply was not asked for. So the
+    /// masthead's LARGEST figure, in its most prominent slot, labelled with
+    /// the month, printed an em dash on every shop for ever — and a permanent
+    /// dash in prime position is not caution, it is a screen giving up on its
+    /// own headline.
+    ///
+    /// It now comes from `lib/pnl-report.js` at month granularity: the SAME
+    /// rule, given the SAME settings, that Reports prints. That is what §5 is
+    /// protecting — one reconciliation, not two — and two screens reading one
+    /// rule is the form of it this codebase uses everywhere else.
+    ///
+    /// Still nil before the book is read, and for a month with no row of its
+    /// own. The dash is then what it always should have meant: nothing to
+    /// show yet, rather than nothing we are willing to say.
+    var monthNet: Double? { monthNetRevenue }
     var monthGross: Double? { monthTotals }
 
-    var monthNetNote: String? { words.callIt("mac.net_in_reports") }
+    /// Only while there is no figure. A note explaining an absence, printed
+    /// under a number that is present, reads as a warning about that number.
+    var monthNetNote: String? {
+        monthNetRevenue == nil ? words.callIt("mac.net_in_reports") : nil
+    }
 
     /// What the month's material cost is KNOWN to be.
     ///

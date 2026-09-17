@@ -655,9 +655,29 @@ final class Shop {
         // screen a shop leaves open.
         var shelf: [JSONValue] = []
         if case .array(let rows)? = root["inventory"] { shelf = rows }
+        // The P&L charges expenses against the period, so they go in with the
+        // orders rather than being left out and the figure quietly overstated.
+        var expenses: [JSONValue] = []
+        if case .array(let rows)? = root["expenses"] { expenses = rows }
         facts = try? await engine.dashboardFacts(orders: orders, machines: machines, settings: settings,
                                                  statusCache: printers.statusCache,
                                                  inventory: shelf)
+        // ── THE MONTH'S NET, FROM THE RULE REPORTS USES ───────────────────
+        //
+        // Through `pnlByPeriod` at month granularity rather than a sum taken
+        // here. That is the whole reason it can be shown at all: the objection
+        // to a net figure on this screen was that net-of-tax depends on
+        // whether the shop prices tax-inclusive, and a figure divided by a VAT
+        // rate that may not apply is the subtly-wrong number. The shared rule
+        // is given the settings and answers that question itself, so this
+        // figure and the one in Reports are the same arithmetic on the same
+        // inputs and cannot drift apart.
+        //
+        // One more crossing per LOAD, beside the several already here — not
+        // per redraw.
+        monthNetRevenue = await Self.thisMonthsNet(
+            engine: engine, orders: orders, expenses: expenses,
+            settings: settings, clients: clients, currencies: Invoice.currencyTable(self))
         var perMachine: [String: NozzleWear] = [:]
         for machine in machines {
             guard case .object(let record) = machine,
@@ -8459,6 +8479,32 @@ final class Shop {
     /// the book loads — it reads the whole active queue and the shop's working
     /// week, which is not a thing to redo per row per redraw.
     private(set) var timeline: KhaytEngine.Timeline?
+
+    /// What the shop earned this month, net of tax — `lib/pnl-report.js` at
+    /// month granularity, which is the same rule and the same figure Reports
+    /// prints.
+    ///
+    /// Nil before the book is read, and nil for a month with no row of its own,
+    /// which is a month nothing happened in. The masthead draws its dash then,
+    /// rather than a confident zero.
+    private(set) var monthNetRevenue: Double?
+
+    /// The current month's row, or nil.
+    ///
+    /// The period key is `YYYY-MM` in LOCAL time, built by `DateRange` — the
+    /// same construction the rule uses for its own keys, so the lookup cannot
+    /// miss by a day at either end of a month for a shop not on UTC.
+    static func thisMonthsNet(engine: KhaytEngine?, orders: [JSONValue],
+                              expenses: [JSONValue], settings: [String: JSONValue],
+                              clients: [JSONValue],
+                              currencies: [String: JSONValue],
+                              now: Date = Date()) async -> Double? {
+        guard let engine else { return nil }
+        let periods = (try? await engine.pnlByPeriod(
+            orders: orders, expenses: expenses, settings: settings, clients: clients,
+            currencies: currencies, now: now, granularity: "month")) ?? []
+        return periods.first { $0.period == DateRange.localMonth(now) }?.revenue
+    }
 
     /// Ask the shared rule when the queue will finish.
     ///
