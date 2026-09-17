@@ -1371,6 +1371,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **Expenses by category disagreed with the P&L about the same money.** For a
+  registered shop the tax on a purchase is not a cost — it is reclaimed from
+  the authority — and `lib/pnl-report.js` has always charged `paid` less what
+  is claimable. The category chart summed the gross, so the two differed by
+  the whole of the reclaimable tax: at the Saudi rate, fifteen per cent of
+  every category with a receipt, with nothing on either screen to say which
+  number was which. The arithmetic is one rule now
+  (`lib/expense-categories.js`) using the same reclaim test as the P&L: what
+  the supplier's invoice says, never a rate applied by us; an expense with no
+  such field reclaims nothing, so nothing about an older book changes; and a
+  shop that is not registered reclaims nothing at all. A receipt claiming more
+  tax than it paid cannot drive a category below zero.
 - **(Mac) The shop's mode was ignored here, so a Simple shop saw the whole
   Professional surface.** Khayt has two modes and `lib/feature-tiers.js` is
   the single source of truth for what each includes — and this app read
