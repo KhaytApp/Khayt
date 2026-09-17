@@ -83,6 +83,15 @@ struct MachineProfitPage: View {
         }
     }
 
+    /// Nobody has told this shop's machines what they are meant to run.
+    ///
+    /// Only when NO machine has a target: with one set, a dash beside the
+    /// others explains itself. Empty rows are excluded because the page draws
+    /// its own empty state then and a note under nothing says nothing.
+    static func noTargetsAnywhere(_ report: KhaytEngine.MachineProfitReport) -> Bool {
+        !report.rows.isEmpty && report.rows.allSatisfy { $0.utilisationPct == nil }
+    }
+
     /// The calendar year the maintenance figures cover.
     ///
     /// Read off an ISO day rather than from `DateComponents`, for the reason
@@ -132,6 +141,26 @@ struct MachineProfitPage: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 2)
+
+            // ── WHY THE UTILISATION COLUMN IS ALL DASHES ──────────────────
+            //
+            // Hours run against hours WANTED needs somebody to have said what
+            // was wanted, and `targetHoursPerDay` is unset on a machine until
+            // the shop fills it in. Every row then shows an em dash, correctly
+            // — and a column of dashes explains nothing, so a shop reads it as
+            // a figure the app failed to work out rather than one it was never
+            // given.
+            //
+            // The field's own hint says what it is for, but it lives on the
+            // machine sheet and the dashes are here. Said once, under the
+            // table, and only when NO machine has a target: with one set, the
+            // dashes beside it are self-explaining.
+            if Self.noTargetsAnywhere(report) {
+                Text(words.callIt("mac.mpl_no_target"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 2)
+            }
         }
         .padding(Metric.screen)
     }
