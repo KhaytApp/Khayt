@@ -553,7 +553,16 @@ struct Reports: View {
             expenses: done.expenses,
             maintenance: done.maintenance,
             settings: shop.settingsDict, clients: shop.clientRows,
-            unassigned: shop.words.callIt("dash.unassigned"))
+            unassigned: shop.words.callIt("dash.unassigned"),
+            // The denominator for utilisation. Taken from the same period the
+            // four collections above were filtered by, and spanning the data
+            // itself on "All time" — the other app's answer, so the same
+            // machine cannot read at two utilisations depending on which app
+            // is open.
+            days: shop.periodDays(dates: done.orders.compactMap { row in
+                if case .object(let o) = row, case .string(let d)? = o["date"] { return d }
+                return nil
+            }))
     }
 
     private func recomputeAccuracy() async {

@@ -3788,6 +3788,38 @@ final class Shop {
         Self.inPeriod(date, period: period, now: now)
     }
 
+    /// How long the chosen period is, in days.
+    ///
+    /// The denominator under "hours run against hours wanted". It has to match
+    /// what the other app's `analyticsRangeDays` answers or the same machine
+    /// reads at two utilisations depending on which app is open — which is the
+    /// whole class of fault the shared rules exist to end, arriving through the
+    /// back door as an argument rather than as arithmetic.
+    ///
+    /// A WHOLE month, not the days elapsed in it. Mid-month that makes every
+    /// machine look under-worked, and it is still the right answer: the target
+    /// is a rate for the month, the figure is what has been done against it so
+    /// far, and a shop reading 40% on the 12th is reading something true.
+    func periodDays(now: Date = Date(), dates: [String] = []) -> Int {
+        let cal = Calendar.current
+        switch period {
+        case .month:
+            return cal.range(of: .day, in: .month, for: now)?.count ?? 30
+        case .last_month:
+            guard let lm = cal.date(byAdding: .month, value: -1, to: now) else { return 30 }
+            return cal.range(of: .day, in: .month, for: lm)?.count ?? 30
+        case .quarter: return 91
+        case .year: return 365
+        case .all:
+            // Span the data itself, as the other app does. A shop six weeks old
+            // is not running against a year.
+            let days = dates.map { String($0.prefix(10)) }.filter { !$0.isEmpty }.sorted()
+            guard let first = days.first, let last = days.last,
+                  let from = Order.day(first), let to = Order.day(last) else { return 30 }
+            return max(1, Int((to.timeIntervalSince(from) / 86_400).rounded()) + 1)
+        }
+    }
+
     static func inPeriod(_ date: String, period: Period, now: Date = Date()) -> Bool {
         if period == .all { return true }
         guard !date.isEmpty else { return false }

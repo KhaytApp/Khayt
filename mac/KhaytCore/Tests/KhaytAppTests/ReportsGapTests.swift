@@ -18,6 +18,52 @@ struct ReportsGapTests {
 
 
 
+    @Test("a machine's hours come from what its prints took, and are never capped")
+    func machineHours() async throws {
+        let engine = try KhaytEngine()
+        let machines: [JSONValue] = [.object([
+            "id": .string("m1"), "name": .string("U1"),
+            "targetHoursPerDay": .number(4),
+        ])]
+        let jobs: [JSONValue] = [
+            // Quoted four hours, measured six. The screen counted the quote,
+            // so a shop whose prints run over read as under-worked.
+            .object(["id": .string("a"), "machineId": .string("m1"),
+                     "status": .string("completed"), "price": .number(500),
+                     "printTime": .number(4), "actualPrintTime": .number(6)]),
+            .object(["id": .string("b"), "machineId": .string("m1"),
+                     "status": .string("completed"), "price": .number(500),
+                     "printTime": .number(74)]),
+        ]
+        let report = try await engine.machineProfit(
+            machines: machines, completed: jobs, expenses: [], maintenance: [],
+            settings: [:], clients: [], unassigned: "Unassigned", days: 10)
+        let row = try #require(report.rows.first { $0.machineId == "m1" })
+        #expect(row.hours == 80, "the quoted 4 was counted instead of the measured 6")
+        #expect(row.measured == 1, "how much of it was measured is reportable")
+        #expect(row.targetHoursPerDay == 4)
+        // 80 against a wanted 40. Capping this at 100 made a machine running
+        // half as much again as it should look exactly on target.
+        #expect(row.utilisationPct == 200)
+        #expect(report.totals.hours == 80)
+    }
+
+    @Test("no target set is no utilisation, not nought per cent")
+    func utilisationWithoutATarget() async throws {
+        let engine = try KhaytEngine()
+        let report = try await engine.machineProfit(
+            machines: [.object(["id": .string("m1"), "name": .string("U1")])],
+            completed: [.object(["id": .string("a"), "machineId": .string("m1"),
+                                 "status": .string("completed"), "price": .number(1),
+                                 "printTime": .number(9)])],
+            expenses: [], maintenance: [], settings: [:], clients: [],
+            unassigned: "Unassigned", days: 30)
+        let row = try #require(report.rows.first)
+        #expect(row.utilisationPct == nil, "zero would read as an idle machine")
+        #expect(row.targetHoursPerDay == nil)
+        #expect(row.hours == 9, "the hours are known whether or not a target is")
+    }
+
     @Test("two overlapping windows are 72 hours out of action, not 96")
     func downtimeIsTheUnion() async throws {
         let engine = try KhaytEngine()

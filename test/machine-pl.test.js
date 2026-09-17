@@ -116,3 +116,99 @@ test('the totals are the rows, so a screen cannot show a sum that is not there',
   assert.equal(totals.revenue, 1000);
   assert.equal(totals.maintenance, 20);
 });
+
+// ── HOURS AND UTILISATION ───────────────────────────────────────────────────
+//
+// `renderPrinterUtilizationChart` worked these out inline, three ways wrong:
+// it capped utilisation at 100, it measured hours from the ESTIMATE even where
+// the printer had measured the print, and it computed a margin from material
+// cost alone — so the same machine carried one margin in that chart and
+// another in the P&L table on the same screen.
+
+test('utilisation is NOT capped at 100', () => {
+  // A printer meant to run 8h a day, over 10 days, that ran 120 hours. It is
+  // at 150% and that is the whole reading: the machine to buy a second of.
+  // `Math.min(100, …)` made it identical to one that hit its target exactly.
+  const { rows } = machineProfit({
+    machines: [{ id: 'M1', name: 'U1', targetHoursPerDay: 8 }],
+    completed: [{ id: 'a', machineId: 'M1', price: 100, printTime: 120 }],
+    days: 10,
+  }, deps);
+  assert.equal(rows[0].hours, 120);
+  assert.equal(rows[0].utilisationPct, 150);
+});
+
+test('hours come from what the print TOOK, not what it was quoted at', () => {
+  // The estimate said four hours; the printer measured six. A shop whose
+  // prints run over read as under-worked, from the same book.
+  const { rows } = machineProfit({
+    machines: [{ id: 'M1', name: 'U1', targetHoursPerDay: 6 }],
+    completed: [
+      { id: 'a', machineId: 'M1', price: 100, printTime: 4, actualPrintTime: 6,
+        actualsSource: 'printer' },
+      // No actual recorded, so the estimate is the best account there is.
+      { id: 'b', machineId: 'M1', price: 100, printTime: 3 },
+    ],
+    days: 3,
+  }, deps);
+  assert.equal(rows[0].hours, 9, 'the quoted 4 was counted instead of the measured 6');
+  assert.equal(rows[0].measured, 1, 'how many of the hours are measured is reportable');
+  assert.equal(rows[0].utilisationPct, 50);
+});
+
+test('a TYPED actual still counts as hours, unlike in machine-accuracy', () => {
+  // The two modules ask different questions. Accuracy must know where the
+  // figure came from, because an estimate confirmed by hand compared against
+  // itself reports a perfectly calibrated machine. "How busy was it" does not
+  // care: the shop's own account of the time is the best there is.
+  const { rows } = machineProfit({
+    machines: [{ id: 'M1', name: 'U1', targetHoursPerDay: 1 }],
+    completed: [{ id: 'a', machineId: 'M1', price: 1, printTime: 2,
+                  actualPrintTime: 5, actualsSource: 'typed' }],
+    days: 10,
+  }, deps);
+  assert.equal(rows[0].hours, 5);
+});
+
+test('no target and no range mean no utilisation, not nought per cent', () => {
+  // A machine nobody has set a target for has no utilisation. Zero would read
+  // as idle, which is a claim about the machine rather than about the book.
+  const noTarget = machineProfit({
+    machines: [{ id: 'M1', name: 'U1' }],
+    completed: [{ id: 'a', machineId: 'M1', price: 100, printTime: 9 }],
+    days: 30,
+  }, deps).rows[0];
+  assert.equal(noTarget.utilisationPct, null);
+  assert.equal(noTarget.hours, 9, 'the hours are still known');
+
+  const noDays = machineProfit({
+    machines: [{ id: 'M1', name: 'U1', targetHoursPerDay: 8 }],
+    completed: [{ id: 'a', machineId: 'M1', price: 100, printTime: 9 }],
+  }, deps).rows[0];
+  assert.equal(noDays.utilisationPct, null, 'utilisation without a denominator is a guess');
+});
+
+test('work naming no machine has hours but never a utilisation', () => {
+  const { rows } = machineProfit({
+    machines: [{ id: 'M1', name: 'U1', targetHoursPerDay: 8 }],
+    completed: [{ id: 'a', price: 100, printTime: 5 }],
+    unassigned: 'Unassigned',
+    days: 1,
+  }, deps);
+  const none = rows.find(r => r.machineId === '__none__');
+  assert.equal(none.hours, 5);
+  assert.equal(none.utilisationPct, null, 'nothing has a target for work with no machine');
+});
+
+test('the totals carry the hours, so a screen never re-adds them', () => {
+  const { totals } = machineProfit({
+    machines: [{ id: 'M1', name: 'A' }, { id: 'M2', name: 'B' }],
+    completed: [
+      { id: 'a', machineId: 'M1', price: 10, printTime: 3, actualPrintTime: 4 },
+      { id: 'b', machineId: 'M2', price: 10, printTime: 2 },
+    ],
+    days: 1,
+  }, deps);
+  assert.equal(totals.hours, 6);
+  assert.equal(totals.measured, 1);
+});

@@ -3084,6 +3084,21 @@ public actor KhaytEngine {
         /// NULL for a machine that earned nothing. Not zero — zero reads as
         /// "broke even", and the truth is that there is no answer.
         public let marginPct: Double?
+        /// Hours this machine was busy — what the prints TOOK where that was
+        /// measured, falling back to what they were quoted at.
+        public let hours: Double
+        /// How many of those jobs carried a measured duration, so a figure
+        /// mostly built from estimates can say so instead of implying it was
+        /// weighed.
+        public let measured: Int
+        /// What the shop wanted this machine to run, per day. Nil when nobody
+        /// has said.
+        public let targetHoursPerDay: Double?
+        /// Hours run against hours wanted, and NEVER capped at 100 — a printer
+        /// running half as much again as it is meant to is the finding, not an
+        /// overflow to hide. Nil when there is no target or no range to divide
+        /// by; zero would read as idle.
+        public let utilisationPct: Double?
         public var id: String { machineId }
     }
 
@@ -3094,6 +3109,8 @@ public actor KhaytEngine {
         public let linkedExpenses: Double
         public let maintenance: Double
         public let net: Double
+        public let hours: Double
+        public let measured: Int
     }
 
     public struct MachineProfitReport: Decodable, Sendable, Equatable {
@@ -3116,13 +3133,13 @@ public actor KhaytEngine {
     public func machineProfit(machines: [JSONValue], completed: [JSONValue],
                               expenses: [JSONValue], maintenance: [JSONValue],
                               settings: [String: JSONValue], clients: [JSONValue],
-                              unassigned: String) throws -> MachineProfitReport {
+                              unassigned: String, days: Int = 0) throws -> MachineProfitReport {
         try runtime.call2(#"""
         (function () {
           var ctx = { settings: ARG4, clients: ARG5 };
           return globalThis.KhaytMachinePL.machineProfit({
             machines: ARG0, completed: ARG1, expenses: ARG2,
-            maintenance: ARG3, unassigned: ARG6,
+            maintenance: ARG3, unassigned: ARG6, days: ARG7,
           }, {
             revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
             partCostOf: function (p) { return globalThis.KhaytCalculatorCost.partTotalCost(p, ctx); },
@@ -3131,7 +3148,7 @@ public actor KhaytEngine {
         """#,
                           [.array(machines), .array(completed), .array(expenses),
                            .array(maintenance), .object(settings), .array(clients),
-                           .string(unassigned)],
+                           .string(unassigned), .number(Double(days))],
                           as: MachineProfitReport.self)
     }
 
