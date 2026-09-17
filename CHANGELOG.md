@@ -1716,6 +1716,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **A Mac test accused the tablet server of holding connections open when it
+  was not.** The read-timeout tests lowered a shared setting, ran, and put it
+  back — and the test runner runs them side by side, so one test's restore
+  landed in the middle of another's wait. The second connection then got the
+  full timeout, outlived its own probe, and reported a stall. It passed on a
+  fast machine every time and failed on a slow one, which is what a race looks
+  like from outside: an accusation against working code, made by the test. The
+  timeout belongs to a server now rather than to the whole app, so there is
+  nothing shared to race on — and the same search found one more test with the
+  same shape, in a different file, which is now fixed too.
+
 - **(Mac) The invoice and label sheets are laid out with everything they do not
   need switched off.** Both are drawn by WebKit, because the document is the
   same html Khayt prints and laying it out any other way would mean a second

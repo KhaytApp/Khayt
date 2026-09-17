@@ -55,6 +55,12 @@ final class LanServer {
         var nowText: () -> String = { LanServer.clockText(Date()) }
         /// A PWA icon by file name, or nil.
         var icon: (String) -> Data? = { LanServer.bundledIcon($0) }
+        /// How long a connection may say nothing before it is let go. Fifteen
+        /// seconds is far longer than a phone on the same network needs and far
+        /// shorter than "never" — see `readTimeout` on the server. Settable so a
+        /// test can shorten it for ITS OWN server rather than for every server
+        /// running at the same time.
+        var readTimeout: TimeInterval = 15
         /// The calendar subscription token (`settings.lanApi.calendarToken`),
         /// opened. Empty means only the owner PIN opens the feed.
         var calendarToken: String = ""
@@ -171,10 +177,19 @@ final class LanServer {
     /// liked. Fifteen seconds is far longer than a phone on the same network
     /// needs and far shorter than "never".
     ///
-    /// A `var` only so the tests can shorten it: a regression test for this
-    /// that waited fifteen real seconds per connection would be a test people
-    /// stop running.
-    static var readTimeout: TimeInterval = 15
+    /// ── AND IT BELONGS TO THE SERVER, NOT TO THE PROCESS ──────────────────
+    ///
+    /// It was a `static var` so a test could shorten it — fifteen real seconds
+    /// per connection is a test people stop running. But Swift Testing runs a
+    /// suite's tests IN PARALLEL, and three of them each set the static, ran,
+    /// and put it back. One test's restore landed while another was still
+    /// waiting on a connection, so that connection got the full fifteen
+    /// seconds, outlived the probe's eight, and reported "held open" — a
+    /// failure with nothing wrong in the server at all. It passed locally and
+    /// failed on a slower runner, which is what a race looks like.
+    ///
+    /// Per-server, it is not shared and there is nothing to restore.
+    var readTimeout: TimeInterval { host.readTimeout }
 
     init(host: Host) { self.host = host }
 
@@ -258,7 +273,7 @@ final class LanServer {
         // unwinds normally. The client sees the connection close, which is what
         // a read timeout looks like on the wire.
         let watchdog = Task { [connection] in
-            try? await Task.sleep(nanoseconds: UInt64(Self.readTimeout * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(readTimeout * 1_000_000_000))
             guard !Task.isCancelled else { return }
             connection.cancel()
         }

@@ -53,46 +53,44 @@ struct LanStallTests {
         return "held open"
     }
 
-    /// Run the body with a short read timeout, then put it back. Fifteen real
-    /// seconds per connection is a test people stop running.
-    private func withShortTimeout(_ body: () async throws -> Void) async rethrows {
-        let was = LanServer.readTimeout
-        LanServer.readTimeout = 1
-        defer { LanServer.readTimeout = was }
-        try await body()
-    }
+    /// ── WHY THE TIMEOUT IS SET PER BENCH AND NOT ONCE ─────────────────────
+    ///
+    /// This used to lower `LanServer.readTimeout`, a static, and put it back in
+    /// a `defer`. Swift Testing runs these three tests in PARALLEL, so one
+    /// test's restore landed while another was still waiting: that connection
+    /// got the full fifteen seconds, outlived its eight-second probe, and
+    /// reported "held open". A green local run and a red CI run, with nothing
+    /// wrong in the server — which is what a shared mutable static looks like
+    /// when it finally bites.
+    ///
+    /// Each bench now carries its own.
+    private static let short: TimeInterval = 1
 
     @Test("a connection that sends nothing is let go, not held for ever")
     func silentConnection() async throws {
-        try await withShortTimeout {
-            let bench = try await LanServerTests.Bench()
-            let port = bench.port
-            let verdict = await Task.detached { Self.stall(port: port, send: nil, waitFor: 8) }.value
-            #expect(verdict == "closed",
-                    Comment(rawValue: "a silent client was \(verdict) — it holds a connection and a task"))
-        }
+        let bench = try await LanServerTests.Bench(readTimeout: Self.short)
+        let port = bench.port
+        let verdict = await Task.detached { Self.stall(port: port, send: nil, waitFor: 8) }.value
+        #expect(verdict == "closed",
+                Comment(rawValue: "a silent client was \(verdict) — it holds a connection and a task"))
     }
 
     @Test("a client that promises a body and never sends it is let go too")
     func stalledBody() async throws {
-        try await withShortTimeout {
-            let bench = try await LanServerTests.Bench()
-            let port = bench.port
-            let head = "POST /api/intake HTTP/1.1\r\nHost: x\r\nContent-Length: 1000\r\n\r\n"
-            let verdict = await Task.detached { Self.stall(port: port, send: head, waitFor: 8) }.value
-            #expect(verdict == "closed", Comment(rawValue: "a stalled body was \(verdict)"))
-        }
+        let bench = try await LanServerTests.Bench(readTimeout: Self.short)
+        let port = bench.port
+        let head = "POST /api/intake HTTP/1.1\r\nHost: x\r\nContent-Length: 1000\r\n\r\n"
+        let verdict = await Task.detached { Self.stall(port: port, send: head, waitFor: 8) }.value
+        #expect(verdict == "closed", Comment(rawValue: "a stalled body was \(verdict)"))
     }
 
     @Test("a head that never reaches its blank line is let go too")
     func partialHead() async throws {
-        try await withShortTimeout {
-            let bench = try await LanServerTests.Bench()
-            let port = bench.port
-            let head = "GET /api/status HTTP/1.1\r\nHost: x\r\n"
-            let verdict = await Task.detached { Self.stall(port: port, send: head, waitFor: 8) }.value
-            #expect(verdict == "closed", Comment(rawValue: "a partial head was \(verdict)"))
-        }
+        let bench = try await LanServerTests.Bench(readTimeout: Self.short)
+        let port = bench.port
+        let head = "GET /api/status HTTP/1.1\r\nHost: x\r\n"
+        let verdict = await Task.detached { Self.stall(port: port, send: head, waitFor: 8) }.value
+        #expect(verdict == "closed", Comment(rawValue: "a partial head was \(verdict)"))
     }
 
     @Test("a complete request is still answered, and the clock does not cut it off")
@@ -100,14 +98,12 @@ struct LanStallTests {
         // The guard against fixing the stall by breaking the server: the
         // watchdog is cancelled the moment the request is fully read, so a slow
         // READER is never killed halfway through the answer it asked for.
-        try await withShortTimeout {
-            let bench = try await LanServerTests.Bench()
-            let reply = try await bench.get("/api/status?format=json")
-            #expect(reply.status == 200)
-            // And again after more than the read timeout has passed on an idle
-            // server, which must not have closed anything it should not have.
-            try await Task.sleep(nanoseconds: 1_500_000_000)
-            #expect(try await bench.get("/api/status?format=json").status == 200)
-        }
+        let bench = try await LanServerTests.Bench(readTimeout: Self.short)
+        let reply = try await bench.get("/api/status?format=json")
+        #expect(reply.status == 200)
+        // And again after more than the read timeout has passed on an idle
+        // server, which must not have closed anything it should not have.
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+        #expect(try await bench.get("/api/status?format=json").status == 200)
     }
 }
