@@ -149,21 +149,26 @@ function machineLoadMins(machine, orders) {
  * have made every maintenance window count SIXTY TIMES over.
  */
 function downtimeHours(machine, now, horizonDays) {
-  const blocks = Array.isArray(machine && machine.downtimeBlocks) ? machine.downtimeBlocks : [];
-  if (!blocks.length) return 0;
   const from = Number.isFinite(now) ? now : Date.now();
   const to = from + Math.max(1, horizonDays) * DAY_MS;
-  let total = 0;
-  for (const b of blocks) {
-    if (!b || !b.from || !b.to) continue;
-    const bFrom = new Date(b.from).getTime();
-    const bTo = new Date(b.to).getTime();
-    if (!Number.isFinite(bFrom) || !Number.isFinite(bTo) || bTo <= bFrom) continue;
-    const start = Math.max(from, bFrom);
-    const end = Math.min(to, bTo);
-    if (end > start) total += (end - start) / 3600000;
-  }
-  return total;
+  // `lib/downtime.js`, which takes the UNION of the windows. Adding their
+  // lengths one by one — which this did — counted every overlap twice, so a
+  // machine booked out Monday-Wednesday and again Tuesday-Thursday looked 96
+  // hours busy instead of 72, and the pick below sent work to a printer that
+  // was freer than this said.
+  return downtimeRules().hoursBetween(machine, from, to);
+}
+
+/**
+ * The downtime rule, through the global in a browser and `require` in Node.
+ *
+ * A host that has not loaded it gets zero downtime rather than a throw, which
+ * is the same answer a machine with no windows gives.
+ */
+function downtimeRules() {
+  const g = typeof globalThis !== 'undefined' ? globalThis : {};
+  if (typeof g.KhaytDowntime !== 'undefined') return g.KhaytDowntime;
+  try { return require('./downtime.js'); } catch (e) { return { hoursBetween: () => 0 }; }
 }
 
 /** True when the order is an un-printed, schedulable job. */

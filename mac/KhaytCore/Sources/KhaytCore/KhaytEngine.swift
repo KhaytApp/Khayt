@@ -48,6 +48,13 @@ public actor KhaytEngine {
         // list. The rule is 300 lines of tested, deterministic JavaScript with
         // no `Date.now()` in it; the Mac gets the same answers by running the
         // same file, not by growing a second scheduler.
+        // DOWNTIME MUST COME FIRST. `scheduling` asks it how long a machine
+        // is out of action, and reaches it through a global — there is no
+        // `require` in JavaScriptCore. Without it the scheduler does not
+        // raise; it falls back to zero and quietly stops knowing a printer is
+        // booked out for a belt change, which is the whole reason it consults
+        // downtime at all. `lead-time-publish` reads it the same way.
+        "downtime",
         "scheduling",
         "loyalty",
         // How long a nozzle lasts, and what wears it out.

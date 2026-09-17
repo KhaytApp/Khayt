@@ -1308,20 +1308,13 @@ function renderMachineDowntimeChart() {
     });
   }
 
+  // `lib/downtime.js`, which merges overlapping windows before it counts them.
+  // Adding each window's length separately double-counted every overlap — two
+  // maintenance windows a shop had recorded over the same days could report
+  // more downtime in a month than the month has hours in it.
+  const periods = months.map(m => ({ from: m.start.getTime(), to: m.end.getTime() }));
   const machineData = (machines || []).map(mach => {
-    const blocks = mach.downtimeBlocks || [];
-    const hoursByMonth = months.map(m => {
-      let total = 0;
-      for (const b of blocks) {
-        if (!b.from || !b.to) continue;
-        const bFrom = new Date(b.from);
-        const bTo   = new Date(b.to);
-        const start = bFrom < m.start ? m.start : bFrom;
-        const end   = bTo   > m.end   ? m.end   : bTo;
-        if (end > start) total += (end - start) / 3600000;
-      }
-      return total;
-    });
+    const hoursByMonth = KhaytDowntime.hoursByPeriod(mach, periods);
     return { name: mach.name || mach.id, hoursByMonth, total: hoursByMonth.reduce((s, h) => s + h, 0) };
   }).filter(d => d.total > 0);
 
