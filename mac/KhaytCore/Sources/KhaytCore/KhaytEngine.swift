@@ -69,7 +69,6 @@ public actor KhaytEngine {
         // A printable sheet of QR labels for the shelf. Pure HTML in, pure HTML
         // out; the QR images are data URLs the caller resolves, because
         // generating one is a platform job and this module is shared.
-        "labels",
         // Whether a spool has gone damp. It reads `driedAt`, which the
         // `inventory` collection did not carry until now — the only one in the
         // store lived on Bed Ready's `filamentDryLog`, a separate list of
@@ -746,7 +745,6 @@ public actor KhaytEngine {
         // documents. A Swift re-reading of a `docs` array would default the
         // other way on the first absent flag and quietly stop shipping safety
         // sheets that used to go out.
-        "product-docs",
         // The merge engine. `applyDeltas` is what folds a chain from the cloud
         // onto a base, and it is the same function the Electron app merges
         // with — a second opinion about which of two edits wins is the one
@@ -1976,19 +1974,15 @@ public actor KhaytEngine {
             as: [String: Dryness].self)
     }
 
-    /// A printable sheet of QR labels, from `lib/labels.js`.
+    /// A printable sheet of QR labels, in Swift — `Labels`.
     ///
-    /// The same builder the Electron app prints from, so a label made here and
-    /// a label made there are the same label. Each entry is
+    /// Byte-for-byte the sheet `lib/labels.js` built, so a rack labelled half
+    /// from each app still fits one holder. Each entry is
     /// `{title, lines[], sub?, qr}` and `qr` is a data URL the CALLER makes —
-    /// drawing a QR code is a platform job, and this module is shared with a
+    /// drawing a QR code is a platform job, and the rule is shared with a
     /// renderer that has its own way of doing it.
     public func labelSheet(_ labels: [JSONValue], heading: String) throws -> String {
-        try runtime.call2("""
-            (function (labels, heading) {
-              return KhaytLabels.buildLabelSheet(labels, { heading: heading });
-            })(ARG0, ARG1)
-            """, [.array(labels), .string(heading)], as: String.self)
+        Labels.sheet(labels, heading: heading)
     }
 
     /// When the queue will actually finish, and what will be late because of it.
@@ -7922,6 +7916,9 @@ public actor KhaytEngine {
     /// One document that travels with an order.
     public struct OrderDocument: Decodable, Sendable, Identifiable {
         public var id: String { filename }
+        public init(filename: String, name: String, packWithOrder: Bool) {
+            self.filename = filename; self.name = name; self.packWithOrder = packWithOrder
+        }
         public let filename: String
         /// What the shop called it — the name on disk is a timestamp.
         public let name: String
@@ -7931,14 +7928,15 @@ public actor KhaytEngine {
 
     /// The papers attached to the product this order is for.
     ///
-    /// Through the shared rule rather than by reading the product's `docs`,
-    /// because the two-audience split and the absent-flag default are the rule
+    /// Through `OrderDocs` rather than by reading the product's `docs` here,
+    /// because the two-audience split and the absent-flag default ARE the rule
     /// — and defaulting the other way would quietly stop shipping safety sheets
     /// that shops attached before the flag existed.
     public func orderDocuments(order: JSONValue,
                                products: [JSONValue]) throws -> [OrderDocument] {
-        try runtime.call2("KhaytProductDocs.docsForOrder(ARG0, ARG1)",
-                          [order, .array(products)], as: [OrderDocument].self)
+        OrderDocs.forOrder(order, products: products).map {
+            OrderDocument(filename: $0.filename, name: $0.name, packWithOrder: $0.packWithOrder)
+        }
     }
 
     // MARK: - Telling somebody else that an order changed

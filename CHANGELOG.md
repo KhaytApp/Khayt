@@ -6,7 +6,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
-- **(Mac) Three of Khayt's shared rules now run natively, with tests that will
+- **(Mac) Five of Khayt's shared rules now run natively, with tests that will
   not let them drift.** The Mac app has always run Khayt's business rules —
   pricing, tax, costing, identity — as the same JavaScript the Windows app runs,
   so that both apps could not disagree. Those rules are being rewritten in
@@ -14,7 +14,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rule is run side by side with the original over thousands of generated inputs,
   and the build fails on the first disagreement. The model-identity key is the
   first, and the harness earned itself immediately — it caught two faults in the
-  new code that no ordinary test would have noticed.
+  new code that no ordinary test would have noticed. Since then: the customer's
+  progress tracker, the currency table, the shelf-label sheet and the rule for
+  which papers go in a customer's box. The label sheet is compared to the byte,
+  because a rack labelled half from each app has to fit one holder — and doing
+  that turned up a fault worth fixing: a malformed label entry used to print
+  `function sub() { [native code] }` onto the label, which the native version
+  cannot do.
 
 - **The machine figures at the top of Reports disagreed with the P&L table
   below them.** The overview worked out a machine's profit as revenue less what
