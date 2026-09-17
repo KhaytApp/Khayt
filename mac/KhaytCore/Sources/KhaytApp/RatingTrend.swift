@@ -48,7 +48,7 @@ struct RatingTrendCard: View {
 
             if let trend, trend.responses > 0 {
                 Bars(points: trend.points)
-                    .frame(height: 74)
+                    .frame(height: 78)
                 // ── AND THE RATINGS THIS CHART DOES NOT COVER ─────────────
                 //
                 // The figure that used to be printed as though it were the
@@ -96,8 +96,35 @@ struct RatingTrendCard: View {
 
     private struct Bars: View {
         let points: [KhaytEngine.RatingTrend.Point]
+        /// How tall a five-star month is drawn. Everything else is a fraction
+        /// of it, which is only readable because the line below says so.
+        static let tall: CGFloat = 46
 
         var body: some View {
+            ZStack(alignment: .topLeading) {
+                // ── THE TOP OF THE SCALE, SAID ────────────────────────────
+                //
+                // These bars are drawn against a FIXED five, not against the
+                // best month in the data, so a bar's height means something
+                // absolute — and without this line nothing on the card said
+                // what. Every other chart in the app either prints its figures
+                // or scales to its own peak; this one does neither, so it owes
+                // the reader an axis. One line, at the only value worth
+                // marking.
+                VStack(spacing: 0) {
+                    HStack(spacing: 5) {
+                        Text("5").font(.caption2).monospacedDigit()
+                            .foregroundStyle(.tertiary)
+                        Rectangle().fill(Khayt.hairline).frame(height: 1)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.bottom, 20)
+                bars
+            }
+        }
+
+        private var bars: some View {
             HStack(alignment: .bottom, spacing: 0) {
                 ForEach(points, id: \.month) { point in
                     VStack(spacing: 0) {
@@ -106,7 +133,7 @@ struct RatingTrendCard: View {
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(RatingTrendCard.tint(average) == .primary
                                       ? Khayt.brand : RatingTrendCard.tint(average))
-                                .frame(height: max(0.04, average / RatingTrendCard.top) * 46)
+                                .frame(height: max(0.04, average / RatingTrendCard.top) * Self.tall)
                         } else {
                             Rectangle().fill(Khayt.hairline).frame(height: 1)
                         }
