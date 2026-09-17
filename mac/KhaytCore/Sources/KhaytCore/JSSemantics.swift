@@ -158,4 +158,46 @@ public enum JSSemantics {
         if digits == "0" { return ("0", 1) }
         return (digits, pointAt)
     }
+
+    /// `String(value)` — JavaScript's coercion to text.
+    ///
+    /// Needed wherever a ported rule prints a field it never checked the type
+    /// of, which in practice is every rule that builds markup. The awkward
+    /// cases are the ones a Swift port would never produce by accident: an
+    /// array becomes its elements joined by commas with a missing element
+    /// printing as nothing, and any other object is the literal
+    /// `[object Object]` — a string a shop has genuinely seen on a label.
+    public static func text(_ value: JSONValue?) -> String {
+        switch value {
+        case .none, .null: return ""
+        case .bool(let b): return b ? "true" : "false"
+        case .number(let n): return string(n)
+        case .string(let s): return s
+        case .array(let items):
+            return items.map { item -> String in
+                // Array.prototype.join prints null and undefined as empty,
+                // NOT as "null".
+                if case .null = item { return "" }
+                return text(item)
+            }.joined(separator: ",")
+        case .object: return "[object Object]"
+        }
+    }
+
+    /// Whether JavaScript would treat this value as true.
+    ///
+    /// `0`, `NaN`, `""`, `false`, `null` and a missing property are false;
+    /// everything else — including an empty array and an empty object — is
+    /// true. Ported rules lean on this constantly (`l.qr ? … : ''`), and
+    /// reading it as "is not nil" gets the empty string exactly backwards.
+    public static func truthy(_ value: JSONValue?) -> Bool {
+        switch value {
+        case .none, .null: return false
+        case .bool(let b): return b
+        case .number(let n): return n != 0 && !n.isNaN
+        case .string(let s): return !s.isEmpty
+        case .array, .object: return true
+        }
+    }
+
 }
