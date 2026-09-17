@@ -303,19 +303,11 @@ private struct NewJobCommand: View {
 private struct JobMenu: View {
     @Environment(Shop.self) private var shop
 
-    /// The stages a job can be moved to from a menu.
-    ///
-    /// `on_hold` is not among them because it asks a question first, and
-    /// `delivered` is not because it is not a status: handing a job over stamps
-    /// a date on a completed job, and both have their own item below.
-    private static let destinations: [Stage] =
-        [.quote, .pending, .printing, .post, .qc, .completed]
-
     private var job: Order? { shop.selection.flatMap { id in shop.orders.first { $0.id == id } } }
     private var canMove: Bool { shop.canMoveJobs && job != nil }
 
     var body: some View {
-        ForEach(Self.destinations) { stage in
+        ForEach(Stage.destinations) { stage in
             Button(Words.upfront(stage.key)) {
                 guard let id = shop.selection else { return }
                 // The same two questions the board asks. A move made from a

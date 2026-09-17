@@ -26,6 +26,68 @@ struct MenuCoverageTests {
     static let shelves = ["dashboard", "board", "machines", "inventory",
                           "catalogue", "expenses", "waste", "reports", "customers"]
 
+    /// One of the app's own source files, by name.
+    static func source(_ name: String) -> String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp/\(name)")
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    }
+
+    /// Where a job can be sent, offered wherever a job is.
+    ///
+    /// Moving a job along is the thing a shop does most, and it was the one
+    /// thing only the MENU BAR could do. The right-click menu on the orders
+    /// table had edit, payment, hold, delivered and invoice — and no stages —
+    /// so changing a status meant selecting the row and going up to the menu
+    /// bar for a decision already made about the row under the pointer. A card
+    /// on the board was worse: no context menu at all, so a stage change was a
+    /// drag across as many as six columns.
+    @Test("a job can be moved from the menu bar, the table and the board")
+    func everyPlaceOffersTheStages() {
+        let menus = Self.menus
+        let table = Self.source("OrdersTable.swift")
+        let board = Self.source("Kanban.swift")
+        #expect(!menus.isEmpty && !table.isEmpty && !board.isEmpty, "a source file moved")
+
+        // The menu bar, as before.
+        #expect(menus.contains("ForEach(Stage.destinations)"))
+        // The orders table's right-click menu.
+        #expect(table.contains("ForEach(Stage.destinations)"),
+                "the right-click menu offers no stages; a status change still needs the menu bar")
+        // A card on the board, which had no context menu at all.
+        #expect(board.contains("JobActions(shop: shop, job: job)"),
+                "a board card cannot be right-clicked, so a move is still a drag")
+    }
+
+    /// The list itself, in one place.
+    ///
+    /// Three menus offering three lists is three chances for which menu you
+    /// opened to decide where a job may go.
+    @Test("the stages a job can be sent to are written down once")
+    func oneListOfDestinations() {
+        let order = Self.source("Order.swift")
+        #expect(order.contains("static let destinations: [Stage] ="),
+                "the shared list has moved out of Stage")
+        for name in ["Menus.swift", "OrdersTable.swift", "Kanban.swift"] {
+            let text = Self.source(name)
+            #expect(!text.contains("[.quote, .pending, .printing, .post, .qc, .completed]"),
+                    "\(name) has grown its own copy of the destinations")
+        }
+    }
+
+    /// The move must leave the same record whichever menu started it.
+    @Test("every route asks the same two questions before moving a job")
+    func everyRouteAsksTheRules() {
+        for name in ["Menus.swift", "OrdersTable.swift"] {
+            let text = Self.source(name)
+            #expect(text.contains("shop.questionFor("),
+                    "\(name) moves a job without asking whether the move needs a question first")
+            #expect(text.contains("shop.moveJob("),
+                    "\(name) does not go through moveJob")
+        }
+    }
+
     @Test("every screen in the sidebar can be reached from the menu bar")
     func everyShelfIsInTheGoMenu() {
         let text = Self.menus

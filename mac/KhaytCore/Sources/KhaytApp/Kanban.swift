@@ -195,6 +195,13 @@ private struct Column: View {
             } else {
                 ForEach(jobs) { job in
                     JobCard(job: job, shop: shop)
+                        // A card could only be DRAGGED. Moving a job two
+                        // columns along meant picking it up and carrying it
+                        // past the ones in between, and moving it back meant
+                        // the same journey in reverse — for a decision made
+                        // about the card under the pointer. The same menu the
+                        // orders table has, on the card itself.
+                        .contextMenu { JobActions(shop: shop, job: job) }
                 }
             }
         }

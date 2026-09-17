@@ -525,6 +525,8 @@ final class Words {
         "mac.customers":     ["en": "Customers",     "ar": "العملاء"],
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
+        // The submenu that holds the stages, wherever a job is right-clicked.
+        "mac.move_to":       ["en": "Move to",       "ar": "نقل إلى"],
         // How much passes inspection first time.
         "mac.qc_title":      ["en": "Quality",        "ar": "الجودة"],
         "mac.qc_first":      ["en": "right first time", "ar": "صحيح من أول مرة"],
