@@ -71,6 +71,69 @@ struct FeatureModeTests {
         #expect(shop.has("somethingNobodyHasWrittenYet"))
     }
 
+    /// THE ONE THING THE FEATURE EXISTS TO DO.
+    ///
+    /// Every test here loaded the bundled sample, which carries no `mode` at
+    /// all and is therefore Professional, and asserted that everything was
+    /// present. Nothing anywhere proved that a Simple shop actually LOSES a
+    /// screen through the path the app really takes — so when somebody set the
+    /// sample to Simple, photographed the sidebar and saw Expenses and Reports
+    /// still on it, there was no test to say whether the app was wrong or the
+    /// experiment was. (It was the experiment: a stale resource bundle, so the
+    /// running app never saw the edited book. Measured through this path, all
+    /// four gated features come back off.)
+    ///
+    /// Driven through `readFeatures` with the engine the real load built, so
+    /// what is proved is the rule, the engine binding and the app's own reading
+    /// of them — not a reimplementation of the tier table.
+    @Test("a Simple shop loses the screens its mode does not include")
+    func simpleHidesWhatItShould() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(shop.engineProblem == nil, "no engine means this proves nothing")
+
+        shop.pretendMode("simple")
+        await shop.readFeatures()
+        for key in Shop.gatedFeatures {
+            #expect(!shop.has(key), Comment(rawValue: "\(key) is still on for a Simple shop"))
+        }
+        // And the two the sidebar actually gates on, named so a rename is caught.
+        #expect(!shop.has("expenses"))
+        #expect(!shop.has("analytics"))
+        // What is NOT gated stays, whatever the mode.
+        #expect(shop.has("waste"))
+
+        // Back to Professional and they all return, so the test is measuring
+        // the mode rather than something that fails closed.
+        shop.pretendMode("professional")
+        await shop.readFeatures()
+        for key in Shop.gatedFeatures {
+            #expect(shop.has(key), Comment(rawValue: "\(key) did not come back"))
+        }
+    }
+
+    @Test("an enthusiast book is read as Simple, and keeps its customers")
+    func enthusiastReadsAsSimple() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.pretendMode("enthusiast")
+        await shop.readFeatures()
+        #expect(!shop.has("analytics"))
+        #expect(shop.has("clients"), "clients is not gated, and an enthusiast book kept its customers")
+    }
+
+    @Test("a book with no mode at all is Professional, not empty")
+    func noModeIsProfessional() async throws {
+        // A book written before modes existed must not lose half its screens.
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.pretendMode(nil)
+        await shop.readFeatures()
+        for key in Shop.gatedFeatures {
+            #expect(shop.has(key), Comment(rawValue: "\(key) vanished from a book with no mode"))
+        }
+    }
+
     @Test("the sample book is Professional, so every gated screen is there")
     func sampleKeepsEverything() async throws {
         let shop = Shop()

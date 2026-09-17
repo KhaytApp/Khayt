@@ -124,6 +124,13 @@ final class Shop {
     private(set) var taxSummary: String?
     private(set) var settingsValue: JSONValue = .object([:])
 
+    /// Put a shop into a mode, for a test. The book on disk is not touched.
+    func pretendMode(_ mode: String?) {
+        var held: [String: JSONValue] = settingsDict
+        if let mode { held["mode"] = .string(mode) } else { held.removeValue(forKey: "mode") }
+        settingsValue = .object(held)
+    }
+
     var selection: Order.ID?
     var fileSelection: Set<LibraryFile.ID> = []
     /// The model the shop has asked to delete, until it confirms or backs out.
@@ -2965,7 +2972,16 @@ final class Shop {
         Self.gatedFeatures.contains(feature) ? features.contains(feature) : true
     }
 
-    private func readFeatures() async {
+    /// What this shop's mode includes, asked of the shared rule.
+    ///
+    /// Internal rather than private so a test can drive it with a mode the
+    /// bundled sample book does not have. Nothing proved that Simple actually
+    /// HID anything through this path: every test loaded the sample, which
+    /// carries no mode at all and is therefore Professional, and asserted that
+    /// everything was present. So the one thing the feature exists to do was
+    /// the one thing untested, and someone reading the screen could not tell
+    /// whether it worked.
+    func readFeatures() async {
         guard let engine else { features = Set(Self.gatedFeatures); return }
         let mode = Self.plainString(settingsDict["mode"])
         var on: Set<String> = []
