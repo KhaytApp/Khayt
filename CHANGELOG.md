@@ -5,6 +5,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 ### Changed
+- **The custom report's "Delivered" box returned nothing at all.** It filtered
+  on the raw status field, and a handed-over job does not carry `delivered`
+  there — it stays `completed` with a `deliveredAt` beside it, which is what
+  the board reads. So a shop that ticked Delivered got an empty report however
+  many jobs it had delivered, and the Completed box quietly returned those jobs
+  as well as the ones still on the bench. The report reports the STAGE now, so
+  each box returns what its label says, and the list of boxes is the whole
+  pipeline including On hold and the new Shipped.
+
 - **Two overlapping maintenance windows counted as twice the downtime.** A shop
   books a printer out for a belt change on Monday to Wednesday, then adds
   "waiting for the part" for Tuesday to Thursday. Both are true and both get

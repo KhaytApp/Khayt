@@ -51,6 +51,13 @@ function plainName(row, localName) {
  * @returns {Array<object>} one record per order, in the shape report-builder
  *   expects — see FIELDS there, which is the list this must satisfy.
  */
+/** Which stage a job is in: a global in the browser, a require in Node. */
+function stageRules() {
+  const g = typeof globalThis !== 'undefined' ? globalThis : {};
+  if (typeof g.KhaytOrderStatus !== 'undefined') return g.KhaytOrderStatus;
+  try { return require('./order-status.js'); } catch (e) { return { stageOf: (o) => o && o.status }; }
+}
+
 function reportRecords(orders, deps = {}) {
   const list = Array.isArray(orders) ? orders : [];
   const money = deps.money;
@@ -73,7 +80,14 @@ function reportRecords(orders, deps = {}) {
         date: String(o.date || '').slice(0, 10),
         project: o.project || '',
         client: plainName(client, localName),
-        status: o.status,
+        // THE STAGE, not the raw field. A handed-over job stays
+        // `status: 'completed'` and carries a `deliveredAt`; a posted one
+        // carries a `shippedAt`. Reporting the raw field meant the custom
+        // report's Delivered box matched nothing at all in a modern book —
+        // zero rows for a shop that had delivered everything — while its
+        // Completed box quietly returned those jobs too. The report now says
+        // what the board says.
+        status: stageRules().stageOf(o) || o.status,
         material: o.material || '',
         printTime: +o.printTime || 0,
         machine: machine ? (machine.name || '') : '',
