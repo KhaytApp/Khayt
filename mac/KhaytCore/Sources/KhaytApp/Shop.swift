@@ -1560,6 +1560,9 @@ final class Shop {
     var relocateNote: String?
     /// True while the network is being asked where a quiet machine went.
     var lookingForMoved = false
+    /// True while the subnets are being asked, which is the slow half and
+    /// worth saying: mDNS answers instantly and a sweep takes seconds.
+    var sweeping = false
 
     /// True when this machine has gone quiet for long enough to be worth asking.
     ///
@@ -1600,10 +1603,59 @@ final class Shop {
             discovered: discovered,
             statusCache: printers.statusCache)) ?? []
 
+        // ── AND IF NOTHING ANNOUNCED ITSELF, ASK ──────────────────────────
+        //
+        // mDNS only finds a printer that talks. A Snapmaker U1 advertises
+        // neither `_moonraker._tcp` nor `_octoprint._tcp` — browsed on the LAN
+        // it was printing on, the answer was nothing at all — so the shop was
+        // told "no printers on the network" while the printer sat two
+        // addresses away answering every question put to it directly.
+        //
+        // So when the announcement turns up nothing that matches, the subnets
+        // of the machines that are actually offline get asked. Only then: a
+        // sweep is the expensive, noisy way to find something mDNS hands over
+        // for free, and it is never the first thing tried.
+        if relocations.isEmpty {
+            let offline = offlineMachineHosts()
+            if !offline.isEmpty {
+                sweeping = true
+                let swept = await PrinterSweep.look(from: offline, engine: engine)
+                sweeping = false
+                if !swept.isEmpty {
+                    relocations = (try? await engine.planRelocations(
+                        machines: machineRows,
+                        discovered: discovered + swept,
+                        statusCache: printers.statusCache)) ?? []
+                }
+            }
+        }
+
         if relocations.isEmpty {
             relocateNote = words.callIt(found.isEmpty ? "mac.moved_none_on_network"
                                                       : "mac.moved_none_matched")
         }
+    }
+
+    /// The last-known addresses of the machines that are not answering.
+    ///
+    /// Only those: sweeping the subnet of a printer that is replying perfectly
+    /// well asks two hundred and fifty questions to learn something already
+    /// known. A machine with no address configured has no subnet to sweep.
+    func offlineMachineHosts() -> [String] {
+        var out: [String] = []
+        for row in machineRows {
+            guard case .object(let m) = row,
+                  case .string(let id)? = m["id"],
+                  case .object(let api)? = m["printerApi"],
+                  case .string(let host)? = api["host"] else { continue }
+            // `looksUnreachable` and not a test written here: it is the same
+            // three-strike rule the status badge uses, so this asks about
+            // exactly the machines the screen already says are in trouble.
+            guard looksUnreachable(id) else { continue }
+            let bare = host.split(separator: ":").first.map(String.init) ?? host
+            if !bare.isEmpty { out.append(bare) }
+        }
+        return out
     }
 
     /// Point a machine at the address the printer is actually on.
