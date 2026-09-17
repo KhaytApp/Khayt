@@ -33,7 +33,8 @@ struct LanServerTests {
         var tokens = 0
 
         init(pin: String = "2468", intakeToken: String = "", recordFails: Bool = false,
-             calendarToken: String = "", measures: Bool = true, sliced: Bool = false) async throws {
+             calendarToken: String = "", measures: Bool = true, sliced: Bool = false,
+             readTimeout: TimeInterval = 15) async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -52,6 +53,10 @@ struct LanServerTests {
                 icon: { LanServer.bundledIcon($0) })
             host.intakeToken = intakeToken
             host.calendarToken = calendarToken
+            // Per BENCH, not per process: the stall tests run in parallel and a
+            // shared static put one test's restore in the middle of another
+            // test's wait.
+            host.readTimeout = readTimeout
             host.mintId = { "intake-fixed" }
             // The reader is Swift and file-backed; the bench stands in for it
             // so these tests are about the ROUTE, not about mesh arithmetic.

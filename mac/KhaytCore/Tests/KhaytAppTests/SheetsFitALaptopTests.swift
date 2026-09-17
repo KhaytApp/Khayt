@@ -31,7 +31,13 @@ import KhaytCore
 /// See `SheetsFitALaptopTests.laptopScreen`.
 private let laptopScreenHeight: CGFloat = 875
 
-@Suite @MainActor struct SheetsFitALaptopTests {
+/// SERIALIZED because one test here swaps `SheetMetrics.screenHeight`, a
+/// shared seam, and puts it back. Swift Testing would otherwise run the rest of
+/// the suite beside it and they would measure a 13-inch screen without asking
+/// for one — the same race that made `LanStallTests` accuse a working server of
+/// holding connections open. See `SharedStateIsSerializedTests`, which is what
+/// found this.
+@Suite(.serialized) @MainActor struct SheetsFitALaptopTests {
 
     /// A 13-inch MacBook Air: 1470×956 points, less the menu bar. Rounded down,
     /// because somebody is running this on an older 1440×900 too.
