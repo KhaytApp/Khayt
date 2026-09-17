@@ -124,6 +124,13 @@ final class Shop {
     private(set) var taxSummary: String?
     private(set) var settingsValue: JSONValue = .object([:])
 
+    /// Put a shop into a mode, for a test. The book on disk is not touched.
+    func pretendMode(_ mode: String?) {
+        var held: [String: JSONValue] = settingsDict
+        if let mode { held["mode"] = .string(mode) } else { held.removeValue(forKey: "mode") }
+        settingsValue = .object(held)
+    }
+
     var selection: Order.ID?
     var fileSelection: Set<LibraryFile.ID> = []
     /// The model the shop has asked to delete, until it confirms or backs out.
@@ -2965,7 +2972,16 @@ final class Shop {
         Self.gatedFeatures.contains(feature) ? features.contains(feature) : true
     }
 
-    private func readFeatures() async {
+    /// What this shop's mode includes, asked of the shared rule.
+    ///
+    /// Internal rather than private so a test can drive it with a mode the
+    /// bundled sample book does not have. Nothing proved that Simple actually
+    /// HID anything through this path: every test loaded the sample, which
+    /// carries no mode at all and is therefore Professional, and asserted that
+    /// everything was present. So the one thing the feature exists to do was
+    /// the one thing untested, and someone reading the screen could not tell
+    /// whether it worked.
+    func readFeatures() async {
         guard let engine else { features = Set(Self.gatedFeatures); return }
         let mode = Self.plainString(settingsDict["mode"])
         var on: Set<String> = []
@@ -6607,7 +6623,14 @@ final class Shop {
     /// The column the card is ALREADY IN is not a refusal. Dropping a card back
     /// where it started is not a move and the board must not draw it as barred.
     func dragRefusal(_ stage: Stage) -> String? {
-        guard let id = draggingJob, let gate = dragGates[stage.rawValue] else { return nil }
+        guard let id = draggingJob else { return nil }
+        // Shipped takes the card by stamping a date rather than by moving the
+        // status, so the rules refuse it as a DESTINATION and the column would
+        // otherwise paint itself barred while a card it will happily take is in
+        // the air. What it actually refuses — a job that is not finished — is
+        // `markShipped`'s answer, given when the card lands.
+        if stage == .shipped { return nil }
+        guard let gate = dragGates[stage.rawValue] else { return nil }
         if orders.first(where: { $0.id == id }).flatMap(Stage.of) == stage { return nil }
         return gate.ok ? nil : words.gateRefusal(gate)
     }

@@ -977,3 +977,54 @@ test('an event that changes nothing reports no change', () => {
   const o = { id: 'J1', status: 'completed', shippedAt: 'A', deliveredAt: 'B' };
   assert.equal(S.stampFromShipping(o, 'delivered', 'T'), false);
 });
+
+/* ------------------------------------------------------------------
+   A stage is not somewhere a status can be set to.
+   ------------------------------------------------------------------ */
+
+test('a job cannot be MOVED to shipped, only stamped', () => {
+  // The board draws a column per stage and every column is a drop target, so
+  // the moment Shipped got a column, dragging a card onto it asked for this
+  // move. Writing 'shipped' into `status` would take the job out of every set
+  // that counts finished work, and nothing would report an error.
+  const o = { id: 'J1', status: 'completed' };
+  const g = S.gate(o, 'shipped', { orders: [o], settings: {} });
+  assert.equal(g.ok, false);
+  assert.equal(g.block.code, 'stage_not_a_status');
+  assert.equal(g.block.params.stage, 'shipped');
+  assert.deepEqual(S.REFUSED_AS_A_DESTINATION, ['shipped']);
+});
+
+test('delivered is still an allowed destination, as it always has been', () => {
+  // Derived the same way, but a status older books really carry, and this gate
+  // has allowed it since the rules were lifted. Refusing it would be a second
+  // change riding along with a feature — see the note in gate().
+  const o = { id: 'J1', status: 'completed' };
+  assert.equal(S.gate(o, 'delivered', { orders: [o], settings: {} }).ok, true);
+  assert.deepEqual(S.DERIVED_STAGES, ['shipped', 'delivered']);
+});
+
+test('the stamps are still the way in', () => {
+  const a = { id: 'A', status: 'completed' };
+  assert.equal(S.markShipped(a, {}).ok, true);
+  assert.equal(a.status, 'completed');
+  const b = { id: 'B', status: 'completed' };
+  assert.equal(S.markDelivered(b, {}).ok, true);
+  assert.equal(b.status, 'completed');
+});
+
+test('an ordinary move is untouched', () => {
+  for (const stage of ['quote', 'pending', 'on_hold', 'printing', 'post', 'qc', 'completed']) {
+    const o = { id: 'J1', status: 'pending' };
+    const g = S.gate(o, stage, { orders: [o], settings: {} });
+    assert.notEqual(g.block && g.block.code, 'stage_not_a_status', stage);
+  }
+});
+
+test('a legacy delivered job is still finished, even though it cannot be moved to', () => {
+  // `delivered` is refused as a DESTINATION and still counts as finished when
+  // it is what a book already says. Reading one is fine; writing one is the bug.
+  assert.equal(S.isFinished({ status: 'delivered' }), true);
+  assert.ok(S.FINISHED_STATUSES.includes('delivered'));
+  assert.ok(S.DERIVED_STAGES.includes('delivered'));
+});
