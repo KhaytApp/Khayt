@@ -244,6 +244,30 @@ private struct Card: View {
                 .controlSize(.small)
                 .disabled(shop.lookingForMoved)
             }
+
+            // ── AND WHAT HAPPENED ─────────────────────────────────────────
+            //
+            // Both of these were written in five places and read in none. A
+            // shop pressed "Find it on the network", waited — and got nothing
+            // at all unless the search happened to succeed: no "nothing
+            // answered", no "could not write that", not even "moved to .56".
+            // The feature either worked silently or failed silently, on the
+            // one screen somebody reaches for when something is already wrong.
+            //
+            // Worse since the sweep: the wait went from about a second to as
+            // much as twenty-five, and silence after twenty-five seconds reads
+            // as a broken button rather than as an answer.
+            if let problem = shop.relocateProblem {
+                Text(problem)
+                    .font(.caption).foregroundStyle(Khayt.late)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let note = shop.relocateNote {
+                // Not an alarm. "Nothing answered" is a real answer to a
+                // question the shop asked, and so is "moved to .56".
+                Text(note)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
