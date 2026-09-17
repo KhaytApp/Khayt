@@ -1772,6 +1772,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) Khayt's Siri shortcuts have never worked, and nothing said so.** The
+  app declares two — "What is printing in Khayt" and "What is waiting in
+  Khayt" — and the step that publishes them to the system was looking in the
+  wrong folder on every build since it was written. It printed a line about it
+  that read like a known limitation rather than a fault, in the middle of a
+  build log, so the app shipped with no Shortcuts and no Siri and no way for
+  anybody to tell. Both now reach the system, and a build that cannot publish
+  them says so loudly instead.
+
 - **(Mac) The sample book expired overnight and took two tests with it.** The
   demo shop's dates are written into a file and the calendar is not, so the
   last job in its queue fell past due and the "at risk" projection — which only

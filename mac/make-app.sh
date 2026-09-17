@@ -358,7 +358,22 @@ EXTENTS
 AI_TOOL="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor"
 if [ -x "$AI_TOOL" ]; then
   find "$PKG/Sources/KhaytApp" -name '*.swift' > "$PKG/.build/ai-sources.txt"
-  find "$PKG/.build/release/KhaytApp.build" -name '*.swiftconstvalues' \
+  # ── WHERE THE CONST VALUES ACTUALLY ARE ──────────────────────────────────
+  #
+  # This looked under the `.build/release` symlink and found nothing — every
+  # time, on every build, for the life of this script. That link now points at
+  # `out/Products/Release`, which holds products and not build intermediates;
+  # the `.swiftconstvalues` files land beside the object files, under
+  # `.build/<triple>/release/`.
+  #
+  # `find` does not descend a symlink given as its starting path either, so
+  # the two mistakes hid each other. The result was the `else` branch below
+  # printing a line that reads like a known limitation — and **Shortcuts and
+  # Siri have never seen Khayt's App Intents.**
+  #
+  # Searched by NAME under .build rather than by path, so the next time
+  # SwiftPM moves its layout this keeps working instead of going quiet again.
+  find "$PKG/.build" -name 'KhaytApp.swiftconstvalues' -not -path '*/Intermediates.noindex/*' \
     > "$PKG/.build/ai-const.txt" 2>/dev/null || true
   if [ -s "$PKG/.build/ai-const.txt" ]; then
     "$AI_TOOL" \
@@ -373,7 +388,14 @@ if [ -x "$AI_TOOL" ]; then
       --swift-const-vals-list "$PKG/.build/ai-const.txt" >/dev/null 2>&1 \
       && echo "  app intents: $(python3 -c "import json,sys;d=json.load(open('$APP/Contents/Resources/Metadata.appintents/extract.actionsdata'));print(len(d.get('actions',{})))" 2>/dev/null || echo '?') actions"
   else
-    echo "  app intents: no const values — Shortcuts and Siri will not see them"
+    # LOUD, because this is a silent feature loss and it went unnoticed for
+    # the life of the script. The app still builds and runs; it simply has no
+    # Shortcuts, which nothing on screen would tell anybody.
+    echo "  app intents: NO CONST VALUES FOUND under $PKG/.build —" >&2
+    echo "    Shortcuts and Siri will not see Khayt's intents." >&2
+    echo "    The build emits them with -emit-const-values; if this is empty," >&2
+    echo "    SwiftPM has moved them again. Find them with:" >&2
+    echo "      find $PKG/.build -name '*.swiftconstvalues'" >&2
   fi
 else
   echo "  app intents: no Xcode toolchain — skipped"
