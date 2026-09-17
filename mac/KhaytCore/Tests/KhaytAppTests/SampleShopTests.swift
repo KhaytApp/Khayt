@@ -570,6 +570,88 @@ extension SampleShopTests {
     /// The trends card draws a column where a month has a reading and a gap
     /// where it has none, for two figures. A sample where every month had a
     /// reading — or none did — is a card whose gap was never drawn.
+    /// The maintenance card ranks machines by what servicing cost, keeps a
+    /// sold machine's spending, and covers ONE year. A sample with one entry
+    /// on one machine draws a single bar and proves none of that.
+    @Test("the sample servicing reaches several machines, a sold one, and another year")
+    func maintenanceCostSpan() async throws {
+        let engine = try KhaytEngine()
+        let book = try Self.book()
+        let machines = Shop.rows(book, "machines")
+        let log = Shop.rows(book, "hub_maint_log_v1")
+        #expect(!log.isEmpty, "nothing was ever serviced — the card draws its empty state only")
+        let year = MachineProfitPage.thisYear()
+        let rows = try await engine.maintenanceCost(machines: machines, entries: log, year: year)
+        #expect(rows.count >= 3, "too few machines serviced to be worth ranking")
+        #expect(rows.contains { $0.orphan },
+                "no entry belongs to a machine the shop has sold")
+        #expect(rows.contains { !$0.orphan && $0.total > 0 })
+        // A machine serviced only in another year must not appear in this
+        // year's chart — the bucketing is the thing most likely to break.
+        let everyMachine = Set(log.compactMap { row -> String? in
+            if case .object(let o) = row, case .string(let id)? = o["machineId"] { return id }
+            return nil
+        })
+        #expect(everyMachine.count > rows.count,
+                "every machine ever serviced appears in this year — the year filter is never exercised")
+    }
+
+    /// The rating card draws a bar where a month was rated and a hairline
+    /// where it was not, and colours the two ends of the scale differently.
+    /// A sample where every month has one good rating draws one flat blue row
+    /// and leaves three of this card's four branches unseen.
+    @Test("the sample ratings reach a rated month, an unrated one, and both ends of the scale")
+    func ratingSpan() async throws {
+        let engine = try KhaytEngine()
+        let orders = Shop.rows(try Self.book(), "printLog")
+        // The same six months `Reports.recomputeRatings` asks for.
+        var months: [String] = []
+        let calendar = Calendar.current
+        for back in stride(from: 5, through: 0, by: -1) {
+            guard let month = calendar.date(byAdding: .month, value: -back, to: Date()),
+                  let year = calendar.dateComponents([.year], from: month).year,
+                  let m = calendar.dateComponents([.month], from: month).month
+            else { continue }
+            months.append(String(format: "%04d-%02d", year, m))
+        }
+        let trend = try await engine.ratingTrend(orders: orders, months: months)
+        #expect(trend.enough, "too few ratings to draw as a score")
+        #expect(trend.points.contains { $0.responses > 0 }, "no month was rated — the card draws nothing")
+        #expect(trend.points.contains { $0.responses == 0 }, "every month was rated — the gap is never drawn")
+        #expect(trend.points.contains { ($0.average ?? 0) >= 4.5 },
+                "no month is good enough to draw in the done colour")
+        #expect(trend.points.contains { let a = $0.average ?? 5; return $0.responses > 0 && a < 3 },
+                "no month is poor enough to draw in the late colour")
+    }
+
+    /// The sources card draws a row per source, and says something different
+    /// when the shop has never filled the field in. A sample where every
+    /// customer has a source never reaches the second, and one where none does
+    /// never reaches the first.
+    @Test("the sample customers reach several sources, and some with none recorded")
+    func clientSourceSpan() async throws {
+        let engine = try KhaytEngine()
+        let book = try Self.book()
+        let report = try await engine.clientSources(
+            clients: Shop.rows(book, "clients"), orders: Shop.rows(book, "printLog"),
+            settings: Shop.settings(book))
+        #expect(report.rows.count >= 4, "too few sources to be worth a chart")
+        #expect(report.rows.contains { $0.source == "online" },
+                "nobody arrived through the intake form — the row that used to be dropped")
+        #expect(report.rows.contains { $0.revenue > 0 }, "no source brought in any money")
+        // "Not recorded" and "Other" are different answers and the sheet
+        // offers both, so the book has to contain both.
+        let clients = Shop.rows(book, "clients")
+        #expect(clients.contains { row in
+            if case .object(let o) = row, case .string(let v)? = o["source"] { return v == "other" }
+            return false
+        }, "no customer is filed under Other")
+        #expect(clients.contains { row in
+            if case .object(let o) = row { return o["source"] == nil }
+            return false
+        }, "every customer has a source — the unset case is never drawn")
+    }
+
     @Test("the sample trends reach a month with a reading and a month without, on both rows")
     func trendsSpan() async throws {
         let engine = try KhaytEngine()

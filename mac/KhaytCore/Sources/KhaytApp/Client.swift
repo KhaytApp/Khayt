@@ -32,6 +32,13 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
     let cr: String
     let vat: String
     let notes: String
+    /// Where this customer came from — one of `Client.sources`, or empty.
+    ///
+    /// The Mac had no way to set this, so `ClientSourcesCard` could only ever
+    /// report "Other" for a shop that does not also run the Electron app. The
+    /// field was already carried through a save untouched (see `record`), so
+    /// nothing was being lost — it simply could not be entered.
+    let source: String
     let defaultDiscount: Double
     let createdAt: String?
     /// What this customer pays for particular things. See `PriceAgreement`.
@@ -45,7 +52,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
 
     private enum CodingKeys: String, CodingKey {
         case id, nameEn, nameAr, phone, email, cr, vat, notes, defaultDiscount, createdAt
-        case priceList, recurring, commLog
+        case priceList, recurring, commLog, source
     }
 
     /// Is there anything under the heading?
@@ -74,6 +81,11 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         cr = try c.decodeIfPresent(String.self, forKey: .cr) ?? ""
         vat = try c.decodeIfPresent(String.self, forKey: .vat) ?? ""
         notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        // NOT normalised on the way in. `lib/client-sources.js` folds an
+        // unknown value onto "other" when it counts, and doing it here too
+        // would rewrite the shop's stored value to "other" the first time
+        // anyone opened the sheet — losing whatever the other app meant by it.
+        source = try c.decodeIfPresent(String.self, forKey: .source) ?? ""
         defaultDiscount = try c.decodeIfPresent(Double.self, forKey: .defaultDiscount) ?? 0
         createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
         // Lenient on shape, like everything else here: a list that is not a
@@ -97,12 +109,13 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
 
     init(id: String, nameEn: String = "", nameAr: String = "", phone: String = "",
          email: String = "", cr: String = "", vat: String = "", notes: String = "",
-         defaultDiscount: Double = 0, createdAt: String? = nil,
+         source: String = "", defaultDiscount: Double = 0, createdAt: String? = nil,
          priceList: [PriceAgreement] = [], recurring: Recurring? = nil,
          commLog: [CommEntry] = []) {
         self.id = id; self.nameEn = nameEn; self.nameAr = nameAr
         self.phone = phone; self.email = email; self.cr = cr; self.vat = vat
-        self.notes = notes; self.defaultDiscount = defaultDiscount; self.createdAt = createdAt
+        self.notes = notes; self.source = source
+        self.defaultDiscount = defaultDiscount; self.createdAt = createdAt
         self.priceList = priceList; self.recurring = recurring; self.commLog = commLog
     }
 
@@ -120,6 +133,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             "nameEn": .string(nameEn), "nameAr": .string(nameAr),
             "phone": .string(phone), "email": .string(email),
             "cr": .string(cr), "vat": .string(vat), "notes": .string(notes),
+            "source": .string(source),
             "defaultDiscount": .number(defaultDiscount),
             "createdAt": createdAt.map(JSONValue.string) ?? .null,
             "priceList": .array(priceList.map { .object($0.raw) }),
@@ -151,6 +165,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             cr: key == \Client.cr ? value : cr,
             vat: key == \Client.vat ? value : vat,
             notes: key == \Client.notes ? value : notes,
+            source: key == \Client.source ? value : source,
             defaultDiscount: defaultDiscount,
             createdAt: createdAt,
             priceList: priceList, recurring: recurring, commLog: commLog)
@@ -159,14 +174,16 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
     /// The same customer with a different price list.
     func replacing(priceList next: [PriceAgreement]) -> Client {
         Client(id: id, nameEn: nameEn, nameAr: nameAr, phone: phone, email: email, cr: cr,
-               vat: vat, notes: notes, defaultDiscount: defaultDiscount, createdAt: createdAt,
+               vat: vat, notes: notes, source: source,
+               defaultDiscount: defaultDiscount, createdAt: createdAt,
                priceList: next, recurring: recurring, commLog: commLog)
     }
 
     /// The same customer with a different standing order.
     func replacing(recurring next: Recurring?) -> Client {
         Client(id: id, nameEn: nameEn, nameAr: nameAr, phone: phone, email: email, cr: cr,
-               vat: vat, notes: notes, defaultDiscount: defaultDiscount, createdAt: createdAt,
+               vat: vat, notes: notes, source: source,
+               defaultDiscount: defaultDiscount, createdAt: createdAt,
                priceList: priceList, recurring: next, commLog: commLog)
     }
 }

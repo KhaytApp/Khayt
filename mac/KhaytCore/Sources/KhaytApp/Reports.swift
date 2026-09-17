@@ -48,6 +48,19 @@ struct Reports: View {
     @State private var promises: KhaytEngine.OnTime?
     /// How much passes inspection, and how much first time.
     @State private var quality: KhaytEngine.QcMetrics?
+    /// What customers said, over the same six months the card draws — see
+    /// `RatingTrendCard` for why the caption used to cover a different span
+    /// from the chart under it.
+    @State private var ratings: KhaytEngine.RatingTrend?
+    /// Where the shop's customers came from. Beside the customer mix, which
+    /// says whether it is finding new ones at all.
+    @State private var sources: KhaytEngine.ClientSources?
+    /// The P&L's expense figure, broken up. NOT the Expenses screen's panel —
+    /// `ExpenseCategoriesCard` has the argument for why they differ.
+    @State private var spending: KhaytEngine.Spending?
+    /// What servicing each machine cost this year. The book already held this
+    /// list — it is what the machine P&L subtracts — and nothing drew it.
+    @State private var maintenance: [KhaytEngine.MaintenanceCostRow] = []
     /// How far each machine runs from its quote, and the shop's own figure.
     /// Not filtered to the chosen period: a machine's calibration is not a
     /// property of this quarter, and the measured-only filter already thins the
@@ -77,12 +90,13 @@ struct Reports: View {
             } else if shop.reportPage == .best {
                 Best(shop: shop, best: best, worth: worth, earns: earns, mix: mix,
                      when: when, quality: quality, cycle: cycle, lead: lead,
-                     promises: promises)
+                     promises: promises, ratings: ratings, sources: sources)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice, funnel: funnel)
             } else if shop.reportPage == .machines {
                 MachineProfitPage(shop: shop, report: machinePL,
-                                  accuracy: accuracy, shopAccuracy: shopAccuracy)
+                                  accuracy: accuracy, shopAccuracy: shopAccuracy,
+                                  maintenance: maintenance)
             } else if shop.reportPage == .custom {
                 CustomReportPage(shop: shop)
             } else if rows.isEmpty {
@@ -113,6 +127,11 @@ struct Reports: View {
                         // And the two figures behind both: what an hour of
                         // printing earned and what a gram of material cost.
                         TrendsChart(shop: shop, trends: trends)
+                            .padding(Metric.screen)
+                        // And where the money went. Under the two charts of
+                        // what came in, because that is the order the table
+                        // above reads in — revenue, then what it cost.
+                        ExpenseCategoriesCard(shop: shop, report: spending)
                             .padding(Metric.screen)
                     }
                     Totals(shop: shop, rows: rows, floor: floor)
@@ -297,6 +316,10 @@ struct Reports: View {
         await recomputeThroughput()
         await recomputeCycleTime()
         await recomputeQuality()
+        await recomputeRatings()
+        await recomputeSources()
+        await recomputeSpending()
+        await recomputeMaintenance()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
@@ -437,6 +460,54 @@ struct Reports: View {
         quality = try? await engine.qcMetrics(orders: shop.orderRows)
     }
 
+    private func recomputeRatings() async {
+        guard let engine = shop.engine else { ratings = nil; return }
+        // SIX MONTHS, the window the other app's chart drew — and now the
+        // window its caption counts too. Built here rather than in the rule so
+        // the caller owns "which months", which is the thing that was wrong.
+        var months: [String] = []
+        let calendar = Calendar.current
+        let now = Date()
+        for back in stride(from: 5, through: 0, by: -1) {
+            guard let month = calendar.date(byAdding: .month, value: -back, to: now)
+            else { continue }
+            let parts = calendar.dateComponents([.year, .month], from: month)
+            guard let year = parts.year, let m = parts.month else { continue }
+            months.append(String(format: "%04d-%02d", year, m))
+        }
+        ratings = try? await engine.ratingTrend(orders: shop.orderRows, months: months)
+    }
+
+    private func recomputeSources() async {
+        guard let engine = shop.engine else { sources = nil; return }
+        // NOT filtered to the chosen period, for the reason `recomputeClientValue`
+        // gives: where a customer came from is a fact about the customer, not
+        // about the quarter, and a source is worth judging on everything it has
+        // ever brought in.
+        sources = try? await engine.clientSources(
+            clients: shop.clientRows, orders: shop.orderRows,
+            settings: shop.settingsDict)
+    }
+
+    private func recomputeSpending() async {
+        guard let engine = shop.engine else { spending = nil; return }
+        // Every expense in the book, matching the P&L table beside it, which
+        // reports every period at once. A breakdown narrowed to one quarter
+        // under a table covering all of them is two questions on one screen.
+        spending = try? await engine.expenseCategories(shop.expenseRows,
+                                                       reclaimsTax: shop.reclaimsTax)
+    }
+
+    private func recomputeMaintenance() async {
+        guard let engine = shop.engine else { maintenance = []; return }
+        // THIS CALENDAR YEAR, which is the rule's own bucket and the period a
+        // shop budgets servicing over — not the chosen range, which the
+        // machine P&L beside it uses for a different question.
+        maintenance = (try? await engine.maintenanceCost(
+            machines: shop.machineRows, entries: shop.maintenanceRows,
+            year: MachineProfitPage.thisYear())) ?? []
+    }
+
     private func recomputeMachinePL() async {
         guard let engine = shop.engine else { return }
         // ── ALL FOUR FILTERED THE SAME WAY ────────────────────────────────
@@ -507,6 +578,8 @@ struct Reports: View {
         let cycle: KhaytEngine.CycleTime?
         let lead: KhaytEngine.LeadTime?
         let promises: KhaytEngine.OnTime?
+        let ratings: KhaytEngine.RatingTrend?
+        let sources: KhaytEngine.ClientSources?
 
         var body: some View {
             // Two cards rather than two halves of one pane divided by a rule.
@@ -535,6 +608,12 @@ struct Reports: View {
                     // should know first whether it is finding new ones.
                     CustomerMixCard(shop: shop, report: mix)
                         .card(rail: Khayt.brand, padding: 14)
+                    // Directly under the mix, because they are halves of one
+                    // question: that card says whether new customers are
+                    // arriving, this one says where from. A shop deciding
+                    // where to spend needs both, and neither alone.
+                    ClientSourcesCard(shop: shop, report: sources)
+                        .card(rail: Khayt.brand, padding: 14)
                     ClientValueTable(shop: shop, report: worth)
                         .card(rail: Khayt.brand, padding: 14)
                     // ── AND WHICH OF THEM EARNS ───────────────────────────
@@ -558,6 +637,14 @@ struct Reports: View {
                     // card is time the shop was not paid for.
                     QualityCard(shop: shop, report: quality)
                         .card(rail: (quality?.firstPassYield ?? 1) < 0.75
+                                    ? Khayt.attention : Khayt.brand,
+                              padding: 14)
+                    // Under quality, and last, because it is the only figure on
+                    // this screen the shop did not work out for itself: whether
+                    // the work passed inspection is the shop's own opinion of
+                    // it, and this is the customer's.
+                    RatingTrendCard(shop: shop, trend: ratings)
+                        .card(rail: (ratings?.average ?? 5) < 3
                                     ? Khayt.attention : Khayt.brand,
                               padding: 14)
                 }

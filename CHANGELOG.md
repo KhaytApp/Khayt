@@ -867,6 +867,31 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) Reports draws four figures it had no screen for: expenses by
+  category, where customers came from, what they thought of the work, and what
+  servicing each machine cost.** The rules behind all four were written and
+  tested for the other app and had stayed there, so the Mac could not answer
+  any of them — and every one of the four had a real fault fixed on the way in,
+  so the Mac gets the fixed version. The customer-source chart never counted
+  anyone who arrived through the shop's own intake form. The expense breakdown
+  summed the gross while the P&L above it charged the net, so the parts did not
+  add up to the whole they were a breakdown of. The rating chart's caption
+  counted every rating the shop had ever collected while the chart under it
+  covered six months, which is how forty happy reviews from last year go on
+  describing a bad quarter. And the maintenance chart read a per-machine
+  property nothing in Khayt has ever written, so it printed "No data yet"
+  however many services a shop had logged — the figures come from the flat
+  service log they actually live in, which this app already reads.
+
+- **(Mac) A customer can be given a lead source.** The Reports screen counts
+  customers by where they came from, and nothing on this app could set one — so
+  a shop that does not also run Khayt on Windows read "Other" for every
+  customer it had. The field was already carried through a save untouched;
+  it simply could not be entered. The list of sources is asked of the shared
+  rule rather than written down a second time, which is the fault that lost the
+  intake form's customers from the chart in the first place. A source this
+  build does not recognise is shown as itself and kept, not quietly refiled.
+
 - **(Mac) A zip of models can be added to the library.** A shop downloads a
   model as a zip because that is how every model site hands one over, and
   dropping one on the library did nothing at all — the import walks for `stl`,

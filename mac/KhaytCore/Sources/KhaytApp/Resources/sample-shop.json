@@ -171,7 +171,11 @@
    "updatedAt": "2026-06-15T09:08:00Z",
    "productId": "PRD-0522F9",
    "qcStatus": "pass",
-   "qcPassedAt": "2026-06-15T14:20:00Z"
+   "qcPassedAt": "2026-06-15T14:20:00Z",
+   "survey": {
+    "rating": 2,
+    "at": "2026-06-15T09:08:00Z"
+   }
   },
   {
    "id": "ORD-01003",
@@ -427,7 +431,11 @@
    "productId": "PRD-68297E",
    "quoteSentAt": "2026-08-14",
    "quoteAcceptedAt": "2026-08-15",
-   "packagingDeducted": true
+   "packagingDeducted": true,
+   "survey": {
+    "rating": 5,
+    "at": "2026-08-28T17:31:00Z"
+   }
   },
   {
    "id": "ORD-01008",
@@ -494,7 +502,11 @@
    "quoteSentAt": "2026-08-12",
    "quoteAcceptedAt": "2026-08-17",
    "qcStatus": "pass",
-   "qcPassedAt": "2026-08-26T14:20:00Z"
+   "qcPassedAt": "2026-08-26T14:20:00Z",
+   "survey": {
+    "rating": 4,
+    "at": "2026-08-26T19:01:00Z"
+   }
   },
   {
    "id": "ORD-01009",
@@ -545,7 +557,11 @@
    "productId": "PRD-F68FC0",
    "quoteSentAt": "2026-07-20",
    "quoteAcceptedAt": "2026-07-23",
-   "packagingDeducted": true
+   "packagingDeducted": true,
+   "survey": {
+    "rating": 4,
+    "at": "2026-08-03T13:42:00Z"
+   }
   },
   {
    "id": "ORD-01010",
@@ -700,7 +716,11 @@
    "quoteSentAt": "2026-05-09",
    "quoteAcceptedAt": "2026-05-16",
    "qcStatus": "pass",
-   "qcPassedAt": "2026-05-16T14:20:00Z"
+   "qcPassedAt": "2026-05-16T14:20:00Z",
+   "survey": {
+    "rating": 5,
+    "at": "2026-05-16T09:16:00Z"
+   }
   },
   {
    "id": "ORD-01013",
@@ -752,7 +772,11 @@
    "quoteSentAt": "2026-04-27",
    "quoteAcceptedAt": "2026-05-06",
    "qcStatus": "pass",
-   "qcPassedAt": "2026-05-07T14:20:00Z"
+   "qcPassedAt": "2026-05-07T14:20:00Z",
+   "survey": {
+    "rating": 4,
+    "at": "2026-05-07T11:44:00Z"
+   }
   },
   {
    "id": "ORD-01014",
@@ -977,7 +1001,11 @@
     "at": "2026-06-04T18:00:00.000Z"
    },
    "quoteSentAt": "2026-05-31",
-   "quoteAcceptedAt": "2026-06-04"
+   "quoteAcceptedAt": "2026-06-04",
+   "survey": {
+    "rating": 3,
+    "at": "2026-06-04T13:19:00Z"
+   }
   },
   {
    "id": "ORD-01018",
@@ -1463,7 +1491,11 @@
    "reprintOf": "ORD-01000",
    "reprintChain": "ORD-01000",
    "reprintReason": "rma",
-   "packagingDeducted": true
+   "packagingDeducted": true,
+   "survey": {
+    "rating": 5,
+    "at": "2026-09-03T16:29:00Z"
+   }
   },
   {
    "id": "ORD-01027",
@@ -4204,7 +4236,8 @@
      "note": "Asked for a delivery slot on Thursday.",
      "at": "2026-09-02T14:12:00.000Z"
     }
-   ]
+   ],
+   "source": "instagram"
   },
   {
    "id": "CLI-F633FC",
@@ -4224,7 +4257,8 @@
      "at": "2026-08-31T09:40:00.000Z",
      "quick": true
     }
-   ]
+   ],
+   "source": "instagram"
   },
   {
    "id": "CLI-1A9EB5",
@@ -4244,7 +4278,8 @@
     "paused": false,
     "endDate": null,
     "leadDays": 3
-   }
+   },
+   "source": "referral"
   },
   {
    "id": "CLI-1EF91E",
@@ -4263,7 +4298,8 @@
     "nextDue": "2026-10-01",
     "paused": false,
     "endDate": null
-   }
+   },
+   "source": "walk_in"
   },
   {
    "id": "CLI-418DAE",
@@ -4275,7 +4311,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "website"
   },
   {
    "id": "CLI-A7B55E",
@@ -4287,7 +4324,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "online"
   },
   {
    "id": "CLI-B84866",
@@ -4313,7 +4351,8 @@
     "nextDue": "2026-09-05",
     "paused": true,
     "endDate": null
-   }
+   },
+   "source": "instagram"
   },
   {
    "id": "CLI-994C0F",
@@ -4325,7 +4364,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "referral"
   },
   {
    "id": "CLI-08D285",
@@ -4337,7 +4377,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "exhibition"
   },
   {
    "id": "CLI-2E3820",
@@ -4349,7 +4390,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "online"
   },
   {
    "id": "CLI-E2682E",
@@ -4361,7 +4403,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "referral"
   },
   {
    "id": "CLI-BF48B2",
@@ -4373,7 +4416,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "website"
   },
   {
    "id": "CLI-43C78E",
@@ -4397,7 +4441,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "instagram"
   },
   {
    "id": "CLI-75DFFA",
@@ -4409,7 +4454,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "walk_in"
   },
   {
    "id": "CLI-1542D4",
@@ -4421,7 +4467,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "other"
   },
   {
    "id": "CLI-502F3A",
@@ -4433,7 +4480,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "referral"
   },
   {
    "id": "CLI-AA555E",
@@ -4445,7 +4493,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "online"
   },
   {
    "id": "CLI-6517BB",
@@ -4469,7 +4518,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "instagram"
   },
   {
    "id": "CLI-68E74C",
@@ -4481,7 +4531,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "website"
   },
   {
    "id": "CLI-7C497F",
@@ -4493,7 +4544,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "referral"
   },
   {
    "id": "CLI-8E9FBF",
@@ -4505,7 +4557,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "exhibition"
   },
   {
    "id": "CLI-36E7BA",
@@ -4517,7 +4570,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "instagram"
   },
   {
    "id": "CLI-DA6156",
@@ -4541,7 +4595,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "walk_in"
   },
   {
    "id": "CLI-4E7DF7",
@@ -4553,7 +4608,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "online"
   },
   {
    "id": "CLI-DE0F3C",
@@ -4565,7 +4621,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "referral"
   },
   {
    "id": "CLI-85403B",
@@ -4577,7 +4634,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "instagram"
   },
   {
    "id": "CLI-2A6590",
@@ -4601,7 +4659,8 @@
    "vat": "",
    "notes": "",
    "defaultDiscount": 0,
-   "createdAt": "2026-01-05T09:00:00.000Z"
+   "createdAt": "2026-01-05T09:00:00.000Z",
+   "source": "website"
   }
  ],
  "products": [
@@ -5326,6 +5385,64 @@
    "unit": "each",
    "minStock": 100,
    "unitCost": 0.15
+  }
+ ],
+ "hub_maint_log_v1": [
+  {
+   "id": "MAINT-01",
+   "machineId": "MACH-x1c",
+   "date": "2026-08-14",
+   "note": "Replace nozzle",
+   "cost": 95.0
+  },
+  {
+   "id": "MAINT-02",
+   "machineId": "MACH-x1c",
+   "date": "2026-05-02",
+   "note": "Belt tension + rails",
+   "cost": 140.0
+  },
+  {
+   "id": "MAINT-03",
+   "machineId": "MACH-core-one",
+   "date": "2026-07-21",
+   "note": "Replace nozzle",
+   "cost": 85.0
+  },
+  {
+   "id": "MAINT-04",
+   "machineId": "MACH-u1",
+   "date": "2026-06-09",
+   "note": "Hotend service",
+   "cost": 210.0
+  },
+  {
+   "id": "MAINT-05",
+   "machineId": "MACH-u1",
+   "date": "2026-02-18",
+   "note": "Firmware + bed levelling",
+   "cost": 0.0
+  },
+  {
+   "id": "MAINT-06",
+   "machineId": "MACH-LASER",
+   "date": "2026-04-05",
+   "note": "Lens clean, mirror align",
+   "cost": 320.0
+  },
+  {
+   "id": "MAINT-07",
+   "machineId": "MACH-UVFLAT",
+   "date": "2025-11-30",
+   "note": "Head flush",
+   "cost": 180.0
+  },
+  {
+   "id": "MAINT-08",
+   "machineId": "MACH-ender-old",
+   "date": "2026-01-16",
+   "note": "Extruder rebuild",
+   "cost": 60.0
   }
  ]
 }

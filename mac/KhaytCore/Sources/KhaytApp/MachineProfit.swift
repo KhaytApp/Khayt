@@ -28,6 +28,10 @@ struct MachineProfitPage: View {
     /// property of this quarter.
     var accuracy: [KhaytEngine.MachineAccuracy] = []
     var shopAccuracy: KhaytEngine.MachineAccuracy?
+    /// What servicing each machine cost this year. Not filtered to the chosen
+    /// range either: the rule buckets by calendar year, and a year is the
+    /// period a shop budgets maintenance over.
+    var maintenance: [KhaytEngine.MaintenanceCostRow] = []
 
     var body: some View {
         let words = shop.words
@@ -36,6 +40,14 @@ struct MachineProfitPage: View {
                 VStack(alignment: .leading, spacing: 0) {
                     rows(report)
                     Accuracy(shop: shop, rows: accuracy, all: shopAccuracy)
+                    // Under the money and the calibration, because it is the
+                    // follow-up to both: the P&L already took maintenance off
+                    // each machine's profit, and this says how much of it
+                    // there was.
+                    MaintenanceCostCard(shop: shop, rows: maintenance,
+                                        year: Self.thisYear())
+                        .card(rail: Khayt.brand, padding: 14)
+                        .padding(Metric.screen)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -43,8 +55,13 @@ struct MachineProfitPage: View {
             // The money is empty and the calibration is not, which happens
             // whenever a shop looks at a quiet month. Showing the empty state
             // over figures this screen HAS would be hiding them.
-            ScrollView { Accuracy(shop: shop, rows: accuracy, all: shopAccuracy) }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            ScrollView {
+                Accuracy(shop: shop, rows: accuracy, all: shopAccuracy)
+                MaintenanceCostCard(shop: shop, rows: maintenance, year: Self.thisYear())
+                    .card(rail: Khayt.brand, padding: 14)
+                    .padding(Metric.screen)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
             // NOT "no data". A shop reaches this by having finished no work in
             // the period it is looking at, which is a thing it can change by
@@ -53,6 +70,15 @@ struct MachineProfitPage: View {
                       message: words.callIt("mac.mpl_empty_why"), mark: .machines)
                 .frame(maxHeight: .infinity)
         }
+    }
+
+    /// The calendar year the maintenance figures cover.
+    ///
+    /// Read off an ISO day rather than from `DateComponents`, for the reason
+    /// `lib/maintenance-cost.js` gives about its own bucketing: a date parsed
+    /// as UTC and read back in the shop's timezone can answer with last year.
+    static func thisYear() -> Int {
+        Int(StoreWriter.iso(Date()).prefix(4)) ?? 0
     }
 
     /// The rows, OUTSIDE the `ScrollView` that holds them.

@@ -31,6 +31,8 @@ struct CustomerSheet: View {
     @State private var schedule: Recurring
     @State private var hasEnd: Bool
     @State private var started = false
+    /// The sources the picker offers, asked of the shared rule on appear.
+    @State private var sources: [String] = []
     @FocusState private var focused: Bool
 
     /// A price agreement as the sheet holds it while it is being typed.
@@ -112,6 +114,14 @@ struct CustomerSheet: View {
             started = true
             focused = true
         }
+        .task {
+            // Empty on failure, not a hardcoded fallback list: a second copy
+            // of these seven written down here is the exact fault that lost
+            // every intake-form customer from the report. The picker then
+            // offers only what the customer already has, which is visibly
+            // wrong rather than quietly wrong.
+            sources = (try? await shop.engine?.clientSourceNames()) .flatMap { $0 } ?? []
+        }
     }
 
     // MARK: - Who they are
@@ -153,6 +163,40 @@ struct CustomerSheet: View {
                 Text(shop.words.callIt("ce.vat")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
                 TextField("", text: binding(\.vat)).textFieldStyle(.roundedBorder)
+            }
+            GridRow {
+                // ── WHERE THEY CAME FROM ──────────────────────────────────
+                //
+                // The one field on this sheet that is not about reaching the
+                // customer. It is here because nothing else can put it there:
+                // the Reports screen counts customers by source, and with no
+                // way to set one every shop that does not also run the other
+                // app read "Other" for all of them.
+                //
+                // The list is the RULE's, fetched rather than written down —
+                // this is the field that broke by having two lists of it, one
+                // of which had never heard of the intake form's `online`.
+                Text(shop.words.callIt("cl.source")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: binding(\.source)) {
+                    // A customer whose source was never asked. Not the same as
+                    // "Other", which is a shop saying it asked and none of
+                    // these fitted — so the report can tell them apart.
+                    Text(shop.words.callIt("mac.cs_unset")).tag("")
+                    if !sources.isEmpty { Divider() }
+                    ForEach(sources, id: \.self) { source in
+                        Text(shop.words.callIt("cl.source_" + source)).tag(source)
+                    }
+                    // A value this build does not know — written by a newer
+                    // Khayt, or by hand. Shown as itself and kept on save
+                    // rather than silently becoming "Other".
+                    if !draft.source.isEmpty, !sources.contains(draft.source) {
+                        Divider()
+                        Text(draft.source).tag(draft.source)
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
             }
             GridRow {
                 Text(shop.words.callIt("ce.notes")).gridColumnAlignment(.trailing)
