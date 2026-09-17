@@ -59,17 +59,48 @@ struct StageTests {
         }
     }
 
+    /// Stages that are a DATE on a completed job rather than a status.
+    ///
+    /// Dropping a card on one of these columns is still meant to work; it just
+    /// cannot work by moving the status. `lib/order-status.js` refuses the move
+    /// for exactly that reason, and the board performs the stamp instead.
+    static let stamped: [Stage] = [.shipped]
+
     @Test("every board column can be dropped on, and the rules decide the rest")
     func boardColumnsAreMoveTargets() async throws {
-        // The board offers seven columns; each is a status `lib/order-status.js`
-        // understands, so a drop is refused for a REASON rather than by falling
-        // through a switch nobody updated.
+        // Each column is a status `lib/order-status.js` understands, so a drop
+        // is refused for a REASON rather than by falling through a switch
+        // nobody updated.
         let engine = try KhaytEngine()
         let job: JSONValue = .object(["id": .string("J1"), "status": .string("pending")])
-        for stage in Stage.boardColumns {
+        for stage in Stage.boardColumns where !Self.stamped.contains(stage) {
             let gate = try await engine.statusGate(order: job, to: stage.rawValue,
                                                    orders: [job], settings: [:])
             #expect(gate.ok, "a shop with no limits set should be able to move a job to \(stage.rawValue)")
+        }
+    }
+
+    /// The other half, and the one that would have shipped a bug.
+    ///
+    /// A stamped column is a drop target like any other. If the rules refuse
+    /// the move and the board has no branch for it, the card is silently
+    /// rejected and the column looks broken; if the board has no branch and the
+    /// rules DON'T refuse, an invalid status is written into the book and every
+    /// figure that counts finished work quietly loses the job.
+    @Test("a column that stamps is refused as a move AND handled by the board")
+    func stampedColumnsAreHandled() async throws {
+        let engine = try KhaytEngine()
+        let job: JSONValue = .object(["id": .string("J1"), "status": .string("completed")])
+        let board = MenuCoverageTests.source("Kanban.swift")
+        #expect(!board.isEmpty, "Kanban.swift moved")
+
+        for stage in Self.stamped {
+            let gate = try await engine.statusGate(order: job, to: stage.rawValue,
+                                                   orders: [job], settings: [:])
+            #expect(!gate.ok,
+                    "the rules let a job be MOVED to \(stage.rawValue); it is a stamp, not a status")
+            #expect(board.contains("if stage == .\(stage.rawValue) {"),
+                    "the board has no branch for the \(stage.rawValue) column, so a card dropped there does nothing")
         }
     }
 }

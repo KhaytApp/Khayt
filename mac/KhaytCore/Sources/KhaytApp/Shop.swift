@@ -6607,7 +6607,14 @@ final class Shop {
     /// The column the card is ALREADY IN is not a refusal. Dropping a card back
     /// where it started is not a move and the board must not draw it as barred.
     func dragRefusal(_ stage: Stage) -> String? {
-        guard let id = draggingJob, let gate = dragGates[stage.rawValue] else { return nil }
+        guard let id = draggingJob else { return nil }
+        // Shipped takes the card by stamping a date rather than by moving the
+        // status, so the rules refuse it as a DESTINATION and the column would
+        // otherwise paint itself barred while a card it will happily take is in
+        // the air. What it actually refuses — a job that is not finished — is
+        // `markShipped`'s answer, given when the card lands.
+        if stage == .shipped { return nil }
+        guard let gate = dragGates[stage.rawValue] else { return nil }
         if orders.first(where: { $0.id == id }).flatMap(Stage.of) == stage { return nil }
         return gate.ok ? nil : words.gateRefusal(gate)
     }

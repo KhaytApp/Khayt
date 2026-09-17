@@ -1547,6 +1547,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **(Mac) Dragging a card onto the new Shipped column would have written an
+  invalid status.** The board draws a column per stage and every column is a
+  drop target, so the moment Shipped got a column, dropping a card on it asked
+  to set `status: 'shipped'` — the exact thing the stage was designed as a
+  stamp to avoid, because a job with a status no "finished" set knows about
+  drops out of revenue, the P&L, the VAT return and a customer's lifetime
+  spend without anything reporting an error. The shared rules refuse the move
+  now, so no app can make it, and the board performs the stamp instead. Only
+  `shipped` is refused: `delivered` is derived the same way but is a status
+  older books really carry, and it has always been an allowed destination.
+
 - **Twenty-two more figures were computed from part of the book.** Khayt
   wrote `delivered` before it wrote `completed` with a `deliveredAt` beside
   it, and both spellings are still in shops' books. Three callers were fixed

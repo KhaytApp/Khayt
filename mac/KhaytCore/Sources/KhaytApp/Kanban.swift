@@ -249,6 +249,16 @@ private struct Column: View {
             // Refused BEFORE the move is attempted, now that the answer is
             // already here. `moveJob` asks the rules again and refuses again —
             // this does not replace that, it stops the drop looking accepted.
+            // SHIPPED IS NOT A STATUS, so it is not a move — and it is asked
+            // BEFORE the gate, because the gate refuses it for exactly that
+            // reason. It is a date stamped on a job that stays `completed`. A
+            // column is a drop target, though, and a card dragged onto this one
+            // plainly means "this went in the post", so it is performed the only
+            // way it can be. `markShipped` refuses a job that is not finished.
+            if stage == .shipped {
+                Task { await shop.markShipped(job.id) }
+                return true
+            }
             guard shop.dragRefusal(stage) == nil else { return false }
             // A hold asks why first — it is the one move whose reason a shop
             // will want three weeks later. Every other move just happens.

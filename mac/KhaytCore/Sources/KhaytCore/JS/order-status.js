@@ -131,6 +131,24 @@
    */
   const FINISHED_STATUSES = ['completed', 'delivered'];
 
+  /**
+   * Stages a job is SHOWN in but never stored as.
+   *
+   * Both are a date stamped on a job that stays `completed`. `delivered` is
+   * also a legacy STATUS, in books written before the stamp existed — which is
+   * why it is in `FINISHED_STATUSES` above and refused as a destination below.
+   * Reading one is fine; writing one is the bug.
+   */
+  const DERIVED_STAGES = ['shipped', 'delivered'];
+
+  /**
+   * Stages `gate` will not let a job be moved TO.
+   *
+   * `delivered` is not here on purpose — see the note in `gate`. It is a status
+   * older books really carry, and it has always been an allowed destination.
+   */
+  const REFUSED_AS_A_DESTINATION = ['shipped'];
+
   function isFinished(order) {
     const st = order && order.status;
     return st === 'completed' || st === 'delivered';
@@ -141,6 +159,37 @@
     const settings = c.settings || {};
     const orders = Array.isArray(c.orders) ? c.orders : [];
     const wipLimits = settings.wipLimits || {};
+
+    // A STAGE IS NOT SOMEWHERE A STATUS CAN BE SET TO.
+    //
+    // `shipped` and `delivered` are stamps on a job that stays `completed`;
+    // `stageOf` derives them from the pair. Writing either into `status` would
+    // take the job out of every set that counts finished work — revenue, the
+    // P&L, the VAT return, a customer's lifetime spend — and nothing would
+    // report an error, because a status is just a string.
+    //
+    // This is not hypothetical. The board draws a column per stage and each
+    // column is a drop target, so the moment Shipped got a column, dragging a
+    // card onto it asked for exactly this move. Refused here rather than in the
+    // one host that happened to have a board, because the next host will have
+    // one too. `markShipped` and `markDelivered` are the way in.
+    //
+    // ONLY `shipped`. `delivered` is derived the same way, but it is ALSO a
+    // status books written before the stamp existed actually carry, and this
+    // gate has allowed it as a destination since it was lifted — there are
+    // tests on that, and the differential test against the original
+    // `updateStatus` holds it there. Refusing it would be a second change
+    // riding along with a feature, decided on no evidence that anything needs
+    // it. What made `shipped` different is that nothing has ever been allowed
+    // to write it, and a drop target had just appeared that would.
+    if (REFUSED_AS_A_DESTINATION.indexOf(newStatus) !== -1) {
+      return {
+        ok: false,
+        block: { code: 'stage_not_a_status', params: { stage: newStatus } },
+        warn: null,
+        needsActuals: false,
+      };
+    }
 
     // Production paused stops work being STARTED, and nothing else. A paused
     // shop still finishes and still ships what it already printed.
@@ -652,7 +701,7 @@
   }
 
   const api = {
-    HISTORY_CAP, SURVEY_TOKEN_BYTES, FINISHED_STATUSES, isFinished,
+    HISTORY_CAP, SURVEY_TOKEN_BYTES, FINISHED_STATUSES, DERIVED_STAGES, REFUSED_AS_A_DESTINATION, isFinished,
     wouldExceedWipLimit, gate, apply, outboundFor, stageOf, markDelivered, markShipped, stampFromShipping, IN_THE_POST,
     resumeFromHold, makeSurveyToken,
   };
