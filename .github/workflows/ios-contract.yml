@@ -14,6 +14,12 @@ on:
     paths:
       - 'ios/**'
       - 'lib/lan-server.js'
+      # The fixture reads the desktop's STATUSES out of this file, so a status
+      # added here is what widens the capture and breaks the phone's enum. The
+      # check could not fire on the change that breaks it until this was listed:
+      # `shipped` went in, this workflow never ran, and the companion shipped
+      # with no case for it.
+      - 'renderer/analytics.js'
       - 'scripts/ios-contract-*'
       - '.github/workflows/ios-contract.yml'
   pull_request:
@@ -21,6 +27,12 @@ on:
     paths:
       - 'ios/**'
       - 'lib/lan-server.js'
+      # The fixture reads the desktop's STATUSES out of this file, so a status
+      # added here is what widens the capture and breaks the phone's enum. The
+      # check could not fire on the change that breaks it until this was listed:
+      # `shipped` went in, this workflow never ran, and the companion shipped
+      # with no case for it.
+      - 'renderer/analytics.js'
       - 'scripts/ios-contract-*'
       - '.github/workflows/ios-contract.yml'
 

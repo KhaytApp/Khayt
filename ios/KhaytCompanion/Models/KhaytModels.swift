@@ -285,7 +285,14 @@ enum OrderStatus: String, CaseIterable, Hashable, Sendable {
     // fell back to `status.capitalized` — which meant an Arabic shop read
     // "Quote" and "Delivered" in English. Nothing crashed; it just quietly
     // stopped being translated.
-    case quote, pending, printing, post, qc, completed, delivered, on_hold
+    //
+    // `shipped` joined the desktop's list later and this enum did not follow,
+    // so the same thing happened a third time. The contract check that exists
+    // to catch exactly this could not: it reads the desktop's list out of
+    // `renderer/analytics.js`, but its workflow only ran on changes to `ios/**`,
+    // `lib/lan-server.js` and `scripts/ios-contract-*` — never on the file it
+    // takes its truth from. The path filter is fixed alongside this.
+    case quote, pending, printing, post, qc, completed, delivered, shipped, on_hold
 
     var label: String {
         switch self {
@@ -296,14 +303,17 @@ enum OrderStatus: String, CaseIterable, Hashable, Sendable {
         case .qc: return "QC"
         case .completed: return "Completed"
         case .delivered: return "Delivered"
+        case .shipped: return "Shipped"
         case .on_hold: return "On hold"
         }
     }
 
     /// Statuses the phone may assign. Deliberately not `allCases`: the companion
     /// is a shop-floor tool, and knowing how to *display* a quote is not the same
-    /// as being allowed to move a live order back into one. Adding `quote` and
-    /// `delivered` above must not silently widen what the phone can write.
+    /// as being allowed to move a live order back into one. Adding `quote`,
+    /// `delivered` or `shipped` above must not silently widen what the phone
+    /// can write — handing a job over is a desktop action with a date stamp
+    /// behind it, not a column the phone drags a card into.
     static let assignable: [OrderStatus] = [.pending, .printing, .post, .qc, .on_hold]
 
     var nextInQueue: OrderStatus? {

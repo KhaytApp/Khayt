@@ -1664,6 +1664,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(iOS companion) A shipped order showed the English word "shipped" to an
+  Arabic shop.** The phone's status list is a closed set and `shipped` was
+  added to the desktop without it, so every badge fell back to the raw status
+  name. The same thing happened with "quote" and "delivered" before it. The
+  check that exists to catch exactly this could not: it reads the desktop's
+  status list out of `renderer/analytics.js`, but only ran on changes to the
+  phone's own files — never on the file it takes its truth from. It runs on
+  that file now, and a new test covers the other half nothing was watching:
+  that every status the phone can show has a word in both its languages.
+
+
 - **A printer's utilisation was capped at 100%, so the machine worth buying a
   second of was invisible.** "Printer utilisation" on Reports clamped the
   figure, and a machine running half as much again as the shop wanted drew
