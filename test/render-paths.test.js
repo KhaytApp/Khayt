@@ -84,6 +84,13 @@ function loadAnalyticsStack() {
   require('../lib/working-week.js'); // globalThis.KhaytWorkingWeek, which it reads the open days from
   require('../lib/supplier-prices.js'); // globalThis.KhaytSupplierPrices
   require('../lib/maintenance-cost.js'); // globalThis.KhaytMaintenanceCost
+  // Both are reached only once a book has an expense in it, which is why they
+  // were missing here until a test seeded one.
+  require('../lib/expense-categories.js'); // globalThis.KhaytExpenseCategories
+  require('../lib/pnl-report.js'); // globalThis.KhaytPnl
+  // The category chart labels its slices with the expenses screen's helper,
+  // which is a plain global in the app.
+  require('../renderer/expenses.js'); // expCatLabel
   require('../renderer/dashboard.js'); // renderMaterialUsageChart / renderFilamentAnalytics
   require('../renderer/analytics.js');
 }
@@ -230,6 +237,46 @@ test('renderAnalytics: a delivered job is finished revenue, like a completed one
   global.renderAnalytics();
   assert.notEqual($('#revenueChartWrap').innerHTML, withCompleted,
     'a job still on the printer has not earned anything yet');
+});
+
+test('renderAnalytics: the "Net profit" KPI is net of expenses, like the P&L below it', () => {
+  // It used to be `revenue - partTotalCost`: a gross margin under the words
+  // "Net profit", bigger than the net profit in the P&L section on the same
+  // screen by exactly the expenses it ignored.
+  loadAnalyticsStack();
+  const month = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const seed = expenses => {
+    dom.seedState({
+      settings: { currency: 'SAR', mode: 'professional', fixedCosts: [] },
+      // A real range, not 'all' — otherwise nothing is ever out of it.
+      analyticsRange: 'year',
+      printLog: [{
+        id: 'a', status: 'completed', date: `${month}-02`, price: 1000, printTime: 1,
+        clientId: null, parts: [{ qty: 1, filamentCost: 200 }],
+      }],
+      expenses,
+    });
+    // The KPI row only renders on the redesigned screen for a professional shop.
+    document.body.classList.add('bedready-ui');
+    global.renderAnalytics();
+    return $('#analyticsHandoffWrap').innerHTML;
+  };
+
+  const withNoExpenses = seed([]);
+  assert.ok(withNoExpenses.length > 0, 'the KPI row should render for a professional shop');
+
+  const withExpenses = seed([
+    { id: 'e1', date: `${month}-05`, amount: 300, category: 'Rent' },
+  ]);
+  assert.notEqual(withExpenses, withNoExpenses,
+    'recording an expense must move the net profit figure');
+
+  // And an expense outside the range must not.
+  const lastYear = seed([
+    { id: 'e2', date: `${new Date().getFullYear() - 1}-05-05`, amount: 300, category: 'Rent' },
+  ]);
+  assert.equal(lastYear, withNoExpenses,
+    'an expense outside the selected range is not this period\'s cost');
 });
 
 // --- Arg-taking HTML builders -------------------------------------------------

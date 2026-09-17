@@ -198,11 +198,11 @@ function renderHandoffAnalyticsOverview(ctx) {
 
   const { revenue, completed, receivables, convRate, revSpark } = ctx;
   const cur = currencySymbol();
-  const netProfit = completed.reduce((s, o) => {
-    const rev = orderNetRevenueBase(o);
-    const cost = (o.parts || []).reduce((cs, p) => cs + partTotalCost(p), 0);
-    return s + (rev - cost);
-  }, 0);
+  // Net, meaning net: revenue less what the work cost AND less what the shop
+  // spent. This used to be `revenue - partTotalCost` — a gross margin printed
+  // under the words "Net profit", larger than the net profit in the P&L
+  // section on the same screen by exactly the expenses it ignored.
+  const netProfit = KhaytPnl.computePnl(pnlInputsForRange()).netProfit;
   const avgOrder = completed.length ? revenue / completed.length : 0;
   const repeatClients = (() => {
     const counts = {};
@@ -2762,6 +2762,35 @@ function openReportBuilder() {
 }
 
 /** Export a P&L summary CSV scoped to the selected analytics date range. */
+/**
+ * The selected range's orders and expenses, in the shape `KhaytPnl` reads.
+ *
+ * Extracted because there were two answers to "what did the shop make". The
+ * P&L export built this properly; the analytics KPI row computed its own
+ * `revenue - partTotalCost` and printed it under the words "Net profit". That
+ * figure left out every expense the shop had recorded AND the shipping it had
+ * paid, so it was a gross margin wearing the name of a net one, and it was
+ * bigger than the net profit in the P&L section directly below it.
+ *
+ * One builder, so the two cannot disagree again.
+ */
+function pnlInputsForRange() {
+  const taxProfile = KhaytTax.profileFromSettings(settings);
+  const orders = (printLog || [])
+    .filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && inRange(o.date, analyticsRange, 'analytics'))
+    .map(o => {
+      const revenue = orderNetRevenueBase(o);
+      const cogs = (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0)
+        + convertToBase(+o.shippingCost || 0, orderCurrency(o));
+      // `revenue` here is gross — see lib/tax.js.
+      return { revenue, cogs, vat: KhaytTax.computeTax(revenue, taxProfile).taxTotal };
+    });
+  const expenseRows = (expenses || [])
+    .filter(e => inRange(e.date, analyticsRange, 'analytics'))
+    .map(e => ({ amount: +e.amount || 0, category: e.category || '' }));
+  return { orders, expenses: expenseRows };
+}
+
 function exportPnlCsv() {
   const sel = $('#analyticsRange');
   let label = sel?.selectedOptions?.[0]?.textContent?.trim() || t('an.range.all') || 'All time';
@@ -2769,19 +2798,7 @@ function exportPnlCsv() {
     const f = customRangeFrom.analytics || '', tt = customRangeTo.analytics || '';
     if (f || tt) label = `${f || '…'} → ${tt || '…'}`;
   }
-  const _taxProfile = KhaytTax.profileFromSettings(settings);
-  const orders = (printLog || [])
-    .filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && inRange(o.date, analyticsRange, 'analytics'))
-    .map(o => {
-      const revenue = orderNetRevenueBase(o);
-      const cogs = (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0)
-        + convertToBase(+o.shippingCost || 0, orderCurrency(o));
-      // Same rule as above — see lib/tax.js. `revenue` here is gross.
-      return { revenue, cogs, vat: KhaytTax.computeTax(revenue, _taxProfile).taxTotal };
-    });
-  const exps = (expenses || [])
-    .filter(e => inRange(e.date, analyticsRange, 'analytics'))
-    .map(e => ({ amount: +e.amount || 0, category: e.category || '' }));
+  const { orders, expenses: exps } = pnlInputsForRange();
 
   if (!orders.length && !exps.length) { toast(t('an.pnl_empty') || 'No data for this period', 'error'); return; }
 

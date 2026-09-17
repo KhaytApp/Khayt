@@ -16,6 +16,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   `"completed"` alone unless the site is listed with a reason, which is how
   this one was found.
 
+- **"Net profit" on the Reports screen was a gross margin.** The figure was
+  revenue less what the parts cost, which leaves out every expense the shop has
+  recorded and the shipping it paid — so the headline read larger than the net
+  profit in the P&L section directly below it, by exactly the expenses it
+  ignored. A shop with rent, filament orders and a machine payment saw a
+  profitable month it had not had. Both figures now come from the same rule
+  (`lib/pnl-report.js`) through one builder, so they cannot disagree again.
+
 - **"Maintenance Cost by Machine" was empty for every shop, always.** The chart
   totalled `machine.machMaintLog` — a per-machine property nothing in Khayt has
   ever written. Services are recorded in the book's own `machMaintLog` list,
