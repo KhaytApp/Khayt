@@ -4287,6 +4287,7 @@ th[data-sort]:hover {
 .source-referral   { background: rgba(34,197,94,0.15);  color: #22c55e; }
 .source-walk_in    { background: rgba(59,130,246,0.15); color: #3b82f6; }
 .source-website    { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.source-online     { background: rgba(6,182,212,0.15);  color: #06b6d4; }
 .source-exhibition { background: rgba(168,85,247,0.15); color: #a855f7; }
 
 /* Order status timeline */

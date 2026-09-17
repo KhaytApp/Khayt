@@ -3296,6 +3296,7 @@
   "cl.source_referral": "Référence",
   "cl.source_walk_in": "Sans rendez-vous",
   "cl.source_website": "Site web",
+  "cl.source_online": "Formulaire en ligne",
   "cl.source_exhibition": "Exposition",
   "cl.source_other": "Autre",
   "an.source_title": "Clients par source",

@@ -3296,6 +3296,7 @@
   "cl.source_referral": "Empfehlung",
   "cl.source_walk_in": "Laufkunde",
   "cl.source_website": "Website",
+  "cl.source_online": "Online-Formular",
   "cl.source_exhibition": "Messe",
   "cl.source_other": "Sonstige",
   "an.source_title": "Kunden nach Herkunft",

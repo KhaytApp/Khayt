@@ -3297,6 +3297,7 @@
   "cl.source_referral": "Indicação",
   "cl.source_walk_in": "Avulso",
   "cl.source_website": "Site",
+  "cl.source_online": "Formulário online",
   "cl.source_exhibition": "Feira",
   "cl.source_other": "Outro",
   "an.source_title": "Clientes por origem",
