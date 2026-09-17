@@ -395,13 +395,23 @@ private struct Card: View {
             // What this machine is due for. Only where the shop has set tasks
             // up: a permanent "no tasks" heading on every printer would be
             // noise on the screen a shop looks at most.
-            if let upkeep, !upkeep.tasks.isEmpty {
+            // Drawn whenever maintenance is ON, not only when tasks exist: the
+            // shop has to be able to create the first one, and a section that
+            // appears only once something is in it is a section nobody can put
+            // anything into. The Mac could read a schedule and never write one,
+            // so a shop whose only app is this one had no schedule at all.
+            if let upkeep {
                 DetailSection(shop.words.callIt("maint.recurring"),
                               accent: Self.worst(upkeep.tasks)) {
                     VStack(alignment: .leading, spacing: 7) {
+                        if upkeep.tasks.isEmpty {
+                            Text(shop.words.callIt("maint.no_tasks"))
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
                         ForEach(upkeep.tasks) { task in
                             Upkeep(task: task, machine: machine, shop: shop)
                         }
+                        AddMaintenanceTask(shop: shop, machine: machine)
                     }
                 }
             }
@@ -466,6 +476,7 @@ struct Upkeep: View {
     let machine: Machine
     let shop: Shop
     @State private var working = false
+    @State private var editing = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -500,6 +511,30 @@ struct Upkeep: View {
             .font(.caption)
             // A sample book is not the shop's to write to.
             .disabled(working || !shop.canMoveJobs)
+            // Changing the interval and stopping the task altogether. Drawn
+            // in the tertiary colour rather than hidden until hover: a
+            // schedule is read far more often than it is edited, so this
+            // should recede — but a control that only appears on hover is one
+            // a shop has to already know is there, and this is the only way to
+            // reach either action.
+            Menu {
+                Button(shop.words.callIt("common.edit")) { editing = true }
+                Button(shop.words.callIt("common.delete"), role: .destructive) {
+                    Task { await shop.deleteMaintenanceTask(task.id) }
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+            .disabled(!shop.canMoveJobs)
+            .accessibilityLabel(shop.words.callIt("common.edit"))
+            .sheet(isPresented: $editing) {
+                MaintenanceTaskSheet(shop: shop, machine: machine, existing: task)
+            }
         }
     }
 

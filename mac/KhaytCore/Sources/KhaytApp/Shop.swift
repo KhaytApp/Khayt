@@ -3583,6 +3583,11 @@ final class Shop {
     /// recomputed when the printers answer, without redoing the whole dashboard.
     private(set) var machineRows: [JSONValue] = []
 
+    /// The tasks, set directly — for tests of what the SIGNATURE does, which
+    /// needs two books that differ by one field and nothing else. A real change
+    /// arrives through `load`, and this does not pretend otherwise.
+    func setMaintTaskRowsForTesting(_ rows: [JSONValue]) { maintTaskRows = rows }
+
     /// `machMaintTasks` as written: what each machine is due for, and when it
     /// was last done. Kept raw because the shared rule reads fields this app
     /// has no model for, and decoding to a Swift struct here would mean
@@ -8578,6 +8583,110 @@ final class Shop {
         }
     }
 
+    /// The machine's hours meter, as the shared rule counts it.
+    ///
+    /// A new task is counted from this reading, so a schedule set up today does
+    /// not open overdue on a printer that has been running for two years.
+    private func machineHours(_ machineId: String) async -> Double {
+        guard let engine else { return 0 }
+        let card = try? await engine.maintenance(
+            machineId: machineId, tasks: maintTaskRows, jobs: orderRows,
+            machine: .object(["id": .string(machineId)]), now: Date())
+        return card?.hours ?? 0
+    }
+
+    /// Set up a recurring maintenance task.
+    ///
+    /// The schedule half of maintenance, which this app could show and tick off
+    /// but never write. A shop whose only app is this one had no way to create
+    /// a task at all, so it had no schedule.
+    func addMaintenanceTask(machineId: String, name: String,
+                            intervalHours: Double, intervalDays: Double) async {
+        writeProblem = nil
+        guard let build = source.build, canMoveJobs else {
+            writeProblem = words.callIt("mac.move_sample"); return
+        }
+        if let problem = MaintenanceTaskEdit.problem(name: name, intervalHours: intervalHours,
+                                                     intervalDays: intervalDays) {
+            writeProblem = words.callIt(problem); return
+        }
+        let hours = await machineHours(machineId)
+        let record = MaintenanceTaskEdit.record(
+            machineId: machineId, name: name, intervalHours: intervalHours,
+            intervalDays: intervalDays, hours: hours,
+            nowIso: StoreWriter.iso(Date()), id: Self.uid("MTASK"))
+        do {
+            try StoreWriter.update(build) { root in
+                var rows: [JSONValue] = []
+                if case .array(let had)? = root[MaintenanceTaskEdit.collection] { rows = had }
+                var stamped = record
+                StoreWriter.stamp(&stamped)
+                rows.append(.object(stamped))
+                root[MaintenanceTaskEdit.collection] = .array(rows)
+            }
+            await load(source)
+        } catch {
+            writeProblem = String(describing: error)
+        }
+    }
+
+    /// Change what a task is called and how often it comes round.
+    ///
+    /// Deliberately does NOT restamp when it was last done: changing "every 100
+    /// hours" to "every 80" says something about the schedule, not that the work
+    /// was just carried out. Restamping would quietly clear a task that is
+    /// overdue at this moment.
+    func editMaintenanceTask(_ taskId: String, name: String,
+                             intervalHours: Double, intervalDays: Double) async {
+        writeProblem = nil
+        guard let build = source.build, canMoveJobs else {
+            writeProblem = words.callIt("mac.move_sample"); return
+        }
+        if let problem = MaintenanceTaskEdit.problem(name: name, intervalHours: intervalHours,
+                                                     intervalDays: intervalDays) {
+            writeProblem = words.callIt(problem); return
+        }
+        do {
+            try StoreWriter.update(build) { root in
+                guard case .array(var rows)? = root[MaintenanceTaskEdit.collection] else { return }
+                for i in rows.indices {
+                    guard case .object(let task) = rows[i],
+                          case .string(let id)? = task["id"], id == taskId else { continue }
+                    var next = MaintenanceTaskEdit.edited(task, name: name,
+                                                          intervalHours: intervalHours,
+                                                          intervalDays: intervalDays)
+                    // Without the stamp the other machine's older copy wins the
+                    // next merge and the interval goes back.
+                    StoreWriter.stamp(&next)
+                    rows[i] = .object(next)
+                }
+                root[MaintenanceTaskEdit.collection] = .array(rows)
+            }
+            await load(source)
+        } catch {
+            writeProblem = String(describing: error)
+        }
+    }
+
+    /// Stop tracking a task. The services already logged against the machine
+    /// stay: a schedule is a plan, and deleting a plan does not unmake the work.
+    func deleteMaintenanceTask(_ taskId: String) async {
+        writeProblem = nil
+        guard let build = source.build, canMoveJobs else {
+            writeProblem = words.callIt("mac.move_sample"); return
+        }
+        do {
+            try StoreWriter.update(build) { root in
+                guard case .array(let rows)? = root[MaintenanceTaskEdit.collection] else { return }
+                root[MaintenanceTaskEdit.collection] =
+                    .array(MaintenanceTaskEdit.removing(taskId, from: rows))
+            }
+            await load(source)
+        } catch {
+            writeProblem = String(describing: error)
+        }
+    }
+
     /// Write down a service: what was done, when, and what it cost.
     ///
     /// The one thing this app could not record about its machines. A shop can
@@ -8775,7 +8884,19 @@ final class Shop {
             var done = "-"
             if case .number(let h)? = task["lastDoneHours"] { done = String(h) }
             if case .string(let at)? = task["lastDoneAt"] { done += "@" + at }
-            return id + ":" + done
+            // ── AND WHAT THE TASK SAYS, NOT ONLY WHEN IT WAS LAST DONE ────
+            //
+            // The name and the intervals are here because they can now be
+            // EDITED. While the schedule could only be written in the other
+            // app, an id and a last-done stamp caught everything this app could
+            // change; the moment it could rename a task or tighten an interval,
+            // a signature blind to both meant the card carried on drawing the
+            // old one until something unrelated moved.
+            var says = ""
+            if case .string(let name)? = task["name"] { says += name }
+            if case .number(let h)? = task["intervalHours"] { says += "/h" + String(h) }
+            if case .number(let d)? = task["intervalDays"] { says += "/d" + String(d) }
+            return id + ":" + done + ":" + says
         }
         return "\(machine.id)|\(meter)|" + marks.sorted().joined(separator: ",")
     }

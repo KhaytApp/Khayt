@@ -273,3 +273,194 @@ struct ServiceEntrySheet: View {
         }
     }
 }
+
+/// Changing a machine's maintenance SCHEDULE, as a rule rather than a closure.
+///
+/// ── THE HALF THE MAC COULD NOT DO ─────────────────────────────────────────
+///
+/// This app could read a shop's recurring tasks, show what each machine was due
+/// for, and tick one off. It could not create one, change an interval, or
+/// delete one — those lived only in the other app's machine editor. So a shop
+/// whose only app is this one could see a maintenance schedule it had no way to
+/// write, which for a Mac-only shop means no schedule at all.
+///
+/// The record's shape is a contract: the other app reads these back, and
+/// `lib/maintenance.js` reads the fields to decide what is due. It is decided
+/// once here rather than inside a store closure, which also makes it testable
+/// without a book on disk to write to.
+enum MaintenanceTaskEdit {
+
+    /// The key the tasks live under, as `renderer/app-state.js` writes it.
+    static let collection = "machMaintTasks"
+
+    /// Why a task cannot be saved yet, or nil when it can.
+    ///
+    /// An interval of nothing is the one worth refusing: `lib/maintenance.js`
+    /// treats a task with neither clock as never due, so it would sit in the
+    /// list for ever looking scheduled and never ask for anything.
+    static func problem(name: String, intervalHours: Double, intervalDays: Double) -> String? {
+        if name.trimmingCharacters(in: .whitespaces).isEmpty { return "maint.need_name" }
+        if intervalHours <= 0 && intervalDays <= 0 { return "maint.need_interval" }
+        return nil
+    }
+
+    /// A new task, counted FROM NOW.
+    ///
+    /// `lastDoneHours` is the machine's meter as it reads today and `lastDoneAt`
+    /// is this moment — so a task created this morning is not instantly overdue
+    /// on a printer that has been running for two years. The other app does the
+    /// same thing for the same reason.
+    static func record(machineId: String, name: String,
+                       intervalHours: Double, intervalDays: Double,
+                       hours: Double, nowIso: String, id: String) -> [String: JSONValue] {
+        [
+            "id": .string(id),
+            "machineId": .string(machineId),
+            "name": .string(name.trimmingCharacters(in: .whitespaces)),
+            // NULL, not zero, for the clock a task does not use. The rule reads
+            // `intervalHours > 0` to decide whether it is hours-driven at all,
+            // and a zero would read the same — but the other app writes null and
+            // these records pass between the two.
+            "intervalHours": intervalHours > 0 ? .number(intervalHours) : .null,
+            "intervalDays": intervalDays > 0 ? .number(intervalDays) : .null,
+            "lastDoneHours": .number(hours),
+            "lastDoneAt": .string(nowIso),
+        ]
+    }
+
+    /// The same task with a new name and intervals, and its history untouched.
+    ///
+    /// Editing an interval must NOT restamp `lastDoneHours`/`lastDoneAt`:
+    /// changing "every 100 hours" to "every 80" is a statement about the
+    /// schedule, not a claim that the work was just done. Restamping would
+    /// quietly clear a task that is overdue right now.
+    static func edited(_ task: [String: JSONValue], name: String,
+                       intervalHours: Double, intervalDays: Double) -> [String: JSONValue] {
+        var next = task
+        next["name"] = .string(name.trimmingCharacters(in: .whitespaces))
+        next["intervalHours"] = intervalHours > 0 ? .number(intervalHours) : .null
+        next["intervalDays"] = intervalDays > 0 ? .number(intervalDays) : .null
+        return next
+    }
+
+    /// Without the task named. Rows this build cannot read are left alone.
+    static func removing(_ taskId: String, from tasks: [JSONValue]) -> [JSONValue] {
+        tasks.filter { row in
+            if case .object(let o) = row, case .string(let id)? = o["id"] { return id != taskId }
+            return true
+        }
+    }
+}
+
+/// Setting up what a machine is due for, and how often.
+///
+/// One sheet for both adding and editing: the fields are the same three, and a
+/// second sheet that differed only in its title is a second place for the
+/// validation to drift.
+struct MaintenanceTaskSheet: View {
+    let shop: Shop
+    let machine: Machine
+    /// The task being changed, or nil to set up a new one.
+    var existing: KhaytEngine.MaintenanceCard.Task?
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name = ""
+    @State private var hours: Double = 0
+    @State private var days: Double = 0
+    @State private var started = false
+
+    static let width: CGFloat = 400
+
+    private var refusal: String? {
+        MaintenanceTaskEdit.problem(name: name, intervalHours: hours, intervalDays: days)
+    }
+
+    var body: some View {
+        let words = shop.words
+        SheetFrame(width: Self.width) {
+            Text(words.callIt(existing == nil ? "mac.mt_new" : "mac.mt_edit")).font(.headline)
+            Text(machine.name).font(.callout).foregroundStyle(.secondary)
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    Text(words.callIt("maint.task_name")).foregroundStyle(.secondary)
+                    TextField(words.callIt("maint.task_ph"), text: $name)
+                        .textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    Text(words.callIt("maint.every_hours")).foregroundStyle(.secondary)
+                    TextField("", value: $hours, format: .number.precision(.fractionLength(0)))
+                        .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 110)
+                }
+                GridRow {
+                    Text(words.callIt("maint.or_days")).foregroundStyle(.secondary)
+                    TextField("", value: $days, format: .number.precision(.fractionLength(0)))
+                        .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 110)
+                }
+            }
+            // ── WHY EITHER CLOCK WILL DO, BUT NOT NEITHER ─────────────────
+            //
+            // A nozzle wears by HOURS and a filter ages by DAYS, so the shop
+            // picks whichever fits and may set both. A task with neither is
+            // read by the shared rule as never due — it would sit in the list
+            // looking scheduled and never ask for anything, which is worse than
+            // refusing to save it.
+            Text(words.callIt("mac.mt_why_interval"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if existing != nil {
+                // Said out loud, because it is the question somebody editing an
+                // interval is actually asking.
+                Text(words.callIt("mac.mt_edit_keeps"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } footer: {
+            HStack {
+                if let refusal { Text(words.callIt(refusal)).font(.caption).foregroundStyle(.secondary) }
+                Spacer()
+                Button(words.callIt("common.cancel")) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button(words.callIt("common.save")) {
+                    let draft = (name, hours, days, existing?.id)
+                    dismiss()
+                    Task {
+                        if let id = draft.3 {
+                            await shop.editMaintenanceTask(id, name: draft.0,
+                                                           intervalHours: draft.1, intervalDays: draft.2)
+                        } else {
+                            await shop.addMaintenanceTask(machineId: machine.id, name: draft.0,
+                                                          intervalHours: draft.1, intervalDays: draft.2)
+                        }
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(refusal != nil)
+            }
+        }
+        .onAppear {
+            guard !started else { return }
+            started = true
+            guard let existing else { return }
+            name = existing.name
+            hours = existing.intervalHours ?? 0
+            days = existing.intervalDays ?? 0
+        }
+    }
+}
+
+/// "Set one up" — the button a machine with no schedule needs most.
+struct AddMaintenanceTask: View {
+    let shop: Shop
+    let machine: Machine
+    @State private var adding = false
+
+    var body: some View {
+        Button(shop.words.callIt("mac.mt_new")) { adding = true }
+            .buttonStyle(.borderless).font(.caption)
+            // A sample book is not the shop's to write to.
+            .disabled(!shop.canMoveJobs)
+            .sheet(isPresented: $adding) {
+                MaintenanceTaskSheet(shop: shop, machine: machine)
+            }
+    }
+}
