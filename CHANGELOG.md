@@ -5,6 +5,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 ### Changed
+- **(Mac) The Reports target was measured against a different set of jobs than
+  the figure beside it.** The monthly target on the Reports screen said it
+  counted finished, unvoided business — and filtered `completed` alone. The
+  quarters drawn beside it come from the shared profit rule, which counts a
+  legacy `delivered` job as finished too, so a shop that had marked work
+  delivered was comparing a target built from some of its jobs against an
+  actual built from all of them. Both sets are the same now. A test also scans
+  every Swift file the app is built from and fails on a status compared against
+  `"completed"` alone unless the site is listed with a reason, which is how
+  this one was found.
+
 - **"Maintenance Cost by Machine" was empty for every shop, always.** The chart
   totalled `machine.machMaintLog` — a per-machine property nothing in Khayt has
   ever written. Services are recorded in the book's own `machMaintLog` list,
