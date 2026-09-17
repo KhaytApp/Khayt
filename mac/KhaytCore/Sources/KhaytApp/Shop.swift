@@ -427,7 +427,7 @@ final class Shop {
             // What the shop has spent SERVICING its machines. `hub_maint_log_v1`
             // is the key `renderer/app-state.js` writes it under; it is read
             // here and nowhere else, by the machine P&L.
-            if case .array(let serviced)? = root["hub_maint_log_v1"] {
+            if case .array(let serviced)? = root[ServiceLogEdit.collection] {
                 maintenanceRows = serviced
             } else { maintenanceRows = [] }
             clients = Self.decodeClients(root)
@@ -8500,6 +8500,10 @@ final class Shop {
                 task: task, hours: card.hours, at: Date())
         else { return }
 
+        // What the task is called, for the line this writes in the log.
+        var taskName = ""
+        if case .object(let o) = task, case .string(let n)? = o["name"] { taskName = n }
+
         do {
             try StoreWriter.update(build) { root in
                 guard case .array(var rows)? = root["machMaintTasks"] else { return }
@@ -8513,8 +8517,108 @@ final class Shop {
                     rows[i] = .object(record)
                 }
                 root["machMaintTasks"] = .array(rows)
+
+                // ── AND THE SERVICE ITSELF ────────────────────────────────
+                //
+                // The schedule says a nozzle is due; the log says one was
+                // changed. Only the second is a history, and this app used to
+                // write only the first — so a shop that did its servicing here
+                // and read it in Khayt found no record of any of it, and the
+                // maintenance figures totalled nothing however much work had
+                // been done. The other app has always written both.
+                //
+                // At no cost. Marking a task done is one click and the shop is
+                // standing at the machine, not holding a receipt; what it cost
+                // is typed into the entry afterwards, which is also how Khayt
+                // does it.
+                var log: [JSONValue] = []
+                if case .array(let had)? = root[ServiceLogEdit.collection] { log = had }
+                var entry = ServiceLogEdit.entry(machineId: machine.id, day: Self.localDay(),
+                                                 note: taskName, cost: 0,
+                                                 id: Self.uid("MAINT"))
+                StoreWriter.stamp(&entry)
+                root[ServiceLogEdit.collection] = .array(ServiceLogEdit.appending(entry, to: log))
             }
             writeProblem = nil
+            await load(source)
+        } catch {
+            writeProblem = String(describing: error)
+        }
+    }
+
+    /// Write down a service: what was done, when, and what it cost.
+    ///
+    /// The one thing this app could not record about its machines. A shop can
+    /// see what its printers are due for and tick them off, and until now none
+    /// of that reached the figures — because the figures come from this log and
+    /// nothing here wrote to it.
+    func addServiceEntry(machineId: String, date: Date, note: String, cost: Double,
+                         alsoAnExpense: Bool) async {
+        writeProblem = nil
+        guard let build = source.build, canMoveJobs else {
+            writeProblem = words.callIt("mac.move_sample"); return
+        }
+        let said = note.trimmingCharacters(in: .whitespaces)
+        guard !said.isEmpty else {
+            writeProblem = words.callIt("maint.need_note"); return
+        }
+        let day = Self.localDay(date)
+        let paid = max(0, cost)
+        let name = machines.first { $0.id == machineId }?.name ?? machineId
+        do {
+            try StoreWriter.update(build) { root in
+                var log: [JSONValue] = []
+                if case .array(let had)? = root[ServiceLogEdit.collection] { log = had }
+                var entry = ServiceLogEdit.entry(machineId: machineId, day: day,
+                                                 note: said, cost: paid,
+                                                 id: Self.uid("MAINT"))
+                StoreWriter.stamp(&entry)
+                root[ServiceLogEdit.collection] = .array(ServiceLogEdit.appending(entry, to: log))
+
+                // ── AND, IF ASKED, THE EXPENSE ────────────────────────────
+                //
+                // OPT IN, never automatic, and this is the reason: a machine's
+                // profit already has its servicing subtracted from it, so a
+                // shop that also books the repair as an expense has charged
+                // itself twice. Which of the two a shop wants is a question
+                // about how it keeps its books, so it is asked rather than
+                // decided here — the other app asks it the same way.
+                guard alsoAnExpense, paid > 0 else { return }
+                var expenses: [JSONValue] = []
+                if case .array(let had)? = root["expenses"] { expenses = had }
+                var expense: [String: JSONValue] = [
+                    "id": .string(Self.uid("EXP")),
+                    "date": .string(day),
+                    "category": .string("maintenance"),
+                    "amount": .number(paid),
+                    "note": .string("\(name): \(said)"),
+                ]
+                StoreWriter.stamp(&expense)
+                expenses.insert(.object(expense), at: 0)
+                root["expenses"] = .array(expenses)
+            }
+            await load(source)
+        } catch {
+            writeProblem = String(describing: error)
+        }
+    }
+
+    /// Take one service out of the log.
+    ///
+    /// The entry only. An expense written beside it is left alone: it is a
+    /// record of money that left the shop, the shop's accountant may already
+    /// have seen it, and deleting a line from a maintenance history is not a
+    /// statement that the money was never spent.
+    func deleteServiceEntry(_ entryId: String) async {
+        writeProblem = nil
+        guard let build = source.build, canMoveJobs else {
+            writeProblem = words.callIt("mac.move_sample"); return
+        }
+        do {
+            try StoreWriter.update(build) { root in
+                guard case .array(let log)? = root[ServiceLogEdit.collection] else { return }
+                root[ServiceLogEdit.collection] = .array(ServiceLogEdit.removing(entryId, from: log))
+            }
             await load(source)
         } catch {
             writeProblem = String(describing: error)

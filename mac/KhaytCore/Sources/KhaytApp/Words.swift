@@ -618,6 +618,18 @@ final class Words {
                               "ar": "لم تُسجَّل صيانة على أي آلة في {year}."],
         "mac.mc_sold":       ["en": "This machine is no longer in the fleet — the cost is kept because the money still left the shop.",
                               "ar": "لم تعد هذه الآلة ضمن الأسطول — أُبقيت التكلفة لأن المال خرج فعلاً."],
+        // The service log — what was DONE to a machine, as against the
+        // schedule above it saying what it is due for.
+        "mac.sl_add":        ["en": "Record a service",
+                              "ar": "تسجيل صيانة"],
+        "mac.sl_total":      ["en": "Spent on this machine",
+                              "ar": "أُنفق على هذه الآلة"],
+        "mac.sl_more":       ["en": "and {n} earlier",
+                              "ar": "و{n} أقدم"],
+        "mac.sl_as_expense": ["en": "Also record this as an expense",
+                              "ar": "سجِّلها أيضاً كمصروف"],
+        "mac.sl_as_expense_why": ["en": "This machine's profit already has its servicing taken off it, so recording the repair as an expense as well counts the money twice. Tick this only if you keep maintenance in your expenses.",
+                              "ar": "رِبح هذه الآلة مخصوم منه أصلاً تكلفة صيانتها، لذا تسجيل الإصلاح كمصروف أيضاً يحتسب المبلغ مرتين. علِّم هذا فقط إن كنت تُدرج الصيانة ضمن مصروفاتك."],
         "mac.ec_reclaimed":  ["en": "{amount} of tax on these is reclaimable, so it is not charged as a cost.",
                               "ar": "{amount} من الضريبة على هذه قابلة للاسترداد، لذا لا تُحتسب تكلفةً."],
         // Report builder — the shared catalogue has the screen's own words

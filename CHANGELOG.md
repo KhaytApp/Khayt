@@ -867,6 +867,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) A service can be written down: what was done to a machine, when, and
+  what it cost.** This app could show what each printer was due for and let you
+  tick a task off, and none of that reached the record. Marking a nozzle change
+  done updated the schedule and wrote nothing to the service log — so a shop
+  doing its servicing here had no history of any of it when it looked in Khayt,
+  and every maintenance figure in both apps counted none of it: the machine
+  P&L subtracts these costs from a printer's profit, and the Reports chart
+  totals them. Ticking a task off now records the service as well, the way
+  Khayt has always done it, and each machine has a log you can add to and
+  delete from. Recording a repair as an expense too is offered and off by
+  default, because a machine's profit already has its servicing taken off it
+  and doing both counts the money twice.
+
 - **(Mac) Reports draws four figures it had no screen for: expenses by
   category, where customers came from, what they thought of the work, and what
   servicing each machine cost.** The rules behind all four were written and

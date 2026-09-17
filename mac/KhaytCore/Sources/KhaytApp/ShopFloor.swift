@@ -405,6 +405,17 @@ private struct Card: View {
                     }
                 }
             }
+
+            // ── AND WHAT WAS ACTUALLY DONE ────────────────────────────────
+            //
+            // Behind the same gate as the schedule above, and shown even when
+            // the shop has set no recurring tasks: a machine can be serviced
+            // without anybody having scheduled it, and that service is still
+            // the thing every maintenance figure in the app is counted from.
+            // `upkeep` is non-nil only once the feature check has passed.
+            if upkeep != nil {
+                ServiceLog(shop: shop, machine: machine)
+            }
         }
         // Machine maintenance and downtime is a Professional feature; the
         // other app hides the whole of it from a Simple shop. Not asked for
