@@ -296,7 +296,6 @@ public actor KhaytEngine {
         "maintenance-cost",
         "rating-trend",
         "client-sources",
-        "expense-categories",
         // What a finished job takes off the shelf: the grams, the hourly
         // consumables, the bought-in components, the packaging. Lifted out of
         // renderer/inventory.js because the move being shared is not enough —
@@ -338,6 +337,15 @@ public actor KhaytEngine {
         // WORKING-WEEK FIRST: order-new estimates a due date from it and reaches
         // it through a global, so listing it after would give every new job a
         // default eight-hour day instead of the shop's own.
+        //
+        // PORTED, AND STILL BUNDLED. `WorkingWeek` in Swift is what this app
+        // asks, but `order-new.js` and `lead-time-publish.js` still read
+        // `KhaytWorkingWeek` at run time, and removing it gave every new job a
+        // due date two days out — silently, because an undefined global reads
+        // as a missing setting rather than as an error. Caught by
+        // `UnbundlingIsSafeTests`, which exists for exactly this, and confirmed
+        // by `NewOrderParityTests`. It leaves the bundle when its last two
+        // JavaScript readers are ported, and not before.
         "working-week",
         // When each queued job will actually be READY, and which will miss
         // their due date because of it. `working-week` first: the day rate this
@@ -389,7 +397,6 @@ public actor KhaytEngine {
         // records fall in "this month". The three rules the Expenses, Waste
         // and Reports screens are built on; each was inline in a renderer
         // handler before, which is why only the Electron window had them.
-        "date-range",
         "expense-book",
         "waste-entry",
         // A spool, as the shelf records it, and what correcting one means.
@@ -2029,13 +2036,7 @@ public actor KhaytEngine {
     /// through a weekend still takes those days off the calendar, and a
     /// delivery date is a calendar date. Eight when the shop has not said.
     public func dailyWorkingHours(settings: [String: JSONValue]) throws -> Double {
-        try runtime.call2("""
-            (function (settings) {
-              const wh = KhaytWorkingWeek.workingHours(settings);
-              const total = Object.values(wh).reduce((s, h) => s + (h > 0 ? h : 0), 0);
-              return total > 0 ? total / 7 : 8;
-            })(ARG0)
-            """, [.object(settings)], as: Double.self)
+        WorkingWeek.dailyWorkingHours(settings: .object(settings))
     }
 
     public func timeline(jobs: [JSONValue], dailyHours: Double,
@@ -3836,14 +3837,7 @@ public actor KhaytEngine {
     /// Which days the shop works, by `getDay()` index — `working-week` reading
     /// the settings, so the two apps agree about the weekend.
     public func openDays(settings: [String: JSONValue]) throws -> [Bool] {
-        try runtime.call2(#"""
-        (function (s) {
-          var wh = globalThis.KhaytWorkingWeek.workingHours(s);
-          return ['sun','mon','tue','wed','thu','fri','sat'].map(function (k) {
-            return (wh[k] || 0) > 0;
-          });
-        })(ARG0)
-        """#, [.object(settings)], as: [Bool].self)
+        WorkingWeek.openDays(settings: .object(settings))
     }
 
     // MARK: - Which machine is costing the shop
@@ -5008,9 +5002,7 @@ public actor KhaytEngine {
     /// Whether a record's date falls in a period — the same rule every list in
     /// Khayt filters through.
     public func inRange(_ date: String, period: String, now: Date) throws -> Bool {
-        try runtime.call2("KhaytDateRange.inRange(ARG0, ARG1, {now: new Date(ARG2)})",
-                          [.string(date), .string(period), .number(now.timeIntervalSince1970 * 1000)],
-                          as: Bool.self)
+        DateRange.inRange(date, range: period, now: now)
     }
 
     /// One expense, as the book records it. `refused` names the field when the
@@ -5335,12 +5327,19 @@ public actor KhaytEngine {
                          settings: [String: JSONValue], currencies: [String: JSONValue],
                          language: String, period: String, limit: Int = 8,
                          now: Date = Date()) throws -> TopLists {
-        try runtime.call2(
-            "(function (orders, ctx, period, at, limit) {"
-          + "  var now = new Date(at);"
-          + "  var ranged = orders.filter(function (o) {"
-          + "    return o && KhaytDateRange.inRange(o.date, period, { now: now });"
-          + "  });"
+        // THE PERIOD IS FILTERED HERE, in `DateRange`, and the rest of the
+        // rollup stays where it is. Which orders fall in a period is now a
+        // Swift answer and which count as trade is still `business-scope`'s —
+        // one rule each, and neither app has a second opinion about who a
+        // shop's biggest customer is.
+        let ranged = orders.filter { row in
+            // `o && …` — a row that is not an object has no `date`, and the
+            // original's guard drops it either way.
+            guard case .object(let o) = row else { return false }
+            return DateRange.inRange(o["date"], range: period, now: now)
+        }
+        return try runtime.call2(
+            "(function (ranged, ctx, period, at, limit) {"
           + "  var completed = ranged.filter(function (o) {"
           + "    return o.status === 'completed' && !o.voidedAt"
           + "        && KhaytBusinessScope.countsForBusiness(o);"
@@ -5349,7 +5348,7 @@ public actor KhaytEngine {
           + "           products: KhaytTopLists.topProducts(ranged, ctx, { limit: limit }) };"
           + "})(ARG0, {settings: ARG1, clients: ARG2, products: ARG3, currencies: ARG4, language: ARG5},"
           + "   ARG6, ARG7, ARG8)",
-            [.array(orders), .object(settings), .array(clients), .array(products),
+            [.array(ranged), .object(settings), .array(clients), .array(products),
              .object(currencies), .string(language), .string(period),
              .number(now.timeIntervalSince1970 * 1000), .number(Double(limit))],
             as: TopLists.self)
@@ -6904,6 +6903,10 @@ public actor KhaytEngine {
     /// registered shop actually bore, which is what made this disagree with the
     /// P&L before it was lifted.
     public struct ExpenseCategoryRow: Decodable, Sendable {
+        public init(category: String, amount: Double, reclaimed: Double, share: Double) {
+            self.category = category; self.amount = amount
+            self.reclaimed = reclaimed; self.share = share
+        }
         public let category: String
         /// What the shop BORE under this category — already net of any tax it
         /// reclaimed, which is the whole point of the rule.
@@ -6919,6 +6922,10 @@ public actor KhaytEngine {
     /// up itself would get a different total the first time a book nets
     /// negative, and then there would be two answers to one question.
     public struct Spending: Decodable, Sendable {
+        public init(rows: [ExpenseCategoryRow], total: Double, reclaimed: Double, biggest: Double) {
+            self.rows = rows; self.total = total
+            self.reclaimed = reclaimed; self.biggest = biggest
+        }
         public let rows: [ExpenseCategoryRow]
         public let total: Double
         public let reclaimed: Double
@@ -6926,8 +6933,11 @@ public actor KhaytEngine {
     }
     public func expenseCategories(_ expenses: [JSONValue], reclaimsTax: Bool)
         throws -> Spending {
-        try runtime.call2("globalThis.KhaytExpenseCategories.byCategory(ARG0, { reclaimsTax: ARG1 })",
-                          [.array(expenses), .bool(reclaimsTax)], as: Spending.self)
+        let spending = ExpenseCategories.byCategory(expenses, reclaimsTax: reclaimsTax)
+        return Spending(rows: spending.rows.map {
+            ExpenseCategoryRow(category: $0.category, amount: $0.amount,
+                               reclaimed: $0.reclaimed, share: $0.share)
+        }, total: spending.total, reclaimed: spending.reclaimed, biggest: spending.biggest)
     }
 
     /// Which signal `moonrakerProgress` chose — so a test can hold the screen's
