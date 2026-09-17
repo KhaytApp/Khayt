@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import WebKit
+import CoreSpotlight
 import KhaytCore
 
 /// Not `@main`: `main.swift` is the entry point, because the writing direction
@@ -110,6 +111,22 @@ struct KhaytApp: App {
                     await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
                 }
 
+                // CHOOSING A MODEL IN SPOTLIGHT OPENS IT HERE.
+                //
+                // On the window rather than the App, because this has to reach
+                // the shop the window is showing: the activity carries a record
+                // id and nothing else, and `reveal` is the only thing that
+                // knows how to make that record visible.
+                //
+                // The book may not be open yet — a Spotlight result can be what
+                // LAUNCHES the app — so the request is held and retried once
+                // the library has rows. Without that, the very first thing a
+                // person ever does with this feature does nothing.
+                .onContinueUserActivity(CSSearchableItemActionType) { activity in
+                    guard let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+                          let record = Spotlight.recordId(forItem: id) else { return }
+                    shop.revealWhenLoaded(fileId: record)
+                }
         }
         // Wide enough that all six columns are on screen with the inspector
         // open, which is how the window opens. At 1180 the table was given

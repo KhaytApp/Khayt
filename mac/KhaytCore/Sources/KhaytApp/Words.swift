@@ -795,6 +795,12 @@ final class Words {
         "mac.labels_count_one": ["en": "label",       "ar": "ملصق"],
         "mac.labels_count_two": ["en": "labels", "ar": "ملصقان"],
 
+        // The library in this Mac's own search.
+        "mac.spotlight":     ["en": "Find models in Spotlight",
+                              "ar": "البحث عن النماذج في Spotlight"],
+        "mac.spotlight_note": ["en": "Model names, projects and tags only — never jobs or customers.",
+                               "ar": "أسماء النماذج والمشاريع والوسوم فقط — لا الطلبات ولا العملاء."],
+
         "mac.reading_file":   ["en": "Reading the file…", "ar": "جارٍ قراءة الملف…"],
         // The library's grouping menu.
         "mac.pick_a_model":  ["en": "Select a model first", "ar": "اختر نموذجًا أولًا"],

@@ -741,6 +741,7 @@ struct PreferencesPane: View {
     @State private var draft = Draft()
     @State private var original = Draft()
     @AppStorage("mac.menuBar") private var menuBar = true
+    @AppStorage(Spotlight.defaultsKey) private var spotlight = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -773,6 +774,19 @@ struct PreferencesPane: View {
                             if on { FloorStatus.shared.install(shop: shop) }
                             else { FloorStatus.shared.remove() }
                         }
+                    // SWITCHING THIS OFF HAS TO UNDO IT.
+                    //
+                    // A toggle that stops adding to an index but leaves what is
+                    // already in it is not an off switch, it is a pause — and
+                    // the person reaching for it wants their library out of
+                    // their Mac's search, today.
+                    Toggle(shop.words.callIt("mac.spotlight"), isOn: $spotlight)
+                        .onChange(of: spotlight) { _, on in
+                            if on { Spotlight.shared.reindex(shop: shop) }
+                            else { Spotlight.shared.forget() }
+                        }
+                    Text(shop.words.callIt("mac.spotlight_note"))
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Section(shop.words.callIt("set.locale_section")) {
                     Toggle(shop.words.callIt("set.use_hijri"), isOn: $draft.useHijri)

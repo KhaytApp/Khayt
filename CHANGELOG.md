@@ -885,6 +885,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) The print library is in Spotlight.** This shop keeps 209 models in 13
+  projects, and finding one meant opening Khayt, going to the library and
+  typing. A Mac already has a search box one keystroke from anywhere, and an
+  app holding hundreds of things that puts none of them in it is asking to be
+  opened before it can be useful. Every model is now a result — its name, its
+  project, its material, its tags and its thumbnail — and choosing one opens
+  Khayt on that model with it selected, clearing whatever the library happened
+  to be filtered to. A result that brings the app forward onto a grid not
+  containing what was picked would be worse than no result, so that is the half
+  the tests are mostly about.
+
+  Model names, projects and tags only: jobs carry customer names and prices,
+  and putting those into a system-wide index is a decision for a shop to make
+  rather than one to be surprised by. The sample book is never indexed either —
+  nobody wants "Benchy" in their Mac's search because they once looked at the
+  demo. There is a switch in Settings under "On this Mac", and switching it off
+  empties what has already been indexed rather than merely stopping.
+
 - **(Mac) A photo of the finished print can be added to a model.** Khayt has
   always preferred a photograph over the generated preview when showing a model
   — it is the print as it came off the bed, which is what somebody is trying to
