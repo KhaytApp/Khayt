@@ -87,6 +87,7 @@
 "status.qc" = "فحص الجودة";
 "status.completed" = "مكتمل";
 "status.delivered" = "تم التسليم";
+"status.shipped" = "تم الشحن";
 "status.on_hold" = "معلق";
 
 /* Lang */

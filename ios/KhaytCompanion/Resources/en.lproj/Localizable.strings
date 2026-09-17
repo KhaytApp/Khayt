@@ -87,6 +87,7 @@
 "status.qc" = "QC";
 "status.completed" = "Completed";
 "status.delivered" = "Delivered";
+"status.shipped" = "Shipped";
 "status.on_hold" = "On hold";
 
 /* Lang */
