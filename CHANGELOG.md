@@ -2555,6 +2555,72 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.24] - 2026-09-18
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Sixteen changes, and three of them are faults that were shipping quietly.
+
+### Added
+
+- **The print library is in Spotlight.** Two hundred models in a dozen
+  projects, and finding one meant opening Khayt first. Every model is a search
+  result now — its name, its project, what it is made of, its tags and its
+  picture — and choosing one opens Khayt on that model with it selected,
+  clearing whatever the library happened to be filtered to. Model names,
+  projects and tags only: jobs carry customer names and prices, and putting
+  those into a Mac-wide index is a decision for a shop to make rather than one
+  to be surprised by. There is a switch in Settings under "On this Mac", and
+  switching it off empties what has already been indexed rather than merely
+  stopping.
+
+- **The shop's own saved messages can be sent from here.** Khayt has always let
+  a shop write its own WhatsApp messages, and nothing on the Mac could read
+  them. Now: pick one on a job, see it filled in with that job's facts, change
+  anything, and WhatsApp opens with the number and the message ready. Nothing
+  is sent without a person pressing send.
+
+### Fixed
+
+- **Every repair typed into the Mac went into a field nothing reads, and the
+  machine P&L charged no maintenance at all.** The service log was written
+  under the name the other app keeps it under *in the browser's own storage* —
+  not the name it uses in the shop's book. So a nozzle change logged here never
+  appeared in Khayt, and the figure that decides whether a printer is worth
+  keeping was missing every riyal a shop had spent servicing it. Repairs
+  already typed into an earlier alpha are moved into the right place the next
+  time the book is opened.
+
+- **Siri and Shortcuts have never seen Khayt's two shortcuts.** The step that
+  publishes them was looking in the wrong folder on every build since it was
+  written, and printed a line about it that read like a known limitation. Both
+  reach the system now.
+
+- **The biggest figure on the main screen was a permanent dash.** The
+  masthead's largest slot is labelled with the month and the word NET, and it
+  printed an em dash on every shop, every month. It now comes from the same
+  rule Reports prints, given the same settings, so the two cannot disagree; the
+  dash is kept for a book that has not loaded and for a month with nothing in
+  it.
+
+### Changed
+
+- **Ten of Khayt's shared rules now run natively.** The Mac app has always run
+  Khayt's business rules as the same code the Windows app runs, so that the two
+  could not disagree. Those rules are being rewritten in Swift, and what makes
+  that safe is a harness that runs every rewritten rule side by side with the
+  original over thousands of generated inputs and fails the build on the first
+  disagreement. It has caught six faults in the new code that no ordinary test
+  would have noticed — including a working week stored in a shape one app read
+  as "closed all week" and the other as "open every day", which would have
+  moved every date the shop quoted.
+
+  Three faults in the ORIGINALS came out of the same work: a label sheet could
+  print `function sub() { [native code] }` onto a label, a saved message could
+  be rewritten by a customer's own name, and a shop with an expense category
+  recorded as a number lost its whole spending panel.
+
 ## [4.0.0-alpha.23] - 2026-09-17
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
