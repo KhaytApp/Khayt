@@ -84,6 +84,7 @@ function loadAnalyticsStack() {
   require('../lib/working-week.js'); // globalThis.KhaytWorkingWeek, which it reads the open days from
   require('../lib/supplier-prices.js'); // globalThis.KhaytSupplierPrices
   require('../lib/maintenance-cost.js'); // globalThis.KhaytMaintenanceCost
+  require('../lib/rating-trend.js'); // globalThis.KhaytRatingTrend
   // Both are reached only once a book has an expense in it, which is why they
   // were missing here until a test seeded one.
   require('../lib/expense-categories.js'); // globalThis.KhaytExpenseCategories
@@ -277,6 +278,54 @@ test('renderAnalytics: the "Net profit" KPI is net of expenses, like the P&L bel
   ]);
   assert.equal(lastYear, withNoExpenses,
     'an expense outside the selected range is not this period\'s cost');
+});
+
+test('renderNpsTrendChart: the caption describes the six months drawn above it', () => {
+  loadAnalyticsStack();
+  const now = new Date();
+  const m = back => {
+    const d = new Date(now.getFullYear(), now.getMonth() - back, 15, 12);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const rated = (month, rating) => ({
+    id: `O${month}${rating}`, status: 'completed', date: `${month}-15`,
+    completedAt: `${month}-15T12:00:00.000Z`, survey: { rating }, printTime: 1, price: 10,
+  });
+
+  dom.seedState({
+    settings: { currency: 'SAR', fixedCosts: [] },
+    printLog: [
+      // Two years ago, when the shop was worse. Off the left of the chart.
+      rated('2024-03', 1), rated('2024-04', 1), rated('2024-05', 1),
+      // The window: three fives.
+      rated(m(0), 5), rated(m(1), 5), rated(m(2), 5),
+    ],
+  });
+  global.renderNpsTrendChart();
+  const html = $('#npsTrendChart').innerHTML;
+
+  assert.ok(html.includes('5.0 / 5'),
+    'the average under a line of 5.0 dots must be 5.0, not the all-time 3.0');
+  assert.ok(html.includes('>3 '), 'three responses fall in the window, not six');
+  assert.ok(!html.includes('3.0 / 5'));
+});
+
+test('renderNpsTrendChart: a rating on a job with no completedAt still counts', () => {
+  loadAnalyticsStack();
+  const now = new Date();
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  dom.seedState({
+    settings: { currency: 'SAR', fixedCosts: [] },
+    printLog: [1, 2, 3].map(i => ({
+      // A legacy delivered job: rated, and carrying no completedAt at all.
+      id: `L${i}`, status: 'delivered', date: `${month}-0${i}`,
+      survey: { rating: 4 }, printTime: 1, price: 10,
+    })),
+  });
+  global.renderNpsTrendChart();
+  const html = $('#npsTrendChart').innerHTML;
+  assert.ok(!html.includes('No data yet'), 'three real ratings were being thrown away');
+  assert.ok(html.includes('4.0 / 5'));
 });
 
 // --- Arg-taking HTML builders -------------------------------------------------
