@@ -1676,6 +1676,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) An empty Utilisation column said nothing about why it was empty.**
+  Hours run against hours wanted needs somebody to have said what was wanted,
+  and a machine has no target hours a day until you fill one in — so every row
+  showed a dash, correctly and unhelpfully. A column of dashes reads as a figure
+  the app could not work out rather than one it was never given, and the field's
+  own hint is on the machine sheet, not on Reports. It says so now, once, under
+  the table, and only while no machine has a target at all.
+
+
 - **(Mac) A device on the shop's Wi-Fi could hold the LAN server's connections
   open indefinitely.** A client that connected and then said nothing — or
   announced a body and never sent it — was waited on for ever: no answer, no

@@ -636,6 +636,8 @@ final class Words {
                               "ar": "ساعات التشغيل"],
         "mac.mpl_estimated": ["en": "{n} estimated",
                               "ar": "{n} تقديري"],
+        "mac.mpl_no_target": ["en": "Utilisation is blank because no machine has target hours a day set — add it on a machine to see how hard it is working against what you wanted.",
+                              "ar": "الاستغلال فارغ لأنه لم تُحدَّد ساعات مستهدفة يومياً لأي آلة — أضفها على آلة لترى مدى تشغيلها مقابل ما أردته."],
         // Setting up what a machine is due for — the schedule half of
         // maintenance, which this app could read and never write.
         "mac.mt_new":        ["en": "Add a task",

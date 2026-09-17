@@ -297,3 +297,67 @@ struct ClientSourceFieldTests {
         #expect(client.source == "")
     }
 }
+
+/// The line that explains an empty utilisation column.
+///
+/// `targetHoursPerDay` is unset on a machine until somebody fills it in, and
+/// every row then shows an em dash — correctly, and with nothing to say why. A
+/// column of dashes reads as a figure the app failed to work out rather than
+/// one it was never given, and the field's own hint lives on the machine sheet
+/// rather than here.
+///
+/// The sample shop sets a target on all five machines, so it can never reach
+/// this. That is right — it is a shop that has been running for a while — but
+/// it means the branch has to be driven deliberately or it is a branch nobody
+/// has seen.
+@MainActor
+struct UtilisationHintTests {
+
+    private func report(targets: Bool) async throws -> KhaytEngine.MachineProfitReport {
+        let engine = try KhaytEngine()
+        var machine: [String: JSONValue] = ["id": .string("m1"), "name": .string("U1")]
+        if targets { machine["targetHoursPerDay"] = .number(8) }
+        return try await engine.machineProfit(
+            machines: [.object(machine)],
+            completed: [.object(["id": .string("a"), "machineId": .string("m1"),
+                                 "status": .string("completed"), "price": .number(100),
+                                 "printTime": .number(9)])],
+            expenses: [], maintenance: [], settings: [:], clients: [],
+            unassigned: "Unassigned", days: 30)
+    }
+
+    @Test("the line appears only when NO machine has a target")
+    func onlyWhenNothingIsSet() async throws {
+        #expect(MachineProfitPage.noTargetsAnywhere(try await report(targets: false)),
+                "a shop with no targets gets a column of dashes and no explanation")
+        #expect(!MachineProfitPage.noTargetsAnywhere(try await report(targets: true)),
+                "a shop that has set its targets is told about a field it has used")
+    }
+
+    @Test("an empty page says nothing about targets")
+    func nothingUnderNothing() async throws {
+        // The page draws its own empty state when no machine finished anything,
+        // and a note under that is a note about a table nobody is looking at.
+        let engine = try KhaytEngine()
+        let empty = try await engine.machineProfit(
+            machines: [.object(["id": .string("m1"), "name": .string("U1")])],
+            completed: [], expenses: [], maintenance: [], settings: [:], clients: [],
+            unassigned: "Unassigned", days: 30)
+        #expect(empty.rows.isEmpty)
+        #expect(!MachineProfitPage.noTargetsAnywhere(empty))
+    }
+
+    @Test("the sample shop never sees it, because it has set its targets")
+    func theSampleIsAMatureShop() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let done = await shop.completedInPeriod()
+        let report = try await engine.machineProfit(
+            machines: shop.machineRows, completed: done.orders, expenses: done.expenses,
+            maintenance: done.maintenance, settings: shop.settingsDict,
+            clients: shop.clientRows, unassigned: "Unassigned",
+            days: shop.periodDays())
+        #expect(!MachineProfitPage.noTargetsAnywhere(report))
+    }
+}
