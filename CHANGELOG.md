@@ -877,7 +877,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   asks instead: the addresses around the one the machine used to be on, nearest
   first, on the ports Khayt already speaks. Only the machines that have actually
   gone quiet, only their own corner of the network, a short question each, and
-  never on a timer — it happens when you press the button and not otherwise.
+  never on a timer — it happens when you press the button and not otherwise. The
+  button says which of the two it is doing, because listening takes a second and
+  asking takes rather longer.
 
 
 - **(Mac) A machine's maintenance schedule can be set up here.** Khayt could
