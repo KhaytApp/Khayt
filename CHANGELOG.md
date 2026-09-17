@@ -868,6 +868,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A photo of the finished print can be added to a model.** Khayt has
+  always preferred a photograph over the generated preview when showing a model
+  — it is the print as it came off the bed, which is what somebody is trying to
+  recognise — and there was no way to take one here: a photo could only be
+  attached in the Windows app. Drop a picture on the model's page or choose one.
+  It is stored exactly as Khayt stores it, so a photo added here is one the
+  other app draws without knowing where it came from.
+
+
 - **(Mac) Khayt can find a printer that moved and never announced itself.**
   "Find moved printers" listened for printers advertising themselves on the
   network, which is how most of them are found — and a Snapmaker U1 advertises

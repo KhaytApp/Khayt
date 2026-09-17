@@ -61,6 +61,8 @@ struct LibraryInspector: View {
                         LayerRule()
                         SetupsSection(setups: setups, shop: shop)
                     }
+                    LayerRule()
+                    PhotoSection(shop: shop, file: file)
                     provenance(file)
                     actions(file)
             if let notes = file.testedNotes, !notes.isEmpty {
