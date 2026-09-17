@@ -5,6 +5,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 ### Changed
+- **"Maintenance Cost by Machine" was empty for every shop, always.** The chart
+  totalled `machine.machMaintLog` — a per-machine property nothing in Khayt has
+  ever written. Services are recorded in the book's own `machMaintLog` list,
+  which is where the machine screen reads them from and shows them correctly.
+  So a shop could log every nozzle, belt and PTFE tube it ever replaced and the
+  Reports chart would still say "No data yet". It reads the real list now. Two
+  smaller things came with it: the year was read with `new Date(...).getFullYear()`,
+  which put a 1 January service in the previous year for any shop west of UTC,
+  and is now compared as a string like every other date in Khayt; and money
+  spent on a machine the shop has since deleted is kept and labelled by its id
+  rather than dropped, because the money left the shop either way. The rule is
+  `lib/maintenance-cost.js`.
+
 - **Supplier price history compares like with like now.** A purchase records
   the unit it was bought in — spool, kg, g, L, piece, roll, box — but the
   price trend and the "best price" table grouped only by material type, so a

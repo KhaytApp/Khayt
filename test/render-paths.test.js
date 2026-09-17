@@ -83,6 +83,7 @@ function loadAnalyticsStack() {
   require('../lib/throughput.js');   // globalThis.KhaytThroughput
   require('../lib/working-week.js'); // globalThis.KhaytWorkingWeek, which it reads the open days from
   require('../lib/supplier-prices.js'); // globalThis.KhaytSupplierPrices
+  require('../lib/maintenance-cost.js'); // globalThis.KhaytMaintenanceCost
   require('../renderer/dashboard.js'); // renderMaterialUsageChart / renderFilamentAnalytics
   require('../renderer/analytics.js');
 }
@@ -171,6 +172,30 @@ test('renderSupplierPriceHistory: a material bought in two units draws two cards
   const spoolRow = html.match(/<tr>(?:(?!<\/tr>)[\s\S])*\/spool[\s\S]*?<\/tr>/)[0];
   assert.equal(spoolRow.match(/75\.00/g).length, 2, 'the spool is its own best and worst');
   assert.ok(!spoolRow.includes('20.00'), 'the per-kilogram price is not in the spool row');
+});
+
+test('renderMaintenanceCostChart: draws the services the shop actually logged', () => {
+  loadAnalyticsStack();
+  const year = new Date().getFullYear();
+  dom.seedState({
+    settings: { currency: 'SAR', fixedCosts: [] },
+    machines: [{ id: 'm1', name: 'U1' }, { id: 'm2', name: 'CORE One' }],
+    // The book's own list, keyed by machineId — where the machine screen
+    // writes a service, and what the chart used to miss entirely.
+    machMaintLog: [
+      { id: 'a', machineId: 'm1', date: `${year}-02-10`, note: 'nozzle', cost: 40 },
+      { id: 'b', machineId: 'm2', date: `${year}-03-04`, note: 'PTFE', cost: 90 },
+      { id: 'c', machineId: 'm2', date: `${year - 1}-11-02`, note: 'last year', cost: 500 },
+    ],
+  });
+  global.renderMaintenanceCostChart();
+  const html = $('#maintenanceCostChart').innerHTML;
+
+  assert.ok(!html.includes('No data yet'), 'the chart is no longer empty for a shop that logs services');
+  assert.equal(html.match(/<rect /g).length, 2, 'a bar per machine with spending');
+  assert.ok(html.includes('CORE One'), 'the bigger spender is drawn');
+  assert.ok(html.includes('U1'));
+  assert.ok(!html.includes('500'), 'last year is not counted against this one');
 });
 
 // --- Arg-taking HTML builders -------------------------------------------------
