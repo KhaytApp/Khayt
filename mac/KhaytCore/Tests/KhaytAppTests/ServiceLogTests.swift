@@ -112,3 +112,164 @@ private extension Dictionary where Key == String, Value == JSONValue {
         return nil
     }
 }
+
+/// Setting up what a machine is due for.
+///
+/// This app could read a shop's recurring tasks, show what each machine was due
+/// for and tick one off — and could not create one, change an interval, or
+/// delete one. Those lived only in the other app's machine editor, so a shop
+/// whose only app is this one saw a schedule it had no way to write, which for
+/// a Mac-only shop means no schedule at all.
+@MainActor
+struct MaintenanceTaskTests {
+
+    @Test("the tasks live under the key the other app writes them to")
+    func sameCollection() {
+        #expect(MaintenanceTaskEdit.collection == "machMaintTasks")
+    }
+
+    @Test("a task with no interval at all is refused")
+    func needsAnInterval() {
+        // `lib/maintenance.js` reads a task with neither clock as NEVER DUE. It
+        // would sit in the list looking scheduled and never ask for anything,
+        // which is worse than refusing to save it.
+        #expect(MaintenanceTaskEdit.problem(name: "Replace nozzle",
+                                            intervalHours: 0, intervalDays: 0) == "maint.need_interval")
+        #expect(MaintenanceTaskEdit.problem(name: "  ",
+                                            intervalHours: 100, intervalDays: 0) == "maint.need_name")
+        // Either clock on its own is enough, and both together is allowed: a
+        // nozzle wears by hours, a filter ages by days.
+        #expect(MaintenanceTaskEdit.problem(name: "Nozzle", intervalHours: 100, intervalDays: 0) == nil)
+        #expect(MaintenanceTaskEdit.problem(name: "Filter", intervalHours: 0, intervalDays: 30) == nil)
+        #expect(MaintenanceTaskEdit.problem(name: "Both", intervalHours: 100, intervalDays: 30) == nil)
+    }
+
+    @Test("a new task is counted from now, not from the machine's whole life")
+    func countedFromNow() {
+        // A printer that has run 2,000 hours must not have a task created this
+        // morning open as twenty times overdue.
+        let task = MaintenanceTaskEdit.record(
+            machineId: "m1", name: "  Replace nozzle  ", intervalHours: 100, intervalDays: 0,
+            hours: 2_000, nowIso: "2026-09-17T10:00:00.000Z", id: "MTASK-1")
+        #expect(task["lastDoneHours"] == .number(2_000))
+        #expect(task["lastDoneAt"] == .string("2026-09-17T10:00:00.000Z"))
+        #expect(task["name"] == .string("Replace nozzle"), "the name kept its typing whitespace")
+        #expect(task["machineId"] == .string("m1"))
+    }
+
+    @Test("the clock a task does not use is null, not zero")
+    func unusedClockIsNull() {
+        // The other app writes null and these records pass between the two.
+        let hourly = MaintenanceTaskEdit.record(
+            machineId: "m1", name: "Nozzle", intervalHours: 100, intervalDays: 0,
+            hours: 0, nowIso: "x", id: "T")
+        #expect(hourly["intervalHours"] == .number(100))
+        #expect(hourly["intervalDays"] == .null)
+    }
+
+    @Test("changing an interval does NOT mark the task done")
+    func editingKeepsTheHistory() async throws {
+        // The trap. Restamping `lastDoneHours` on an edit would quietly clear a
+        // task that is overdue at this moment — a shop tightening "every 100
+        // hours" to "every 80" because a nozzle failed early would find the
+        // warning gone, which is the opposite of what it asked for.
+        let before: [String: JSONValue] = [
+            "id": .string("T"), "machineId": .string("m1"), "name": .string("Nozzle"),
+            "intervalHours": .number(100), "intervalDays": .null,
+            "lastDoneHours": .number(10), "lastDoneAt": .string("2026-01-01T00:00:00.000Z"),
+        ]
+        let after = MaintenanceTaskEdit.edited(before, name: "Nozzle", intervalHours: 80, intervalDays: 0)
+        #expect(after["intervalHours"] == .number(80))
+        #expect(after["lastDoneHours"] == .number(10), "the edit restamped the meter")
+        #expect(after["lastDoneAt"] == .string("2026-01-01T00:00:00.000Z"), "the edit restamped the clock")
+
+        // And the shared rule still calls it overdue afterwards, which is the
+        // thing the shop actually sees.
+        let engine = try KhaytEngine()
+        let card = try await engine.maintenance(
+            machineId: "m1", tasks: [.object(after)],
+            jobs: [.object(["machineId": .string("m1"), "status": .string("completed"),
+                            "printTime": .number(500)])],
+            machine: .object(["id": .string("m1")]), now: Date())
+        #expect(card.tasks.first?.status == "overdue",
+                Comment(rawValue: "got \(card.tasks.first?.status ?? "no task")"))
+    }
+
+    @Test("deleting one task leaves the others exactly as they were")
+    func removeOne() {
+        let tasks: [JSONValue] = [
+            .object(["id": .string("a"), "name": .string("first")]),
+            // A row from a newer Khayt this build cannot read.
+            .object(["id": .string("b"), "somethingNew": .string("kept")]),
+        ]
+        let next = MaintenanceTaskEdit.removing("a", from: tasks)
+        #expect(next.count == 1)
+        #expect(MaintenanceTaskEdit.removing("nope", from: tasks).count == 2)
+    }
+}
+
+/// The machine card redraws when a task changes.
+///
+/// `maintenanceSignature` is what `.task(id:)` watches. It captured each task's
+/// id and its last-done stamps — everything this app could change, while the
+/// schedule itself could only be written in the other app. The moment this app
+/// could rename a task or tighten an interval, a signature blind to both meant
+/// the card carried on showing the old one until something unrelated moved.
+@MainActor
+struct MaintenanceSignatureTests {
+
+    private func shopWith(_ tasks: [JSONValue]) async -> (Shop, Machine) {
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.setMaintTaskRowsForTesting(tasks)
+        return (shop, shop.machines.first!)
+    }
+
+    @Test("renaming a task moves the signature")
+    func nameMoves() async throws {
+        let base: [String: JSONValue] = [
+            "id": .string("T"), "machineId": .string("MACH-u1"), "name": .string("Nozzle"),
+            "intervalHours": .number(100), "lastDoneHours": .number(0),
+            "lastDoneAt": .string("2026-01-01T00:00:00.000Z"),
+        ]
+        let (shop, _) = await shopWith([.object(base)])
+        let machine = try #require(shop.machines.first { $0.id == "MACH-u1" })
+        let before = shop.maintenanceSignature(for: machine)
+        var renamed = base
+        renamed["name"] = .string("Nozzle and bed")
+        shop.setMaintTaskRowsForTesting([.object(renamed)])
+        #expect(shop.maintenanceSignature(for: machine) != before,
+                "a renamed task leaves the card drawing the old name")
+    }
+
+    @Test("tightening an interval moves the signature")
+    func intervalMoves() async throws {
+        let base: [String: JSONValue] = [
+            "id": .string("T"), "machineId": .string("MACH-u1"), "name": .string("Nozzle"),
+            "intervalHours": .number(100), "lastDoneHours": .number(0),
+            "lastDoneAt": .string("2026-01-01T00:00:00.000Z"),
+        ]
+        let (shop, _) = await shopWith([.object(base)])
+        let machine = try #require(shop.machines.first { $0.id == "MACH-u1" })
+        let before = shop.maintenanceSignature(for: machine)
+        var tighter = base
+        tighter["intervalHours"] = .number(80)
+        shop.setMaintTaskRowsForTesting([.object(tighter)])
+        #expect(shop.maintenanceSignature(for: machine) != before,
+                "a tightened interval leaves the card drawing the old one")
+    }
+
+    @Test("an unchanged task holds the signature still")
+    func stableWhenNothingChanged() async throws {
+        // The other half: a signature that moves on every read would recompute
+        // the card constantly, which is what `.task(id:)` exists to avoid.
+        let task: [String: JSONValue] = [
+            "id": .string("T"), "machineId": .string("MACH-u1"), "name": .string("Nozzle"),
+            "intervalHours": .number(100), "lastDoneHours": .number(0),
+            "lastDoneAt": .string("2026-01-01T00:00:00.000Z"),
+        ]
+        let (shop, _) = await shopWith([.object(task)])
+        let machine = try #require(shop.machines.first { $0.id == "MACH-u1" })
+        #expect(shop.maintenanceSignature(for: machine) == shop.maintenanceSignature(for: machine))
+    }
+}

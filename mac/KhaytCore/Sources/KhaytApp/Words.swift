@@ -636,6 +636,16 @@ final class Words {
                               "ar": "ساعات التشغيل"],
         "mac.mpl_estimated": ["en": "{n} estimated",
                               "ar": "{n} تقديري"],
+        // Setting up what a machine is due for — the schedule half of
+        // maintenance, which this app could read and never write.
+        "mac.mt_new":        ["en": "Add a task",
+                              "ar": "إضافة مهمة"],
+        "mac.mt_edit":       ["en": "Edit task",
+                              "ar": "تعديل المهمة"],
+        "mac.mt_why_interval": ["en": "Set hours, days, or both — a nozzle wears by hours and a filter ages by days.",
+                              "ar": "حدِّد ساعات أو أياماً أو كليهما — الفوهة تتآكل بالساعات والمرشِّح يتقادم بالأيام."],
+        "mac.mt_edit_keeps": ["en": "Changing the interval does not mark the task done — if it is overdue now, it stays overdue.",
+                              "ar": "تغيير الفترة لا يعني إنجاز المهمة — إن كانت متأخرة الآن فستبقى متأخرة."],
         "mac.ec_reclaimed":  ["en": "{amount} of tax on these is reclaimable, so it is not charged as a cost.",
                               "ar": "{amount} من الضريبة على هذه قابلة للاسترداد، لذا لا تُحتسب تكلفةً."],
         // Report builder — the shared catalogue has the screen's own words

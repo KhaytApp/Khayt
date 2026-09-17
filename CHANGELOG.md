@@ -867,6 +867,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+
+- **(Mac) A machine's maintenance schedule can be set up here.** Khayt could
+  already show what each printer was due for and let you tick a task off, but
+  the tasks themselves could only be created in the Windows app — so a shop
+  whose only app is this one saw a schedule it had no way to write, which meant
+  no schedule at all. Add a task, change what it is called or how often it comes
+  round, or stop tracking it. A task can run on hours, on days, or on both: a
+  nozzle wears by hours and a filter ages by days. A new task counts from today,
+  so setting one up on a printer that has been running for two years does not
+  open it as instantly overdue — and changing an interval does not mark the task
+  done, so a task that is overdue now stays overdue.
+
 - **(Mac) A machine row says how hard the printer worked, not just what it
   earned.** Hours run and utilisation beside the money, because a printer that
   earned little in three hours and one that earned little in three hundred are
