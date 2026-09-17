@@ -538,9 +538,17 @@ final class Shop {
             await readSlicers()
             remeasureIfDue()
             createRecurringIfDue()
+            // The library, in this Mac's own search. Compares before it works,
+            // so a book that reloads unchanged costs one string comparison —
+            // and takes the library back OUT when the sample is opened.
+            Spotlight.shared.reindex(shop: self)
+            // A model chosen in Spotlight before the book was open.
+            answerPendingReveal()
         } catch {
             orders = []
             files = []
+            // A book that would not open must not stay findable.
+            Spotlight.shared.forget()
             libraryRows = []
             libraryFacets = LibraryFacets()
             categoriesInUse = []
@@ -8295,6 +8303,56 @@ final class Shop {
 
     /// The one the keyboard is standing on, for scrolling into view.
     var focusedFile: LibraryFile.ID? { cursor ?? fileSelection.first }
+
+    /// Show one model, whatever the library is currently filtered to.
+    ///
+    /// For Spotlight: somebody searched their Mac, chose a model, and the app
+    /// came forward. If it came forward on a filtered grid that does not
+    /// contain what they picked, the search result was a lie — so every filter
+    /// that could hide it is cleared, including the archived switch, because a
+    /// superseded model is still a model somebody can ask for by name.
+    ///
+    /// A model somebody asked for before the book was open.
+    ///
+    /// Held here rather than dropped: a Spotlight result is often what launches
+    /// the app, and the activity arrives while `files` is still empty.
+    private var pendingReveal: String?
+
+    /// Show a model now if the book is open, and as soon as it is if not.
+    func revealWhenLoaded(fileId: String) {
+        if reveal(fileId: fileId) { return }
+        // Not found YET is not the same as not there. If the library has rows
+        // and this is not one of them, the model is genuinely gone and holding
+        // the request would make the next load jump somewhere unasked.
+        pendingReveal = files.isEmpty ? fileId : nil
+    }
+
+    /// Answer a held request, once there is a library to answer it from.
+    private func answerPendingReveal() {
+        guard let wanted = pendingReveal else { return }
+        pendingReveal = nil
+        reveal(fileId: wanted)
+    }
+
+    /// Returns whether the model was found at all. A book that has moved on
+    /// since Spotlight last heard about it is a real state, and the caller
+    /// needs to know rather than leave the window sitting on an empty library.
+    @discardableResult
+    func reveal(fileId: String) -> Bool {
+        guard let file = files.first(where: { $0.id == fileId }) else { return false }
+        search = ""
+        libraryCategory = nil
+        libraryTag = nil
+        libraryUnfiledOnly = false
+        if file.isArchived { libraryShowArchived = true }
+        // Into its own project if it has one: that is where the model lives,
+        // and opening the library at the top with one tile selected somewhere
+        // below is not showing it to anybody.
+        shelf = .library(file.groupName)
+        fileSelection = [file.id]
+        cursor = file.id
+        return true
+    }
 
     // MARK: - What the customers screen shows
 
