@@ -79,3 +79,60 @@ test('nothing at all is refused rather than cleared by accident', () => {
     assert.equal(S.verdict(facts).ok, false, JSON.stringify(facts));
   }
 });
+
+/* ------------------------------------------------------------------
+   A plain zip answers for the same things a 3MF does.
+   ------------------------------------------------------------------ */
+
+const ZIP = '504b03040a00';
+
+test('a shop\'s own zip of models is accepted', () => {
+  const v = S.verdict({
+    size: 5_000_000, ext: 'zip', header: ZIP,
+    entries: [
+      { name: 'kings/faisal.stl', size: 2_000_000, compressedSize: 600_000 },
+      { name: 'kings/saud.stl', size: 1_800_000, compressedSize: 550_000 },
+    ],
+  });
+  assert.deepEqual(v, { ok: true, reason: null });
+});
+
+test('a zip naming a member outside itself is refused', () => {
+  // The library expands these onto a shop's own disk. A member called
+  // `../../x` is the whole reason that is not just an unzip call.
+  for (const name of ['../../etc/passwd', '/tmp/x.stl', 'C:\\windows\\x.stl', 'a/../../b.stl']) {
+    const v = S.verdict({ size: 1000, ext: 'zip', header: ZIP,
+                          entries: [{ name, size: 10, compressedSize: 5 }] });
+    assert.equal(v.ok, false, name);
+    assert.equal(v.reason, 'unsafe-path', name);
+  }
+});
+
+test('a zip that expands to far more than it weighs is refused', () => {
+  const v = S.verdict({ size: 1000, ext: 'zip', header: ZIP,
+                        entries: [{ name: 'a.stl', size: 900_000_000, compressedSize: 500 }] });
+  assert.equal(v.ok, false);
+  assert.equal(v.reason, 'expands-too-far');
+});
+
+test('a zip with too many members is refused', () => {
+  const entries = Array.from({ length: S.MAX_ENTRIES + 1 },
+                             (_, i) => ({ name: `m${i}.stl`, size: 10, compressedSize: 5 }));
+  const v = S.verdict({ size: 100_000, ext: 'zip', header: ZIP, entries });
+  assert.equal(v.ok, false);
+  assert.equal(v.reason, 'too-many-parts');
+});
+
+test('something merely NAMED .zip is refused', () => {
+  const v = S.verdict({ size: 5_000_000, ext: 'zip', header: '7f454c46', entries: [] });
+  assert.equal(v.ok, false);
+  assert.equal(v.reason, 'not-what-it-says');
+});
+
+test('both archive kinds are guarded, and they are the only two', () => {
+  assert.deepEqual(S.ARCHIVES, ['3mf', 'zip']);
+  // A model file is not an archive and answers for none of it.
+  const v = S.verdict({ size: 5_000_000, ext: 'stl', header: '736f6c6964',
+                        entries: [{ name: '../x', size: 9e9, compressedSize: 1 }] });
+  assert.equal(v.ok, true, 'the archive checks must not fire on a plain model');
+});

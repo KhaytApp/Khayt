@@ -88,6 +88,44 @@ struct MenuCoverageTests {
         }
     }
 
+    /// The way out of a library folder.
+    ///
+    /// Tapping a folder put the whole grid inside it and left NOTHING on screen
+    /// to get out again: the routes were the sidebar's Library row and the Go
+    /// menu, neither of which is where somebody who has just tapped a folder is
+    /// looking.
+    ///
+    /// It cannot live in the filter bar, which draws nothing when there are no
+    /// chips — so a group with one category and no tags, the plainest folder
+    /// there is, would have had no way back at all.
+    @Test("a library folder has a way back out of it")
+    func libraryGroupHasAWayBack() {
+        let grid = Self.source("LibraryGrid.swift")
+        #expect(!grid.isEmpty, "LibraryGrid.swift moved")
+        #expect(grid.contains("GroupCrumb(shop: shop, group: group)"),
+                "nothing on screen leaves a library folder")
+        #expect(grid.contains("shop.shelf = .library(nil)"),
+                "the way back does not go anywhere")
+        // Drawn above the filter bar, which renders nothing without chips.
+        let crumbAt = grid.range(of: "GroupCrumb(shop: shop")?.lowerBound
+        let barAt = grid.range(of: "LibraryFilterBar(shop: shop)")?.lowerBound
+        #expect(crumbAt != nil && barAt != nil && crumbAt! < barAt!,
+                "the way back sits below a bar that can draw nothing")
+        // ⌘[ is what every other Mac app uses to go back.
+        #expect(grid.contains("keyboardShortcut(\"[\", modifiers: .command)"),
+                "there is no keyboard route back")
+    }
+
+    @Test("the back shortcut does not collide with another command")
+    func backShortcutIsItsOwn() {
+        // ⌘[ belongs to the library crumb. Nothing in the menu bar may claim it
+        // — a shortcut that does two things depending on focus is one nobody
+        // trusts.
+        let menus = Self.menus
+        #expect(!menus.contains("keyboardShortcut(\"[\""),
+                "the menu bar has taken ⌘[ as well")
+    }
+
     @Test("every screen in the sidebar can be reached from the menu bar")
     func everyShelfIsInTheGoMenu() {
         let text = Self.menus

@@ -5090,7 +5090,10 @@ final class Shop {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = true
         panel.prompt = words.callIt("mac.add_model")
-        panel.allowedContentTypes = LibraryImport.kinds.compactMap {
+        // Archives too: a zip is not a model, but the models come out of it —
+        // see ArchiveImport. Offering only model types meant a shop that had
+        // just downloaded one could not even select it.
+        panel.allowedContentTypes = LibraryImport.kinds.union(ArchiveImport.kinds).compactMap {
             UTType(filenameExtension: $0)
         }
         // A slicer's own type is not always registered on a Mac that has no
@@ -5164,10 +5167,45 @@ final class Shop {
         }
         guard let engine else { importProblem = "the engine is not loaded"; return }
 
-        let files = Self.modelsUnder(chosen, skipping: roots.primary)
-        guard !files.isEmpty else {
-            importProblem = words.callIt("mac.import_nothing"); return
+        // ARCHIVES FIRST, so what comes out of them is imported like anything
+        // else. A shop downloads a model as a zip because that is how every
+        // model site hands one over, and dropping one here used to do nothing
+        // at all — the walk below looks for models and a `.zip` is not one, so
+        // it was skipped in silence.
+        //
+        // The archive itself is never consumed: it stays where the shop put it,
+        // and only copies of the models inside are moved into the vault.
+        var files = Self.modelsUnder(chosen, skipping: roots.primary)
+        var scratches: [URL] = []
+        var refusals: [String] = []
+        for url in chosen where ArchiveImport.kinds.contains(url.pathExtension.lowercased()) {
+            do {
+                let out = try await ArchiveImport.expand(url, engine: engine)
+                scratches.append(out.scratch)
+                // Grouped by the archive's own name, the way a folder of models
+                // is grouped by the folder — see `ImportGrouping`.
+                files += out.models.map { LibraryImport.Incoming(url: $0, group: out.group) }
+            } catch let refusal as ArchiveImport.Failure {
+                refusals.append(refusal.description)
+            } catch {
+                refusals.append(String(describing: error))
+            }
         }
+        // The scratch copies are consumed by the import (it MOVES them in), but
+        // a refusal or a duplicate leaves some behind, and they are in the
+        // system temp directory either way.
+        defer { for dir in scratches { try? FileManager.default.removeItem(at: dir) } }
+
+        guard !files.isEmpty else {
+            // A refused archive is a reason, not an absence. "Nothing to
+            // import" beside a zip the shop can see is the unhelpful half of
+            // this, and it is what the old code would have said.
+            importProblem = refusals.isEmpty
+                ? words.callIt("mac.import_nothing")
+                : refusals.joined(separator: "\n")
+            return
+        }
+        if !refusals.isEmpty { importProblem = refusals.joined(separator: "\n") }
 
         importing = true
         defer { importing = false; importProgress = nil }

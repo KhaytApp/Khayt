@@ -526,6 +526,8 @@ final class Words {
         // Stage — the one status Khayt has no word for
         "mac.cancelled":     ["en": "Cancelled",     "ar": "ملغى"],
         // The submenu that holds the stages, wherever a job is right-clicked.
+        // The tooltip on the library breadcrumb's way out of a folder.
+        "mac.leave_group":   ["en": "Back to the whole library", "ar": "العودة إلى كل المكتبة"],
         "mac.move_to":       ["en": "Move to",       "ar": "نقل إلى"],
         // How much passes inspection first time.
         "mac.qc_title":      ["en": "Quality",        "ar": "الجودة"],
