@@ -791,7 +791,6 @@ public actor KhaytEngine {
         // guarded require is still a require somebody will later unguard. The
         // pure half was split into `geometry-key.js` for that reason, and
         // `model-identity` re-exports it. Swift does the SHA-256.
-        "geometry-key",
         // The shop's slicers, and which programs may be launched as one.
         //
         // The allowlist matters more than the list. A slicer path and its
@@ -2354,16 +2353,21 @@ public actor KhaytEngine {
     ///
     /// Returns nil for geometry with no substance, so an unmeasured model never
     /// acquires an identity another unmeasured one would share.
+    /// NATIVE NOW, and the comment above is why that took a harness.
+    ///
+    /// The format is still the JavaScript's — `GeometryKey` reproduces it
+    /// including `Math.round`'s half-up and a whole number printed without a
+    /// `.0`, and `GeometryKeyParityTests` runs both over some three thousand
+    /// generated geometries and fails on the first disagreement. The rule that
+    /// "a format agreed by two implementations is a format that drifts" has
+    /// not been repealed; it has been given a test.
     public func geometryKey(triangleCount: Int, volumeMm3: Double,
                             x: Double, y: Double, z: Double) throws -> String? {
-        try runtime.call2("""
-        (globalThis.KhaytGeometryKey.geometryKey({
-          triangleCount: ARG0, volumeMm3: ARG1, bbox: { x: ARG2, y: ARG3, z: ARG4 }
-        }) || null)
-        """,
-        [.number(Double(triangleCount)), .number(volumeMm3),
-         .number(x), .number(y), .number(z)],
-        as: String?.self)
+        GeometryKey.key(of: .object([
+            "triangleCount": .number(Double(triangleCount)),
+            "volumeMm3": .number(volumeMm3),
+            "bbox": .object(["x": .number(x), "y": .number(y), "z": .number(z)]),
+        ]))
     }
 
     /// Which reader this build measures with — written on every record it
@@ -2413,15 +2417,14 @@ public actor KhaytEngine {
             """, [.array(names.map(JSONValue.string)), .array(priceList)], as: [Double?].self)
     }
 
-    public func geometryReader() throws -> Int {
-        try runtime.call2("globalThis.KhaytGeometryKey.READER", [], as: Int.self)
-    }
+    public func geometryReader() throws -> Int { GeometryKey.reader }
 
     /// Whether a record measured by `reader` (nil: before the rule existed)
     /// is due to be read again under this build's reader.
     public func needsRemeasure(reader: Int?) throws -> Bool {
-        try runtime.call2("globalThis.KhaytGeometryKey.needsRemeasure({ geometryReader: ARG0 })",
-                          [reader.map { .number(Double($0)) } ?? .null], as: Bool.self)
+        GeometryKey.needsRemeasure(.object([
+            "geometryReader": reader.map { JSONValue.number(Double($0)) } ?? .null,
+        ]))
     }
 
     // MARK: - The shop's slicers

@@ -5,6 +5,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 ### Changed
+
+- **(Mac) The first of Khayt's shared rules now runs natively, with a test that
+  will not let it drift.** The Mac app has always run Khayt's business rules —
+  pricing, tax, costing, identity — as the same JavaScript the Windows app runs,
+  so that both apps could not disagree. Those rules are being rewritten in
+  Swift. The thing that makes that safe is a parity harness: every rewritten
+  rule is run side by side with the original over thousands of generated inputs,
+  and the build fails on the first disagreement. The model-identity key is the
+  first, and the harness earned itself immediately — it caught two faults in the
+  new code that no ordinary test would have noticed.
+
 - **The machine figures at the top of Reports disagreed with the P&L table
   below them.** The overview worked out a machine's profit as revenue less what
   the parts cost, while the table underneath goes through the shared rule and
