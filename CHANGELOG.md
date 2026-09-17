@@ -2051,6 +2051,86 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.19] - 2026-09-17
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **(Mac) A customer's model can be priced by slicing it, not by guessing at
+  its shape.** The estimate from geometry is honest but blunt: it cannot know
+  about purge, and on a real four-colour dragon the shape said 13 g where the
+  slicer said 57. With this on, a cleared upload is sliced by the shop's own
+  slicer — the one it picks for this, or its default — and the slicer's own
+  weight and time are what the customer is shown. Off in a fresh book,
+  because it is the only setting in Khayt that writes a stranger's file down
+  and points a native binary at it. Anything missing — no slicer, a slicer
+  since removed, a slice that produced nothing — falls back to measuring the
+  shape rather than failing.
+- **A customer's upload is inspected before it is used.** Is it the kind of
+  model its name claims; does an archive name a member outside the folder it
+  would be opened in; does it expand out of all proportion to what arrived. A
+  file that fails is refused with the reason and never reaches the reader.
+  The judgement is one shared rule (`lib/upload-scan.js`) so both apps refuse
+  the same files for the same reasons, and the host gathers the facts —
+  thirty-two megabytes of somebody else's file has no business crossing into
+  the rules engine to be judged. What it cannot promise is said where the
+  shop reads it: a parser bug in somebody else's C++ is not something a
+  structural check can see.
+
+### Changed
+
+- **(Maintainers) How a slicer is launched is one rule now, and it has tests.**
+  `settings.slicers[].args` is untrusted — it travels in backups and cloud
+  sync, like the path beside it that `isAllowedSlicerBinary` already guards —
+  and how that template is split into arguments decides what the slicer is
+  actually run with. The splitter lived in `main.js` alone, with no test and
+  no second reader, and the Mac needs the same split to run the same slicer.
+  It is in `lib/slicers.js` now as `sliceArgv`, which splits first and fills
+  the placeholders in afterwards, so a model at `My Models/dragon.stl` stays
+  one argument and a path chosen to look like a flag cannot become one. The
+  test compares it against the original character for character.
+- **(Mac) The Reports target was measured against a different set of jobs than
+  the figure beside it.** The monthly target on the Reports screen said it
+  counted finished, unvoided business — and filtered `completed` alone. The
+  quarters drawn beside it come from the shared profit rule, which counts a
+  legacy `delivered` job as finished too, so a shop that had marked work
+  delivered was comparing a target built from some of its jobs against an
+  actual built from all of them. Both sets are the same now. A test also scans
+  every Swift file the app is built from and fails on a status compared against
+  `"completed"` alone unless the site is listed with a reason, which is how
+  this one was found.
+
+### Fixed
+
+- **(Mac) The shop's mode was ignored here, so a Simple shop saw the whole
+  Professional surface.** Khayt has two modes and `lib/feature-tiers.js` is
+  the single source of truth for what each includes — and this app read
+  `settings.mode` nowhere at all. Of the nine Professional features it has
+  built four, and all four were shown to everybody: full analytics, expense
+  tracking, machine maintenance and ZATCA e-invoicing. They are gated now,
+  so the two apps agree about what a shop has. A shop that switches to
+  Simple while looking at Reports or Expenses is moved to the Dashboard
+  rather than left on a screen that is no longer theirs. Only those four are
+  gated: a screen added later and never classified stays visible rather than
+  quietly disappearing. An enthusiast book — Bed Ready's mode, retired on
+  this side — is read as Simple exactly as `applyMode()` migrates it, so
+  opening one here does not strip its customers and invoices.
+- **The mode comparison was short of two things a shop actually gets.** The
+  product catalogue and the portfolio are both hidden from the commerce-free
+  flavour by a `.biz-only` class in the markup, but neither appeared in
+  `lib/feature-tiers.js` — the file that calls itself the single source of
+  truth for that boundary and that builds the table a shop reads when it
+  chooses a mode. Both are listed now, and a test joins the two halves: every
+  gated navigation tab must name a feature the registry knows. It also pins
+  what the two gates MEAN, which is not the same thing — a `pro-only` tab is
+  Professional whole, while a `biz-only` tab may still be a Pro feature when
+  what Professional unlocks is the depth inside it. Analytics is that case,
+  with fourteen gated elements within a tab a simple shop can open, and the
+  test now requires such a tab to really gate something rather than quietly
+  giving away the whole of it.
+
 ## [4.0.0-alpha.18] - 2026-09-16
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
