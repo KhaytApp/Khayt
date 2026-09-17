@@ -633,7 +633,6 @@ public actor KhaytEngine {
         "lan-quote-page",
         "carriers",
         "lan-order-page",
-        "lan-calendar",
         "upload-scan",
         "feature-tiers",
         "public-quote",
@@ -4657,7 +4656,7 @@ public actor KhaytEngine {
 
     /// The shop's due dates as a calendar: `lib/lan-calendar.js`.
     public func lanCalendarFeed(store: JSONValue) throws -> String {
-        try runtime.call2("globalThis.KhaytLanCalendar.feed(ARG0)", [store], as: String.self)
+        LanCalendar.feed(store)
     }
 
     // The customer's order page and its survey: `lib/lan-order-page.js`.
