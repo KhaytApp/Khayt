@@ -557,53 +557,51 @@ function renderAnalytics() {
 function renderClientSourceChart() {
   const el = $('#clientSourceChart');
   if (!el) return;
-  const sources = ['instagram','referral','walk_in','website','exhibition','other'];
-  const counts = {};
-  for (const s of sources) counts[s] = 0;
-  for (const c of clients) counts[c.source || 'other'] = (counts[c.source || 'other'] || 0) + 1;
 
-  const maxCount = Math.max(...Object.values(counts), 1);
+  // The list is `lib/client-sources.js`'s, not six spelled out here. The six
+  // that were spelled out here left out `online` — the source the intake
+  // import stamps — so every customer who arrived through the shop's own
+  // intake form, and their revenue, was drawn nowhere. The revenue also now
+  // takes the same finished/unvoided/business filters as every other figure
+  // on this screen; it used to count voided orders and personal jobs.
+  const report = KhaytClientSources.byClient(
+    { clients: clients || [], orders: printLog || [] },
+    {
+      revenueOf: orderNetRevenueBase,
+      isFinished: (o) => KhaytOrderStatus.isFinished(o),
+      countsForBusiness: _countsForBusiness,
+    },
+  );
+
+  if (!report.rows.length) {
+    el.innerHTML = `<p class="dash-empty">${escapeHtml(t('an.source_empty'))}</p>`;
+    return;
+  }
 
   const sourceColors = {
     instagram:  '#e1306c',
     referral:   '#22c55e',
     walk_in:    '#3b82f6',
     website:    '#f59e0b',
+    online:     '#06b6d4',
     exhibition: '#a855f7',
     other:      '#6b7280',
   };
 
-  // Revenue per source in a single pass (was O(sources × orders × clients) with a nested
-  // clients.find inside the per-source loop; now O(orders) using the clientById index).
-  const revBySrc = {};
-  for (const o of printLog) {
-    if (!KhaytOrderStatus.isFinished(o) || !o.clientId) continue;
-    const c = clientById(o.clientId);
-    if (!c) continue;
-    const src = c.source || 'other';
-    revBySrc[src] = (revBySrc[src] || 0) + orderNetRevenueBase(o);
-  }
+  const maxCount = Math.max(...report.rows.map(r => r.count), 1);
 
-  const rows = sources
-    .filter(s => counts[s] > 0)
-    .sort((a, b) => counts[b] - counts[a])
-    .map(s => {
-      const pct = Math.round((counts[s] / maxCount) * 100);
-      const revBySource = revBySrc[s] || 0;
-      return `
+  const rows = report.rows.map(r => {
+    const pct = Math.round((r.count / maxCount) * 100);
+    return `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-          <div style="min-width:90px;font-size:12px;color:var(--text);text-align:end;">${escapeHtml(t('cl.source_' + s))}</div>
+          <div style="min-width:90px;font-size:12px;color:var(--text);text-align:end;">${escapeHtml(t('cl.source_' + r.source))}</div>
           <div style="flex:1;background:var(--border);border-radius:4px;height:14px;overflow:hidden;">
-            <div style="width:${pct}%;height:100%;background:${sourceColors[s]};border-radius:4px;transition:width .4s;"></div>
+            <div style="width:${pct}%;height:100%;background:${sourceColors[r.source] || 'var(--text-muted)'};border-radius:4px;transition:width .4s;"></div>
           </div>
-          <div style="min-width:60px;font-size:11px;color:var(--text-muted);">${counts[s]} · ${fmtPrice(revBySource)}</div>
+          <div style="min-width:60px;font-size:11px;color:var(--text-muted);">${r.count} · ${fmtPrice(r.revenue)}</div>
         </div>`;
-    }).join('');
+  }).join('');
 
-  if (!rows) {
-    el.innerHTML = `<p class="dash-empty">${escapeHtml(t('an.source_empty'))}</p>`;
-    return;
-  }
   el.innerHTML = `
     <div class="card" style="margin-bottom:16px;">
       <h3 class="card-head"><span class="swatch"></span>${escapeHtml(t('an.source_title'))}</h3>
@@ -611,7 +609,6 @@ function renderClientSourceChart() {
     </div>`;
 }
 
-/* ── Quote Conversion Funnel ────────────────────────────── */
 function renderQuoteFunnelChart() {
   const el = $('#quoteFunnelChart');
   if (!el) return;

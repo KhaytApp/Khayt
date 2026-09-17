@@ -181,8 +181,13 @@ function renderClients() {
     const ratingBadge = avgRating !== null
       ? `<span style="font-size:10px;color:#f59e0b;margin-inline-start:5px;white-space:nowrap;" title="${clientOrdersWithSurveyCount} ${escapeHtml(t('an.survey_responses') || 'survey response(s)')}">⭐ ${avgRating.toFixed(1)}</span>`
       : '';
-    const sourceBadge = c.source && c.source !== 'other'
-      ? `<span class="source-badge source-${escapeHtml(c.source)}">${escapeHtml(t('cl.source_' + c.source))}</span>`
+    // Through the shared list, because an unrecognised source used to reach
+    // `t('cl.source_' + c.source)` and print its own key — a customer imported
+    // from the intake form carries `online`, and no locale had that key, so the
+    // badge read "cl.source_online" beside their name.
+    const badgeSource = KhaytClientSources.normalize(c.source);
+    const sourceBadge = badgeSource !== KhaytClientSources.DEFAULT_SOURCE
+      ? `<span class="source-badge source-${escapeHtml(badgeSource)}">${escapeHtml(t('cl.source_' + badgeSource))}</span>`
       : '';
     return `
       <tr>
@@ -591,9 +596,19 @@ function openClientEditor(clientId = null) {
 
     <label style="margin-top:10px;">${escapeHtml(t('cl.source'))}</label>
     <select data-f="source">
-      ${['instagram','referral','walk_in','website','exhibition','other'].map(s =>
-        `<option value="${s}" ${(draft.source || 'other') === s ? 'selected' : ''}>${escapeHtml(t('cl.source_' + s))}</option>`
-      ).join('')}
+      ${(() => {
+        // `online` is stamped by the intake import and is not a thing a shop
+        // picks, so it is not offered — EXCEPT to a customer who already has
+        // it. A select with no matching option shows its first one, so hiding
+        // it outright would quietly re-label an intake customer as Instagram
+        // the next time anyone opened their card and pressed save.
+        const current = KhaytClientSources.normalize(draft.source);
+        const choices = KhaytClientSources.SOURCES
+          .filter(s => s !== 'online' || current === 'online');
+        return choices.map(s =>
+          `<option value="${s}" ${current === s ? 'selected' : ''}>${escapeHtml(t('cl.source_' + s))}</option>`
+        ).join('');
+      })()}
     </select>
 
     <div style="margin-top:14px; display:flex; align-items:center; gap:12px;">

@@ -3296,6 +3296,7 @@
   "cl.source_referral": "紹介",
   "cl.source_walk_in": "飛び込み",
   "cl.source_website": "ウェブサイト",
+  "cl.source_online": "オンラインフォーム",
   "cl.source_exhibition": "展示会",
   "cl.source_other": "その他",
   "an.source_title": "ソース別顧客数",

@@ -3296,6 +3296,7 @@
   "cl.source_referral": "Recomendación",
   "cl.source_walk_in": "Presencial",
   "cl.source_website": "Sitio web",
+  "cl.source_online": "Formulario en línea",
   "cl.source_exhibition": "Exposición",
   "cl.source_other": "Otro",
   "an.source_title": "Clientes por fuente",

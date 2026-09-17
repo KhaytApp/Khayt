@@ -85,6 +85,7 @@ function loadAnalyticsStack() {
   require('../lib/supplier-prices.js'); // globalThis.KhaytSupplierPrices
   require('../lib/maintenance-cost.js'); // globalThis.KhaytMaintenanceCost
   require('../lib/rating-trend.js'); // globalThis.KhaytRatingTrend
+  require('../lib/client-sources.js'); // globalThis.KhaytClientSources
   // Both are reached only once a book has an expense in it, which is why they
   // were missing here until a test seeded one.
   require('../lib/expense-categories.js'); // globalThis.KhaytExpenseCategories
@@ -326,6 +327,46 @@ test('renderNpsTrendChart: a rating on a job with no completedAt still counts', 
   const html = $('#npsTrendChart').innerHTML;
   assert.ok(!html.includes('No data yet'), 'three real ratings were being thrown away');
   assert.ok(html.includes('4.0 / 5'));
+});
+
+test('renderClientSourceChart: a customer from the intake form is drawn', () => {
+  loadAnalyticsStack();
+  const month = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  dom.seedState({
+    settings: { currency: 'SAR', fixedCosts: [] },
+    clients: [
+      // What `clientFromIntake` in renderer/integrations.js creates.
+      { id: 'c1', nameEn: 'Acme', source: 'online' },
+      { id: 'c2', nameEn: 'Bolt', source: 'instagram' },
+    ],
+    printLog: [
+      { id: 'a', clientId: 'c1', status: 'completed', date: `${month}-02`, price: 500, printTime: 1 },
+      { id: 'b', clientId: 'c2', status: 'completed', date: `${month}-03`, price: 100, printTime: 1 },
+      // Voided: money no source brought in.
+      { id: 'c', clientId: 'c2', status: 'completed', date: `${month}-04`, price: 900, printTime: 1, voidedAt: `${month}-05` },
+    ],
+  });
+  global.renderClientSourceChart();
+  const html = $('#clientSourceChart').innerHTML;
+
+  assert.ok(html.includes('Online form'),
+    'the intake customer was counted into a bucket the chart never drew');
+  assert.ok(html.includes('Instagram'));
+  assert.ok(!html.includes('cl.source_'), 'no raw translation key reaches the page');
+  assert.ok(!html.includes('900'), 'a voided order is not revenue a source brought in');
+});
+
+test('renderClientSourceChart: an unrecognised source is filed, not lost', () => {
+  loadAnalyticsStack();
+  dom.seedState({
+    settings: { currency: 'SAR', fixedCosts: [] },
+    clients: [{ id: 'c1', nameEn: 'Acme', source: 'tiktok' }],
+    printLog: [],
+  });
+  global.renderClientSourceChart();
+  const html = $('#clientSourceChart').innerHTML;
+  assert.ok(html.includes('Other'), 'the customer still appears');
+  assert.ok(!html.includes('tiktok'), 'but never under a name nothing can translate');
 });
 
 // --- Arg-taking HTML builders -------------------------------------------------

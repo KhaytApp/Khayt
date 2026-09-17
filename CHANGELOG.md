@@ -5,6 +5,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 ### Changed
+- **Every customer who came in through the intake form was missing from the
+  chart that says where customers come from.** Importing an order request
+  stamps the new customer's source as `online`. The chart drew six sources and
+  `online` was not one of them, so those customers were counted into a bucket
+  it then never read — and their revenue with them. A source that shows nobody
+  looks exactly like a source that brought nobody, which is the wrong thing to
+  tell a shop deciding where to spend. Their name badge in the customer list
+  had the same gap from the other end: no translation existed for `online`, and
+  a missing key in Khayt renders as the key, so the badge read
+  "cl.source_online" beside the customer's name. The list is
+  `lib/client-sources.js` now, `online` is in it and named in all nine
+  languages, and anything unrecognised is filed under Other rather than
+  dropped. The chart's revenue also takes the same finished, unvoided,
+  business-scoped filters as every other figure on that screen; it had been
+  counting voided orders and personal jobs.
+
 - **(Maintainers) The invoice-language smoke test passed and reported failure.**
   Every assertion printed, then Playwright's `electronApp.close()` never
   returned, so `npm run test:e2e:all` killed the suite and counted it as the one

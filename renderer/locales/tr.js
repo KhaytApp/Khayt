@@ -3296,6 +3296,7 @@
   "cl.source_referral": "Tavsiye",
   "cl.source_walk_in": "Gelen müşteri",
   "cl.source_website": "Web sitesi",
+  "cl.source_online": "Çevrimiçi form",
   "cl.source_exhibition": "Fuar",
   "cl.source_other": "Diğer",
   "an.source_title": "Kaynağa Göre Müşteriler",
