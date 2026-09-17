@@ -2252,6 +2252,44 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.21] - 2026-09-17
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **(Mac) A zip of models can be added to the library.** A shop downloads a
+  model as a zip because that is how every model site hands one over, and
+  dropping one on the library did nothing at all — the import walks for `stl`,
+  `3mf`, `obj` and gcode, and a `.zip` is none of those, so it was skipped in
+  silence with no error and no model. Khayt reads the archive now, takes the
+  models out of it and leaves the readme and the render previews behind, and
+  groups what came out by the archive's own name the way a folder of models is
+  grouped by its folder. The zip itself is never consumed; it stays where you
+  put it.
+- **(Mac) There is a way back out of a library folder.** Tapping a folder put
+  the whole grid inside it and left nothing on screen to get out again — the
+  routes were the sidebar's Library row and the Go menu, neither of which is
+  where somebody who has just tapped a folder is looking. There is a path at
+  the top now, "Library / Saudi Kings", with the first half doing the work, and
+  ⌘[ does it from the keyboard. It could not live in the filter bar below: that
+  draws nothing when there are no chips, so the plainest folder would have had
+  no way back at all.
+
+### Fixed
+
+- **(Mac) A live print's percentage was captioned "as the printer shows it",
+  beside a number the printer was not showing.** Khayt reads the slicer's own
+  M73 figure, which counts elapsed TIME. A Snapmaker U1's panel counts file
+  position. Mid-print those genuinely differ — 57% here against 63% there on a
+  print measured end to end — so the caption promised an agreement that does
+  not exist, and a correct figure read as a fault. It says "of the estimated
+  time" now, which is what it measures. Khayt's is the better clock and that
+  was measured rather than assumed: across thirty samples of one print, its
+  figure predicted the finish to a mean of two minutes, against five for the
+  printer's own model and thirteen at its worst.
+
 ## [4.0.0-alpha.20] - 2026-09-17
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
