@@ -1674,6 +1674,31 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   that file now, and a new test covers the other half nothing was watching:
   that every status the phone can show has a word in both its languages.
 
+- **The customer tracking link and the calendar subscription link both stopped
+  working the moment a shop set a LAN PIN.** Both carry their own key — a
+  per-order tracking token, a calendar token — but the owner-PIN gate runs
+  first and answered 401 before either key was ever looked at, and neither a
+  customer with a tracking link nor a calendar app has a PIN to send. Every
+  shop that writes through the API has a PIN, because writes require one. The
+  tell was that `/order/<id>?token=…` served the same tracking token happily
+  while `/status/<id>?token=…` refused it, and that the Mac app served both:
+  one route was on the exemption list and its twin was not. They are on it now,
+  through a list of their own — the existing one also hands out a wildcard CORS
+  header, and the calendar feed accepts the owner PIN, so inheriting that would
+  have let any web page guess a shop's PIN through the shop's own browser.
+  Guessing the PIN through the calendar feed now trips the same lockout as
+  anywhere else.
+
+- **A malformed web address could leave a customer's browser hanging and file a
+  crash report that was not a crash.** `GET /status/%` — a lone percent sign —
+  threw while decoding the order id, and Node's request handling has no
+  recovery of its own: the connection was never answered at all, and the throw
+  reached the app's crash handler, which reported it. No PIN or token was
+  needed; anyone on the shop's Wi-Fi could do it, and a mistyped link could do
+  it by accident. Seven other addresses decode the same way and the intake form
+  reads a cookie the customer's own browser sends. A request that cannot be
+  understood is answered "bad request" now, and the server carries on.
+
 
 - **A printer's utilisation was capped at 100%, so the machine worth buying a
   second of was invisible.** "Printer utilisation" on Reports clamped the
