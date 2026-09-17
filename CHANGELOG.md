@@ -1576,6 +1576,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+- **(Mac) A live print's percentage was captioned "as the printer shows it",
+  beside a number the printer was not showing.** Khayt reads the slicer's own
+  M73 figure, which counts elapsed TIME. A Snapmaker U1's panel counts file
+  position. Mid-print those genuinely differ — 57% here against 63% there on a
+  print measured end to end — so the caption promised an agreement that does
+  not exist, and a correct figure read as a fault. It says "of the estimated
+  time" now, which is what it measures. Khayt's is the better clock and that
+  was measured rather than assumed: across thirty samples of one print, its
+  figure predicted the finish to a mean of two minutes, against five for the
+  printer's own model and thirteen at its worst.
+
 - **(Maintainers) Nothing proved that Simple mode actually hides anything.**
   Every test loaded the sample book, which carries no mode at all and is
   therefore Professional, and asserted that every gated screen was present — so
