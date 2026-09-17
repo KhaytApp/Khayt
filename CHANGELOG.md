@@ -2397,6 +2397,43 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.23] - 2026-09-17
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **A machine's maintenance schedule can be set up here.** Khayt could already
+  show what each printer was due for and let you tick a task off, but the tasks
+  themselves could only be created in the Windows app — so a shop whose only app
+  is this one saw a schedule it had no way to write, which meant no schedule at
+  all. Add a task, change what it is called or how often it comes round, or stop
+  tracking it. A task can run on hours, on days, or on both: a nozzle wears by
+  hours and a filter ages by days. A new task counts from today, so setting one
+  up on a printer that has been running for two years does not open it as
+  instantly overdue — and changing an interval does not mark the task done, so a
+  task that is overdue now stays overdue.
+
+### Fixed
+
+- **A device on your Wi-Fi could hold the LAN server's connections open
+  indefinitely.** A client that connected and then said nothing — or announced a
+  body and never sent it — was waited on for ever: no answer, no close, the
+  connection held until the app quit. Open enough of them and your own phones
+  cannot get through. The Windows app never had this because its web server
+  applies its own time limits; this one is built directly on the system's
+  networking and had none. A request now has fifteen seconds to arrive, after
+  which the connection is let go — and the clock stops the moment the request is
+  complete, so a slow connection is never cut off partway through the answer it
+  asked for.
+
+- **An empty Utilisation column said nothing about why it was empty.** Hours run
+  against hours wanted needs somebody to have said what was wanted, and a machine
+  has no target hours a day until you fill one in — so every row showed a dash,
+  correctly and unhelpfully. It says so now, once, under the table, and only
+  while no machine has a target at all.
+
 ## [4.0.0-alpha.22] - 2026-09-17
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
