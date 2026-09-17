@@ -1382,17 +1382,12 @@ function renderMaintenanceCostChart() {
   const el = $('#maintenanceCostChart');
   if (!el) return;
 
-  const currentYear = new Date().getFullYear();
-
-  const machData = (machines || []).map(mach => {
-    const log = mach.machMaintLog || [];
-    const total = log.reduce((s, entry) => {
-      if (!entry.date) return s;
-      if (new Date(entry.date).getFullYear() !== currentYear) return s;
-      return s + (+entry.cost || 0);
-    }, 0);
-    return { name: mach.name || mach.id, total };
-  }).filter(d => d.total > 0).sort((a, b) => b.total - a.total);
+  // From the book's own `machMaintLog`, which is where the machine screen
+  // writes a service. This read `machine.machMaintLog` — a property nothing
+  // has ever written — so the chart was empty for every shop.
+  const machData = KhaytMaintenanceCost.byMachine(machines, machMaintLog, {
+    year: new Date().getFullYear(),
+  });
 
   if (!machData.length) {
     el.innerHTML = `<div class="card" style="margin-bottom:16px;"><h3 class="card-head"><span class="swatch"></span>${escapeHtml(t('an.maint_cost') || 'Maintenance Cost by Machine')}</h3><p style="color:var(--text-muted);padding:12px 0;font-size:13px;">${escapeHtml(t('an.no_data') || 'No data yet')}</p></div>`;
