@@ -7939,6 +7939,47 @@ final class Shop {
         }
     }
 
+    /// Attach a photograph of the finished print to a model.
+    ///
+    /// `thumbnail(for:)` has always preferred one — "a photograph the shop took
+    /// beats a generated thumbnail" — and this app had no way to take one. The
+    /// bytes are the other app's: 480px, JPEG at 0.82, inline as a data URI, so
+    /// a picture attached here is one Khayt draws without knowing where it came
+    /// from.
+    func setLibraryPhoto(_ fileId: LibraryFile.ID, from url: URL) {
+        writeProblem = nil
+        guard source.build != nil else {
+            writeProblem = words.callIt("mac.move_sample"); return
+        }
+        let uri: String
+        do { uri = try LibraryPhoto.dataURI(of: url) }
+        catch {
+            // The reader's own sentence — "8 MB", "not a picture Khayt can
+            // read" — rather than a generic failure, because each of them
+            // tells the shop what to do differently.
+            writeProblem = (error as? LocalizedError)?.errorDescription
+                ?? String(describing: error)
+            return
+        }
+        editFiles([fileId], named: words.callIt("mac.lp_action")) { record in
+            record["userPhoto"] = .string(uri)
+        }
+    }
+
+    /// Take the photograph off again, leaving the generated preview to show.
+    func clearLibraryPhoto(_ fileId: LibraryFile.ID) {
+        writeProblem = nil
+        guard source.build != nil else {
+            writeProblem = words.callIt("mac.move_sample"); return
+        }
+        // NULL, not absent. The other app writes `userPhoto: null` on a new
+        // record, and a field removed entirely is a field a merge can resurrect
+        // from the older copy on another machine.
+        editFiles([fileId], named: words.callIt("mac.lp_removed")) { record in
+            record["userPhoto"] = .null
+        }
+    }
+
     /// What the tag box starts with: the tags shared by everything selected.
     ///
     /// Not the first one's tags. With several chosen, showing one model's tags
