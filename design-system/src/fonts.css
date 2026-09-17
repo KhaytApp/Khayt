@@ -1,0 +1,40 @@
+/* The Mac app's brand family, and only it.
+ *
+ * `TypeScale.brandFamily` is "Space Grotesk" and nothing else. Khayt's
+ * renderer bundles thirteen families for its eight themes; shipping all of
+ * them here would be 900K of fonts no Khayt design uses.
+ *
+ * The files themselves are the repo's own, not copies.
+ */
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../renderer/fonts/space-grotesk-latin-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../../renderer/fonts/space-grotesk-latin-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../../renderer/fonts/space-grotesk-latin-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../../renderer/fonts/space-grotesk-latin-700.woff2") format("woff2");
+}
