@@ -321,7 +321,8 @@ struct Reports: View {
         // figure derived from another is two answers pretending to be one.
         let completed = shop.orderRows.filter { row in
             guard case .object(let o) = row else { return false }
-            guard case .string(let status)? = o["status"], status == "completed" else { return false }
+            guard case .string(let status)? = o["status"],
+                  Shop.finishedStatuses.contains(status) else { return false }
             if case .string(let voided)? = o["voidedAt"], !voided.isEmpty { return false }
             return true
         }
