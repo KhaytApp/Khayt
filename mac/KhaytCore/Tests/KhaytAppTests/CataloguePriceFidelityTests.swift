@@ -194,7 +194,22 @@ struct ProgressCaptionTests {
 
     @Test("only the adapter that chooses between signals is captioned")
     func onlyMoonraker() {
-        #expect(PrinterWatch.progressCaption(type: "moonraker", source: "m73") == "mac.by_printer")
+        // NOT "as the printer shows it": M73 counts elapsed time and a U1's
+        // panel counts file position, so they differ mid-print and the caption
+        // must not promise they agree.
+        #expect(PrinterWatch.progressCaption(type: "moonraker", source: "m73") == "mac.by_time")
+
+        // The caption must never CLAIM the printer's own panel. Khayt's figure
+        // is the slicer's time-based one; a Snapmaker U1's panel is file
+        // position, and they read 57% against 63% on a print measured end to
+        // end. Saying "as the printer shows it" beside a number the printer is
+        // not showing is how a correct figure comes to look like a fault.
+        let caption = Words.own["mac.by_time"]?["en"] ?? ""
+        #expect(!caption.isEmpty, "the caption has no English wording")
+        #expect(!caption.lowercased().contains("printer"),
+                Comment(rawValue: "the caption claims the printer's own number: \(caption)"))
+        #expect(caption.lowercased().contains("time"),
+                Comment(rawValue: "the caption does not say what it measures: \(caption)"))
         #expect(PrinterWatch.progressCaption(type: "moonraker", source: "layers") == "mac.by_layers")
         #expect(PrinterWatch.progressCaption(type: "moonraker", source: "bytes") == "mac.by_bytes")
         // A resin printer's own words, which are not about a file at all.

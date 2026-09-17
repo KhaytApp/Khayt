@@ -1481,7 +1481,7 @@ final class Words {
         // The slicer's own time percentage, relayed by the firmware — the
         // number on the machine's screen. Named after where the shop can
         // check it, not after the G-code command that carries it.
-        "mac.by_printer":    ["en": "as the printer shows it", "ar": "كما تعرضه الطابعة"],
+        "mac.by_time":       ["en": "of the estimated time", "ar": "من الوقت المقدَّر"],
         "mac.by_bytes":      ["en": "by file position", "ar": "حسب موضع الملف"],
         "mac.nozzle_temp":   ["en": "Nozzle",        "ar": "الفوهة"],
         "mac.bed_temp":      ["en": "Bed",           "ar": "المنصة"],

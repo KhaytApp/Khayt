@@ -918,7 +918,21 @@ final class PrinterWatch {
     static func progressCaption(type: String, source: String?) -> String? {
         guard type == "moonraker", let source else { return nil }
         switch source {
-        case "m73": return "mac.by_printer"
+        // NOT "as the printer shows it", which is what this said and which is
+        // a claim about somebody else's firmware — the exact mistake the note
+        // above warns about for the byte case, made here instead.
+        //
+        // M73 is the SLICER's own percentage, and it counts elapsed TIME. The
+        // panel on a Snapmaker U1 counts file position, so the two genuinely
+        // differ mid-print: 57% here against 63% there, on a print measured
+        // end to end. Both are right about different questions, and the caption
+        // has to say which one this is or the difference reads as a fault.
+        //
+        // Khayt's is the better clock, and that was measured rather than
+        // assumed: over thirty samples of one print, M73 predicted the finish
+        // to a mean of two minutes; the printer's own model was five, and wrong
+        // by thirteen at its worst.
+        case "m73": return "mac.by_time"
         case "layers": return "mac.by_layers"
         case "bytes": return "mac.by_bytes"
         default: return nil
