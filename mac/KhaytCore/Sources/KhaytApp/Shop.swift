@@ -46,6 +46,13 @@ final class Shop {
     private(set) var source: Source
     private(set) var orders: [Order] = []
     private(set) var files: [LibraryFile] = []
+
+    /// Show the models that have been put aside. Off: they are still there.
+    var libraryShowArchived = false
+
+    /// How many are hidden right now, so the library can offer to show them
+    /// rather than leave a shop wondering where a model went.
+    var archivedCount: Int { files.count { $0.isArchived } }
     private(set) var machines: [Machine] = []
     private(set) var spools: [Spool] = []
     /// The shop's own record of its customers. Read from the `clients`
@@ -5242,7 +5249,26 @@ final class Shop {
         panel.nameFieldStringValue = suggestedConvertName(file, target: target)
         panel.allowedContentTypes = [UTType(filenameExtension: "3mf")].compactMap { $0 }
         panel.canCreateDirectories = true
+
+        // ASKED HERE, WITH EVERYTHING ELSE ABOUT WHERE IT GOES.
+        //
+        // In the same panel as the name and the folder, because it is the same
+        // question — what this conversion is FOR. A shop converting a model to
+        // move to a new printer wants the old one out of the way; a shop
+        // keeping both wants both. Asking afterwards would be asking about work
+        // already done.
+        //
+        // OFF by default. Keeping both is the answer that loses nothing.
+        let replace = NSButton(checkboxWithTitle: words.callIt("mac.replace_original"),
+                               target: nil, action: nil)
+        replace.state = .off
+        let holder = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 30))
+        replace.frame = NSRect(x: 12, y: 5, width: 296, height: 20)
+        holder.addSubview(replace)
+        panel.accessoryView = holder
+
         guard panel.runModal() == .OK, let destination = panel.url else { return }
+        let replaceOriginal = replace.state == .on
 
         converting = true
         defer { converting = false }
@@ -5253,7 +5279,43 @@ final class Shop {
         do {
             _ = try await Converter.convert(source, into: destination,
                                             options: options, engine: engine)
-            convertNote = words.callIt("mac.converted", [
+
+            // AND INTO THE LIBRARY.
+            //
+            // A conversion used to end at a file in a folder. The shop then had
+            // to go and import the thing it had just made, in the one app whose
+            // whole job is knowing what models it has — so the converted file
+            // was the only model in the building Khayt did not know about.
+            //
+            // `keepOriginal: true` because the shop chose that folder in a save
+            // panel a moment ago. The import copies the bytes in and would
+            // otherwise take the file away from where it was just asked to put
+            // it. The library ends up with its own copy, which is what the
+            // library is.
+            //
+            // A failed import is NOT a failed conversion: the file exists and is
+            // correct, and saying otherwise would send a shop looking for a
+            // problem with a conversion that worked. It is said separately.
+            var landed = false
+            do {
+                _ = try await LibraryImport.add(destination, shop: self, keepOriginal: true)
+                landed = true
+            } catch let refusal as LibraryImport.Failure {
+                convertProblem = refusal.description
+            } catch {
+                convertProblem = String(describing: error)
+            }
+
+            // Only once the replacement is IN the library. Putting the
+            // original aside in favour of a file the library does not have
+            // would leave the shop with neither.
+            if replaceOriginal, landed,
+               let replacement = files.first(where: { $0.name == destination.lastPathComponent })
+                                 ?? files.first(where: { $0.title == destination.deletingPathExtension().lastPathComponent }) {
+                await supersede(file, with: replacement.id)
+            }
+
+            convertNote = words.callIt(landed ? "mac.converted_into_library" : "mac.converted", [
                 "name": .string(destination.lastPathComponent),
                 "target": .string(target?.name ?? words.callIt("mac.standard_3mf")),
             ])
@@ -5262,6 +5324,49 @@ final class Shop {
         } catch {
             convertProblem = String(describing: error)
         }
+    }
+
+    /// Put a model aside because another has taken its place.
+    ///
+    /// ARCHIVED, NOT DELETED. A job printed from this model months ago was
+    /// printed from THESE bytes. Deleting them so the converted file could take
+    /// the record's place would make that job appear to have been printed from
+    /// a file it never saw, and a book that misreports its own history is worse
+    /// than a library with one extra thing in it.
+    ///
+    /// So the record keeps everything it had, gains the date and the id of what
+    /// replaced it, and stops being offered. The file stays where it is.
+    func supersede(_ original: LibraryFile, with replacement: String) async {
+        guard let build = source.build else { return }
+        let now = ISO8601DateFormatter().string(from: Date())
+        do {
+            try StoreWriter.updateRecord(build, collection: "printFiles", id: original.id) { record in
+                record["archivedAt"] = .string(now)
+                record["supersededBy"] = .string(replacement)
+            }
+        } catch {
+            convertProblem = String(describing: error)
+            return
+        }
+        await load(source)
+    }
+
+    /// Bring a model back into the library.
+    ///
+    /// The other half, because a one-way door is not a decision a shop should
+    /// have to be sure about before it makes it.
+    func unarchive(_ file: LibraryFile) async {
+        guard let build = source.build else { return }
+        do {
+            try StoreWriter.updateRecord(build, collection: "printFiles", id: file.id) { record in
+                record.removeValue(forKey: "archivedAt")
+                record.removeValue(forKey: "supersededBy")
+            }
+        } catch {
+            convertProblem = String(describing: error)
+            return
+        }
+        await load(source)
     }
 
     /// `Falcon hood — Snapmaker U1.3mf`. The target in the name, because a
@@ -7910,6 +8015,11 @@ final class Shop {
 
     var shownFiles: [LibraryFile] {
         var rows = files
+        // A model a conversion has replaced is put aside rather than deleted —
+        // see `LibraryFile.archivedAt`. It is still in the book, still on disk
+        // and still what a past job was printed from; it is simply not one of
+        // the things the shop is choosing between today.
+        if !libraryShowArchived { rows = rows.filter { !$0.isArchived } }
         if case .library(let group) = shelf, let group {
             rows = rows.filter { $0.groupName == group }
         }

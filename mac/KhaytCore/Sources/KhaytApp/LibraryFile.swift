@@ -42,6 +42,20 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let category: String?
     let material: String?
     let favorite: Bool?
+    /// When this model was put aside, superseded by another.
+    ///
+    /// ARCHIVED, NOT DELETED, and the difference matters to the book. A job
+    /// printed six months ago was printed from THESE bytes, and deleting them
+    /// so a converted file could take their place would make that job appear to
+    /// have been printed from a file it never saw. The record stays, the file
+    /// stays, and the library simply stops offering it.
+    let archivedAt: String?
+    /// The model that took its place, by id. Absent when a model was put aside
+    /// on its own rather than replaced by a conversion.
+    let supersededBy: String?
+
+    /// Put aside: still in the book, not in the library's list.
+    var isArchived: Bool { !(archivedAt ?? "").isEmpty }
     /// SHA-256 of the file's bytes.
     ///
     /// The CERTAIN half of `lib/model-identity.js`'s pair — "the bytes are

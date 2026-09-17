@@ -855,6 +855,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   measured pass rather than a substitution.
 
 ### Added
+- **(Mac) A converted model goes into the library, and can put the original
+  aside.** A conversion used to end at a file in a folder. The shop then had to
+  go and import the thing it had just made — in the one app whose whole job is
+  knowing what models it has — so the converted file was the only model in the
+  building Khayt did not know about. It is added to the library now, and it
+  still lands in the folder the save panel asked about, because that is where
+  the shop just said to put it.
+
+  The save panel also offers to put the original aside. **Aside, not deleted.**
+  A job printed six months ago was printed from the original's bytes, and
+  removing them so the converted file could take the record's place would make
+  that job appear to have been printed from a file it never saw. So the record
+  keeps everything it had, gains the date and the id of what replaced it, and
+  stops being offered by the library; the file stays where it is. It can be
+  brought back. Keeping both is the default, because that is the answer that
+  loses nothing.
+
 - **A job can be marked shipped.** Between finishing a job and handing it over
   there was nowhere to say it had gone in the post, so a parcel sitting with a
   courier looked exactly like one still on the bench. The board has a Shipped
