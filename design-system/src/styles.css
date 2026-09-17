@@ -1,0 +1,221 @@
+/* Khayt's look, for the web.
+ *
+ * The tokens are generated from the Mac app's own source — see
+ * `.design-sync/extract-tokens.mjs`. Everything below is the geometry those
+ * tokens are spent on, written once here so that "a card" is a decision made
+ * in one place rather than at ninety call sites with slightly different
+ * numbers. That is the same reason the Mac app has one `.card()` modifier.
+ */
+@import "./tokens/khayt.css";
+
+/* ── The ground ─────────────────────────────────────────────────────────── */
+
+.khayt-theme {
+  background: var(--khayt-ground);
+  color: var(--khayt-note);
+  font-family: var(--khayt-font-system);
+  font-size: var(--khayt-size-body);
+  line-height: 1.45;
+  /* The tokens are defined on :root and inherit, but a theme pinned with
+     `mode` needs them redefined on this element — the [data-theme] block in
+     the token file does exactly that, and this is what it attaches to. */
+}
+
+/* ── The card ───────────────────────────────────────────────────────────── */
+
+.khayt-card {
+  position: relative;
+  background: var(--khayt-surface);
+  border: var(--khayt-hairline-width) solid var(--khayt-hairline);
+  border-radius: var(--khayt-radius);
+  padding: var(--khayt-card-padding);
+  color: var(--khayt-note);
+}
+
+/* A card with nothing to say gets no rail. The bar is clipped to the card's
+   own shape so it takes the corner radius on the two corners it touches and
+   stays square on the two it does not — a rounded pill floating inside the
+   edge reads as a stray element rather than as part of the card. */
+.khayt-card[data-rail] { padding-inline-start: calc(var(--khayt-card-padding) + var(--khayt-rail-inset)); }
+.khayt-card[data-rail]::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--khayt-rail-width);
+  background: var(--khayt-card-rail);
+}
+
+.khayt-card--fills { height: 100%; }
+
+/* ── Type ───────────────────────────────────────────────────────────────── */
+
+.khayt-caps {
+  font-family: var(--khayt-font-brand);
+  font-size: var(--khayt-caps-size, var(--khayt-size-label));
+  font-weight: var(--khayt-weight-label);
+  letter-spacing: var(--khayt-track-label);
+  text-transform: uppercase;
+  color: var(--khayt-caps-tone, var(--khayt-note));
+}
+
+.khayt-figure {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+.khayt-figure__value {
+  /* Semibold, not bold: at this size bold is shouting, and everything on the
+     screen would then have to shout back. */
+  font-family: var(--khayt-font-brand);
+  font-size: var(--khayt-figure-size, 34px);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--khayt-figure-tone, var(--khayt-surface-ink, inherit));
+}
+.khayt-figure__unit {
+  font-size: calc(var(--khayt-figure-size, 34px) * 0.42);
+  font-weight: 500;
+  color: var(--khayt-note);
+}
+
+/* ── Chip ───────────────────────────────────────────────────────────────── */
+
+.khayt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--khayt-chip-tone);
+  /* A wash of the same hue rather than a second colour, so a chip never
+     introduces a colour the palette has not accounted for. */
+  background: color-mix(in srgb, var(--khayt-chip-tone) 13%, transparent);
+}
+.khayt-chip__icon { font-size: 9px; font-weight: 700; line-height: 1; }
+
+/* ── Stage pill ─────────────────────────────────────────────────────────── */
+
+.khayt-stage {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: var(--khayt-size-label);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  /* No tone is the common case and is meant to be: the pill says where the job
+     is, and colour is kept for the few stages that are actually news. */
+  color: var(--khayt-stage-tone, var(--khayt-note));
+  background: color-mix(in srgb, var(--khayt-stage-tone, var(--khayt-note)) 12%, transparent);
+}
+
+/* ── Board ──────────────────────────────────────────────────────────────── */
+
+.khayt-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  inline-size: 196px;
+  flex: 0 0 196px;
+}
+.khayt-lane__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 2px;
+  font-family: var(--khayt-font-brand);
+  font-size: var(--khayt-size-title);
+  font-weight: var(--khayt-weight-title);
+}
+.khayt-lane__dot {
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: 50%;
+  background: var(--khayt-lane-tone, var(--khayt-hairline));
+  flex: none;
+}
+.khayt-lane__name { flex: 1; }
+.khayt-lane__count {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--khayt-size-row);
+  color: var(--khayt-note);
+}
+.khayt-lane__body { display: flex; flex-direction: column; gap: 6px; }
+.khayt-lane__empty {
+  margin: 0;
+  padding-block: 18px;
+  text-align: center;
+  font-size: var(--khayt-size-row);
+  color: var(--khayt-note);
+  opacity: 0.7;
+}
+
+.khayt-job {
+  background: var(--khayt-surface);
+  border: var(--khayt-hairline-width) solid var(--khayt-hairline);
+  border-radius: var(--khayt-radius);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.khayt-job__top { display: flex; align-items: flex-start; gap: 7px; }
+.khayt-job__thumb {
+  inline-size: 34px;
+  block-size: 34px;
+  border-radius: 5px;
+  overflow: hidden;
+  flex: none;
+  background: var(--khayt-ground);
+}
+.khayt-job__text { min-inline-size: 0; flex: 1; }
+.khayt-job__title {
+  margin: 0;
+  font-size: var(--khayt-size-row);
+  font-weight: 500;
+  display: flex;
+  align-items: first baseline;
+  gap: 5px;
+}
+.khayt-job__flag { color: var(--khayt-attention); font-size: 10px; flex: none; }
+.khayt-job__client,
+.khayt-job__material { margin: 2px 0 0; font-size: var(--khayt-size-label); color: var(--khayt-note); }
+.khayt-job__material { opacity: 0.8; }
+.khayt-job__footer { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* ── Stat, sidebar, empty ───────────────────────────────────────────────── */
+
+.khayt-stat { display: flex; flex-direction: column; gap: 3px; }
+.khayt-stat__note { margin: 0; font-size: var(--khayt-size-label); color: var(--khayt-note); }
+
+.khayt-navrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: var(--khayt-size-row);
+  font-weight: var(--khayt-weight-row);
+}
+.khayt-navrow[data-selected] {
+  background: color-mix(in srgb, var(--khayt-brand) 14%, transparent);
+  color: var(--khayt-brand);
+}
+.khayt-navrow__icon { flex: none; opacity: 0.85; }
+.khayt-navrow__label { flex: 1; }
+.khayt-navrow__count { font-variant-numeric: tabular-nums; color: var(--khayt-note); }
+
+.khayt-empty { padding: 28px 16px; text-align: center; }
+.khayt-empty__title {
+  margin: 0;
+  font-family: var(--khayt-font-brand);
+  font-size: var(--khayt-size-title);
+  font-weight: var(--khayt-weight-title);
+}
+.khayt-empty__body { margin: 4px 0 0; font-size: var(--khayt-size-row); color: var(--khayt-note); }
