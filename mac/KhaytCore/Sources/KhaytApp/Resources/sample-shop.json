@@ -2396,7 +2396,19 @@
     "gramsAtInstall": 0
    },
    "kind": "fdm",
-   "targetHoursPerDay": 14
+   "targetHoursPerDay": 14,
+   "downtimeBlocks": [
+    {
+     "from": "2026-07-20T09:00:00.000Z",
+     "to": "2026-07-20T17:00:00.000Z",
+     "reason": "Hotend service"
+    },
+    {
+     "from": "2026-09-03T09:00:00.000Z",
+     "to": "2026-09-04T12:00:00.000Z",
+     "reason": "Nozzle jam"
+    }
+   ]
   },
   {
    "id": "MACH-core-one",
@@ -2455,7 +2467,19 @@
     "gramsAtInstall": 0
    },
    "kind": "fdm",
-   "targetHoursPerDay": 16
+   "targetHoursPerDay": 16,
+   "downtimeBlocks": [
+    {
+     "from": "2026-08-08T08:00:00.000Z",
+     "to": "2026-08-10T08:00:00.000Z",
+     "reason": "Belt change"
+    },
+    {
+     "from": "2026-08-09T08:00:00.000Z",
+     "to": "2026-08-11T08:00:00.000Z",
+     "reason": "Waiting for the part"
+    }
+   ]
   },
   {
    "id": "MACH-UVFLAT",
@@ -2487,7 +2511,14 @@
    },
    "powerDraw": 1400,
    "createdAt": "2026-05-02",
-   "targetHoursPerDay": 6
+   "targetHoursPerDay": 6,
+   "downtimeBlocks": [
+    {
+     "from": "2026-07-05T08:00:00.000Z",
+     "to": "2026-07-06T18:00:00.000Z",
+     "reason": "Lens clean, mirror align"
+    }
+   ]
   }
  ],
  "printFiles": [

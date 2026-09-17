@@ -61,6 +61,10 @@ struct Reports: View {
     /// What servicing each machine cost this year. The book already held this
     /// list — it is what the machine P&L subtracts — and nothing drew it.
     @State private var maintenance: [KhaytEngine.MaintenanceCostRow] = []
+    /// How long each machine was out of action, over three months. The rule
+    /// has been bundled since the scheduler started using it; nothing drew it.
+    @State private var downtime: [KhaytEngine.DowntimeRow] = []
+    @State private var downtimeMonths: [String] = []
     /// How far each machine runs from its quote, and the shop's own figure.
     /// Not filtered to the chosen period: a machine's calibration is not a
     /// property of this quarter, and the measured-only filter already thins the
@@ -96,7 +100,8 @@ struct Reports: View {
             } else if shop.reportPage == .machines {
                 MachineProfitPage(shop: shop, report: machinePL,
                                   accuracy: accuracy, shopAccuracy: shopAccuracy,
-                                  maintenance: maintenance)
+                                  maintenance: maintenance,
+                                  downtime: downtime, downtimeMonths: downtimeMonths)
             } else if shop.reportPage == .custom {
                 CustomReportPage(shop: shop)
             } else if rows.isEmpty {
@@ -320,6 +325,7 @@ struct Reports: View {
         await recomputeSources()
         await recomputeSpending()
         await recomputeMaintenance()
+        await recomputeDowntime()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
@@ -506,6 +512,29 @@ struct Reports: View {
         maintenance = (try? await engine.maintenanceCost(
             machines: shop.machineRows, entries: shop.maintenanceRows,
             year: MachineProfitPage.thisYear())) ?? []
+    }
+
+    private func recomputeDowntime() async {
+        guard let engine = shop.engine else { downtime = []; downtimeMonths = []; return }
+        // THREE MONTHS, the window the other app draws. Long enough to show a
+        // machine that keeps going down and short enough that a repair last
+        // spring is not still being counted against a printer.
+        let calendar = Calendar.current
+        var periods: [(from: Date, to: Date)] = []
+        var keys: [String] = []
+        for back in stride(from: 2, through: 0, by: -1) {
+            guard let day = calendar.date(byAdding: .month, value: -back, to: Date()),
+                  let month = calendar.dateInterval(of: .month, for: day)
+            else { continue }
+            periods.append((from: month.start, to: month.end))
+            let parts = calendar.dateComponents([.year, .month], from: day)
+            if let y = parts.year, let m = parts.month {
+                keys.append(String(format: "%04d-%02d", y, m))
+            }
+        }
+        downtimeMonths = keys
+        downtime = (try? await engine.downtimeHours(machines: shop.machineRows,
+                                                    months: periods)) ?? []
     }
 
     private func recomputeMachinePL() async {

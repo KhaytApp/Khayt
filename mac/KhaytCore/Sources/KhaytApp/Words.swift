@@ -630,6 +630,8 @@ final class Words {
                               "ar": "سجِّلها أيضاً كمصروف"],
         "mac.sl_as_expense_why": ["en": "This machine's profit already has its servicing taken off it, so recording the repair as an expense as well counts the money twice. Tick this only if you keep maintenance in your expenses.",
                               "ar": "رِبح هذه الآلة مخصوم منه أصلاً تكلفة صيانتها، لذا تسجيل الإصلاح كمصروف أيضاً يحتسب المبلغ مرتين. علِّم هذا فقط إن كنت تُدرج الصيانة ضمن مصروفاتك."],
+        "mac.dt_none":       ["en": "No machine has been booked out of action in these months.",
+                              "ar": "لم تُسجَّل أي آلة خارج الخدمة في هذه الأشهر."],
         "mac.ec_reclaimed":  ["en": "{amount} of tax on these is reclaimable, so it is not charged as a cost.",
                               "ar": "{amount} من الضريبة على هذه قابلة للاسترداد، لذا لا تُحتسب تكلفةً."],
         // Report builder — the shared catalogue has the screen's own words

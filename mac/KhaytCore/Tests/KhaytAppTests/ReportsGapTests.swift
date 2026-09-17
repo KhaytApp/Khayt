@@ -18,6 +18,52 @@ struct ReportsGapTests {
 
 
 
+    @Test("two overlapping windows are 72 hours out of action, not 96")
+    func downtimeIsTheUnion() async throws {
+        let engine = try KhaytEngine()
+        // A belt change Monday to Wednesday, and "waiting for the part"
+        // Tuesday to Thursday. Both true, both recorded, and the machine is
+        // unavailable for one stretch of 72 hours.
+        let day = 86_400.0
+        let monday = Date(timeIntervalSince1970: 1_767_225_600)   // 2026-01-01
+        func iso(_ d: Date) -> String {
+            let f = ISO8601DateFormatter()
+            return f.string(from: d)
+        }
+        let machines: [JSONValue] = [.object([
+            "id": .string("m1"), "name": .string("X1C"),
+            "downtimeBlocks": .array([
+                .object(["from": .string(iso(monday)), "to": .string(iso(monday + 2 * day))]),
+                .object(["from": .string(iso(monday + day)), "to": .string(iso(monday + 3 * day))]),
+            ]),
+        ])]
+        let rows = try await engine.downtimeHours(
+            machines: machines, months: [(from: monday - day, to: monday + 10 * day)])
+        let row = try #require(rows.first)
+        #expect(abs(row.total - 72) < 0.001,
+                Comment(rawValue: "summing the windows gives 96; got \(row.total)"))
+        #expect(row.name == "X1C")
+    }
+
+    @Test("a machine that never went down is not a row of zeros")
+    func downtimeSkipsHealthyMachines() async throws {
+        let engine = try KhaytEngine()
+        let machines: [JSONValue] = [
+            .object(["id": .string("fine"), "name": .string("Never down")]),
+            .object(["id": .string("m1"), "name": .string("Down once"),
+                     "downtimeBlocks": .array([.object([
+                        "from": .string("2026-01-01T00:00:00Z"),
+                        "to": .string("2026-01-01T06:00:00Z")])])]),
+        ]
+        let rows = try await engine.downtimeHours(
+            machines: machines,
+            months: [(from: Date(timeIntervalSince1970: 1_767_225_600),
+                      to: Date(timeIntervalSince1970: 1_767_225_600 + 86_400 * 31))])
+        #expect(rows.count == 1, "a machine with nothing to say got a row anyway")
+        #expect(rows[0].machineId == "m1")
+        #expect(abs(rows[0].total - 6) < 0.001)
+    }
+
     @Test("maintenance comes from the book's own list, for the year asked")
     func maintenanceCost() async throws {
         let engine = try KhaytEngine()
