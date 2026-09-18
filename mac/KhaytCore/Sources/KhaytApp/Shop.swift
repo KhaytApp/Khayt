@@ -7836,6 +7836,69 @@ final class Shop {
     /// shells can raise it.
     var editingTemplate: MessageTemplate?
 
+    // MARK: - The shop's own mark
+
+    /// The logo as the book holds it, or empty.
+    var bizLogo: String {
+        guard case .object(let s) = settingsValue else { return "" }
+        let stored = Shop.plainString(s["bizLogo"]) ?? ""
+        // Read through the SAME test the document applies. A picture Settings
+        // showed and the invoice refused would be the worst of both.
+        return stored.hasPrefix("data:image/") ? stored : ""
+    }
+
+    /// Put a picture on the shop's documents.
+    ///
+    /// Written straight onto `settings.bizLogo` rather than through a form:
+    /// `settings-edit.js` keeps `out.bizLogo = s.bizLogo || ''`, so it
+    /// preserves what it finds and takes none from a form.
+    func setLogo(from url: URL) {
+        writeProblem = nil
+        guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
+        let uri: String
+        do { uri = try ShopLogo.dataURI(of: url) }
+        catch let refused as ShopLogo.Refused {
+            // The refusal's own sentence — too big, or not a picture — because
+            // each of them tells the shop something different to do.
+            writeProblem = words.callIt(refused.errorDescription ?? "")
+            return
+        } catch {
+            writeProblem = String(describing: error)
+            return
+        }
+        write { root in
+            var settings = Self.settings(root)
+            settings["bizLogo"] = .string(uri)
+            root["settings"] = .object(settings)
+        }
+    }
+
+    /// Take it off again, back to Khayt's own mark on the document.
+    func clearLogo() {
+        writeProblem = nil
+        guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
+        write { root in
+            var settings = Self.settings(root)
+            // The EMPTY STRING, which is what `settings-edit` writes for an
+            // absent one — not a removed key, which a merge could resurrect
+            // from an older copy on another machine.
+            settings["bizLogo"] = .string("")
+            root["settings"] = .object(settings)
+        }
+    }
+
+    /// Ask for a picture, then put it on the documents.
+    func pickLogo() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .gif, .webP]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = words.callIt("set.logo")
+        panel.prompt = words.callIt("set.logo_upload")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        setLogo(from: url)
+    }
+
     // MARK: - How much of the app the shop wants
 
     /// The two modes Khayt offers. `enthusiast` exists in the book and is NOT

@@ -160,6 +160,37 @@ struct BusinessPane: View {
                     row(shop.words.callIt("set.phone")) { TextField("", text: $draft.phone) }
                     row(shop.words.callIt("set.email")) { TextField("", text: $draft.email) }
                 }
+                // ── THE MARK ON THE SHOP'S DOCUMENTS ──────────────────────
+                //
+                // Saved on the spot rather than with the bar below, and not in
+                // `Draft`: `settings-edit.js` keeps `out.bizLogo = s.bizLogo
+                // || ''`, so it preserves what it finds and takes none from a
+                // form. A logo sent through the Save bar would be read and
+                // thrown away.
+                Section(shop.words.callIt("set.logo")) {
+                    HStack(spacing: 12) {
+                        if let mark = ShopLogo.image(from: shop.bizLogo) {
+                            Image(nsImage: mark)
+                                .resizable().scaledToFit()
+                                .frame(width: 96, height: 48)
+                                // The paper is white; a dark logo on a dark
+                                // settings pane looks like nothing at all.
+                                .padding(6)
+                                .background(.white, in: RoundedRectangle(cornerRadius: 6))
+                        }
+                        Button(shop.words.callIt("set.logo_upload")) { shop.pickLogo() }
+                            .disabled(!shop.canWrite)
+                        if !shop.bizLogo.isEmpty {
+                            Button(shop.words.callIt("set.logo_remove"), role: .destructive) {
+                                shop.clearLogo()
+                            }
+                            .disabled(!shop.canWrite)
+                        }
+                        Spacer()
+                    }
+                    Text(shop.words.callIt("set.logo_too_big"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 // ── THE REDESIGNED WINDOW ─────────────────────────────────
                 //
                 // Off by default while the rest of the app is migrated screen
