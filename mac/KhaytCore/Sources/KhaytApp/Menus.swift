@@ -371,6 +371,15 @@ private struct JobMenu: View {
         }
         .keyboardShortcut("e", modifiers: [.command, .shift])
         .disabled(!canMove)
+        // A LABEL FOR THE BOX. The shelf could be labelled from here and a job
+        // could not, so a parcel going out of the door had to be labelled from
+        // the other app.
+        Button(Words.upfront("ord.label_btn") + "\u{2026}") {
+            guard let id = shop.selection else { return }
+            Task { await shop.askForOrderLabels([id]) }
+        }
+        .disabled(job == nil)
+
         // WHAT THE CUSTOMER THOUGHT. Offered on finished work only, the way
         // the other app offers it — a rating on a job still on the bench would
         // be counted by every reader as the finished job's.
