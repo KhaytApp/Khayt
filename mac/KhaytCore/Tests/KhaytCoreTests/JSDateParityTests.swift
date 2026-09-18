@@ -147,3 +147,34 @@ struct JSDateParityTests {
         }
     }
 }
+
+/// `getDay()` and `getHours()`, against the engine's own readers.
+///
+/// The working week is indexed by `getDay()`, so an off-by-one here moves a
+/// shop's whole week — and the hour is what the throughput grid is drawn from.
+@MainActor
+struct JSDateLocalPartsParityTests {
+
+    private func js() throws -> JSModule { try JSModule([]) }
+
+    @Test("the weekday and the hour agree, across the epoch and across the day")
+    func partsMatch() throws {
+        let js = try js()
+        var instants: [Double] = [0, -1, 1, -86_400_000, 86_400_000,
+                                  1_790_000_000_000, 1_767_225_600_000, 1e12, -1e12]
+        // Every hour of one local day, and the seam on either side of it.
+        for hour in -2...26 { instants.append(1_789_000_000_000 + Double(hour) * 3_600_000) }
+        // And a week, to catch a weekday that is one out.
+        for day in 0..<8 { instants.append(1_789_000_000_000 + Double(day) * 86_400_000) }
+        for ms in instants {
+            let mine = JSDate.localDayAndHour(ms: ms)
+            guard case .array(let pair) = try js.value(
+                "(function (t) { var d = new Date(t); return [d.getDay(), d.getHours()]; })(ARG0)",
+                [.number(ms)]), pair.count == 2,
+                  case .number(let day) = pair[0], case .number(let hour) = pair[1]
+            else { Issue.record("no answer for \(ms)"); continue }
+            #expect(mine.weekday == Int(day) && mine.hour == Int(hour),
+                    Comment(rawValue: "\(ms): swift \(mine) vs js (\(Int(day)), \(Int(hour)))"))
+        }
+    }
+}

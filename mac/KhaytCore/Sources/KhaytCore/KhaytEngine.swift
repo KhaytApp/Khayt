@@ -649,7 +649,6 @@ public actor KhaytEngine {
         // to "which jobs count" is a second answer to when a nozzle is due.
         "maintenance",
         // When the shop actually finishes work.
-        "throughput",
         // What the shelf costs, and whether that has moved.
         "material-cost",
         // How much passes inspection, and how much first time.
@@ -3875,14 +3874,21 @@ public actor KhaytEngine {
         }
     }
 
+    /// Native since the port — `KhaytCore.Throughput`, with the grid's shape
+    /// kept as it was so the card that draws it did not have to move.
     public func throughput(orders: [JSONValue], openDays: [Bool],
                            minimum: Int) throws -> Throughput {
-        try runtime.call2(#"""
-        globalThis.KhaytThroughput.throughput({
-          orders: ARG0, openDays: ARG1, minimum: ARG2,
-        }, {})
-        """#, [.array(orders), .array(openDays.map { .bool($0) }),
-               .number(Double(minimum))], as: Throughput.self)
+        let g = KhaytCore.Throughput.grid(orders: orders, openDays: openDays,
+                                          minimum: Double(minimum))
+        return Throughput(
+            matrix: g.matrix,
+            byDay: g.byDay.map { Throughput.Day(day: $0.day, jobs: $0.jobs, open: $0.open) },
+            byHour: g.byHour.map { Throughput.Hour(hour: $0.hour, jobs: $0.jobs) },
+            totals: Throughput.Totals(
+                jobs: g.totals.jobs, enough: g.totals.enough,
+                busiestDay: g.totals.busiestDay, busiestHour: g.totals.busiestHour,
+                onClosedDays: g.totals.onClosedDays,
+                closedDayShare: g.totals.closedDayShare, peak: g.totals.peak))
     }
 
     /// Which days the shop works, by `getDay()` index — `working-week` reading
