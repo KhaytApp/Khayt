@@ -294,7 +294,7 @@
           <input type="file" id="stlFileInput" accept=".stl,.obj,.3mf,.gcode,.gco,model/stl,application/sla" style="display:none;">
           <div id="stlEstimateNote" style="display:none;font-size:12px;color:var(--text-muted);margin-top:6px;padding:8px 10px;background:var(--bg-elev);border-radius:var(--radius);"></div>
 
-          <label style="margin-top:8px;"><span data-i18n="calc.support_wt">Support weight (g)</span></label>
+          <label style="margin-top:8px;" for="supportWeight"><span data-i18n="calc.support_wt">Support weight (g)</span></label>
           <input type="number" id="supportWeight" value="0" min="0" placeholder="0">
 
           <label style="margin-top:8px;" data-i18n="link.from_library">From your print library</label>
@@ -304,7 +304,7 @@
           </div>
           <div id="partLinkHint" style="display:none;font-size:11px;color:var(--text-muted);margin-top:4px;"></div>
 
-          <label style="margin-top:8px;"><span data-i18n="calc.part_note">Part note</span></label>
+          <label style="margin-top:8px;" for="partNote"><span data-i18n="calc.part_note">Part note</span></label>
           <input type="text" id="partNote" data-i18n-placeholder="calc.part_note_ph" placeholder="e.g. special requirements…">
 
           <!-- Extra materials (Feature 8) -->
@@ -315,15 +315,15 @@
             <summary style="cursor:pointer; font-size:12px; color:var(--text-muted); user-select:none;" data-i18n="calc.print_settings">⚙️ Print settings (optional)</summary>
             <div class="inline-pair" style="margin-top:8px;">
               <div>
-                <label><span data-i18n="calc.layer_height">Layer height</span> (mm)</label>
+                <label for="layerHeight"><span data-i18n="calc.layer_height">Layer height</span> (mm)</label>
                 <input type="number" id="layerHeight" step="0.05" min="0.05" max="1" placeholder="0.2">
               </div>
               <div>
-                <label><span data-i18n="calc.infill">Infill</span> (%)</label>
+                <label for="infill"><span data-i18n="calc.infill">Infill</span> (%)</label>
                 <input type="number" id="infill" min="0" max="100" step="5" placeholder="20">
               </div>
             </div>
-            <label data-i18n="calc.profile">Profile name</label>
+            <label data-i18n="calc.profile" for="printProfile">Profile name</label>
             <input type="text" id="printProfile" data-i18n-placeholder="calc.profile_ph" placeholder="Quality 0.2mm">
             <label style="margin-top:10px;" data-i18n="calc.file_ref">File / STL reference</label>
             <div style="display:flex;gap:6px;align-items:center;">
@@ -346,7 +346,7 @@
 
           <div class="preset-row">
             <div style="flex:1;">
-              <label data-i18n="calc.machine.preset" style="margin-top:0;">Printer preset</label>
+              <label data-i18n="calc.machine.preset" style="margin-top:0;" for="printerPreset">Printer preset</label>
               <select id="printerPreset" style="margin:0;"></select>
             </div>
             <button class="btn small" id="btnSavePreset" style="margin-bottom:1px;" data-i18n="calc.machine.save_preset">Save preset</button>
@@ -354,23 +354,23 @@
           </div>
           <div class="preset-row" style="margin-top:8px;">
             <div style="flex:1;">
-              <label data-i18n="tpl.job_label" style="margin-top:0;">Job template</label>
+              <label data-i18n="tpl.job_label" style="margin-top:0;" for="jobTemplateSelect">Job template</label>
               <select id="jobTemplateSelect" style="margin:0;"></select>
             </div>
             <button class="btn small primary" id="btnSaveJobTemplate" style="margin-bottom:1px;" data-i18n="tpl.job_save">Save template</button>
             <button class="btn small danger" id="btnDeleteJobTemplate" style="display:none; margin-bottom:1px;" data-i18n="tpl.job_del">Delete</button>
           </div>
 
-          <label data-i18n="calc.machine.printer">Printer name</label>
+          <label data-i18n="calc.machine.printer" for="printerModel">Printer name</label>
           <input type="text" id="printerModel" value="Prusa CORE One+">
 
           <div class="inline-pair">
             <div>
-              <label><span data-i18n="calc.machine.time">Print time</span> (<span data-i18n="common.hours">hrs</span>)</label>
+              <label for="printTime"><span data-i18n="calc.machine.time">Print time</span> (<span data-i18n="common.hours">hrs</span>)</label>
               <input type="number" id="printTime" value="5.5" step="0.1" min="0">
             </div>
             <div>
-              <label><span data-i18n="calc.machine.wear">Wear & tear</span> (<span data-i18n="common.currency">SAR</span> <span data-i18n="calc.machine.per_hr">/ hr</span>)</label>
+              <label for="wearRate"><span data-i18n="calc.machine.wear">Wear & tear</span> (<span data-i18n="common.currency">SAR</span> <span data-i18n="calc.machine.per_hr">/ hr</span>)</label>
               <input type="number" id="wearRate" value="0.75" step="0.05" min="0" data-tip="tip.wear_rate">
             </div>
           </div>
@@ -380,7 +380,7 @@
                 <!-- Resin exposure profile preset row -->
                 <div class="preset-row" style="margin-bottom:8px;">
                   <div style="flex:1;">
-                    <label data-i18n="resin.profile_label" style="margin-top:0;">Resin profile</label>
+                    <label data-i18n="resin.profile_label" style="margin-top:0;" for="resinProfileSelect">Resin profile</label>
                     <select id="resinProfileSelect" style="margin:0;"></select>
                   </div>
                   <button class="btn small primary" id="btnSaveResinProfile" style="margin-bottom:1px;" data-i18n="resin.save_profile">Save profile</button>
@@ -388,27 +388,27 @@
                 </div>
                 <div class="inline-pair" style="margin-top:8px;">
                   <div>
-                    <label data-i18n="calc.resin.layers">Layer Count</label>
+                    <label data-i18n="calc.resin.layers" for="resinLayers">Layer Count</label>
                     <input type="number" id="resinLayers" min="1" step="1" placeholder="200">
                   </div>
                   <div>
-                    <label data-i18n="calc.resin.layer_height">Layer Height (mm)</label>
+                    <label data-i18n="calc.resin.layer_height" for="resinLayerHeight">Layer Height (mm)</label>
                     <input type="number" id="resinLayerHeight" min="0.01" max="0.3" step="0.01" value="0.05">
                   </div>
                 </div>
                 <div class="inline-pair" style="margin-top:8px;">
                   <div>
-                    <label data-i18n="calc.resin.exposure">Exposure (s/layer)</label>
+                    <label data-i18n="calc.resin.exposure" for="resinExposure">Exposure (s/layer)</label>
                     <input type="number" id="resinExposure" min="0.1" step="0.1" placeholder="2.0">
                   </div>
                   <div>
-                    <label data-i18n="calc.resin.base_layers">Base Layers</label>
+                    <label data-i18n="calc.resin.base_layers" for="resinBaseLayers">Base Layers</label>
                     <input type="number" id="resinBaseLayers" min="0" step="1" placeholder="6">
                   </div>
                 </div>
                 <div class="inline-pair" style="margin-top:8px;">
                   <div>
-                    <label data-i18n="calc.resin.base_exposure">Base Exposure (s)</label>
+                    <label data-i18n="calc.resin.base_exposure" for="resinBaseExposure">Base Exposure (s)</label>
                     <input type="number" id="resinBaseExposure" min="0.1" step="0.1" placeholder="40">
                   </div>
                   <div style="display:flex;align-items:flex-end;">
@@ -419,11 +419,11 @@
 
           <div class="inline-pair">
             <div>
-              <label><span data-i18n="calc.machine.power">Power draw</span> (<span data-i18n="calc.machine.watts">Watts</span>)</label>
+              <label for="powerDraw"><span data-i18n="calc.machine.power">Power draw</span> (<span data-i18n="calc.machine.watts">Watts</span>)</label>
               <input type="number" id="powerDraw" value="150" step="10" min="0">
             </div>
             <div>
-              <label style="display:flex;align-items:center;gap:6px;justify-content:space-between;">
+              <label style="display:flex;align-items:center;gap:6px;justify-content:space-between;" for="elecRate">
                 <span><span data-i18n="calc.machine.elec">Electricity</span> (<span data-i18n="common.currency">SAR</span> <span data-i18n="calc.machine.per_kwh">/ kWh</span>)</span>
                 <button type="button" id="btnElecAuto" class="btn small ghost" style="font-size:11px;padding:2px 7px;" data-i18n-title="calc.elec_auto_hint" title="Fill from your location's typical electricity rate">📍 <span data-i18n="calc.elec_auto">Auto</span></button>
               </label>
@@ -435,16 +435,16 @@
         <div class="card labor">
           <h3 class="card-head"><span class="swatch"></span><span data-i18n="calc.labor.title">3. Labor & Overhead</span></h3>
 
-          <label><span data-i18n="calc.labor.prep">Slicer / prep time</span> (<span data-i18n="common.hours">hrs</span>)</label>
+          <label for="prepTime"><span data-i18n="calc.labor.prep">Slicer / prep time</span> (<span data-i18n="common.hours">hrs</span>)</label>
           <input type="number" id="prepTime" value="0.25" step="0.1" min="0">
 
-          <label><span data-i18n="calc.labor.post">Post-processing / assembly</span> (<span data-i18n="common.hours">hrs</span>)</label>
+          <label for="postTime"><span data-i18n="calc.labor.post">Post-processing / assembly</span> (<span data-i18n="common.hours">hrs</span>)</label>
           <input type="number" id="postTime" value="0.5" step="0.1" min="0">
 
-          <label><span data-i18n="calc.labor.rate">Labor rate</span> (<span data-i18n="common.currency">SAR</span> <span data-i18n="calc.labor.per_hour">/ hour</span>)</label>
+          <label for="laborRate"><span data-i18n="calc.labor.rate">Labor rate</span> (<span data-i18n="common.currency">SAR</span> <span data-i18n="calc.labor.per_hour">/ hour</span>)</label>
           <input type="number" id="laborRate" value="90" min="0">
 
-          <label style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <label style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;" for="failureRate">
             <span data-i18n="calc.labor.failure">Failure buffer</span> (<span data-i18n="common.percent">%</span>)
             <span id="failureRateHint" style="font-size:11px; color:var(--primary); font-weight:500; margin-inline-start:auto;"></span>
           </label>
@@ -457,7 +457,7 @@
           <!-- Quote templates -->
           <div class="preset-row" style="margin-bottom: 12px;">
             <div style="flex:1;">
-              <label data-i18n="calc.tpl.label" style="margin-top:0;">Quote template</label>
+              <label data-i18n="calc.tpl.label" style="margin-top:0;" for="quoteTplSelect">Quote template</label>
               <select id="quoteTplSelect" style="margin:0;"></select>
             </div>
             <button class="btn small" id="btnLoadTpl" data-i18n="calc.tpl.load">Load</button>
@@ -486,20 +486,20 @@
 
           <div class="inline-pair biz-only">
             <div>
-              <label style="display:flex;align-items:center;gap:8px;">
+              <label style="display:flex;align-items:center;gap:8px;" for="margin">
                 <span><span data-i18n="calc.quote.margin">Target profit margin</span> (<span data-i18n="common.percent">%</span>)</span>
                 <button type="button" class="btn ghost small" id="btnAiPrice" title="Suggest a margin from your pricing history" style="margin:0;padding:2px 8px;">✨ <span data-i18n="ai.price_btn">Suggest</span></button>
               </label>
               <input type="number" id="margin" value="30" min="0" data-tip="tip.margin">
             </div>
             <div>
-              <label><span data-i18n="calc.quote.discount">Discount</span> (<span data-i18n="common.percent">%</span>)</label>
+              <label for="discountPct"><span data-i18n="calc.quote.discount">Discount</span> (<span data-i18n="common.percent">%</span>)</label>
               <input type="number" id="discountPct" value="0" min="0" max="100" step="1">
             </div>
           </div>
           <div class="inline-pair biz-only" style="margin-top:10px;">
             <div>
-              <label><span data-i18n="oe.shipping">Shipping cost</span> (<span data-i18n="common.currency">SAR</span>)</label>
+              <label for="shippingCost"><span data-i18n="oe.shipping">Shipping cost</span> (<span data-i18n="common.currency">SAR</span>)</label>
               <input type="number" id="shippingCost" value="0" min="0" step="0.01">
             </div>
           </div>
@@ -532,17 +532,17 @@
               </div>
             </div>
             <div>
-              <label data-i18n="mach.assign">Assign to printer</label>
+              <label data-i18n="mach.assign" for="machineAssign">Assign to printer</label>
               <select id="machineAssign"></select>
             </div>
           </div>
           <div class="inline-pair" style="margin-top:8px;">
             <div class="biz-only">
-              <label data-i18n="calc.client_ref">Client PO / reference</label>
+              <label data-i18n="calc.client_ref" for="calcClientRef">Client PO / reference</label>
               <input type="text" id="calcClientRef" data-i18n-placeholder="calc.client_ref_ph" placeholder="e.g. PO-2024-001">
             </div>
             <div>
-              <label data-i18n="calc.currency">Currency</label>
+              <label data-i18n="calc.currency" for="calcCurrency">Currency</label>
               <select id="calcCurrency"></select>
             </div>
           </div>
@@ -1101,7 +1101,7 @@
 
           <div class="inline-pair" style="align-items:end;">
             <div>
-              <label data-i18n="inv.material">Brand & material</label>
+              <label data-i18n="inv.material" for="invMaterial">Brand & material</label>
               <input type="text" id="invMaterial" data-i18n-placeholder="inv.material_ph">
             </div>
             <div>
@@ -1121,7 +1121,7 @@
 
           <div class="inline-pair">
             <div>
-              <label data-i18n="inv.material_type">Material type</label>
+              <label data-i18n="inv.material_type" for="invMaterialType">Material type</label>
               <select id="invMaterialType">
                 <option value="fdm" data-i18n="inv.type_fdm">FDM Filament</option>
                 <option value="resin" data-i18n="inv.type_resin">Resin</option>
@@ -1129,22 +1129,22 @@
               </select>
             </div>
             <div>
-              <label><span data-i18n="inv.cost">Spool cost</span> (<span data-i18n="common.currency">SAR</span>)</label>
+              <label for="invCost"><span data-i18n="inv.cost">Spool cost</span> (<span data-i18n="common.currency">SAR</span>)</label>
               <input type="number" id="invCost" value="75" min="0">
             </div>
           </div>
           <div class="inline-pair">
             <div>
-              <label><span id="invWeightLabel" data-i18n="inv.weight">Spool weight</span> (<span id="invWeightUnitSpan" data-i18n="common.grams">g</span>)</label>
+              <label for="invWeight"><span id="invWeightLabel" data-i18n="inv.weight">Spool weight</span> (<span id="invWeightUnitSpan" data-i18n="common.grams">g</span>)</label>
               <input type="number" id="invWeight" value="1000" min="1">
             </div>
             <div>
-              <label data-i18n="inv.lot">Lot / Batch</label>
+              <label data-i18n="inv.lot" for="invLot">Lot / Batch</label>
               <input type="text" id="invLot" data-i18n-placeholder="inv.lot_ph">
             </div>
           </div>
           <div id="invLocationField" style="display:none; margin-top:8px;">
-            <label data-i18n="inv.location_branch">Location / Branch</label>
+            <label data-i18n="inv.location_branch" for="invLocation">Location / Branch</label>
             <select id="invLocation"></select>
           </div>
 
@@ -1302,9 +1302,9 @@
         <!-- Add expense form -->
         <div class="card">
           <h3 class="card-head"><span class="swatch"></span><span data-i18n="exp.add_title">Add Expense</span></h3>
-          <label data-i18n="exp.date">Date</label>
+          <label data-i18n="exp.date" for="expDate">Date</label>
           <input type="date" id="expDate" max="">
-          <label data-i18n="exp.category" style="margin-top:12px;">Category</label>
+          <label data-i18n="exp.category" style="margin-top:12px;" for="expCategory">Category</label>
           <select id="expCategory">
             <option value="filament"    data-i18n="exp.cat.filament">Filament</option>
             <option value="electricity" data-i18n="exp.cat.electricity">Electricity</option>
@@ -1314,7 +1314,7 @@
             <option value="other"       data-i18n="exp.cat.other">Other</option>
           </select>
           <div id="expCatSuggest" style="display:none; font-size:12px; margin-top:5px;"></div>
-          <label style="margin-top:12px;"><span data-i18n="exp.amount">Amount</span> (<span data-i18n="common.currency">SAR</span>)</label>
+          <label style="margin-top:12px;" for="expAmount"><span data-i18n="exp.amount">Amount</span> (<span data-i18n="common.currency">SAR</span>)</label>
           <input type="number" id="expAmount" min="0" step="0.01" placeholder="0.00">
           <!-- The tax on the supplier's invoice, as an amount: rates differ by
                line and an exempt or imported purchase carries none, so the shop
@@ -1322,20 +1322,20 @@
                nothing, which is what every expense recorded before this does.
                Hidden for a shop that is not registered — see wire-events.js. -->
           <div id="expVatRow" hidden>
-            <label data-i18n="exp.vat_paid" style="margin-top:12px;">VAT on it</label>
+            <label data-i18n="exp.vat_paid" style="margin-top:12px;" for="expVatAmount">VAT on it</label>
             <input type="number" id="expVatAmount" min="0" step="0.01" placeholder="0.00">
             <div class="hint" data-i18n="exp.vat_paid_hint">From the supplier's invoice. Reclaimed, so it is not a cost.</div>
           </div>
-          <label data-i18n="exp.note" style="margin-top:12px;">Note</label>
+          <label data-i18n="exp.note" style="margin-top:12px;" for="expNote">Note</label>
           <input type="text" id="expNote" data-i18n-placeholder="exp.note_ph">
-          <label data-i18n="exp.recurring" style="margin-top:12px;">Recurring</label>
+          <label data-i18n="exp.recurring" style="margin-top:12px;" for="expRecurring">Recurring</label>
           <select id="expRecurring">
             <option value="">— None —</option>
             <option value="monthly"   data-i18n="exp.recurring_monthly">Monthly</option>
             <option value="quarterly" data-i18n="exp.recurring_quarterly">Quarterly</option>
             <option value="annually"  data-i18n="exp.recurring_annually">Annually</option>
           </select>
-          <label data-i18n="exp.order_ref" style="margin-top:12px;">Link to order (optional)</label>
+          <label data-i18n="exp.order_ref" style="margin-top:12px;" for="expOrderRef">Link to order (optional)</label>
           <input type="text" id="expOrderRef" list="expOrderList" placeholder="Order ID (optional)" data-i18n-placeholder="exp.order_ref_ph">
           <datalist id="expOrderList"></datalist>
           <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
@@ -1528,11 +1528,11 @@
           <div class="settings-section-head" data-i18n="set.biz_contact">Contact</div>
           <div class="inline-pair" style="margin-bottom:10px;">
             <div>
-              <label data-i18n="set.phone">Phone</label>
+              <label data-i18n="set.phone" for="set_phone">Phone</label>
               <input type="tel" id="set_phone">
             </div>
             <div>
-              <label data-i18n="set.email">Email</label>
+              <label data-i18n="set.email" for="set_email">Email</label>
               <input type="email" id="set_email">
             </div>
           </div>
@@ -1543,11 +1543,11 @@
           <div class="settings-section-head" data-i18n="set.biz_tax">Tax &amp; Registration</div>
           <div class="inline-pair">
             <div>
-              <label data-i18n="set.vat">VAT number</label>
+              <label data-i18n="set.vat" for="set_vat">VAT number</label>
               <input type="text" id="set_vat" placeholder="3xxxxxxxxxxxxx3" maxlength="15">
             </div>
             <div>
-              <label data-i18n="set.cr">CR #</label>
+              <label data-i18n="set.cr" for="set_cr">CR #</label>
               <input type="text" id="set_cr">
             </div>
           </div>
@@ -1659,12 +1659,12 @@
 
         <div class="inline-pair" style="margin-top:14px;">
           <div>
-            <label data-i18n="set.low_stock">Low-stock threshold (grams)</label>
+            <label data-i18n="set.low_stock" for="set_lowStock">Low-stock threshold (grams)</label>
             <input type="number" id="set_lowStock" value="200" min="0">
             <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.low_stock_hint"></p>
           </div>
           <div>
-            <label data-i18n="set.supplier_phone">Supplier WhatsApp</label>
+            <label data-i18n="set.supplier_phone" for="set_supplierPhone">Supplier WhatsApp</label>
             <input type="tel" id="set_supplierPhone" data-i18n-placeholder="set.supplier_ph">
           </div>
         </div>
@@ -1675,13 +1675,13 @@
         <div class="pro-only">
           <p style="font-size:11.5px; color:var(--text-muted); margin:0 0 10px;" data-i18n="set.wh_hint">Available print hours per day of week (0 = closed)</p>
           <div id="workingHoursGrid" style="display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-bottom:12px;">
-            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.mon">Mon</label><input type="number" id="wh_mon" min="0" max="24" step="0.5" value="8" style="text-align:center; padding:4px;"></div>
-            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.tue">Tue</label><input type="number" id="wh_tue" min="0" max="24" step="0.5" value="8" style="text-align:center; padding:4px;"></div>
-            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.wed">Wed</label><input type="number" id="wh_wed" min="0" max="24" step="0.5" value="8" style="text-align:center; padding:4px;"></div>
-            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.thu">Thu</label><input type="number" id="wh_thu" min="0" max="24" step="0.5" value="8" style="text-align:center; padding:4px;"></div>
-            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.fri">Fri</label><input type="number" id="wh_fri" min="0" max="24" step="0.5" value="0" style="text-align:center; padding:4px;"></div>
-            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.sat">Sat</label><input type="number" id="wh_sat" min="0" max="24" step="0.5" value="0" style="text-align:center; padding:4px;"></div>
-            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.sun">Sun</label><input type="number" id="wh_sun" min="0" max="24" step="0.5" value="8" style="text-align:center; padding:4px;"></div>
+            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.mon" for="wh_mon">Mon</label><input type="number" id="wh_mon" min="0" max="24" step="0.5" value="8" style="text-align:center; padding:4px;"></div>
+            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.tue" for="wh_tue">Tue</label><input type="number" id="wh_tue" min="0" max="24" step="0.5" value="8" style="text-align:center; padding:4px;"></div>
+            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.wed" for="wh_wed">Wed</label><input type="number" id="wh_wed" min="0" max="24" step="0.5" value="8" style="text-align:center; padding:4px;"></div>
+            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.thu" for="wh_thu">Thu</label><input type="number" id="wh_thu" min="0" max="24" step="0.5" value="8" style="text-align:center; padding:4px;"></div>
+            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.fri" for="wh_fri">Fri</label><input type="number" id="wh_fri" min="0" max="24" step="0.5" value="0" style="text-align:center; padding:4px;"></div>
+            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.sat" for="wh_sat">Sat</label><input type="number" id="wh_sat" min="0" max="24" step="0.5" value="0" style="text-align:center; padding:4px;"></div>
+            <div style="text-align:center;"><label style="font-size:11px; margin:0; color:var(--text-muted);" data-i18n="day.sun" for="wh_sun">Sun</label><input type="number" id="wh_sun" min="0" max="24" step="0.5" value="8" style="text-align:center; padding:4px;"></div>
           </div>
           <label data-i18n="set.holidays">Closure dates</label>
           <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
@@ -1705,12 +1705,12 @@
         <div class="settings-section-head" data-i18n="set.worldwide_section">Currency & Region</div>
         <div class="inline-pair">
           <div>
-            <label data-i18n="set.currency">Currency</label>
+            <label data-i18n="set.currency" for="set_currency">Currency</label>
             <select id="set_currency" style="margin-bottom:4px;"></select>
             <p style="font-size:11.5px; color:var(--text-muted); margin:0 0 0;" data-i18n="set.currency_hint">Used on all invoices, analytics, and the calculator.</p>
           </div>
           <div>
-            <label data-i18n="dash.goal_setting">Monthly revenue goal</label>
+            <label data-i18n="dash.goal_setting" for="set_monthlyGoal">Monthly revenue goal</label>
             <input type="number" id="set_monthlyGoal" min="0" step="100" placeholder="0">
             <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="dash.goal_hint"></p>
           </div>
@@ -1733,17 +1733,17 @@
               <span data-i18n="set.enable_vat">Enable VAT on invoices</span>
             </label>
             <div style="margin-top:8px;">
-              <label data-i18n="set.vat_rate">VAT rate (%)</label>
+              <label data-i18n="set.vat_rate" for="set_vatRate">VAT rate (%)</label>
               <input type="number" id="set_vatRate" value="15" min="0" max="100" step="0.1" data-tip="tip.vat_rate">
               <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.vat_rate_hint"></p>
             </div>
             <div style="margin-top:12px;">
-              <label data-i18n="set.tax_country">Tax rules for</label>
+              <label data-i18n="set.tax_country" for="set_taxCountry">Tax rules for</label>
               <select id="set_taxCountry" style="max-width:240px;"></select>
               <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.tax_country_hint">Sets the name, rate and pricing convention. You can still change them.</p>
             </div>
             <div style="margin-top:12px;">
-              <label data-i18n="set.tax_mode">Your prices</label>
+              <label data-i18n="set.tax_mode" for="set_taxMode">Your prices</label>
               <select id="set_taxMode" style="max-width:240px;">
                 <option value="inclusive" data-i18n="set.tax_mode_inclusive">Include tax</option>
                 <option value="exclusive" data-i18n="set.tax_mode_exclusive">Exclude tax (added at checkout)</option>
@@ -1760,7 +1760,7 @@
           </div>
         </div>
         <div style="margin-top:14px;">
-          <label data-i18n="set.inv_template">Invoice template</label>
+          <label data-i18n="set.inv_template" for="set_invTemplate">Invoice template</label>
           <select id="set_invTemplate" style="max-width:240px;">
             <option value="classic" data-i18n="set.inv_tmpl_classic">Classic</option>
             <option value="modern" data-i18n="set.inv_tmpl_modern">Modern (accent header)</option>
@@ -1769,7 +1769,7 @@
         </div>
 
         <div style="margin-top:14px;">
-          <label data-i18n="set.inv_bilingual">Document language</label>
+          <label data-i18n="set.inv_bilingual" for="set_invoiceBilingual">Document language</label>
           <select id="set_invoiceBilingual" style="max-width:240px;">
             <option value="auto" data-i18n="set.inv_bilingual_auto">Automatic</option>
             <option value="single" data-i18n="set.inv_bilingual_single">My language only</option>
@@ -1780,18 +1780,18 @@
         </div>
 
         <div id="invSecondLangRow" style="margin-top:14px;">
-          <label data-i18n="set.inv_second_lang">Second language</label>
+          <label data-i18n="set.inv_second_lang" for="set_invoiceSecondLang">Second language</label>
           <select id="set_invoiceSecondLang" style="max-width:240px;"></select>
           <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.inv_second_lang_hint">Printed under each label on bilingual documents.</p>
         </div>
 
         <div class="inline-pair" style="margin-top:14px;">
           <div>
-            <label data-i18n="set.invoice_prefix">Invoice number prefix</label>
+            <label data-i18n="set.invoice_prefix" for="set_invPrefix">Invoice number prefix</label>
             <input type="text" id="set_invPrefix" value="INV" maxlength="6">
           </div>
           <div>
-            <label data-i18n="set.quote_prefix">Quote number prefix</label>
+            <label data-i18n="set.quote_prefix" for="set_quotePrefix">Quote number prefix</label>
             <input type="text" id="set_quotePrefix" value="QUO" maxlength="6">
           </div>
         </div>
@@ -1818,15 +1818,15 @@
         <div class="settings-section-head" data-i18n="set.bank_section">Bank Details</div>
         <div class="inline-pair">
           <div>
-            <label data-i18n="set.bank_name">Bank name</label>
+            <label data-i18n="set.bank_name" for="set_bankName">Bank name</label>
             <input type="text" id="set_bankName" placeholder="Al Rajhi Bank">
           </div>
           <div>
-            <label data-i18n="set.account_holder">Account holder</label>
+            <label data-i18n="set.account_holder" for="set_accountHolder">Account holder</label>
             <input type="text" id="set_accountHolder">
           </div>
         </div>
-        <label data-i18n="set.iban">IBAN</label>
+        <label data-i18n="set.iban" for="set_iban">IBAN</label>
         <input type="text" id="set_iban" data-i18n-placeholder="set.iban_ph" maxlength="34">
 
         <label data-i18n="set.accepted">Accepted payment methods</label>
@@ -1962,7 +1962,7 @@
         <div class="settings-section-head" data-i18n="set.ops_pricing">Pricing & Quotes</div>
         <div class="inline-pair" style="align-items:flex-end; margin-top:0;">
           <div>
-            <label data-i18n="set.min_margin">Minimum margin warning (%)</label>
+            <label data-i18n="set.min_margin" for="set_minMarginPct">Minimum margin warning (%)</label>
             <input type="number" id="set_minMarginPct" min="0" max="100" step="1" placeholder="0">
           </div>
           <div style="padding-bottom:6px; font-size:12px; color:var(--text-muted);" data-i18n="set.min_margin_hint">Show a warning in the calculator when margin falls below this threshold. Set 0 to disable.</div>
@@ -1970,11 +1970,11 @@
 
         <div class="inline-pair" style="align-items:flex-end; margin-top:12px; flex-wrap:wrap;">
           <div>
-            <label data-i18n="set.quote_validity">Default quote validity (days)</label>
+            <label data-i18n="set.quote_validity" for="set_quoteValidityDays">Default quote validity (days)</label>
             <input type="number" id="set_quoteValidityDays" min="1" max="365" step="1" placeholder="7">
           </div>
           <div>
-            <label data-i18n="set.min_order_amount">Minimum order amount</label>
+            <label data-i18n="set.min_order_amount" for="set_minOrderAmount">Minimum order amount</label>
             <input type="number" id="set_minOrderAmount" min="0" step="0.01" placeholder="0">
           </div>
         </div>
@@ -1988,7 +1988,7 @@
             <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.quote_followup_hint">When on, Khayt automatically follows up on unapproved quotes near expiry. The dashboard always lists them for one-click follow-up.</p>
           </div>
           <div>
-            <label data-i18n="set.quote_followup_window">Follow up days before expiry</label>
+            <label data-i18n="set.quote_followup_window" for="set_quoteFollowUpWindow">Follow up days before expiry</label>
             <input type="number" id="set_quoteFollowUpWindow" min="0" max="60" step="1" placeholder="2">
           </div>
         </div>
@@ -2002,7 +2002,7 @@
             <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.pay_reminder_hint">When on, Khayt periodically flags unpaid invoices past their due date so you can send a payment reminder in one tap.</p>
           </div>
           <div>
-            <label data-i18n="set.pay_reminder_grace">Remind days after due</label>
+            <label data-i18n="set.pay_reminder_grace" for="set_payReminderGrace">Remind days after due</label>
             <input type="number" id="set_payReminderGrace" min="0" max="90" step="1" placeholder="3">
           </div>
         </div>
@@ -2016,18 +2016,18 @@
             <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;">Adds a surcharge checkbox to the calculator.</p>
           </div>
           <div>
-            <label data-i18n="set.rush_fee_pct">Rush fee percentage (%)</label>
+            <label data-i18n="set.rush_fee_pct" for="set_rushFeePct">Rush fee percentage (%)</label>
             <input type="number" id="set_rushFeePct" min="0" max="500" step="1" placeholder="25">
           </div>
         </div>
 
         <div class="inline-pair" style="margin-top:16px;">
           <div>
-            <label data-i18n="set.default_packaging_cost">Default packaging cost per order</label>
+            <label data-i18n="set.default_packaging_cost" for="set_defaultPackagingCost">Default packaging cost per order</label>
             <input type="number" id="set_defaultPackagingCost" min="0" step="0.01" placeholder="0">
           </div>
           <div>
-            <label data-i18n="set.payment_instructions">Payment instructions (shown in client portal)</label>
+            <label data-i18n="set.payment_instructions" for="set_paymentInstructions">Payment instructions (shown in client portal)</label>
             <textarea id="set_paymentInstructions" rows="3" style="resize:vertical;" placeholder="Bank name, IBAN, Mada/STCPay..."></textarea>
           </div>
         </div>
@@ -2042,9 +2042,9 @@
              so these would be fields a shop can change with no effect. -->
         <p style="font-size:12px; color:var(--text-muted); margin:0 0 10px;" data-i18n="set.lead_from_hours">Hours a day and days a week come from your Working Hours, above.</p>
         <div class="inline-pair" style="flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
-          <div><label data-i18n="set.lead_finishing">Finishing &amp; QC (days)</label><input type="number" id="set_leadFinishingDays" min="0" max="90" step="1" placeholder="1"></div>
-          <div><label data-i18n="set.lead_dispatch">Packing &amp; handover (days)</label><input type="number" id="set_leadDispatchDays" min="0" max="90" step="1" placeholder="1"></div>
-          <div><label data-i18n="set.lead_safety">Safety margin (days)</label><input type="number" id="set_leadSafetyDays" min="0" max="90" step="1" placeholder="1"></div>
+          <div><label data-i18n="set.lead_finishing" for="set_leadFinishingDays">Finishing &amp; QC (days)</label><input type="number" id="set_leadFinishingDays" min="0" max="90" step="1" placeholder="1"></div>
+          <div><label data-i18n="set.lead_dispatch" for="set_leadDispatchDays">Packing &amp; handover (days)</label><input type="number" id="set_leadDispatchDays" min="0" max="90" step="1" placeholder="1"></div>
+          <div><label data-i18n="set.lead_safety" for="set_leadSafetyDays">Safety margin (days)</label><input type="number" id="set_leadSafetyDays" min="0" max="90" step="1" placeholder="1"></div>
         </div>
         <p style="font-size:12px; color:var(--text-muted); margin:8px 0 0;" data-i18n="set.lead_safety_hint">The safety margin is added to what a customer is told and to nothing else — your own schedule board still shows your real dates.</p>
         <div style="margin-top:14px;">
@@ -2059,10 +2059,10 @@
         <div class="card settings-card">
         <div class="settings-section-head" data-i18n="set.wip_limits">WIP Limits per Column</div>
         <div class="inline-pair" style="flex-wrap:wrap;">
-          <div><label data-i18n="queue.pending">Pending</label><input type="number" id="set_wip_pending" min="0" step="1" placeholder="0 = unlimited"></div>
-          <div><label data-i18n="queue.printing">Printing</label><input type="number" id="set_wip_printing" min="0" step="1" placeholder="0 = unlimited"></div>
-          <div><label data-i18n="queue.post">Post</label><input type="number" id="set_wip_post" min="0" step="1" placeholder="0 = unlimited"></div>
-          <div><label>QC</label><input type="number" id="set_wip_qc" min="0" step="1" placeholder="0 = unlimited"></div>
+          <div><label data-i18n="queue.pending" for="set_wip_pending">Pending</label><input type="number" id="set_wip_pending" min="0" step="1" placeholder="0 = unlimited"></div>
+          <div><label data-i18n="queue.printing" for="set_wip_printing">Printing</label><input type="number" id="set_wip_printing" min="0" step="1" placeholder="0 = unlimited"></div>
+          <div><label data-i18n="queue.post" for="set_wip_post">Post</label><input type="number" id="set_wip_post" min="0" step="1" placeholder="0 = unlimited"></div>
+          <div><label for="set_wip_qc">QC</label><input type="number" id="set_wip_qc" min="0" step="1" placeholder="0 = unlimited"></div>
         </div>
         <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:400;">
           <input type="checkbox" id="set_wipEnforceHardLimit">
@@ -2086,7 +2086,7 @@
           <span data-i18n="set.qc_require_photo">Prompt for a photo on a QC fail</span>
         </label>
         <div style="margin-top:10px;max-width:220px;">
-          <label data-i18n="set.qc_warranty_days">Warranty window (days)</label>
+          <label data-i18n="set.qc_warranty_days" for="set_qcWarrantyDays">Warranty window (days)</label>
           <input type="number" id="set_qcWarrantyDays" min="0" step="1" placeholder="30">
         </div>
         </div>
@@ -2095,8 +2095,8 @@
         <div class="settings-section-head" data-i18n="set.post_process_presets">Post-process presets</div>
         <div id="postProcessPresetsList" style="margin-bottom:8px;"></div>
         <div style="display:flex; gap:8px; align-items:flex-end;">
-          <div style="flex:1;"><label style="margin:0;" data-i18n="common.name">Name</label><input type="text" id="set_ppName" placeholder="e.g. Sanding + Painting"></div>
-          <div style="width:100px;"><label style="margin:0;" data-i18n="common.amount">Amount</label><input type="number" id="set_ppAmount" min="0" step="0.01" placeholder="0"></div>
+          <div style="flex:1;"><label style="margin:0;" data-i18n="common.name" for="set_ppName">Name</label><input type="text" id="set_ppName" placeholder="e.g. Sanding + Painting"></div>
+          <div style="width:100px;"><label style="margin:0;" data-i18n="common.amount" for="set_ppAmount">Amount</label><input type="number" id="set_ppAmount" min="0" step="0.01" placeholder="0"></div>
           <button class="btn small primary" id="btnAddPostPreset" style="margin-bottom:1px;" data-i18n="common.add">Add</button>
         </div>
         </div>
@@ -2104,12 +2104,12 @@
         <div class="card settings-card">
         <div class="settings-section-head" data-i18n="set.exp_budgets">Monthly Expense Budgets</div>
         <div class="inline-pair" style="flex-wrap:wrap;">
-          <div><label data-i18n="exp.cat.filament">Filament</label><input type="number" id="set_budget_filament" min="0" step="1" placeholder="0"></div>
-          <div><label data-i18n="exp.cat.electricity">Electricity</label><input type="number" id="set_budget_electricity" min="0" step="1" placeholder="0"></div>
-          <div><label data-i18n="exp.cat.maintenance">Maintenance</label><input type="number" id="set_budget_maintenance" min="0" step="1" placeholder="0"></div>
-          <div><label data-i18n="exp.cat.tools">Tools</label><input type="number" id="set_budget_tools" min="0" step="1" placeholder="0"></div>
-          <div><label data-i18n="exp.cat.shipping">Shipping</label><input type="number" id="set_budget_shipping" min="0" step="1" placeholder="0"></div>
-          <div><label data-i18n="exp.cat.other">Other</label><input type="number" id="set_budget_other" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.filament" for="set_budget_filament">Filament</label><input type="number" id="set_budget_filament" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.electricity" for="set_budget_electricity">Electricity</label><input type="number" id="set_budget_electricity" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.maintenance" for="set_budget_maintenance">Maintenance</label><input type="number" id="set_budget_maintenance" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.tools" for="set_budget_tools">Tools</label><input type="number" id="set_budget_tools" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.shipping" for="set_budget_shipping">Shipping</label><input type="number" id="set_budget_shipping" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.other" for="set_budget_other">Other</label><input type="number" id="set_budget_other" min="0" step="1" placeholder="0"></div>
         </div>
         </div>
 
@@ -2300,7 +2300,7 @@
           </label>
           <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 10px;" data-i18n="set.plib_s3_hint">A second copy of every file, off-site. On its own this is only a backup — it does not free up any space here. To do that, switch on cloud storage below.</p>
           <div style="margin-bottom:8px;">
-            <label data-i18n="set.plib_s3_provider">Provider</label>
+            <label data-i18n="set.plib_s3_provider" for="set_plibS3Provider">Provider</label>
             <select id="set_plibS3Provider"></select>
             <p id="plibS3ProviderNote" style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;"></p>
             <!-- Every other field on this page is copied off a dashboard you need an
@@ -2313,12 +2313,12 @@
             <!-- Filled from the chosen provider's `vars` — an account id, a region.
                  Rebuilt by renderPrintLibProviders() whenever the dropdown changes. -->
             <div id="plibS3Vars" style="grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; gap:8px;"></div>
-            <div id="plibS3EndpointRow"><label data-i18n="set.plib_s3_endpoint">Endpoint</label><input type="text" id="set_plibS3Endpoint" placeholder="https://…"></div>
-            <div><label data-i18n="set.plib_s3_bucket">Bucket</label><input type="text" id="set_plibS3Bucket" placeholder="khayt-models"></div>
-            <div><label data-i18n="set.plib_s3_region">Region</label><input type="text" id="set_plibS3Region" placeholder="auto"></div>
-            <div><label data-i18n="set.plib_s3_prefix">Folder inside the bucket (optional)</label><input type="text" id="set_plibS3Prefix" placeholder="shop-1"></div>
-            <div><label data-i18n="set.plib_s3_key">Access key ID</label><input type="text" id="set_plibS3Key" autocomplete="off"></div>
-            <div><label data-i18n="set.plib_s3_secret">Secret access key</label><input type="password" id="set_plibS3Secret" autocomplete="new-password"></div>
+            <div id="plibS3EndpointRow"><label data-i18n="set.plib_s3_endpoint" for="set_plibS3Endpoint">Endpoint</label><input type="text" id="set_plibS3Endpoint" placeholder="https://…"></div>
+            <div><label data-i18n="set.plib_s3_bucket" for="set_plibS3Bucket">Bucket</label><input type="text" id="set_plibS3Bucket" placeholder="khayt-models"></div>
+            <div><label data-i18n="set.plib_s3_region" for="set_plibS3Region">Region</label><input type="text" id="set_plibS3Region" placeholder="auto"></div>
+            <div><label data-i18n="set.plib_s3_prefix" for="set_plibS3Prefix">Folder inside the bucket (optional)</label><input type="text" id="set_plibS3Prefix" placeholder="shop-1"></div>
+            <div><label data-i18n="set.plib_s3_key" for="set_plibS3Key">Access key ID</label><input type="text" id="set_plibS3Key" autocomplete="off"></div>
+            <div><label data-i18n="set.plib_s3_secret" for="set_plibS3Secret">Secret access key</label><input type="password" id="set_plibS3Secret" autocomplete="new-password"></div>
           </div>
           <div style="display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap;">
             <button class="btn" id="btnPlibS3Save" data-i18n="common.save">Save</button>
@@ -2337,9 +2337,9 @@
           </label>
           <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 10px;" data-i18n="set.plib_gd_hint">Khayt can only see the files it puts there itself — it has no access to the rest of your Drive. You will need a free OAuth client ID from a Google Cloud project; the setup guide is in the docs.</p>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-            <div><label data-i18n="set.plib_gd_client">OAuth client ID</label><input type="text" id="set_plibGDClientId" autocomplete="off" placeholder="…apps.googleusercontent.com"></div>
-            <div><label data-i18n="set.plib_gd_secret">Client secret (if your project has one)</label><input type="password" id="set_plibGDSecret" autocomplete="new-password"></div>
-            <div><label data-i18n="set.plib_gd_folder">Folder name in Drive</label><input type="text" id="set_plibGDFolder" placeholder="Khayt print library"></div>
+            <div><label data-i18n="set.plib_gd_client" for="set_plibGDClientId">OAuth client ID</label><input type="text" id="set_plibGDClientId" autocomplete="off" placeholder="…apps.googleusercontent.com"></div>
+            <div><label data-i18n="set.plib_gd_secret" for="set_plibGDSecret">Client secret (if your project has one)</label><input type="password" id="set_plibGDSecret" autocomplete="new-password"></div>
+            <div><label data-i18n="set.plib_gd_folder" for="set_plibGDFolder">Folder name in Drive</label><input type="text" id="set_plibGDFolder" placeholder="Khayt print library"></div>
           </div>
           <div style="display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap;">
             <button class="btn" id="btnPlibGDSave" data-i18n="common.save">Save</button>
