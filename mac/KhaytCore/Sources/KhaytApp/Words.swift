@@ -1016,6 +1016,8 @@ final class Words {
         // grammatical, translated, and the wrong sentence.
         "mac.logo_accepts":  ["en": "PNG, JPEG, GIF or WebP, under 1 MB. It is kept inside the book, so it travels with every backup.",
                               "ar": "PNG أو JPEG أو GIF أو WebP، أقل من 1 ميغابايت. يُحفظ داخل الدفتر، فينتقل مع كل نسخة احتياطية."],
+        "mac.rating_out_of_range": ["en": "A rating is one to five stars.",
+                                    "ar": "التقييم من نجمة إلى خمس نجوم."],
         "mac.licence_set":   ["en": "Record Licence",   "ar": "تسجيل الترخيص"],
         "mac.licence_cleared": ["en": "Clear Licence",  "ar": "مسح الترخيص"],
         "mac.licence_unknown": ["en": "That is not a licence Khayt knows.",
