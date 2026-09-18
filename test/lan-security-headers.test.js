@@ -65,6 +65,59 @@ test('the header set still covers the four that matter', () => {
   assert.match(body, /base-uri 'none'/, "CSP no longer pins <base>, so an injected tag could re-root every relative URL");
 });
 
+/**
+ * The directives above are the ones an injected TAG uses. These are the ones an
+ * injected tag uses to GET THE DATA OUT, and they were missing for the same
+ * reason the headers themselves once were: nothing names what is not there.
+ *
+ * A CSP restricts only the directives it lists. With no `default-src`, a policy
+ * naming four directives leaves `img-src`, `connect-src` and `frame-src` wide
+ * open, and `form-action` and `frame-ancestors` stay open even WITH one, because
+ * neither falls back to it. On the intake form — the one public page that takes
+ * a customer's name, email and phone — that was the difference between an
+ * injection being contained and it being able to post the lot to another host.
+ *
+ * Asserted one directive at a time, with the consequence spelled out, so that
+ * dropping any of them fails loudly instead of quietly widening the policy.
+ */
+test('the CSP closes the routes an injection would exfiltrate through', () => {
+  const fn = SRC.slice(SRC.indexOf('function setLanHtmlSecurityHeaders'));
+  const body = fn.slice(0, fn.indexOf('\n}'));
+
+  assert.match(body, /default-src 'self'/,
+    'CSP has no default-src, so every directive it does not name — img-src and '
+    + 'connect-src among them — is unrestricted, and a pixel is enough to carry a quote out');
+  assert.match(body, /form-action 'self'/,
+    'CSP no longer pins form-action. It does NOT fall back to default-src, so without it '
+    + "an injected <form> on /intake can post the customer's name, email and phone to any host");
+  assert.match(body, /frame-ancestors 'none'/,
+    'CSP no longer pins frame-ancestors. X-Frame-Options still says DENY, but it is the '
+    + 'legacy half of the pair and frame-ancestors does not fall back to default-src either');
+});
+
+/**
+ * `script-src` keeps `'unsafe-inline'` because these pages embed their script —
+ * the tracking page reloads itself every 30s, the intake form submits by fetch.
+ * That is a fact to design around, not one to fix by deleting the keyword: drop
+ * it and the customer-facing pages stop working, which is why no future tidy-up
+ * should. The test exists so that the next person to read the policy and reach
+ * for it finds out here rather than from a shop.
+ */
+test("inline script is permitted on purpose, and the pages still need it", () => {
+  const fn = SRC.slice(SRC.indexOf('function setLanHtmlSecurityHeaders'));
+  const body = fn.slice(0, fn.indexOf('\n}'));
+  assert.match(body, /script-src 'self' 'unsafe-inline'/,
+    'the LAN pages embed their own script; removing unsafe-inline stops the tracking '
+    + 'page refreshing and the intake form submitting');
+
+  for (const page of ['lan-order-page.js', 'lan-intake.js']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'lib', page), 'utf8');
+    assert.match(src, /<script>/,
+      `${page} no longer embeds script — if that is true of every LAN page, `
+      + "'unsafe-inline' can and should come out of the CSP");
+  }
+});
+
 test('no HTML response is left relying on its own header call', () => {
   // The inverse check. With the central call in place a per-route call is
   // harmless and idempotent, but a NEW html response written without one must

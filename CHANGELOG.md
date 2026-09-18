@@ -4,6 +4,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+### Security
+
+- **A customer's details cannot be posted away from the intake form.** The pages
+  Khayt Online serves your customers — the intake form, the quote approval, the
+  order tracking page — carried a content policy that named four rules and left
+  everything it did not name unrestricted. Nothing was leaking: every value those
+  pages print is escaped, and that has not changed. What was missing was the
+  second line behind it. If an injection ever did land, nothing stopped it
+  posting the name, email and phone from the intake form to another host, or
+  fetching a quote's contents out through an image. The policy now names where a
+  form may post, what may be loaded, and who may frame the page — all of it your
+  own shop, which is the only place these pages ever needed to reach. This
+  matters most with the remote tunnel switched on, where those pages answer from
+  the internet rather than your own network.
+
 ### Changed
 
 - **(Mac) Which customers are worth keeping is worked out natively.** Lifetime
