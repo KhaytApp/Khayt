@@ -20,6 +20,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   ones. A customer who was new and then came back inside the same period is
   still one person.
 
+- **(Mac) How many quotes turn into work is worked out natively.** The funnel
+  runs in the app now, and keeps both fixes the rule carries: delivered work
+  counts as won — leaving it out made the win rate too low for every shop that
+  marks work delivered — and a cancelled job is not a win. Both rates are still
+  reported, by count and by value, because ten small quotes won and one large
+  one lost is a very different month from the reverse.
+
 - **(Mac) What the shop has to bill to break even is worked out natively.** The
   figure that says how much a month has to carry before the rent and the
   accountant are paid for now runs in the app. It stays a floor: a window with

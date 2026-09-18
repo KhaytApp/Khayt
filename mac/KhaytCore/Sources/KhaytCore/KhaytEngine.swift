@@ -627,7 +627,6 @@ public actor KhaytEngine {
         // Whether the shop can take another job, and when it would start.
         "capacity",
         // How many quotes turn into work, and how much of the money does.
-        "quote-funnel",
         // Which products actually earn, and which earn per machine hour.
         "product-profit",
         // Growing, or serving the same people?
@@ -4143,19 +4142,32 @@ public actor KhaytEngine {
     public func quoteFunnel(orders: [JSONValue], now: Date,
                             settings: [String: JSONValue], clients: [JSONValue])
         throws -> QuoteFunnel {
-        try runtime.call2(#"""
+        // `order-money` still lives in JavaScript, so what each quote is worth
+        // is worked out once, in order, and handed across. The funnel itself is
+        // `KhaytCore.QuoteFunnel`, and `business-scope` is native.
+        let prices: [Double] = try runtime.call2(#"""
         (function () {
-          var ctx = { settings: ARG2, clients: ARG3 };
-          return globalThis.KhaytQuoteFunnel.quoteFunnel({ orders: ARG0, now: ARG1 }, {
-            priceOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
-            countsForBusiness: function (o) {
-              return globalThis.KhaytBusinessScope
-                ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
-            },
+          var ctx = { settings: ARG1, clients: ARG2 };
+          return ARG0.map(function (o) {
+            var n = Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx));
+            return isFinite(n) ? n : 0;
           });
         })()
-        """#, [.array(orders), .number(now.timeIntervalSince1970 * 1000),
-               .object(settings), .array(clients)], as: QuoteFunnel.self)
+        """#, [.array(orders), .object(settings), .array(clients)], as: [Double].self)
+
+        let report = KhaytCore.QuoteFunnel.report(
+            orders: orders, prices: prices, now: now.timeIntervalSince1970 * 1000,
+            countsForBusiness: { BusinessScope.countsForBusiness($0) })
+        return QuoteFunnel(
+            steps: report.steps.map { QuoteFunnel.Step(key: $0.key, count: $0.count,
+                                                       value: $0.value) },
+            totals: QuoteFunnel.Totals(
+                winRateByCount: report.totals.winRateByCount,
+                winRateByValue: report.totals.winRateByValue,
+                medianDaysToDecide: report.totals.medianDaysToDecide,
+                openCount: report.totals.openCount,
+                openValue: report.totals.openValue,
+                oldestOpenDays: report.totals.oldestOpenDays))
     }
 
     // MARK: - Can the shop take this job?
