@@ -193,6 +193,39 @@ final class LanServer {
 
     init(host: Host) { self.host = host }
 
+    /// What a phone sees in the list.
+    ///
+    /// The shop's own name, because "Ward" is what somebody standing in Ward
+    /// recognises and "Turki's MacBook Pro" — the Bonjour default — is what they
+    /// have to guess at in a building with three Macs.
+    ///
+    /// It is broadcast in the clear to everything on the network, which is worth
+    /// saying out loud and is not a new exposure: `/intake` already serves this
+    /// shop's name to anyone on the LAN with no PIN at all, because it is the
+    /// page customers are meant to open. A name that is already public cannot be
+    /// leaked by publishing it again.
+    ///
+    /// Bonjour allows 63 bytes and the system de-duplicates collisions itself by
+    /// appending a number, so neither is handled here. Empty falls back to the
+    /// product name rather than to an empty entry in a list, which is
+    /// unselectable and looks broken.
+    nonisolated static func advertisedName(_ store: [String: JSONValue]) -> String {
+        guard case .object(let settings)? = store["settings"],
+              case .string(let name)? = settings["shopName"] else { return "Khayt" }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Khayt" }
+        // Truncated by BYTES, not characters: an Arabic shop name is two bytes a
+        // letter, so a 40-character name is 80 bytes and the service silently
+        // fails to register rather than appearing with a shortened label.
+        var bytes = Array(trimmed.utf8)
+        guard bytes.count > 63 else { return trimmed }
+        bytes = Array(bytes.prefix(63))
+        // Dropping whole bytes can split a character in half; walk back until
+        // what is left is a string again.
+        while !bytes.isEmpty, String(bytes: bytes, encoding: .utf8) == nil { bytes.removeLast() }
+        return String(bytes: bytes, encoding: .utf8) ?? "Khayt"
+    }
+
     // MARK: - Listening
 
     /// Start, and return the port actually bound (asked for 0, given one).
@@ -210,6 +243,42 @@ final class LanServer {
             listener = try NWListener(using: params, on: nwPort)
         }
         self.listener = listener
+
+        // ── TELL THE NETWORK WE ARE HERE ──────────────────────────────────
+        //
+        // Pairing a phone means typing an IP address and a port off a Mac's
+        // Settings screen, on a phone, into a wizard — a shop's worst five
+        // minutes with this product, and the step that fails when somebody
+        // reads a 1 as a 7 or the router hands the Mac a new address next week.
+        // None of that is necessary: this is a Bonjour service, and a phone can
+        // be shown a list of shops rather than an empty text field.
+        //
+        // ONLY ON `.lan`, and this is the whole reason the switch above is not
+        // just about binding. A loopback server is reachable by nothing but this
+        // Mac, so advertising it would put a shop on a phone's list that the
+        // phone can never connect to — a setup step that looks like it is
+        // working right up until it does not.
+        if case .lan = bind {
+            var txt = NWTXTRecord()
+            // The LAN API this build speaks, so a much older phone can decline
+            // rather than half-work.
+            txt["v"] = "1"
+            // Whether `GET /api/store` is here. It is the one thing a phone most
+            // needs to know BEFORE it pairs, because it is the difference
+            // between a companion that can work away from the desk and one that
+            // empties the moment it loses the Mac — and only the native app
+            // serves it, not the Electron desktop most shops still run.
+            //
+            // A property of the build, never of the moment, which is why it is
+            // safe to broadcast. The PIN is deliberately NOT advertised: it can
+            // change while the server is up, and a stale "no PIN needed" is a
+            // phone confidently telling a shop the wrong thing. A 401 says it
+            // accurately and costs one request.
+            txt["store"] = "1"
+            listener.service = NWListener.Service(name: Self.advertisedName(host.store()),
+                                                 type: "_khayt._tcp",
+                                                 txtRecord: txt)
+        }
 
         let bound: UInt16 = try await withCheckedThrowingContinuation { cont in
             // The handler fires for every state for the listener's whole

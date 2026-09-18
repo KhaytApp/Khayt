@@ -311,6 +311,35 @@ struct LanServerTests {
         #expect(sent.store == expected)
     }
 
+    @Test("the shop is advertised under its own name, and an Arabic one is not cut in half")
+    func advertisedName() {
+        // What somebody standing in the shop recognises in a list.
+        #expect(LanServer.advertisedName(["settings": .object(["shopName": .string("Ward")])]) == "Ward")
+
+        // A shop that has not named itself gets the product, not an empty row —
+        // an unselectable blank in a list reads as a broken app.
+        #expect(LanServer.advertisedName([:]) == "Khayt")
+        #expect(LanServer.advertisedName(["settings": .object(["shopName": .string("   ")])]) == "Khayt")
+
+        // Bonjour allows 63 BYTES. Arabic is two bytes a letter, so a name well
+        // under 63 characters is over the limit — and the failure is not a
+        // shortened label, it is a service that never registers and a shop that
+        // simply does not appear on the phone.
+        let arabic = String(repeating: "ورشة", count: 12)          // 48 chars, 96 bytes
+        #expect(arabic.count == 48)
+        #expect(arabic.utf8.count == 96)
+        let cut = LanServer.advertisedName(["settings": .object(["shopName": .string(arabic)])])
+        #expect(cut.utf8.count <= 63)
+        // And it is still a string: truncating bytes can split a character in
+        // half, which produces bytes no reader can decode.
+        #expect(!cut.isEmpty)
+        #expect(arabic.hasPrefix(cut), "the shortened name is not a prefix of the shop's")
+
+        // An ASCII name at the boundary keeps every byte it is entitled to.
+        let long = String(repeating: "a", count: 70)
+        #expect(LanServer.advertisedName(["settings": .object(["shopName": .string(long)])]).count == 63)
+    }
+
     @Test("the live queue page is the module's HTML, with the clock it was given")
     func queuePageIsTheModules() async throws {
         let bench = try await Bench()
