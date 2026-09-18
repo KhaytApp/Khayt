@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) What each machine cost to keep running is worked out natively.** The
+  maintenance chart now runs in the app, and keeps the two decisions that make
+  it honest: the year comes off the front of the date rather than through a
+  clock — read as a date, a shop west of Greenwich had its new year's servicing
+  counted against the year before — and a machine the shop has since sold keeps
+  its spending, labelled, because the money still left the shop.
+
 - **(Mac) Whether the shop keeps its promises is worked out natively.** The
   on-time figure — of the finished jobs that had a due date, how many were done
   by it — now runs in the app. A job finished ON its due date still counts as

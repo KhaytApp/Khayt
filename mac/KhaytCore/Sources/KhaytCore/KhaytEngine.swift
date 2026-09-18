@@ -293,7 +293,6 @@ public actor KhaytEngine {
         //   A second card sourced from nothing would be empty in every shop
         //   that has ever opened this app.
         //
-        "maintenance-cost",
         "rating-trend",
         "client-sources",
         // What a finished job takes off the shelf: the grams, the hourly
@@ -6888,6 +6887,10 @@ public actor KhaytEngine {
     /// written, so it totalled zero for every machine and printed "No data
     /// yet" however many services a shop had logged.
     public struct MaintenanceCostRow: Decodable, Sendable {
+        public init(machineId: String, name: String, orphan: Bool, total: Double) {
+            self.machineId = machineId; self.name = name
+            self.orphan = orphan; self.total = total
+        }
         public let machineId: String
         public let name: String
         /// The machine has been deleted, and the row is labelled by the id the
@@ -6897,9 +6900,10 @@ public actor KhaytEngine {
     }
     public func maintenanceCost(machines: [JSONValue], entries: [JSONValue], year: Int)
         throws -> [MaintenanceCostRow] {
-        try runtime.call2("globalThis.KhaytMaintenanceCost.byMachine(ARG0, ARG1, { year: ARG2 })",
-                          [.array(machines), .array(entries), .number(Double(year))],
-                          as: [MaintenanceCostRow].self)
+        KhaytCore.MaintenanceCost
+            .byMachine(machines: machines, entries: entries, year: String(year))
+            .map { MaintenanceCostRow(machineId: $0.machineId, name: $0.name,
+                                      orphan: $0.orphan, total: $0.total) }
     }
 
     /// What customers have said, month by month.
