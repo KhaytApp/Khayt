@@ -222,35 +222,15 @@ struct Sidebar: View {
 /// thing a shop should be left to notice on its own.
 private struct Provenance: View {
 
-    /// One line for every state sync can be in.
-    ///
-    /// Locked is the one worth reading twice: it is not a fault, it is a shop
-    /// that has not typed its passphrase since the app opened, and the data key
-    /// deliberately lives no longer than that.
-    static func syncLine(_ shop: Shop) -> (String, String, AnyShapeStyle) {
-        switch shop.syncStatus {
-        case .off:
-            return (shop.words.callIt("mac.sync_off"), "icloud.slash", AnyShapeStyle(.tertiary))
-        case .locked:
-            return (shop.words.callIt("mac.sync_locked"), "lock.icloud", AnyShapeStyle(.secondary))
-        case .idle:
-            return (shop.words.callIt("mac.sync_on"), "icloud", AnyShapeStyle(.tertiary))
-        case .syncing:
-            return (shop.words.callIt("mac.sync_sending"), "icloud.and.arrow.up",
-                    AnyShapeStyle(.secondary))
-        case .waiting:
-            return (shop.words.callIt("mac.sync_waiting"), "clock.arrow.circlepath",
-                    AnyShapeStyle(.tertiary))
-        case .synced(let when):
-            return (shop.words.callIt("mac.sync_done", ["time": .string(Self.clock(when))]),
-                    "checkmark.icloud", AnyShapeStyle(.tertiary))
-        case .failing:
-            // `attention`, not `late`: it is going to be tried again and
-            // nothing has been lost — the change is still in the book. Those
-            // two colours are the difference between "this needs you when you
-            // have a moment" and "this has failed".
-            return (shop.words.callIt("mac.sync_retrying"), "exclamationmark.icloud",
-                    AnyShapeStyle(Khayt.attention))
+    // `syncLine` moved to `Shop.syncLine` — the shipping shell needs the
+    // same sentence, and two copies of "what sync is doing" is how the two
+    // windows start telling a shop different things. The model returns a TONE;
+    // this window's own styling stays here.
+    static func tint(_ tone: Shop.SyncTone) -> AnyShapeStyle {
+        switch tone {
+        case .quiet: AnyShapeStyle(.tertiary)
+        case .normal: AnyShapeStyle(.secondary)
+        case .attention: AnyShapeStyle(Khayt.attention)
         }
     }
 
@@ -320,9 +300,9 @@ private struct Provenance: View {
             // changed. It is now what sync is actually doing, because the
             // sentence it replaced was a standing apology rather than a status.
             if shop.cloudConnected {
-                let (text, symbol, tint) = Self.syncLine(shop)
-                Label(text, systemImage: symbol)
-                    .foregroundStyle(tint).font(.caption).lineLimit(1)
+                let line = shop.syncLine
+                Label(line.text, systemImage: line.symbol)
+                    .foregroundStyle(Self.tint(line.tone)).font(.caption).lineLimit(1)
                     .help(shop.words.callIt("mac.sync_auto_why"))
             }
             // What the app said as it died last time. One line, like every

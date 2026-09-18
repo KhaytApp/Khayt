@@ -63,16 +63,39 @@ struct CloudNoticeTests {
         ]))
     }
 
-    @Test("the sidebar carries it, and only when connected")
-    func theSidebarSaysIt() throws {
-        let sidebar = try String(contentsOf: URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Sidebar.swift"), encoding: .utf8)
+    /// ── THIS TEST WAS PINNED TO THE WRONG WINDOW ──────────────────────────
+    ///
+    /// It asserted that `Sidebar.swift` carries the sync line and calls
+    /// `Self.syncLine(shop)` — and passed for months while the SHIPPING window
+    /// showed no sync state at all, because `Sidebar.swift` is the shell the
+    /// app stopped opening with in 4.0.0-alpha.12.
+    ///
+    /// A test naming one shell is how the app came to have things that ship in
+    /// no window. It asks about both now, and about the one place the sentence
+    /// is written.
+    @Test("both windows carry it, and only when connected")
+    func theWindowsSayIt() throws {
+        func source(_ file: String) throws -> String {
+            try String(contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appending(path: "Sources/KhaytApp/\(file)"), encoding: .utf8)
+        }
+        // The window that ships.
+        let shell = try source("Shell.swift")
+        #expect(shell.contains("if shop.cloudConnected {"),
+                "the shipping window shows no sync state")
+        #expect(shell.contains("shop.syncLine"))
+
+        // And the one being retired, while it is still here.
+        let sidebar = try source("Sidebar.swift")
         #expect(sidebar.contains("if shop.cloudConnected {"))
-        // It says what sync is DOING now rather than one standing sentence, so
-        // what the sidebar has to carry is the status, not a fixed key.
-        #expect(sidebar.contains("Self.syncLine(shop)"))
-        #expect(sidebar.contains("shop.syncStatus"))
+        #expect(sidebar.contains("shop.syncLine"))
+
+        // It says what sync is DOING now rather than one standing sentence,
+        // and it says it from ONE place so the two cannot drift.
+        let shop = try source("Shop.swift")
+        #expect(shop.contains("var syncLine:"))
+        #expect(shop.contains("case .failing:"), "the states are no longer enumerated here")
     }
 }

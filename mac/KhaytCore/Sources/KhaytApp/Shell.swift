@@ -327,8 +327,66 @@ struct ShellSidebar: View {
         }
     }
 
+    /// What the app has to tell the shop, above the book's name.
+    ///
+    /// ── THESE THREE SHIPPED IN NO WINDOW AT ALL ───────────────────────────
+    ///
+    /// They were written into `Sidebar.swift`'s footer, and that is the shell
+    /// the app stopped opening with in 4.0.0-alpha.12. Nothing else in the app
+    /// read `shop.skipped`, `shop.lastCrash` or the sync line, so a shop was
+    /// never told that records in its book could not be read, never told that
+    /// Khayt had closed unexpectedly, and never shown what sync was doing.
+    ///
+    /// The neighbouring lines in that same footer — the tax summary, the
+    /// backup state, the engine failure — all survived, because they are named
+    /// `…Problem` or are read by another screen, and `MessagesAreShownTests`
+    /// ratchets that naming. These three slipped through on their names.
+    ///
+    /// One line each, capped, with the detail in the tooltip: this column is
+    /// 150pt and a wrapped sentence here pushes the book's name off the bottom.
+    private var notices: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if !shop.skipped.isEmpty {
+                // The app DROPPED data. Whatever else is wrong, a shop should
+                // not have to find that out by noticing something missing.
+                noticeLine(shop.words.callIt("mac.unreadable_records",
+                                             ["n": .number(Double(shop.skipped.count))]),
+                           "exclamationmark.triangle", Role.lateOnNavy,
+                           help: shop.skipped.prefix(8).joined(separator: "\n"))
+            }
+            if shop.cloudConnected {
+                // Only for a book that expects to be in step with somewhere
+                // else. A shop that has never connected is not missing
+                // anything, and a line telling it so is one people stop
+                // reading.
+                let line = shop.syncLine
+                noticeLine(line.text, line.symbol,
+                           line.tone == .attention ? Role.lateOnNavy : Role.onNavy2,
+                           help: shop.words.callIt("mac.sync_auto_why"))
+            }
+            if let crash = shop.lastCrash {
+                // Clicking it says it has been read.
+                noticeLine(shop.words.callIt("mac.last_crash"),
+                           "exclamationmark.bubble", Role.lateOnNavy, help: crash)
+                    .onTapGesture { shop.forgetLastCrash() }
+            }
+        }
+    }
+
+    private func noticeLine(_ text: String, _ symbol: String, _ tint: Color,
+                            help: String) -> some View {
+        Label(text, systemImage: symbol)
+            .font(TypeScale.body(9.5))
+            .foregroundStyle(tint)
+            .lineLimit(1)
+            .help(help)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var file: some View {
         VStack(alignment: .leading, spacing: 2) {
+            notices
             Text(shop.words.callIt("mac.book"))
                 .font(TypeScale.body(9))
                 .foregroundStyle(Role.onNavy3)
