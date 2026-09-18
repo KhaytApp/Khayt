@@ -6,6 +6,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Money in and money out is counted natively.** The cash-flow chart
+  runs in the app now, on the day money actually moved. A deposit still moves
+  only the share it paid rather than the whole job's revenue, voided jobs and
+  work outside the shop's trade still move nothing, and a payment recorded with
+  no date is still counted separately rather than dropped in silence.
+
 - **(Mac) Where a model came from can be recorded, not just read.** The
   library's inspector has always shown a model's source and licence, and this
   Mac had no way to set either — so on a real book the panel was blank on every
