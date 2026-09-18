@@ -188,8 +188,9 @@ struct BusinessPane: View {
                         }
                         Spacer()
                     }
-                    Text(shop.words.callIt("set.logo_too_big"))
+                    Text(shop.words.callIt("mac.logo_accepts"))
                         .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 // ── THE REDESIGNED WINDOW ─────────────────────────────────
                 //

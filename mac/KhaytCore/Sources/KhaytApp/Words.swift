@@ -1009,6 +1009,13 @@ final class Words {
         // Where a model came from. The licence's own names come from Khayt's
         // shared catalogue (`plib.licence_*`); these are the few sentences this
         // app needs around them.
+        // What the logo box ACCEPTS. It used to borrow `set.logo_too_big` —
+        // "Image too large — use a file under 1 MB" — which is a REFUSAL, and
+        // sat under an empty box saying something had already gone wrong.
+        // Found by photographing the pane; no test can see a sentence that is
+        // grammatical, translated, and the wrong sentence.
+        "mac.logo_accepts":  ["en": "PNG, JPEG, GIF or WebP, under 1 MB. It is kept inside the book, so it travels with every backup.",
+                              "ar": "PNG أو JPEG أو GIF أو WebP، أقل من 1 ميغابايت. يُحفظ داخل الدفتر، فينتقل مع كل نسخة احتياطية."],
         "mac.licence_set":   ["en": "Record Licence",   "ar": "تسجيل الترخيص"],
         "mac.licence_cleared": ["en": "Clear Licence",  "ar": "مسح الترخيص"],
         "mac.licence_unknown": ["en": "That is not a licence Khayt knows.",
