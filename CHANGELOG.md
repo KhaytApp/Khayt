@@ -13,6 +13,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   window where the work cost more than it earned has no target rather than a
   negative one.
 
+- **(Mac) The logo box no longer says something went wrong before anything
+  has.** The line under it was the refusal a file over 1 MB gets — "Image too
+  large" — sitting there permanently under an empty box. It says what the box
+  accepts now.
+
 - **(Mac) Money in and money out is counted natively.** The cash-flow chart
   runs in the app now, on the day money actually moved. A deposit still moves
   only the share it paid rather than the whole job's revenue, voided jobs and

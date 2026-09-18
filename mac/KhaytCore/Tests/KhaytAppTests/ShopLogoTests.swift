@@ -107,6 +107,32 @@ struct ShopLogoTests {
         #expect(body.contains("data:image/"), "the guard is gone")
     }
 
+    @Test("the caption under the box says what is accepted, not what went wrong")
+    func captionIsAHintNotARefusal() async throws {
+        // It borrowed `set.logo_too_big` — "Image too large — use a file under
+        // 1 MB" — which is a REFUSAL, and sat under an empty box saying
+        // something had already failed. Found by photographing the pane: no
+        // test can see a sentence that is grammatical, translated, and the
+        // wrong sentence. This one can see the pane reaching for the refusal.
+        let pane = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/SettingsWindow.swift"), encoding: .utf8)
+        guard let section = pane.range(of: "Section(shop.words.callIt(\"set.logo\"))") else {
+            Issue.record("the logo section has moved"); return
+        }
+        let body = pane[section.lowerBound...].prefix(1400)
+        #expect(!body.contains("set.logo_too_big"),
+                "the caption is the refusal again")
+        #expect(body.contains("mac.logo_accepts"))
+        // And it says something in both languages.
+        let words = Words()
+        await words.load("en", engine: try KhaytEngine())
+        #expect(words.callIt("mac.logo_accepts") != "mac.logo_accepts")
+        await words.load("ar", engine: try KhaytEngine())
+        #expect(words.callIt("mac.logo_accepts") != "mac.logo_accepts")
+    }
+
     @Test("the control is on the pane that ships")
     func wiredIn() throws {
         let pane = try String(contentsOf: URL(fileURLWithPath: #filePath)
