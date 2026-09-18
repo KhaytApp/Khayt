@@ -12,6 +12,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   *unknown*, never as *may not be sold*. A shop that has filled nothing in is
   told nothing rather than told no.
 
+- **(Mac) Tags are kept to one spelling each natively.** Typing "resin" where
+  the shop already writes "Resin" still files it under the tag they have, and
+  the library's tag counts still fold spellings together so one chip carries
+  the real number. What is new is where it runs, not what it decides — and a
+  tag the shop has never used before is still stored exactly as typed rather
+  than lower-cased into a house style.
+
 - **(Mac) A customer's agreed prices are applied natively.** The rule that
   charges a customer what they were promised now runs in the app, and keeps the
   decision that makes it safe: the first product on the list that matches wins

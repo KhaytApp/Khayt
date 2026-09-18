@@ -141,7 +141,6 @@ public actor KhaytEngine {
         // " resin" become three chips each finding a third of the files. The
         // rule that folds them is here, not in the reading, and a second copy
         // of it would fold differently on one of the two apps.
-        "tags",
         // A product's pictures — more than one, and each saying what it IS.
         //
         // The catalogue held `imagePath` and `thumbnail`: one file and one data
@@ -2620,9 +2619,9 @@ public actor KhaytEngine {
     /// `lib/tags.js` rather than `organise`, because counting a field that
     /// holds a list is a different sum — and it folds spellings the same way, so
     /// a record naming one tag twice in two spellings counts once for it.
+    /// Native since the port — `KhaytCore.Tags`.
     public func tagCounts(_ records: [JSONValue]) throws -> [GroupCount] {
-        try runtime.call("KhaytTags", "tagCounts", [JSONValue.array(records)],
-                         as: [GroupCount].self)
+        Tags.counts(records).map { GroupCount(name: $0.label, count: $0.count) }
     }
 
     /// The patch that files a record under a name — `{group, folder}`, both set.
@@ -2662,10 +2661,9 @@ public actor KhaytEngine {
     /// `lib/tags.js` rather than written here because its own note says what
     /// happens otherwise: "resin", "Resin" and " resin" become three chips, each
     /// finding a third of the files, and nothing errors.
+    /// Native since the port — `KhaytCore.Tags`.
     public func normaliseTags(_ typed: String, known: [String]) throws -> [String] {
-        try runtime.call("KhaytTags", "normaliseTags",
-                         [JSONValue.string(typed), .array(known.map { .string($0) })],
-                         as: [String].self)
+        Tags.normalise(typed, known: known)
     }
 
     /// The name one record is filed under. `folder` wins over `group` — see the
