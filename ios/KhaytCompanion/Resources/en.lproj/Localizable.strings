@@ -67,7 +67,7 @@
 "settings.pin" = "Owner LAN PIN";
 "settings.retest" = "Re-test pairing";
 "settings.unpair" = "Unpair this device";
-"settings.unpair.footer" = "Clears paired state; PIN stays in Keychain until you change it.";
+"settings.unpair.footer" = "Deletes the shop's book from this phone, along with the PIN.";
 "settings.language" = "Language";
 "settings.notifications" = "Notifications";
 "settings.notify.queue" = "Queue changes";
