@@ -1060,11 +1060,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   simulator asks the engine for 15% inclusive VAT on 1,000 and pins it to
   Node's answer to the halala, so the day the two diverge is the day it fails.
 
-  The floor is iOS 17, and deliberately not the 26 the Mac package sets. That
-  floor costs nothing on a Mac, because arm64-only had already excluded every
-  machine that cannot run 26. It is not free on a phone: an iPhone XS runs iOS
-  17 and never will run 26, so the same number here would strand hardware
-  rather than inconvenience somebody who has not updated.
+  The floor is iOS 26, matching the Mac. It does cost something the macOS floor
+  did not: iOS 26 needs an A13, so the iPhone XR and XS are out. What makes it
+  affordable is that the companion has not shipped — the App Store is still "a
+  future path" in its own README — so there is no shop on an XS to strand, only
+  a 2018 phone nobody will buy new. Free today, expensive after the first shop
+  installs it, which is why it is settled now.
 
 - **(Mac) The shop's own saved messages can be sent from the Mac.** Khayt has
   always let a shop write its own WhatsApp messages — "Hi {{client}}, your

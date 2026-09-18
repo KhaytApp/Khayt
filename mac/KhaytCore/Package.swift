@@ -37,7 +37,7 @@ let package = Package(
     // the enum only knows the versions its own toolchain shipped with. The
     // string initializer takes any version and means the same thing.
     //
-    // ── AND iOS 17, WHICH IS A DIFFERENT ARGUMENT ─────────────────────────
+    // ── AND iOS 26, FOR THE SAME REASON AND NOT A DIFFERENT ONE ───────────
     //
     // The phone is here because the alternative was a second implementation of
     // the same money. `ios/KhaytCompanion` computes nothing today — it asks the
@@ -56,19 +56,21 @@ let package = Package(
     // is on macOS, so a shop's business rules run on the phone with nothing
     // bundled, for the same reason they run on the Mac.
     //
-    // 17.0 and NOT 26.0, and the asymmetry is the whole point. The macOS floor
-    // above costs nothing because arm64-only had already excluded every Mac
-    // that cannot run 26. That reasoning does not transfer: an iPhone XS runs
-    // iOS 17 and will never run 26, so the same floor here would strand
-    // hardware rather than merely inconvenience somebody who has not updated.
-    // 17.0 is what `KhaytCompanion` already targets, so this adds the package
-    // to the app a shop can install today instead of asking it to buy a phone.
+    // 26.0, matching the floor above, and the argument is the one the Mac makes
+    // rather than a weaker version of it. iOS 26 needs an A13 — iPhone 11 or
+    // the second-generation SE — so it does drop the XR and the XS, which is a
+    // real cost the macOS floor did not have to pay. What makes it cheap is the
+    // same sentence: THE COMPANION HAS NOT SHIPPED. `ios/README.md` still calls
+    // the App Store "a future path", so there is no shop on an iPhone XS to
+    // strand, only a 2018 phone that will not be bought new. This is free today
+    // and expensive after the first shop installs it, which is exactly why it
+    // is being decided now and not later.
     //
     // Verified by building the KhaytCore product against the iOS SDK at this
     // floor — including with Sparkle still in `dependencies`, which is
     // macOS-only. SwiftPM does not hold that against a target that never names
     // it, so the update path for the Mac costs the phone nothing.
-    platforms: [.macOS("26.0"), .iOS("17.0")],
+    platforms: [.macOS("26.0"), .iOS("26.0")],
     products: [
         .library(name: "KhaytCore", targets: ["KhaytCore"]),
         .executable(name: "Khayt", targets: ["KhaytApp"]),
