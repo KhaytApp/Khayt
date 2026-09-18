@@ -2984,6 +2984,92 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.25] - 2026-09-18
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Twenty-eight changes. Six of them are things this app could read and never
+write — including one that left a shop with no way out.
+
+### Added
+
+- **Production can be stopped and started from here.** Khayt has always refused
+  to start a print while production is paused. This app knew that refusal and
+  could only report it — so a shop that paused production on the Windows app
+  opened its Mac to find every start blocked, nothing on screen saying why, and
+  no way to resume. There is a banner on the board now, and ⌘⇧. stops the floor
+  and starts it again. Pausing asks for a reason and does not require one.
+
+- **The shop's own messages can be written here.** The Mac could pick a saved
+  WhatsApp message, fill it in with a job's facts and open WhatsApp with it
+  ready — and could not write one. A shop whose book had none opened that sheet
+  to an empty list with nothing to explain it. They are written in Settings →
+  Integrations now, and the placeholders offered are the ones that actually get
+  replaced rather than a list typed beside the box.
+
+- **Invoices carry the shop's own logo.** Every invoice this app printed
+  carried Khayt's mark where the Windows app printed the shop's — the logo was
+  refused outright rather than checked. It is checked now, the same way: only a
+  picture kept inside the book is printed, never a link out of the settings
+  file. Settings → Business takes a PNG, JPEG, GIF or WebP under 1 MB, read by
+  the file's own bytes rather than by the name on it.
+
+- **Simple and Professional can be chosen here.** The app has honoured the
+  shop's chosen mode since Simple started hiding Expenses and Reports, and
+  there was no way to set one. Settings → Preferences offers both, and says
+  what Simple takes away and that nothing is deleted.
+
+- **Where a model came from can be recorded.** The library's inspector has
+  always shown a model's source and its licence, and nothing here could set
+  either — so on a real library that panel was blank on every model. There is a
+  menu beside Group and Category now, set on everything selected at once.
+  *Not recorded* is an entry on that menu rather than only the starting state:
+  a licence chosen by mistake would otherwise tell a shop for ever that it may
+  not sell its own work.
+
+- **A photo of the finished print can be added to a job.** Portfolio has always
+  asked for one and nothing here could take one. The sizes, the folder and the
+  filename are the Windows app's, so the same photo is one photo on both.
+
+### Changed
+
+- **Twenty more of Khayt's shared rules now run natively.** The Mac app has
+  always run Khayt's business rules as the same code the Windows app runs, so
+  that the two could not disagree. They are being rewritten in Swift, and what
+  makes that safe is a harness that runs every rewritten rule beside the
+  original over thousands of generated inputs and fails the build on the first
+  disagreement.
+
+  It caught five faults in the new code that no ordinary test would have
+  noticed. Two would have reached an accountant: a negative figure written into
+  an exported CSV as text rather than as money, and a job with no recorded
+  stage slipping into a report filtered by stage. One would have reached a
+  customer: a project name ending in a Windows line break could have forged a
+  second line in a WhatsApp message, because the two characters that make that
+  line break count as one in Swift and the check walked straight past them.
+
+  Two faults in the ORIGINALS came out of the same work. Reporting a tax
+  invoice to ZATCA from this Mac could never have worked at all — the code that
+  encodes the document reaches for two things that exist in a browser and in a
+  server and in neither place this app runs. And an invoice counter stored as
+  text numbered the next invoice 51 instead of 6, in both apps; it is left
+  as-is, in the open and under test, because the two apps disagreeing about a
+  sequence a tax authority requires to be unbroken would be worse.
+
+### Fixed
+
+- **Simple mode has never hidden anything.** A shop set to Simple saw Expenses
+  and Reports exactly as a Professional one did, in both the sidebar and the
+  menu bar. The rule was right, the setting reached the app, and the check was
+  written correctly — into the window Khayt used to open with. The redesigned
+  one has been the default since alpha.12 and never asked.
+
+- **Three more things the app knew and never said.** A warning that records
+  were unreadable, the line saying whether the book was in step with the cloud,
+  and the note that the app had crashed last time were all written into the
+  retired window. The app dropped data and said nothing.
+
 ## [4.0.0-alpha.24] - 2026-09-18
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
