@@ -94,6 +94,15 @@ tested against both.
   Cancelled jobs stop booking a machine, and a machine nobody has set a target
   for is still on the list with its hours held apart.
 
+- **(Mac) What an hour earned and what a gram cost are worked out natively.**
+  Both figures on the cost-trends chart run in the app now, and both keep the
+  corrections the rule carries: delivered work is in the chart, so a shop that
+  hands over promptly no longer sees its best months as its emptiest; and a
+  gram costs what the spool cost divided by what it weighed new, in the month
+  the spool was opened — rather than by what is left on it today, which made a
+  nearly finished spool cost a fortune and turned the trend into one number
+  twelve times.
+
 - **(Mac) How long a job takes is worked out natively.** The cycle-time chart
   and the per-product lead times run in the app now, in the shop's own
   calendar. A month that finished nothing still has no answer rather than a
