@@ -770,7 +770,6 @@ public actor KhaytEngine {
         // series is built by handing `forecast` a money function, and one that
         // read `o.price` instead would count a foreign job at its face value
         // and every credit note at nothing.
-        "forecast",
         // What a slicer's configs say a model is printed in. `colorsFromConfigs`
         // takes the config TEXT rather than an open zip, which is what lets it
         // be shared at all: `lib/zip-read.js` needs Buffer and zlib, and the
@@ -2214,6 +2213,9 @@ public actor KhaytEngine {
 
     /// One month of the shop's takings.
     public struct RevenueMonth: Decodable, Sendable, Equatable, Identifiable {
+        public init(key: Int, label: String, revenue: Double) {
+            self.key = key; self.label = label; self.revenue = revenue
+        }
         /// `year * 12 + month`, from the module — a sortable key that does not
         /// go through a date and cannot pick up a timezone on the way.
         public let key: Int
@@ -2224,6 +2226,11 @@ public actor KhaytEngine {
     }
 
     public struct RevenueOutlook: Decodable, Sendable, Equatable {
+        public init(history: [RevenueMonth], projection: [Projected], nextMonth: Double,
+                    trendPct: Double?, method: String) {
+            self.history = history; self.projection = projection
+            self.nextMonth = nextMonth; self.trendPct = trendPct; self.method = method
+        }
         public let history: [RevenueMonth]
         public let projection: [Projected]
         public let nextMonth: Double
@@ -2237,6 +2244,9 @@ public actor KhaytEngine {
         public let method: String
 
         public struct Projected: Decodable, Sendable, Equatable, Identifiable {
+            public init(key: Int, label: String, projected: Double) {
+                self.key = key; self.label = label; self.projected = projected
+            }
             public let key: Int
             public let label: String
             public let projected: Double
@@ -2252,29 +2262,44 @@ public actor KhaytEngine {
     /// screen are reading the same numbers rather than two opinions about
     /// revenue.
     ///
-    /// The money function is written in JavaScript inside the bridge for the
-    /// same reason `kpis` does it: a function cannot cross the JSON bridge, and
-    /// the alternative is this app having its own idea of what an order earned.
+    /// ── WHAT EARNED WHAT IS STILL SHARED; THE ARITHMETIC IS NOT ──────────
     ///
-    /// `now` is milliseconds. The module buckets by month in UTC and never asks
-    /// a clock.
+    /// `orderNetRevenueBase` is the money chokepoint and stays in JavaScript,
+    /// asked ONCE for the whole list rather than through a callback — a
+    /// function cannot cross the bridge, and the alternative is this app
+    /// having its own idea of what an order earned. The fitting and the
+    /// bucketing are `Forecast`.
+    ///
+    /// `now` is milliseconds, and the module buckets by month in LOCAL time.
+    /// This comment used to say UTC; it never did. `lib/forecast.js` carries
+    /// the scar of the day it did — reading the month in UTC put a UTC+3
+    /// shop's jobs completed between midnight and 03:00 on the 1st into the
+    /// previous month, and slid the whole window back with them.
     public func revenueOutlook(orders: [JSONValue], clients: [JSONValue],
                                settings: [String: JSONValue],
                                now: Double, months: Int = 6,
                                periods: Int = 1) throws -> RevenueOutlook {
-        try runtime.call2("""
+        let revenues: [Double] = try runtime.call2("""
         (function () {
-          var ctx = { settings: ARG2, clients: ARG1 };
+          var ctx = { settings: ARG1, clients: ARG2 };
           var M = globalThis.KhaytOrderMoney;
-          return globalThis.KhaytForecast.forecast(ARG0, {
-            now: ARG3, months: ARG4, periods: ARG5,
-            revenueOf: function (o) { return M.orderNetRevenueBase(o, ctx); }
+          return (ARG0 || []).map(function (o) {
+            var v = +M.orderNetRevenueBase(o, ctx);
+            // `+x || 0` is what the callback's caller applied, kept here so
+            // the figures handed over are the ones the rule produced.
+            return (v === 0 || v !== v) ? 0 : v;
           });
         })()
-        """,
-        [.array(orders), .array(clients), .object(settings),
-         .number(now), .number(Double(months)), .number(Double(periods))],
-        as: RevenueOutlook.self)
+        """, [.array(orders), .object(settings), .array(clients)], as: [Double].self)
+
+        let outlook = Forecast.forecast(orders: orders, revenues: revenues,
+                                        now: now, months: months, periods: periods)
+        return RevenueOutlook(
+            history: outlook.history.map {
+                RevenueMonth(key: $0.key, label: $0.label, revenue: $0.revenue) },
+            projection: outlook.projection.map {
+                RevenueOutlook.Projected(key: $0.key, label: $0.label, projected: $0.projected) },
+            nextMonth: outlook.nextMonth, trendPct: outlook.trendPct, method: outlook.method)
     }
 
     // MARK: - What a model is printed in
