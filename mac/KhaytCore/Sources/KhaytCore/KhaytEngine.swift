@@ -604,7 +604,6 @@ public actor KhaytEngine {
         // What a shop must bill to cover what it pays anyway.
         // What reached and left the bank, as opposed to what was earned.
         // Twelve months of revenue per print-hour and material cost per gram.
-        "cost-trends",
         // How long a job takes, by month and by product.
         // What was thrown away, by month and by why.
         // Whether the shop keeps its promises: finished by the due date, or by how many days not.
@@ -4441,22 +4440,30 @@ public actor KhaytEngine {
     public func costTrends(orders: [JSONValue], spools: [JSONValue],
                            settings: [String: JSONValue], clients: [JSONValue],
                            now: Date, months: Int = 12) throws -> CostTrends {
-        try runtime.call2(#"""
+        // `order-money` still lives in JavaScript, so each job's revenue is
+        // worked out once, in order, and handed across; `business-scope` is
+        // native. The two figures are `KhaytCore.CostTrends` now.
+        let revenues: [Double] = try runtime.call2(#"""
         (function () {
-          var ctx = { settings: ARG2, clients: ARG3 };
-          return globalThis.KhaytCostTrends.costTrends(ARG0, ARG1, {
-            now: ARG4, months: ARG5,
-            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
-            countsForBusiness: function (o) {
-              return globalThis.KhaytBusinessScope
-                ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
-            },
+          var ctx = { settings: ARG1, clients: ARG2 };
+          return ARG0.map(function (o) {
+            var n = Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx));
+            return isFinite(n) ? n : 0;
           });
         })()
-        """#,
-                          [.array(orders), .array(spools), .object(settings), .array(clients),
-                           .number(now.timeIntervalSince1970 * 1000), .number(Double(months))],
-                          as: CostTrends.self)
+        """#, [.array(orders), .object(settings), .array(clients)], as: [Double].self)
+
+        let report = KhaytCore.CostTrends.report(
+            orders: orders, spools: spools, revenues: revenues,
+            now: now.timeIntervalSince1970 * 1000, months: months,
+            countsForBusiness: { BusinessScope.countsForBusiness($0) })
+        return CostTrends(
+            months: report.months.map {
+                CostTrends.Month(key: $0.key, revenue: $0.revenue, hours: $0.hours,
+                                 perHour: $0.perHour, costPerGram: $0.costPerGram,
+                                 spoolsOpened: $0.spoolsOpened)
+            },
+            perHour: report.perHour, costPerGram: report.costPerGram)
     }
 
     // MARK: - How long a job takes
