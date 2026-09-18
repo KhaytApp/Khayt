@@ -214,6 +214,59 @@ never "there are none". A collection the shop simply does not have comes back as
 not an empty book: a client that accepted `{}` would replace a shop it already had
 with nothing.
 
+### `POST /api/store/deltas`
+
+A paired client's changes, folded into the shop's book. **Requires owner PIN.**
+
+> **Served by the native Mac app only, and off unless the app switches it on.**
+> `LanServer.Host.fold` is `nil` by default; a build that has not wired it answers
+> `405` and says so, rather than failing as though something broke.
+
+**Request** — an outbox, the shape `KhaytCloudOutbox.changesToSend` produces and
+`KhaytSync.applyDeltas` consumes:
+
+```json
+{
+  "deltas": [
+    { "collection": "clients", "record": { "id": "c-1", "name": "Sara", "rev": 2 } }
+  ],
+  "tombstones": [],
+  "cursor": null
+}
+```
+
+Neither end invents a rule here. The client computes the payload with the same
+function the desktop pushes with, and the Mac folds it with the same function
+every device pulls with.
+
+**The book is protected by the fold, not by this route.** `applyDeltas` keeps the
+higher revision, so a client carrying a stale copy cannot undo work done at the
+desk — its record is counted in `skipped` and discarded. The host's writer does
+the rest: it reads inside the write and swaps atomically.
+
+**A partial client cannot delete history.** `changesToSend` emits a delta only for
+a record it *holds* at a higher rev, and takes tombstones only from the store's
+own `tombstones` collection. A phone carrying 200 of 3,140 orders says nothing at
+all about the 2,940 it was never given.
+
+**Response 200** — what the fold did:
+
+```json
+{ "applied": 1, "skipped": 1, "removed": 0 }
+```
+
+`skipped` is normal and not a fault: it counts records the book already held at an
+equal or higher revision. An empty outbox answers `200` with all zeros without
+writing — a write with no change still rewrites the file and still rolls `.prev`.
+
+**Response 400** — the payload is not `{deltas, tombstones, cursor}` with both
+arrays present. Checked before the engine sees it.
+
+**Response 405** — this Mac does not take changes from a client.
+
+**Response 500** — the book could not be written. Nothing was changed, and a
+client must not treat this as delivered.
+
 ### `GET /api/orders`
 
 Order log slice. **Requires owner PIN.**

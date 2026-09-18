@@ -1201,6 +1201,37 @@ tested against both.
 
 ### Added
 
+- **(iOS + Mac) The phone can work out what it changed while the Mac was away,
+  and the Mac can take it back.** Neither half invents a rule. The phone
+  computes an outbox with `KhaytCloudOutbox.changesToSend` — the function the
+  desktop already pushes with — against a baseline written at the moment of the
+  pull, when the book and the baseline are by definition identical. The Mac
+  folds it with `KhaytSync.applyDeltas`, the function every device already pulls
+  with. A phone gets no private theory about what a change is, which is the only
+  reason it may write to a shop's book at all.
+
+  What protects the book is the fold, not the route: `applyDeltas` keeps the
+  higher revision, so a phone carrying a stale record cannot undo work done at
+  the desk — it is counted as skipped and discarded. Pinned by a test that
+  sends exactly that.
+
+  And a partial book cannot delete a shop's history. `changesToSend` emits a
+  delta only for a record the phone *holds* at a higher rev, and takes
+  tombstones only from the store's own collection — so a phone carrying 200 of
+  3,140 orders says nothing at all about the 2,940 it was never given. That is a
+  property of the shared rule rather than caution on the phone's side, and it is
+  verified against the rule rather than assumed.
+
+  `POST /api/store/deltas` is **off unless the Mac app switches it on**. Taking a
+  phone's edits is a decision about a shop's book, so the capability is nil by
+  default and an unwired build answers 405 and says so, rather than failing as
+  though something broke.
+
+  Nothing sends yet: the phone can compute its outbox and the Mac can accept
+  one, but no screen writes offline and the app does not wire the capability.
+  The protocol is in place and tested; turning it on is a separate change.
+
+
 - **(iOS) The screens read the shop's own records.** Five of them could not load
   at all against the native Mac: it serves `/api/status`, `/api/queue` and
   `/api/store`, and orders, inventory, clients, machines and the waiting list

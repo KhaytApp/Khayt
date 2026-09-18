@@ -30,11 +30,13 @@ struct LanServerTests {
         let recorded = Recorded()
         /// The book the server reads — mutable, so an approval shows on the next read.
         let book = Book()
+        /// How many times the delta writer was actually entered.
+        let foldCalls = Counter()
         var tokens = 0
 
         init(pin: String = "2468", intakeToken: String = "", recordFails: Bool = false,
              calendarToken: String = "", measures: Bool = true, sliced: Bool = false,
-             readTimeout: TimeInterval = 15) async throws {
+             readTimeout: TimeInterval = 15, foldsDeltas: Bool = false) async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -88,6 +90,18 @@ struct LanServerTests {
                 book.value["printLog"] = log
                 return result.order
             }
+            // Off unless a test asks for it, exactly as it is off on a Mac
+            // whose app has not wired it. `foldCalls` lets a test prove the
+            // writer was NOT reached, which is most of what the refusals are for.
+            if foldsDeltas {
+                let calls = self.foldCalls
+                host.fold = { payload in
+                    calls.n += 1
+                    let folded = try await engine.foldDeltas(base: book.value, deltas: [payload])
+                    book.value = folded.store
+                    return folded
+                }
+            }
             let server = LanServer(host: host)
             self.server = server
             port = try await server.start(port: 0, bind: .loopback)
@@ -140,6 +154,18 @@ struct LanServerTests {
     final class Recorded: @unchecked Sendable {
         var entries: [JSONValue] = []
     }
+    /// How many times something was entered. Proving a writer was NOT reached
+    /// is most of what the refusal tests are for, and absence of a side effect
+    /// is not evidence on its own.
+    final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = 0
+        var n: Int {
+            get { lock.lock(); defer { lock.unlock() }; return value }
+            set { lock.lock(); defer { lock.unlock() }; value = newValue }
+        }
+    }
+
     final class Book: @unchecked Sendable {
         var value: [String: JSONValue] = [:]
         /// Put one job into the book, replacing any with the same id.
@@ -338,6 +364,90 @@ struct LanServerTests {
         // An ASCII name at the boundary keeps every byte it is entitled to.
         let long = String(repeating: "a", count: 70)
         #expect(LanServer.advertisedName(["settings": .object(["shopName": .string(long)])]).count == 63)
+    }
+
+    @Test("a phone's changes are folded into the book, and a stale one cannot undo desk work")
+    func foldFromPhone() async throws {
+        let bench = try await Bench(foldsDeltas: true)
+        defer { bench.stop() }
+
+        // The shop's book as this Mac holds it. C-1 was edited at the desk after
+        // the phone last pulled, so it stands at rev 5.
+        bench.book.value["clients"] = .array([
+            .object(["id": .string("C-1"), "name": .string("Edited at the desk"), "rev": .number(5)]),
+            .object(["id": .string("C-2"), "name": .string("Nora"), "rev": .number(1)]),
+        ])
+
+        // The phone carries a genuine edit to C-2, and a STALE C-1 at rev 2 —
+        // the shape a phone has when it was pulled before the desk touched it.
+        let outbox = #"""
+        {"deltas":[
+          {"collection":"clients","record":{"id":"C-2","name":"Nora Al-Harbi","rev":2}},
+          {"collection":"clients","record":{"id":"C-1","name":"Stale from the phone","rev":2}}],
+         "tombstones":[],"cursor":null}
+        """#
+
+        let none = try await bench.post("/api/store/deltas", json: outbox)
+        #expect(none.status == 401, "a phone's edits reached the book without the PIN")
+
+        let reply = try await bench.post("/api/store/deltas", json: outbox,
+                                         headers: ["x-khayt-pin": "2468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"applied\":1"), Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"skipped\":1"), Comment(rawValue: reply.text))
+
+        guard case .array(let clients)? = bench.book.value["clients"] else {
+            Issue.record("the clients collection went missing"); return
+        }
+        var byId: [String: [String: JSONValue]] = [:]
+        for row in clients {
+            guard case .object(let o) = row, case .string(let id)? = o["id"] else { continue }
+            byId[id] = o
+        }
+        #expect(byId["C-2"]?["name"] == .string("Nora Al-Harbi"), "the phone's real edit did not land")
+        // The desk's work survived a phone that had never seen it. This is
+        // `applyDeltas`'s higher-rev rule, and it is the whole reason a phone is
+        // allowed to write to a shop's book at all.
+        #expect(byId["C-1"]?["name"] == .string("Edited at the desk"),
+                "a stale phone overwrote work done at the desk")
+        #expect(byId["C-1"]?["rev"] == .number(5))
+    }
+
+    @Test("a Mac that has not switched the capability on says so, rather than failing")
+    func foldRefusedWhenUnwired() async throws {
+        let bench = try await Bench()          // fold is nil, as on an unwired Mac
+        defer { bench.stop() }
+        let reply = try await bench.post("/api/store/deltas",
+                                         json: #"{"deltas":[{"collection":"clients","record":{"id":"C-9","rev":2}}],"tombstones":[],"cursor":null}"#,
+                                         headers: ["x-khayt-pin": "2468"])
+        #expect(reply.status == 405, Comment(rawValue: reply.text))
+        #expect(reply.text.contains("does not take changes"))
+    }
+
+    @Test("nonsense is refused before the engine sees it")
+    func foldRefusesNonsense() async throws {
+        let bench = try await Bench(foldsDeltas: true)
+        defer { bench.stop() }
+
+        for (label, raw) in [
+            ("not an object", "[]"),
+            ("deltas is not an array", #"{"deltas":{},"tombstones":[]}"#),
+            ("tombstones missing", #"{"deltas":[]}"#),
+        ] {
+            let reply = try await bench.post("/api/store/deltas", json: raw,
+                                             headers: ["x-khayt-pin": "2468"])
+            #expect(reply.status == 400, Comment(rawValue: "\(label): \(reply.status) \(reply.text)"))
+        }
+
+        // An empty outbox is valid, and must not rewrite the book: a write with
+        // no change still rewrites the file and still rolls `.prev`.
+        let empty = try await bench.post("/api/store/deltas",
+                                         json: #"{"deltas":[],"tombstones":[],"cursor":null}"#,
+                                         headers: ["x-khayt-pin": "2468"])
+        #expect(empty.status == 200)
+
+        #expect(bench.foldCalls.n == 0,
+                "the writer was entered for a payload that should never have reached it")
     }
 
     @Test("the live queue page is the module's HTML, with the clock it was given")

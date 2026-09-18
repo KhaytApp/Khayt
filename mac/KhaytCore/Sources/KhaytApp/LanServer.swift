@@ -80,6 +80,16 @@ final class LanServer {
         /// is NOW (it moved underneath the phone). Throws when the book cannot
         /// be written.
         var approve: (String, String) async throws -> JSONValue? = { _, _ in throw CocoaError(.fileWriteUnknown) }
+        /// Fold a paired phone's changes into the shop's book, inside the write.
+        ///
+        /// `nil` — the DEFAULT — means this Mac does not take changes from a
+        /// phone, and the route says so plainly. Every other write closure here
+        /// defaults to throwing, which is right for a capability the app always
+        /// has and a test may stub. This one is different: taking a phone's
+        /// edits is a decision about a shop's book, and it should be switched on
+        /// by the app deliberately rather than be on by construction and fail
+        /// with a file error when nobody wired it.
+        var fold: ((_ payload: [String: JSONValue]) async throws -> KhaytEngine.Folded)? = nil
         /// Write a customer's survey onto the order that holds `token`, inside
         /// the write. Returns false when no order holds it any more (spent by
         /// a concurrent submit, or never issued). Throws when the book cannot
@@ -517,6 +527,30 @@ final class LanServer {
                 return .json(500, #"{"error":"The book could not be prepared to send"}"#)
             }
             return .json(200, body)
+
+        // ── AND THE WAY BACK ──────────────────────────────────────────────
+        //
+        // A phone that holds the shop's records can be edited while this Mac is
+        // switched off. This is where those edits come home.
+        //
+        // The payload is an OUTBOX — `{deltas, tombstones, cursor}` — computed
+        // on the phone by `KhaytCloudOutbox.changesToSend`, which is the rule
+        // the desktop already pushes with. It is folded here by
+        // `KhaytSync.applyDeltas`, which is the rule every device already pulls
+        // with. Neither end has a private theory about what a change is, and
+        // that is the only reason a phone may write to a shop's book at all.
+        //
+        // What protects the book is not this route. It is `applyDeltas`'s
+        // higher-rev rule — a record the Mac has at an equal or newer revision
+        // is skipped, so a phone carrying a stale copy cannot undo desk work —
+        // and the host's own writer, which reads inside the write and swaps
+        // atomically. This route's job is to check the PIN, refuse nonsense,
+        // and say what happened.
+        //
+        // OFF BY DEFAULT: `host.fold` is nil unless the app sets it.
+        case ("/api/store/deltas", false) where request.method == "POST":
+            if let refused = await pinGate(request) { return refused }
+            return await foldFromPhone(request)
 
         case ("", true), ("/", true):
             if case .object(let settings)? = host.store()["settings"], settings["onlineEnabled"] == .bool(true) {
@@ -1091,6 +1125,42 @@ final class LanServer {
         let scope = String(decoding: scopeData, as: UTF8.self)
         let book = String(decoding: storeData, as: UTF8.self)
         return #"{"whole":\#(whole),"scope":\#(scope),"store":\#(book)}"#
+    }
+
+    /// `POST /api/store/deltas` — a phone's changes, folded into the book.
+    private func foldFromPhone(_ request: Request) async -> Response {
+        guard let fold = host.fold else {
+            // Not an error and not a failure — a capability this build does not
+            // offer. Said in a way a phone can act on: keep the edits, stop
+            // asking.
+            return .json(405, #"{"error":"This Mac does not take changes from a phone."}"#)
+        }
+        guard let body = try? JSONDecoder().decode(JSONValue.self, from: request.body),
+              case .object(let payload) = body else {
+            return .json(400, #"{"error":"Invalid request"}"#)
+        }
+        // Shape, before the engine sees it. `applyDeltas` reads `deltas` and
+        // `tombstones` as arrays; handing it an object or a string is a way to
+        // find out what a JavaScript runtime does with the unexpected, which is
+        // not a question a shop's book should be the subject of.
+        guard case .array(let deltas)? = payload["deltas"],
+              case .array(let tombstones)? = payload["tombstones"] else {
+            return .json(400, #"{"error":"Expected {deltas, tombstones, cursor}"}"#)
+        }
+        guard !deltas.isEmpty || !tombstones.isEmpty else {
+            // Nothing to do, and worth answering rather than writing the book
+            // to say so: a write with no change still rewrites the file and
+            // still rolls `.prev`.
+            return .json(200, #"{"applied":0,"skipped":0,"removed":0}"#)
+        }
+        do {
+            let folded = try await fold(payload)
+            return .json(200, #"{"applied":\#(folded.applied),"skipped":\#(folded.skipped),"removed":\#(folded.removed)}"#)
+        } catch {
+            // The book was not written. The phone keeps its changes and tries
+            // again — which is why it must not read this as "delivered".
+            return .json(500, #"{"error":"The change could not be written to the book."}"#)
+        }
     }
 
     // MARK: - The PIN

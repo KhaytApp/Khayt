@@ -83,6 +83,52 @@ actor BookReader {
         return f.string(from: now)
     }
 
+    // MARK: - What this phone has changed and the Mac has not seen
+
+    /// The edits made on this phone since the Mac last handed over the book.
+    ///
+    /// ── IT IS THE SHOP'S OWN RULE, NOT A SECOND ONE ──────────────────────
+    ///
+    /// `KhaytCloudOutbox.changesToSend` is what the desktop already uses to
+    /// decide what to push, and it is what runs here — over the book and the
+    /// baseline. The phone does not get a private theory about what counts as a
+    /// change, which matters because the answer has to survive a round trip: the
+    /// Mac folds this with `KhaytSync.applyDeltas`, the same pair of rules that
+    /// have been moving records between devices since before the phone existed.
+    ///
+    /// ── WHY A PARTIAL BOOK CANNOT DELETE A SHOP'S HISTORY ────────────────
+    ///
+    /// The phone holds a working set — 200 finished orders out of a possible
+    /// 3,140. Handing that to a rule that diffs two stores sounds alarming: the
+    /// 2,940 it does not have look, at a glance, like records it deleted.
+    ///
+    /// They are not, and this is a property of the rule rather than caution
+    /// here: `changesToSend` emits a delta only for a record PRESENT locally at
+    /// a higher rev, and takes tombstones only from the store's own
+    /// `tombstones` collection. Absence says nothing. Verified against the rule
+    /// directly, not assumed.
+    ///
+    /// The consequence is that a deletion made on the phone is not expressible
+    /// yet — nothing here writes a tombstone — so deleting stays a desktop
+    /// action. That is a limit, stated, rather than a silent half-behaviour.
+    ///
+    /// Returns nil when there is no baseline: a phone that has never been given
+    /// the book has not changed anything, and has nothing to say.
+    func pendingChanges() async throws -> KhaytEngine.Outbox? {
+        guard let baseline = book.baseline() else { return nil }
+        let local = try book.read()
+        return try await engine().changesToSend(local: local, server: baseline)
+    }
+
+    /// Has this phone got anything to send?
+    ///
+    /// Separate from `pendingChanges` so a screen can ask the cheap question —
+    /// a badge, a "waiting to sync" line — without the engine crossing.
+    func hasPendingChanges() async -> Bool {
+        guard let outbox = try? await pendingChanges() else { return false }
+        return !outbox.isEmpty
+    }
+
     // MARK: - The collections that are records as they stand
 
     func recentOrders(limit: Int = 40, status: String? = nil) throws -> [OrderLogEntry] {
