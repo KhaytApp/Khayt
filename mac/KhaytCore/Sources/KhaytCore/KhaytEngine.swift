@@ -621,7 +621,6 @@ public actor KhaytEngine {
         // How long a job takes, by month and by product.
         "cycle-time",
         // What was thrown away, by month and by why.
-        "waste-trend",
         // Whether the shop keeps its promises: finished by the due date, or by how many days not.
         "on-time",
         // The LAN server's rules and pages: the lockout in front of it, and what
@@ -4421,6 +4420,11 @@ public actor KhaytEngine {
     /// `types` are the columns in stacking order, heaviest first, `other` last
     /// only when something fell in it.
     public struct WasteTrend: Decodable, Sendable {
+        public init(types: [String], months: [Month], total: Double, entries: Int,
+                    byType: [String: Double]) {
+            self.types = types; self.months = months; self.total = total
+            self.entries = entries; self.byType = byType
+        }
         public let types: [String]
         public let months: [Month]
         public let total: Double
@@ -4428,6 +4432,9 @@ public actor KhaytEngine {
         public let byType: [String: Double]
 
         public struct Month: Decodable, Sendable, Identifiable, Hashable {
+            public init(key: String, total: Double, byType: [String: Double], entries: Int) {
+                self.key = key; self.total = total; self.byType = byType; self.entries = entries
+            }
             public let key: String
             public let total: Double
             public let byType: [String: Double]
@@ -4437,10 +4444,13 @@ public actor KhaytEngine {
     }
 
     public func wasteTrend(wasteLog: [JSONValue], now: Date, months: Int = 6, named: Int = 3) throws -> WasteTrend {
-        try runtime.call2("globalThis.KhaytWasteTrend.wasteTrend(ARG0, { now: ARG1, months: ARG2, named: ARG3 })",
-                          [.array(wasteLog), .number(now.timeIntervalSince1970 * 1000),
-                           .number(Double(months)), .number(Double(named))],
-                          as: WasteTrend.self)
+        let t = KhaytCore.WasteTrend.trend(wasteLog, now: now.timeIntervalSince1970 * 1000,
+                                           months: months, named: named)
+        return WasteTrend(types: t.types,
+                          months: t.months.map {
+                              WasteTrend.Month(key: $0.key, total: $0.total,
+                                               byType: $0.byType, entries: $0.entries) },
+                          total: t.total, entries: t.entries, byType: t.byType)
     }
 
     // MARK: - Whether the shop keeps its promises
