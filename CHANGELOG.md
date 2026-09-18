@@ -1801,6 +1801,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) Simple mode has never hidden anything.** A shop set to Simple saw
+  Expenses and Reports exactly as a Professional one did, in both the sidebar
+  and the menu bar. The rule was right, the setting reached the app, and the
+  check was written correctly — into the window Khayt used to open with. The
+  redesigned one has been the default since alpha.12 and never asked. The menu
+  and a reopened window never asked either, so the keyboard shortcuts went
+  straight to the screens. All three ask now, from one answer rather than three
+  copies of it, and a check holds them to it.
+
+  Khayt still cannot SET the mode on a Mac — that is done in the Windows app —
+  it can only honour one.
+
 - **(Mac) Khayt's Siri shortcuts have never worked, and nothing said so.** The
   app declares two — "What is printing in Khayt" and "What is waiting in
   Khayt" — and the step that publishes them to the system was looking in the

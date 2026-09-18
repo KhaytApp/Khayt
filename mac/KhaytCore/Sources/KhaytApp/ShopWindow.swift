@@ -454,11 +454,13 @@ private struct OwedSummary: View {
         case "board":
             return .board
         case "expenses":
-            return .expenses
+            // Same reasoning as the catalogue below: a window reopened onto a
+            // screen whose row is gone has no way back to it.
+            return shop.canShow(.expenses) ? .expenses : nil
         case "waste":
             return .waste
         case "reports":
-            return .reports
+            return shop.canShow(.reports) ? .reports : nil
         case "catalogue":
             // Only if the shop still has one — a catalogue that was emptied
             // since would restore to a screen with nothing on it and no way

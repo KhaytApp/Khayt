@@ -246,11 +246,18 @@ private struct GoMenu: View {
         // people easy access to all the commands they need to do things in your
         // app" — and a screen you cannot get to from the menu bar is a screen
         // with no keyboard route at all.
-        Button(Words.upfront("exp.title")) { shop.shelf = .expenses }
-            .keyboardShortcut("9", modifiers: .command)
+        // GATED LIKE THE SIDEBAR ROW. Hiding the row while ⌘9 still opens the
+        // screen is half a gate — and the shortcut is the half nobody would
+        // find by looking.
+        if shop.canShow(.expenses) {
+            Button(Words.upfront("exp.title")) { shop.shelf = .expenses }
+                .keyboardShortcut("9", modifiers: .command)
+        }
         Button(Words.upfront("waste.title")) { shop.shelf = .waste }
-        Button(Words.upfront("an.pnl_title")) { shop.shelf = .reports }
-            .keyboardShortcut("0", modifiers: .command)
+        if shop.canShow(.reports) {
+            Button(Words.upfront("an.pnl_title")) { shop.shelf = .reports }
+                .keyboardShortcut("0", modifiers: .command)
+        }
     }
 }
 
