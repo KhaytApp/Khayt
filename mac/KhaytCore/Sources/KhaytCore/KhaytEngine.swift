@@ -413,7 +413,6 @@ public actor KhaytEngine {
         // What a shop's Telegram bot says when a job moves. Built inline in
         // renderer/integrations.js, so this app had no way to say it — which
         // is why it refused to finish a job for any shop with a bot.
-        "telegram-message",
         // The shop's quarters. ORDER-MONEY AND TAX ARE ALREADY ABOVE, and both
         // must be: this consults them through their globals, and without them
         // it does not raise — it reports every order at its gross price and no
@@ -5245,6 +5244,10 @@ public actor KhaytEngine {
 
     /// What the shop's Telegram bot would say about this move, or nil when the
     /// shop has not asked for one — no bot configured, or not this move.
+    /// What the shop's Telegram bot would say about this move, or nil when the
+    /// shop has not asked for one — no bot configured, or not this move.
+    ///
+    /// Native since the port — `KhaytCore.TelegramBot`.
     public func telegramMessage(order: JSONValue, newStatus: String,
                                 settings: [String: JSONValue],
                                 currency: String) throws -> TelegramMessage? {
@@ -5253,29 +5256,21 @@ public actor KhaytEngine {
         // "$ 9.69" from another is the shop speaking with two voices about the
         // same job — and a currency whose symbol sits in front was printed
         // behind by the old one-liner, for every shop not using riyals.
-        try runtime.call2("""
-            KhaytTelegramMessage.forStatus(ARG0, ARG1, {
-              settings: ARG2,
-              fmtPrice: function (n) {
-                // The symbol and its side come from SWIFT now — `Currencies`
-                // is native, so this no longer reaches for a global that the
-                // app may not be loading. Passed in rather than looked up, so
-                // un-bundling the table cannot quietly turn "€" back into
-                // "EUR" here.
-                var cur = { symbol: ARG4, pos: ARG5 };
-                var num = (Math.round((+n || 0) * 100) / 100).toFixed(2);
-                // U+202F, the narrow no-break space renderer/currency.js uses:
-                // it keeps the symbol against the figure across a line break.
-                return cur.pos === 'before'
-                  ? cur.symbol + '\u{202F}' + num
-                  : num + '\u{202F}' + cur.symbol;
-              }
-            })
-            """,
-            [order, .string(newStatus), .object(settings), .string(currency),
-             .string(Currencies.all[currency]?.symbol ?? Currencies.all["SAR"]?.symbol ?? currency),
-             .string(Currencies.all[currency]?.pos ?? "after")],
-            as: TelegramMessage?.self)
+        let money = Currencies.all[currency] ?? Currencies.all["SAR"]
+        let symbol = money?.symbol ?? currency
+        let before = (money?.pos ?? "after") == "before"
+        return TelegramBot.forStatus(order, newStatus: newStatus, settings: settings) { value in
+            // `(Math.round((+n || 0) * 100) / 100).toFixed(2)`, exactly:
+            // `|| 0` turns NaN into zero and leaves an infinity alone, and
+            // `toFixed` spells an infinity out rather than printing "inf".
+            let raw = JSSemantics.number(value)
+            let n = JSSemantics.round((raw.isNaN ? 0 : raw) * 100) / 100
+            let figure = n.isFinite ? String(format: "%.2f", n)
+                                    : (n > 0 ? "Infinity" : "-Infinity")
+            // U+202F, the narrow no-break space the other app uses: it keeps
+            // the symbol against the figure across a line break.
+            return before ? symbol + "\u{202F}" + figure : figure + "\u{202F}" + symbol
+        }
     }
 
     /// The email a move owes a customer, or nil when it owes none.

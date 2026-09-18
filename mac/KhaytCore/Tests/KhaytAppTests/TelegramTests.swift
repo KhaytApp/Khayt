@@ -158,24 +158,26 @@ struct TelegramTests {
         return []
     }
 
-    // MARK: - The two checks spelled out in Swift
+    // MARK: - The two checks the app asks before it sends
 
-    @Test("the token and chat-id checks agree with the shared rule")
+    @Test("the token and chat-id checks are the shared rule, not a copy of it")
     func checksAgree() async throws {
-        let engine = try KhaytEngine()
-        for token in ["123456:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw", "", "nope", "123456", "1:a b", "1:a-b_c"] {
-            let theirs = try await engine.raw("KhaytTelegramMessage.isBotToken(\(Self.json(token)))", as: Bool.self)
-            #expect(KhaytTelegram.isBotToken(token) == theirs, "\(token)")
+        // These used to be spelled out twice — once in the module, once in
+        // Swift — and this test ran both and compared. The rule is native now,
+        // so what is left to prove is that this app reaches THAT one rather
+        // than growing a third copy: `KhaytCore.TelegramBotParityTests` holds
+        // it to the JavaScript, and these call straight through.
+        #expect(KhaytTelegram.isBotToken("123456:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"))
+        #expect(!KhaytTelegram.isBotToken("nope"))
+        for token in ["123456:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw", "", "nope", "123456",
+                      "1:a b", "1:a-b_c"] {
+            #expect(KhaytTelegram.isBotToken(token) == TelegramBot.isBotToken(token), "\(token)")
         }
-        // A chat id is one of the two shapes Telegram documents, or nothing —
-        // and the Swift copy has to agree with the module about which is which,
-        // because this app sends on the strength of it.
         for id in [" -100123456 ", "@khaytshop", "khaytshop", " @Khayt_Shop ", "12345678",
                    "123; rm -rf /", "", "@my-shop", "@abc"] {
-            let theirs = try await engine.raw("KhaytTelegramMessage.chatId(\(Self.json(id)))",
-                                              as: String?.self)
-            #expect(KhaytTelegram.chatId(id) == theirs, "\(id)")
+            #expect(KhaytTelegram.chatId(id) == TelegramBot.chatId(id), "\(id)")
         }
+        #expect(KhaytTelegram.maxMessage == TelegramBot.maxMessage)
     }
 
     static func json(_ s: String) -> String {

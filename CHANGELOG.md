@@ -26,6 +26,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   project name as a formula, and a number is written as a number so money does
   not arrive as text.
 
+- **(Mac) What the shop's Telegram bot says is worked out natively.** The
+  message a completed or held job sends now runs in the app, and the two checks
+  the app makes before it sends — that a bot token could be one, and that a
+  chat id is one Telegram can deliver to — are the same rule rather than a
+  second copy of it. A customer-supplied project name still cannot forge a
+  second line in the message, including one ending in a Windows line break,
+  which the first version of this let through.
 
 - **(Mac) A customer's agreed prices are applied natively.** The rule that
   charges a customer what they were promised now runs in the app, and keeps the
@@ -46,6 +53,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the same way — "PA6-CF" is a nylon and needs drying every day, "PC-ABS" is an
   ABS and does not, and a spool nobody has recorded a drying for is left alone
   rather than being reported as overdue.
+
 - **(Mac) The queue projection is worked out natively, and survives a book that
   is wrong.** The "ready by" dates and the at-risk warning now run in the app.
   A job whose hours are recorded as something impossible used to take the whole
@@ -716,6 +724,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   sentence when the rate came from your own measured jobs and names how many,
   another when there are none yet and it is an assumption. An estimate that
   looks typed is the same mistake as a zero that looks typed.
+
 - **Comparable margins are net of tax — which changes a figure Khayt has been
   showing.** AI price assist recommends a margin from what a shop has actually
   realized, and it computed those margins against the **gross** price. For an
@@ -798,6 +807,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   had no way to see — let alone refuse — what the other one sends, and the
   consent it records is real and shop-wide. But a switch that does nothing where
   you switched it has to say so.
+
 - **The Mac can draft a quote from a description.** Say what the job is — "20
   cable clips, black PETG" — and the grams, the hours, the quantity and the
   spool fill themselves in. It was the other app's feature; the Mac had the
@@ -871,6 +881,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   than against a Swift copy of its regex — the first version of that test
   compared the implementation with a duplicate of itself and passed while both
   were wrong.
+
 - **The Mac can connect a storefront.** Khayt's cloud serves an import route per
   platform — paste it into Salla, Zid, Shopify or WooCommerce as an order
   webhook and new orders arrive in Order requests — and a feed route that
@@ -942,6 +953,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the wrong day. The suite exists to prove that adding measured actuals moved no
   money, and lateness is not money: what is pinned now is that the sample still
   carries overdue work for the attention list to find.
+
 - **The Mac app can group several prints that are one object.** A figure
   printed as a head, two hands and a body on four evenings is four jobs in the
   book, and "what did that figure cost me" was arithmetic across four rows that
@@ -1340,6 +1352,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and points a native binary at it. Anything missing — no slicer, a slicer
   since removed, a slice that produced nothing — falls back to measuring the
   shape rather than failing.
+
 - **A customer's upload is inspected before it is used.** Is it the kind of
   model its name claims; does an archive name a member outside the folder it
   would be opened in; does it expand out of all proportion to what arrived. A
@@ -1350,6 +1363,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the rules engine to be judged. What it cannot promise is said where the
   shop reads it: a parser bug in somebody else's C++ is not something a
   structural check can see.
+
 - **(Mac) A listing can be taken off the catalogue.** There was no way to
   delete a product here at all — the words for it had been sitting in the app
   unused. Right-click a product in the grid or the table and it asks, in
@@ -1360,6 +1374,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   months later as a screen that cannot draw. All of it comes back with one
   undo, except the pictures, whose bytes are gone — the record is restored
   without them rather than naming files that no longer exist.
+
 - **(Mac) Settings → Online can switch public pricing on, and make the
   printer preset it needs.** The customer-facing price is built from a saved
   preset — a name and the seven figures a part is costed at — and the shared
@@ -1371,6 +1386,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   one: name it, adjust the seven figures, and it is saved and chosen. A name
   already in use replaces that preset rather than doubling it, which is the
   other app's rule and the same id, so anything pointing at it still does.
+
 - **(Mac) A customer can price their own model on the intake form.** With
   public pricing switched on, the form offers an upload: the file is measured
   in memory, priced on the shop's own preset, spool cost, margin and waste
@@ -1384,6 +1400,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   (`lib/public-quote.js`, `lib/gcode-parse.js`), which the other app already
   quotes through, so a customer is never shown a different sum from the one
   the shop would reach for the same part.
+
 - **(Mac) The shop's due dates as a calendar subscription.** With the LAN
   server on, Settings → Online shows the same `/calendar.ics` link the
   Windows and Linux app offers: one all-day event per open job with a due
@@ -1391,6 +1408,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Wi‑Fi. The feed is one shared module now (`lib/lan-calendar.js`), lifted
   verbatim out of the Node route and held byte-identical to it; the
   subscription token is minted into the book the first time the Mac serves.
+
 - **(Mac) "Where is my order": the customer's tracking page, served by the
   Mac.** On a job under way or done, the inspector has "Copy tracking link":
   the link points at this Mac, carries the job's own tracking token (minted
@@ -1400,6 +1418,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   is lifted verbatim out of the Node route into `lib/lan-order-page.js`, the
   Node server draws from it, and the carriers directory moved from the
   renderer into `lib/` so both hosts read the same carrier names and links.
+
 - **(Mac) Rounding and "Your own price" on the product sheet.** The two
   controls Khayt's product editor has had all along — round to a step (up,
   down or nearest) and a typed price that wins over everything — with the
@@ -1420,6 +1439,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   from a form and merges it the way the Electron page always did: the fields
   shown over the stored block, a blank PIN keeps the current one, a port that
   is not a port is 3219. The Electron page is unchanged.
+
 - **(Mac) The customer intake form, served by the Mac.** With the LAN server
   on, `/intake` on a phone or laptop on the shop's Wi‑Fi is the same request
   form the Windows and Linux app serves — same page, same session cookie,
@@ -1430,6 +1450,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   is held byte-identical to its old handlers. Not yet on the Mac: pricing an
   uploaded model on the form (the form does not offer the upload here) and
   the legacy intake PIN route.
+
 - **(Mac) A customer approves a quote from their phone.** On a job that is a
   quote, the inspector has "Copy quote link": the link points at this Mac,
   carries the job's own approval token (minted into the job the first time,
@@ -1959,6 +1980,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   nobody anticipated. It is a screen rather than a small modal with an
   eight-row preview, the money reads as money, and the stages and payment
   states read in your own language instead of as the values they are stored as.
+
 - **A report can be kept and reopened, and now thrown away.** Name it and it
   comes back the next time. Saving twice under one name *replaces* it rather
   than filing a second copy, so correcting a report you have just run leaves
@@ -1971,12 +1993,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   an attached Pi — and the app finds which one your machine answers on, then
   remembers it. A Duet with a password is asked for one; a Duet without, which
   is most of them, is never made to shake hands it did not ask for.
+
 - **The Mac app can watch a Repetier-Server printer.** It speaks four of the
   six protocols now rather than three, and the machines screen stops saying it
   cannot ask this kind of machine what it is doing. It also gets the fix the
   other app needed: the job is read from `listPrinter`, not `stateList` — which
   lists neither the progress nor the filename, and is why a printing Repetier
   used to show as Idle at 0% with no file name.
+
 - **(Maintainers) Electron moves to 44.** The 42 line falls out of Electron's
   three-major support window when 45 ships — due around late October on the
   current cadence — and an unsupported Electron stops receiving Chromium
@@ -1985,6 +2009,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the main process here, and the six other APIs the release notes flag are not
   used at all. v44 requires macOS 13 or later, which is far below Khayt's own
   floor of macOS 26.
+
 - **Khayt for macOS updates itself.** The native Mac app had no way to: a shop
   that installed it stayed on that build until somebody noticed and downloaded
   another by hand. It now checks for updates through Sparkle, with a *Check for
@@ -1993,6 +2018,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   checks before it installs — Apple's, that the download is signed by the same
   developer and notarised, and ours, that the archive matches a signature only
   we can produce — so replacing the download is not enough to replace the app.
+
 - **The Mac app has its own version, and its own downloads.** It is
   `4.0.0-alpha.2` — `alpha.1` was withdrawn the same hour it was published,
   before anyone had it, because it could not check for updates (see Fixed). It
@@ -2062,6 +2088,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   timeout belongs to a server now rather than to the whole app, so there is
   nothing shared to race on — and the same search found one more test with the
   same shape, in a different file, which is now fixed too.
+
 - **(Mac) Every repair typed into the Mac went into a field nothing reads, and
   the machine P&L charged no maintenance at all.** The service log was written
   under the name the other app keeps it under *in the browser's own storage* —
@@ -2216,6 +2243,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   progress or still active. And the suggested failure rate, which feeds what
   a customer is quoted, divided waste by a denominator missing every
   delivered job, so it read high. All of them ask `isFinished` now.
+
 - **Expenses by category disagreed with the P&L about the same money.** For a
   registered shop the tax on a purchase is not a cost — it is reclaimed from
   the authority — and `lib/pnl-report.js` has always charged `paid` less what
@@ -2228,6 +2256,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   such field reclaims nothing, so nothing about an older book changes; and a
   shop that is not registered reclaims nothing at all. A receipt claiming more
   tax than it paid cannot drive a category below zero.
+
 - **(Mac) The shop's mode was ignored here, so a Simple shop saw the whole
   Professional surface.** Khayt has two modes and `lib/feature-tiers.js` is
   the single source of truth for what each includes — and this app read
@@ -2241,6 +2270,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   quietly disappearing. An enthusiast book — Bed Ready's mode, retired on
   this side — is read as Simple exactly as `applyMode()` migrates it, so
   opening one here does not strip its customers and invoices.
+
 - **The mode comparison was short of two things a shop actually gets.** The
   product catalogue and the portfolio are both hidden from the commerce-free
   flavour by a `.biz-only` class in the markup, but neither appeared in
@@ -2254,6 +2284,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   with fourteen gated elements within a tab a simple shop can open, and the
   test now requires such a tab to really gate something rather than quietly
   giving away the whole of it.
+
 - **A delivered job was missing from what its printer had earned, in both
   apps.** Khayt wrote `delivered` before it wrote `completed` with a
   `deliveredAt` beside it, and both are still in shops' books — thirteen of
@@ -2267,6 +2298,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the three callers ask it. A test holds the Mac's copy of the list to the
   rule's own, and another checks the charts have not gone back to comparing
   by hand.
+
 - **A multi-colour print weighed nothing, so anything made from it cost
   nothing.** A one-material slice reports a single filament weight, and that
   is the only figure this read. A toolchanger does not produce one: a U1, an
@@ -2278,12 +2310,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   matched. The colours are summed now, and labelled as the slicer's own
   arithmetic rather than an estimate, because that is what it is. A file that
   genuinely knows no weight still says so.
+
 - **Public pricing settings were dropped on the way to the book.** The shared
   settings save merges the LAN block by naming the fields it knows, and the
   model-pricing block was not among them — so a pane that set a margin and a
   preset would have had both discarded on save, silently. It is merged whole
   now, over what was stored, so a field a newer build wrote survives a save
   by an older pane.
+
 - **(Mac) A resin printer's progress was captioned with a claim about a file
   it does not have.** The machine card names which signal a percentage came
   from, so that "by layer" and "by file position" can be told apart on a
@@ -2294,6 +2328,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   reporting its own elapsed ticks was described in terms of a file it never
   had. The adapter now decides whether to caption at all, and a signal this
   app has not been taught is left undescribed rather than described wrongly.
+
 - **(Mac) A product made on the Mac was priced on its filament alone.** The
   other app's calculator puts a labour rate, prep and post time, power draw,
   electricity, wear and a failure allowance on every part it writes; this
@@ -2305,6 +2340,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   form carries, folded away under "Labour, power and wear" so they can be
   changed before the part goes in, and a part already in the list that has
   none of them says so instead of quietly costing less.
+
 - **Time left on a Klipper printer is the figure the machine itself shows.**
   Khayt worked the number out from the layer count, and a layer count assumes
   every layer costs the same. Measured on a U1 printing a part whose lower
@@ -2317,6 +2353,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   it, captioned "as the printer shows it" so the two can be checked against
   each other. Layers stay the fallback: a file with no `M73` behaves exactly
   as before, including the relief whose byte position read 0.7% at 19% done.
+
 - **(Mac) Saving a product no longer throws away its cost inputs or its
   price.** The Mac product sheet rebuilt every part from the five fields it
   shows, so the labour rate, prep and post time, power draw, wear and failure
@@ -2326,6 +2363,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rounding and typed price. Now a part keeps every field the sheet does not
   edit, and the product is priced through the shared rule with its rounding
   and override, so the same product saves to the same price in both apps.
+
 - **(Mac) "New job from this" prices the job at the product's own rates.**
   The job's parts were costed from grams and hours alone, so the same
   portrait opened at 15 where the catalogue said 50. A part taken from a
@@ -2707,6 +2745,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   counted orders at *completed* only, and *delivered* comes after it — so the
   work that actually reached a customer was missing from its own product's row.
   The same fault the quote funnel had, in a second place.
+
 - **The profitability table was sorted by revenue**, which put the biggest
   seller at the top regardless of whether it earned anything — hiding the row
   the table exists to show. It is sorted by profit now.
@@ -2731,6 +2770,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the top of the list, which is the one place that must not reward asking. It
   counted voided orders and out-of-trade work too. Lifetime value is now
   revenue *earned*, the same set the quarters count.
+
 - **A customer who had never bought anything was flagged as a churn risk.** It
   had not gone anywhere. Only a customer who bought and then stopped is marked
   quiet now, so the list stays one a shop can act on.
@@ -2741,6 +2781,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   chart whose whole subject is money you actually have. It now counts what was
   actually paid. It was also counting voided orders, and work marked as outside
   the shop's trade, which every neighbouring figure excludes.
+
 - **The cash-flow chart could read "collected nothing" for a shop that had been
   paid.** Payment dates were added to Khayt after it had been in use, so older
   orders carry an amount and no date, and a timeline cannot place them — they
@@ -2754,6 +2795,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   whole job is to be a floor, that is the wrong direction to be wrong in. It
   now costs the work the same way the quote and the machine P&L do.
   **Your break-even figure will go up**, and the new one is the right one.
+
 - **The break-even card spoke English in every language.** "Monthly Fixed
   Costs", "Break-Even Revenue", "Above Break-Even" were written into the page
   rather than translated. They are proper strings now, in all nine.
@@ -2777,6 +2819,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and that is what got notarised. `--notarize` now works on the app already
   built, and the release refuses to publish a bundle with no feed, no public
   key, no embedded Sparkle or no stapled ticket.
+
 - **Security (Mac): a printer camera that answered with a redirect was handed
   the printer's own credential.** A camera is allowed to be a separate device
   from the printer it belongs to, and the request to it carries the printer's
@@ -2786,6 +2829,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
 - **(Maintainers) The Mac app could not be notarised, so it could not open on
   any Mac but the one that built it.** It was signed with a real Developer ID
   but without the hardened runtime and without a secure timestamp, both of
@@ -2795,6 +2839,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   names "the fast-path of the JavaScriptCore framework" as its first example of
   something requiring `allow-jit`, and Khayt runs every tax, pricing and
   estimator rule through JavaScriptCore.
+
 - **(Maintainers) The macOS release build stopped signing when the runner image
   moved.** `v3.7.0` built Windows and Linux and failed macOS in 26 seconds:
   electron-builder could not unlock the temporary keychain it had itself just
@@ -2986,6 +3031,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   groups what came out by the archive's own name the way a folder of models is
   grouped by its folder. The zip itself is never consumed; it stays where you
   put it.
+
 - **(Mac) There is a way back out of a library folder.** Tapping a folder put
   the whole grid inside it and left nothing on screen to get out again — the
   routes were the sidebar's Library row and the Go menu, neither of which is
@@ -3026,6 +3072,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   because a delivered job that was never shipped is a hole in its own history.
   A printed label is deliberately not enough — that is a parcel still on the
   bench.
+
 - **(Mac) A converted model goes into the library, and can put the original
   aside.** A conversion used to end at a file in a folder. The shop then had to
   go and import the thing it had just made — in the one app whose whole job is
@@ -3046,6 +3093,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   Both offer the stages now, and a card on the board offers everything the
   table's menu does. It is one list in one place, and a move started from any
   of the three asks the same questions and leaves the same record.
+
 - **Two overlapping maintenance windows counted as twice the downtime.** A shop
   books a printer out for a belt change on Monday to Wednesday, then adds
   "waiting for the part" for Tuesday to Thursday. Both are true and both get
@@ -3058,6 +3106,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   lengths, and `lib/downtime.js` is the one place that knows it. The windows a
   shop has stored are not touched: merging happens when the hours are counted,
   so "belt change" and "waiting for the part" both survive as written.
+
 - **The snapshot runner can be pinned to the sample book.** It opens whichever
   book is on the machine and swaps back to it partway through — right for
   reviewing a build, wrong for anything published. Taking the website's
@@ -3078,6 +3127,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   now, so no app can make it, and the board performs the stamp instead. Only
   `shipped` is refused: `delivered` is derived the same way but is a status
   older books really carry, and it has always been an allowed destination.
+
 - **(Maintainers) Nothing proved that Simple mode actually hides anything.**
   Every test loaded the sample book, which carries no mode at all and is
   therefore Professional, and asserted that every gated screen was present — so
@@ -3108,6 +3158,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   and points a native binary at it. Anything missing — no slicer, a slicer
   since removed, a slice that produced nothing — falls back to measuring the
   shape rather than failing.
+
 - **A customer's upload is inspected before it is used.** Is it the kind of
   model its name claims; does an archive name a member outside the folder it
   would be opened in; does it expand out of all proportion to what arrived. A
@@ -3131,6 +3182,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   the placeholders in afterwards, so a model at `My Models/dragon.stl` stays
   one argument and a path chosen to look like a flag cannot become one. The
   test compares it against the original character for character.
+
 - **(Mac) The Reports target was measured against a different set of jobs than
   the figure beside it.** The monthly target on the Reports screen said it
   counted finished, unvoided business — and filtered `completed` alone. The
@@ -3157,6 +3209,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   quietly disappearing. An enthusiast book — Bed Ready's mode, retired on
   this side — is read as Simple exactly as `applyMode()` migrates it, so
   opening one here does not strip its customers and invoices.
+
 - **The mode comparison was short of two things a shop actually gets.** The
   product catalogue and the portfolio are both hidden from the commerce-free
   flavour by a `.biz-only` class in the markup, but neither appeared in
@@ -3188,6 +3241,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   months later as a screen that cannot draw. All of it comes back with one
   undo, except the pictures, whose bytes are gone — the record is restored
   without them rather than naming files that no longer exist.
+
 - **(Mac) Settings → Online can switch public pricing on, and make the
   printer preset it needs.** The customer-facing price is built from a saved
   preset — a name and the seven figures a part is costed at — and the shared
@@ -3199,6 +3253,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   one: name it, adjust the seven figures, and it is saved and chosen. A name
   already in use replaces that preset rather than doubling it, which is the
   other app's rule and the same id, so anything pointing at it still does.
+
 - **(Mac) A customer can price their own model on the intake form.** With
   public pricing switched on, the form offers an upload: the file is measured
   in memory, priced on the shop's own preset, spool cost, margin and waste
@@ -3228,6 +3283,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   the three callers ask it. A test holds the Mac's copy of the list to the
   rule's own, and another checks the charts have not gone back to comparing
   by hand.
+
 - **A multi-colour print weighed nothing, so anything made from it cost
   nothing.** A one-material slice reports a single filament weight, and that
   is the only figure this read. A toolchanger does not produce one: a U1, an
@@ -3239,12 +3295,14 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   matched. The colours are summed now, and labelled as the slicer's own
   arithmetic rather than an estimate, because that is what it is. A file that
   genuinely knows no weight still says so.
+
 - **Public pricing settings were dropped on the way to the book.** The shared
   settings save merges the LAN block by naming the fields it knows, and the
   model-pricing block was not among them — so a pane that set a margin and a
   preset would have had both discarded on save, silently. It is merged whole
   now, over what was stored, so a field a newer build wrote survives a save
   by an older pane.
+
 - **(Mac) A resin printer's progress was captioned with a claim about a file
   it does not have.** The machine card names which signal a percentage came
   from, so that "by layer" and "by file position" can be told apart on a
@@ -3255,6 +3313,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   reporting its own elapsed ticks was described in terms of a file it never
   had. The adapter now decides whether to caption at all, and a signal this
   app has not been taught is left undescribed rather than described wrongly.
+
 - **(Mac) A product made on the Mac was priced on its filament alone.** The
   other app's calculator puts a labour rate, prep and post time, power draw,
   electricity, wear and a failure allowance on every part it writes; this
@@ -3281,6 +3340,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   Wi‑Fi. The feed is one shared module now (`lib/lan-calendar.js`), lifted
   verbatim out of the Node route and held byte-identical to it; the
   subscription token is minted into the book the first time the Mac serves.
+
 - **(Mac) "Where is my order": the customer's tracking page, served by the
   Mac.** On a job under way or done, the inspector has "Copy tracking link":
   the link points at this Mac, carries the job's own tracking token (minted
@@ -3323,6 +3383,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   security headers on every response. Saving restarts the server when the
   port or the PIN changed. The intake form, quote approval, the calendar feed
   and the webhooks are still the other app's; they follow.
+
 - **(Mac) The customer intake form, served by the Mac.** With the LAN server
   on, `/intake` on a phone or laptop on the shop's Wi‑Fi is the same request
   form the Windows and Linux app serves — same page, same session cookie,
@@ -3333,6 +3394,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   is held byte-identical to its old handlers. Not yet on the Mac: pricing an
   uploaded model on the form (the form does not offer the upload here) and
   the legacy intake PIN route.
+
 - **(Mac) A customer approves a quote from their phone.** On a job that is a
   quote, the inspector has "Copy quote link": the link points at this Mac,
   carries the job's own approval token (minted into the job the first time,
@@ -3345,6 +3407,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   into `lib/lan-quote-page.js`, verbatim, and the Node server draws from
   them; the rule's clock is injectable so both hosts can be held to it. Not
   yet on the Mac: the order tracking page and the legacy POST /order/:id.
+
 - **(Mac) Rounding and "Your own price" on the product sheet.** The two
   controls Khayt's product editor has had all along — round to a step (up,
   down or nearest) and a typed price that wins over everything — with the
@@ -3366,6 +3429,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   rounding and typed price. Now a part keeps every field the sheet does not
   edit, and the product is priced through the shared rule with its rounding
   and override, so the same product saves to the same price in both apps.
+
 - **(Mac) "New job from this" prices the job at the product's own rates.**
   The job's parts were costed from grams and hours alone, so the same
   portrait opened at 15 where the catalogue said 50. A part taken from a
@@ -4157,6 +4221,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   sentence when the rate came from your own measured jobs and names how many,
   another when there are none yet and it is an assumption. An estimate that
   looks typed is the same mistake as a zero that looks typed.
+
 - **Comparable margins are net of tax — which changes a figure Khayt has been
   showing.** AI price assist recommends a margin from what a shop has actually
   realized, and it computed those margins against the **gross** price. For an
@@ -4239,6 +4304,7 @@ Sixteen changes, and three of them are faults that were shipping quietly.
   had no way to see — let alone refuse — what the other one sends, and the
   consent it records is real and shop-wide. But a switch that does nothing where
   you switched it has to say so.
+
 - **The Mac can draft a quote from a description.** Say what the job is — "20
   cable clips, black PETG" — and the grams, the hours, the quantity and the
   spool fill themselves in. It was the other app's feature; the Mac had the
@@ -4929,11 +4995,13 @@ else. Nothing you have to do, and nothing about this release depends on it.
   money. Your own numbers will move by the VAT you collected in each quarter.
   Nothing about what you charged or what you are owed changes, and neither does
   a single invoice.
+
 - **If your prices EXCLUDE VAT, nothing changes at all.** Your price is already
   the net figure and it is left alone. This only moves the numbers of a shop
   whose prices include the tax, which is the Saudi default. Khayt's export for
   your accountant has always split it correctly, so this makes the app agree
   with the file your accountant already had.
+
 - **You can now record the VAT you PAY, and it stops being a cost.** There is a
   box on an expense and on a spool for the tax on the supplier's invoice — an
   amount, not a rate, because rates differ line by line and an imported or
@@ -5059,6 +5127,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   about which screen you are looking at. An empty shelf shows a spool now, an
   empty machines screen a printer, an empty catalogue a price tag. The screens
   that are about the work itself rather than a kind of thing keep the nozzle.
+
 - **The sample shop's portfolio shows eight different things.** It was eight
   photographs of the same slab in eight colours, on the one screen whose entire
   purpose is showing finished work. A bracket, a chain, a hood, a socket, a set
@@ -6293,6 +6362,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   behaviour changes. There is no evidence any of this was exploited, and none
   of it was reachable without first getting code into the app — this is keeping
   the floor current, which for an Electron app is most of the work.
+
 - **The Mac shelf drew a reel of filament for everything on it.** A bottle of
   resin was a spool, a stack of plywood was a spool, and the only thing saying
   otherwise was the unit after the number — "340 ml" under a picture of a reel.
@@ -6301,6 +6371,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   sheet, so two left looks like two. Khayt has known which is which since it
   learned to count things that are not filament; the picture was the last part
   still assuming grams.
+
 - **Mac cards on the machines and shelf screens were all different heights.** A
   laser cutter has no nozzle, no extruder and no colour count, so its card came
   out a good deal shorter than the printer beside it, and a spool carrying
@@ -6309,6 +6380,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   now the height of the tallest, with its contents still at the top. Nothing is
   padded out or invented to fill the space: a machine with less to say still
   says less, inside a box the same size as its neighbours.
+
 - **"Estimate accuracy" was blank for every shop whose jobs come from its
   printer.** Both accuracy panels worked out what a print took by subtracting
   two timestamps, and the first of those is only written when somebody drags a
@@ -6321,10 +6393,12 @@ else. Nothing you have to do, and nothing about this release depends on it.
   numbers: the gap between them is the print PLUS however long it sat finished
   on the bed before anyone marked it done, which could only ever make a machine
   look slower than it is.
+
 - **One long print could decide a machine's whole verdict.** The percentage was
   the total hours actually taken over the total quoted, so a single forty-hour
   job outweighed a dozen short ones and a machine could be judged on the work
   least like the rest of its week. It is now the middle value across its prints.
+
 - **A printer's time left could be wildly wrong for the first few minutes of a
   print.** On a Klipper machine Khayt worked the figure out from how much of the
   job had finished so far, which early on is guesswork: two percent into a
@@ -6335,6 +6409,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   away instead of a blank for the first percent. Bambu, OctoPrint, PrusaLink and
   Duet machines are unaffected — those printers report their own time left and
   Khayt has always used it.
+
 - **The Mac calculator did not say what "Target profit margin" means.** It is a
   markup on cost — price = cost × (1 + margin%) — which is what Khayt has always
   computed and what the Windows and Linux app has always said on that field. On
@@ -6342,12 +6417,14 @@ else. Nothing you have to do, and nothing about this release depends on it.
   is 30% on top of the cost, and the difference on a typical job is about seven
   points of what you actually keep. The sentence is on the screen now. **No
   price changes**: the arithmetic is exactly what it was.
+
 - **An idle printer on the dashboard still looked like a screen that had not
   finished loading.** A machine Khayt cannot reach was fixed to show its bed
   instead of an empty progress bar; a machine Khayt CAN reach that simply is not
   printing kept the empty bar — pale ragged lines under the word "Idle". On a
   shop whose printers are connected and quiet, that was the whole front door.
   An idle machine now draws its bed too, and says it is idle.
+
 - **Delivery dates ignored the working week you typed in.** Settings has a
   Working Hours grid — one number per day — and, a few rows below it under
   Delivery Estimates, a separate "Working days per week" and "Printing hours per
@@ -6359,20 +6436,24 @@ else. Nothing you have to do, and nothing about this release depends on it.
   on the default week — Sunday to Thursday, eight hours — nothing changes.** It
   moves only for a shop that set its own hours, which is the shop the dates were
   wrong for.
+
 - **The Portfolio grid ran off both edges of the window.** Every card measured
   wider than the column it sat in, so the first project's name was cut to
   "urbine bracket" and the last card had no right-hand edge. The photographs are
   sized the way the model library sizes its tiles now, and the grid fits.
+
 - **Cards in a row floated at different heights.** On the shelf, five spools sat
   at three different top edges; on Machines, a printer with a short card hung a
   long way below its neighbours. A card that is shorter than the one beside it
   now lines up with it instead of drifting to the middle of the row.
+
 - **An invoice printed the print time to three decimal places.** A slicer
   reports 8.745 hours, and that is what a customer's invoice said, beside a
   weight that had always been rounded: "PETG-CF · 8.745 hrs · 559 g". The hours
   now round to one decimal like everything else on the line, and a whole number
   no longer grows a `.0`. Nothing about what you charged changes — this is the
   wording of the document, not its arithmetic.
+
 - **Internal: the screenshot runner drew thirty of its thirty-six shots in the
   wrong appearance.** Nothing a shop can see — this is the tool that
   photographs the Mac app for review. Two of its three capture paths already
@@ -6380,16 +6461,19 @@ else. Nothing you have to do, and nothing about this release depends on it.
   the pictures, did not, so every dynamic system colour resolved light whatever
   the app was set to. In light mode the shot and the app agreed for the wrong
   reason, which is why it lasted.
+
 - **The scheduler showed a warning sign when there was nothing to schedule.**
   Opening "Suggest assignments" with every job already on a machine drew the
   system's warning triangle over "No unassigned orders" — the same treatment as
   a real refusal, for the state a shop reaches by finishing its assigning. It
   now gets an ordinary empty screen with the board's own drawing, and says why
   there is nothing to do.
+
 - **On the jobs table, the bar showing how much of a job is paid looked like a
   rendering fault.** It ran the full width of the cell at two points tall, so it
   landed on the line between rows and the two read as one. It is short now, and
   sits under the figure it belongs to.
+
 - **A spool added from your phone was missing what the roll weighed when it
   arrived — so its cost per kilo was wrong.** The shelf keeps two weights: what
   a roll weighed new, which never changes, and what is left of it, which falls
@@ -6400,19 +6484,23 @@ else. Nothing you have to do, and nothing about this release depends on it.
   exactly the rolls you scan most. Spools added from the phone from now on carry
   it. A roll already on your shelf cannot be corrected, because once you have
   printed with it there is no record of the other half.
+
 - **The temperatures and product code your phone read off a roll were thrown
   away.** Scanning a label or an NFC tag reads the print temperature, the bed
   temperature and the supplier's code — the reason for pointing a camera at a
   spool at all — and the desktop dropped all three in silence on the way in. It
   keeps them now.
+
 - **A spool booked in late at night was dated to the day before.** The phone
   dated it in UTC, so between midnight and 03:00 in Riyadh a roll landed on
   yesterday's shelf. The date is your shop's now, as it already is everywhere
   else in the app.
+
 - **Weighing a part-used roll from your phone changed the shelf and nothing
   else.** The correction showed on the shelf, while every calculation — what the
   next print deducts, when the roll is low enough to reorder — carried on from
   the figure you had just replaced. All of it reads the corrected weight now.
+
 - **The waste log's costs in the sample shop were the pre-tax figures.** This app
   prices a failed print itself, from the shelf's per-kilo rate and net of tax a
   registered shop reclaims — and every one of the six sample entries held the
@@ -6421,12 +6509,14 @@ else. Nothing you have to do, and nothing about this release depends on it.
   screen whose whole purpose is that number. One entry was wrong twice over,
   priced at double its own shelf rate. A guard now checks each entry against
   what the app would price it at.
+
 - **The customers table fills its window.** Every one of its five columns had a
   maximum width, and the five maxima add up to 720 points inside a pane eleven
   hundred wide — so a third of the screen sat blank behind a trailing divider,
   which reads as a column somebody forgot to finish. It was the only table in
   the app that did this. The name takes the slack now, as it does on the jobs,
   expenses, gift-card and catalogue tables.
+
 - **The sample shop now pays VAT on what it buys, so the P&L can show the
   reclaim.** A registered shop remits what it collected on sales LESS what it
   paid on its own purchases, and Khayt has computed that for a long time — but
@@ -6437,6 +6527,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   now; two deliberately do not, because an unregistered supplier and an import
   reclaim nothing and that has to stay a case somebody can see. Nothing changes
   in your own book — this is the demonstration data.
+
 - **The 48-hour band stopped explaining itself across the timeline.** A machine
   Khayt cannot time had a sixty-character sentence drawn along its lane, from the
   left edge — under the red "now" bar, with the hour grid running through the
@@ -6446,11 +6537,13 @@ else. Nothing you have to do, and nothing about this release depends on it.
   where a sentence has room to be one. Both reasons appear when both apply: a
   printer that is not answering is a fault, and a laser cutter that cannot be
   asked is not.
+
 - **A job on the dashboard shows its order number.** The attention list and the
   chase list both did; the new "expected to miss their due date" list did not —
   and the sample shop has two different jobs called "HVAC duct adapter", one
   finished and unpaid, one pending and about to be late, so the two sections read
   as the same job written twice.
+
 - **Arabic counts two of a thing properly.** Arabic has a dual — not a plural of
   two, a form of its own — and the numeral is not said with it. The Mac app
   wrote `2 أيام`, which reads roughly the way "2 dayses" reads in English, and
@@ -6458,6 +6551,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   printers, two customers. Seven counted words have their dual now; a word
   without one behaves exactly as before, so the rest can be corrected one at a
   time. Numbers other than two are unchanged, and English is untouched.
+
 - **The dashboard says which jobs are going to be late, before they are.** The
   attention panel says a job IS late, which is true and arrives too late to do
   anything with. This says a job WILL BE, because of the work queued in front of
@@ -6467,6 +6561,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   the queue's print hours over the shop's own working hours per calendar day, and
   a job already in the attention panel is left out of it: saying the same job
   twice in two different words is how a screen teaches somebody to skim it.
+
 - **A snapshot run that hangs now says so.** The runner spins sometimes —
   AppKit enters a layout pass it never finishes and pins a core — and from
   outside that looked exactly like a finished run: a folder of pictures, no
@@ -6474,6 +6569,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   thread now names the step it got stuck on and exits, and `KHAYT_SNAPSHOT_SKIP`
   lets a run leave out a section so iterating on one screen does not cost sixty
   captures. Developer tooling; nothing a shop sees.
+
 - **The Mac app can print shelf labels.** A sheet of QR labels for the rack —
   one per spool, with the material, the colour the shop calls it, how much is
   left **in that item's own unit**, and the id in small type for when the camera
@@ -6483,6 +6579,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   `lib/labels.js` both apps share, and the QR codes are drawn by macOS rather
   than by anything added to the app. It shows you the sheet before it prints,
   because forty labels is forty labels' worth of paper.
+
 - **A spool says when it was last dried, and the shelf says when it is overdue.**
   Filament goes damp on a shelf and prints badly when it has — stringing,
   popping, brittle parts — and how fast depends on the material and how it is
@@ -6498,6 +6595,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   recorded drying says nothing at all** — an unknown state, not an overdue one.
   A shelf that accused every old spool of being wet on the day this shipped
   would be ignored by the end of the week.
+
 - **A spool says how long it has got.** "640 g" looks perfectly healthy; at the
   rate this shop is using ASA it is a fortnight from empty, and the shelf now
   says so. Only for a spool with two months or less left — a roll with a year in
@@ -6508,6 +6606,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
 
   The arithmetic is the reorder list's own, so the shelf and the reorder list
   cannot disagree about the same spool.
+
 - **Every job in the sample shop consumed a spool the shop did not own.** All
   forty-two of them named `seed-1` against a shelf of `sp-1`…`sp-6`, so nothing
   that joins a job to a spool could produce anything: no consumption rate, no
@@ -6516,6 +6615,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   match, and jobs that have not been printed yet name no spool at all — which is
   how a shop actually works, and which is a missing reference rather than a
   broken one. This changes only the demonstration book; nobody's own data moves.
+
 - **A print that runs out of filament now says so, instead of "stalled".** Khayt
   watched Klipper's filament sensors not at all: a print stopped for want of
   filament stopped advancing, and fifteen minutes later the app reported it as
@@ -6534,6 +6634,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   answers nothing — reading it anyway is how you send somebody to load a spool
   that is already loaded — and a machine with no sensor reports "cannot tell"
   rather than "filament fine".
+
 - **Zero is a reading, and four places said it was not.** `(obj && obj.field) ||
   null` turns a genuine 0 into "nothing reported". OctoPrint sends
   `printTimeLeft: 0` at the instant a print finishes, so the one moment the app
@@ -6545,6 +6646,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   Moonraker's nozzle line was already right and the bed line two lines below it
   was wrong; both go through one shared helper now, so there is nowhere left for
   them to disagree.
+
 - **The Mac app could close itself while you were clicking down the sidebar.**
   It died with `NSGenericException: The window has been marked as needing
   another Update Constraints in Window pass…`, which is AppKit's loop detector:
@@ -6556,25 +6658,30 @@ else. Nothing you have to do, and nothing about this release depends on it.
   Mac apps do. AppKit then stops iterating and draws what it has, the way it
   does at every other cycle limit. A driver that switches screen on consecutive
   runloop turns crashed 4 runs in 6 before and 0 in 12 after.
+
 - **Fixed: the calculator asked "What to charge" twice.** The pricing controls
   and the price itself sat under the identical heading, one above the other. It
   had been that way since the screen was written and was invisible for as long
   as nobody had photographed it with a part in it — the second heading only
   exists once there is something to price. The controls now say what they are.
+
 - **Fixed: the cost breakdown did not add up.** Material + machine + labour +
   buffer came to a halala more than the cost printed beside them, because each
   figure was rounded on its own and the total was rounded once. The rounding
   lands in the buffer now, which is what a buffer is — so the row can be checked
   by eye, which is the only reason to print it.
+
 - **The pricing controls appear once there is something to price.** A live
   margin slider, a discount slider and a rush-fee switch sat above the words
   "Nothing to price yet": three controls for a calculation that had not started,
   on the screen you price a job on.
+
 - **Fixed: the expenses and waste screens drew a wall of empty grey bands.** Six
   waste entries came with twenty blank striped rows under them, filling the
   window — which reads as a list that failed to load rather than as a short
   list. Those two tables were the only ones in the app with no style set at all,
   so they took the system's.
+
 - **Fixed: the Profit & Loss pane invited arithmetic that gave the wrong
   answer.** It listed Revenue, Expenses and VAT under one heading, so anybody
   subtracting the three got a figure thousands short of the net income printed
@@ -6583,14 +6690,17 @@ else. Nothing you have to do, and nothing about this release depends on it.
   held for ZATCA and was never income. The VAT line is what you owe, and it now
   sits ruled off from the two figures that make the total, with the sum written
   under the total itself.
+
 - **Fixed: a rack with two sheets of acrylic on it reported "2 g".** The shelf
   had learned to count in sheets and millilitres and the dashboard had not, so
   it wrote the gram after every figure it showed.
+
 - **Fixed: a crash on quitting, when the menu bar item was on.** Nothing stopped
   its clock, so it went on ticking on the main run loop while the app was being
   taken apart around it — and each tick asked the Swift runtime a question about
   machinery that was already going away. It stops when the app does now, and it
   no longer needs to ask.
+
 - **Fixed: on an OctoPrint shop the menu bar said nothing was printing.** It
   asked whether a printer's state was exactly `printing`, and OctoPrint hands
   over the printer's own wording, which it capitalises — so the count was zero
@@ -6599,6 +6709,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   that this part of the menu bar exists to settle. Four places in the app were
   asking "is it printing" and two of them had forgotten to allow for the
   printer's own capitalisation; all four now ask the same one.
+
 - **Fixed: a printer that had stopped looked exactly like a nozzle reminder.**
   The dashboard's attention panel colours a row red when something has actually
   failed and amber when something merely wants a person — and it decided which
@@ -6607,12 +6718,14 @@ else. Nothing you have to do, and nothing about this release depends on it.
   amber with a machine down, and the distinction it exists to make was thrown
   away one line before the screen. Nothing failed and nothing was logged, which
   is what a string compared against a value nobody produces does.
+
 - **Fixed: the attention panel could fill the whole dashboard.** It listed
   everything, and on a shop with twenty late jobs that is a dashboard which is
   nothing but that list. It shows six now — the six the rule already sorted to
   the top, so a stopped machine and a low spool are never the ones cut — and
   counts the rest, because a list that silently stops at six says a shop has six
   problems.
+
 - **Fixed: the product catalogue said "Rounded from" and never said from what.**
   Nineteen of twenty rows carried a caption that names a figure and then stopped
   before printing it, which is the one number that lets you tell a rounded price
@@ -6621,6 +6734,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   printed only the prefix. It reads "Rounded from 4,858.56 ﷼" now. A price you
   typed yourself still says just "Your own price", because that is already a
   whole sentence and appending a figure to it would state the price twice.
+
 - **Fixed: the first screen a new shop ever sees was eight zeros.** Revenue
   0.00, gross profit 0.00, margin 0.00%, average job 0.00, jobs 0, completed 0,
   on time "—", and then two thirds of an empty window. Every figure in that
@@ -7232,20 +7346,24 @@ else. Nothing you have to do, and nothing about this release depends on it.
   then *follows the group*. File an eighth king into the Saudi Kings and he is
   in the package, with nothing to remember. Quoting it puts every member in the
   build in one tap. Packages you built by hand are untouched and keep working.
+
 - **Work on many files at once.** Press **Select** in Print Files, tick what you
   want — or take everything a filter is showing in one press — and then group,
   categorise, tag or delete the lot together. What you have picked stays picked
   while you change the filter, so the way to handle a big set is to narrow to
   part of it, take that, narrow to the next part and take that too. Filing two
   hundred files one dialog at a time was not filing them.
+
 - **A print can now be several files.** Spiderman is a head, two arms and a
   torso, and he is one thing you print — not four. Until now the library could
   only hold one file per entry, so a kit downloaded as twelve STLs became twelve
   rows with nothing tying them together. A print's files are now listed on its
   card, and **Open in slicer** opens all of them at once, in one slicer window,
   instead of whichever one happened to be first.
+
 - **Add files to this print**, in a card's ⋯ menu. Files or a whole archive go
   into the print you are looking at, rather than making new entries beside it.
+
 - **Which file a print is named for is yours to choose.** The first file added
   is the main one — the one whose picture, size and file type the card shows,
   and what *Convert* and *View in 3D* open. Any part can be made the main one,
@@ -7262,12 +7380,14 @@ else. Nothing you have to do, and nothing about this release depends on it.
   then another. A name you have already used anywhere is offered as you type,
   and typing it in a different case joins what you have rather than starting a
   second copy of one collection.
+
 - **Your storefront publishes the category you already set.** It read only the
   box inside the Storefront dialog, so a shop that had categorised its whole
   catalogue published a storefront where nothing had a category, and had to
   type it all again. Your product's own category is used unless you override it
   there — the same fix the price got. The group is published too, so a
   storefront can show a collection together.
+
 - **Dropping in a zip now asks what it is.** An archive of twelve models is
   either twelve prints or one print in twelve pieces, and nothing inside it says
   which. It used to always make twelve entries; it now asks once — and asks once
@@ -7306,6 +7426,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   see what was dragging it down and no way to remove anything. Settings →
   Storefront now lists your reviews, marks which came from a signed-in customer,
   and lets you delete one.
+
 - **A model Khayt could not measure is no longer quoted as free.** A damaged or
   malformed 3D file could come through the estimator as zero grams and zero
   hours, and be marked as a sound estimate — including on the public quote page
@@ -7324,12 +7445,14 @@ else. Nothing you have to do, and nothing about this release depends on it.
   would have gone on showing the deposit as still owed even after the customer
   had paid every instalment. Cash recorded outside the plan — a payment taken at
   the counter — is never overwritten either.
+
 - **Khayt now tells you about two things in your existing data.** Payment plans
   written before the deposit fix ask for more than the order still owes, and are
   flagged rather than quietly rewritten, because the amounts may be something you
   agreed with the customer. And where a client had already spent more loyalty
   points than they had really earned, you are told, so you hear it before they
   ask.
+
 - **The tax summary now suits the country you are actually in.** It called
   itself a GAZT VAT return and numbered its rows the way the Saudi form does,
   which was wrong for every other country Khayt supports — a shop in the UK,
@@ -7345,11 +7468,13 @@ else. Nothing you have to do, and nothing about this release depends on it.
   no key and been unable to open your shop at all. Khayt now checks that the key
   arrived, shows the recovery key only once it has, and tells you plainly if it
   has not. The same check was added to joining and leaving an organisation.
+
 - **The save Khayt makes just before installing an update is now as safe as
   every other save.** It was written by a separate, weaker route that skipped
   the step forcing data onto the disk and kept no rollback copy — so a power cut
   during an install could have left the store empty or half-written, at the one
   moment the app cannot try again.
+
 - **A deposit taken before a job was split is credited back to the work.** Jobs
   you split in an earlier version kept the deposit on the original entry, and
   once that entry correctly stopped counting, the money was credited to nothing —
@@ -7362,6 +7487,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   billing the customer SAR 3,000 for SAR 2,000 of work. Plans are now built from
   what is actually outstanding, and an order that is already settled says so
   instead of offering to bill it again.
+
 - **Loyalty points were awarded for sales that never happened.** A cancelled
   order, a print you had marked as not business, and an order you had refunded
   in full all still earned the customer points — the calculation looked only at
@@ -7380,11 +7506,13 @@ else. Nothing you have to do, and nothing about this release depends on it.
   new sub-order started as though nothing had been paid and the customer was
   invoiced for the full amount again. The deposit and any credit notes now
   travel with the work, split the same way the price is.
+
 - **A customer could get a copy of the reply you sent them.** An email address
   submitted through your intake form was put into the mail link exactly as
   typed, so an address with extra instructions hidden on the end could quietly
   add a second recipient to your own reply — and the compose window looked
   completely normal. Addresses are now encoded, everywhere Khayt opens mail.
+
 - **A filament tag can no longer put its own buttons on the scan screen.** The
   temperatures and weights read from an NFC tag were trusted to be numbers; a
   specially made tag could put page content in their place. They are now checked
@@ -7395,6 +7523,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   from the printer itself, and then deleted that record on the very next edit
   you made — so the figures were never there the next morning, and a job's
   actuals fell back to an estimate. The history is kept now.
+
 - **The VAT return declared no VAT at all.** Boxes 1 to 3 read fields Khayt has
   never written to an order, so the VAT due always came out as zero and total
   sales were reported with the VAT still in them. On SAR 400,000 of sales at 15%
@@ -7419,6 +7548,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   **Last backup** as though nothing had happened. All four now accept whatever
   the app is willing to save, and a backup that fails says so on the screen
   instead of leaving yesterday's date sitting there.
+
 - **Recovering after a crash could hand you back a two-month-old shop, and call it
   a success.** If a save was ever interrupted, Khayt left a half-finished file
   behind and never cleaned it up — and when it later had to recover, it preferred
@@ -7426,6 +7556,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   whichever copy is genuinely newest. And when recovery does cost you your last
   save, it says so plainly instead of showing a green tick that read "Recovered
   your data", so you know to check your most recent work.
+
 - **Cloud sync no longer overwrites your edit without telling you.** If another
   machine had changed the same client, order or spool more times than yours had,
   its version won and yours simply vanished — no message, nothing in the record.
@@ -7439,32 +7570,39 @@ else. Nothing you have to do, and nothing about this release depends on it.
   something else — and the picture was saved with the entry and synced to your
   other machines. Previews are now checked properly instead of by their first
   few characters.
+
 - **Quoting off a part-used spool no longer multiplies the material cost.** The
   calculator divided the spool's price by however many grams were LEFT on it
   instead of the spool's size, so the same 100 g part costed SAR 9 off a fresh
   kilo and SAR 36 off a quarter-full one — and SAR 180 off the last 50 g. Every
   other place in Khayt already used the spool size.
+
 - **A rush fee no longer follows you into the next quote.** Every other money
   field is cleared after you log a job; the rush checkbox was not, so one rush
   job silently added its percentage to every quote after it.
+
 - **Importing the wrong file no longer erases everything you have.** Choosing any
   `.json` that was not a Khayt export — a slicer profile, a settings file,
   anything — emptied every order, client, invoice, spool and print file, applied
   nothing in their place, and told you it had imported successfully. It now
   refuses a file that is not ours and leaves your data untouched.
+
 - **Restoring a backup no longer deletes newer work on your other machine.** If
   you restore an older backup on one computer, the records created since were
   treated as deletions and removed everywhere else the next time it synced —
   silently, on both machines. A restore is now understood as choosing an older
   state, not as deleting the difference.
+
 - **Settings said your data file had no size limit. It has one.** It reported
   "No size limit ✓" in green while the app refuses to save past 50 MB — the
   exact wall a shop with thousands of files was heading for. It now shows how
   full the file is and warns before saving stops, not after.
+
 - **Bed Ready updates could never show the warning either.** Its releases were
   published with one fixed sentence instead of the notes, so a Bed Ready shop
   was asked to install a change nobody had shown it — for every release there
   has ever been.
+
 - **The warning before a major update would not have appeared at all.** Khayt
   reads a release's notes from GitHub as a rendered page, not as the file we
   write, and the part that finds the changes you must accept could not read a
@@ -7472,55 +7610,68 @@ else. Nothing you have to do, and nothing about this release depends on it.
   offered itself with one press. Every change in this release's warning runs
   over one line. Also fixed: using **Check for updates** by hand skipped the
   warning entirely, and a failed download replaced it with a live *Retry*.
+
 - **A downloaded model pack can no longer fill your disk.** An archive that
   understates how big its contents are was allowed through a size check that it
   cost nothing, then unpacked anyway — measured at 480 MB written from a 470 KB
   file, and far more from a larger one.
+
 - **The catalogue's "Ungrouped" and "Uncategorised" chips do nothing no longer.**
   Same fault as the one in Print Files below: pressing them looked like showing
   everything, so there was no way to find the products you had not filed.
+
 - **Catalogue filter chips now count what pressing them gives you**, instead of
   counting the whole catalogue while the grid narrows on three things at once.
   And pressing a lit chip clears the filter even when that product's own
   spelling of the name differs from the one on the bar.
+
 - **A recurring-order reminder no longer shows `{name}` and `{days}` as text.**
   The heading and the sentence underneath were stored under the same name, so
   one quietly replaced the other — in every language.
+
 - **Two machines stay in step while only one of them has updated.** If you run
   Khayt on a laptop and a workshop PC and update one first, renaming a group on
   the older one no longer goes unseen by the newer one, and using *Identify*
   there no longer drops the other files of a multi-part print. Sync replaces a
   whole record at a time, so the older build carries fields it does not
   understand — and it was winning arguments it should have lost.
+
 - **The "Unfiled" chip in Print Files has never worked, and now does.** Pressing
   it looked like it showed everything, because the filter it set could never
   match — so there was no way to find the files you had not filed anywhere. The
   new "Uncategorised" chip had inherited the same fault before anyone saw it.
+
 - **Adding a file to a print that has versions no longer loses it.** If a print
   had versions — which happens by itself once you convert one for another
   printer — then adding, removing or re-ordering its files and afterwards
   pressing a version chip put the old set of files back, and anything added
   since was gone from the entry.
+
 - **Making a different file the main one now drops what the old one said.** A
   print whose main file was a colourful sliced 3MF kept showing that file's
   colours, swap count, print time and weight after you promoted a plain model
   inside it — the previous file's numbers under the new file's name.
+
 - **A filter chip's number now tells you what pressing it gives you.** They
   counted your whole library while the grid narrows on four things at once, so
   with a category on, a group chip could say 7 and then show 2. Each bar counts
   against the others now, and a combination that would show you an empty grid is
   no longer offered.
+
 - **A file that fails to import no longer abandons the rest of the drop.** One
   bad file in a folder or archive stopped everything after it, left the files
   already copied with no entry, and never cleaned up.
+
 - **The selection bar now counts what the filter is showing.** Turn on Select,
   then narrow to a group, and it still said how many the *previous* filter had.
+
 - **Buttons that cannot be pressed now look like it.** Only one in the whole app
   did: the Download button on the update screen, which stays off until you have
   read what is changing. Everywhere else a disabled button was the same colour
   as a working one and the cursor still promised it would do something — so
   *Add file* with no library folder set, or a bulk action with nothing selected,
   read as broken rather than unavailable.
+
 - **The Print Files screen no longer freezes on a big library.** Every card in
   the library was drawn every time — on every filter you pressed, every file you
   starred, and every round of the preview move below. At three and a half
@@ -7531,6 +7682,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   file that matches, not the ones on screen. The photo gallery is the same — and
   it matters more there, because each of those is a full photo rather than a
   small preview.
+
 - **Moving your previews out of the data file now finishes on the first
   launch.** It did forty at a time, because drawing the screen after each round
   was so expensive — so a library of three and a half thousand needed **eighty-six
@@ -7538,6 +7690,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   takes about a second and a half now, in the background, and your library is
   safe to save again the same day you update. Measured end to end on 3,415
   files: every preview moved, verified on disk, none lost.
+
 - **Fifty-nine buttons and messages were showing their own internal name.** Not
   English text — the literal `plib.unfiled`, on a chip in your library, in every
   language including English. The bar that filters by folder and tag, the batch
@@ -7555,9 +7708,11 @@ else. Nothing you have to do, and nothing about this release depends on it.
   use the Print Files tab, and no preview is removed until its new copy has been
   written and read back. This is what lets a library grow past a few thousand
   files.
+
 - **A file you converted for another printer now shows as a version of the
   print** rather than a separate row underneath it. Nothing is refiled and
   nothing is lost — the original stays the one on show.
+
 - **The tags box now offers the tags you already use.** Typing a tag that
   exists in another spelling files it under the one you have, so "Resin" joins
   "resin" instead of starting a second tag.
@@ -7579,6 +7734,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   twenty-fifth of a second and holding backspace redrew the whole library each
   time. Finding the files was never the slow part — that takes under a
   millisecond — so the screen now waits for you to stop typing.
+
 - **Two files added at the same moment no longer overwrite each other.** Files
   in a print's folder were named by the millisecond they arrived, which is only
   unique if no two ever arrive together.
@@ -7622,17 +7778,21 @@ else. Nothing you have to do, and nothing about this release depends on it.
   slicer, mark it printed or failed, and one **···** for the rest. Delete moved
   to the bottom of that menu, under a divider; it used to sit one button away
   from "Open in slicer".
+
 - **The queue's view switch is one control that shows where you are.** It was a
   single button that renamed itself, reading "Board view" while you were looking
   at the list — so the word on it was the place you were going one moment and
   the place you were in the next. **List** and **Board** now sit together with
   the current one marked.
+
 - **Pause production is quiet until production is actually paused.** A button
   that is red all day is a red button nobody reads.
+
 - **The same tidy-up across clients, the waiting list, quotes, products, the
   converter and Bed Ready's queue.** Bed Ready's toolbar had nine buttons and no
   "more" button at all. Everywhere a **Delete** or **Reject** used to sit beside
   the button you were reaching for, it now sits under a divider in the menu.
+
 - **Icons are drawn, not typed.** Screens were showing emoji, which arrive in
   whatever colour and shape each computer decides — the print library, the
   queue, the catalogue, the converter and the order board all did. They use
@@ -7646,12 +7806,15 @@ else. Nothing you have to do, and nothing about this release depends on it.
   simply been copied across from English, so every check that counts
   translations said they were done. They are translated now, along with three
   more in Arabic, Japanese and French.
+
 - **A button no longer gains or loses its "+" depending on the language.**
   Buttons like "+ Add photo" and "+ Add location" carry that mark in the text
   itself, and eight of them had lost it in some languages.
+
 - **An icon no longer sits flush against the words next to it** — the print
   history line read "printed3x printed". In Arabic the gap was on the wrong side
   of the glyph entirely.
+
 - **A big print file can be added again, and it is measured.** Adding a file
   larger than about 50 MB left it in your library with no print time, no weight,
   no material and no picture — and said nothing, so the import looked like it
@@ -7663,12 +7826,14 @@ else. Nothing you have to do, and nothing about this release depends on it.
   now needs a fifth of a second, and the figures are identical to the last
   digit. **You can add a model up to 1 GB**, and an STL is measured from the
   file on disk instead of being copied whole into the interface first.
+
 - **A big 3MF is measured instead of being given up on.** Working out a 3MF's
   size and volume used to build every surface in it twice over, so a poster or a
   kit — the files that are actually 200 MB — wanted six to twelve gigabytes of
   memory and never finished. Khayt now adds each surface up as it reads it: the
   same numbers to the last digit, a few hundred megabytes instead of gigabytes,
   and it happens outside the window so the app keeps drawing while it works.
+
 - **Too big to draw is no longer treated as too big to read.** Only the preview
   picture and the overhang report need every triangle; print time, weight,
   material, volume and size do not. Past 150 MB a model still gets all of those
@@ -7687,6 +7852,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   the smaller version instead of a picture that cannot arrive, and the cloud's
   limit has been raised so a real photograph fits either way. **Republish to get
   your pictures back.**
+
 - **A published listing no longer sends its main photo twice.** The storefront
   needs a `photo` field as well as the gallery, and it was being uploaded a
   second time rather than worked out at the other end — half a publish, for
@@ -7722,6 +7888,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   every order request, with nothing to show that anything was missing. It also
   carries a link straight back to the order in your Medusa admin, if you set
   `MEDUSA_ADMIN_URL`.
+
 - **A failed import is now retried instead of only logged.** The subscriber used
   to swallow failures, because a retry could once have filed a second order
   request. It cannot any more — Khayt Cloud recognises a repeat and answers it —
@@ -7752,6 +7919,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
 - **Publish your catalogue from the catalogue.** A ☁ Publish button sits in the
   Product Catalog toolbar. It was reachable only from Settings → Advanced →
   Automation → Khayt Cloud, four levels away from the screen you are looking at.
+
 - **Sync your print library from the library.** A ☁ Sync button in the print-file
   toolbar pushes to Khayt Cloud now instead of waiting for the next automatic
   sync. Both buttons appear only when cloud is connected.
@@ -7768,18 +7936,22 @@ else. Nothing you have to do, and nothing about this release depends on it.
 - **The last English text in the interface is translated.** "Board view", "Save
   filter", the work-in-progress limit labels and the post-processing preset
   fields stayed English in every language.
+
 - **The default working week is Sunday to Thursday, five days.** It was Monday to
   Thursday — four days, matching no working week anywhere: the Gulf works Sunday
   to Thursday and most of Europe and the Americas work Monday to Friday. Due
   dates, machine queue estimates and the schedule were all worked out against a
   day less than a shop actually has. If you have already set your own hours,
   nothing changes.
+
 - **Day names in Working Hours are translated.** Mon–Sun were English in every
   language.
+
 - **A product description you type is saved.** It was silently discarded on every
   save, in every shop — the box accepted the text and the product kept nothing.
   Anything you wrote before this is still on the product and now appears in the
   editor again.
+
 - **Shops writing a language other than English or Arabic can use the catalogue
   at all.** Product names were dropped the same way descriptions were, and the
   save refused outright with "Give the product a name first" even when the name
@@ -7794,13 +7966,16 @@ else. Nothing you have to do, and nothing about this release depends on it.
   your own shelf — tick the box in the order editor and it stays out of revenue,
   order counts and every report. It still counts towards nozzle wear and still
   occupies the machine, because it really printed.
+
 - **The sidebar shows your business name** instead of the name of whichever
   theme you have active. The theme is still named in Settings, where you choose
   it.
+
 - **The machines page shows what each printer is actually doing.** It had no live
   state at all — every figure on the card came from your order book, so a printer
   running a job you sent straight from your slicer looked like it had nothing on.
   Khayt was already asking that printer every thirty seconds.
+
 - **Round your catalogue prices, or just type the one you want.** A calculated
   price of 43.71 is not a price anyone puts on a shelf. Set a rounding step —
   fives, tens, halves — and whether to go up, down or to the nearest, or type a
@@ -7814,20 +7989,25 @@ else. Nothing you have to do, and nothing about this release depends on it.
   voided job counted for or against your delivery record like any other. Prints
   you have marked as not business are left out of it too — a calibration cube is
   not a promise to a customer.
+
 - **Entering your business name updates the sidebar straight away.** It only
   changed after switching theme or restarting.
+
 - **The sidebar shows the Khayt wordmark again until you have actually entered a
   business name.** A shop that had never opened Settings saw "KHAYT" in place of
   it, which is the product's name rather than the shop's. Your own name is shown
   exactly as you typed it, not forced into capitals.
+
 - **Hover descriptions appear when you hover.** Icon-only buttons relied on the
   browser's own tooltip, which waits about a second before showing anything and
   never shows on keyboard focus at all. They now appear promptly, and keyboard
   users get them too.
+
 - **An empty print-file preview says why it is empty.** Khayt shows the preview
   your slicer embedded in the file; it does not render the model itself. A record
   imported from your printer's job history has no file on this computer at all,
   so there is nothing to show — and it now says so instead of showing a bare box.
+
 - **Publishing a storefront uses the prices you already set in the catalogue.**
   It read only the price box on the storefront form, so a shop that had priced
   every product — cost, margin, rounding and all — published a storefront where
@@ -7835,14 +8015,17 @@ else. Nothing you have to do, and nothing about this release depends on it.
   now an override for the few items you want priced differently; leave it empty
   and the catalogue price is used. Product feeds are built from the same payload,
   so they were blank too.
+
 - **A printer that is printing no longer counts as free capacity.** Lead times
   quoted to customers were worked out from your order book alone, so a machine
   five hours into a job was treated as available. Where the printer can say how
   long it has left, that time now counts; where it cannot, the machine is left
   out of the promise rather than assumed idle.
+
 - **A printer nobody has heard from is no longer shown as idle.** "Not answering"
   and "free right now" looked identical, which is the wrong one to guess when
   you are deciding whether a bed is available.
+
 - **Linking a print file to a catalogue part fills in the weight and print time.**
   It recorded the link and left both at zero, which looks exactly like zeros
   somebody typed — the numbers were behind a separate button. Anything you have
@@ -7857,11 +8040,13 @@ else. Nothing you have to do, and nothing about this release depends on it.
   dictionary", and Cut, Copy, Paste and Select All are there — on Windows and
   Linux, right-click is how people copy text and Khayt had no menu at all. The
   menu is in your language.
+
 - **The spellchecker follows the app, not your operating system.** It used to
   check everything against English whatever you were writing; there is no Arabic
   dictionary available, so for Arabic it now stays quiet rather than underlining
   every correct word. (On macOS the system spellchecker is used, which handles
   Arabic itself.)
+
 - **You choose which languages you write in** — one or two, and which ones,
   from the nine Khayt speaks. Settings → Preferences → *Product languages*.
   Product names and descriptions, your business name, tagline, address, invoice
@@ -7870,9 +8055,11 @@ else. Nothing you have to do, and nothing about this release depends on it.
   and the invoice a customer received had a blank where the business name goes —
   and a shop selling only in Arabic is no longer shown English boxes it has to
   leave blank.
+
 - **Descriptions are per language.** A product could have a name in two
   languages and only one description — the paragraph a customer actually reads
   to decide. Existing descriptions are kept and moved into your first language.
+
 - **Your online shop shows the languages you write in.** Publishing a catalogue
   now tells the storefront which languages it is written in, so a shop writing
   German and French is read in German and French. The public page could show
@@ -7887,25 +8074,30 @@ else. Nothing you have to do, and nothing about this release depends on it.
   submitted with the seller's street blank, and the customer portal's printable
   copy showed no address either — all three read a settings field that has never
   existed. They now read the address you actually entered.
+
 - **An order raised on your phone is numbered like one raised at the desk.** It
   used a prefix setting that was never saved anywhere, so it always came out as
   `ORD-…` and ignored the prefix you had set.
+
 - **Customers are greeted by name in campaigns and reminders.** If you write in
   a language other than English or Arabic, the `{{name}}` merge field and the
   waiting-list reminder came out blank — so a campaign went to your whole client
   list opening "Hi ,". Client names were also missing from the kiosk view, order
   documents and the waiting list, and typing an existing client's name offered
   to create a second copy of them instead of finding the one you had.
+
 - **Publishing a catalogue with a lot of photos works again.** A shop with
   roughly fourteen or more photo-rich products was refused outright — the whole
   catalogue, because of the pictures on part of it. Khayt now trims to fit,
   taking spare photos before any listing's only one, so the storefront publishes
   with fewer pictures instead of not at all.
+
 - **The phone, the quote link and the recovery file know your business name.**
   They read English-or-Arabic directly, so a shop writing Turkish or German got
   a quote page headed "Khayt", a recovery code file that named no business, and
   client names missing on the companion app. All three now use the languages you
   chose.
+
 - **The second name under a product or client shows your other language.** If
   you write in German and French, the line under every product name and every
   client row was blank — it was picking between English and Arabic, and Arabic
@@ -7914,6 +8106,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   only one.
 - Importing a printer's job history no longer stops if the printer sends back a
   malformed entry.
+
 - **Icon-only buttons say what they do when you hover them.** Fifty of them
   announced themselves to a screen reader and showed nothing to everyone else.
 
@@ -7925,9 +8118,11 @@ else. Nothing you have to do, and nothing about this release depends on it.
   machine card and on no dashboard at all: every theme draws its own, and none
   of them rendered the maintenance list it lived in. It reaches the attention
   bar on every theme that has one.
+
 - **The Meridian dashboard's attention bar works.** It called a function that
   does not exist, so it had shown "All clear" since the day it shipped —
   through offline printers and late orders alike.
+
 - **A nozzle threshold you have set is never changed for you.** Picking a
   printer model, or changing which nozzle is fitted, could overwrite the figure
   you chose whenever it happened to match one of Khayt's own suggestions — and
@@ -7970,6 +8165,7 @@ else. Nothing you have to do, and nothing about this release depends on it.
   customer is really asking of a listing is whether that is a render or what
   arrives, and getting it wrong is a refund. The catalogue marks listings that
   have no photo of the real thing, and the storefront publishes up to three.
+
 - **A catalogue part can be linked to a print file and filled in from it**:
   weight and time from the slicer, material and layer height from the setup you
   have had most success with. It tells you what it could not fill rather than
@@ -7996,10 +8192,12 @@ else. Nothing you have to do, and nothing about this release depends on it.
   see Settings → Printers → *Nozzle wear reference*, where you can replace any
   of it with your own numbers, and [docs/NOZZLE-WEAR.md](./docs/NOZZLE-WEAR.md)
   for the readings behind them. The four figures that are still estimates say so.
+
 - **Abrasive filament counts for more.** 300 g of carbon-fibre PLA costs a brass
   nozzle far more than 300 g of plain PLA, and the counter now reflects that.
   Glow-in-the-dark is included but rated mild — a controlled test measured no
   wear from it at all, which is the opposite of its reputation.
+
 - **The printer catalogue knows more, for 39 of its 49 printers**: what nozzle it
   ships with, maximum hotend and bed temperature, whether the chamber is heated,
   filament diameter, and a support link that was checked to resolve. Picking your
@@ -8019,16 +8217,20 @@ else. Nothing you have to do, and nothing about this release depends on it.
   answer, and then stopped one line later on an internal error that nothing
   reported. Nothing was saved and nothing was shown, so the only symptom was a
   panel that never finished. All three now complete.
+
 - **Saving Settings no longer signs you out of Khayt Cloud.** Entering a
   business name or a logo rebuilt your settings from the form and dropped
   everything the form does not show — your cloud account among them, along with
   your slicer setup and your privacy choices. Settings the page does not display
   are now carried through untouched.
+
 - **The "Email not verified" warning no longer appears for accounts that are
   verified.** Khayt asked the server on every sign-in and then discarded the
   answer, so every device started out believing your email was unverified.
+
 - **When a self-hosted server has no email set up, sign-up says so** instead of
   asking for a verification code that was never sent.
+
 - **An action that fails now says so.** When something goes wrong mid-way, Khayt
   tells you rather than leaving the screen mid-flight — including during start-up,
   which previously had no reporting at all.
@@ -8987,12 +9189,15 @@ to anyone holding a portal link.
 - **Anyone with a portal link could read the whole message thread on it.** A
   customer portal link now proves who is holding it before it will show a
   conversation, and Khayt no longer has any way to read a thread without that.
+
 - **A printer address written as a number could point Khayt at your own network.**
   An address like `2130706433` is another way of writing `127.0.0.1`, and the
   check that was meant to refuse it did not recognise the form.
+
 - **The converter could be made to write a file anywhere the app could read.**
 - **The brute-force lockout never actually locked.** Ten wrong LAN PINs were
   meant to lock the door; they did not.
+
 - **Every known vulnerability in the parts Khayt ships is patched**, including the
   move to Electron 42.8.1.
 
@@ -9002,13 +9207,17 @@ to anyone holding a portal link.
   newer data on your other devices.** With cloud sync on, restoring a backup or a
   named restore point while the app was running could send that older copy up as
   the latest, and every other device would take it. Nothing warned you.
+
 - **Your data is now copied aside before any update touches it**, so there is
   always a copy from immediately before the version changed.
+
 - **When cloud sync fails, it now says why.** The status used to read "Sync
   error" and nothing more, indefinitely.
+
 - **Khayt Cloud no longer re-downloads your whole shop every time you open the
   app.** It asks for the part it is missing and folds that onto the copy it
   already has.
+
 - **Cloud sync uploads about a sixth as much.** If you run a second machine on
   3.6.0-beta.16 or earlier, update it — otherwise it stops syncing until you do.
 
@@ -9017,14 +9226,18 @@ to anyone holding a portal link.
 - **Drop a model on the calculator and get a quote.** One drop zone takes STL,
   3MF and g-code, and your customers can price their own model too — optional,
   and off until you turn it on.
+
 - **Khayt learns what a print actually cost.** When a job finishes on a Moonraker
   or Klipper machine, the real filament and duration are captured and kept
   against the file.
+
 - **Estimates that correct themselves.** Once a few jobs have finished with
   measured figures, the estimator calibrates against them rather than against a
   fixed assumption.
+
 - **Settings that worked, remembered.** A print file keeps the setups you have
   used, and a model you have printed before is priced from its own prints.
+
 - **Khayt says when a model is one it cannot price**, instead of guessing.
 - **3MF files now give up their slicer figures**, and **Bambu and Orca print times
   are no longer silently dropped** — neither had ever worked.
@@ -9033,9 +9246,11 @@ to anyone holding a portal link.
 
 - **Keep the library on a network drive, an external disk, or a synced folder**,
   and back it up to object storage alongside the backup folder.
+
 - **Khayt recognises a file you already have** — including a g-code file your shop
   re-sliced, which used to come back as a stranger — and there is now an
   **Identify** button for files it cannot place.
+
 - **Drop a .zip straight into your print files.** Model packs arrive as archives.
 - **Documents that travel with a product** — assembly instructions, a datasheet, a
   licence.
@@ -9044,9 +9259,11 @@ to anyone holding a portal link.
 
 - **Consumables reach the reorder list and purchase orders**, which until now only
   filament could, and they can be given categories.
+
 - **Receiving a filament purchase order records what it cost.**
 - **A fee can be a percentage**, not only a fixed amount, and **marketplace fees go
   onto a quote in one click** for Etsy and the like.
+
 - **Kits — several prints that are one object.** A figure printed as a head, a
   body and a base is one thing to the customer. Kits can be renamed, and they
   reach Bed Ready.
@@ -9055,12 +9272,16 @@ to anyone holding a portal link.
 
 - **A large 3MF could convert into a model missing most of itself**, and report
   success.
+
 - **The converter stopped the app while it worked.** That work has moved off the
   main process.
+
 - **A big multi-colour 3MF could open as if it had no colours at all**, and **the
   top colour was dropping out of the print.**
+
 - **Prints took about twice as long as they needed to** — the base of a relief was
   being printed at full detail.
+
 - **HueForge FLAT mode** — colour by region instead of by height.
 
 ### Added — elsewhere
@@ -9068,6 +9289,7 @@ to anyone holding a portal link.
 - **"Across the branches" now shows the money, and what is late.** The
   organisation overview counted work and said nothing about what it earned. Each
   branch is shown in its own currency and the figures are the branch's own.
+
 - **Elegoo resin printers** — Mars and Saturn machines.
 - **The production queue opens on the board**, and there is now a **Help menu**.
 - **Low stock can have its own colour**, under Settings → Appearance.
@@ -9968,6 +10190,7 @@ folders it was allowed to *read*.
   failed for no apparent reason. The build now keeps watching after it restores,
   puts back anything that moves, and stops with a clear message naming the file if
   it cannot. Affects contributors building from source, not anyone using the app.
+
 - **A beta build could not find its own updates.** Bed Ready ships on a beta line,
   and every release on it is marked pre-release on GitHub. An app that refuses
   pre-releases is answered with the newest release that *isn't* one — which, on a
@@ -10045,6 +10268,7 @@ folders it was allowed to *read*.
   waited on an answer that was never coming, with no error and no end. It now
   gives up after thirty minutes, says the converter stopped responding and that
   nothing on disk was changed, and starts a fresh one for the next file.
+
 - **Bed Ready could not put a job on its own production queue.** The calculator's
   primary button says "Add to print queue". It was wired to `logPrint()`, which
   lives in the business-only module Bed Ready does not ship, so the shim had
@@ -10826,11 +11050,13 @@ midnight belonged to yesterday.
   out "today" from UTC rather than from your own calendar, so a quote that
   expired yesterday stayed approvable on the page your customer uses to accept
   it.
+
 - **An order taken through the LAN page after midnight was dated yesterday.**
   Same cause, worse effect: that date is what the revenue-by-day reports group
   on, so the money landed on the wrong day. Orders arriving from Salla and Zid
   were dated the same way, and the kiosk count of work completed today covered
   the wrong hours.
+
 - **A monthly recurring expense walked backwards a day every cycle** for any
   shop west of London. An expense anchored on the 15th became the 14th, then the
   13th, then the 12th. The date was being built on one calendar and read on
@@ -10886,11 +11112,13 @@ well looked like it had frozen. Meridian also could not be scrolled.
   supplies an English fallback for each, every screen looked finished — in
   English — in all nine languages, and nothing reported a problem. Those keys
   now exist, translated.
+
 - **Tooltips, placeholders and several labels were English everywhere.** The
   theme toggle, notification bell, location filter, global search, the G-code
   parser and quote buttons, the waste search box, the aged-receivables report
   and the NPS panel all carried text no translation could reach. The theme
   toggle and bell alone appear on every screen in the app.
+
 - **A guard now fails the build on a key the code asks for but no language
   defines** — the mirror of the existing one that fails on a key nothing uses.
   Together they close the loop in both directions. Fixing a hole in the latter
@@ -10907,10 +11135,12 @@ well looked like it had frozen. Meridian also could not be scrolled.
   follows the language you picked. Arabic keeps Western digits — the same
   deliberate choice the rest of the app makes — while its month and day names
   are Arabic, and the Hijri calendar is untouched.
+
 - **Two calendars were permanently English.** The analytics activity heatmap and
   the calendar view both carried a hardcoded `Sun, Mon, Tue…` list, invisible in
   English and unchangeable in every other language. The same bug the email
   digest had. Both now come from the system's own calendar data.
+
 - **The Meridian header kept the old language for half a minute** after
   switching, because its date only repainted on a 30-second timer.
 
@@ -10922,13 +11152,16 @@ well looked like it had frozen. Meridian also could not be scrolled.
   but nothing is downloading"; the download was fine and finished on its own.
   The panel now shows how much has arrived, the current speed and a rough time
   remaining, all of which the app was already receiving and throwing away.
+
 - **A download that really has stalled now says so.** After 45 seconds with no
   progress the panel says the download has stopped moving and points to the
   manual download, instead of showing a bar that will never fill. It does not
   cancel anything — if the download recovers, the message clears itself.
+
 - **Screen readers announced 0% for the entire download.** The progress bar
   never updated its accessible value, and the whole live region was rebuilt on
   every progress tick, which made it re-announce several times a second.
+
 - **Update failures left no trace.** electron-updater was running without a
   logger, so a stalled or failed update produced no record of the feed it used,
   the file it chose, or how far it got. It now logs to the app's standard error.
@@ -10950,6 +11183,7 @@ means a rewrite can no longer silently orphan its translations.
   come from the system's own calendar data, so they are correct in every
   language — including ones Khayt does not ship a translation for. Stored
   settings are unaffected: only the labels changed, not the values behind them.
+
 - **Four settings sections and two of their descriptions never translated.**
   "LAN API & iCal", "Fixed Costs & Break-Even", "Outbound Webhooks" and
   "Salla / Zid Webhooks" shipped without translation markers, so they stayed in
@@ -11206,9 +11440,11 @@ this is what changed for you since 3.1.0.
 - **Quoted prices ignored how many of each part you were making.** Multi-part orders
   were costed as though you were printing one of everything, so quotes could come out
   far below what the job actually cost you.
+
 - **Reported profit margins were higher than the real ones**, for the same reason.
 - **Saving in two places at once could damage your saved data.** Writes now can't
   overwrite each other.
+
 - **Saving settings could wipe stored passwords and keys** for email, cloud sync and
   accounting.
 
@@ -11216,6 +11452,7 @@ this is what changed for you since 3.1.0.
 
 - **Printer alerts never fired.** The module that watches for a stopped or failed print
   wasn't being loaded at all.
+
 - **The scheduled daily summary email was never sent.**
 - **Ctrl/⌘+K never opened search.**
 - **A printer added after startup stayed dark until you restarted Khayt.**
@@ -12313,6 +12550,7 @@ Geometry is still never touched — the converter only rewrites slicer metadata,
   - **Multi-device** — log in on another device and pull your data; the encrypted keyset is delivered on login and unlocked locally with your passphrase.
   - **Auto-sync on save** — changes sync in the background (debounced) with automatic conflict resolution (last-write-wins by revision, append-only logs preserved, deletes honored). Manual **Sync now** / **Restore from cloud** also available.
   - **Account recovery** — **password reset** and **email verification** via an emailed code.
+
 - **Customer portal.** Publish a public, owner-curated status link for an order (`/p/…`) that works anywhere — shows only what you choose (shop, order #, status, due date). For quotes, the customer can **Approve / Decline** from the link, and an approved quote advances the order to Pending. Share via QR / Copy / WhatsApp.
 - **AI message drafting (BYO key).** A new **✨ Draft message (AI)** order action drafts a short, localized customer message — status update, ready-for-pickup, quote follow-up, payment reminder, or a custom note — from the order's facts. You edit before sending (Copy / WhatsApp / Email). Uses your own Anthropic key; never invents prices or dates.
 

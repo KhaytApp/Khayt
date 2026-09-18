@@ -367,6 +367,12 @@ public struct TelegramMessage: Decodable, Sendable, Equatable {
     public let botToken: String
     public let chatId: String
     public let message: String
+
+    public init(botToken: String, chatId: String, message: String) {
+        self.botToken = botToken
+        self.chatId = chatId
+        self.message = message
+    }
 }
 
 /// The email a status change owes a customer, as `lib/order-email.js` writes it.
