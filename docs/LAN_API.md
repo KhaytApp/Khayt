@@ -110,6 +110,37 @@ Active kanban orders (`pending`, `printing`, `post`, `qc`). **Requires owner PIN
 ]
 ```
 
+### Discovery — `_khayt._tcp`
+
+The native Mac app advertises itself over Bonjour whenever its LAN API is bound
+to the network, so a client does not have to be told an address.
+
+| | |
+|---|---|
+| Service type | `_khayt._tcp` |
+| Service name | the shop's own name (`settings.shopName`), truncated to 63 **bytes** |
+| `TXT v` | the LAN API version — `1` |
+| `TXT store` | `1` when this server implements `GET /api/store`; absent means no |
+
+**Only when bound to the LAN.** A loopback-only server is not advertised, because
+a client that found it could never connect to it.
+
+`TXT store` is the one thing worth knowing before pairing: it separates a Mac that
+can hand over the book — so the client keeps working away from the desk — from one
+that cannot. The Electron desktop does not advertise at all.
+
+**The PIN is deliberately not advertised.** It can change while the server is up,
+and a stale "no PIN needed" is a client confidently telling a shop something
+untrue. A `401` answers it accurately for the cost of one request.
+
+Bonjour names and TXT records are broadcast in the clear to everything on the
+network. Nothing here is private: `/intake` already serves the shop's name to
+anyone on the LAN with no PIN, because it is the page customers are meant to open.
+
+On iOS, browsing requires `NSBonjourServices` in `Info.plist` alongside
+`NSLocalNetworkUsageDescription` — without it the system returns an empty result
+set rather than an error, which reads as "the Mac is not running".
+
 ### `GET /api/store`
 
 The working set of the shop's book, for a client that keeps its own copy.

@@ -997,6 +997,35 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac + iOS) The phone finds the shop instead of asking for its address.**
+  Pairing has meant reading an IP address and a port off one machine's Settings
+  screen and typing them into a wizard on another — the worst five minutes a
+  shop spends with this product, and a step that comes undone by itself when the
+  router hands the Mac a different address next week.
+
+  The Mac now advertises `_khayt._tcp` whenever its LAN API is bound to the
+  network, under the shop's own name, and the phone offers a list. Not when it
+  is bound to loopback: a client that found that could never connect to it, and
+  a setup step that looks like it is working until it is not is worse than one
+  that is plainly absent.
+
+  The advert carries whether that Mac serves `GET /api/store`, which is the
+  difference between a companion that keeps working away from the desk and one
+  that empties the moment it loses the Mac — so the list says which before
+  anybody commits. The PIN is deliberately not advertised: it can change while
+  the server is up, and a stale "no PIN needed" is the phone telling a shop
+  something untrue, where a 401 says it accurately.
+
+  Typing the address by hand is still there, and not as a fallback for flaky
+  discovery: the Electron desktop does not advertise at all, and plenty of
+  buildings block Bonjour between their wireless and wired halves. Removing it
+  would make those shops unpairable rather than inconvenienced.
+
+  An Arabic shop name is truncated by bytes rather than characters, because
+  Bonjour's limit is 63 bytes and Arabic is two a letter — over it, the service
+  does not register at all and the shop simply never appears.
+
+
 - **(Mac) A photo of the finished print can be added to a job.** Portfolio has
   always shown these and nothing on the Mac could add one — so its empty state
   told a shop to "add a photo to a completed order" with nowhere to do it, and

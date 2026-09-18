@@ -10,6 +10,9 @@ struct PairingView: View {
     @State private var testOK = false
     @State private var isTesting = false
     @State private var showIPHelp = false
+    @StateObject private var browser = ShopBrowser()
+    @State private var resolving: String?
+    @State private var showManual = false
 
     private let totalSteps = 4
 
@@ -111,43 +114,162 @@ struct PairingView: View {
             VStack(alignment: .leading, spacing: 16) {
                 stepCard(
                     icon: "link",
-                    title: "Enter connection",
-                    body: "Phone and computer must be on the **same Wi‑Fi**. Default port is **3219**."
+                    title: "Choose your shop",
+                    body: "Phone and computer must be on the **same Wi‑Fi**. Khayt looks for it — you should not have to type an address."
                 )
 
-                Group {
-                    TextField("Shop name (optional label)", text: $settings.shopLabel)
-                    TextField("Computer IP address", text: $settings.host)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                    Stepper("Port: \(settings.port)", value: $settings.port, in: 1024...65535)
-                    SecureField("Owner LAN PIN", text: $settings.pin)
-                }
-                .textFieldStyle(.roundedBorder)
+                shopsOnThisNetwork
 
-                DisclosureGroup("How do I find the IP address?", isExpanded: $showIPHelp) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("On the Mac running Khayt, open **Terminal** and run:")
-                            .font(.caption)
-                        Text("ipconfig getifaddr en0")
-                            .font(.system(.caption, design: .monospaced))
-                            .padding(8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-                        Text("Use the number shown (e.g. 192.168.1.42). If empty, try **en1** or check **System Settings → Wi‑Fi → Details**.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.top, 4)
+                // ── THE TYPED ADDRESS STAYS ──────────────────────────────
+                //
+                // Not as a fallback for when discovery is flaky, but because
+                // there are shops it cannot serve at all: the Electron desktop
+                // does not advertise itself, and a network with Bonjour blocked
+                // between its wireless and wired sides is common enough in
+                // buildings that were wired by somebody else. Removing this
+                // would make those shops unpairable rather than inconvenient.
+                DisclosureGroup("Enter the address myself", isExpanded: $showManual) {
+                    manualEntry
+                        .padding(.top, 8)
                 }
                 .font(.subheadline)
+
+                // The PIN is asked for whichever way the shop was found: it is
+                // not discoverable, deliberately, and the Mac does not advertise
+                // whether it needs one — a stale "no PIN needed" would be the
+                // phone telling a shop something untrue.
+                SecureField("Owner LAN PIN", text: $settings.pin)
+                    .textFieldStyle(.roundedBorder)
+
             }
             .padding(.horizontal)
         }
         .onChange(of: settings.host) { _, _ in invalidatePairingTest() }
         .onChange(of: settings.port) { _, _ in invalidatePairingTest() }
         .onChange(of: settings.pin) { _, _ in invalidatePairingTest() }
+        // Scoped to this step rather than the whole wizard: browsing holds a
+        // network assertion, and there is no reason to hold it while somebody
+        // reads the welcome screen.
+        .onAppear { browser.start() }
+        .onDisappear { browser.stop() }
+    }
+
+    /// The list that replaces typing an address.
+    @ViewBuilder
+    private var shopsOnThisNetwork: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("Shops on this Wi‑Fi").font(.subheadline.weight(.semibold))
+                if browser.isSearching && browser.shops.isEmpty {
+                    ProgressView().controlSize(.small)
+                }
+            }
+
+            if let failure = browser.failure {
+                // Said as what it usually is. "No shops found" for a refused
+                // permission sends somebody to reboot a router that is fine.
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Khayt cannot look for shops on this network.")
+                        Text(failure).font(.caption).foregroundStyle(.secondary)
+                        Text("If you declined the local network prompt, allow it in Settings → Khayt → Local Network.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                }
+                .font(.footnote)
+            } else if browser.shops.isEmpty {
+                Text(browser.isSearching
+                     ? "Looking… make sure Khayt is open on the Mac with its LAN API switched on."
+                     : "Nothing found yet.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(browser.shops) { shop in
+                    Button { Task { await choose(shop) } } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "desktopcomputer")
+                                .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(shop.name).font(.body)
+                                // The difference between a phone that keeps
+                                // working away from the desk and one that
+                                // empties when it loses the Mac. Worth knowing
+                                // before pairing, not after.
+                                Text(shop.servesBook
+                                     ? "Can work offline with this shop"
+                                     : "Needs the Mac in reach for every screen")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if resolving == shop.id {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption).foregroundStyle(.tertiary)
+                            }
+                        }
+                        .frame(minHeight: 44)          // the tap target rule
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var manualEntry: some View {
+        Group {
+            TextField("Shop name (optional label)", text: $settings.shopLabel)
+            TextField("Computer IP address", text: $settings.host)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+            Stepper("Port: \(settings.port)", value: $settings.port, in: 1024...65535)
+
+            DisclosureGroup("How do I find the IP address?", isExpanded: $showIPHelp) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("On the Mac running Khayt, open **Terminal** and run:")
+                        .font(.caption)
+                    Text("ipconfig getifaddr en0")
+                        .font(.system(.caption, design: .monospaced))
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                    Text("Use the number shown (e.g. 192.168.1.42). If empty, try **en1** or check **System Settings → Wi‑Fi → Details**.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 4)
+            }
+            .font(.subheadline)
+        }
+        .textFieldStyle(.roundedBorder)
+    }
+
+    /// Fill in the address from a shop the phone found.
+    private func choose(_ shop: ShopBrowser.Shop) async {
+        resolving = shop.id
+        defer { resolving = nil }
+        guard let found = await browser.resolve(shop) else {
+            // Discovery said it was there and the connection disagreed — a Mac
+            // that went to sleep between the two, most likely. Open the manual
+            // fields rather than leaving somebody looking at a list that does
+            // not respond to being tapped.
+            showManual = true
+            return
+        }
+        settings.host = found.host
+        settings.port = Int(found.port)
+        if settings.shopLabel.trimmingCharacters(in: .whitespaces).isEmpty {
+            settings.shopLabel = shop.name
+        }
+        invalidatePairingTest()
     }
 
     private var verifyStep: some View {
