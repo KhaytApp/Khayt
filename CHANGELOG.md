@@ -12,6 +12,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   work outside the shop's trade still move nothing, and a payment recorded with
   no date is still counted separately rather than dropped in silence.
 
+- **(Mac) The messages a shop sends its customers can be written here.** The
+  WhatsApp templates could always be USED on the Mac and never written, so a
+  shop whose book carried none opened the message sheet to an empty picker with
+  nothing to explain it. They are edited in Settings → Integrations now — new,
+  corrected in place, or removed — and the placeholders on offer are the ones
+  the rule actually replaces rather than a list typed beside it. The message
+  sheet also says where to make one instead of showing an empty box.
+
 - **(Mac) Where a model came from can be recorded, not just read.** The
   library's inspector has always shown a model's source and licence, and this
   Mac had no way to set either — so on a real book the panel was blank on every

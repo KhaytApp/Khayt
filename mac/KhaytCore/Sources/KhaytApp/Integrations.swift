@@ -112,6 +112,13 @@ struct IntegrationsPane: View {
                     }
                 }
 
+                // The shop's own messages, on the page where the rest of
+                // reaching a customer lives. They are a COLLECTION rather than
+                // a setting, so they save on their own rather than through the
+                // bar below — a template written and then reverted with the
+                // payment links would be a surprise.
+                Section { TemplatesSection(shop: shop) }
+
                 if let copied {
                     Section { Text(copied).font(.callout).foregroundStyle(Khayt.done) }
                 }

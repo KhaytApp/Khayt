@@ -53,6 +53,10 @@ struct SettingsWindow: View {
                 .tag(SettingsPane.preferences)
         }
         .frame(width: 600, height: 640)
+        // Raised HERE rather than from the shop window: the list it is reached
+        // from lives on the Integrations pane, and a sheet bound to the same
+        // state from two windows presents itself twice.
+        .sheet(item: $shop.editingTemplate) { TemplateSheet(shop: shop, template: $0) }
     }
 }
 
