@@ -108,7 +108,6 @@ public actor KhaytEngine {
         "full-spectrum",
         "mf-convert",
         "kpi-rows",
-        "kpi",
         // What needs a shop's attention, and the figures on the dashboard.
         // Pure, zero requires, and already assigning onto globalThis — so the
         // screen a shop opens on is the same arithmetic the Electron app shows,
@@ -2197,11 +2196,20 @@ public actor KhaytEngine {
     public func kpis(orders: [JSONValue], clients: [JSONValue],
                      settings: [String: JSONValue], range: String,
                      language: String) throws -> Kpis {
-        let script = KPI_SCRIPT
-        return try runtime.call2(script,
-                                 [.array(orders), .array(clients), .object(settings),
-                                  .string(range), .string("\u{2014}"), .string(language)],
-                                 as: Kpis.self)
+        // `kpi-rows` still runs in JavaScript: it reads `order-money`,
+        // `order-payment` and `content-languages`, none of which have moved
+        // yet, and the money function it takes cannot cross the bridge. Adding
+        // the rows up is `KhaytCore.Kpi` now.
+        let rows: [JSONValue] = try runtime.call2(
+            KPI_SCRIPT, [.array(orders), .array(clients), .object(settings),
+                         .string(range), .string("\u{2014}"), .string(language)],
+            as: [JSONValue].self)
+        let summary = Kpi.compute(Kpi.rows(rows))
+        return Kpis(orderCount: summary.orderCount, completedCount: summary.completedCount,
+                    revenue: summary.revenue, cost: summary.cost,
+                    grossProfit: summary.grossProfit, grossMargin: summary.grossMargin,
+                    avgOrderValue: summary.avgOrderValue, onTimePct: summary.onTimePct,
+                    onTimeTotal: summary.onTimeTotal, outstanding: summary.outstanding)
     }
 
     // A note kept from when this was not yet possible:
@@ -8494,7 +8502,7 @@ private let KPI_SCRIPT = """
   var ctx = { settings: ARG2, clients: ARG1 };
   var M = globalThis.KhaytOrderMoney;
   var b = globalThis.KhaytKpiRows.bounds(ARG3);
-  return globalThis.KhaytKpi.computeKpis(globalThis.KhaytKpiRows.kpiRows({
+  return globalThis.KhaytKpiRows.kpiRows({
     orders: ARG0, from: b[0], to: b[1],
     // So the rows come back with revenue NET OF TAX — the module resolves the
     // profile from these settings and decides, rather than this host netting it
@@ -8531,6 +8539,6 @@ private let KPI_SCRIPT = """
       return globalThis.KhaytContentLanguages.read(c, 'name', ARG5, ARG2) || "";
     },
     unassigned: ARG4
-  }));
+  });
 })()
 """

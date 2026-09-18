@@ -60,7 +60,24 @@ struct UnbundlingIsSafeTests {
         for url in files where url.pathExtension == "js" {
             let module = url.deletingPathExtension().lastPathComponent
             let text = try String(contentsOf: url, encoding: .utf8)
-            source[module] = text
+            // ── A MENTION IN A COMMENT IS NOT A READ ──────────────────────
+            //
+            // The scan below asks whether a module's text contains a global.
+            // `kpi-rows.js` names `KhaytKpi.computeKpis` in a JSDoc line
+            // explaining what its rows are FOR, and that held `kpi` in the
+            // bundle for a reader that does not exist.
+            //
+            // So whole-line comments are dropped first — a line whose first
+            // non-space character is `//`, `/*` or the `*` of a JSDoc body. A
+            // trailing comment on a line of code still counts, which keeps the
+            // guard strict where it is hard to be sure.
+            source[module] = text.split(separator: "\n", omittingEmptySubsequences: false)
+                .filter { line in
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    return !(trimmed.hasPrefix("//") || trimmed.hasPrefix("/*")
+                             || trimmed.hasPrefix("*"))
+                }
+                .joined(separator: "\n")
             for line in text.split(separator: "\n") where line.contains("Khayt") {
                 guard let range = line.range(of: #"global(?:This)?\.(Khayt\w+)\s*="#,
                                              options: .regularExpression) else { continue }
@@ -80,7 +97,14 @@ struct UnbundlingIsSafeTests {
             guard let text = source[module] else { continue }
             for (global, owners) in definers {
                 guard !owners.contains(module) else { continue }   // it defines it
-                guard text.contains(global) else { continue }
+                // ── A WHOLE NAME, NOT A SUBSTRING ─────────────────────────
+                //
+                // `KhaytKpi` is a prefix of `KhaytKpiRows`, so a plain
+                // `contains` said kpi-rows reads kpi when all it does is
+                // define itself. Word boundaries, so a longer global whose
+                // name starts with a shorter one is not a read of the shorter.
+                guard text.range(of: "\\b\(global)\\b", options: .regularExpression) != nil
+                else { continue }
                 guard owners.isDisjoint(with: bundled) else { continue }  // somebody supplies it
                 if Self.allowed[module]?.contains(global) == true { continue }
                 dangling.append("\(module).js reads \(global), defined only by "
