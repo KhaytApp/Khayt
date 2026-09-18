@@ -33,6 +33,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saying why and no way out. There is a banner on the board now, and ⌘⇧. stops
   the floor and starts it again.
 
+- **(Mac) Invoices carry the shop's own logo again, and it can be set here.**
+  Every invoice this app printed carried Khayt's mark where the other app
+  printed the shop's — the logo was refused outright rather than checked. It is
+  checked now, by the same rule the other app uses: only a picture stored in
+  the book is printed, never a link out of the settings file. Settings →
+  Business takes a PNG, JPEG, GIF or WebP under 1 MB, read by its own bytes
+  rather than by the name on the file.
+
 - **(Mac) Where a model came from can be recorded, not just read.** The
   library's inspector has always shown a model's source and licence, and this
   Mac had no way to set either — so on a real book the panel was blank on every

@@ -8308,8 +8308,18 @@ private let INVOICE_SCRIPT = """
     // document already guards every optional slot, and a name in the footer is
     // worse than no footer.
     shopField: function (base) { return sellerFields[base] || ''; },
-    // Refused rather than passed through: this document goes to a customer.
-    safeBizLogo: function () { return ''; },
+    // ── THE SHOP'S OWN MARK, GUARDED THE WAY THE OTHER APP GUARDS IT ──
+    //
+    // This used to answer the empty string always, so every invoice this app
+    // printed carried Khayt's mark where the other app printed the shop's.
+    // The worry behind that was right — a document going to a customer must
+    // not carry an arbitrary URL out of a settings file — but the answer is
+    // the guard, not the refusal: `data:image/` and nothing else, which is
+    // `safeBizLogo()` in `renderer/app-helpers.js` exactly.
+    safeBizLogo: function () {
+      var v = settings.bizLogo;
+      return (typeof v === 'string' && v.indexOf('data:image/') === 0) ? v : '';
+    },
     safeCssColor: function (v, fallback) {
       return /^#[0-9a-fA-F]{3,8}$/.test(String(v || '')) ? String(v) : fallback;
     },
