@@ -669,7 +669,6 @@ public actor KhaytEngine {
         "sdcp-reply",
         "report-records",
         // A report a shop named, kept in one shape for both apps.
-        "saved-reports",
         // What the machine itself remembers. The nozzle-wear counter reads
         // completed ORDERS, so a machine that has extruded twelve kilos while
         // nineteen of its jobs were customer orders reports a fraction of its
@@ -5698,26 +5697,28 @@ public actor KhaytEngine {
     /// What is really on the settings, with the junk dropped. `lib/saved-reports.js`
     /// owns the shape so a report saved in one app loads in the other.
     public func savedReports(settings: [String: JSONValue]) throws -> [SavedReport] {
-        try runtime.call2("globalThis.KhaytSavedReports.savedReports(ARG0)",
-                          [.object(settings)], as: [SavedReport].self)
+        SavedReports.all(settings: settings).map(Self.decode)
+    }
+
+    private static func decode(_ r: SavedReports.Report) -> SavedReport {
+        SavedReport(id: r.id, name: r.name, fields: r.fields, statusIn: r.statusIn,
+                    from: r.from, to: r.to)
     }
 
     /// Keep one under a name — replacing, not appending, when the name is reused.
     public func addSavedReport(_ list: [SavedReport], name: String, fields: [String],
                                statusIn: [String], from: String, to: String,
                                id: String) throws -> [SavedReport] {
-        try runtime.call2(#"""
-        globalThis.KhaytSavedReports.addReport(ARG0, {
-          name: ARG1, fields: ARG2, statusIn: ARG3, from: ARG4, to: ARG5,
-        }, ARG6)
-        """#, [.array(list.map(Self.encode)), .string(name),
-               .array(fields.map { .string($0) }), .array(statusIn.map { .string($0) }),
-               .string(from), .string(to), .string(id)], as: [SavedReport].self)
+        SavedReports.add(list.map(Self.encode),
+                         spec: ["name": .string(name),
+                                "fields": .array(fields.map { .string($0) }),
+                                "statusIn": .array(statusIn.map { .string($0) }),
+                                "from": .string(from), "to": .string(to)],
+                         id: id).map(Self.decode)
     }
 
     public func removeSavedReport(_ list: [SavedReport], id: String) throws -> [SavedReport] {
-        try runtime.call2("globalThis.KhaytSavedReports.removeReport(ARG0, ARG1)",
-                          [.array(list.map(Self.encode)), .string(id)], as: [SavedReport].self)
+        SavedReports.remove(list.map(Self.encode), id: id).map(Self.decode)
     }
 
     private static func encode(_ r: SavedReport) -> JSONValue {

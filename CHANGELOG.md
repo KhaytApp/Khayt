@@ -36,6 +36,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   job had a due date has no on-time figure at all, rather than a score of nought
   per cent — a shop that made no promises did not break any.
 
+- **(Mac) Saved reports are kept natively.** Naming a report and getting it
+  back runs in the app now, and still does the thing the rule exists for:
+  saving again under a name the shop already used replaces that report in
+  place, rather than leaving six entries called "Monthly VAT" with no way to
+  tell them apart.
+
 - **(Mac) What a model's licence permits is worked out natively.** The library
   reads a downloaded model's licence in the app now, and keeps the decision
   that makes it safe: a model nobody has recorded a licence for is reported as
