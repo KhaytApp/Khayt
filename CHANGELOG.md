@@ -977,6 +977,31 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   machine is one photo, and the empty state now takes you to the finished jobs
   rather than just telling you about them.
 
+- **(iOS) The phone runs the shop's own business logic.** `KhaytCore` — the
+  package the Mac app already computes every figure through — now builds for
+  iOS too, and the companion links it. That is one line in the manifest and no
+  change to any of its 29 source files: there is no AppKit in the target, and
+  JavaScriptCore is a system framework on iOS exactly as it is on macOS, so the
+  shop's tax engine, pricing, payment plans and split-order money run on the
+  phone unchanged, with nothing bundled and no second implementation.
+
+  The companion has never computed anything. Every figure on its screens came
+  down the wire from the desktop, which is why it goes blank the moment the
+  desktop is out of reach — and it is used in the back room and at the
+  machines, which is where the Wi-Fi is worst. Working without the desk means
+  the phone needs the shop's arithmetic in its pocket, and there were only ever
+  two ways to get it there: run the shop's engine, or write a second one in
+  Swift. A second one would earn the right to be wrong in a second, different
+  way, and every future fix would have to be made twice. A test on an iOS
+  simulator asks the engine for 15% inclusive VAT on 1,000 and pins it to
+  Node's answer to the halala, so the day the two diverge is the day it fails.
+
+  The floor is iOS 17, and deliberately not the 26 the Mac package sets. That
+  floor costs nothing on a Mac, because arm64-only had already excluded every
+  machine that cannot run 26. It is not free on a phone: an iPhone XS runs iOS
+  17 and never will run 26, so the same number here would strand hardware
+  rather than inconvenience somebody who has not updated.
+
 - **(Mac) The shop's own saved messages can be sent from the Mac.** Khayt has
   always let a shop write its own WhatsApp messages — "Hi {{client}}, your
   order {{id}} is ready!" — and this shop wrote three. Nothing on the Mac could
@@ -1861,6 +1886,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
   Khayt still cannot SET the mode on a Mac — that is done in the Windows app —
   it can only honour one.
+
+- **(iOS) The companion did not compile, and nothing in CI noticed.** `shipped`
+  was added to the order-status list — the enum learned it, the English label
+  learned it — but the switch that translates a status for an Arabic shop did
+  not, and in Swift a switch that does not cover its enum is a compile error,
+  not a missing string. So `ios/` was broken on `main` outright. The reason it
+  went unseen is worth more than the fix: the required checks never run
+  `xcodebuild`, and the iOS contract check compiles `KhaytModels.swift` by
+  itself — which is one of the files that WAS finished. Both Arabic and
+  English already had the word.
 
 - **(Mac) Khayt's Siri shortcuts have never worked, and nothing said so.** The
   app declares two — "What is printing in Khayt" and "What is waiting in
