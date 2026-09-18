@@ -29,6 +29,24 @@ Required checks — all come from [`.github/workflows/ci.yml`](.github/workflows
 - `Syntax check`
 - `E2E smoke (Electron)`
 - `DCO sign-off`
+- `Mac app tests`
+
+There are **five**, and this list said four for long enough to be worth a warning: `Mac app
+tests` was required all along and simply went unrecorded here, so a session that trusted the
+list read a red Swift check as advisory and went looking for why its PR would not merge.
+Read the ruleset, not this file, when the two disagree — the command is three lines up.
+
+`Mac app tests` is the one that surprises a JavaScript-only session, because it is **not**
+path-filtered: a PR touching nothing but `lib/` still has to satisfy it. It runs `swift
+build`, `swift test` and the guard that `mac/KhaytCore/Sources/KhaytCore/JS/` has not drifted
+from `lib/`. **161** modules are copied into that bundle, and **24** of them are pinned
+harder still — `KhaytCoreTests` loads the real file out of `lib/` and asserts the Swift agrees
+with it, so the JavaScript is the fixture (see `Tests/KhaytCoreTests/Parity.swift`). Change
+one of those and the check that blocks your merge is a Swift one. Run it before pushing:
+
+```bash
+bash mac/sync-js.sh && swift test --package-path mac/KhaytCore
+```
 
 `bypass_actors` is **empty**, so nobody is exempt. `gh pr merge --admin` is refused with
 `Repository rule violations found` even for a repo admin — verified by attempting it, not
