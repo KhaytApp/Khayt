@@ -7836,6 +7836,57 @@ final class Shop {
     /// shells can raise it.
     var editingTemplate: MessageTemplate?
 
+    // MARK: - How much of the app the shop wants
+
+    /// The two modes Khayt offers. `enthusiast` exists in the book and is NOT
+    /// on this list on purpose: it is Bed Ready's only mode and was retired as
+    /// a Khayt one, so a book carrying it is read as Simple and re-saving would
+    /// pin it there rather than offering it back.
+    static let modes = ["simple", "professional"]
+
+    /// What the shop is on now, with `enthusiast` resolved the way every reader
+    /// resolves it and an absent mode read as Professional — which is what a
+    /// book written before modes existed means.
+    var mode: String { Self.modeOf(settingsValue) }
+
+    /// Static so it can be shown to agree with `KhaytEngine.featureEnabled`,
+    /// which makes the same two decisions on the other side of the bridge. A
+    /// picker that showed one mode while the shelves obeyed another would be
+    /// the Simple-mode bug again, from the other end.
+    static func modeOf(_ settings: JSONValue) -> String {
+        guard case .object(let s) = settings, case .string(let m)? = s["mode"],
+              !m.isEmpty else { return "professional" }
+        return m == "enthusiast" ? "simple" : m
+    }
+
+    /// Switch between Simple and Professional.
+    ///
+    /// ── WHY THIS HAD TO EXIST ─────────────────────────────────────────────
+    ///
+    /// This app has HONOURED the mode since the shells were fixed — Simple
+    /// hides Expenses and Reports — and had no way to set one. A shop that
+    /// wanted its Mac simpler had to open the other app to say so, which is a
+    /// gap rather than a difference.
+    ///
+    /// Written straight onto `settings.mode`, exactly as the other app's mode
+    /// pills do it, and NOT through the settings form: `settings-edit.js` keeps
+    /// `out.mode = s.mode || 'professional'` — it preserves what it finds and
+    /// takes no mode from a form — so a pane saving through it could never
+    /// change this.
+    func chooseMode(_ wanted: String) async {
+        writeProblem = nil
+        guard Self.modes.contains(wanted) else {
+            writeProblem = words.callIt("mac.mode_unknown"); return
+        }
+        guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
+        guard wanted != mode else { return }
+        write { root in
+            var settings = Self.settings(root)
+            settings["mode"] = .string(wanted)
+            root["settings"] = .object(settings)
+        }
+    }
+
     // MARK: - What is likely to go wrong with this print
 
     /// The overhang report for each model, keyed by the model's id.
