@@ -3119,6 +3119,39 @@ final class Shop {
         Self.gatedFeatures.contains(feature) ? features.contains(feature) : true
     }
 
+    /// The feature a whole SCREEN needs, or nil for one everybody has.
+    ///
+    /// ── WHY THIS IS A FUNCTION AND NOT AN `if` IN THE SIDEBAR ─────────────
+    ///
+    /// It was two `if`s in the sidebar, and they were in the wrong sidebar.
+    /// The gate was written for the shell the app used to open with; the
+    /// redesigned one has shipped by default since 4.0.0-alpha.12 and asks
+    /// nothing, so a Simple shop saw Expenses and Reports exactly as a
+    /// Professional one did — while the rule, the book and the old shell's
+    /// gate were all correct, which is what made it so hard to place.
+    ///
+    /// The menu bar and the restore path never asked either, so hiding the row
+    /// alone would still have left ⌘-menu and a reopened window going straight
+    /// to the screen. "Simple does not include this" has to mean it cannot be
+    /// reached, not that one list omits it.
+    ///
+    /// So the answer lives here once, and everything that can navigate asks.
+    /// The waste log is deliberately absent: it is not gated in
+    /// `lib/feature-tiers.js` either.
+    static func gate(of shelf: Shelf) -> String? {
+        switch shelf {
+        case .expenses: "expenses"
+        case .reports: "analytics"
+        default: nil
+        }
+    }
+
+    /// Can this shop reach that screen at all?
+    func canShow(_ shelf: Shelf) -> Bool {
+        guard let gate = Self.gate(of: shelf) else { return true }
+        return has(gate)
+    }
+
     /// What this shop's mode includes, asked of the shared rule.
     ///
     /// Internal rather than private so a test can drive it with a mode the

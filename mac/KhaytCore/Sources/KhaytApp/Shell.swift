@@ -318,7 +318,10 @@ struct ShellSidebar: View {
                 .tracking(1.2)
                 .padding(.horizontal, 14)
                 .frame(height: 20, alignment: .leading)
-            ForEach(items) { item in
+            // WHAT THE SHOP'S MODE INCLUDES. Asked here rather than at each
+            // row, so a screen added to this list later is gated by having a
+            // gate rather than by somebody remembering to write one.
+            ForEach(items.filter { shop.canShow($0.shelf) }) { item in
                 NavRow(item: item, shop: shop)
             }
         }
