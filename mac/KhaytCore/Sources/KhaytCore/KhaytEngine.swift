@@ -631,7 +631,6 @@ public actor KhaytEngine {
         // Which products actually earn, and which earn per machine hour.
         "product-profit",
         // Growing, or serving the same people?
-        "customer-mix",
         // Which machine is costing the shop, and what it keeps doing wrong.
         "machine-reliability",
         // When each machine is next due a service, and how many hours it has
@@ -3999,21 +3998,32 @@ public actor KhaytEngine {
     public func customerMix(orders: [JSONValue], from: String, to: String,
                             settings: [String: JSONValue], clients: [JSONValue])
         throws -> CustomerMix {
-        try runtime.call2(#"""
+        // `order-money` still lives in JavaScript and the function the rule
+        // takes cannot cross the bridge, so each order's revenue is worked out
+        // once, in order, and handed across. `business-scope` is native.
+        let revenues: [Double] = try runtime.call2(#"""
         (function () {
-          var ctx = { settings: ARG3, clients: ARG4 };
-          return globalThis.KhaytCustomerMix.customerMix({
-            orders: ARG0, from: ARG1, to: ARG2,
-          }, {
-            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
-            countsForBusiness: function (o) {
-              return globalThis.KhaytBusinessScope
-                ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
-            },
+          var ctx = { settings: ARG1, clients: ARG2 };
+          return ARG0.map(function (o) {
+            var n = Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx));
+            return isFinite(n) ? n : 0;
           });
         })()
-        """#, [.array(orders), .string(from), .string(to),
-               .object(settings), .array(clients)], as: CustomerMix.self)
+        """#, [.array(orders), .object(settings), .array(clients)], as: [Double].self)
+
+        let report = KhaytCore.CustomerMix.report(
+            orders: orders, revenues: revenues, from: from, to: to,
+            countsForBusiness: { BusinessScope.countsForBusiness($0) })
+        func side(_ s: KhaytCore.CustomerMix.Side) -> CustomerMix.Side {
+            CustomerMix.Side(revenue: s.revenue, jobs: s.jobs, clients: s.clients,
+                             shareOfRevenue: s.shareOfRevenue)
+        }
+        return CustomerMix(
+            fresh: side(report.fresh), returning: side(report.returning),
+            totals: CustomerMix.Totals(revenue: report.totals.revenue,
+                                       jobs: report.totals.jobs,
+                                       clients: report.totals.clients,
+                                       firstOrderValue: report.totals.firstOrderValue))
     }
 
     // MARK: - Which products actually earn
