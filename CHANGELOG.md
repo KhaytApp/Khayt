@@ -109,6 +109,12 @@ tested against both.
   tolerance and the height rule are unchanged, so a model this screen calls too
   big is still one the conversion report calls too big.
 
+- **(Mac) Which machine is costing the shop is worked out natively.** Scrap by
+  machine — a question neither app answered before the rule existed — runs in
+  the app now. It still ranks by rate rather than by grams, so the answer is
+  the machine that scraps most of what it prints rather than simply the busiest
+  one, and it still refuses to name a printer that has run fewer than two jobs.
+
 - **(Mac) How long a job takes is worked out natively.** The cycle-time chart
   and the per-product lead times run in the app now, in the shop's own
   calendar. A month that finished nothing still has no answer rather than a
