@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The waste trend is worked out natively.** What the shop threw away,
+  month by month and by why, now runs in the app. It keeps the thing that
+  makes the chart worth reading: the three failure types it names are the
+  heaviest three in the window, chosen from what the shop actually logged,
+  rather than a list somebody typed — which is how every failed first layer
+  used to end up in "other".
+
 - **(Mac) The revenue outlook is worked out natively, in the shop's own
   calendar.** The chart that projects what next month is likely to bill now
   runs in the app. What each job earned is still the one shared rule both apps
