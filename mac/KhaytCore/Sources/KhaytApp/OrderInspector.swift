@@ -72,6 +72,14 @@ private struct Detail: View {
                     .buttonStyle(.link)
                     .font(.callout)
                 }
+                // A PHOTOGRAPH OF THE FINISHED PRINT. Portfolio has always
+                // read these and nothing here could write one, so the empty
+                // state told a shop to add a photo to a completed order and
+                // offered nowhere to do it.
+                if shop.canPhotograph(job) {
+                    Divider()
+                    AddPrintPhoto(shop: shop, job: job)
+                }
                 if shop.kit(of: job.id) != nil || !shop.kits.isEmpty || shop.canWrite {
                     Divider()
                     KitSection(shop: shop, job: job)
@@ -348,6 +356,43 @@ struct ZatcaLine: View {
         case "accepted": "checkmark.seal.fill"
         case "rejected", "error": "exclamationmark.triangle.fill"
         default: "clock.badge.exclamationmark"
+        }
+    }
+}
+
+/// "Add a photo" on a finished job.
+///
+/// A link rather than a tile: the inspector is a column of facts, and the one
+/// thing this adds is an action. The picture itself is shown in Portfolio,
+/// which is where somebody goes to look at them.
+struct AddPrintPhoto: View {
+    let shop: Shop
+    let job: Order
+
+    @State private var choosing = false
+    @State private var working = false
+
+    var body: some View {
+        HStack(spacing: Space.xs) {
+            Button(shop.words.callIt("mac.add_print_photo")) { choosing = true }
+                .buttonStyle(.link)
+                .font(.callout)
+                .disabled(working)
+            if working { ProgressView().controlSize(.small) }
+        }
+        .fileImporter(isPresented: $choosing,
+                      allowedContentTypes: LibraryPhoto.kinds) { result in
+            guard case .success(let url) = result else { return }
+            working = true
+            Task {
+                defer { working = false }
+                // Security-scoped, because the file is wherever the shop keeps
+                // its photographs and this app is asking for one by name.
+                let opened = url.startAccessingSecurityScopedResource()
+                defer { if opened { url.stopAccessingSecurityScopedResource() } }
+                guard let data = try? Data(contentsOf: url) else { return }
+                await shop.addPhoto(to: job, from: data)
+            }
         }
     }
 }

@@ -937,6 +937,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A photo of the finished print can be added to a job.** Portfolio has
+  always shown these and nothing on the Mac could add one — so its empty state
+  told a shop to "add a photo to a completed order" with nowhere to do it, and
+  the only way was the Windows app. Open a finished job and choose *Add a photo
+  of the print*. It is stored exactly as the other app stores it — the same two
+  sizes, the same folder, the same filename — so a photo added on either
+  machine is one photo, and the empty state now takes you to the finished jobs
+  rather than just telling you about them.
+
 - **(Mac) The shop's own saved messages can be sent from the Mac.** Khayt has
   always let a shop write its own WhatsApp messages — "Hi {{client}}, your
   order {{id}} is ready!" — and this shop wrote three. Nothing on the Mac could
