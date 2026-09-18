@@ -376,7 +376,6 @@ public actor KhaytEngine {
         // What matters here is that a Mac shop can see an invoice it handed a
         // customer has not been reported, which is a compliance problem and was
         // invisible on this side.
-        "zatca-submit",
         // PRINT-DATE FIRST: the document's own date formatter reaches it
         // through a global, and without it every invoice this app printed
         // showed the raw ISO timestamp under DATE.
@@ -1550,39 +1549,33 @@ public actor KhaytEngine {
         }
     }
 
+    /// Native since the port — `KhaytCore.ZatcaSubmit`.
     public func zatcaReporting(settings: [String: JSONValue],
                                orders: [JSONValue]) throws -> ZatcaReporting {
-        try runtime.call2("""
-            (function (a) {
-              var Z = KhaytZatcaSubmit;
-              var ready = Z.zatcaPhase2Ready(a.settings);
-              var out = [];
-              var owed = 0;
-              for (var i = 0; i < a.orders.length; i++) {
-                var o = a.orders[i];
-                if (!o) continue;
-                var eligible = Z.orderEligibleForZatcaSubmit(o);
-                var sub = o.zatcaSubmission || null;
-                var status;
-                if (!ready) status = 'notConfigured';
-                else if (sub && sub.status) status = String(sub.status);
-                else status = 'pending';
-                if (ready && eligible && status !== 'accepted') owed += 1;
-                var when = sub && sub.at ? Date.parse(sub.at) : NaN;
-                out.push({
-                  id: String(o.id == null ? '' : o.id),
-                  eligible: !!eligible,
-                  status: status,
-                  icv: sub && sub.icv > 0 ? Number(sub.icv) : null,
-                  at: isFinite(when) ? when : null,
-                  message: String(sub && sub.message ? sub.message : ''),
-                });
-              }
-              return { configured: !!ready, invoices: out, unreported: owed };
-            })(ARG0)
-            """,
-            [.object(["settings": .object(settings), "orders": .array(orders)])],
-            as: ZatcaReporting.self)
+        let ready = ZatcaSubmit.phase2Ready(settings: settings)
+        var invoices: [ZatcaReporting.Invoice] = []
+        var owed = 0
+        for order in orders {
+            guard JSSemantics.truthy(order), case .object(let o) = order else { continue }
+            let eligible = ZatcaSubmit.eligible(order)
+            var sub: [String: JSONValue] = [:]
+            if case .object(let fields)? = o["zatcaSubmission"] { sub = fields }
+            let status: String
+            if !ready { status = "notConfigured" }
+            else if let s = sub["status"], JSSemantics.truthy(s) { status = JSSemantics.text(s) }
+            else { status = "pending" }
+            if ready && eligible && status != "accepted" { owed += 1 }
+            let when = JSSemantics.truthy(sub["at"]) ? JSDate.parse(JSSemantics.text(sub["at"])) : nil
+            let icv = JSSemantics.number(sub["icv"])
+            invoices.append(ZatcaReporting.Invoice(
+                id: JSSemantics.text(o["id"]),
+                eligible: eligible,
+                status: status,
+                icv: icv > 0 ? icv : nil,
+                at: (when?.isFinite ?? false) ? when : nil,
+                message: JSSemantics.truthy(sub["message"]) ? JSSemantics.text(sub["message"]) : ""))
+        }
+        return ZatcaReporting(configured: ready, invoices: invoices, unreported: owed)
     }
 
     // MARK: - What a print has been printed with, and printed as

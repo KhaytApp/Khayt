@@ -15,6 +15,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   only the starting state, because a licence chosen by mistake would otherwise
   tell a shop for ever that it may not sell its own work.
 
+- **(Mac) Whether a tax invoice has been reported is worked out natively.** The
+  ZATCA Phase 2 panel — which invoices are eligible, which are still
+  unreported, and what the authority last said about each — runs in the app
+  now. The reading is unchanged, including the one that matters most: only an
+  explicit REJECTED counts as a rejection, so a response naming no status at
+  all is not read as one.
+
 - **(Mac) What a model's licence permits is worked out natively.** The library
   reads a downloaded model's licence in the app now, and keeps the decision
   that makes it safe: a model nobody has recorded a licence for is reported as
