@@ -13,6 +13,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   name that has never bought anything is still not called quiet, because it has
   not gone anywhere.
 
+- **(Mac) What customers have said about the work is worked out natively.** The
+  ratings line on Reports runs in the app now, and keeps both corrections the
+  rule carries: the caption describes the same months the line draws rather
+  than every rating the shop has ever collected, and a rating on a job with no
+  completion stamp still counts rather than being dropped.
+
 - **(Mac) How long a job takes is worked out natively.** The cycle-time chart
   and the per-product lead times run in the app now, in the shop's own
   calendar. A month that finished nothing still has no answer rather than a
