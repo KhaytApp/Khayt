@@ -91,7 +91,6 @@ public actor KhaytEngine {
         "print-fit",
         // Where a model came from and what may be done with it. Pure, and the
         // one place that decides whether a print may be sold.
-        "model-licence",
         // ── THE CONVERTER ────────────────────────────────────────────────
         //
         // In dependency order, because each reads the one above it off the
@@ -982,9 +981,12 @@ public actor KhaytEngine {
         public let derivatives: Bool?
     }
 
+    /// Native since the port — `KhaytCore.ModelLicence`.
     public func licenceStanding(source: String?, licence: String?) throws -> Standing {
-        try runtime.call2("KhaytModelLicence.standing({ source: ARG0, licence: ARG1 })",
-                          [.string(source ?? ""), .string(licence ?? "")], as: Standing.self)
+        let s = ModelLicence.standing(source: source, licence: licence)
+        return Standing(known: s.known, licence: s.licence, source: s.source,
+                        sellable: s.sellable, attribution: s.attribution,
+                        derivatives: s.derivatives)
     }
 
     // MARK: - Converting a 3MF
