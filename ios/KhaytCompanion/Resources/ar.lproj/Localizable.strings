@@ -37,7 +37,7 @@
 "home.overdue" = "%d متأخر";
 "stat.in_queue" = "في الطابور";
 "stat.printing" = "طباعة";
-"stat.post" = "ما بعد";
+"stat.post" = "ما بعد الطباعة";
 "stat.qc" = "فحص الجودة";
 
 /* Orders */
@@ -67,7 +67,7 @@
 "settings.pin" = "رمز PIN";
 "settings.retest" = "إعادة اختبار الاتصال";
 "settings.unpair" = "إلغاء الربط";
-"settings.unpair.footer" = "يمسح حالة الربط؛ يبقى PIN في Keychain.";
+"settings.unpair.footer" = "يحذف دفتر الورشة من هذا الهاتف، ومعه رمز PIN.";
 "settings.language" = "اللغة";
 "settings.notifications" = "الإشعارات";
 "settings.notify.queue" = "تغييرات الطابور";

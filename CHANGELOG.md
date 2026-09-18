@@ -2254,6 +2254,25 @@ tested against both.
   only cue is placeholder text — and they need wording, in nine languages,
   rather than a rename.
 
+- **(iOS) Unpairing said it kept the PIN, while deleting it.** The sentence under
+  *Unpair this device* read "Clears paired state; PIN stays in Keychain until you
+  change it", in both languages, long after `unpair()` had started deleting that
+  Keychain item — the audit records the deletion as a fix and nobody went back to
+  the sentence describing what it replaced. A privacy claim is the worst kind of
+  string to have pointing the wrong way, and this one told a shop its PIN was
+  kept at the moment it was destroyed.
+
+  It had since drifted the other way too: unpairing now also forgets the shop's
+  book, its `.prev` rollback copy and its scope file. The footer says what
+  actually happens, and a guard pins the claim to the three calls that make it
+  true — because the sentence and the code have now been edited by different
+  people at different times twice.
+
+  Also corrected: the Arabic for the post-processing stat tile was `"ما بعد"` —
+  the preposition "after" with nothing after it — where the status label already
+  said `"ما بعد الطباعة"`. That key is not referenced by any screen today, so
+  nobody has read it; it is fixed before the redesign starts using it.
+
 - **(iOS) The queue screen could not load a single real shop's queue.** The
   companion opens on the queue, and `QueueOrder.priority` was typed as a string.
   The desktop has never sent one: `lib/order-new.js` writes `priority: false` on
