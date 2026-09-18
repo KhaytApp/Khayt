@@ -622,7 +622,6 @@ public actor KhaytEngine {
         "cycle-time",
         // What was thrown away, by month and by why.
         // Whether the shop keeps its promises: finished by the due date, or by how many days not.
-        "on-time",
         // The LAN server's rules and pages: the lockout in front of it, and what
         // the phone is shown — the same bytes the other app serves.
         "lan-auth",
@@ -4458,6 +4457,12 @@ public actor KhaytEngine {
     /// Of the finished jobs that had a due date, how many were done by it —
     /// `lib/on-time.js`. `rate` is nil when nothing was promised.
     public struct OnTime: Decodable, Sendable {
+        public init(promised: Int, onTime: Int, late: Int, rate: Double?,
+                    avgDelayDays: Double?, worstDelayDays: Double?, lateJobs: [LateJob]) {
+            self.promised = promised; self.onTime = onTime; self.late = late
+            self.rate = rate; self.avgDelayDays = avgDelayDays
+            self.worstDelayDays = worstDelayDays; self.lateJobs = lateJobs
+        }
         public let promised: Int
         public let onTime: Int
         public let late: Int
@@ -4467,6 +4472,11 @@ public actor KhaytEngine {
         public let lateJobs: [LateJob]
 
         public struct LateJob: Decodable, Sendable, Identifiable, Hashable {
+            public init(id: String, project: String, dueDate: String,
+                        finishedDay: String, delayDays: Double) {
+                self.id = id; self.project = project; self.dueDate = dueDate
+                self.finishedDay = finishedDay; self.delayDays = delayDays
+            }
             public let id: String
             public let project: String
             public let dueDate: String
@@ -4476,13 +4486,17 @@ public actor KhaytEngine {
     }
 
     public func onTime(orders: [JSONValue]) throws -> OnTime {
-        try runtime.call2(#"""
-        globalThis.KhaytOnTime.onTime(ARG0, {
-          countsForBusiness: function (o) {
-            return globalThis.KhaytBusinessScope ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
-          },
-        })
-        """#, [.array(orders)], as: OnTime.self)
+        // `countsForBusiness` is `BusinessScope`, which is ported — and still
+        // bundled, because `order-money`, `kpi-rows` and `top-lists` read the
+        // global at run time. It leaves when they do.
+        let r = KhaytCore.OnTime.record(orders)
+        return OnTime(promised: r.promised, onTime: r.onTime, late: r.late, rate: r.rate,
+                      avgDelayDays: r.avgDelayDays,
+                      worstDelayDays: r.worstDelayDays.map(Double.init),
+                      lateJobs: r.lateJobs.map {
+                          OnTime.LateJob(id: $0.id, project: $0.project, dueDate: $0.dueDate,
+                                         finishedDay: $0.finishedDay,
+                                         delayDays: Double($0.delayDays)) })
     }
 
     // MARK: - The LAN server: what the phone is shown, and the gate in front

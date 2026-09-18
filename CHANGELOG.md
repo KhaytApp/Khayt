@@ -6,6 +6,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Whether the shop keeps its promises is worked out natively.** The
+  on-time figure — of the finished jobs that had a due date, how many were done
+  by it — now runs in the app. A job finished ON its due date still counts as
+  kept, and a shop that has promised nothing still gets a dash rather than
+  "0% on time", which is not a record but the absence of one.
+
 - **(Mac) The waste trend is worked out natively.** What the shop threw away,
   month by month and by why, now runs in the app. It keeps the thing that
   makes the chart worth reading: the three failure types it names are the
