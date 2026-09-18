@@ -633,7 +633,6 @@ public actor KhaytEngine {
         "product-profit",
         // Growing, or serving the same people?
         // Which machine is costing the shop, and what it keeps doing wrong.
-        "machine-reliability",
         // When each machine is next due a service, and how many hours it has
         // run. The hour meter is the input to every figure on the maintenance
         // card, so it is shared rather than recomputed here — a second answer
@@ -3959,14 +3958,27 @@ public actor KhaytEngine {
     public func machineReliability(machines: [JSONValue], orders: [JSONValue],
                                    waste: [JSONValue], from: String, to: String,
                                    unassigned: String) throws -> MachineReliability {
-        try runtime.call2(#"""
-        globalThis.KhaytMachineReliability.machineReliability({
-          machines: ARG0, orders: ARG1, waste: ARG2,
-          from: ARG3, to: ARG4, unassigned: ARG5,
-        }, {})
-        """#, [.array(machines), .array(orders), .array(waste),
-               .string(from), .string(to), .string(unassigned)],
-              as: MachineReliability.self)
+        // Native since the port — `KhaytCore.MachineReliability`. The grams
+        // and hours are the rule's own defaults, read off each job's parts.
+        let report = KhaytCore.MachineReliability.report(
+            machines: machines, orders: orders, waste: waste,
+            from: from, to: to, unassigned: unassigned)
+        func row(_ r: KhaytCore.MachineReliability.Row) -> MachineReliability.Row {
+            MachineReliability.Row(
+                machineId: r.machineId, name: r.name, color: r.color, jobs: r.jobs,
+                grams: r.grams, hours: r.hours, scraps: r.scraps,
+                scrapGrams: r.scrapGrams, scrapCost: r.scrapCost,
+                scrapRate: r.scrapRate,
+                worstFault: r.worstFault.map { MachineReliability.Fault(type: $0.type,
+                                                                        grams: $0.grams) })
+        }
+        return MachineReliability(
+            rows: report.rows.map(row),
+            totals: MachineReliability.Totals(
+                jobs: report.totals.jobs, grams: report.totals.grams,
+                scrapGrams: report.totals.scrapGrams, scraps: report.totals.scraps,
+                scrapCost: report.totals.scrapCost, scrapRate: report.totals.scrapRate,
+                worst: report.totals.worst.map(row)))
     }
 
     // MARK: - Growing, or serving the same people?
