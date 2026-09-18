@@ -243,9 +243,17 @@ struct PairingView: View {
             // does not, say what that means rather than showing an error for
             // something that is not broken.
             do {
-                let records = try await api.pullBook(into: CompanionBook.inSharedContainer())
-                message += " The shop's book is on this phone — \(records) record(s) — "
-                        + "so it keeps working when this Mac is not in reach."
+                let book = try CompanionBook.inSharedContainer()
+                let records = try await api.pullBook(into: book)
+                message += " \(records) record(s) are on this phone, so it keeps working "
+                        + "when this Mac is not in reach."
+                // Said plainly, because the alternative is a phone that looks
+                // like it has the shop on it and quietly does not. The history
+                // stays on the Mac by design; what is worth saying is that it is
+                // still there rather than gone.
+                if let scope = book.scope(), !scope.omitted.isEmpty {
+                    message += " Older history stays on the Mac and is fetched when you ask for it."
+                }
             } catch {
                 message += " This desktop does not hand over its book, so the phone will "
                         + "ask it again for every screen and will empty when it is out of reach."

@@ -13,9 +13,23 @@ import KhaytCore
  * to cache.
  *
  * This is the other thing: the book itself, in the same shape the desktop keeps
- * it on disk — `khayt-store.json`, the collections named by
- * `KhaytStoreValidate.ARRAY_COLLECTIONS`. With the book here and `KhaytEngine`
- * linked, the phone can work a figure out instead of asking for it.
+ * it on disk — `khayt-store.json`. With it here and `KhaytEngine` linked, the
+ * phone can work a figure out instead of asking for it.
+ *
+ * ── IT IS A WORKING SET, NOT THE WHOLE BOOK ────────────────────────────────
+ *
+ * `printLog` is half of a real shop's store and `printFiles` another quarter,
+ * and none of that history has ever been on a companion screen. What travels is
+ * `BookScope.workingSet` — declared in KhaytCore so this phone and the Mac
+ * cannot hold different opinions about it — and what does not travel stays on
+ * the Mac, where it already lives and is already backed up.
+ *
+ * Which means this book is PARTIAL, and it has to be able to say so. A partial
+ * book that reads as a complete one is worse than no book: a screen would count
+ * two hundred orders and report a three-year-old shop as having done two
+ * hundred. `scope` beside the book is what it answers with, and it is kept in
+ * its own file rather than inside the store — the store must stay a valid Khayt
+ * store, because the engine and the sync rules read it as one.
  *
  * ── IT WRITES THROUGH THE MAC'S WRITER, NOT ITS OWN ────────────────────────
  *
@@ -112,6 +126,32 @@ struct CompanionBook {
 
     var exists: Bool { FileManager.default.fileExists(atPath: url.path) }
 
+    /// Where the description of what this phone holds lives.
+    ///
+    /// Beside the book, not inside it. Anything added to the store itself is a
+    /// key the engine, `store-validate` and the sync stamping would all have to
+    /// know to ignore, and the first one that did not would either refuse the
+    /// book or push a phantom record to the cloud.
+    var scopeURL: URL { directory.appending(path: "book-scope.json") }
+
+    /// What this phone was told it has — and, more usefully, has not.
+    ///
+    /// `nil` when no pull has recorded one. Callers must treat that as "I do not
+    /// know what I am missing", never as "I have everything".
+    func scope() -> BookScope.Taken? {
+        guard let data = try? Data(contentsOf: scopeURL) else { return nil }
+        return try? JSONDecoder().decode(BookScope.Taken.self, from: data)
+    }
+
+    /// May a screen total, count or report on this collection?
+    ///
+    /// The one question the rest of the app should ask before putting a number
+    /// on screen. False when the phone holds a window of the records, or when it
+    /// has no idea — both of which make a total a lie.
+    func holdsAll(_ collection: String) -> Bool {
+        scope()?.isWhole(collection) ?? false
+    }
+
     /// The whole book, as the engine wants it.
     func read() throws -> [String: JSONValue] {
         guard let data = try? Data(contentsOf: url) else { throw Failure.notYetPulled }
@@ -123,12 +163,17 @@ struct CompanionBook {
     /// Deliberately routed through `StoreWriter.atomicWrite` rather than
     /// `Data.write`, so the very first book a phone receives lands the same way
     /// every later edit does: fsync, `.prev`, swap.
-    func replace(with store: [String: JSONValue]) throws {
+    func replace(with store: [String: JSONValue], scope: BookScope.Taken?) throws {
         let next = try JSONEncoder().encode(store)
         guard next.count <= StoreWriter.maxStoreBytes else {
             throw StoreWriter.Refusal.tooLarge(next.count)
         }
         try StoreWriter.atomicWrite(next, to: url)
+        // AFTER the book, and only if it landed. A scope written beside a book
+        // that failed to write would describe records that are not there.
+        if let scope, let described = try? JSONEncoder().encode(scope) {
+            try? described.write(to: scopeURL, options: [.atomic])
+        }
     }
 
     /// Change the book in place, atomically.
@@ -156,6 +201,7 @@ struct CompanionBook {
 
     /// Forget the shop entirely. Unpairing must not leave a client list behind.
     func forget() {
+        try? FileManager.default.removeItem(at: scopeURL)
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(at: url.appendingPathExtension("prev"))
     }

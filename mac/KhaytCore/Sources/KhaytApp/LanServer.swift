@@ -397,37 +397,54 @@ final class LanServer {
             let body = (try? await engine.lanQueueBody(store: store)) ?? "[]"
             return .json(200, body)
 
-        // ── THE WHOLE BOOK, FOR A DEVICE THAT KEEPS ONE ───────────────────
+        // ── WHAT A PHONE CARRIES, WHICH IS NOT THE WHOLE BOOK ─────────────
         //
         // Every other route here answers a QUESTION: what is in the queue, what
         // is on the machines. That shape assumes the asker is a screen with a
-        // connection, and it is why the phone empties the moment this Mac is
-        // out of reach — a cached reply to `/api/queue` can show the queue and
-        // nothing else, and it cannot answer a question nobody thought to ask
-        // in advance.
+        // live connection, and it is why the phone empties the moment this Mac
+        // is out of reach — a cached reply to `/api/queue` shows the queue and
+        // nothing else, and cannot answer a question nobody thought to ask in
+        // advance.
         //
-        // This hands over the book itself, once, so the phone can stop asking.
-        // What it does with it afterwards is arithmetic it does locally,
-        // through the same engine this app computes with.
+        // This hands over enough of the book that the asker can stop asking.
+        // Enough, and not all of it: `printLog` is half a shop's store and
+        // `printFiles` another quarter, all of it history that no companion
+        // screen has ever shown. `BookScope` is the rule about which parts
+        // travel and it lives in KhaytCore so this app and the phone cannot
+        // hold different opinions about it.
+        //
+        // `?scope=whole` is here for the one caller that legitimately wants
+        // everything — a restore, or a person with curl — and is never what the
+        // phone asks for.
         //
         // MASKED, and not as a courtesy. This app reads the store from DISK, so
-        // what it is holding includes the real `__enc__` credentials — a
-        // printer's password, a shop's cloud token. The renderer has never had
-        // those and has always pushed masks. `forCloud` is the rule that draws
-        // that line and it is `lib/cloud-outbox.js`'s, not a second one written
-        // here for the phone: a device on the LAN is exactly as entitled to a
-        // shop's secrets as the cloud is, which is to say not at all.
+        // what it holds includes the real `__enc__` credentials — a printer's
+        // password, a shop's cloud token. The renderer has never had those and
+        // has always pushed masks. `forCloud` is the rule that draws that line
+        // and it is `lib/cloud-outbox.js`'s, not a second one written here for
+        // the phone: a device on the LAN is exactly as entitled to a shop's
+        // secrets as the cloud is, which is to say not at all.
         //
         // Behind the same PIN as the queue. Anyone who can read this can read
-        // the shop's whole client list, so it is the owner PIN that gates it,
-        // and `pinGate` is what does the constant-time compare and the lockout.
+        // the shop's client list, so it is the owner PIN that gates it, and
+        // `pinGate` does the constant-time compare and the lockout.
         case ("/api/store", true):
             if let refused = await pinGate(request) { return refused }
-            guard let masked = try? await engine.storeForCloud(host.store()),
-                  let body = try? String(decoding: JSONEncoder().encode(JSONValue.object(masked)),
-                                         as: UTF8.self) else {
+            guard let masked = try? await engine.storeForCloud(host.store()) else {
                 // Deliberately not an empty book. A phone that took `{}` for an
                 // answer would replace a shop it already had with nothing.
+                return .json(500, #"{"error":"The book could not be prepared to send"}"#)
+            }
+            let whole = request.query["scope"] == "whole"
+            let cut = whole
+                ? (store: masked, taken: BookScope.Taken(
+                    collections: [:], omitted: [], takenAt: StoreWriter.iso(host.now())))
+                : BookScope.take(from: masked, now: host.now())
+            // An ENVELOPE, not a bare store. The records alone cannot say what
+            // was left out, and a partial book that cannot say it is partial is
+            // worse than none: a screen would count 200 orders and report a
+            // three-year-old shop as having done 200.
+            guard let body = Self.envelope(store: cut.store, taken: cut.taken, whole: whole) else {
                 return .json(500, #"{"error":"The book could not be prepared to send"}"#)
             }
             return .json(200, body)
@@ -987,6 +1004,24 @@ final class LanServer {
                                   "Content-Disposition": "attachment; filename=\"khayt-orders.ics\"",
                                   "Cache-Control": "no-cache"],
                         body: Data(ics.utf8))
+    }
+
+    /// `{ scope, store }` — what travelled, and the description of what did not.
+    ///
+    /// Hand-assembled around one `JSONEncoder` pass each rather than a single
+    /// Codable wrapper, because `store` is `[String: JSONValue]` and the scope
+    /// is a struct; a wrapper would need `JSONValue` to swallow the struct or
+    /// the struct to be expressed as `JSONValue`, and both are more code than
+    /// two encodes and a bracket.
+    nonisolated static func envelope(store: [String: JSONValue],
+                                     taken: BookScope.Taken, whole: Bool) -> String? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let scopeData = try? encoder.encode(taken),
+              let storeData = try? encoder.encode(JSONValue.object(store)) else { return nil }
+        let scope = String(decoding: scopeData, as: UTF8.self)
+        let book = String(decoding: storeData, as: UTF8.self)
+        return #"{"whole":\#(whole),"scope":\#(scope),"store":\#(book)}"#
     }
 
     // MARK: - The PIN

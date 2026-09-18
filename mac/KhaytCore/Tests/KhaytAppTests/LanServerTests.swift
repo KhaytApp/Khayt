@@ -224,8 +224,8 @@ struct LanServerTests {
         #expect(wrong.headers["x-content-type-options"] == "nosniff")
     }
 
-    @Test("the whole book goes to a phone that keeps one, with the shop's secrets masked")
-    func wholeBookBehindPin() async throws {
+    @Test("a phone is sent a working set, not the whole book, with the shop's secrets masked")
+    func workingSetBehindPin() async throws {
         let bench = try await Bench()
         defer { bench.stop() }
 
@@ -241,26 +241,45 @@ struct LanServerTests {
             "name": .string("X1C"),
             "printerApi": .object(["accessCode": .string("__enc__12345678")]),
         ])])
+        // Put the history in the book on purpose rather than relying on the
+        // sample having it: what is being tested is that this is left behind,
+        // and a fixture that never had it would pass by accident.
+        bench.book.value["printFiles"] = .array([.object(["id": .string("f1")])])
+        bench.book.value["auditLog"] = .array([.object(["id": .string("a1")])])
 
         let none = try await bench.get("/api/store")
-        #expect(none.status == 401, "the shop's whole book must never be open on the LAN")
+        #expect(none.status == 401, "the shop's book must never be open on the LAN")
 
         let reply = try await bench.get("/api/store", headers: ["x-khayt-pin": "2468"])
         #expect(reply.status == 200, Comment(rawValue: reply.text))
 
-        // The body is `forCloud`'s answer, not a shape assembled here — the same
-        // rule the cloud push uses, so a device on the LAN is trusted with
-        // exactly what the cloud is trusted with and no more.
-        let expected = try await bench.engine.storeForCloud(bench.book.value)
-        let sent = try #require(try? JSONDecoder().decode([String: JSONValue].self,
-                                                          from: Data(reply.text.utf8)))
-        #expect(sent == expected)
+        struct Envelope: Decodable {
+            let whole: Bool
+            let scope: BookScope.Taken
+            let store: [String: JSONValue]
+        }
+        let sent = try #require(try? JSONDecoder().decode(Envelope.self, from: Data(reply.text.utf8)))
 
-        // Said again as a fact rather than as a comparison, because the
-        // comparison would still pass if `forCloud` stopped masking.
-        guard case .object(let settings)? = sent["settings"],
+        #expect(sent.whole == false, "the phone was sent the whole book")
+
+        // The history that is half a real shop's store and that no companion
+        // screen has ever shown. Withheld, and SAID to be withheld — a phone
+        // cannot tell "not sent" from "there are none" by looking.
+        #expect(sent.store["printFiles"] == nil)
+        #expect(sent.store["auditLog"] == nil)
+        #expect(sent.scope.omitted.contains("printFiles"))
+        #expect(sent.scope.omitted.contains("auditLog"))
+
+        // What it does get, and the settings without which it can price nothing.
+        #expect(sent.store["settings"] != nil)
+        #expect(sent.store["printLog"] != nil)
+        #expect(sent.store["inventory"] != nil)
+
+        // Said as a fact rather than a comparison, because a comparison against
+        // `forCloud` would still pass if `forCloud` stopped masking.
+        guard case .object(let settings)? = sent.store["settings"],
               case .object(let telegram)? = settings["telegram"],
-              case .array(let machines)? = sent["machines"],
+              case .array(let machines)? = sent.store["machines"],
               case .object(let machine) = machines[0],
               case .object(let api)? = machine["printerApi"] else {
             Issue.record("the book did not arrive in the shape it was sent in")
@@ -271,10 +290,25 @@ struct LanServerTests {
         #expect(api["accessCode"] == .string("__KHAYT_MASKED__"),
                 "a printer's access code went out over the LAN")
         #expect(settings["shopName"] == .string("Ward"), "masking took something that was not a secret")
+    }
 
-        // And the thing that is NOT masked, which is why the PIN is the gate:
-        // customers are not secrets, they are the book.
-        #expect(sent["printLog"] != nil, "the phone was sent a book with no orders in it")
+    @Test("`?scope=whole` still exists for the caller that genuinely wants everything")
+    func wholeOnRequest() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let reply = try await bench.get("/api/store?scope=whole", headers: ["x-khayt-pin": "2468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+
+        struct Envelope: Decodable {
+            let whole: Bool
+            let store: [String: JSONValue]
+        }
+        let sent = try #require(try? JSONDecoder().decode(Envelope.self, from: Data(reply.text.utf8)))
+        #expect(sent.whole)
+        // Masked all the same: wanting everything is not the same as being
+        // entitled to the shop's credentials.
+        let expected = try await bench.engine.storeForCloud(bench.book.value)
+        #expect(sent.store == expected)
     }
 
     @Test("the live queue page is the module's HTML, with the clock it was given")

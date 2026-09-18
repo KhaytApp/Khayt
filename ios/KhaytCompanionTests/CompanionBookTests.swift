@@ -47,7 +47,7 @@ final class CompanionBookTests: XCTestCase {
     }
 
     func testTheFirstPullLandsAndComesBackWhole() throws {
-        try book.replace(with: shop())
+        try book.replace(with: shop(), scope: nil)
         XCTAssertTrue(book.exists)
 
         let back = try book.read()
@@ -57,7 +57,7 @@ final class CompanionBookTests: XCTestCase {
     }
 
     func testAnEditIsStampedSoTheMacCanHearAboutIt() throws {
-        try book.replace(with: shop())
+        try book.replace(with: shop(), scope: nil)
         try book.updateRecord(collection: "clients", id: "C-1") { record in
             record["name"] = .string("Sara Al-Otaibi")
         }
@@ -75,7 +75,7 @@ final class CompanionBookTests: XCTestCase {
     }
 
     func testTheBookKeepsOneGenerationOfRollback() throws {
-        try book.replace(with: shop())
+        try book.replace(with: shop(), scope: nil)
         try book.update { root in root["clients"] = .array([]) }
 
         // `.prev` is what a corrupt primary is recovered from, and it is the
@@ -87,7 +87,7 @@ final class CompanionBookTests: XCTestCase {
     }
 
     func testForgettingLeavesNoClientListOnThePhone() throws {
-        try book.replace(with: shop())
+        try book.replace(with: shop(), scope: nil)
         try book.update { root in root["clients"] = .array([]) }
         XCTAssertTrue(FileManager.default.fileExists(atPath: book.url.appendingPathExtension("prev").path))
 
@@ -98,6 +98,49 @@ final class CompanionBookTests: XCTestCase {
         XCTAssertFalse(book.exists)
         XCTAssertFalse(FileManager.default.fileExists(atPath: book.url.appendingPathExtension("prev").path),
                        "unpairing left the rollback copy, which holds the same names")
+    }
+
+    func testAPartialBookNeverReadsAsACompleteOne() throws {
+        // The failure this guards against: the phone holds 200 of a shop's 3,140
+        // orders, a screen totals what it has, and a three-year-old shop is
+        // reported as having done 200 jobs.
+        let scope = BookScope.Taken(
+            collections: [
+                "printLog": .init(whole: false, sent: 200, available: 3_140),
+                "clients": .init(whole: true, sent: 31, available: nil),
+            ],
+            omitted: ["printFiles", "auditLog"],
+            takenAt: "2026-09-18T09:00:00.000Z")
+        try book.replace(with: shop(), scope: scope)
+
+        XCTAssertFalse(book.holdsAll("printLog"), "a windowed collection must never claim to be whole")
+        XCTAssertTrue(book.holdsAll("clients"), "a complete collection should be usable for totals")
+        XCTAssertEqual(book.scope()?.collections["printLog"]?.available, 3_140,
+                       "the phone cannot say \"200 of 3,140\" without being told the 3,140")
+    }
+
+    func testNotKnowingWhatIsMissingIsNotTheSameAsHavingEverything() throws {
+        // A book written with no scope beside it — an older build, an
+        // interrupted pull. The safe answer to "may I total this?" is no.
+        try book.replace(with: shop(), scope: nil)
+        XCTAssertNil(book.scope())
+        XCTAssertFalse(book.holdsAll("clients"),
+                       "a phone with no idea what it is missing claimed to hold everything")
+    }
+
+    func testForgettingTakesTheScopeWithTheBook() throws {
+        let scope = BookScope.Taken(collections: ["clients": .init(whole: true, sent: 31, available: nil)],
+                                    omitted: [], takenAt: "2026-09-18T09:00:00.000Z")
+        try book.replace(with: shop(), scope: scope)
+        XCTAssertNotNil(book.scope())
+
+        book.forget()
+
+        // It names the shop's collections and how many records of each this
+        // phone was carrying. Leaving it behind at unpair leaks the shape of a
+        // business even once the records are gone.
+        XCTAssertNil(book.scope())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: book.scopeURL.path))
     }
 
     func testTheCountShownAtPairingCountsRecordsAndNotSettings() {
@@ -119,7 +162,7 @@ final class CompanionBookTests: XCTestCase {
         // The two halves together, which is the whole thesis: the phone holds
         // the book, the phone holds the engine, so the phone can work out a
         // figure with nothing to ask.
-        try book.replace(with: shop())
+        try book.replace(with: shop(), scope: nil)
         let settings = try book.read()["settings"]
         guard case .object(let fields) = settings else { return XCTFail("no settings in the book") }
 

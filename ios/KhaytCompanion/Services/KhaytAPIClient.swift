@@ -59,8 +59,15 @@ final class KhaytAPIClient: ObservableObject {
         try await get("/api/waiting-list", requiresPin: true, as: [WaitingListItem].self)
     }
 
-    /// Fetch the shop's whole book and keep it, so this phone can work without
-    /// asking again.
+    /// Fetch the working set of the shop's book and keep it, so this phone can
+    /// work without asking again.
+    ///
+    /// NOT the whole book. `printLog` is half a real shop's store and
+    /// `printFiles` another quarter, all of it history no companion screen has
+    /// ever shown, so the Mac cuts it down to `BookScope.workingSet` and says in
+    /// the same breath what it left out. The phone keeps that description beside
+    /// the records, because a partial book that reads as a complete one is worse
+    /// than no book at all.
     ///
     /// ── NOT THROUGH `get`, AND THAT IS THE POINT ─────────────────────────
     ///
@@ -90,7 +97,8 @@ final class KhaytAPIClient: ObservableObject {
         guard (200...299).contains(http.statusCode) else {
             throw try decodeAPIError(data, status: http.statusCode)
         }
-        let store = try JSONDecoder().decode([String: JSONValue].self, from: data)
+        let envelope = try JSONDecoder().decode(BookPull.self, from: data)
+        let store = envelope.store
 
         // A book with nothing in it is not a shop, it is a route that answered
         // the wrong thing — and replacing a book this phone already has with
@@ -102,8 +110,19 @@ final class KhaytAPIClient: ObservableObject {
             throw KhaytAPIError.server("The Mac sent an empty book. Nothing was changed on this phone.")
         }
 
-        try book.replace(with: store)
+        try book.replace(with: store, scope: envelope.scope)
         return Self.recordCount(in: store)
+    }
+
+    /// What `GET /api/store` sends: the records, and what was left behind.
+    ///
+    /// `whole` is what a caller asking `?scope=whole` gets and the phone never
+    /// does. It is decoded anyway so that a build of this app pointed at a Mac
+    /// answering that way does not fail to read a perfectly good reply.
+    private struct BookPull: Decodable {
+        let whole: Bool
+        let scope: BookScope.Taken
+        let store: [String: JSONValue]
     }
 
     /// How many records a book holds, counting only what is actually a list of

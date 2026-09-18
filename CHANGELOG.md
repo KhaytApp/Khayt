@@ -985,7 +985,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the app the shop actually has would be worse than one that cannot work
   offline. If the book arrives, the screen says how many records came with it;
   if it does not, it says what that means — that the phone will keep asking for
-  every screen and will empty when the Mac is out of reach.
+  every screen and will empty when the Mac is out of reach. When history has
+  stayed behind on the Mac it says that too, so the phone never looks like it
+  holds a shop it does not.
 
   Unpairing forgets the book, and the `.prev` rollback copy with it. That copy
   is the same client list, one write behind.
@@ -998,7 +1000,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   else, and it cannot answer a question nobody thought to cache in advance.
 
   Now the phone can hold the book itself, in the shape the desktop keeps it on
-  disk. `StoreWriter` moved into `KhaytCore` so that the phone writes through
+  disk — a working set of it, not all of it, and it keeps beside the records a
+  description of what it was NOT sent. That part is not bookkeeping: a partial
+  book that reads as a complete one is worse than no book, because a screen
+  would total the two hundred orders it has and report a three-year-old shop as
+  having done two hundred. A phone that does not know what it is missing answers
+  "no" to "may I total this", rather than guessing. `StoreWriter` moved into `KhaytCore` so that the phone writes through
   the Mac's writer rather than a second one: the read happens inside the write,
   so a second caller cannot put back what it saw before the first change; the
   swap is atomic with an fsync before it; the old copy rolls to `.prev`, which
@@ -1010,15 +1017,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Unpairing removes the rollback copy as well as the book. A `.prev` left behind
   holds the same client list as the file that was deleted.
 
-- **(Mac) `GET /api/store` — the whole book, for a device that keeps one.**
-  Every other LAN route answers a question. This one hands over the book, so a
-  phone can stop asking. The shop's secrets are masked by
-  `KhaytCloudOutbox.forCloud` — the same rule the cloud push uses, so a device
-  on the LAN is trusted with exactly what the cloud is trusted with and no more.
-  Customers are not masked, because they are not a secret, they are the book:
-  which is why the owner PIN gates it, lockout included. A failure answers 500
-  rather than an empty book, since a phone that accepted `{}` would replace a
-  shop it already had with nothing.
+- **(Mac) `GET /api/store` — enough of the book that a phone can stop asking.**
+  Every other LAN route answers a question, which assumes the asker is a screen
+  with a live connection. This one hands over records.
+
+  Not all of them. `printLog` is about half of a real shop's store and
+  `printFiles` another quarter, and none of that history has ever been on a
+  companion screen — so what travels is a working set: the settings, every
+  **unfinished** order whatever its age, the newest 200 finished ones, and the
+  clients, spools, machines and waiting list. A job stuck in QC for two months
+  is still in the shop, and a phone that dropped it for being old would hide the
+  very record somebody is chasing. `?scope=whole` still returns everything, for
+  a restore or a person with curl.
+
+  The reply is an envelope rather than a bare store, because the records alone
+  cannot say what was left out, and `omitted` names the withheld collections
+  instead of leaving them to be inferred from absence.
+
+  Secrets are masked by `KhaytCloudOutbox.forCloud` — the same rule the cloud
+  push uses, so a device on the LAN is trusted with exactly what the cloud is
+  trusted with and no more. Customers are not masked, because they are not a
+  secret, they are the book: which is why the owner PIN gates it, lockout
+  included. A failure answers 500 rather than an empty book, since a phone that
+  accepted `{}` would replace a shop it already had with nothing.
 
 - **(iOS) The phone runs the shop's own business logic.** `KhaytCore` — the
   package the Mac app already computes every figure through — now builds for
