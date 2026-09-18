@@ -1,12 +1,50 @@
 # iOS Companion (v2)
 
-Native **LAN-only** client. The desktop app remains the source of truth (`khayt-store.json`).
+Native iPhone client. The desktop remains the **book of record** — `khayt-store.json`
+lives there, and that is the copy a shop backs up and bills from — but the phone is
+no longer a live view of it.
+
+## How it actually works now
+
+Three things changed the shape of this app, and anything written before them is
+misleading:
+
+1. **The phone runs the shop's own business logic.** `mac/KhaytCore` builds for
+   iOS and the companion links it, so the tax engine, pricing and money rules are
+   the same code the Mac computes with — running in JavaScriptCore on the phone,
+   with nothing bundled and no second implementation. See the `KhaytCore` section
+   of [CLAUDE.md](../CLAUDE.md).
+
+2. **The phone keeps a working set of the shop's records.** Not the whole book:
+   `printLog` is about half of a real store and `printFiles` another quarter, all
+   of it history no companion screen has ever shown. What travels is
+   `BookScope.workingSet` — the settings, every *unfinished* order whatever its
+   age, the newest 200 finished ones, and the clients, spools, machines and
+   waiting list. The phone reads from that, so the screens work with the Mac
+   switched off.
+
+   It is **partial, and it knows it.** A scope file beside the book records which
+   collections are complete and which are windowed, so a screen can say "200 of
+   3,140" rather than reporting a three-year-old shop as having done 200. A phone
+   that does not know what it is missing answers "no" to "may I total this".
+
+3. **The phone finds the Mac by itself.** The Mac advertises `_khayt._tcp` under
+   the shop's own name, so pairing is a list to tap rather than an IP to type.
+   Typing an address by hand is still there, demoted, because the Electron
+   desktop does not advertise and some networks block Bonjour.
+
+**The two desktops do not serve the same routes.** `lib/lan-server.js` (Electron)
+serves the full surface. The native Mac's `LanServer.swift` serves `/api/status`,
+`/api/queue`, `/api/store` and the customer-facing intake — and nothing else. Five
+of the companion's screens have no endpoint on it at all, which is why they read
+from the book rather than the wire. [LAN_API.md](./LAN_API.md) marks which is
+which; do not assume a route exists on both.
 
 ## Feature set
 
 | Area | Features |
 |------|----------|
-| **Pairing** | 4-step wizard (IP, port, LAN PIN, test) |
+| **Pairing** | Pick the shop off the Wi-Fi (Bonjour `_khayt._tcp`), then the owner PIN. Manual address entry kept for desktops that do not advertise |
 | **Home** | Queue stats, kanban strip, completed today, low-stock & overdue alerts, quick actions, order preview |
 | **Orders** | Active queue + filters (status, overdue) + recent history; detail sheet; advance / set status; **assign machine**; haptics |
 | **New order** | Create an order from the app (client, item, material, qty, due date) — posts to the queue |
@@ -23,6 +61,17 @@ Native **LAN-only** client. The desktop app remains the source of truth (`khayt-
 | **Localization** | English + Arabic strings, RTL layout for Arabic |
 
 ## LAN API
+
+Endpoints, and **which desktop serves them** — see [LAN_API.md](./LAN_API.md) for
+the full reference.
+
+| Feature | Endpoint | Native Mac | Electron |
+|---------|----------|:---:|:---:|
+| The shop's records, as a working set | `GET /api/store` | ✅ | — |
+| Discovery | `_khayt._tcp` (Bonjour) | ✅ | — |
+| Status | `GET /api/status` | ✅ | ✅ |
+| Queue | `GET /api/queue` | ✅ | ✅ |
+| Orders, inventory, clients, machines, waiting list | see below | — | ✅ |
 
 | Feature | Endpoint |
 |---------|----------|
@@ -64,6 +113,16 @@ Any individual with an **iPhone + blank NTAG tags** can write tags from the app.
 ## Out of scope (v2)
 
 Calculator, ZATCA, invoicing, full desktop settings, cloud sync, remote push server.
+
+**No longer out of scope, and once was:** a local business database. The phone
+holds one — see "How it actually works now" above. Anything in this repo that
+still describes the companion as having no local store, or as a live view of the
+desktop, predates that and is wrong.
+
+**Still true:** the phone cannot delete records, and does not write offline. A
+deletion needs a tombstone and nothing on the phone writes one, so deleting stays
+a desktop action. Offline writes are a protocol question rather than a missing
+button — see `BookReader.pendingChanges` and `POST /api/store/deltas`.
 
 ## UI redesign
 
