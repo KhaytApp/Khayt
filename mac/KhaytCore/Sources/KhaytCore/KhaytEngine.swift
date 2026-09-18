@@ -603,7 +603,6 @@ public actor KhaytEngine {
         // What a Bambu says it is doing. The MQTT under it is Swift's —
         // `lib/bambu.js` is Node-only from its first line.
         // What a shop must bill to cover what it pays anyway.
-        "break-even",
         // What reached and left the bank, as opposed to what was earned.
         // Twelve months of revenue per print-hour and material cost per gram.
         "cost-trends",
@@ -4839,20 +4838,40 @@ public actor KhaytEngine {
                           since: String, month: String,
                           settings: [String: JSONValue], clients: [JSONValue])
         throws -> BreakEven {
-        try runtime.call2(#"""
+        // `order-money` and `calculator-cost` still live in JavaScript, and the
+        // two functions the rule takes cannot cross the bridge — so each job's
+        // revenue and each job's parts cost are worked out once, in order, and
+        // handed across. The rule itself is `KhaytCore.BreakEven` now.
+        let figures: [[Double]] = try runtime.call2(#"""
         (function () {
-          var ctx = { settings: ARG4, clients: ARG5 };
-          return globalThis.KhaytBreakEven.breakEven({
-            fixedCosts: ARG0, completed: ARG1, since: ARG2, month: ARG3,
-          }, {
-            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
-            partCostOf: function (p) { return globalThis.KhaytCalculatorCost.partTotalCost(p, ctx); },
-          });
+          var ctx = { settings: ARG1, clients: ARG2 };
+          var revenue = [], cost = [];
+          for (var i = 0; i < ARG0.length; i++) {
+            var o = ARG0[i];
+            var r = Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx));
+            revenue.push(isFinite(r) ? r : 0);
+            var parts = (o && Array.isArray(o.parts)) ? o.parts : [];
+            var sum = 0;
+            for (var j = 0; j < parts.length; j++) {
+              var c = Number(globalThis.KhaytCalculatorCost.partTotalCost(parts[j], ctx));
+              if (isFinite(c)) sum += c;
+            }
+            cost.push(sum);
+          }
+          return [revenue, cost];
         })()
-        """#,
-                          [.array(fixedCosts), .array(completed), .string(since),
-                           .string(month), .object(settings), .array(clients)],
-                          as: BreakEven.self)
+        """#, [.array(completed), .object(settings), .array(clients)], as: [[Double]].self)
+
+        let report = KhaytCore.BreakEven.report(
+            fixedCosts: fixedCosts, completed: completed,
+            revenues: figures.first ?? [], partCosts: figures.count > 1 ? figures[1] : [],
+            since: since, month: month)
+        return BreakEven(
+            totalFixed: report.totalFixed, breakEvenRevenue: report.breakEvenRevenue,
+            marginPct: report.marginPct, avgRevenuePerJob: report.avgRevenuePerJob,
+            jobsCounted: report.jobsCounted, billedThisMonth: report.billedThisMonth,
+            surplus: report.surplus, progressPct: report.progressPct,
+            costs: report.costs.map { BreakEven.FixedCost(name: $0.name, amount: $0.amount) })
     }
 
     /// Where this move would reach outside the shop's own book.

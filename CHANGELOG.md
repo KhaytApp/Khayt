@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) What the shop has to bill to break even is worked out natively.** The
+  figure that says how much a month has to carry before the rent and the
+  accountant are paid for now runs in the app. It stays a floor: a window with
+  no finished work in it has no answer rather than a margin of nought, and a
+  window where the work cost more than it earned has no target rather than a
+  negative one.
+
 - **(Mac) Money in and money out is counted natively.** The cash-flow chart
   runs in the app now, on the day money actually moved. A deposit still moves
   only the share it paid rather than the whole job's revenue, voided jobs and
