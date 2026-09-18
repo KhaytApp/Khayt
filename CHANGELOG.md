@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Which customers are worth keeping is worked out natively.** Lifetime
+  value, how often each comes back, and how badly it would hurt to lose the
+  biggest one all run in the app now. A quote is still not lifetime value — a
+  customer who asks for ten and buys nothing does not top the table — and a
+  name that has never bought anything is still not called quiet, because it has
+  not gone anywhere.
+
 - **(Mac) How long a job takes is worked out natively.** The cycle-time chart
   and the per-product lead times run in the app now, in the shop's own
   calendar. A month that finished nothing still has no answer rather than a

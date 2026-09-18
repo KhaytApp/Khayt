@@ -623,7 +623,6 @@ public actor KhaytEngine {
         "public-quote",
         "gcode-parse",
         // Which customers are worth keeping.
-        "client-value",
         // Whether the shop can take another job, and when it would start.
         "capacity",
         // How many quotes turn into work, and how much of the money does.
@@ -4269,30 +4268,61 @@ public actor KhaytEngine {
                             now: Date, quietDays: Int, limit: Int,
                             settings: [String: JSONValue], language: String)
         throws -> ClientValue {
-        try runtime.call2(#"""
+        // Two things still live in JavaScript: `order-money` says what a job
+        // earned, and `content-languages` decides WHICH of a customer's names
+        // this reader gets. Both are worked out once, in order, and handed
+        // across; the rule itself is `KhaytCore.ClientValue`.
+        struct Resolved: Decodable { let revenues: [Double]; let names: [String] }
+        let resolved: Resolved = try runtime.call2(#"""
         (function () {
-          var ctx = { settings: ARG5, clients: ARG0 };
-          return globalThis.KhaytClientValue.clientValue({
-            clients: ARG0, orders: ARG1, now: ARG2, quietDays: ARG3, limit: ARG4,
-          }, {
-            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
-            countsForBusiness: function (o) {
-              return globalThis.KhaytBusinessScope
-                ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
-            },
-            // The shop's own text may be written in more than one language.
-            nameOf: function (c) {
-              return globalThis.KhaytContentLanguages.read(c, 'name', ARG6, ARG5)
-                || (c && (c.name || c.company)) || '';
-            },
-          });
+          var ctx = { settings: ARG2, clients: ARG0 };
+          return {
+            revenues: ARG1.map(function (o) {
+              var n = Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx));
+              return isFinite(n) ? n : 0;
+            }),
+            names: ARG0.map(function (c) {
+              return String(globalThis.KhaytContentLanguages.read(c, 'name', ARG3, ARG2)
+                || (c && (c.name || c.company)) || '');
+            }),
+          };
         })()
-        """#,
-                          [.array(clients), .array(orders),
-                           .number(now.timeIntervalSince1970 * 1000),
-                           .number(Double(quietDays)), .number(Double(limit)),
-                           .object(settings), .string(language)],
-                          as: ClientValue.self)
+        """#, [.array(clients), .array(orders), .object(settings), .string(language)],
+                          as: Resolved.self)
+
+        var nameByIndex: [Int: String] = [:]
+        for (i, name) in resolved.names.enumerated() { nameByIndex[i] = name }
+        // Matched by IDENTITY of the row rather than by id, because two rows
+        // can carry the same id and the original names each from its own.
+        var nameFor: [String: String] = [:]
+        for (i, client) in clients.enumerated() {
+            guard case .object(let c) = client, let id = c["id"],
+                  JSSemantics.truthy(id) else { continue }
+            let key = JSSemantics.text(id)
+            if nameFor[key] == nil { nameFor[key] = nameByIndex[i] ?? "" }
+        }
+
+        let report = KhaytCore.ClientValue.report(
+            clients: clients, orders: orders, revenues: resolved.revenues,
+            now: now.timeIntervalSince1970 * 1000,
+            quietDays: Double(quietDays), limit: limit,
+            countsForBusiness: { BusinessScope.countsForBusiness($0) },
+            nameOf: { client in
+                guard case .object(let c) = client, let id = c["id"] else { return "" }
+                return nameFor[JSSemantics.text(id)] ?? ""
+            })
+
+        return ClientValue(
+            rows: report.rows.map {
+                ClientValue.Row(clientId: $0.clientId, name: $0.name, value: $0.value,
+                                jobs: $0.jobs, averageJob: $0.averageJob,
+                                daysSince: $0.daysSince, quiet: $0.quiet,
+                                shareOfRevenue: $0.shareOfRevenue, inFlight: $0.inFlight)
+            },
+            totals: ClientValue.Totals(earned: report.totals.earned,
+                                       clients: report.totals.clients,
+                                       topShare: report.totals.topShare,
+                                       quiet: report.totals.quiet))
     }
 
     // MARK: - Cash flow
