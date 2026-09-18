@@ -30,6 +30,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   filled in, and VAT on an inclusive price is the tax inside it rather than
   zero.
 
+- **(Mac) The headline figures are added up natively.** Revenue, margin,
+  average order value, cash outstanding and the on-time share now run in the
+  app. The reading that is easy to get wrong stays right: a period in which no
+  job had a due date has no on-time figure at all, rather than a score of nought
+  per cent — a shop that made no promises did not break any.
+
 - **(Mac) What a model's licence permits is worked out natively.** The library
   reads a downloaded model's licence in the app now, and keeps the decision
   that makes it safe: a model nobody has recorded a licence for is reported as

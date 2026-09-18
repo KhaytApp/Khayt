@@ -207,6 +207,16 @@ public struct Kpis: Decodable, Sendable {
     public let onTimePct: Double?
     public let onTimeTotal: Int
     public let outstanding: Double
+
+    public init(orderCount: Int, completedCount: Int, revenue: Double, cost: Double,
+                grossProfit: Double, grossMargin: Double, avgOrderValue: Double,
+                onTimePct: Double?, onTimeTotal: Int, outstanding: Double) {
+        self.orderCount = orderCount; self.completedCount = completedCount
+        self.revenue = revenue; self.cost = cost
+        self.grossProfit = grossProfit; self.grossMargin = grossMargin
+        self.avgOrderValue = avgOrderValue; self.onTimePct = onTimePct
+        self.onTimeTotal = onTimeTotal; self.outstanding = outstanding
+    }
 }
 
 /// Whether a job may move to a stage, as `lib/order-status.js` decides it.
