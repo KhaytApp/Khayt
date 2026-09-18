@@ -76,7 +76,6 @@ public actor KhaytEngine {
         // same roll twice and the half that knew the material was not the half
         // that knew when it was dried. `spool-edit.js` records it on the spool
         // now, and this module answers about the spool itself.
-        "filament-dryness",
         // What one order is worth and what is owed on it, and which orders
         // count towards a period. Both lifted out of the renderer so this app
         // could use the same rules rather than invent a second opinion about
@@ -1953,6 +1952,10 @@ public actor KhaytEngine {
     /// of being wet on the day this shipped would be ignored by the end of the
     /// week.
     public struct Dryness: Decodable, Sendable {
+        public init(state: String, daysSince: Double?, intervalDays: Double, pct: Double) {
+            self.state = state; self.daysSince = daysSince
+            self.intervalDays = intervalDays; self.pct = pct
+        }
         public let state: String
         public let daysSince: Double?
         public let intervalDays: Double
@@ -1960,17 +1963,20 @@ public actor KhaytEngine {
     }
 
     public func dryness(spools: [JSONValue], now: Date) throws -> [String: Dryness] {
-        try runtime.call2("""
-            (function (rows, now) {
-              const out = {};
-              for (const s of rows || []) {
-                if (s && s.id != null) out[String(s.id)] = KhaytFilamentDryness.dryStatus(s, now);
-              }
-              return out;
-            })(ARG0, ARG1)
-            """,
-            [.array(spools), .number(now.timeIntervalSince1970 * 1000)],
-            as: [String: Dryness].self)
+        // Keyed by `String(s.id)` for a spool whose `id` is not null — the
+        // loop's own guard, kept because a spool with no id would otherwise
+        // key the map under "undefined" and collapse every such row into one.
+        var out: [String: Dryness] = [:]
+        for row in spools {
+            guard case .object(let s) = row, let id = s["id"], id != .null else { continue }
+            let status = FilamentDryness.status(of: row,
+                                                now: now.timeIntervalSince1970 * 1000)
+            out[JSSemantics.text(id)] = Dryness(state: status.state,
+                                                daysSince: status.daysSince,
+                                                intervalDays: status.intervalDays,
+                                                pct: status.pct)
+        }
+        return out
     }
 
     /// A printable sheet of QR labels, in Swift — `Labels`.

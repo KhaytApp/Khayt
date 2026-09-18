@@ -6,6 +6,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) When a spool needs drying again is worked out natively.** The shelf's
+  dryness reminder runs in the app now, and still reads a supplier's own label
+  the same way — "PA6-CF" is a nylon and needs drying every day, "PC-ABS" is an
+  ABS and does not, and a spool nobody has recorded a drying for is left alone
+  rather than being reported as overdue.
+
 - **(Mac) What each machine cost to keep running is worked out natively.** The
   maintenance chart now runs in the app, and keeps the two decisions that make
   it honest: the year comes off the front of the date rather than through a
