@@ -110,6 +110,44 @@ Active kanban orders (`pending`, `printing`, `post`, `qc`). **Requires owner PIN
 ]
 ```
 
+### `GET /api/store`
+
+The shop's whole book, once, for a client that keeps its own copy.
+**Requires owner PIN.**
+
+> **Served by the native Mac app only.** `lib/lan-server.js` does not implement
+> this route. Every other endpoint on this page answers a *question* — what is in
+> the queue, what is on the machines — which assumes the asker is a screen with a
+> live connection. This one hands over the book so the asker can stop asking, and
+> it exists for the iOS companion's local store.
+
+**Secrets are masked.** The body is `KhaytCloudOutbox.forCloud(store)` — the same
+rule the cloud push uses — so every path named in `lib/store-secret-paths.js`
+(printer access codes, API keys, bot tokens, refresh tokens) arrives as
+`"__KHAYT_MASKED__"`. A device on the LAN is trusted with exactly what the cloud
+is trusted with, and no more.
+
+**Customer data is NOT masked**, because it is not a secret — it is the book. The
+response carries the shop's clients, orders and prices in full, which is why the
+owner PIN gates it and why the PIN lockout applies.
+
+**Response 200** — the store object, collections as named by
+`KhaytStoreValidate.ARRAY_COLLECTIONS`:
+
+```json
+{
+  "settings": { "shopName": "Ward", "telegram": { "botToken": "__KHAYT_MASKED__" } },
+  "printLog": [ { "id": "ord-123", "client": "Acme Co", "status": "printing" } ],
+  "clients": [ { "id": "c-1", "name": "Sara" } ],
+  "inventory": [],
+  "machines": [ { "id": "m1", "printerApi": { "accessCode": "__KHAYT_MASKED__" } } ]
+}
+```
+
+**Response 500** — `{"error":"The book could not be prepared to send"}`. Deliberately
+not an empty book: a client that accepted `{}` would replace a shop it already had
+with nothing.
+
 ### `GET /api/orders`
 
 Order log slice. **Requires owner PIN.**

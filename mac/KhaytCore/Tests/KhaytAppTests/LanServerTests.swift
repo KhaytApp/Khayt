@@ -224,6 +224,59 @@ struct LanServerTests {
         #expect(wrong.headers["x-content-type-options"] == "nosniff")
     }
 
+    @Test("the whole book goes to a phone that keeps one, with the shop's secrets masked")
+    func wholeBookBehindPin() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+
+        // A shop with a printer's access code and a bot token in it — two of the
+        // paths `lib/store-secret-paths.js` names. This app reads the store from
+        // disk, so unlike the renderer it is genuinely holding them.
+        bench.book.value["settings"] = .object([
+            "shopName": .string("Ward"),
+            "telegram": .object(["botToken": .string("__enc__BOTSECRET")]),
+        ])
+        bench.book.value["machines"] = .array([.object([
+            "id": .string("m1"),
+            "name": .string("X1C"),
+            "printerApi": .object(["accessCode": .string("__enc__12345678")]),
+        ])])
+
+        let none = try await bench.get("/api/store")
+        #expect(none.status == 401, "the shop's whole book must never be open on the LAN")
+
+        let reply = try await bench.get("/api/store", headers: ["x-khayt-pin": "2468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+
+        // The body is `forCloud`'s answer, not a shape assembled here — the same
+        // rule the cloud push uses, so a device on the LAN is trusted with
+        // exactly what the cloud is trusted with and no more.
+        let expected = try await bench.engine.storeForCloud(bench.book.value)
+        let sent = try #require(try? JSONDecoder().decode([String: JSONValue].self,
+                                                          from: Data(reply.text.utf8)))
+        #expect(sent == expected)
+
+        // Said again as a fact rather than as a comparison, because the
+        // comparison would still pass if `forCloud` stopped masking.
+        guard case .object(let settings)? = sent["settings"],
+              case .object(let telegram)? = settings["telegram"],
+              case .array(let machines)? = sent["machines"],
+              case .object(let machine) = machines[0],
+              case .object(let api)? = machine["printerApi"] else {
+            Issue.record("the book did not arrive in the shape it was sent in")
+            return
+        }
+        #expect(telegram["botToken"] == .string("__KHAYT_MASKED__"),
+                "a shop's bot token went out over the LAN")
+        #expect(api["accessCode"] == .string("__KHAYT_MASKED__"),
+                "a printer's access code went out over the LAN")
+        #expect(settings["shopName"] == .string("Ward"), "masking took something that was not a secret")
+
+        // And the thing that is NOT masked, which is why the PIN is the gate:
+        // customers are not secrets, they are the book.
+        #expect(sent["printLog"] != nil, "the phone was sent a book with no orders in it")
+    }
+
     @Test("the live queue page is the module's HTML, with the clock it was given")
     func queuePageIsTheModules() async throws {
         let bench = try await Bench()

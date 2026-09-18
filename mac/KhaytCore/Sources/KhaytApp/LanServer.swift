@@ -397,6 +397,41 @@ final class LanServer {
             let body = (try? await engine.lanQueueBody(store: store)) ?? "[]"
             return .json(200, body)
 
+        // ── THE WHOLE BOOK, FOR A DEVICE THAT KEEPS ONE ───────────────────
+        //
+        // Every other route here answers a QUESTION: what is in the queue, what
+        // is on the machines. That shape assumes the asker is a screen with a
+        // connection, and it is why the phone empties the moment this Mac is
+        // out of reach — a cached reply to `/api/queue` can show the queue and
+        // nothing else, and it cannot answer a question nobody thought to ask
+        // in advance.
+        //
+        // This hands over the book itself, once, so the phone can stop asking.
+        // What it does with it afterwards is arithmetic it does locally,
+        // through the same engine this app computes with.
+        //
+        // MASKED, and not as a courtesy. This app reads the store from DISK, so
+        // what it is holding includes the real `__enc__` credentials — a
+        // printer's password, a shop's cloud token. The renderer has never had
+        // those and has always pushed masks. `forCloud` is the rule that draws
+        // that line and it is `lib/cloud-outbox.js`'s, not a second one written
+        // here for the phone: a device on the LAN is exactly as entitled to a
+        // shop's secrets as the cloud is, which is to say not at all.
+        //
+        // Behind the same PIN as the queue. Anyone who can read this can read
+        // the shop's whole client list, so it is the owner PIN that gates it,
+        // and `pinGate` is what does the constant-time compare and the lockout.
+        case ("/api/store", true):
+            if let refused = await pinGate(request) { return refused }
+            guard let masked = try? await engine.storeForCloud(host.store()),
+                  let body = try? String(decoding: JSONEncoder().encode(JSONValue.object(masked)),
+                                         as: UTF8.self) else {
+                // Deliberately not an empty book. A phone that took `{}` for an
+                // answer would replace a shop it already had with nothing.
+                return .json(500, #"{"error":"The book could not be prepared to send"}"#)
+            }
+            return .json(200, body)
+
         case ("", true), ("/", true):
             if case .object(let settings)? = host.store()["settings"], settings["onlineEnabled"] == .bool(true) {
                 return .redirect("/intake")

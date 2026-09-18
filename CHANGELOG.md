@@ -977,6 +977,36 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   machine is one photo, and the empty state now takes you to the finished jobs
   rather than just telling you about them.
 
+- **(iOS) The phone keeps the shop's book, and writes it the way the Mac
+  does.** The companion has had a cache of the desktop's *answers* — one file
+  per endpoint, read-only by design, writes refused rather than queued. That is
+  the right shape only while the desktop is the one thing that can compute
+  anything. A screen fed by `/api/queue`'s reply can show the queue and nothing
+  else, and it cannot answer a question nobody thought to cache in advance.
+
+  Now the phone can hold the book itself, in the shape the desktop keeps it on
+  disk. `StoreWriter` moved into `KhaytCore` so that the phone writes through
+  the Mac's writer rather than a second one: the read happens inside the write,
+  so a second caller cannot put back what it saw before the first change; the
+  swap is atomic with an fsync before it; the old copy rolls to `.prev`, which
+  is the one generation of rollback a corrupt book is recovered from; and the
+  size ceiling is the one every backup is built to hold. A phone writing with
+  `Data.write(to:)` would have had to learn all four the same way they were
+  learned the first time.
+
+  Unpairing removes the rollback copy as well as the book. A `.prev` left behind
+  holds the same client list as the file that was deleted.
+
+- **(Mac) `GET /api/store` — the whole book, for a device that keeps one.**
+  Every other LAN route answers a question. This one hands over the book, so a
+  phone can stop asking. The shop's secrets are masked by
+  `KhaytCloudOutbox.forCloud` — the same rule the cloud push uses, so a device
+  on the LAN is trusted with exactly what the cloud is trusted with and no more.
+  Customers are not masked, because they are not a secret, they are the book:
+  which is why the owner PIN gates it, lockout included. A failure answers 500
+  rather than an empty book, since a phone that accepted `{}` would replace a
+  shop it already had with nothing.
+
 - **(iOS) The phone runs the shop's own business logic.** `KhaytCore` — the
   package the Mac app already computes every figure through — now builds for
   iOS too, and the companion links it. That is one line in the manifest and no
