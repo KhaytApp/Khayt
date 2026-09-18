@@ -346,6 +346,19 @@ struct ShellSidebar: View {
     /// 150pt and a wrapped sentence here pushes the book's name off the bottom.
     private var notices: some View {
         VStack(alignment: .leading, spacing: 3) {
+            if shop.productionPaused {
+                // THE ONE NOTICE THAT IS ALSO A DEAD END. The shared rule
+                // refuses a move to printing while this is set, and this app
+                // used to translate that refusal without ever saying the floor
+                // was stopped or offering a way to start it again. Tapping it
+                // resumes.
+                noticeLine(shop.pauseReason.isEmpty
+                             ? shop.words.callIt("prod.paused_banner")
+                             : shop.words.callIt("prod.paused_banner") + " — " + shop.pauseReason,
+                           "pause.circle", Role.lateOnNavy,
+                           help: shop.words.callIt("prod.resume"))
+                    .onTapGesture { shop.resumeProduction() }
+            }
             if !shop.skipped.isEmpty {
                 // The app DROPPED data. Whatever else is wrong, a shop should
                 // not have to find that out by noticing something missing.

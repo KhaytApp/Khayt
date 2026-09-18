@@ -26,6 +26,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the other app to say so. Settings → Preferences now offers the two modes
   Khayt offers, and says what Simple takes away and that nothing is deleted.
 
+- **(Mac) Production can be paused and resumed here, and says so when it is.**
+  The shared rule has always refused to start a print while production is
+  paused, and this app could only report that refusal — so a shop that paused
+  in the other app arrived to find every start blocked, with nothing on screen
+  saying why and no way out. There is a banner on the board now, and ⌘⇧. stops
+  the floor and starts it again.
+
 - **(Mac) Where a model came from can be recorded, not just read.** The
   library's inspector has always shown a model's source and licence, and this
   Mac had no way to set either — so on a real book the panel was blank on every

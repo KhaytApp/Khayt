@@ -7887,6 +7887,70 @@ final class Shop {
         }
     }
 
+    // MARK: - Stopping the floor
+
+    /// Whether the shop has stopped starting new prints.
+    ///
+    /// ── WHY THIS HAD TO EXIST ─────────────────────────────────────────────
+    ///
+    /// `lib/order-status.js` REFUSES a move to printing while this is set, and
+    /// this app already translates that refusal — "Production is paused —
+    /// resume before starting new prints." So a shop that paused production in
+    /// the other app arrived here to find every start refused, with no way to
+    /// resume and nothing on screen saying production was paused at all. That
+    /// is worse than a missing feature: it is a dead end that looks like a bug.
+    var productionPaused: Bool {
+        guard case .object(let s) = settingsValue else { return false }
+        return Shop.plainBool(s["productionPaused"]) ?? false
+    }
+
+    /// Why, as the shop wrote it. Empty is allowed on purpose — a shop that
+    /// just needs the floor stopped should not have to invent a reason.
+    var pauseReason: String {
+        guard case .object(let s) = settingsValue else { return "" }
+        return Shop.plainString(s["pauseReason"]) ?? ""
+    }
+
+    /// When it was paused, as stored. Read for the banner, not for arithmetic.
+    var pausedAt: String {
+        guard case .object(let s) = settingsValue else { return "" }
+        return Shop.plainString(s["pausedAt"]) ?? ""
+    }
+
+    /// The reason box, open. Nil when nobody is being asked.
+    var pausingProduction = false
+
+    func pauseProduction(reason: String) {
+        writeProblem = nil
+        guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
+        let reason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        // All three fields, the other app's own shape — `productionPaused`,
+        // `pauseReason`, `pausedAt`. A pause that set only the flag would leave
+        // a stale reason from the last one on the banner.
+        write { root in
+            var settings = Self.settings(root)
+            settings["productionPaused"] = .bool(true)
+            settings["pauseReason"] = .string(reason)
+            settings["pausedAt"] = .string(ISO8601DateFormatter().string(from: Date()))
+            root["settings"] = .object(settings)
+        }
+    }
+
+    func resumeProduction() {
+        writeProblem = nil
+        guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
+        write { root in
+            var settings = Self.settings(root)
+            settings["productionPaused"] = .bool(false)
+            settings["pauseReason"] = .string("")
+            // NULL, not absent. The other app writes `pausedAt = null`, and a
+            // field removed entirely is one a merge can resurrect from an older
+            // copy on another machine.
+            settings["pausedAt"] = .null
+            root["settings"] = .object(settings)
+        }
+    }
+
     // MARK: - What is likely to go wrong with this print
 
     /// The overhang report for each model, keyed by the model's id.
