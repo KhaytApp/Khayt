@@ -33,7 +33,6 @@ public actor KhaytEngine {
         // JavaScriptCore there is no require — it falls back to the global,
         // which only exists once `tax` has run. `tax` is the first module in
         // this list, so both are satisfied.
-        "accounting-rows",
         "accounting-export",
         "pricing",
         "payment-plan",
@@ -1075,12 +1074,20 @@ public actor KhaytEngine {
     public func invoiceCsv(_ orders: [JSONValue], settings: [String: JSONValue],
                            clients: [JSONValue], format: String,
                            from: String = "", to: String = "") throws -> String {
-        try runtime.call2(
-            "KhaytAccountingExport.buildInvoiceCsv("
-            + "KhaytAccountingRows.ordersToInvoiceRows(ARG0, {settings: ARG1, clients: ARG2}),"
-            + " {format: ARG3, from: ARG4 || undefined, to: ARG5 || undefined})",
-            [.array(orders), .object(settings), .array(clients),
-             .string(format), .string(from), .string(to)],
+        // The PROFILE is still `lib/tax.js` — eight bundled modules read it, so
+        // it has not moved — but which orders are invoices, and whose name goes
+        // on each row, is `KhaytCore.AccountingRows` now.
+        let profile: JSONValue = (try? runtime.call2(
+            "KhaytTax.profileFromSettings(ARG0)", [.object(settings)], as: JSONValue.self)) ?? .null
+        let rows = AccountingRows.invoiceRows(orders: orders, settings: settings,
+                                              clients: clients,
+                                              tax: AccountingRows.tax(profile: profile))
+        // `buildInvoiceCsv` is a formatter and stays where it is: it lays out
+        // four accounting packages' column orders, which is a table, not a rule.
+        return try runtime.call2(
+            "KhaytAccountingExport.buildInvoiceCsv(ARG0,"
+            + " {format: ARG1, from: ARG2 || undefined, to: ARG3 || undefined})",
+            [.array(rows), .string(format), .string(from), .string(to)],
             as: String.self)
     }
 

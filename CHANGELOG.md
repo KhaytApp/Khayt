@@ -22,6 +22,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   explicit REJECTED counts as a rejection, so a response naming no status at
   all is not read as one.
 
+- **(Mac) The accountant's invoice file decides what it says natively.** Which
+  orders are invoices at all, whose name goes on each row, and the VAT rate and
+  mode that go with them now run in the app. The four things that used to be
+  wrong when an app called the formatter directly stay right: a quote is not an
+  invoice, an order with no price is not one either, the customer's name is
+  filled in, and VAT on an inclusive price is the tax inside it rather than
+  zero.
+
 - **(Mac) What a model's licence permits is worked out natively.** The library
   reads a downloaded model's licence in the app now, and keeps the decision
   that makes it safe: a model nobody has recorded a licence for is reported as
