@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 
 @MainActor
 final class KhaytAPIClient: ObservableObject {
@@ -56,6 +57,65 @@ final class KhaytAPIClient: ObservableObject {
 
     func fetchWaitingList() async throws -> [WaitingListItem] {
         try await get("/api/waiting-list", requiresPin: true, as: [WaitingListItem].self)
+    }
+
+    /// Fetch the shop's whole book and keep it, so this phone can work without
+    /// asking again.
+    ///
+    /// ── NOT THROUGH `get`, AND THAT IS THE POINT ─────────────────────────
+    ///
+    /// Every other call here ends in `CompanionCache.store`, which is right for
+    /// an answer to a question — a screenful of queue, kept so the screen is not
+    /// blank next time. The book is not an answer to a question. Putting it
+    /// through the same path would leave a second copy of the shop's whole
+    /// client list on the phone, in a different file, with its own lifetime and
+    /// its own thing to remember to delete at unpair. One copy, in the book.
+    ///
+    /// It also does not fall back to the cache on failure, for a harder reason:
+    /// the fallback in `get` exists so a screen can show something slightly old
+    /// rather than nothing. A pull that quietly "succeeded" with an older book
+    /// would be telling this phone it is up to date with a Mac it never reached,
+    /// and everything downstream — what to send, what to keep — measures against
+    /// that. A pull either happened or it did not.
+    ///
+    /// Returns how many records arrived, so the screen that asked can say
+    /// something true rather than "done".
+    @discardableResult
+    func pullBook(into book: CompanionBook) async throws -> Int {
+        let (data, response) = try await request(path: "/api/store", method: "GET",
+                                                 body: nil, requiresPin: true)
+        guard let http = response as? HTTPURLResponse else {
+            throw KhaytAPIError.transport(URLError(.badServerResponse))
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw try decodeAPIError(data, status: http.statusCode)
+        }
+        let store = try JSONDecoder().decode([String: JSONValue].self, from: data)
+
+        // A book with nothing in it is not a shop, it is a route that answered
+        // the wrong thing — and replacing a book this phone already has with
+        // that would lose everything on it. The Mac answers 500 rather than
+        // `{}` for the same reason; this is the other half of that agreement,
+        // because the phone must not depend on the Mac being the version that
+        // keeps it.
+        guard !store.isEmpty else {
+            throw KhaytAPIError.server("The Mac sent an empty book. Nothing was changed on this phone.")
+        }
+
+        try book.replace(with: store)
+        return Self.recordCount(in: store)
+    }
+
+    /// How many records a book holds, counting only what is actually a list of
+    /// them. `settings` is one object, not a collection, and counting its keys
+    /// would inflate the number the screen shows.
+    ///
+    /// `nonisolated` so it can be tested without a client, a PIN or a network.
+    nonisolated static func recordCount(in store: [String: JSONValue]) -> Int {
+        store.values.reduce(0) { total, value in
+            if case .array(let rows) = value { return total + rows.count }
+            return total
+        }
     }
 
     /**

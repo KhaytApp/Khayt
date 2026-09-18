@@ -977,6 +977,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   machine is one photo, and the empty state now takes you to the finished jobs
   rather than just telling you about them.
 
+- **(iOS) Pairing now takes a copy of the shop's book.** The one moment a phone
+  is certainly on the shop's Wi-Fi with the PIN freshly typed is the moment it
+  finishes pairing, so that is when it asks for the book. It cannot fail the
+  pairing: `GET /api/store` is served by the native Mac app and not by the
+  Electron desktop most shops still run, and a phone that refused to pair with
+  the app the shop actually has would be worse than one that cannot work
+  offline. If the book arrives, the screen says how many records came with it;
+  if it does not, it says what that means — that the phone will keep asking for
+  every screen and will empty when the Mac is out of reach.
+
+  Unpairing forgets the book, and the `.prev` rollback copy with it. That copy
+  is the same client list, one write behind.
+
 - **(iOS) The phone keeps the shop's book, and writes it the way the Mac
   does.** The companion has had a cache of the desktop's *answers* — one file
   per endpoint, read-only by design, writes refused rather than queued. That is

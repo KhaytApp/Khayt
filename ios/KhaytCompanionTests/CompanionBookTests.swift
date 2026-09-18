@@ -100,6 +100,21 @@ final class CompanionBookTests: XCTestCase {
                        "unpairing left the rollback copy, which holds the same names")
     }
 
+    func testTheCountShownAtPairingCountsRecordsAndNotSettings() {
+        // What the pairing screen says arrived. `settings` is one object, not a
+        // list of records, and counting its keys would inflate the number —
+        // a shop with three clients would be told it received a dozen things.
+        let store: [String: JSONValue] = [
+            "settings": .object(["shopName": .string("Ward"), "vatRate": .number(15),
+                                 "currency": .string("SAR")]),
+            "clients": .array([.object(["id": .string("c1")]), .object(["id": .string("c2")])]),
+            "printLog": .array([.object(["id": .string("o1")])]),
+            "inventory": .array([]),
+        ]
+        XCTAssertEqual(KhaytAPIClient.recordCount(in: store), 3)
+        XCTAssertEqual(KhaytAPIClient.recordCount(in: [:]), 0)
+    }
+
     func testTheEngineCanWorkFromTheBookWithNoDesktopInReach() async throws {
         // The two halves together, which is the whole thesis: the phone holds
         // the book, the phone holds the engine, so the phone can work out a
