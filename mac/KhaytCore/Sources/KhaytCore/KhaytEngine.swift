@@ -623,7 +623,6 @@ public actor KhaytEngine {
         "gcode-parse",
         // Which customers are worth keeping.
         // Whether the shop can take another job, and when it would start.
-        "capacity",
         // How many quotes turn into work, and how much of the money does.
         // Which products actually earn, and which earn per machine hour.
         "product-profit",
@@ -4213,12 +4212,32 @@ public actor KhaytEngine {
 
     public func capacity(machines: [JSONValue], orders: [JSONValue],
                          days: Int, unassigned: String) throws -> Capacity {
-        try runtime.call2(#"""
-        globalThis.KhaytCapacity.capacity({
-          machines: ARG0, orders: ARG1, days: ARG2, unassigned: ARG3,
-        }, {})
-        """#, [.array(machines), .array(orders), .number(Double(days)),
-               .string(unassigned)], as: Capacity.self)
+        // Native since the port — `KhaytCore.Capacity`. The hours are the
+        // order's own `printTime`, which is what the rule defaults to.
+        let hours = orders.map { order -> Double in
+            guard case .object(let o) = order else { return 0 }
+            let n = JSSemantics.number(o["printTime"])
+            return n.isFinite ? n : 0
+        }
+        let report = KhaytCore.Capacity.report(
+            machines: machines, orders: orders, hours: hours,
+            days: Double(days), unassigned: unassigned)
+        return Capacity(
+            rows: report.rows.map {
+                Capacity.Row(machineId: $0.machineId, name: $0.name, color: $0.color,
+                             hoursPerDay: $0.hoursPerDay, bookedHours: $0.bookedHours,
+                             jobs: $0.jobs, availableHours: $0.availableHours,
+                             loadPct: $0.loadPct, daysToClear: $0.daysToClear,
+                             overbooked: $0.overbooked)
+            },
+            totals: Capacity.Totals(bookedHours: report.totals.bookedHours,
+                                    availableHours: report.totals.availableHours,
+                                    untargeted: report.totals.untargeted,
+                                    jobs: report.totals.jobs,
+                                    loadPct: report.totals.loadPct,
+                                    daysToClear: report.totals.daysToClear,
+                                    overbooked: report.totals.overbooked,
+                                    noTargets: report.totals.noTargets))
     }
 
     // MARK: - Who the customers are worth
