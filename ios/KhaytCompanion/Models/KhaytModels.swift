@@ -22,7 +22,68 @@ struct QueueOrder: Codable, Identifiable, Sendable {
     let machine: String?
     let machineId: String?
     let dueDate: String?
+    /// Rush or not.
+    ///
+    /// ── THIS FIELD BROKE THE QUEUE SCREEN FOR EVERY SHOP ─────────────────
+    ///
+    /// It was `String?`, and the desktop has never sent a string.
+    /// `lib/order-new.js` writes `priority: false` on every order it creates and
+    /// `lib/order-edit.js` writes `priority: wanted !== 'normal'` — a BOOLEAN,
+    /// always, with the word kept separately in `priorityLevel`. `queueJson`
+    /// passes the field straight through, so both servers put a boolean on the
+    /// wire.
+    ///
+    /// A `Codable` mismatch is not a blank field, it throws — and it throws for
+    /// the whole array, so ONE order was enough to empty the queue screen. The
+    /// screen this app opens on could not load a single real shop's queue.
+    ///
+    /// The contract check that exists to catch exactly this could not see it:
+    /// `scripts/ios-contract-capture.mjs` built its fixture with
+    /// `priority: 'high'`, a shape the desktop does not write, so the guard
+    /// certified a contract that does not hold anywhere but in the guard. The
+    /// fixture is corrected alongside this.
+    ///
+    /// Read leniently rather than retyped to `Bool?`, because both spellings are
+    /// now loose in the world: an older book holds booleans, and nothing stops a
+    /// server sending the word later. A field this app does not draw must never
+    /// again be the reason a screen is empty.
     let priority: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, project, client, status, machine, machineId, dueDate, priority
+    }
+
+    /// Spelled out because `init(from:)` above suppresses the synthesized one,
+    /// and the tests build these directly.
+    init(id: String, project: String?, client: String?, status: String,
+         machine: String?, machineId: String?, dueDate: String?, priority: String?) {
+        self.id = id; self.project = project; self.client = client; self.status = status
+        self.machine = machine; self.machineId = machineId
+        self.dueDate = dueDate; self.priority = priority
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        project = try c.decodeIfPresent(String.self, forKey: .project)
+        client = try c.decodeIfPresent(String.self, forKey: .client)
+        status = try c.decode(String.self, forKey: .status)
+        machine = try c.decodeIfPresent(String.self, forKey: .machine)
+        machineId = try c.decodeIfPresent(String.self, forKey: .machineId)
+        dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate)
+        priority = Self.priorityText(c, forKey: .priority)
+    }
+
+    /// The word, whichever way it arrived — and nil rather than a throw for
+    /// anything else, because no screen draws this and none should fail for it.
+    private static func priorityText(_ c: KeyedDecodingContainer<CodingKeys>,
+                                     forKey key: CodingKeys) -> String? {
+        if let text = try? c.decodeIfPresent(String.self, forKey: key) { return text }
+        if let flag = try? c.decodeIfPresent(Bool.self, forKey: key) {
+            return flag ? "high" : "normal"
+        }
+        return nil
+    }
 
     var displayTitle: String {
         (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }

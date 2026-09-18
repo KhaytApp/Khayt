@@ -1045,6 +1045,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(iOS) The screens read the shop's own records.** Five of them could not load
+  at all against the native Mac: it serves `/api/status`, `/api/queue` and
+  `/api/store`, and orders, inventory, clients, machines and the waiting list
+  have no endpoint on it — those live only in the Electron desktop's LAN server.
+  They now read the book this phone already holds, so they work against either
+  desktop and keep working when neither is in reach.
+
+  Four of the models decode a raw store record unchanged; that was proven by
+  decoding the sample shop's actual records with the shipping structs rather
+  than assumed. The queue is not one of them, and it is the reason the queue
+  goes through `KhaytEngine.lanQueueBody` — the same rule the Mac serves, run
+  locally — which decides which orders are in the queue instead of the phone
+  holding its own opinion.
+
+  Reads come from the book FIRST rather than falling back to it. A screen fed
+  live while its neighbour is fed locally is a phone whose two screens disagree
+  about the same shop; freshness is kept by refreshing the book in the
+  background, at most once a minute, and never by making a screen wait on the
+  network to draw records the phone already has.
+
+
 - **(Mac + iOS) The phone finds the shop instead of asking for its address.**
   Pairing has meant reading an IP address and a port off one machine's Settings
   screen and typing them into a wizard on another — the worst five minutes a
@@ -2064,6 +2085,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   [KhaytApp/khayt-mac](https://github.com/KhaytApp/khayt-mac).
 
 ### Fixed
+
+- **(iOS) The queue screen could not load a single real shop's queue.** The
+  companion opens on the queue, and `QueueOrder.priority` was typed as a string.
+  The desktop has never sent one: `lib/order-new.js` writes `priority: false` on
+  every order it creates and `lib/order-edit.js` writes
+  `priority: wanted !== 'normal'` — always a boolean, with the word kept
+  separately in `priorityLevel` — and `queueJson` passes the field straight
+  through, so both servers put a boolean on the wire. A `Codable` mismatch does
+  not blank a field, it throws, and it throws for the whole array: one order was
+  enough to empty the screen. No view has ever drawn this field.
+
+  The check that exists to catch exactly this could not see it. The iOS contract
+  guard builds its own fixture, and the fixture said `priority: 'high'` — a shape
+  nothing in the product writes — so it certified a contract that held only
+  inside the guard. The fixture now carries what the desktop carries, and with
+  the old model restored it fails, which is how this was confirmed rather than
+  assumed.
+
 
 - **(Mac) Three more things the app knew and never said.** Hunting the cause of
   the Simple-mode fault turned up the same shape three more times: a shop was

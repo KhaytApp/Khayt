@@ -147,3 +147,42 @@ above for why a path-filtered check must stay optional.
 fine** — that is what the `Mac: work out X natively` commits do. Put the Swift in
 `Sources/KhaytCore/`, not `Sources/KhaytApp/`, unless it genuinely needs AppKit.
 A rule that lands in `KhaytApp` is a rule the phone has to ask the Mac for.
+
+## Several parts of this repo are worked on in parallel — check who else owns what
+
+This repo is not one app. Five products share it, and they are edited
+concurrently, so a change that looks local often is not.
+
+| Area | What it is |
+|---|---|
+| `main.js`, `preload.js`, `lib/`, `renderer/` | the Electron desktop |
+| `mac/` | the native Mac app — **and `mac/KhaytCore` also ships inside the iPhone app**, see the section above |
+| `ios/` | the companion |
+| `renderer/bedready-*`, `lib/bedready-data.js`, `electron-builder.bedready.js` | **Bed Ready** — a separate product built from this same Electron codebase |
+| `lib/makerrun-*.js` | the MakerRun integration |
+
+`khayt-cloud/` and `khayt-website/` sit inside this folder but are **their own
+git repositories** and are gitignored here. Changing them is a different repo
+with different rules; nothing in this file applies to them.
+
+**What this means in practice:**
+
+- **`CHANGELOG.md` conflicts on nearly every rebase**, because everyone appends
+  to `[Unreleased]`. It is not a real conflict — keep both sides, in either
+  order — but expect it, and prefer one larger PR over several small ones: `main`
+  is strict, checks take 8–12 minutes, and a busy day moves `main` faster than
+  that, so every extra PR costs another rebase cycle.
+- **`lib/` is shared by four of the five.** A change there reaches the desktop,
+  Bed Ready, the LAN API and — through `/api/store` — the phone. `lib/store-secret-paths.js`
+  is the sharpest example: it decides what is masked before a book is handed to
+  any device, so removing a path from it leaks that secret to every paired phone.
+- **The LAN API has two implementations that are not the same.** `lib/lan-server.js`
+  serves the full surface; the native Mac's `LanServer.swift` serves `/api/status`,
+  `/api/queue`, `/api/store` and the customer intake, and nothing else. Do not
+  assume a route exists on both. [`docs/LAN_API.md`](docs/LAN_API.md) marks which is which.
+- **`scripts/ios-contract-capture.mjs` must be fixed against what the desktop
+  actually writes, not what seems reasonable.** It built its fixture with
+  `priority: 'high'` while `lib/order-new.js` writes `priority: false` on every
+  order — so the guard certified a wire contract that held only inside the guard,
+  and the phone's queue screen could not decode a single real shop's queue. If
+  you change what a record holds in `lib/`, change the fixture with it.

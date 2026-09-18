@@ -55,7 +55,15 @@ const store = {
     { id: 'o-full', project: 'Bracket v2', client: 'Acme', status: 'printing',
       material: 'PLA', price: 120, dueDate: '2026-08-01', date: '2026-07-20',
       paymentStatus: 'paid', machine: 'Prusa CORE One', machineId: 'm-1',
-      priority: 'high', completedAt: null },
+      // A BOOLEAN, because that is what the desktop writes: `order-new.js`
+      // sets `priority: false` on every order and `order-edit.js` sets
+      // `priority: wanted !== 'normal'`, with the word kept in `priorityLevel`.
+      // This fixture said `'high'` — a shape nothing in the product produces —
+      // so this guard certified a wire contract that held only inside the
+      // guard, while the phone's queue screen could not decode a single real
+      // shop. A fixture that does not match what the app writes is not a
+      // fixture, it is a second opinion.
+      priority: true, priorityLevel: 'high', completedAt: null },
     // One order per status the desktop can write, carrying only what the desktop
     // guarantees — an id and a status. A fully-populated record would prove only
     // that the happy path decodes.

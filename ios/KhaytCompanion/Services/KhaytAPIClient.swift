@@ -12,6 +12,22 @@ final class KhaytAPIClient: ObservableObject {
     /// numbers as though they were current.
     @Published private(set) var servingCachedSince: Date?
 
+    /// True while the screens are reading this phone's own book rather than
+    /// asking the desktop. Not a degraded mode — it is the normal one once a
+    /// shop has paired with a Mac that can hand the book over.
+    @Published private(set) var servingFromBook = false
+
+    /// The book, and the reader that turns it into what the screens decode.
+    ///
+    /// Optional because a build without its App Group container has neither, and
+    /// because the companion still has to work against the Electron desktop,
+    /// which does not serve `/api/store` and so never fills one.
+    private let book: CompanionBook?
+    private let reader: BookReader?
+    /// Guards against a burst of screens each starting their own refresh.
+    private var refreshing = false
+    private var lastRefresh: Date?
+
     var isConfigured: Bool { settings.isConfigured }
 
     init(settings: ConnectionSettings) {
@@ -20,14 +36,64 @@ final class KhaytAPIClient: ObservableObject {
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 30
         self.session = URLSession(configuration: config)
+        let opened = try? CompanionBook.inSharedContainer()
+        self.book = opened
+        self.reader = opened.map(BookReader.init(book:))
+    }
+
+    /// Read from this phone's own records when it has them, and ask the desktop
+    /// when it does not.
+    ///
+    /// ── WHY THE BOOK COMES FIRST, NOT SECOND ─────────────────────────────
+    ///
+    /// The obvious arrangement is to ask the desktop and fall back to local data
+    /// when it cannot be reached. That is what `CompanionCache` does, and for a
+    /// cache it is right. It is wrong here for two reasons.
+    ///
+    /// The native Mac serves `/api/status`, `/api/queue` and `/api/store` and
+    /// nothing else. Orders, inventory, clients, machines and the waiting list
+    /// have no endpoint on it at all, so "ask the desktop first" is not a slower
+    /// path for those screens, it is a broken one.
+    ///
+    /// And a screen fed live while its neighbour is fed locally is a phone whose
+    /// two screens disagree about the same shop. One source at a time.
+    ///
+    /// Freshness is kept by refreshing the BOOK in the background rather than by
+    /// reading past it — see `refreshBookIfConnected`.
+    private func fromBook<T>(_ read: (BookReader) async throws -> T) async -> T? {
+        guard let reader, reader.holdsAnyBook else { return nil }
+        guard let value = try? await read(reader) else { return nil }
+        servingFromBook = true
+        servingCachedSince = nil
+        refreshBookIfConnected()
+        return value
+    }
+
+    /// Bring the book up to date, at most once a minute, without blocking a read.
+    ///
+    /// Deliberately fire-and-forget: a screen must never wait on the network to
+    /// draw records this phone already holds. If the Mac is out of reach this
+    /// fails silently, which is correct — the screens are still right, they are
+    /// just as of the last pull.
+    private func refreshBookIfConnected() {
+        guard let book, settings.isConfigured, !refreshing else { return }
+        if let lastRefresh, Date().timeIntervalSince(lastRefresh) < 60 { return }
+        refreshing = true
+        Task { [weak self] in
+            defer { Task { @MainActor in self?.refreshing = false } }
+            _ = try? await self?.pullBook(into: book)
+            await MainActor.run { self?.lastRefresh = Date() }
+        }
     }
 
     func fetchStatus() async throws -> ShopStatus {
-        try await get("/api/status?format=json", requiresPin: false, as: ShopStatus.self)
+        if let local = await fromBook({ try await $0.status() }) { return local }
+        return try await get("/api/status?format=json", requiresPin: false, as: ShopStatus.self)
     }
 
     func fetchQueue() async throws -> [QueueOrder] {
-        try await get("/api/queue", requiresPin: true, as: [QueueOrder].self)
+        if let local = await fromBook({ try await $0.queue() }) { return local }
+        return try await get("/api/queue", requiresPin: true, as: [QueueOrder].self)
     }
 
     func fetchRecentOrders(limit: Int = 40, status: String? = nil) async throws -> [OrderLogEntry] {
@@ -36,15 +102,20 @@ final class KhaytAPIClient: ObservableObject {
             let encoded = status.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? status
             path += "&status=\(encoded)"
         }
+        if let local = await fromBook({ try await $0.recentOrders(limit: limit, status: status) }) {
+            return local
+        }
         return try await get(path, requiresPin: true, as: [OrderLogEntry].self)
     }
 
     func fetchInventory() async throws -> [InventorySpool] {
-        try await get("/api/inventory", requiresPin: true, as: [InventorySpool].self)
+        if let local = await fromBook({ try await $0.inventory() }) { return local }
+        return try await get("/api/inventory", requiresPin: true, as: [InventorySpool].self)
     }
 
     func fetchMachines() async throws -> [MachineInfo] {
-        try await get("/api/machines", requiresPin: true, as: [MachineInfo].self)
+        if let local = await fromBook({ try await $0.machines() }) { return local }
+        return try await get("/api/machines", requiresPin: true, as: [MachineInfo].self)
     }
 
     func fetchMachinesLive() async throws -> [MachineLiveStatus] {
@@ -52,11 +123,13 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     func fetchClients() async throws -> [Client] {
-        try await get("/api/clients", requiresPin: true, as: [Client].self)
+        if let local = await fromBook({ try await $0.clients() }) { return local }
+        return try await get("/api/clients", requiresPin: true, as: [Client].self)
     }
 
     func fetchWaitingList() async throws -> [WaitingListItem] {
-        try await get("/api/waiting-list", requiresPin: true, as: [WaitingListItem].self)
+        if let local = await fromBook({ try await $0.waitingList() }) { return local }
+        return try await get("/api/waiting-list", requiresPin: true, as: [WaitingListItem].self)
     }
 
     /// Fetch the working set of the shop's book and keep it, so this phone can
