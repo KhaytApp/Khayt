@@ -607,7 +607,6 @@ public actor KhaytEngine {
         // Twelve months of revenue per print-hour and material cost per gram.
         "cost-trends",
         // How long a job takes, by month and by product.
-        "cycle-time",
         // What was thrown away, by month and by why.
         // Whether the shop keeps its promises: finished by the due date, or by how many days not.
         // The LAN server's rules and pages: the lockout in front of it, and what
@@ -4424,27 +4423,28 @@ public actor KhaytEngine {
         }
     }
 
+    /// Native since the port — `KhaytCore.CycleTime`, with `business-scope`
+    /// (already native) called directly rather than through the bridge.
     public func cycleTime(orders: [JSONValue], now: Date, months: Int = 6) throws -> CycleTime {
-        try runtime.call2(#"""
-        globalThis.KhaytCycleTime.cycleTime(ARG0, {
-          now: ARG1, months: ARG2,
-          countsForBusiness: function (o) {
-            return globalThis.KhaytBusinessScope ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
-          },
-        })
-        """#, [.array(orders), .number(now.timeIntervalSince1970 * 1000), .number(Double(months))],
-                          as: CycleTime.self)
+        let report = KhaytCore.CycleTime.report(
+            orders: orders, now: now.timeIntervalSince1970 * 1000, months: months,
+            countsForBusiness: { BusinessScope.countsForBusiness($0) })
+        return CycleTime(
+            months: report.months.map { CycleTime.Month(key: $0.key, avgDays: $0.avgDays,
+                                                        jobs: $0.jobs) },
+            avgDays: report.avgDays, jobs: report.jobs)
     }
 
     public func leadTimeByProduct(orders: [JSONValue], top: Int = 10) throws -> LeadTime {
-        try runtime.call2(#"""
-        globalThis.KhaytCycleTime.leadTimeByProduct(ARG0, {
-          top: ARG1,
-          countsForBusiness: function (o) {
-            return globalThis.KhaytBusinessScope ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
-          },
-        })
-        """#, [.array(orders), .number(Double(top))], as: LeadTime.self)
+        let report = KhaytCore.CycleTime.byProduct(
+            orders: orders, top: top,
+            countsForBusiness: { BusinessScope.countsForBusiness($0) })
+        return LeadTime(
+            rows: report.rows.map { LeadTime.Row(key: $0.key, productId: $0.productId,
+                                                 name: $0.name, avgDays: $0.avgDays,
+                                                 fastest: $0.fastest, slowest: $0.slowest,
+                                                 jobs: $0.jobs) },
+            jobs: report.jobs)
     }
 
     // MARK: - What was thrown away

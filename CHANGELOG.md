@@ -6,6 +6,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) How long a job takes is worked out natively.** The cycle-time chart
+  and the per-product lead times run in the app now, in the shop's own
+  calendar. A month that finished nothing still has no answer rather than a
+  reading of nought days, and a job whose dates say it finished before it was
+  taken is still left out rather than pulling an average below zero.
+
 - **(Mac) What the shop has to bill to break even is worked out natively.** The
   figure that says how much a month has to carry before the rent and the
   accountant are paid for now runs in the app. It stays a floor: a window with
