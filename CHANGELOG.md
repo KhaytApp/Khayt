@@ -1801,6 +1801,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) Three more things the app knew and never said.** Hunting the cause of
+  the Simple-mode fault turned up the same shape three more times: a shop was
+  never told that records in its book could not be read — the app had dropped
+  data and said nothing — never told that Khayt had closed unexpectedly the
+  time before, and never shown what syncing was doing. All three had been
+  written into the window Khayt stopped opening with, so they shipped in no
+  window at all. They are in the one that ships now, and a check reads both
+  windows to make sure nothing is left behind in the old one again.
+
 - **(Mac) Simple mode has never hidden anything.** A shop set to Simple saw
   Expenses and Reports exactly as a Professional one did, in both the sidebar
   and the menu bar. The rule was right, the setting reached the app, and the

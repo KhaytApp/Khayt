@@ -3119,6 +3119,59 @@ final class Shop {
         Self.gatedFeatures.contains(feature) ? features.contains(feature) : true
     }
 
+    /// How loudly a sync line should be said.
+    ///
+    /// A TONE rather than a colour, because `Shop` does not import SwiftUI and
+    /// should not: the model says what the state IS and each window decides
+    /// how it looks. That also stopped the two shells inheriting one file's
+    /// private styling.
+    enum SyncTone { case quiet, normal, attention }
+
+    /// One line for every state sync can be in.
+    ///
+    /// ── LIFTED OUT OF THE RETIRED SHELL ───────────────────────────────────
+    ///
+    /// It was `Provenance.syncLine`, private to a type in `Sidebar.swift` —
+    /// the window the app stopped opening with in 4.0.0-alpha.12. So the
+    /// shipping shell showed no sync state at all, and nothing outside that
+    /// one file read `syncStatus`.
+    ///
+    /// Locked is the one worth reading twice: it is not a fault, it is a shop
+    /// that has not typed its passphrase since the app opened, and the data
+    /// key deliberately lives no longer than that.
+    var syncLine: (text: String, symbol: String, tone: SyncTone) {
+        switch syncStatus {
+        case .off:
+            (words.callIt("mac.sync_off"), "icloud.slash", .quiet)
+        case .locked:
+            (words.callIt("mac.sync_locked"), "lock.icloud", .normal)
+        case .idle:
+            (words.callIt("mac.sync_on"), "icloud", .quiet)
+        case .syncing:
+            (words.callIt("mac.sync_sending"), "icloud.and.arrow.up", .normal)
+        case .waiting:
+            (words.callIt("mac.sync_waiting"), "clock.arrow.circlepath", .quiet)
+        case .synced(let when):
+            (words.callIt("mac.sync_done", ["time": .string(Shop.clockText(when))]),
+             "checkmark.icloud", .quiet)
+        case .failing:
+            // ATTENTION, not late: it is going to be tried again and nothing
+            // has been lost — the change is still in the book. Those two are
+            // the difference between "this needs you when you have a moment"
+            // and "this has failed".
+            (words.callIt("mac.sync_retrying"), "exclamationmark.icloud", .attention)
+        }
+    }
+
+    /// The time of day, in the shop's own locale.
+    static func clockText(_ when: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale.current
+        f.timeStyle = .short
+        f.dateStyle = .none
+        return f.string(from: when)
+    }
+
     /// The feature a whole SCREEN needs, or nil for one everybody has.
     ///
     /// ── WHY THIS IS A FUNCTION AND NOT AN `if` IN THE SIDEBAR ─────────────
