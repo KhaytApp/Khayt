@@ -6,6 +6,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A customer's agreed prices are applied natively.** The rule that
+  charges a customer what they were promised now runs in the app, and keeps the
+  decision that makes it safe: the first product on the list that matches wins
+  even when it has no price, because a product written down with no price means
+  "this one is not agreed" — a later entry must not quietly stand in for it.
+
 - **(Mac) When a spool needs drying again is worked out natively.** The shelf's
   dryness reminder runs in the app now, and still reads a supplier's own label
   the same way — "PA6-CF" is a nylon and needs drying every day, "PC-ABS" is an
