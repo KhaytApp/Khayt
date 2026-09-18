@@ -348,7 +348,6 @@ public actor KhaytEngine {
         // When each queued job will actually be READY, and which will miss
         // their due date because of it. `working-week` first: the day rate this
         // projects with comes from the shop's own hours.
-        "schedule",
         // What a print costs money at when nobody has said otherwise. BEFORE
         // calculator-cost, because it supplies four of the six things that
         // module adds up — and a caller that omits them gets a price with
@@ -2006,6 +2005,12 @@ public actor KhaytEngine {
     /// so a projection is reproducible and testable to the day.
     public struct Timeline: Decodable, Sendable {
         public struct Job: Decodable, Sendable {
+            public init(id: String, project: String, status: String, hours: Double,
+                        etaDate: String, dueDate: String, late: Bool) {
+                self.id = id; self.project = project; self.status = status
+                self.hours = hours; self.etaDate = etaDate
+                self.dueDate = dueDate; self.late = late
+            }
             public let id: String
             public let project: String
             public let status: String
@@ -2016,6 +2021,12 @@ public actor KhaytEngine {
             public let late: Bool
         }
         public struct Machine: Decodable, Sendable {
+            public init(machineId: String, unassigned: Bool, jobs: [Job], totalHours: Double,
+                        days: Int, readyDate: String, lateCount: Int) {
+                self.machineId = machineId; self.unassigned = unassigned; self.jobs = jobs
+                self.totalHours = totalHours; self.days = days
+                self.readyDate = readyDate; self.lateCount = lateCount
+            }
             public let machineId: String
             public let unassigned: Bool
             public let jobs: [Job]
@@ -2023,6 +2034,9 @@ public actor KhaytEngine {
             public let days: Int
             public let readyDate: String
             public let lateCount: Int
+        }
+        public init(machines: [Machine], dailyHours: Double) {
+            self.machines = machines; self.dailyHours = dailyHours
         }
         public let machines: [Machine]
         public let dailyHours: Double
@@ -2039,15 +2053,20 @@ public actor KhaytEngine {
 
     public func timeline(jobs: [JSONValue], dailyHours: Double,
                          startDate: String) throws -> Timeline {
-        try runtime.call2("""
-            (function (jobs, daily, start) {
-              return KhaytSchedule.computeSchedule({
-                jobs: jobs, dailyHours: daily, startDate: start,
-              });
-            })(ARG0, ARG1, ARG2)
-            """,
-            [.array(jobs), .number(dailyHours), .string(startDate)],
-            as: Timeline.self)
+        let t = Schedule.compute(jobs: jobs, dailyHours: dailyHours, startDate: startDate)
+        // `Timeline.Job` carries no `startDay`: the decode never read one, so
+        // the screen has never had it and adding it here would be a field
+        // nothing draws.
+        return Timeline(machines: t.machines.map { m in
+            Timeline.Machine(machineId: m.machineId, unassigned: m.unassigned,
+                             jobs: m.jobs.map {
+                                 Timeline.Job(id: $0.id, project: $0.project,
+                                              status: $0.status, hours: $0.hours,
+                                              etaDate: $0.etaDate, dueDate: $0.dueDate,
+                                              late: $0.late) },
+                             totalHours: m.totalHours, days: m.days,
+                             readyDate: m.readyDate, lateCount: m.lateCount)
+        }, dailyHours: t.dailyHours)
     }
 
     public func lowStock(_ spools: [JSONValue],
