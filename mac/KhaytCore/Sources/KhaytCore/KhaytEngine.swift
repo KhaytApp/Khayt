@@ -605,7 +605,6 @@ public actor KhaytEngine {
         // What a shop must bill to cover what it pays anyway.
         "break-even",
         // What reached and left the bank, as opposed to what was earned.
-        "cash-flow",
         // Twelve months of revenue per print-hour and material cost per gram.
         "cost-trends",
         // How long a job takes, by month and by product.
@@ -4320,23 +4319,30 @@ public actor KhaytEngine {
                          endMonth: String, months: Int,
                          settings: [String: JSONValue], clients: [JSONValue])
         throws -> CashFlow {
-        try runtime.call2(#"""
+        // `order-money` still says what an order earned — it has not moved —
+        // so its answer is worked out once, in order, and handed across. The
+        // rule about WHICH money is cash, and which month holds it, is
+        // `KhaytCore.CashFlow` now.
+        let revenues: [Double] = try runtime.call2(#"""
         (function () {
-          var ctx = { settings: ARG4, clients: ARG5 };
-          return globalThis.KhaytCashFlow.cashFlow({
-            orders: ARG0, expenses: ARG1, endMonth: ARG2, months: ARG3,
-          }, {
-            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
-            countsForBusiness: function (o) {
-              return globalThis.KhaytBusinessScope
-                ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
-            },
+          var ctx = { settings: ARG1, clients: ARG2 };
+          return ARG0.map(function (o) {
+            var n = Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx));
+            return isFinite(n) ? n : 0;
           });
         })()
-        """#,
-                          [.array(orders), .array(expenses), .string(endMonth),
-                           .number(Double(months)), .object(settings), .array(clients)],
-                          as: CashFlow.self)
+        """#, [.array(orders), .object(settings), .array(clients)], as: [Double].self)
+
+        let report = KhaytCore.CashFlow.report(orders: orders, revenues: revenues,
+                                               expenses: expenses, endMonth: endMonth,
+                                               months: Double(months))
+        return CashFlow(
+            rows: report.rows.map { CashFlow.Month(month: $0.month, collected: $0.collected,
+                                                   paidOut: $0.paidOut, net: $0.net) },
+            totals: CashFlow.Totals(collected: report.totals.collected,
+                                    paidOut: report.totals.paidOut, net: report.totals.net,
+                                    anyMovement: report.totals.anyMovement,
+                                    undated: report.totals.undated))
     }
 
     // MARK: - Cost and revenue trends
