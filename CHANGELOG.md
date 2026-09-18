@@ -6,6 +6,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) What a model's licence permits is worked out natively.** The library
+  reads a downloaded model's licence in the app now, and keeps the decision
+  that makes it safe: a model nobody has recorded a licence for is reported as
+  *unknown*, never as *may not be sold*. A shop that has filled nothing in is
+  told nothing rather than told no.
+
 - **(Mac) A customer's agreed prices are applied natively.** The rule that
   charges a customer what they were promised now runs in the app, and keeps the
   decision that makes it safe: the first product on the list that matches wins
