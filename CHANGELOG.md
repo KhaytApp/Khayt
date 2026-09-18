@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) First-pass yield is worked out natively.** The figure that says how
+  much of a shop's work is right the first time — as opposed to right
+  eventually — now runs in the app rather than through the shared engine, and
+  it survives one more thing: a warranty cost too large for the format the two
+  used to talk over was dropped on the way across and took the whole quality
+  panel with it.
+
 - **(Mac) The calendar subscription is served natively, and it serves exactly
   what it used to.** A shop that has added Khayt's due-date feed to its
   calendar sees the same events, to the byte — including two oddities the
