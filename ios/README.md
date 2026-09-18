@@ -1,12 +1,21 @@
 # Khayt iOS Companion (v2)
 
-LAN-connected companion for iPhone/iPad. **Desktop is the source of truth** (`khayt-store.json` on Mac/PC). No cloud sync, no local business database.
+Companion for iPhone/iPad. The desktop is the **book of record** — `khayt-store.json`
+on the Mac or PC is what a shop backs up and bills from — but the phone is no longer
+a live view of it.
+
+It holds a **working set** of the shop's records and reads from that, so the screens
+work with the desktop switched off, and it runs the shop's own business logic through
+`mac/KhaytCore` rather than asking for every figure. No cloud sync.
+
+The sentence that used to be here said "no local business database". That stopped
+being true; see [docs/IOS_COMPANION.md](../docs/IOS_COMPANION.md) for what replaced it.
 
 ## v2 features
 
 | Area | Implementation |
 |------|----------------|
-| **Pairing** | Shop IP + port + owner LAN PIN; validated with `GET /api/queue` |
+| **Pairing** | Pick the shop off the Wi-Fi (Bonjour `_khayt._tcp`), then the owner PIN. Manual address entry kept for desktops that do not advertise |
 | **Connection health** | Polls `GET /api/status` + PIN check |
 | **Production queue** | View kanban orders, advance or set status, **assign machine** (`PATCH /api/orders/:id`) |
 | **New order** | Create orders from the app (`POST /api/orders`) |
