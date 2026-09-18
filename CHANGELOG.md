@@ -87,6 +87,13 @@ tested against both.
   than every rating the shop has ever collected, and a rating on a job with no
   completion stamp still counts rather than being dropped.
 
+- **(Mac) Whether the shop can take another job is worked out natively.** The
+  capacity panel runs in the app now, and keeps the reading that makes it
+  useful: a machine booked three weeks over says so instead of reading exactly
+  full, which is what a shop needs to know before it promises anything.
+  Cancelled jobs stop booking a machine, and a machine nobody has set a target
+  for is still on the list with its hours held apart.
+
 - **(Mac) How long a job takes is worked out natively.** The cycle-time chart
   and the per-product lead times run in the app now, in the shop's own
   calendar. A month that finished nothing still has no answer rather than a
