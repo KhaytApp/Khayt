@@ -288,7 +288,6 @@ public actor KhaytEngine {
         //   A second card sourced from nothing would be empty in every shop
         //   that has ever opened this app.
         //
-        "rating-trend",
         "client-sources",
         // What a finished job takes off the shelf: the grams, the hourly
         // consumables, the bought-in components, the packaging. Lifted out of
@@ -7026,10 +7025,15 @@ public actor KhaytEngine {
         public let allTimeResponses: Int
         public let enough: Bool
     }
+    /// Native since the port — `KhaytCore.RatingTrend`.
     public func ratingTrend(orders: [JSONValue], months: [String]) throws -> RatingTrend {
-        try runtime.call2("globalThis.KhaytRatingTrend.trend(ARG0, ARG1)",
-                          [.array(orders), .array(months.map(JSONValue.string))],
-                          as: RatingTrend.self)
+        let report = KhaytCore.RatingTrend.trend(orders: orders, months: months)
+        return RatingTrend(
+            points: report.points.map { RatingTrend.Point(month: $0.month,
+                                                          responses: $0.responses,
+                                                          average: $0.average) },
+            responses: report.responses, average: report.average,
+            allTimeResponses: report.allTimeResponses, enough: report.enough)
     }
 
     /// Where the shop's customers came from, and what they have spent.
