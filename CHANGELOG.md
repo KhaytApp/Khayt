@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Where a model came from can be recorded, not just read.** The
+  library's inspector has always shown a model's source and licence, and this
+  Mac had no way to set either — so on a real book the panel was blank on every
+  model and the only way to fill it in was to open the other app. There is a
+  menu beside Group and Category now: pick a licence for everything selected,
+  or type where it came from. *Not recorded* is an entry on that menu and not
+  only the starting state, because a licence chosen by mistake would otherwise
+  tell a shop for ever that it may not sell its own work.
+
 - **(Mac) What a model's licence permits is worked out natively.** The library
   reads a downloaded model's licence in the app now, and keeps the decision
   that makes it safe: a model nobody has recorded a licence for is reported as

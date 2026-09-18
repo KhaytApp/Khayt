@@ -1006,6 +1006,18 @@ final class Words {
         // once REPLACES what each carried rather than adding to it.
         "mac.tags_replaced": ["en": "These become the tags on every model selected.",
                               "ar": "تصبح هذه وسوم كل نموذج مختار."],
+        // Where a model came from. The licence's own names come from Khayt's
+        // shared catalogue (`plib.licence_*`); these are the few sentences this
+        // app needs around them.
+        "mac.licence_set":   ["en": "Record Licence",   "ar": "تسجيل الترخيص"],
+        "mac.licence_cleared": ["en": "Clear Licence",  "ar": "مسح الترخيص"],
+        "mac.licence_unknown": ["en": "That is not a licence Khayt knows.",
+                                "ar": "هذا ليس ترخيصًا يعرفه خيط."],
+        "mac.source_set":    ["en": "Record Source",    "ar": "تسجيل المصدر"],
+        "mac.source_replaced": ["en": "This becomes the source on every model selected.",
+                                "ar": "يصبح هذا مصدر كل نموذج مختار."],
+        "mac.provenance_why": ["en": "Say where a model came from and what its licence allows. Not recorded is not the same as not for sale.",
+                               "ar": "سجِّل مصدر النموذج وما يسمح به ترخيصه. \"غير مسجل\" لا يعني \"غير قابل للبيع\"."],
         "mac.n_models":      ["en": "{n} models",      "ar": "{n} نماذج"],
         "mac.together":      ["en": "Together",        "ar": "مجتمعة"],
         "mac.on_disk":       ["en": "On disk",         "ar": "على القرص"],

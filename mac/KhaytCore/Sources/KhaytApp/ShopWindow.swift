@@ -227,6 +227,12 @@ struct ShopWindow: View {
                     HStack(spacing: 6) {
                         GroupMenu(shop: shop)
                         CategoryMenu(shop: shop)
+                        // Where it came from is the FOURTH thing a library row
+                        // can say, and the only one that decides whether a
+                        // print may be sold. It sits here rather than in the
+                        // inspector because it is set on a selection — twenty
+                        // models downloaded from one site share one answer.
+                        ProvenanceMenu(shop: shop)
                     }
                 } else { OwedSummary(shop: shop) }
             }
