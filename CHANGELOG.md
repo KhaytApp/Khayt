@@ -2182,6 +2182,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **A screen reader could not say which box you were in.** Across the app 178
+  fields showed a label — "Layer height (mm)", "Infill (%)" — that was only
+  ever visual: nothing tied the words to the box beneath them, so a screen
+  reader announced "number edit" and stopped. On a settings screen carrying
+  fifty-six number fields that is not a hint, it is a guess. The label now
+  names its field, in both Khayt and Bed Ready. Nothing moves on screen and
+  nothing reads differently for anyone not using a screen reader; clicking a
+  label now puts the cursor in its field, which is the one visible change.
+  Seventy-five fields still have no label to tie — mostly toolbar boxes whose
+  only cue is placeholder text — and they need wording, in nine languages,
+  rather than a rename.
+
 - **(iOS) The queue screen could not load a single real shop's queue.** The
   companion opens on the queue, and `QueueOrder.priority` was typed as a string.
   The desktop has never sent one: `lib/order-new.js` writes `priority: false` on
