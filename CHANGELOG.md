@@ -20,6 +20,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the rule actually replaces rather than a list typed beside it. The message
   sheet also says where to make one instead of showing an empty box.
 
+- **(Mac) Simple and Professional can be chosen here.** The app has honoured
+  the shop's chosen mode since Simple started hiding Expenses and Reports, and
+  there was no way to set one — a shop that wanted its Mac simpler had to open
+  the other app to say so. Settings → Preferences now offers the two modes
+  Khayt offers, and says what Simple takes away and that nothing is deleted.
+
 - **(Mac) Where a model came from can be recorded, not just read.** The
   library's inspector has always shown a model's source and licence, and this
   Mac had no way to set either — so on a real book the panel was blank on every

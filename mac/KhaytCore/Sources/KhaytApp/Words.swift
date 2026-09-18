@@ -1018,6 +1018,12 @@ final class Words {
                                 "ar": "يصبح هذا مصدر كل نموذج مختار."],
         "mac.provenance_why": ["en": "Say where a model came from and what its licence allows. Not recorded is not the same as not for sale.",
                                "ar": "سجِّل مصدر النموذج وما يسمح به ترخيصه. \"غير مسجل\" لا يعني \"غير قابل للبيع\"."],
+        // The mode switch. Khayt's own catalogue names the modes and the
+        // sentences around them (`set.mode_*`); these two are this app's.
+        "mac.mode_unknown":  ["en": "That is not a mode Khayt offers.",
+                              "ar": "هذا ليس وضعًا يوفره خيط."],
+        "mac.simple_hides":  ["en": "Simple hides Expenses and Reports. Nothing is deleted — switch back and they return.",
+                              "ar": "يُخفي الوضع البسيط المصروفات والتقارير. لا يُحذف شيء — عُد وستظهر من جديد."],
         "mac.n_models":      ["en": "{n} models",      "ar": "{n} نماذج"],
         "mac.together":      ["en": "Together",        "ar": "مجتمعة"],
         "mac.on_disk":       ["en": "On disk",         "ar": "على القرص"],

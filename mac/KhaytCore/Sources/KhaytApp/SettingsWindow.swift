@@ -792,6 +792,41 @@ struct PreferencesPane: View {
                     Text(shop.words.callIt("mac.spotlight_note"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                // ── HOW MUCH OF THE APP THE SHOP WANTS ────────────────────
+                //
+                // Saved on the spot rather than with the bar below, because it
+                // is NOT part of this pane's draft: `settings-edit.js` keeps
+                // `out.mode = s.mode || 'professional'` — it preserves the
+                // stored mode and takes none from a form — so a mode sent
+                // through the Save bar would be read and thrown away. The
+                // other app's pills write it straight onto the settings too.
+                Section(shop.words.callIt("set.experience")) {
+                    Text(shop.words.callIt("set.mode_subtitle"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Picker("", selection: Binding(
+                        get: { shop.mode },
+                        set: { wanted in Task { await shop.chooseMode(wanted) } }
+                    )) {
+                        Text(shop.words.callIt("set.mode_simple")).tag("simple")
+                        Text(shop.words.callIt("set.mode_pro")).tag("professional")
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .disabled(!shop.canWrite)
+                    Text(shop.words.callIt("set.mode_changed_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    // What Simple actually takes away, said out loud. The other
+                    // app draws a whole tier comparison here; this names the
+                    // two shelves this app itself hides, which is the part a
+                    // person switching is about to notice.
+                    if shop.mode == "simple" {
+                        Text(shop.words.callIt("mac.simple_hides"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
                 Section(shop.words.callIt("set.locale_section")) {
                     Toggle(shop.words.callIt("set.use_hijri"), isOn: $draft.useHijri)
                     Toggle(shop.words.callIt("set.use_arabic_nums"), isOn: $draft.useArabicNumerals)
