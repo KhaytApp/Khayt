@@ -7774,6 +7774,68 @@ final class Shop {
         }
     }
 
+    // MARK: - The shop's saved messages
+
+    /// Save a message template — a new one, or a correction to one it has.
+    ///
+    /// ── WHY THIS HAD TO EXIST ─────────────────────────────────────────────
+    ///
+    /// `MessageSheet` has always READ `waTemplates` and nothing on this Mac
+    /// could write one. A shop whose book carries none opened the sheet to an
+    /// empty picker and an empty box with nothing to explain it, and the only
+    /// way to make a template was to open the other app. The templates are how
+    /// a shop talks to its customers, so that is a gap, not a difference.
+    ///
+    /// Both fields are required, exactly as the other app requires them: a
+    /// template with no name cannot be picked off a list, and one with no body
+    /// sends nothing.
+    func saveTemplate(id: String?, name: String, body: String) {
+        writeProblem = nil
+        // THE FIELDS BEFORE THE BOOK. What is wrong with the two strings is a
+        // fact about the arguments, true whichever book is open, so the answer
+        // does not depend on which one is. Nobody reaches these through the
+        // sheet — Save is disabled until both are filled — but a caller that
+        // does is told what it got wrong rather than where it would have gone.
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { writeProblem = words.callIt("wa.tpl_need_name"); return }
+        guard !body.isEmpty else { writeProblem = words.callIt("wa.tpl_need_body"); return }
+        guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
+        // `uid('WATPL')`, the other app's own shape, so a template made here
+        // looks like one made there to anything that sorts or dedupes ids.
+        let wanted = id ?? Self.uid("WATPL")
+        write { root in
+            var rows = Self.rows(root, MessageTemplate.collection)
+            let row: JSONValue = .object(["id": .string(wanted), "name": .string(name),
+                                          "body": .string(body)])
+            if let at = rows.firstIndex(where: { Self.recordId($0) == wanted }) {
+                // REPLACED IN PLACE, keeping its position. A corrected template
+                // that jumps to the bottom of the list is one a shop has to
+                // find again every time it fixes a typo.
+                rows[at] = row
+            } else {
+                rows.append(row)
+            }
+            root[MessageTemplate.collection] = .array(rows)
+        }
+    }
+
+    /// Take one off the list. An id nobody has is not an error.
+    func deleteTemplate(_ id: String) {
+        writeProblem = nil
+        guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
+        write { root in
+            let rows = Self.rows(root, MessageTemplate.collection)
+                .filter { Self.recordId($0) != id }
+            root[MessageTemplate.collection] = .array(rows)
+        }
+    }
+
+    /// The template being edited, or a blank one being written. Nil when the
+    /// editor is closed — the sheet is raised from `WindowSheets` so that both
+    /// shells can raise it.
+    var editingTemplate: MessageTemplate?
+
     // MARK: - What is likely to go wrong with this print
 
     /// The overhang report for each model, keyed by the model's id.

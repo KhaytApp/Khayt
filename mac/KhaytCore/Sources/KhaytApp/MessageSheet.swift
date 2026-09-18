@@ -46,9 +46,18 @@ struct MessageSheet: View {
                     .font(.callout).foregroundStyle(.secondary).lineLimit(1)
             }
 
+            if templates.isEmpty {
+                // An empty picker over an empty box is a screen that looks
+                // broken. The templates are written in Settings, and saying so
+                // is the difference between a dead end and a next step — the
+                // other app says it in these same words.
+                Label(shop.words.callIt("wa.no_templates"), systemImage: "text.bubble")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
             Picker(shop.words.callIt("mac.message_template"), selection: $chosen) {
                 ForEach(templates) { one in Text(one.name).tag(one.id) }
             }
+            .disabled(templates.isEmpty)
             .onChange(of: chosen) { _, id in
                 guard edited else { refill(id); return }
                 // The shop typed something. Ask before replacing it.
