@@ -659,7 +659,6 @@ public actor KhaytEngine {
         // What the shelf costs, and whether that has moved.
         "material-cost",
         // How much passes inspection, and how much first time.
-        "qc-metrics",
         // Which job goes on which printer next. A rule, not a button: see
         // `dispatchPlan` and `lib/auto-dispatch.js` for why it proposes.
         "auto-dispatch",
@@ -3699,6 +3698,14 @@ public actor KhaytEngine {
     /// reprints until it passes has a pass rate near 100% and a quality
     /// problem. First-pass yield collapses a reprint chain to one job.
     public struct QcMetrics: Decodable, Sendable {
+        public init(qcd: Int, passed: Int, failed: Int, passRate: Double?, roots: Int,
+                    firstPass: Int, firstPassYield: Double?, defectsByType: [String: Int],
+                    worstDefect: Defect?, rmaCount: Int, rmaCost: Double) {
+            self.qcd = qcd; self.passed = passed; self.failed = failed
+            self.passRate = passRate; self.roots = roots; self.firstPass = firstPass
+            self.firstPassYield = firstPassYield; self.defectsByType = defectsByType
+            self.worstDefect = worstDefect; self.rmaCount = rmaCount; self.rmaCost = rmaCost
+        }
         public let qcd: Int
         public let passed: Int
         public let failed: Int
@@ -3719,14 +3726,20 @@ public actor KhaytEngine {
         public let rmaCost: Double
 
         public struct Defect: Decodable, Sendable, Hashable {
+            public init(type: String, count: Int) { self.type = type; self.count = count }
             public let type: String
             public let count: Int
         }
     }
 
     public func qcMetrics(orders: [JSONValue]) throws -> QcMetrics {
-        try runtime.call2("globalThis.KhaytQcMetrics.qcMetrics(ARG0)",
-                          [.array(orders)], as: QcMetrics.self)
+        let m = KhaytCore.QcMetrics.metrics(orders)
+        return QcMetrics(qcd: m.qcd, passed: m.passed, failed: m.failed,
+                         passRate: m.passRate, roots: m.roots, firstPass: m.firstPass,
+                         firstPassYield: m.firstPassYield, defectsByType: m.defectsByType,
+                         worstDefect: m.worstDefect.map {
+                             QcMetrics.Defect(type: $0.type, count: $0.count) },
+                         rmaCount: m.rmaCount, rmaCost: m.rmaCost)
     }
 
     // MARK: - What the shelf costs
