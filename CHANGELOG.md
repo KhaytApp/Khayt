@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The revenue outlook is worked out natively, in the shop's own
+  calendar.** The chart that projects what next month is likely to bill now
+  runs in the app. What each job earned is still the one shared rule both apps
+  read, so the Mac and the Windows analytics screen cannot disagree about it —
+  only the fitting moved. The months are bucketed in local time, which is what
+  the rule has always done and what the code comment beside it had been
+  claiming the opposite of.
+
 - **(Mac) First-pass yield is worked out natively.** The figure that says how
   much of a shop's work is right the first time — as opposed to right
   eventually — now runs in the app rather than through the shared engine, and
