@@ -87,7 +87,6 @@ public actor KhaytEngine {
         // Whether a model goes on a bed. Six numbers, and until it was lifted
         // out of `mf-convert` it could only be asked during a conversion — by
         // the one app that can run one.
-        "print-fit",
         // Where a model came from and what may be done with it. Pure, and the
         // one place that decides whether a print may be sold.
         // ── THE CONVERTER ────────────────────────────────────────────────
@@ -404,6 +403,13 @@ public actor KhaytEngine {
         // chamber, and the machine sheet quietly offers a shop less than the
         // Electron one does. It does not raise; it just knows less.
         "printer-facts",
+        // STAYS BUNDLED, even though the rule is ported. `mf-convert`'s
+        // `fitWarnings` reads `KhaytPrintFit` — and `convertMembers`, which
+        // this app DOES call, reaches it. Unbundling this would make
+        // `printFit` undefined, `fitWarnings` return an empty list, and every
+        // bed-fit warning vanish from a conversion report with nothing said.
+        // Caught by `UnbundlingIsSafeTests`, which is exactly its job.
+        "print-fit",
         "printer-catalog",
         "machine-edit",
         // What a shop's Telegram bot says when a job moves. Built inline in
@@ -2086,12 +2092,19 @@ public actor KhaytEngine {
         public let checked: Int
     }
 
+    /// Native since the port — `KhaytCore.PrintFit`.
     public func bestFit(_ bounds: (x: Double, y: Double, z: Double),
                         among machines: [JSONValue]) throws -> Fit {
-        try runtime.call2("KhaytPrintFit.bestFit({x: ARG0, y: ARG1, z: ARG2}, ARG3)",
-                          [.number(bounds.x), .number(bounds.y), .number(bounds.z),
-                           .array(machines)],
-                          as: Fit.self)
+        let best = PrintFit.bestFit(
+            bounds: .object(["x": .number(bounds.x), "y": .number(bounds.y),
+                             "z": .number(bounds.z)]),
+            machines: machines)
+        // The rule answers with an INDEX — the caller already has the list, and
+        // a copy across the bridge would be a second one. The machine itself is
+        // put back here so the shape this hands out has not moved.
+        return Fit(verdict: best.verdict.rawValue,
+                   machine: best.machineIndex.map { machines[$0] },
+                   checked: best.checked)
     }
 
     // MARK: - Gift cards

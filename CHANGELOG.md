@@ -103,6 +103,12 @@ tested against both.
   nearly finished spool cost a fortune and turned the trend into one number
   twelve times.
 
+- **(Mac) Whether a model will go on a bed is worked out natively.** The
+  answer the library gives — fits, fits turned a quarter turn, or fits nowhere
+  — now runs in the app rather than through the bundled copy of the rule. The
+  tolerance and the height rule are unchanged, so a model this screen calls too
+  big is still one the conversion report calls too big.
+
 - **(Mac) How long a job takes is worked out natively.** The cycle-time chart
   and the per-product lead times run in the app now, in the shop's own
   calendar. A month that finished nothing still has no answer rather than a
