@@ -362,7 +362,6 @@ public actor KhaytEngine {
         // order here is only that all three are present.
         "subscriptions",
         "recurring-orders",
-        "price-agreements",
         // Which language a shop writes its customers' names in, and which of
         // them to show. Not the interface language: a shop that writes only
         // Arabic must not be shown the stale English name left over from setup.
@@ -2451,12 +2450,7 @@ public actor KhaytEngine {
     /// The price a customer has agreed for each named part — nil where they
     /// have none. One crossing for the whole cart.
     public func agreedPrices(names: [String], priceList: [JSONValue]) throws -> [Double?] {
-        try runtime.call2("""
-            ARG0.map(function (name) {
-              var entry = KhaytPriceAgreements.find(ARG1, name);
-              return entry ? +entry.price : null;
-            })
-            """, [.array(names.map(JSONValue.string)), .array(priceList)], as: [Double?].self)
+        names.map { PriceAgreements.price(in: priceList, name: .string($0)) }
     }
 
     public func geometryReader() throws -> Int { GeometryKey.reader }
