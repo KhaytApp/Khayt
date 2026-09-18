@@ -344,6 +344,26 @@ private struct JobMenu: View {
         .disabled(!canMove || job?.status != "completed" || job?.deliveredAt != nil)
 
         Divider()
+        // THE FLOOR, not one job — but reached for while looking at the board,
+        // which is what this menu is beside. The shared rule refuses a move to
+        // printing while production is paused, and until now this app could
+        // only translate that refusal.
+        //
+        // ONE item that changes its mind, not two — `MenuCoverageTests` reads
+        // the source for shortcut clashes and cannot tell a pair of mutually
+        // exclusive branches from two commands fighting over ⌘⇧P. It is also
+        // the better item: the same key stops the floor and starts it again.
+        Button(Words.upfront(shop.productionPaused ? "prod.resume" : "prod.pause")
+               + (shop.productionPaused ? "" : "\u{2026}")) {
+            if shop.productionPaused { shop.resumeProduction() }
+            else { shop.pausingProduction = true }
+        }
+        // ⌘⇧P is Record payment and ⌘P is Print. ⌘⇧. reads as "stop" on a Mac,
+        // which is what this is.
+        .keyboardShortcut(".", modifiers: [.command, .shift])
+        .disabled(!shop.canMoveJobs)
+
+        Divider()
         Button(Words.upfront("mac.edit_job")) {
             guard let one = job else { return }
             shop.pendingEdit = Shop.PendingHold(id: one.id, project: one.project)
