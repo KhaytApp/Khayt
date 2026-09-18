@@ -12,6 +12,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   reading of nought days, and a job whose dates say it finished before it was
   taken is still left out rather than pulling an average below zero.
 
+- **(Mac) New customers against returning ones is worked out natively.** The
+  split that says whether the shop is growing or serving the same people runs
+  in the app now, and keeps the reading that makes it true: who is new is
+  decided by which ORDER was their first, not by which day — a customer whose
+  first two jobs land on one day is one new sale and one repeat, not two new
+  ones. A customer who was new and then came back inside the same period is
+  still one person.
+
 - **(Mac) What the shop has to bill to break even is worked out natively.** The
   figure that says how much a month has to carry before the rent and the
   accountant are paid for now runs in the app. It stays a floor: a window with
