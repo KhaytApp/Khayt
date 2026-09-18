@@ -977,6 +977,110 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   machine is one photo, and the empty state now takes you to the finished jobs
   rather than just telling you about them.
 
+- **(iOS) Pairing now takes a copy of the shop's book.** The one moment a phone
+  is certainly on the shop's Wi-Fi with the PIN freshly typed is the moment it
+  finishes pairing, so that is when it asks for the book. It cannot fail the
+  pairing: `GET /api/store` is served by the native Mac app and not by the
+  Electron desktop most shops still run, and a phone that refused to pair with
+  the app the shop actually has would be worse than one that cannot work
+  offline. If the book arrives, the screen says how many records came with it;
+  if it does not, it says what that means — that the phone will keep asking for
+  every screen and will empty when the Mac is out of reach. When history has
+  stayed behind on the Mac it says that too, so the phone never looks like it
+  holds a shop it does not.
+
+  Unpairing forgets the book, and the `.prev` rollback copy with it. That copy
+  is the same client list, one write behind.
+
+- **(iOS) The phone keeps the shop's book, and writes it the way the Mac
+  does.** The companion has had a cache of the desktop's *answers* — one file
+  per endpoint, read-only by design, writes refused rather than queued. That is
+  the right shape only while the desktop is the one thing that can compute
+  anything. A screen fed by `/api/queue`'s reply can show the queue and nothing
+  else, and it cannot answer a question nobody thought to cache in advance.
+
+  Now the phone can hold the book itself, in the shape the desktop keeps it on
+  disk — a working set of it, not all of it, and it keeps beside the records a
+  description of what it was NOT sent. That part is not bookkeeping: a partial
+  book that reads as a complete one is worse than no book, because a screen
+  would total the two hundred orders it has and report a three-year-old shop as
+  having done two hundred. A phone that does not know what it is missing answers
+  "no" to "may I total this", rather than guessing. `StoreWriter` moved into `KhaytCore` so that the phone writes through
+  the Mac's writer rather than a second one: the read happens inside the write,
+  so a second caller cannot put back what it saw before the first change; the
+  swap is atomic with an fsync before it; the old copy rolls to `.prev`, which
+  is the one generation of rollback a corrupt book is recovered from; and the
+  size ceiling is the one every backup is built to hold. A phone writing with
+  `Data.write(to:)` would have had to learn all four the same way they were
+  learned the first time.
+
+  Unpairing removes the rollback copy as well as the book. A `.prev` left behind
+  holds the same client list as the file that was deleted.
+
+- **(Mac) `GET /api/store` — enough of the book that a phone can stop asking.**
+  Every other LAN route answers a question, which assumes the asker is a screen
+  with a live connection. This one hands over records.
+
+  Not all of them. `printLog` is about half of a real shop's store and
+  `printFiles` another quarter, and none of that history has ever been on a
+  companion screen — so what travels is a working set: the settings, every
+  **unfinished** order whatever its age, the newest 200 finished ones, and the
+  clients, spools, machines and waiting list. A job stuck in QC for two months
+  is still in the shop, and a phone that dropped it for being old would hide the
+  very record somebody is chasing. `?scope=whole` still returns everything, for
+  a restore or a person with curl.
+
+  The reply is an envelope rather than a bare store, because the records alone
+  cannot say what was left out, and `omitted` names the withheld collections
+  instead of leaving them to be inferred from absence.
+
+  Secrets are masked by `KhaytCloudOutbox.forCloud` — the same rule the cloud
+  push uses, so a device on the LAN is trusted with exactly what the cloud is
+  trusted with and no more. Customers are not masked, because they are not a
+  secret, they are the book: which is why the owner PIN gates it, lockout
+  included. A failure answers 500 rather than an empty book, since a phone that
+  accepted `{}` would replace a shop it already had with nothing.
+
+- **(Repo) `KhaytCore` is flagged as shared, and a guard holds it to that.**
+  A package filed under `mac/` now ships inside an iPhone, and nothing about a
+  Mac session makes that visible. Adding `import AppKit` to it is a completely
+  ordinary macOS change — `swift build` stays green, `swift test` stays green,
+  every Mac screen keeps working, and the iOS app stops compiling, which nobody
+  discovers until somebody opens Xcode days later and reads it as the phone's
+  fault. `KhaytCoreIsPortableTests` fails in the ordinary Mac test run instead,
+  naming the file and the line, and it also refuses the two edits that would
+  un-ship the phone silently: dropping the iOS platform from the manifest, and
+  moving the store writer or the scope rule back out of the shared half. The
+  iOS contract workflow now triggers on `mac/KhaytCore/**` as well, so the
+  compiler that actually holds the iOS SDK reports on the commit that broke it
+  rather than on some later one. CLAUDE.md says all of this out loud.
+
+- **(iOS) The phone runs the shop's own business logic.** `KhaytCore` — the
+  package the Mac app already computes every figure through — now builds for
+  iOS too, and the companion links it. That is one line in the manifest and no
+  change to any of its 29 source files: there is no AppKit in the target, and
+  JavaScriptCore is a system framework on iOS exactly as it is on macOS, so the
+  shop's tax engine, pricing, payment plans and split-order money run on the
+  phone unchanged, with nothing bundled and no second implementation.
+
+  The companion has never computed anything. Every figure on its screens came
+  down the wire from the desktop, which is why it goes blank the moment the
+  desktop is out of reach — and it is used in the back room and at the
+  machines, which is where the Wi-Fi is worst. Working without the desk means
+  the phone needs the shop's arithmetic in its pocket, and there were only ever
+  two ways to get it there: run the shop's engine, or write a second one in
+  Swift. A second one would earn the right to be wrong in a second, different
+  way, and every future fix would have to be made twice. A test on an iOS
+  simulator asks the engine for 15% inclusive VAT on 1,000 and pins it to
+  Node's answer to the halala, so the day the two diverge is the day it fails.
+
+  The floor is iOS 26, matching the Mac. It does cost something the macOS floor
+  did not: iOS 26 needs an A13, so the iPhone XR and XS are out. What makes it
+  affordable is that the companion has not shipped — the App Store is still "a
+  future path" in its own README — so there is no shop on an XS to strand, only
+  a 2018 phone nobody will buy new. Free today, expensive after the first shop
+  installs it, which is why it is settled now.
+
 - **(Mac) The shop's own saved messages can be sent from the Mac.** Khayt has
   always let a shop write its own WhatsApp messages — "Hi {{client}}, your
   order {{id}} is ready!" — and this shop wrote three. Nothing on the Mac could
@@ -1861,6 +1965,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
   Khayt still cannot SET the mode on a Mac — that is done in the Windows app —
   it can only honour one.
+
+- **(iOS) The companion did not compile, and nothing in CI noticed.** `shipped`
+  was added to the order-status list — the enum learned it, the English label
+  learned it — but the switch that translates a status for an Arabic shop did
+  not, and in Swift a switch that does not cover its enum is a compile error,
+  not a missing string. So `ios/` was broken on `main` outright. The reason it
+  went unseen is worth more than the fix: the required checks never run
+  `xcodebuild`, and the iOS contract check compiles `KhaytModels.swift` by
+  itself — which is one of the files that WAS finished. Both Arabic and
+  English already had the word.
 
 - **(Mac) Khayt's Siri shortcuts have never worked, and nothing said so.** The
   app declares two — "What is printing in Khayt" and "What is waiting in

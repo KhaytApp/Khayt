@@ -224,6 +224,93 @@ struct LanServerTests {
         #expect(wrong.headers["x-content-type-options"] == "nosniff")
     }
 
+    @Test("a phone is sent a working set, not the whole book, with the shop's secrets masked")
+    func workingSetBehindPin() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+
+        // A shop with a printer's access code and a bot token in it — two of the
+        // paths `lib/store-secret-paths.js` names. This app reads the store from
+        // disk, so unlike the renderer it is genuinely holding them.
+        bench.book.value["settings"] = .object([
+            "shopName": .string("Ward"),
+            "telegram": .object(["botToken": .string("__enc__BOTSECRET")]),
+        ])
+        bench.book.value["machines"] = .array([.object([
+            "id": .string("m1"),
+            "name": .string("X1C"),
+            "printerApi": .object(["accessCode": .string("__enc__12345678")]),
+        ])])
+        // Put the history in the book on purpose rather than relying on the
+        // sample having it: what is being tested is that this is left behind,
+        // and a fixture that never had it would pass by accident.
+        bench.book.value["printFiles"] = .array([.object(["id": .string("f1")])])
+        bench.book.value["auditLog"] = .array([.object(["id": .string("a1")])])
+
+        let none = try await bench.get("/api/store")
+        #expect(none.status == 401, "the shop's book must never be open on the LAN")
+
+        let reply = try await bench.get("/api/store", headers: ["x-khayt-pin": "2468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+
+        struct Envelope: Decodable {
+            let whole: Bool
+            let scope: BookScope.Taken
+            let store: [String: JSONValue]
+        }
+        let sent = try #require(try? JSONDecoder().decode(Envelope.self, from: Data(reply.text.utf8)))
+
+        #expect(sent.whole == false, "the phone was sent the whole book")
+
+        // The history that is half a real shop's store and that no companion
+        // screen has ever shown. Withheld, and SAID to be withheld — a phone
+        // cannot tell "not sent" from "there are none" by looking.
+        #expect(sent.store["printFiles"] == nil)
+        #expect(sent.store["auditLog"] == nil)
+        #expect(sent.scope.omitted.contains("printFiles"))
+        #expect(sent.scope.omitted.contains("auditLog"))
+
+        // What it does get, and the settings without which it can price nothing.
+        #expect(sent.store["settings"] != nil)
+        #expect(sent.store["printLog"] != nil)
+        #expect(sent.store["inventory"] != nil)
+
+        // Said as a fact rather than a comparison, because a comparison against
+        // `forCloud` would still pass if `forCloud` stopped masking.
+        guard case .object(let settings)? = sent.store["settings"],
+              case .object(let telegram)? = settings["telegram"],
+              case .array(let machines)? = sent.store["machines"],
+              case .object(let machine) = machines[0],
+              case .object(let api)? = machine["printerApi"] else {
+            Issue.record("the book did not arrive in the shape it was sent in")
+            return
+        }
+        #expect(telegram["botToken"] == .string("__KHAYT_MASKED__"),
+                "a shop's bot token went out over the LAN")
+        #expect(api["accessCode"] == .string("__KHAYT_MASKED__"),
+                "a printer's access code went out over the LAN")
+        #expect(settings["shopName"] == .string("Ward"), "masking took something that was not a secret")
+    }
+
+    @Test("`?scope=whole` still exists for the caller that genuinely wants everything")
+    func wholeOnRequest() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let reply = try await bench.get("/api/store?scope=whole", headers: ["x-khayt-pin": "2468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+
+        struct Envelope: Decodable {
+            let whole: Bool
+            let store: [String: JSONValue]
+        }
+        let sent = try #require(try? JSONDecoder().decode(Envelope.self, from: Data(reply.text.utf8)))
+        #expect(sent.whole)
+        // Masked all the same: wanting everything is not the same as being
+        // entitled to the shop's credentials.
+        let expected = try await bench.engine.storeForCloud(bench.book.value)
+        #expect(sent.store == expected)
+    }
+
     @Test("the live queue page is the module's HTML, with the clock it was given")
     func queuePageIsTheModules() async throws {
         let bench = try await Bench()

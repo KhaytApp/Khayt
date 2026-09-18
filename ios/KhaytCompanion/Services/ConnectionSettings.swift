@@ -171,6 +171,11 @@ final class ConnectionSettings: ObservableObject {
         // Dropping the PIN while leaving that on disk would mean "unpaired" only
         // stops new reads, and everything already fetched stays readable.
         Task { await CompanionCache.shared.clear() }
+        // And the book, which is the same argument with more in it: the cache
+        // holds the answers this phone happened to ask for, the book holds the
+        // shop. `forget` takes the `.prev` rollback copy too — it is the same
+        // client list, one write behind.
+        try? CompanionBook.inSharedContainer().forget()
     }
 }
 

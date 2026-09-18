@@ -1,18 +1,22 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-/// KhaytCore — the shared heart of Khayt, on macOS.
+/// KhaytCore — the shared heart of Khayt, on macOS and iOS.
 ///
 /// Khayt's business logic is 29,121 lines of dependency-free JavaScript in
 /// `lib/`: the tax engine, pricing, payment plans, split-order money, loyalty,
 /// the estimator. It carries the corrections from twenty-two review passes and
 /// is pinned by 3,598 tests.
 ///
-/// This package does NOT reimplement any of it. macOS ships JavaScriptCore as a
-/// system framework, so that code runs here unchanged, with nothing bundled and
-/// no Node — and a differential test suite proves Swift and Node agree to the
+/// This package does NOT reimplement any of it. Both systems ship JavaScriptCore
+/// as a system framework, so that code runs here unchanged, with nothing bundled
+/// and no Node — and a differential test suite proves Swift and Node agree to the
 /// byte. Reimplementing `computeTax` in Swift would earn the right to be wrong
 /// in a second, different way, and every future fix would have to be made twice.
+///
+/// TWO platforms for that same reason and no other. A phone that has to work
+/// when the Mac is out of reach needs the shop's arithmetic in its pocket, and
+/// the only copy of that arithmetic anybody should ever ship is this one.
 ///
 /// What IS written in Swift: the store, the platform layer, and the interface.
 let package = Package(
@@ -32,7 +36,41 @@ let package = Package(
     // A STRING, because `.v26` does not exist in swift-tools-version 6.0 —
     // the enum only knows the versions its own toolchain shipped with. The
     // string initializer takes any version and means the same thing.
-    platforms: [.macOS("26.0")],
+    //
+    // ── AND iOS 26, FOR THE SAME REASON AND NOT A DIFFERENT ONE ───────────
+    //
+    // The phone is here because the alternative was a second implementation of
+    // the same money. `ios/KhaytCompanion` computes nothing today — it asks the
+    // desktop for every number and shows the answer — and the moment it is
+    // asked to work without the desktop, somebody has to decide where its tax
+    // comes from. Reimplementing `computeTax` in Swift would earn the right to
+    // be wrong in a second, different way; the note at the top of this file
+    // already refused that once, for macOS, and the phone does not get a
+    // different answer.
+    //
+    // It costs one line, and that is not a figure of speech: every file in the
+    // KhaytCore target compiles for iOS unchanged. There is no AppKit in it,
+    // and Foundation, JavaScriptCore, CryptoKit, CommonCrypto, Compression and
+    // CoreGraphics — the complete import list — are all iOS frameworks too.
+    // JavaScriptCore especially: it is a system framework on iOS exactly as it
+    // is on macOS, so a shop's business rules run on the phone with nothing
+    // bundled, for the same reason they run on the Mac.
+    //
+    // 26.0, matching the floor above, and the argument is the one the Mac makes
+    // rather than a weaker version of it. iOS 26 needs an A13 — iPhone 11 or
+    // the second-generation SE — so it does drop the XR and the XS, which is a
+    // real cost the macOS floor did not have to pay. What makes it cheap is the
+    // same sentence: THE COMPANION HAS NOT SHIPPED. `ios/README.md` still calls
+    // the App Store "a future path", so there is no shop on an iPhone XS to
+    // strand, only a 2018 phone that will not be bought new. This is free today
+    // and expensive after the first shop installs it, which is exactly why it
+    // is being decided now and not later.
+    //
+    // Verified by building the KhaytCore product against the iOS SDK at this
+    // floor — including with Sparkle still in `dependencies`, which is
+    // macOS-only. SwiftPM does not hold that against a target that never names
+    // it, so the update path for the Mac costs the phone nothing.
+    platforms: [.macOS("26.0"), .iOS("26.0")],
     products: [
         .library(name: "KhaytCore", targets: ["KhaytCore"]),
         .executable(name: "Khayt", targets: ["KhaytApp"]),

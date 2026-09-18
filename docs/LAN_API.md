@@ -110,6 +110,79 @@ Active kanban orders (`pending`, `printing`, `post`, `qc`). **Requires owner PIN
 ]
 ```
 
+### `GET /api/store`
+
+The working set of the shop's book, for a client that keeps its own copy.
+**Requires owner PIN.**
+
+> **Served by the native Mac app only.** `lib/lan-server.js` does not implement
+> this route. Every other endpoint on this page answers a *question* — what is in
+> the queue, what is on the machines — which assumes the asker is a screen with a
+> live connection. This one hands over enough of the book that the asker can stop
+> asking, and it exists for the iOS companion's local store.
+
+**It is not the whole book.** `printLog` is about half of a real shop's store and
+`printFiles` another quarter — history no companion screen has ever shown. What
+travels is `BookScope.workingSet` (declared in `mac/KhaytCore/Sources/KhaytCore/BookScope.swift`,
+so the Mac and the phone cannot disagree about it):
+
+| Collection | What travels |
+|---|---|
+| `settings` | always, in full — nothing can be priced without it |
+| `printLog` | every **unfinished** order whatever its age, plus the newest 200 finished |
+| `clients`, `inventory`, `machines`, `waitingList` | in full, up to a ceiling |
+| everything else | stays on the Mac |
+
+An order is finished at `completed`, `shipped`, `delivered` or `cancelled`.
+Anything else travels however old it is — a job stuck in QC for two months is
+still in the shop.
+
+`?scope=whole` returns the entire store instead, for a restore or a person with
+`curl`. The companion never asks for it.
+
+**Secrets are masked** either way. The store passes through
+`KhaytCloudOutbox.forCloud(store)` — the same rule the cloud push uses — so every
+path named in `lib/store-secret-paths.js` (printer access codes, API keys, bot
+tokens, refresh tokens) arrives as `"__KHAYT_MASKED__"`. A device on the LAN is
+trusted with exactly what the cloud is trusted with, and no more.
+
+**Customer data is NOT masked**, because it is not a secret — it is the book. The
+response carries the shop's clients, orders and prices, which is why the owner PIN
+gates it and why the PIN lockout applies.
+
+**Response 200** — an envelope, not a bare store. The records alone cannot say what
+was left out, and a partial book that cannot say it is partial is worse than none:
+a client would count 200 orders and report a three-year-old shop as having done 200.
+
+```json
+{
+  "whole": false,
+  "scope": {
+    "collections": {
+      "printLog":  { "whole": false, "sent": 200, "available": 3140 },
+      "clients":   { "whole": true,  "sent": 31 },
+      "inventory": { "whole": true,  "sent": 13 }
+    },
+    "omitted": ["auditLog", "expenses", "printFiles", "products"],
+    "takenAt": "2026-09-18T09:00:00.000Z"
+  },
+  "store": {
+    "settings": { "shopName": "Ward", "telegram": { "botToken": "__KHAYT_MASKED__" } },
+    "printLog": [ { "id": "ord-123", "client": "Acme Co", "status": "printing" } ],
+    "clients":  [ { "id": "c-1", "name": "Sara" } ]
+  }
+}
+```
+
+`omitted` names what was withheld rather than leaving it to be inferred from
+absence: a client asking "do I have expenses?" must be told "they were not sent",
+never "there are none". A collection the shop simply does not have comes back as
+`{"whole": true, "sent": 0}` — the client has everything there is.
+
+**Response 500** — `{"error":"The book could not be prepared to send"}`. Deliberately
+not an empty book: a client that accepted `{}` would replace a shop it already had
+with nothing.
+
 ### `GET /api/orders`
 
 Order log slice. **Requires owner PIN.**

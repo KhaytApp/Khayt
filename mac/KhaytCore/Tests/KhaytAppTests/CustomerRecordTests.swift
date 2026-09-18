@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import KhaytCore
 @testable import KhaytApp
 
 /// Three kinds of customer, and the middle one was missing.

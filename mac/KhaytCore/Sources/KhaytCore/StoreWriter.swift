@@ -1,7 +1,6 @@
 import Foundation
-import KhaytCore
 
-/// Changing a shop's book, from the Mac app.
+/// Changing a shop's book — on whichever device is holding it.
 ///
 /// Three rules, and each is a failure this app would otherwise have.
 ///
@@ -22,7 +21,7 @@ import KhaytCore
 /// **It writes only while it owns the book.** Ownership is checked before the
 /// read and again immediately before the swap, so the window in which Electron
 /// could take over is the width of one serialisation rather than a whole edit.
-enum StoreWriter {
+public enum StoreWriter {
 
     /// Told after every successful write, with the store that was written.
     ///
@@ -42,19 +41,19 @@ enum StoreWriter {
     ///
     /// Hopped to the main actor because the synchronous `update` is not on it
     /// and the listener — `Shop` — is.
-    @MainActor static var didWrite: (@MainActor (URL) -> Void)?
+    @MainActor public static var didWrite: (@MainActor (URL) -> Void)?
 
     /// Matches `MAX_STORE_BYTES` in lib/store-io.js. Every safety net — the
     /// daily backup, the iCloud copy, the pre-update snapshot — is built to that
     /// number, so writing past it produces a store nothing can protect.
-    static let maxStoreBytes = 50_000_000
+    public static let maxStoreBytes = 50_000_000
 
-    enum Refusal: Error, CustomStringConvertible {
+    public enum Refusal: Error, CustomStringConvertible {
         case notOurs(String)
         case tooLarge(Int)
         case unreadable(String)
 
-        var description: String {
+        public var description: String {
             switch self {
             case .notOurs(let who):
                 return "\(who). Nothing was changed — only the app that owns the book may write to it."
@@ -67,22 +66,13 @@ enum StoreWriter {
         }
     }
 
-    /// Read-modify-write the whole store, atomically, while we own it.
-    static func update(_ build: StoreReader.Build,
-                       mutate: (inout [String: JSONValue]) throws -> Void) throws {
-        try update(storeURL: build.storeURL,
-                   owns: { StoreLock.weOwnIt(build) },
-                   whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
-                   mutate: mutate)
-    }
-
     /// The same, addressed by path.
     ///
     /// Not a convenience: it is the seam the tests need. Everything below runs
     /// against a copy of a real store in a temp directory, because a write path
     /// whose only trial run was on a shop's live book has not been tested, it
     /// has been risked.
-    static func update(storeURL url: URL,
+    public static func update(storeURL url: URL,
                        owns: () -> Bool,
                        whoHasIt: () -> String?,
                        mutate: (inout [String: JSONValue]) throws -> Void) throws {
@@ -128,7 +118,7 @@ enum StoreWriter {
     /// hop to the engine actor. Leaving it nonisolated only means handing three
     /// closures across an isolation boundary they have no reason to cross.
     @MainActor
-    static func update(storeURL url: URL,
+    public static func update(storeURL url: URL,
                        owns: () -> Bool,
                        whoHasIt: () -> String?,
                        mutate: (inout [String: JSONValue]) async throws -> Void) async throws {
@@ -161,7 +151,7 @@ enum StoreWriter {
     /// a corrupt `.prev`, and the setup wizard. The old
     /// store rolls to `.prev` first: one generation of rollback, and the file
     /// `recoverStoreRaw` reaches for when the primary will not parse.
-    static func atomicWrite(_ data: Data, to url: URL) throws {
+    public static func atomicWrite(_ data: Data, to url: URL) throws {
         let tmp = url.deletingLastPathComponent()
             .appending(path: "\(url.lastPathComponent).tmp.\(ProcessInfo.processInfo.processIdentifier).\(UUID().uuidString)")
         let fm = FileManager.default
@@ -201,7 +191,7 @@ enum StoreWriter {
     /// the next Electron launch, exactly like the state it had always been in —
     /// and would never reach the cloud. Bumping it makes the edit
     /// self-describing whether or not Electron ever runs again.
-    static func stamp(_ record: inout [String: JSONValue]) {
+    public static func stamp(_ record: inout [String: JSONValue]) {
         let rev: Double
         if case .number(let n)? = record["rev"] { rev = n + 1 } else { rev = 1 }
         record["rev"] = .number(rev)
@@ -209,7 +199,7 @@ enum StoreWriter {
     }
 
     /// `new Date().toISOString()` — millisecond precision, always UTC, always Z.
-    static func iso(_ date: Date) -> String {
+    public static func iso(_ date: Date) -> String {
         let f = DateFormatter()
         f.calendar = Calendar(identifier: .gregorian)
         f.locale = Locale(identifier: "en_US_POSIX")
@@ -225,7 +215,7 @@ enum StoreWriter {
     /// would look to the next sync exactly like the change never happened, and
     /// the other machine's copy would win — the undo would be undone, by a
     /// laptop, quietly.
-    static func restoring(_ wanted: [String: JSONValue],
+    public static func restoring(_ wanted: [String: JSONValue],
                           over current: [String: JSONValue]) -> [String: JSONValue] {
         var out = wanted
         out["rev"] = current["rev"]
@@ -233,16 +223,7 @@ enum StoreWriter {
         return out
     }
 
-    /// Change one record of one collection in place, stamping it.
-    static func updateRecord(_ build: StoreReader.Build, collection: String, id: String,
-                             change: (inout [String: JSONValue]) -> Void) throws {
-        try updateRecord(storeURL: build.storeURL,
-                         owns: { StoreLock.weOwnIt(build) },
-                         whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
-                         collection: collection, id: id, change: change)
-    }
-
-    static func updateRecord(storeURL: URL, owns: () -> Bool, whoHasIt: () -> String?,
+    public static func updateRecord(storeURL: URL, owns: () -> Bool, whoHasIt: () -> String?,
                              collection: String, id: String,
                              change: (inout [String: JSONValue]) -> Void) throws {
         try update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in

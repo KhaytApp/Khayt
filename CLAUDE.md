@@ -90,3 +90,42 @@ both addresses when they disagree, rather than just refusing.
 
 Merge commits are exempt on purpose: `main` is strict, so a stale PR gets an "Update branch"
 merge commit written by GitHub that nobody can sign. See [`scripts/check-dco.js`](scripts/check-dco.js).
+
+## `KhaytCore` is shared with the phone now — it is not a Mac-only package
+
+This is the one thing in this repo that is easy to break from the outside and
+impossible to notice from inside a Mac session.
+
+`mac/KhaytCore` builds for **macOS and iOS**. `ios/KhaytCompanion` links the
+`KhaytCore` product and computes the shop's money with it, which is the whole
+reason there is no second tax engine written in Swift. The path is not obvious
+from the directory name: a package under `mac/` ships inside the iPhone app.
+
+**Four things silently un-ship the phone.** None of them fails a Mac build, and
+`swift build` in `mac/KhaytCore` will look perfectly green for all four:
+
+| Change | What it does to the phone |
+|---|---|
+| `import AppKit` / `Cocoa` / any macOS-only framework in `Sources/KhaytCore/` | the iOS build stops compiling |
+| dropping `.iOS("26.0")` from `platforms:` in `Package.swift` | the companion cannot resolve the package at all |
+| moving a file **out** of `Sources/KhaytCore/` into `Sources/KhaytApp/` | the phone loses the type; `StoreWriter` is the live example — the phone writes its book through it |
+| a macOS-only API inside an otherwise portable file | compiles here, fails against the iOS SDK |
+
+`KhaytCoreIsPortableTests` in `KhaytCoreTests` catches the first two in the
+ordinary Mac test run, so `swift test` is enough to be told. It cannot catch the
+last one, because only a compiler with the iOS SDK can — for that, build it:
+
+```bash
+xcodebuild -scheme KhaytCore -destination 'generic/platform=iOS' \
+  -derivedDataPath /tmp/kc-ios build          # from mac/KhaytCore
+```
+
+`.github/workflows/ios-contract.yml` runs that on CI and its path filter now
+includes `mac/KhaytCore/**`, so a Mac-side change that breaks the phone reports
+on the PR that made it. It is still **not** a required check — see the section
+above for why a path-filtered check must stay optional.
+
+**Moving logic out of JavaScript into Swift is the common case here, and it is
+fine** — that is what the `Mac: work out X natively` commits do. Put the Swift in
+`Sources/KhaytCore/`, not `Sources/KhaytApp/`, unless it genuinely needs AppKit.
+A rule that lands in `KhaytApp` is a rule the phone has to ask the Mac for.

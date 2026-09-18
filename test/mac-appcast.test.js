@@ -67,9 +67,21 @@ test('the minimum system version is stated, and matches what the app declares', 
   assert.match(xml, /<sparkle:minimumSystemVersion>26\.0<\/sparkle:minimumSystemVersion>/);
   // The app's own floor, from the package manifest — if that moves and this
   // does not, Sparkle offers the update to Macs that cannot run it.
+  //
+  // It matches the macOS entry WHEREVER it sits in the array rather than
+  // requiring the array to hold nothing else, because it does hold something
+  // else now: KhaytCore builds for iOS too, since ios/KhaytCompanion links it
+  // to work the shop's money out on the phone. The old pattern pinned the whole
+  // list and so failed on `.iOS` being added beside `.macOS` — a change that
+  // moved no Mac floor at all and had nothing to do with Sparkle, which does
+  // not run on iOS.
+  //
+  // Still anchored to `platforms:` and still exact about 26.0, so the thing it
+  // was written to catch — somebody raising the Mac floor without raising the
+  // feed's — fails here exactly as before.
   const pkg = require('fs').readFileSync(
     require('path').join(__dirname, '..', 'mac', 'KhaytCore', 'Package.swift'), 'utf8');
-  assert.match(pkg, /platforms:\s*\[\.macOS\("26\.0"\)\]/,
+  assert.match(pkg, /platforms:\s*\[[^\]]*\.macOS\("26\.0"\)/,
     'the package floor moved — update the appcast default with it');
 });
 

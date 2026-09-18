@@ -13,6 +13,15 @@ on:
     branches: [main]
     paths:
       - 'ios/**'
+      # ── THE PHONE SHIPS A PACKAGE THAT LIVES UNDER mac/ ────────────────
+      #
+      # `mac/KhaytCore` builds for iOS and `ios/KhaytCompanion` links it, so
+      # the phone's business logic is Mac-side source. A commit that adds
+      # `import AppKit` to it is an ordinary macOS change: `swift build` stays
+      # green, `swift test` stays green, every Mac screen keeps working, and
+      # the iOS app stops compiling. Without this line the one check that
+      # would have said so does not run on the commit that did it.
+      - 'mac/KhaytCore/**'
       - 'lib/lan-server.js'
       # The fixture reads the desktop's STATUSES out of this file, so a status
       # added here is what widens the capture and breaks the phone's enum. The
@@ -26,6 +35,15 @@ on:
     branches: [main]
     paths:
       - 'ios/**'
+      # ── THE PHONE SHIPS A PACKAGE THAT LIVES UNDER mac/ ────────────────
+      #
+      # `mac/KhaytCore` builds for iOS and `ios/KhaytCompanion` links it, so
+      # the phone's business logic is Mac-side source. A commit that adds
+      # `import AppKit` to it is an ordinary macOS change: `swift build` stays
+      # green, `swift test` stays green, every Mac screen keeps working, and
+      # the iOS app stops compiling. Without this line the one check that
+      # would have said so does not run on the commit that did it.
+      - 'mac/KhaytCore/**'
       - 'lib/lan-server.js'
       # The fixture reads the desktop's STATUSES out of this file, so a status
       # added here is what widens the capture and breaks the phone's enum. The
@@ -54,6 +72,19 @@ jobs:
 
       - name: Decode live server responses with the shipping Swift models
         run: npm run test:ios-contract
+
+      # BEFORE the app, on purpose. If KhaytCore has stopped being portable the
+      # app build fails too, but it fails with the app's name on it and a list
+      # of missing types — which sends whoever reads it looking in `ios/`. This
+      # says the package, and it is the package that changed.
+      - name: KhaytCore still builds for the phone
+        working-directory: mac/KhaytCore
+        run: |
+          xcodebuild build \
+            -scheme KhaytCore \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/kc-ios" \
+            CODE_SIGNING_ALLOWED=NO | tail -30
 
       # The companion's own unit tests. They need a booted simulator, which the
       # contract check above does not, so a failure here is about the app rather

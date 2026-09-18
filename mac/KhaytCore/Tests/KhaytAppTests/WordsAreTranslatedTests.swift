@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import KhaytCore
 @testable import KhaytApp
 
 /// Nothing on a screen may be written in English in the source.
@@ -34,8 +35,14 @@ struct WordsAreTranslatedTests {
         // Low-level writers with no interface language in scope. What they carry
         // is a fallback for a lock whose holder did not name itself, and
         // threading `Words` into a file writer to say it would be worse than the
-        // gap. KNOWN GAP: these four sentences are English in every language.
-        "StoreWriter.swift": "a nonisolated writer, below the interface",
+        // gap. KNOWN GAP: these sentences are English in every language.
+        //
+        // `StoreWriter.swift` was on this list and is not any more — not because
+        // it was translated, but because it moved to KhaytCore so the phone
+        // could write a book through the same atomic swap. Its refusals went
+        // with it, so the gap is still a gap; it is simply outside what this
+        // test reads, which is `Sources/KhaytApp` alone. Whoever closes it has
+        // two files to close, not one.
         "StoreLock.swift": "a nonisolated lock, below the interface",
         "Restore.swift": "shares the writer's refusals",
     ]

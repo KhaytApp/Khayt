@@ -62,6 +62,12 @@ extension OrderStatus {
         case .qc: return L10n.tr("status.qc")
         case .completed: return L10n.tr("status.completed")
         case .delivered: return L10n.tr("status.delivered")
+        // `shipped` reached the enum and `label` but not this switch, and a
+        // non-exhaustive switch is a COMPILE error — so `ios/` did not build at
+        // all on main. Nothing said so: `ci.yml`'s required checks never run
+        // `xcodebuild`, and the iOS contract check compiles `KhaytModels.swift`
+        // on its own, which is the one file that WAS finished.
+        case .shipped: return L10n.tr("status.shipped")
         case .on_hold: return L10n.tr("status.on_hold")
         }
     }

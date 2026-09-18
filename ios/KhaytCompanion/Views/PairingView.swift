@@ -226,7 +226,39 @@ struct PairingView: View {
         do {
             let status = try await api.validatePairing()
             testOK = true
-            testMessage = "Connected — \(status.queued) job(s) in queue. PIN accepted."
+            var message = "Connected — \(status.queued) job(s) in queue. PIN accepted."
+
+            // ── AND THEN ASK FOR THE BOOK, BUT DO NOT INSIST ─────────────
+            //
+            // Pairing has succeeded by this line. Taking a copy of the shop's
+            // book is what lets this phone keep working when the Mac is not in
+            // reach, so it is worth doing at the one moment the shop is
+            // definitely on the same Wi-Fi and has just typed the PIN.
+            //
+            // It must NOT be able to fail the pairing, because `/api/store` is
+            // served by the native Mac app and not by the Electron desktop most
+            // shops are still running. A phone that refused to pair with the app
+            // the shop actually has would be a worse phone than the one that
+            // could not work offline. So: if the book arrives, say so; if it
+            // does not, say what that means rather than showing an error for
+            // something that is not broken.
+            do {
+                let book = try CompanionBook.inSharedContainer()
+                let records = try await api.pullBook(into: book)
+                message += " \(records) record(s) are on this phone, so it keeps working "
+                        + "when this Mac is not in reach."
+                // Said plainly, because the alternative is a phone that looks
+                // like it has the shop on it and quietly does not. The history
+                // stays on the Mac by design; what is worth saying is that it is
+                // still there rather than gone.
+                if let scope = book.scope(), !scope.omitted.isEmpty {
+                    message += " Older history stays on the Mac and is fetched when you ask for it."
+                }
+            } catch {
+                message += " This desktop does not hand over its book, so the phone will "
+                        + "ask it again for every screen and will empty when it is out of reach."
+            }
+            testMessage = message
         } catch {
             testMessage = error.localizedDescription
         }
