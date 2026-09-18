@@ -19,6 +19,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   tag the shop has never used before is still stored exactly as typed rather
   than lower-cased into a house style.
 
+- **(Mac) A shop's own reports are built natively.** Choosing columns,
+  filtering by date and status, and exporting the CSV all run in the app now.
+  Two things the export has always got right and still does: a cell beginning
+  `=`, `+`, `-`, `@` or a tab is neutralised so a spreadsheet cannot run a
+  project name as a formula, and a number is written as a number so money does
+  not arrive as text.
+
+
 - **(Mac) A customer's agreed prices are applied natively.** The rule that
   charges a customer what they were promised now runs in the app, and keeps the
   decision that makes it safe: the first product on the list that matches wins

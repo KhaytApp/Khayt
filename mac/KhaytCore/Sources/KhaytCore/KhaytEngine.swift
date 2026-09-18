@@ -672,7 +672,6 @@ public actor KhaytEngine {
         "sdcp",
         "sdcp-reply",
         "report-records",
-        "report-builder",
         // A report a shop named, kept in one shape for both apps.
         "saved-reports",
         // What the machine itself remembers. The nozzle-wear counter reads
@@ -5612,12 +5611,10 @@ public actor KhaytEngine {
 
     /// The columns on offer, and the ones a report starts with.
     public func reportFields() throws -> [ReportField] {
-        try runtime.call2("globalThis.KhaytReportBuilder.FIELDS", [], as: [ReportField].self)
+        ReportBuilder.fields.map { ReportField(key: $0.key, label: $0.label) }
     }
 
-    public func reportDefaultFields() throws -> [String] {
-        try runtime.call2("globalThis.KhaytReportBuilder.DEFAULT_FIELDS", [], as: [String].self)
-    }
+    public func reportDefaultFields() throws -> [String] { ReportBuilder.defaultFields }
 
     /// The table a shop asked for.
     ///
@@ -5649,8 +5646,11 @@ public actor KhaytEngine {
                             fields: [String], statusIn: [String],
                             from: String, to: String,
                             labels: [String: JSONValue]) throws -> Report {
-        try runtime.call2(#"""
-        (function (orders, clients, machines, settings, lang, fields, statusIn, from, to, labels) {
+        // `report-records` still turns orders into rows — it resolves the
+        // client and machine names and the three money figures from the
+        // modules that own them, and those have not moved yet...
+        let records: [JSONValue] = try runtime.call2(#"""
+        (function (orders, clients, machines, settings, lang) {
           var records = globalThis.KhaytReportRecords.reportRecords(orders, {
             money: globalThis.KhaytOrderMoney,
             payment: globalThis.KhaytOrderPayment,
@@ -5663,17 +5663,21 @@ public actor KhaytEngine {
                 || (row && row.name) || '';
             },
           });
-          var r = globalThis.KhaytReportBuilder.buildReport(records, {
-            fields: fields, statusIn: statusIn, from: from, to: to, labels: labels,
-          });
-          return { headers: r.headers || [], keys: r.keys || [], rows: (r.rows || []).map(function (row) {
-            return row.map(function (cell) { return cell == null ? '' : String(cell); });
-          }), total: (r.rows || []).length };
-        })(ARG0, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7, ARG8, ARG9)
+          return records;
+        })(ARG0, ARG1, ARG2, ARG3, ARG4)
         """#, [.array(orders), .array(clients), .array(machines), .object(settings),
-               .string(language), .array(fields.map { .string($0) }),
-               .array(statusIn.map { .string($0) }), .string(from), .string(to),
-               .object(labels)], as: Report.self)
+               .string(language)], as: [JSONValue].self)
+
+        // ...and `report-builder` selects, filters and orders, natively.
+        let report = ReportBuilder.build(records: records, fields: fields,
+                                         statusIn: statusIn.map { .string($0) },
+                                         from: from, to: to, labels: labels)
+        return Report(headers: report.headers, keys: report.keys,
+                      // `cell == null ? '' : String(cell)` — the table draws
+                      // text, and a number reaches it printed the way the other
+                      // app prints one.
+                      rows: report.rows.map { $0.map(JSSemantics.text) },
+                      total: report.rows.count)
     }
 
     // MARK: - Saved reports
@@ -5727,10 +5731,7 @@ public actor KhaytEngine {
     /// contains a comma, a quote or a newline. `reportToCsv` handles all of it
     /// and is tested for it.
     public func reportToCsv(headers: [String], rows: [[String]]) throws -> String {
-        try runtime.call2(#"""
-        globalThis.KhaytReportBuilder.reportToCsv({ headers: ARG0, rows: ARG1 })
-        """#, [.array(headers.map { .string($0) }),
-               .array(rows.map { .array($0.map { .string($0) }) })], as: String.self)
+        ReportBuilder.csv(headers: headers, rows: rows)
     }
 
     // MARK: - Duet
