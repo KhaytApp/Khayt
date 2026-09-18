@@ -80,35 +80,12 @@ enum Telegram {
 
 /// The message rule, as this app reaches it.
 ///
-/// A thin Swift face on `lib/telegram-message.js` so the call sites read like
-/// the rest of the app; every decision is still the module's.
+/// One name for the call sites; every decision is `KhaytCore.TelegramBot`,
+/// which is where the rule now lives. It used to be spelled out twice — once
+/// in `lib/telegram-message.js` and once here — with a test holding the two
+/// together. There is one copy now, and the phone can reach it.
 enum KhaytTelegram {
-    static let maxMessage = 4096
-
-    static func isBotToken(_ token: String) -> Bool {
-        // The same shape the module checks and the Electron main process
-        // checks. Spelled here because it is asked on the way into a network
-        // call, where a bridge crossing to answer "is this string shaped like
-        // a token" would be absurd — and pinned to the module by a test.
-        token.range(of: "^[0-9]+:[A-Za-z0-9_-]+$", options: .regularExpression) != nil
-    }
-
-    /// A chat id Telegram will accept, or nil.
-    ///
-    /// Either a numeric id (negative for a group or channel) or a public
-    /// `@username` of 5–32 letters, digits and underscores. Khayt used to strip
-    /// with `[^0-9@-]`, which keeps the @ and throws the name away — a shop
-    /// that typed `@khaytshop` was sending to `@` and getting nothing.
-    ///
-    /// Spelled here because it is asked on the way into a network call, and
-    /// pinned to `lib/telegram-message.js` by a test that runs both.
-    static func chatId(_ value: String) -> String? {
-        let raw = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !raw.isEmpty else { return nil }
-        if raw.range(of: "^-?[0-9]+$", options: .regularExpression) != nil { return raw }
-        let name = raw.hasPrefix("@") ? String(raw.dropFirst()) : raw
-        guard name.range(of: "^[A-Za-z0-9_]{5,32}$", options: .regularExpression) != nil,
-              name.contains(where: { $0.isLetter || $0 == "_" }) else { return nil }
-        return "@" + name
-    }
+    static let maxMessage = TelegramBot.maxMessage
+    static func isBotToken(_ token: String) -> Bool { TelegramBot.isBotToken(token) }
+    static func chatId(_ value: String) -> String? { TelegramBot.chatId(value) }
 }
