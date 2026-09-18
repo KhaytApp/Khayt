@@ -8231,6 +8231,65 @@ final class Shop {
         }
     }
 
+    // MARK: - Where a model came from
+
+    /// Record what a model's licence is, on everything selected.
+    ///
+    /// ── WHY THIS HAD TO EXIST ─────────────────────────────────────────────
+    ///
+    /// The inspector has always READ a licence and nothing on this Mac could
+    /// write one, so on a real book the panel was blank on every model and the
+    /// only way to fill it in was to open the other app. A library holds work
+    /// the shop made and models it downloaded, they look identical in a grid,
+    /// and the difference decides whether a print can be SOLD.
+    ///
+    /// An empty string CLEARS it, back to "nobody has recorded one" — which is
+    /// not the same as "may not be sold" and must stay reachable, because a
+    /// licence set by mistake is worse than no licence at all.
+    func fileSelection(licence: String) async {
+        guard !fileSelection.isEmpty else { return }
+        // Through `ModelLicence`, so a value this app cannot name never reaches
+        // the book: the id stored is the module's own spelling of it.
+        let id = ModelLicence.find(licence)?.id ?? ""
+        guard !licence.isEmpty == !id.isEmpty else {
+            writeProblem = words.callIt("mac.licence_unknown"); return
+        }
+        let named = id.isEmpty ? words.callIt("mac.licence_cleared")
+                               : words.callIt("mac.licence_set")
+        editFiles(fileSelection, named: named) { record in
+            record["licence"] = .string(id)
+        }
+    }
+
+    /// Record where a model came from — a model-site URL, or the shop's own
+    /// name for it. Free text on purpose: it is a note to a person.
+    func setSourceOnSelection(_ typed: String) async {
+        guard !fileSelection.isEmpty else { return }
+        // Trimmed and capped at the other app's own `maxlength`, so a source
+        // typed here is one it will show back.
+        let source = String(typed.trimmingCharacters(in: .whitespacesAndNewlines).prefix(300))
+        editFiles(fileSelection, named: words.callIt("mac.source_set")) { record in
+            record["source"] = .string(source)
+        }
+    }
+
+    /// The licence everything selected already carries, or nil when they
+    /// disagree — the same reasoning as `tagsOnSelection`: showing one model's
+    /// answer and writing it to the rest would hand them one they never had.
+    var licenceOnSelection: String? {
+        let chosen = selectedFiles
+        guard let first = chosen.first else { return nil }
+        let id = ModelLicence.find(first.licence)?.id ?? ""
+        return chosen.allSatisfy { (ModelLicence.find($0.licence)?.id ?? "") == id } ? id : nil
+    }
+
+    /// The source shared by everything selected, or empty when they disagree.
+    var sourceOnSelection: String {
+        let chosen = selectedFiles
+        guard let first = chosen.first?.source else { return "" }
+        return chosen.allSatisfy { ($0.source ?? "") == first } ? first : ""
+    }
+
     /// What the tag box starts with: the tags shared by everything selected.
     ///
     /// Not the first one's tags. With several chosen, showing one model's tags
