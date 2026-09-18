@@ -126,6 +126,34 @@ struct CompanionBook {
 
     var exists: Bool { FileManager.default.fileExists(atPath: url.path) }
 
+    /// The book exactly as the Mac last handed it over.
+    ///
+    /// ── WHY A SECOND COPY ────────────────────────────────────────────────
+    ///
+    /// To send the Mac what this phone changed, something has to know what
+    /// "changed" means. `KhaytCloudOutbox.changesToSend` answers it by
+    /// comparing two stores — and that is the shop's own rule, the one the
+    /// desktop and the cloud already use, so the phone does not get a private
+    /// theory about what a change is.
+    ///
+    /// The baseline is the second store in that comparison: written at the
+    /// moment of a pull, when it is by definition identical to the book, and
+    /// then left alone while the book moves. Everything that differs afterwards
+    /// is this phone's doing.
+    ///
+    /// It costs a duplicate of the working set on disk, which is bounded — the
+    /// set is capped at 200 finished orders plus the live ones. The alternative
+    /// was a change log maintained by hand on the phone, which is a second
+    /// implementation of the thing `sync.js` already does and gets wrong in its
+    /// own way.
+    var baselineURL: URL { directory.appending(path: "khayt-store.baseline.json") }
+
+    /// What the Mac last gave this phone, or nil if it has never given it one.
+    func baseline() -> [String: JSONValue]? {
+        guard let data = try? Data(contentsOf: baselineURL) else { return nil }
+        return try? JSONDecoder().decode([String: JSONValue].self, from: data)
+    }
+
     /// Where the description of what this phone holds lives.
     ///
     /// Beside the book, not inside it. Anything added to the store itself is a
@@ -174,6 +202,12 @@ struct CompanionBook {
         if let scope, let described = try? JSONEncoder().encode(scope) {
             try? described.write(to: scopeURL, options: [.atomic])
         }
+        // The baseline is the same bytes, written at the one moment the two are
+        // known to agree. NOT `try?` — a pull whose baseline did not land would
+        // leave the phone unable to tell its own edits from the Mac's, and the
+        // next outbox would either send nothing or send everything. Failing the
+        // pull is the safe direction: a phone with no book asks for one again.
+        try next.write(to: baselineURL, options: [.atomic, .completeFileProtection])
     }
 
     /// Change the book in place, atomically.
@@ -201,6 +235,9 @@ struct CompanionBook {
 
     /// Forget the shop entirely. Unpairing must not leave a client list behind.
     func forget() {
+        // The baseline is a second full copy of the shop's records — same client
+        // list, same prices. It goes with everything else.
+        try? FileManager.default.removeItem(at: baselineURL)
         try? FileManager.default.removeItem(at: scopeURL)
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(at: url.appendingPathExtension("prev"))
