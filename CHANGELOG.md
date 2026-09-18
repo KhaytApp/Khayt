@@ -11,6 +11,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the same way — "PA6-CF" is a nylon and needs drying every day, "PC-ABS" is an
   ABS and does not, and a spool nobody has recorded a drying for is left alone
   rather than being reported as overdue.
+- **(Mac) The queue projection is worked out natively, and survives a book that
+  is wrong.** The "ready by" dates and the at-risk warning now run in the app.
+  A job whose hours are recorded as something impossible used to take the whole
+  board down with it — in the other app the screen simply failed, and the first
+  version of the Swift one crashed outright. That job now loses its own date
+  and every other job on the board keeps one.
 
 - **(Mac) What each machine cost to keep running is worked out natively.** The
   maintenance chart now runs in the app, and keeps the two decisions that make
