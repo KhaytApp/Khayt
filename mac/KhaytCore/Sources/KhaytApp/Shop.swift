@@ -6766,6 +6766,83 @@ final class Shop {
     func revealPhoto(_ snap: Snapshot) { if let file = snap.file { FileActions.reveal(file) } }
     func revealPhotoFolder() { if let folder = photoFolder { FileActions.reveal(folder) } }
 
+    /// The job a photo is being added to, or nil.
+    var photographing: Order?
+
+    /// Whether a photo can be added to this job at all.
+    ///
+    /// A finished job only. A photograph of the finished print is a record of
+    /// what came off the bed, and one attached to a quote is a picture of
+    /// something that has not been made.
+    func canPhotograph(_ job: Order) -> Bool {
+        canWrite && ["completed", "delivered"].contains(job.status)
+    }
+
+    /// Add a photograph of the finished print to a job.
+    ///
+    /// ── THE RECORD IS THE OTHER APP'S, EXACTLY ────────────────────────────
+    ///
+    /// Portfolio has always read `printLog[].printPhotos[]` and nothing here
+    /// could write one, so the screen told a shop to add a photo to a completed
+    /// order and offered no way to do it. Both apps read these back, so the
+    /// sizes, the folder and the filename are `hub:save-order-photo`'s — see
+    /// `OrderPhoto`.
+    ///
+    /// The file is written BEFORE the record, and the record only if the file
+    /// was written: a row naming a file that is not there draws an empty cell
+    /// with no way to fix it, whereas a file with no row is invisible and
+    /// harmless.
+    func addPhoto(to job: Order, from data: Data) async {
+        guard let build = source.build, canPhotograph(job) else {
+            writeProblem = words.callIt("mac.move_sample"); return
+        }
+        guard data.count <= OrderPhoto.maxBytes else {
+            writeProblem = words.callIt("pe.image_too_big"); return
+        }
+        guard let made = OrderPhoto.encode(data) else {
+            writeProblem = words.callIt("pe.upload_failed"); return
+        }
+        guard let folder = photoFolder else { return }
+
+        // The index the other app uses is the position in the job's own list,
+        // so it is read from the record rather than counted from the screen.
+        let index = orderRow(job.id).flatMap { row -> Int? in
+            guard case .object(let o) = row, case .array(let had)? = o["printPhotos"]
+            else { return 0 }
+            return had.count
+        } ?? 0
+        let name = OrderPhoto.filename(orderId: job.id, index: index)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try made.full.write(to: folder.appending(path: name))
+        } catch {
+            writeProblem = String(describing: error); return
+        }
+
+        do {
+            try StoreWriter.update(build) { root in
+                guard case .array(var jobs)? = root["printLog"] else { return }
+                for i in jobs.indices {
+                    guard case .object(var record) = jobs[i],
+                          Self.recordId(jobs[i]) == job.id else { continue }
+                    var photos: [JSONValue] = []
+                    if case .array(let had)? = record["printPhotos"] { photos = had }
+                    photos.append(OrderPhoto.record(thumb: made.thumb, filename: name))
+                    record["printPhotos"] = .array(photos)
+                    // Without the stamp the other machine's older copy wins the
+                    // next merge and the photograph disappears again.
+                    StoreWriter.stamp(&record)
+                    jobs[i] = .object(record)
+                }
+                root["printLog"] = .array(jobs)
+            }
+            writeProblem = nil
+            await load(source)
+        } catch {
+            writeProblem = String(describing: error)
+        }
+    }
+
     /// Who else has this book open, in the shop's own language.
     ///
     /// `StoreLock` hands back the application's name and — only when it is

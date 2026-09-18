@@ -46,7 +46,22 @@ struct Portfolio: View {
     var body: some View {
         Group {
             if shop.snapshots.isEmpty {
-                EmptyHere(title: shop.words.callIt("pf.empty"), mark: .portfolio)
+                // ── AND A WAY TO ACT ON IT ────────────────────────────
+                //
+                // `pf.empty` says "add a photo to a completed order" and this
+                // screen used to stop there — on a Mac where nothing could add
+                // one at all. Reported as exactly that question. The photo is
+                // added on the job, so the empty state goes there.
+                EmptyHere(title: shop.words.callIt("pf.empty"),
+                          message: shop.canWrite ? shop.words.callIt("mac.photo_where") : nil,
+                          mark: .portfolio) {
+                    if shop.canWrite {
+                        Button(shop.words.callIt("mac.show_finished_jobs")) {
+                            shop.shelf = .jobs(.completed)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
             } else if shown.isEmpty {
                 NothingMatched(shop: shop, mark: .portfolio)
             } else {

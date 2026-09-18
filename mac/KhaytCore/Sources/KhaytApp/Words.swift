@@ -801,6 +801,15 @@ final class Words {
         "mac.spotlight_note": ["en": "Model names, projects and tags only — never jobs or customers.",
                                "ar": "أسماء النماذج والمشاريع والوسوم فقط — لا الطلبات ولا العملاء."],
 
+        // A photograph of the finished print, on the job that made it.
+        "mac.add_print_photo": ["en": "Add a photo of the print",
+                                "ar": "إضافة صورة للطباعة"],
+        "mac.photo_on_finished_only": ["en": "A photo can be added once the job is finished.",
+                                       "ar": "يمكن إضافة صورة بعد انتهاء الطلب."],
+        "mac.photo_where": ["en": "Open a finished job and choose “Add a photo of the print”.",
+                            "ar": "افتح طلبًا منتهيًا واختر «إضافة صورة للطباعة»."],
+        "mac.show_finished_jobs": ["en": "Show finished jobs", "ar": "عرض الطلبات المنتهية"],
+
         // The shop's own saved messages.
         "mac.send_a_message": ["en": "Send a message", "ar": "إرسال رسالة"],
         "mac.message_template": ["en": "Message",      "ar": "الرسالة"],
