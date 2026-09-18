@@ -1041,6 +1041,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   included. A failure answers 500 rather than an empty book, since a phone that
   accepted `{}` would replace a shop it already had with nothing.
 
+- **(Repo) `KhaytCore` is flagged as shared, and a guard holds it to that.**
+  A package filed under `mac/` now ships inside an iPhone, and nothing about a
+  Mac session makes that visible. Adding `import AppKit` to it is a completely
+  ordinary macOS change — `swift build` stays green, `swift test` stays green,
+  every Mac screen keeps working, and the iOS app stops compiling, which nobody
+  discovers until somebody opens Xcode days later and reads it as the phone's
+  fault. `KhaytCoreIsPortableTests` fails in the ordinary Mac test run instead,
+  naming the file and the line, and it also refuses the two edits that would
+  un-ship the phone silently: dropping the iOS platform from the manifest, and
+  moving the store writer or the scope rule back out of the shared half. The
+  iOS contract workflow now triggers on `mac/KhaytCore/**` as well, so the
+  compiler that actually holds the iOS SDK reports on the commit that broke it
+  rather than on some later one. CLAUDE.md says all of this out loud.
+
 - **(iOS) The phone runs the shop's own business logic.** `KhaytCore` — the
   package the Mac app already computes every figure through — now builds for
   iOS too, and the companion links it. That is one line in the manifest and no
