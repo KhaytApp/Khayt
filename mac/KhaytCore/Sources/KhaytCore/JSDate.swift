@@ -60,6 +60,24 @@ public enum JSDate {
         return (civil.0, civil.1 - 1)
     }
 
+    /// `getDay()` and `getHours()` — LOCAL, like every other reader here.
+    ///
+    /// `getDay()` is 0 for Sunday, which is what the working week is indexed
+    /// by. The 1st of January 1970 was a Thursday, and the arithmetic is
+    /// anchored on that rather than on a `Calendar`, for the same reason
+    /// `localYearMonth` is: a `Calendar` brings a first-weekday preference and
+    /// an era with it, and JavaScript has neither.
+    public static func localDayAndHour(ms: Double) -> (weekday: Int, hour: Int) {
+        let date = Date(timeIntervalSince1970: ms / 1000)
+        let shifted = ms / 1000 + Double(TimeZone.current.secondsFromGMT(for: date))
+        let days = Int(floor(shifted / 86_400))
+        let secondsIntoDay = shifted - Double(days) * 86_400
+        // 1970-01-01 was a Thursday — day 4 counting Sunday as 0 — and the
+        // modulo is floored so days before the epoch land in 0...6 too.
+        let weekday = ((days + 4) % 7 + 7) % 7
+        return (weekday, Int(floor(secondsIntoDay / 3600)))
+    }
+
     /// What a parsed stamp is made of.
     struct Form {
         var year = 0, month = 1, day = 1

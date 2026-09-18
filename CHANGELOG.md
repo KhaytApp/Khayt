@@ -12,6 +12,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   even when it has no price, because a product written down with no price means
   "this one is not agreed" — a later entry must not quietly stand in for it.
 
+- **(Mac) When the shop actually finishes work is worked out natively.** The
+  seven-by-twenty-four grid on Reports — which day carries the most finished
+  jobs, which hour, and how much of the week's work lands on a day the shop is
+  closed — now runs in the app rather than through the bundled copy of the
+  rule. The reading is unchanged, including the deliberate tie-break: when two
+  days or two hours are equally busy the earlier one is named, so looking twice
+  gives the same answer.
+
 - **(Mac) When a spool needs drying again is worked out natively.** The shelf's
   dryness reminder runs in the app now, and still reads a supplier's own label
   the same way — "PA6-CF" is a nylon and needs drying every day, "PC-ABS" is an
