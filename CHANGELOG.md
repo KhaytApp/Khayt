@@ -1178,6 +1178,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   by name, description, material and group; the shelf and the catalogue also
   stop asking for a job number when what they filter is filament and products.
 
+### Fixed
+
+- **(iOS) A job on a printer read as "Unassigned".** An order carries
+  `machineId` and not the printer's name: `lib/order-new.js` writes the id
+  alone, and `queueJson` passes `machine` straight through — so for every job a
+  shop assigned at the desk, the phone drew the row without a printer and the
+  detail sheet said *Unassigned*.
+
+  What hid it is that the phone's own assignment worked. When the PHONE assigns
+  a machine, `lib/lan-server.js` looks the name up and writes both fields — so
+  the same job read as unassigned until somebody reassigned it from the phone,
+  and then named itself correctly. That reads as a display quirk rather than a
+  gap in the data.
+
+  The id was always there and so was the machine list; the book holds both. The
+  queue joins them where the two are already together, rather than threading a
+  machine list through every row that wants to draw a printer.
+
+  Pinned against the shop's real sample book, where all eleven queued jobs are
+  assigned and not one records a name.
 
 ## [3.8.0] - 2026-09-18
 
