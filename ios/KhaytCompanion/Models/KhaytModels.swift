@@ -129,7 +129,65 @@ struct MachineInfo: Codable, Identifiable, Sendable {
     let name: String?
     let type: String?
     let status: String?
+    /// Whether this machine can be asked what it is doing right now.
+    ///
+    /// ── IT IS DERIVED, AND THE BOOK DOES NOT CARRY IT ────────────────────
+    ///
+    /// `lib/lan-server.js` computes this on the way out:
+    /// `!!(m.printerApi?.type && m.printerApi.type !== 'none')`. A stored
+    /// machine has no such field — it has the `printerApi` object the answer is
+    /// derived from.
+    ///
+    /// That stopped mattering the moment the screens started reading the book
+    /// instead of the wire: a raw record decoded to `nil`, `MachinesView` read
+    /// that as false, and every machine in a shop — including the ones with a
+    /// printer connected — was labelled "No live connection".
+    ///
+    /// The shop's sample book could not show it: not one of its five machines
+    /// has a `printerApi` configured, so both paths agreed on false and the gap
+    /// was invisible to a fixture. It takes a shop with a printer plugged in.
+    ///
+    /// So the rule is applied here, where both paths pass: the wire's boolean
+    /// when it is sent, derived from `printerApi` when it is not.
     var hasPrinterApi: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, type, status, hasPrinterApi, printerApi
+    }
+
+    private struct PrinterApi: Decodable { let type: String? }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+        type = try c.decodeIfPresent(String.self, forKey: .type)
+        status = try c.decodeIfPresent(String.self, forKey: .status)
+        if let sent = try c.decodeIfPresent(Bool.self, forKey: .hasPrinterApi) {
+            hasPrinterApi = sent
+        } else if let api = try? c.decode(PrinterApi.self, forKey: .printerApi) {
+            // `lib/lan-server.js`'s rule, and "none" is a configured absence
+            // rather than a connection.
+            let kind = api.type
+            hasPrinterApi = (kind != nil && !kind!.isEmpty && kind != "none")
+        } else {
+            hasPrinterApi = nil
+        }
+    }
+
+    init(id: String, name: String?, type: String?, status: String?, hasPrinterApi: Bool?) {
+        self.id = id; self.name = name; self.type = type
+        self.status = status; self.hasPrinterApi = hasPrinterApi
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encodeIfPresent(name, forKey: .name)
+        try c.encodeIfPresent(type, forKey: .type)
+        try c.encodeIfPresent(status, forKey: .status)
+        try c.encodeIfPresent(hasPrinterApi, forKey: .hasPrinterApi)
+    }
 }
 
 /// Real-time printer telemetry from `/api/machines/live`.
