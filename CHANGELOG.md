@@ -61,6 +61,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   so an import or an older backup still exports. A shop writing in neither
   English nor Arabic gets its own names too: which of a record's names to print
   is the shop's own content-language rule, not a pick between two fields.
+- **(Mac) A label this app printed can be scanned back.** Khayt puts a code on
+  every label it prints — a spool gets its own, a parcel gets the order's or,
+  for a shop with the cloud connected, the customer's tracking link — and this
+  app could print them and not read one. Hold a scanner to a label now (⇧⌘S, or
+  Go → Scan a Label) and the spool opens, or the job is selected. A barcode
+  scanner is a keyboard: it types the code and presses Return, so there is
+  nothing to aim and no button to press. A code for something this book does
+  not have says so and leaves the field alone, because a scanner that misread
+  one character is the ordinary case and clearing the box hides the evidence.
 
 - **(Mac) A Simple shop no longer sees purchase orders it cannot see in the
   other app.** Purchase orders arrived here in 4.0.0-alpha.27, and arrived

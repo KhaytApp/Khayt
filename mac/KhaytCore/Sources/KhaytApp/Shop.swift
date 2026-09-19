@@ -5747,6 +5747,70 @@ final class Shop {
         }
     }
 
+    // MARK: - Reading back a label this app printed
+
+    /// Whether the scan sheet is open.
+    var scanning = false
+
+    /// Follow a scanned code to the record it names.
+    ///
+    /// Returns nil when it went somewhere, or what to tell the shop.
+    ///
+    /// ── WHAT THIS APP DECIDES, WHICH IS WHERE TO GO ───────────────────────
+    ///
+    /// What the code MEANS is `lib/scan.js` — the same module that reads the
+    /// labels `lib/labels.js` writes, which is why the reader and the writer
+    /// cannot drift. This looks the record up and opens it.
+    ///
+    /// A tracking link is followed by its TOKEN, not by an id: that is what is
+    /// printed on a parcel for a shop with the cloud connected, and the whole
+    /// point of the link is that it names the order without exposing its id.
+    func followScan(_ text: String) async -> String? {
+        guard let engine else { return words.callIt("mac.move_no_engine") }
+        guard let read = try? await engine.scanCode(text) else {
+            return words.callIt("mac.scan_unknown")
+        }
+        switch read.type {
+        case "spool":
+            guard let id = read.id, let spool = spools.first(where: { $0.id == id }) else {
+                return words.callIt("scan.spool_missing")
+            }
+            shelf = .inventory
+            editingSpool = spool
+            return nil
+        case "order", "track":
+            let match: Order?
+            if read.type == "order" {
+                match = orders.first { $0.id == read.id }
+            } else {
+                // Read off the ROW, not the decoded `Order`: a tracking token
+                // is not something a job screen ever shows, and putting it on
+                // the model would mean carrying it through every list that has
+                // no use for it — which is the reason `ShelfLabels` reads it
+                // off the row too.
+                let id = orderRows.first { row in
+                    guard case .object(let o) = row else { return false }
+                    guard let token = Self.plainString(o["trackingToken"]), !token.isEmpty
+                    else { return false }
+                    return token == read.token
+                }.flatMap(Self.recordId)
+                match = orders.first { $0.id == id }
+            }
+            guard let job = match else { return words.callIt("scan.order_missing") }
+            // The search box narrows the table, and a job filtered out of it
+            // cannot be selected — so a scan that lands on a job the shop
+            // cannot see would look like a scan that did nothing.
+            search = ""
+            shelf = .jobs(nil)
+            selection = job.id
+            return nil
+        case "empty":
+            return words.callIt("mac.scan_unknown")
+        default:
+            return words.callIt("mac.scan_unknown")
+        }
+    }
+
     /// The accounting packages `lib/accounting-export.js` lays out columns for.
     ///
     /// The names are the products' own and are deliberately NOT translated —
