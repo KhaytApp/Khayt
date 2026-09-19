@@ -78,6 +78,10 @@ struct NewJobSheet: View {
     /// The typed total as typed. Text, because a `Double?` behind a field
     /// reformats under the cursor and cannot be cleared back to "auto".
     @State private var overrideText = ""
+    /// Charges that are not printing: a design fee, painting, a marketplace's
+    /// cut. Empty for most jobs, which is why the row only appears once there
+    /// is one.
+    @State private var extraLines: [Shop.ExtraLine] = []
     /// "Price agreement applied" — said once, under the customer, when
     /// choosing them changed a figure in the cart.
     @State private var agreementNote: String?
@@ -481,6 +485,72 @@ struct NewJobSheet: View {
                         }
                 }
             }
+            // ── CHARGES THAT ARE NOT PRINTING ─────────────────────────────
+            //
+            // A design fee, painting, a marketplace's cut. Khayt has priced
+            // these since 3.0 and this sheet could not carry one, so a shop
+            // that charges for anything but the print had to take the job in
+            // the other window.
+            //
+            // A PERCENTAGE IS NOT AN AMOUNT. `lib/pricing.js` works a
+            // percentage out against the price before extras — after the
+            // margin, the discount and the rounding — so the two cannot be
+            // collapsed into one field here. The picker is the whole reason
+            // this is not just a number.
+            //
+            // The row only appears once there is a line, because most jobs
+            // have none and an empty table is a row of furniture.
+            GridRow {
+                Text(shop.words.callIt("calc.extra_lines")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary).fixedSize()
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach($extraLines) { $line in
+                        HStack(spacing: 6) {
+                            TextField(shop.words.callIt("calc.extra_label_ph"), text: $line.label)
+                                .textFieldStyle(.roundedBorder).frame(width: 190)
+                            Picker("", selection: Binding(
+                                get: { line.isPercent },
+                                set: { wantsPercent in
+                                    // Switching kind CLEARS the other figure.
+                                    // "50" meaning fifty riyals and "50"
+                                    // meaning half the job are different
+                                    // charges, and carrying the number across
+                                    // would quietly turn one into the other.
+                                    if wantsPercent { line.pct = 0; line.amount = 0 }
+                                    else { line.pct = nil }
+                                })) {
+                                    Text(Money.mark(shop.currency)).tag(false)
+                                    Text("%").tag(true)
+                                }
+                                .labelsHidden().pickerStyle(.segmented).frame(width: 84)
+                            if line.isPercent {
+                                TextField("", value: Binding(
+                                    get: { line.pct ?? 0 },
+                                    set: { line.pct = max(0, $0) }),
+                                          format: .number.precision(.fractionLength(0...2)))
+                                    .textFieldStyle(.roundedBorder).frame(width: 72).monospacedDigit()
+                            } else {
+                                TextField("", value: $line.amount,
+                                          format: .number.precision(.fractionLength(0...2)))
+                                    .textFieldStyle(.roundedBorder).frame(width: 72).monospacedDigit()
+                            }
+                            Button {
+                                extraLines.removeAll { $0.id == line.id }
+                            } label: {
+                                Image(systemName: "xmark.circle")
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel(shop.words.callIt("common.delete"))
+                        }
+                    }
+                    Button(shop.words.callIt("calc.add_extra_line")) {
+                        extraLines.append(Shop.ExtraLine())
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+            .onChange(of: extraLines) { Task { await reprice() } }
+
             // ── WHAT THIS SHOP HAS ACTUALLY MADE ON WORK LIKE THIS ────────
             //
             // No model is involved. `buildComparables` is arithmetic over the
@@ -750,7 +820,7 @@ struct NewJobSheet: View {
             baseCost: costedBase,
             margin: margin, discountPct: discountPct,
             shippingCost: shippingCost, rush: rush,
-            agreedAmount: agreedAmount, rule: rule)
+            agreedAmount: agreedAmount, rule: rule, extraLines: extraLines)
     }
 
     private func save(asQuote: Bool) async {
@@ -758,7 +828,7 @@ struct NewJobSheet: View {
             parts: parts, project: project, clientId: clientId,
             margin: margin, discountPct: discountPct, shippingCost: shippingCost,
             deposit: deposit, rush: rush, asQuote: asQuote, fromProduct: product,
-            rule: rule))
+            rule: rule, extraLines: extraLines))
         if shop.moveProblem == nil { shop.takingAJob = false } else { problem = shop.moveProblem }
     }
 }
