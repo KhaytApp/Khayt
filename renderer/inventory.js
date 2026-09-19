@@ -4179,29 +4179,20 @@ async function batchGenPOs() {
 
 function createPurchaseOrder(item, opts) {
   // opts: { supplierId, supplierName, qty, unitPrice, estimatedDelivery, notes }
+  //
+  // WHAT A PURCHASE ORDER IS lives in `lib/purchase-orders.js` — the same rule
+  // the macOS app reads, rather than a second copy of the defaults that decide
+  // how much a shop is asked to buy.
   const resolvedSupplierId = (opts && opts.supplierId) || item.supplierId || null;
-  const resolvedSupplierName = (opts && opts.supplierName) || (resolvedSupplierId ? (suppliers.find(s => s.id === resolvedSupplierId)?.name || '') : '');
-  // A consumable is counted in the shop's own unit, not in grams, and is named
-  // rather than described by material. `kind` is absent on every PO written
-  // before consumables could be ordered, so absent MUST read as filament — the
-  // receive path restocks a different field depending on this answer.
-  const isConsumable = !!(opts && opts.kind === 'consumable');
-  const po = {
+  const resolvedSupplierName = (opts && opts.supplierName)
+    || (resolvedSupplierId ? (suppliers.find(s => s.id === resolvedSupplierId)?.name || '') : '');
+  const po = KhaytPurchaseOrders.draft({
+    item,
+    ask: opts || {},
     id: uid('PO'),
-    ...(isConsumable ? { kind: 'consumable', unit: (item.unit || '').trim() } : {}),
-    itemId: item.id,
-    itemName: isConsumable ? (item.name || '') : item.material,
-    supplierId: resolvedSupplierId,
+    today: localDateStr(),
     supplierName: resolvedSupplierName,
-    // 1000 is a spool; it is not a sane default for a box of screws.
-    qty: (opts && opts.qty) ? +opts.qty : (item.reorderQty || (isConsumable ? 1 : 1000)),
-    unitPrice: (opts && opts.unitPrice) ? +opts.unitPrice : undefined,
-    estimatedDelivery: (opts && opts.estimatedDelivery) || null,
-    status: (opts && opts.status) || 'ordered',
-    orderedAt: localDateStr(),
-    receivedAt: null,
-    notes: (opts && opts.notes) || '',
-  };
+  });
   purchaseOrders.unshift(po);
   if (opts && opts.silent) return po; // caller batches save/render/toast
   saveAll();

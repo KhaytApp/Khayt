@@ -30,6 +30,11 @@ const decomment = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$
 
 require('../renderer/util.js');
 require('../renderer/format.js');
+// WHAT A PURCHASE ORDER IS is `lib/purchase-orders.js` now, shared with the
+// macOS app. index.html loads it as a <script>; requiring it here does the same
+// thing, so `createPurchaseOrder` below is the one that ships rather than one
+// that throws for want of a global.
+require('../lib/purchase-orders.js');
 global.suppliers = [];
 global.purchaseOrders = [];
 const { createPurchaseOrder } = require('../renderer/inventory.js');
@@ -67,13 +72,26 @@ test('every purchase-order field the app reads is one createPurchaseOrder writes
   // Written = the keys the real function produces, for both kinds, plus the
   // fields the order picks up over its life (assigned as `po.x = …`). Nothing
   // is hand-listed, so this cannot drift out of date with the writer.
-  const written = new Set([...Object.keys(filamentPo()), ...Object.keys(consumablePo())]);
+  const PO = require('../lib/purchase-orders.js');
+  // Written = the keys the real functions produce. Drafting is one of them; the
+  // other is RECEIVING, which adds `receivedSoFar` and stamps `receivedAt`.
+  // Those arrive as keys of a returned record rather than as `po.x = …`, so a
+  // sweep that only looked for assignment stopped seeing them the day the rule
+  // moved out of the renderer — and reported a field the app has always
+  // written as a silent zero.
+  const receivedKeys = Object.keys(PO.receive({
+    po: filamentPo(), item: { id: 'SPOOL-1', weight: 0, usageHistory: [] },
+    quantity: 10, today: '2026-09-19', expenseId: 'EXP-1',
+  }).po);
+  const written = new Set([...Object.keys(filamentPo()), ...Object.keys(consumablePo()),
+                           ...receivedKeys]);
 
   // The purchase-order lifecycle: drafting, rendering, receiving, auditing.
   // lib/csv-bundle.js is deliberately absent — its `po.date`/`po.total` are ||
   // fallbacks for an externally-shaped snapshot, sitting behind the canonical
   // names, and the export is asserted behaviourally below instead.
-  const FILES = ['renderer/inventory.js', 'renderer/wire-events.js', 'lib/po-audit.js'];
+  const FILES = ['renderer/inventory.js', 'renderer/wire-events.js', 'lib/po-audit.js',
+                 'lib/purchase-orders.js'];
 
   // A purchase order is never the paid one until something says so, and nothing
   // does: there is no "mark supplier invoice paid" control yet. Absent reads as
@@ -100,23 +118,33 @@ test('every purchase-order field the app reads is one createPurchaseOrder writes
 });
 
 test('receiving goods books the order\'s own unit price against what arrived', () => {
+  // The expense arithmetic moved into `lib/purchase-orders.js` with the rest of
+  // the receive chain, so it is driven here rather than read out of the
+  // renderer. What the renderer must still do is GO THROUGH it.
+  const PO = require('../lib/purchase-orders.js');
   const wire = decomment(read('renderer/wire-events.js'));
   const at = wire.indexOf("const recv    = e.target.closest('[data-act=\"po-receive\"]')");
   assert.ok(at > -1, 'the receive handler moved; this guard is anchored on it');
   const body = wire.slice(at, at + 4500);
-
-  assert.match(body, /const unitPrice = \+po\.unitPrice \|\| 0;/,
-    'the expense branch is gated on a field nothing writes, so it never runs');
-  assert.match(body, /const expAmount = \+\(w \* unitPrice\)\.toFixed\(2\)/,
-    'the amount is not the received quantity times the order\'s rate');
+  assert.match(body, /KhaytPurchaseOrders\.receive\(/,
+    'the receive handler prices goods itself again instead of asking the rule');
   assert.doesNotMatch(body, /unitCost|totalCost|weightOrdered/,
     'a field no version of createPurchaseOrder writes is still read here');
+  assert.doesNotMatch(body, /\/\s*1000/,
+    'a per-kilo division survives somewhere in the receive handler');
 
-  // The arithmetic, with the two ways it used to be wrong. unitPrice is per
-  // GRAM (resolveReorderPrice divides the spool cost by spoolWeight), so the
-  // /1000 that the per-KILO unitCost needed is a thousandfold understatement.
-  const w = 250, rate = 0.085;                       // 250 g of an 85/kg spool
-  assert.equal(+(w * rate).toFixed(2), 21.25, 'the true cost of 250 g');
+  // 250 g of an 85/kg spool, priced per GRAM as the order carries it.
+  const out = PO.receive({
+    po: { id: 'PO-1', qty: 750, unitPrice: 0.085 },
+    item: { id: 'SPOOL-1', weight: 0, usageHistory: [] },
+    quantity: 250, today: '2026-09-19', expenseId: 'EXP-1',
+  });
+  assert.equal(out.expense.amount, 21.25, 'the true cost of 250 g');
+  assert.equal(out.expense.category, 'filament');
+
+  // The two ways it used to be wrong, kept as arithmetic so the numbers stay
+  // in front of a reader.
+  const w = 250, rate = 0.085;
   assert.equal(+(w * rate / 1000).toFixed(2), 0.02, 'the per-kilo formula, applied to a per-gram rate');
   assert.equal(+(w * (undefined || 0) / 1000).toFixed(2), 0, 'and what it actually booked: nothing');
 });
