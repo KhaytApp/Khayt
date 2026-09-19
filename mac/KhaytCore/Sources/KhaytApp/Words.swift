@@ -1637,6 +1637,21 @@ final class Words {
             "ar": "لم يُختر خيط، لذا لا تشمل هذه التسعيرة تكلفة المادة."],
         "mac.export_accounting": ["en": "Export for the Accountant",
                                   "ar": "تصدير للمحاسب"],
+        // WHO A CAMPAIGN WOULD REACH. The other app has no word for the
+        // count, because it draws a number beside a fixed label; this says the
+        // whole sentence, which is what a shop about to write to forty people
+        // is actually reading.
+        "mac.campaign_reach":     ["en": "{n} customers would get this",
+                                   "ar": "{n} عملاء سيصلهم هذا"],
+        "mac.campaign_reach_one": ["en": "1 customer would get this",
+                                   "ar": "عميل واحد سيصله هذا"],
+        "mac.campaign_reach_two": ["en": "2 customers would get this",
+                                   "ar": "عميلان سيصلهما هذا"],
+        // Said rather than left to be noticed: a sheet with no Send button
+        // reads as one that lost it.
+        "mac.campaign_no_send": ["en": "This shows who would be written to. Sending is still done in the Windows and Linux app.",
+                                 "ar": "يعرض هذا من ستتم مراسلته. أما الإرسال فما زال من تطبيق ويندوز ولينكس."],
+        "mac.whatsapp": ["en": "WhatsApp", "ar": "واتساب"],
         "mac.export_accounting_where": [
             "en": "Two files are written here: one of invoices and one of expenses.",
             "ar": "يُكتب هنا ملفان: ملف للفواتير وآخر للمصروفات."],

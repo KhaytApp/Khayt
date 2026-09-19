@@ -401,6 +401,11 @@ public actor KhaytEngine {
         // records fall in "this month". The three rules the Expenses, Waste
         // and Reports screens are built on; each was inline in a renderer
         // handler before, which is why only the Electron window had them.
+        // Who a message would go to, and what it would say to each of them.
+        // The segmentation and the merge fields both; `fillTemplate` reaches
+        // for `content-languages` to decide which of a customer's names to
+        // greet them by, and that is bundled already.
+        "campaigns",
         "expense-book",
         // Guessing a category from what the shop typed on the receipt line.
         // Suggestion only, applied by a tap: the keyword list is short and a
@@ -5795,6 +5800,62 @@ public actor KhaytEngine {
     public func suggestedCategory(for text: String) throws -> String? {
         try runtime.call2("KhaytExpenseCategorize.suggestCategory(ARG0)",
                           [.string(text)], as: String?.self)
+    }
+
+    /// Who a message would reach: `lib/campaigns.js`.
+    ///
+    /// ── WHY THE TIERS COME IN AS A TABLE ──────────────────────────────────
+    ///
+    /// The rule takes `opts.tierOf`, a FUNCTION, because the renderer already
+    /// has one. A Swift closure cannot cross into JavaScriptCore, so the tiers
+    /// are worked out on this side — by `lib/loyalty.js`, through the same
+    /// bridge — and handed over as a table the wrapper closes over. The rule is
+    /// unchanged; what differs is how the host supplies the answer it asks for.
+    ///
+    /// A customer who has opted out of marketing, or has no address on the
+    /// channel, is left out by the rule. This app does not filter anything.
+    public func campaignRecipients(clients: [JSONValue], orders: [JSONValue],
+                                   criteria: [String: JSONValue], channel: String,
+                                   tiers: [String: JSONValue], now: Date) throws -> [Recipient] {
+        try runtime.call2("""
+            (function (clients, orders, criteria, channel, tiers, now) {
+              return globalThis.KhaytCampaigns.segmentRecipients(
+                clients, orders, criteria, channel, now,
+                { tierOf: function (id) { return tiers[id] || null; } });
+            })(ARG0, ARG1, ARG2, ARG3, ARG4, ARG5)
+            """,
+            [.array(clients), .array(orders), .object(criteria), .string(channel),
+             .object(tiers), .number(now.timeIntervalSince1970 * 1000)],
+            as: [Recipient].self)
+    }
+
+    /// One customer a campaign would reach.
+    public struct Recipient: Decodable, Sendable {
+        public let client: JSONValue
+        public let contact: String
+        public let stats: Stats
+
+        public struct Stats: Decodable, Sendable {
+            public let completedCount: Int
+            public let totalSpend: Double
+            public let lastOrderDate: String
+        }
+    }
+
+    /// One message, with its merge fields filled in for one recipient.
+    ///
+    /// The MONEY is formatted on this side and handed in, because how a shop
+    /// writes an amount is a property of the shop — its currency, its digits —
+    /// and the rule holds no formatter.
+    public func fillCampaignTemplate(_ body: String, recipient: JSONValue,
+                                     spend: String, settings: JSONValue) throws -> String {
+        try runtime.call2("""
+            (function (body, recipient, spend, settings) {
+              return globalThis.KhaytCampaigns.fillTemplate(
+                body, recipient, function () { return spend; }, settings);
+            })(ARG0, ARG1, ARG2, ARG3)
+            """,
+            [.string(body), recipient, .string(spend), settings], as: String.self)
     }
 
     /// Whether a category has gone past its monthly budget, AFTER the expense
