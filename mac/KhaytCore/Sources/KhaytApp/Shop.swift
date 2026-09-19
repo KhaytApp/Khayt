@@ -6970,6 +6970,25 @@ final class Shop {
         return try? await engine.materialCost(inventory: inventoryRows, minimum: 2)
     }
 
+    /// What the shop has PAID for a material, from the supplier purchase log.
+    ///
+    /// ── WHY THIS IS NOT THE CARD ABOVE ────────────────────────────────────
+    ///
+    /// `materialCost` reads the SHELF: what the spools on it cost, which is
+    /// what the shop owns. This reads the LOG: what was actually paid, when,
+    /// and to whom — which is what a shop takes to a supplier when it asks for
+    /// a better rate. A shop with no purchases logged has the first and not
+    /// the second, which is why this returns an empty list rather than a card
+    /// full of dashes.
+    ///
+    /// Grouped by material AND unit family by the rule, and this app never
+    /// flattens that: a spool of PLA and a kilogram of PLA are two answers.
+    func supplierPrices() async -> [KhaytEngine.PriceGroup] {
+        guard let engine, !supplierRows.isEmpty else { return [] }
+        return (try? await engine.supplierPriceGroups(
+            supplierRows, untagged: words.callIt("sup.untagged"))) ?? []
+    }
+
     /// Keep the shop's saved reports.
     ///
     /// The same narrowness as `saveSlicers` and for the same reason: one named

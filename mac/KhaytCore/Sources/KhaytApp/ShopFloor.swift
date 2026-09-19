@@ -638,6 +638,9 @@ struct Inventory: View {
     /// the reports because it is a fact about the shelf, and this is the screen
     /// a shop is on when it is deciding what to reorder.
     @State private var prices: KhaytEngine.MaterialCost?
+    /// What each material has actually cost, from the supplier purchase log.
+    /// Empty for a shop that has logged none, which is most of them.
+    @State private var supplierPrices: [KhaytEngine.PriceGroup] = []
 
     /// Top-aligned for the reason `MachineFloor` gives: an unaligned `GridItem` centres.
     private let columns = [GridItem(.adaptive(minimum: 210, maximum: 280), spacing: 14, alignment: .top)]
@@ -698,6 +701,21 @@ struct Inventory: View {
                     if !shop.spools.isEmpty,
                        shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         MaterialCostCard(shop: shop, report: prices)
+                            .card(rail: Khayt.brand, padding: 14)
+                            .padding(.bottom, 14)
+                    }
+                    // ── WHAT WAS PAID, UNDER WHAT IT COSTS ────────────────
+                    //
+                    // The card above reads the SHELF — what the spools on it
+                    // cost. This reads the LOG: what was actually paid, when,
+                    // and to whom, which is what a shop takes to a supplier
+                    // when it asks for a better rate. Only where there is a
+                    // log at all; a shop that has never recorded a purchase
+                    // has nothing to draw and should not be shown an empty
+                    // frame.
+                    if !supplierPrices.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        SupplierPricesCard(shop: shop, groups: supplierPrices)
                             .card(rail: Khayt.brand, padding: 14)
                             .padding(.bottom, 14)
                     }
@@ -793,6 +811,11 @@ struct Inventory: View {
         // bought, so it moves only when a spool is added or edited.
         .task(id: shop.spools.count) {
             prices = await shop.materialCost()
+        }
+        // Re-read when the log changes rather than when the shelf does: a
+        // purchase logged against a supplier moves this and touches no spool.
+        .task(id: shop.supplierRows.count) {
+            supplierPrices = await shop.supplierPrices()
         }
         // The other shelf moves for a second reason: the usage rate is measured
         // over a trailing window, so what is about to run out changes as jobs

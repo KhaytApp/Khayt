@@ -1067,6 +1067,20 @@ final class Words {
         // than typed into the field: `WordsAreTranslatedTests` refuses English
         // spelled out in a view, and it is right to — a placeholder is text a
         // shop reads.
+        // WHAT A MATERIAL HAS COST. The other app draws this chart under a
+        // bare div with no heading of its own, so there is no shared key to
+        // borrow — these are this app's words.
+        "mac.price_history": ["en": "What materials have cost",
+                              "ar": "ما كلّفته المواد"],
+        "mac.purchases_word":     ["en": "{n} purchases", "ar": "{n} مشتريات"],
+        "mac.purchases_word_one": ["en": "1 purchase",    "ar": "شراء واحد"],
+        "mac.purchases_word_two": ["en": "2 purchases",   "ar": "شراءان"],
+        "mac.cheapest_was": ["en": "cheapest", "ar": "الأرخص"],
+        // Said, because a group that quietly mixed grams with kilograms would
+        // be the very thing this rule exists to stop, and a shop looking at a
+        // converted figure should know it was converted.
+        "mac.units_converted": ["en": "converted to one unit",
+                                "ar": "محوّلة إلى وحدة واحدة"],
         "mac.material_ph": ["en": "PLA, PETG, Resin…", "ar": "PLA أو PETG أو راتنج…"],
         "mac.quotes_word":     ["en": "{n} quoted prices", "ar": "{n} أسعار مسجّلة"],
         "mac.quotes_word_one": ["en": "1 quoted price",    "ar": "سعر مسجّل واحد"],

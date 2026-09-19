@@ -16,6 +16,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   has since been deleted still carries the name it was written with: an invoice
   records who was billed.
 
+- **(Mac) What each material has actually cost, and whether that has moved.**
+  The shelf already said what the spools on it cost; this says what the shop
+  PAID, when, and to whom — which is what it takes to a supplier when it asks
+  for a better rate. Khayt has drawn this since 3.0 and this app could not.
+  Each material appears once per unit it was bought in, never merged: a spool
+  of PLA and a kilogram of PLA are two answers, and putting both on one line
+  says the shop's PLA got cheaper when it did nothing of the sort. Grams and
+  kilograms DO become one figure, because they convert exactly — and the row
+  says so, since a shop looking at a converted number should know it was
+  converted. Nothing is drawn for a shop that has logged no purchases.
+
 - **(Mac) The shop can take its whole book out as spreadsheets.** Khayt has had
   "Export all data (CSV)" since 3.0 — a file per collection, in a form a
   spreadsheet opens — and this app had nothing like it: the JSON export is for

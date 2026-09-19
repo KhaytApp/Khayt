@@ -401,6 +401,11 @@ public actor KhaytEngine {
         // records fall in "this month". The three rules the Expenses, Waste
         // and Reports screens are built on; each was inline in a renderer
         // handler before, which is why only the Electron window had them.
+        // What a supplier's prices may be COMPARED against. Two prices are
+        // comparable only when they measure the same thing: a spool of PLA and
+        // a kilogram of PLA are not one trend line, and the rule that says so
+        // is the whole module.
+        "supplier-prices",
         "expense-book",
         // Guessing a category from what the shop typed on the receipt line.
         // Suggestion only, applied by a tap: the keyword list is short and a
@@ -5860,6 +5865,57 @@ public actor KhaytEngine {
     public struct CsvFile: Decodable, Sendable {
         public let name: String
         public let content: String
+    }
+
+    /// What the shop has paid for a material, grouped so the figures can
+    /// honestly be compared: `lib/supplier-prices.js`.
+    ///
+    /// ── ONE GROUP PER MATERIAL *AND* UNIT FAMILY ──────────────────────────
+    ///
+    /// The same word — "PLA" — is attached to a spool bought for 75 and, a
+    /// month later, a kilogram bought for 22. Plotting both on one line says
+    /// the shop's PLA got cheaper when it did nothing of the sort, and naming
+    /// a "best price" supplier by sorting the mixed numbers always picks
+    /// whoever sells by the smaller unit. So the grouping is the rule's, and
+    /// this app never flattens it.
+    ///
+    /// The label for a purchase with no material on it is passed in, because
+    /// it is a translated word and the rule holds no text.
+    public func supplierPriceGroups(_ suppliers: [JSONValue],
+                                    untagged: String) throws -> [PriceGroup] {
+        try runtime.call2("KhaytSupplierPrices.groups(ARG0, {untagged: ARG1})",
+                          [.array(suppliers), .string(untagged)], as: [PriceGroup].self)
+    }
+
+    /// One material, in one unit family, with what it has cost.
+    public struct PriceGroup: Decodable, Sendable, Identifiable {
+        public let material: String
+        /// The family's base unit — `kg` for anything weighed, the unit itself
+        /// for a spool, a piece, a roll, a box or a litre.
+        public let unit: String
+        public let count: Int
+        public let entries: [Entry]
+        public let latest: Entry?
+        public let previous: Entry?
+        /// How far the latest price has moved from the one before it, or nil
+        /// when there is nothing to compare it with.
+        public let pctChange: Double?
+        public let best: Entry?
+        public let worst: Entry?
+        /// True when this group holds more than one spelling of its base unit
+        /// — grams converted into kilograms, say.
+        public let converted: Bool
+
+        public var id: String { material + "\u{1F}" + unit }
+
+        public struct Entry: Decodable, Sendable, Hashable {
+            public let date: String
+            public let price: Double
+            public let unit: String
+            public let recordedUnit: String
+            public let supplier: String
+            public let total: Double
+        }
     }
 
     /// Whether a category has gone past its monthly budget, AFTER the expense
