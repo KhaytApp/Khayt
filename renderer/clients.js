@@ -1121,78 +1121,45 @@ function hideClientSuggestions() {
 }
 
 /**
- * Loyalty points a client has earned across completed orders (read-only display).
- * Earns on the ex-VAT base × the tier's points multiplier, via lib/loyalty.
- * Gated by settings.loyaltyEnabled; 0 when disabled or the lib is absent.
+ * Loyalty points a client has earned — `lib/loyalty.js`'s `earnedBy`.
+ *
+ * The sum, and every exclusion in it, moved into the shared rule so the macOS
+ * app can show a customer's points at all: this window was the only place they
+ * existed, while the programme was accruing them for both.
  */
 function clientLoyaltyPoints(clientId) {
-  if (!settings.loyaltyEnabled || typeof KhaytLoyalty === 'undefined') return 0;
-  const perUnit = +settings.loyaltyPointsPerUnit || 1;
+  if (typeof KhaytLoyalty === 'undefined') return 0;
   const tier = getClientTier(clientId);
-  const mult = (tier && +tier.pointsMultiplier) || 1;
-  const _tp = KhaytTax.profileFromSettings(settings);
-  let pts = 0;
-  for (const o of printLog) {
-    if (o.clientId !== clientId || !KhaytOrderStatus.isFinished(o)) continue;
-    // A voided order is not a sale, and neither is a print the shop marked as
-    // not business. Both earned points anyway — this loop checked only the
-    // status — and so did an order refunded in full by a credit note, because
-    // it read the gross price. Points are a liability the shop honours, so it
-    // was awarding a discount on money it never kept: four times the real
-    // figure on a client with one kept sale, one void, one personal print and
-    // one refund.
-    if (o.voidedAt) continue;
-    // orderNetRevenueBase is the shop's revenue chokepoint: it excludes a
-    // non-business print and a split parent, subtracts credit notes, and
-    // converts to the shop's base currency — which this sum needs anyway, since
-    // it was adding prices from different currencies together.
-    const kept = orderNetRevenueBase(o);
-    if (kept <= 0) continue;
-    // Points are earned on the value the shop keeps, not on the tax it merely
-    // collects — true whichever way it prices.
-    const exVat = KhaytTax.computeTax(kept, _tp).subtotal;
-    pts += KhaytLoyalty.earnPoints(exVat, { pointsPerUnit: perUnit, tierMultiplier: mult });
-  }
-  return pts;
+  return KhaytLoyalty.earnedBy({
+    orders: printLog,
+    clientId,
+    settings,
+    // Guarded: the money rule reads it only for a customer's own currency, and
+    // this file is loaded in tests that have no client list at all.
+    clients: (typeof clients !== 'undefined' && Array.isArray(clients)) ? clients : [],
+    tierMultiplier: (tier && +tier.pointsMultiplier) || 1,
+  });
 }
 
 /** Points a client has already redeemed (sum of loyaltyLedger redeem entries). */
 function clientLoyaltyRedeemed(clientId) {
-  if (!Array.isArray(loyaltyLedger)) return 0;
-  return loyaltyLedger
-    .filter(e => e && e.clientId === clientId && e.type === 'redeem')
-    .reduce((s, e) => s + (+e.points || 0), 0);
+  if (typeof KhaytLoyalty === 'undefined') return 0;
+  return KhaytLoyalty.redeemedBy(loyaltyLedger, clientId);
 }
 
 /**
  * Clients who have redeemed more points than they now appear to have earned.
- *
- * Points used to be awarded for cancelled orders, prints marked not-business and
- * orders refunded in full. Correcting that lowers what a client has EARNED — and
- * `clientLoyaltyAvailable` clamps at zero, so nothing breaks and nothing goes
- * negative. What does happen is that a customer who was told they had a balance
- * now has none, silently, and the shop finds out when they ask.
- *
- * `redeemed > earned` is exactly that situation and needs no stored history to
- * detect: it can only arise from points that were awarded and spent against
- * something that was not a sale.
- *
- * Report-only. The points were over-awarded, the shop has already honoured some
- * of them, and re-inflating the balance would perpetuate a liability it does not
- * owe. Naming the clients lets the shop decide what to tell them.
+ * Report-only — see the rule's own note on why the balance is not re-inflated.
  */
 function clientsOverRedeemed() {
-  if (!settings.loyaltyEnabled || typeof KhaytLoyalty === 'undefined') return [];
-  if (!Array.isArray(clients)) return [];
-  const out = [];
-  for (const c of clients) {
-    if (!c || typeof c.id !== 'string') continue;
-    const redeemed = clientLoyaltyRedeemed(c.id);
-    if (redeemed <= 0) continue;
-    const earned = clientLoyaltyPoints(c.id);
-    if (redeemed > earned) out.push({ id: c.id, name: c.name || c.id, earned, redeemed, over: redeemed - earned });
-  }
-  return out;
+  if (typeof KhaytLoyalty === 'undefined') return [];
+  return KhaytLoyalty.overRedeemed({
+    orders: printLog,
+    ledger: loyaltyLedger,
+    clients: (typeof clients !== 'undefined' && Array.isArray(clients)) ? clients : [],
+    settings,
+    tierOf: (id) => { const t = getClientTier(id); return (t && +t.pointsMultiplier) || 1; },
+  });
 }
 
 /** Spendable points = earned − already-redeemed (never negative). */
@@ -1201,56 +1168,51 @@ function clientLoyaltyAvailable(clientId) {
 }
 
 /**
- * Redeem a client's available points into STORE CREDIT — issues a gift card the
- * owner applies via the existing gift-card flow (we never write giftCardDiscount
- * directly), and records a ledger entry so points can't be double-spent.
+ * Redeem a client's available points into STORE CREDIT.
+ *
+ * The card and the ledger row are the shared rule's — `redemption` returns
+ * both and this writes both, because a card written without its ledger row is
+ * a customer spending the same points again next month. Redemption still goes
+ * through the gift-card rail rather than writing `giftCardDiscount` directly.
  */
 function redeemLoyaltyPoints(clientId) {
   const avail = clientLoyaltyAvailable(clientId);
-  if (avail <= 0) { toast(t('loyalty.none_to_redeem') || 'No points to redeem', 'info'); return; }
-  const rate = +settings.loyaltyRedeemRate || 0.01; // credit per point (default 100 pts = 1)
-  const credit = (typeof KhaytLoyalty !== 'undefined')
-    ? KhaytLoyalty.pointsToCredit(avail, rate)
-    : Math.round(avail * rate * 100) / 100;
-  if (credit <= 0) { toast(t('loyalty.none_to_redeem') || 'No points to redeem', 'info'); return; }
   const cl = clients.find(c => c.id === clientId);
-  const code = uid('LOY');
-  giftCards.push({
-    id: uid('GC'), code, initialBalance: credit, balance: credit,
-    issuedTo: clientId, issuedToName: cl ? localName(cl) : '',
-    issuedAt: new Date().toISOString(), expiresAt: null, redeemedOrders: [], source: 'loyalty',
+  const made = KhaytLoyalty.redemption({
+    clientId,
+    clientName: cl ? localName(cl) : '',
+    points: avail,
+    rate: +settings.loyaltyRedeemRate || 0.01, // credit per point (100 pts = 1)
+    code: uid('LOY'),
+    cardId: uid('GC'),
+    entryId: uid('LOY'),
+    ts: new Date().toISOString(),
   });
-  loyaltyLedger.push({ id: uid('LOY'), clientId, type: 'redeem', points: avail, credit, giftCardCode: code, ts: new Date().toISOString() });
+  if (!made.ok) { toast(t('loyalty.none_to_redeem') || 'No points to redeem', 'info'); return; }
+  giftCards.push(made.card);
+  loyaltyLedger.push(made.entry);
   saveAll();
   if (typeof renderClients === 'function') renderClients();
-  toast(t('loyalty.redeemed', { pts: avail, amt: fmtMoney(credit), code }) || `Redeemed ${avail} pts → ${fmtMoney(credit)} store credit (${code})`, 'success', 7000);
+  toast(t('loyalty.redeemed', { pts: made.entry.points, amt: fmtMoney(made.entry.credit), code: made.card.code })
+        || `Redeemed ${made.entry.points} pts \u2192 ${fmtMoney(made.entry.credit)} store credit (${made.card.code})`,
+        'success', 7000);
 }
 
+/**
+ * The highest tier a client qualifies for — `lib/loyalty.js`'s `tierFor`.
+ *
+ * Lifted with the points sum it feeds: the multiplier is an input to what a
+ * customer has earned, so an app that could not work out the tier would
+ * under-count every balance rather than fail.
+ */
 function getClientTier(clientId) {
-  if (!settings.loyaltyEnabled) return null;
-  const tiers = (settings.loyaltyTiers || []).filter(tier => tier.name);
-  if (tiers.length === 0) return null;
-
-  let completedCount = 0;
-  let totalSpend = 0;
-  for (const o of printLog) {
-    if (o.clientId !== clientId || !KhaytOrderStatus.isFinished(o)) continue;
-    completedCount++;
-    totalSpend += orderNetRevenueBase(o);
-  }
-
-  // Find the highest tier the client qualifies for
-  const eligible = tiers.filter(tier =>
-    (!tier.minOrders || completedCount >= +tier.minOrders) &&
-    (!tier.minSpend  || totalSpend     >= +tier.minSpend)
-  );
-  if (eligible.length === 0) return null;
-  // Return the tier with the highest benefit (largest minOrders/minSpend combo)
-  return eligible.sort((a, b) => {
-    const orderDiff = (+b.minOrders || 0) - (+a.minOrders || 0);
-    if (orderDiff !== 0) return orderDiff;
-    return (+b.minSpend || 0) - (+a.minSpend || 0);
-  })[0];
+  if (typeof KhaytLoyalty === 'undefined') return null;
+  return KhaytLoyalty.tierFor({
+    orders: printLog,
+    clientId,
+    settings,
+    clients: (typeof clients !== 'undefined' && Array.isArray(clients)) ? clients : [],
+  });
 }
 
 function exportClientsCsv() {

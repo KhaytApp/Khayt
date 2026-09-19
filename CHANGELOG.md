@@ -17,6 +17,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Nothing is written: a plate is a way of running the work, not a field on a
   record.
 
+- **(Mac) A customer's points are shown here, and can be spent.** Khayt can run
+  a rewards programme — points on what a job earned, tiers, and redemption as
+  store credit — and this app could not show a customer's balance, could not
+  redeem it, and could not even switch the programme on: every one of those
+  lived in the other window, while the points went on accruing for both. The
+  customer pane now shows what they have earned, what they have spent and what
+  is left, and redeems it into a gift card in one step. It is in Settings →
+  Payments, off unless the shop turns it on.
+
 - **(Mac) A job going out the door can be labelled here.** The filament shelf
   could be labelled from this app and a parcel could not, so a box leaving the
   shop had to be labelled from the other one. Same sheet, same preview before

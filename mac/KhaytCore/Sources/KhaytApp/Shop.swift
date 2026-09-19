@@ -500,6 +500,10 @@ final class Shop {
             // comparison of two date strings — asked once for all of them,
             // because the table redraws on every keystroke in the search box.
             giftCardRows = (root["giftCards"].flatMap { if case .array(let r) = $0 { r } else { nil } }) ?? []
+            // The points ledger travels with them: store credit IS a gift card
+            // here, and a card issued without its ledger row is points spent
+            // twice.
+            loyaltyRows = (root["loyaltyLedger"].flatMap { if case .array(let r) = $0 { r } else { nil } }) ?? []
             giftCardStatuses = (try? await engine?.giftCardStatuses(
                 giftCardRows, today: Self.today())) ?? [:]
             wasteLog = Self.decode(root, "wasteLog", as: WasteEntry.self)
@@ -9218,6 +9222,92 @@ final class Shop {
     /// The cards the shop has issued, and what each one is today.
     private(set) var giftCards: [GiftCard] = []
     private(set) var giftCardRows: [JSONValue] = []
+
+    // MARK: - Points a customer has earned
+
+    /// The points ledger, as the book holds it.
+    private(set) var loyaltyRows: [JSONValue] = []
+
+    /// Whether the shop runs a rewards programme at all.
+    ///
+    /// Off unless the shop turned it on, and then nothing below is drawn. A
+    /// points line on a customer who earns none is a screen inventing a
+    /// programme the shop never agreed to.
+    var loyaltyOn: Bool {
+        if case .bool(true)? = settingsDict["loyaltyEnabled"] { return true }
+        return false
+    }
+
+    /// Where one customer stands: earned, spent, and left to spend.
+    ///
+    /// ── WHY THIS APP COULD NOT ANSWER IT ──────────────────────────────────
+    ///
+    /// The sum lived in `renderer/clients.js`, so a customer's points existed
+    /// only in the other window — while the programme went on accruing them
+    /// for a shop working here. It is `lib/loyalty.js` now, and this asks it.
+    func loyalty(of clientId: String) async -> KhaytEngine.LoyaltyStanding? {
+        guard loyaltyOn, let engine, !clientId.isEmpty else { return nil }
+        return try? await engine.loyalty(orders: orderRows, ledger: loyaltyRows,
+                                         clientId: clientId, settings: settingsDict,
+                                         clients: clientRows)
+    }
+
+    /// Turn a customer's points into store credit.
+    ///
+    /// TWO RECORDS, ONE SWAP. The gift card and the ledger row are written
+    /// together or not at all: a card written without its row is the same
+    /// points spent again next month, and a row written without its card is a
+    /// customer told their balance is gone with nothing to show for it.
+    ///
+    /// Returns nil when it worked, or what to tell the shop.
+    func redeemPoints(_ clientId: String) async -> String? {
+        guard let build = source.build, StoreLock.weOwnIt(build) else {
+            return words.callIt("mac.read_only")
+        }
+        guard let engine, loyaltyOn else { return words.callIt("loyalty.none_to_redeem") }
+        guard let standing = await loyalty(of: clientId), standing.available > 0 else {
+            return words.callIt("loyalty.none_to_redeem")
+        }
+
+        // The shop's own rate, and the rule's default when it has not set one:
+        // a hundred points to the unit.
+        var rate = 0.01
+        if case .number(let set)? = settingsDict["loyaltyRedeemRate"], set > 0 { rate = set }
+
+        let made: KhaytEngine.Redemption
+        do {
+            made = try await engine.redeemLoyalty(
+                clientId: clientId, clientName: clientNames[clientId]?.name ?? "",
+                points: standing.available, rate: rate,
+                code: Self.uid("LOY"), cardId: Self.uid("GC"),
+                entryId: Self.uid("LOY"), now: Self.isoNow())
+        } catch {
+            return String(describing: error)
+        }
+        guard made.ok, let card = made.card, let entry = made.entry else {
+            return words.callIt("loyalty.none_to_redeem")
+        }
+
+        do {
+            try StoreWriter.update(storeURL: build.storeURL,
+                                   owns: { StoreLock.weOwnIt(build) },
+                                   whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) { root in
+                var cards: [JSONValue] = []
+                if case .array(let existing)? = root["giftCards"] { cards = existing }
+                cards.append(card)
+                root["giftCards"] = .array(cards)
+
+                var ledger: [JSONValue] = []
+                if case .array(let existing)? = root["loyaltyLedger"] { ledger = existing }
+                ledger.append(entry)
+                root["loyaltyLedger"] = .array(ledger)
+            }
+        } catch {
+            return String(describing: error)
+        }
+        await load(source)
+        return nil
+    }
     private(set) var giftCardStatuses: [String: String] = [:]
     /// Which state the screen is narrowed to, or nil for all of them.
     ///

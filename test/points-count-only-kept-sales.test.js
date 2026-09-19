@@ -34,37 +34,30 @@ const ROOT = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const code = (p) => read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 
-/** clientLoyaltyPoints, lifted from the shipped source and given what it reads. */
-function loadPoints(printLog) {
-  const src = read('renderer/clients.js');
-  const at = src.indexOf('function clientLoyaltyPoints(');
-  assert.ok(at > 0, 'clientLoyaltyPoints is gone');
-  const body = src.slice(at, src.indexOf('\n}', at) + 2);
+/**
+ * The points sum, as the app now reaches it.
+ *
+ * This used to lift `clientLoyaltyPoints`'s BODY out of `renderer/clients.js`
+ * and re-host it in a vm sandbox, because the rule lived in a window this
+ * process cannot open. It lives in `lib/loyalty.js` now — shared with the macOS
+ * app — so the gates below are checked against the shipped rule itself, which
+ * is what the sandbox was standing in for.
+ *
+ * `business-scope` is required for the same reason the sandbox loaded it: the
+ * money chokepoint asks it whether a print was a sale at all, and without it
+ * every gate here silently passes.
+ */
+require('../lib/business-scope.js');
+require('../lib/order-money.js');
 
-  // business-scope and currency first — the chokepoint gates on both, and a
-  // sandbox missing them would skip the gates and pass while the app did not.
-  const sandbox = { globalThis: null, window: {}, module: { exports: {} }, console };
-  sandbox.globalThis = sandbox;
-  vm.createContext(sandbox);
-  vm.runInContext(read('lib/business-scope.js'), sandbox, { filename: 'business-scope.js' });
-  sandbox.module = { exports: {} };
-  // order-money.js first: currency.js's rules moved there so the Mac app
-  // could share them, and it delegates through the global. In a sandbox
-  // there is no require, so the dependency has to be run in here too.
-  vm.runInContext(read('lib/order-money.js'), sandbox, { filename: 'order-money.js' });
-  vm.runInContext(read('renderer/currency.js'), sandbox, { filename: 'currency.js' });
-  // The loyalty count asks whether a sale is finished, and 'delivered' is the
-  // legacy spelling of that — so the rule has to be in the sandbox too.
-  vm.runInContext(read('lib/order-status.js'), sandbox, { filename: 'order-status.js' });
-  Object.assign(sandbox, {
-    KhaytTax,
-    KhaytLoyalty,
-    printLog,
-    settings: { loyaltyEnabled: true, loyaltyPointsPerUnit: 1, enableVat: true, vatRate: 15, currency: 'SAR' },
-    getClientTier: () => null,
+function loadPoints(printLog) {
+  return (clientId) => KhaytLoyalty.earnedBy({
+    orders: printLog,
+    clientId,
+    settings: { loyaltyEnabled: true, loyaltyPointsPerUnit: 1,
+                enableVat: true, vatRate: 15, currency: 'SAR' },
+    clients: [],
   });
-  const fn = new vm.Script(`${body}; clientLoyaltyPoints`).runInContext(sandbox);
-  return fn;
 }
 
 const sale = (over = {}) => ({ id: 'O', clientId: 'C-1', status: 'completed', price: 1000, ...over });
