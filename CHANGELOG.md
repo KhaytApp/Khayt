@@ -6,6 +6,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **"Export all data (CSV)" was mostly empty columns.** The customer's name,
+  the product's name and price, and what is left on a spool and what it held
+  new — all blank, in every row of every export, because the file was reading
+  field names the app does not write: `name` where Khayt writes `nameEn` and
+  `nameAr`, `price` where it writes `basePrice`, `remaining` and `total` where
+  the shelf writes `weight` and `spoolWeight`. The spreadsheets looked
+  perfectly well-formed, which is why nobody noticed. The orders file was worse
+  than blank: it printed the JOB's name under the heading "Client", so every
+  row said the customer was called "Helmet build", and the customer's name
+  appeared nowhere. It has its own Project column now, and the Client column
+  holds the client. What a job was printed in comes off its parts, where it
+  actually lives. Older spellings still work, behind the ones the app writes,
+  so an import or an older backup still exports. A shop writing in neither
+  English nor Arabic gets its own names too: which of a record's names to print
+  is the shop's own content-language rule, not a pick between two fields.
+
 - **(Mac) The shop's suppliers can be kept here.** A supplier is not a contact
   card: its price list is where the price of a drafted purchase order comes
   from — the quoted rate per kilogram, in preference to dividing a spool's own
