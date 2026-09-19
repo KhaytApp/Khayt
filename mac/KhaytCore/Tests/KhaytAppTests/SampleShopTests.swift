@@ -507,6 +507,51 @@ extension SampleShopTests {
                 "every sample consumable is being reordered, which cannot be right")
     }
 
+    /// The suppliers card draws three different suppliers, and until this file
+    /// carried any at all it drew an empty state and nothing else — so neither
+    /// a row, nor a quoted price, nor the total-spent column had ever been
+    /// looked at.
+    ///
+    /// The quoted price is the one that matters: it is what a drafted purchase
+    /// order is priced at, and a sample book with no quote in it can never
+    /// show that path working.
+    @Test("the sample shop has suppliers, one quoting and one that has cost nothing")
+    func supplierSpread() async throws {
+        let rows = try Self.rows("suppliers")
+        #expect(!rows.isEmpty, "no suppliers — the card only ever draws its empty state")
+
+        let suppliers = rows.compactMap { Supplier(row: .object($0)) }
+        #expect(suppliers.count == rows.count, "a sample supplier does not read as one")
+
+        #expect(suppliers.contains { !$0.priceList.isEmpty },
+                "no sample supplier quotes a price, so a drafted order is never priced off one")
+        #expect(suppliers.contains { $0.priceList.isEmpty },
+                "every sample supplier quotes, so the ordinary contact-only one is never drawn")
+        #expect(suppliers.contains { $0.totalSpent > 0 },
+                "nothing has been bought from anybody, so the money column is all dashes")
+        #expect(suppliers.contains { $0.totalSpent == 0 },
+                "everything has been bought from somebody, so the dash is never drawn")
+        #expect(suppliers.contains { $0.leadDays != nil },
+                "no sample supplier says how long it takes")
+        #expect(suppliers.contains { $0.leadDays == nil },
+                "every sample supplier has a lead time, so the silent one is never drawn")
+        #expect(Set(suppliers.map(\.category)).count > 1,
+                "every sample supplier sells the same thing")
+
+        // And a quote the sample carries actually prices a spool the sample
+        // carries. A price list naming a material nothing on the shelf is made
+        // of would leave the pricing path as untrodden as an empty list.
+        let engine = try KhaytEngine()
+        let shelf = try Self.rows("inventory").map { JSONValue.object($0) }
+        var priced = 0
+        for spool in shelf {
+            let out = try await engine.perGramPrice(item: spool,
+                                                    suppliers: rows.map { JSONValue.object($0) })
+            if out.supplierId != nil, !(out.supplierId ?? "").isEmpty { priced += 1 }
+        }
+        #expect(priced > 0, "no sample quote names a material on the sample shelf, so an order drafted from this book is still priced off the spool's own cost")
+    }
+
     /// The maintenance card draws four statuses and two clocks. Until this
     /// file carried any tasks at all, none of those branches had ever been
     /// drawn, let alone looked at.

@@ -1054,6 +1054,18 @@ final class Words {
         "mac.overpriced_orders": ["en": "Priced per spool", "ar": "مسعّرة بالبكرة"],
         "mac.orders_word":     ["en": "on order",  "ar": "قيد الطلب"],
         "mac.orders_word_one": ["en": "on order",  "ar": "قيد الطلب"],
+        // HOW MANY MATERIALS THIS SUPPLIER HAS A PRICE FOR, which is the
+        // field on a supplier that actually does something: a quoted rate is
+        // what a drafted order is priced at, in preference to dividing a
+        // spool's own cost by its weight.
+        "mac.quotes_word":     ["en": "{n} quoted prices", "ar": "{n} أسعار مسجّلة"],
+        "mac.quotes_word_one": ["en": "1 quoted price",    "ar": "سعر مسجّل واحد"],
+        "mac.quotes_word_two": ["en": "2 quoted prices",   "ar": "سعران مسجّلان"],
+        // What is kept when a supplier is corrected, said where it can be read
+        // BEFORE the form is saved: this app writes the fields on the form and
+        // leaves the purchase log the other app keeps exactly as it found it.
+        "mac.supplier_kept_history": ["en": "{n} logged purchases stay with this supplier.",
+                                      "ar": "تبقى {n} من المشتريات المسجّلة مع هذا المورّد."],
         // Said BEFORE save, not discovered afterwards: an order with no price
         // on it books no expense, and a shop reconciling its spend should know
         // which receipts will never appear there.

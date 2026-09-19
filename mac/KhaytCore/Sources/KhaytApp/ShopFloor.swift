@@ -770,6 +770,20 @@ struct Inventory: View {
                     }
                     .equalCardHeights($tallest)
                     .padding(Metric.screen)
+                    // ── WHO THE SHOP BUYS FROM, UNDER WHAT IT BOUGHT ──────
+                    //
+                    // Below the rack, where the other app keeps it: a supplier
+                    // is a fact ABOUT the shelf — who to ring, how long they
+                    // take, what they quote — rather than a state of it, and
+                    // the cards above answer what the shelf is doing today.
+                    // Shown even when empty, because a card that appeared only
+                    // once there was a supplier would leave a shop no way to
+                    // write down its first.
+                    if shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        SuppliersCard(shop: shop)
+                            .card(padding: 14)
+                            .padding(.bottom, 14)
+                    }
                 }
                 .background(Khayt.ground)
             }
