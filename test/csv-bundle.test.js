@@ -66,6 +66,28 @@ test("a customer's name reaches the file, whichever language it is written in", 
   assert.equal(columnOf(arabic, 'Name'), 'مختبر الخليج');
 });
 
+test('a shop that writes neither English nor Arabic still gets its names', () => {
+  /* The obvious repair for the blank Name column — `nameEn || nameAr` — is the
+   * shape `test/content-languages.test.js` forbids by name, and it is blank for
+   * a shop working in German or Turkish. The shop's own content-language rule
+   * answers it instead, so this is the case that says the repair was the right
+   * one rather than the near one.
+   */
+  const [clients] = buildCsvBundle({
+    settings: { contentLangs: ['de'] },
+    clients: [{ id: 'C1', name_de: 'Muster Werkstatt' }],
+  });
+  assert.equal(columnOf(clients, 'Name'), 'Muster Werkstatt');
+
+  // And English is only ASKED for, never imposed: a shop that does not write it
+  // is not handed a stale English field left over from setup.
+  const [mixed] = buildCsvBundle({
+    settings: { contentLangs: ['ar'] },
+    clients: [{ id: 'C2', nameEn: 'Old Setup Name', nameAr: 'مختبر الخليج' }],
+  });
+  assert.equal(columnOf(mixed, 'Name'), 'مختبر الخليج');
+});
+
 test("a spool's grams are what is left and what it held new", () => {
   // `weight` and `spoolWeight` are what the shelf writes; `remaining`/`total`
   // are written by nothing, and reading them emptied both columns.

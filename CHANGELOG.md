@@ -18,7 +18,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   appeared nowhere. It has its own Project column now, and the Client column
   holds the client. What a job was printed in comes off its parts, where it
   actually lives. Older spellings still work, behind the ones the app writes,
-  so an import or an older backup still exports.
+  so an import or an older backup still exports. A shop writing in neither
+  English nor Arabic gets its own names too: which of a record's names to print
+  is the shop's own content-language rule, not a pick between two fields.
 
 - **(Mac) The shop's suppliers can be kept here.** A supplier is not a contact
   card: its price list is where the price of a drafted purchase order comes
