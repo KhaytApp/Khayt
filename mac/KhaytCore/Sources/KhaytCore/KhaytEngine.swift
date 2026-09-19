@@ -406,6 +406,11 @@ public actor KhaytEngine {
         // a kilogram of PLA are not one trend line, and the rule that says so
         // is the whole module.
         "supplier-prices",
+        // What a scanned label means. This app PRINTS those labels already —
+        // `ShelfLabels` writes "KHAYT-SPOOL:<id>" onto a spool and either
+        // "KHAYT-ORDER:<id>" or the customer's tracking link onto a parcel —
+        // and could not read one back.
+        "scan",
         "expense-book",
         // Guessing a category from what the shop typed on the receipt line.
         // Suggestion only, applied by a tap: the keyword list is short and a
@@ -5916,6 +5921,24 @@ public actor KhaytEngine {
             public let supplier: String
             public let total: Double
         }
+    }
+
+    /// What a scanned or typed code means: `lib/scan.js`.
+    ///
+    /// The three shapes are the ones `lib/labels.js` prints, which is why this
+    /// is not a regular expression written here: the reader and the writer have
+    /// to agree, and they agree by being the same pair of modules in both apps.
+    public func scanCode(_ text: String) throws -> Scanned {
+        try runtime.call2("KhaytScan.parseScanCode(ARG0)", [.string(text)], as: Scanned.self)
+    }
+
+    /// A scanned code, as the rule reads it.
+    public struct Scanned: Decodable, Sendable {
+        /// `spool` | `order` | `track` | `unknown` | `empty`
+        public let type: String
+        public let id: String?
+        public let token: String?
+        public let raw: String?
     }
 
     /// Whether a category has gone past its monthly budget, AFTER the expense

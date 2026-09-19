@@ -1667,6 +1667,19 @@ final class Words {
                                  "ar": "تصدير كل البيانات (CSV)…"],
         "mac.export_csv_where": ["en": "Choose a folder for the CSV files",
                                  "ar": "اختر مجلداً لملفات CSV"],
+        // READING BACK A LABEL THIS APP PRINTED. Not "scan" as in a camera:
+        // a barcode scanner is a keyboard, and what the shop needs is
+        // somewhere for it to type.
+        "mac.scan_title": ["en": "Scan a Label", "ar": "مسح ملصق"],
+        "mac.scan_hint":  ["en": "Hold a scanner to a spool or parcel label, or type the code.",
+                           "ar": "وجّه الماسح إلى ملصق بكرة أو طرد، أو اكتب الرمز."],
+        // The shape of a code, said rather than typed into the field:
+        // `WordsAreTranslatedTests` refuses English spelled out in a view, and
+        // "or a tracking link" is the half a shop actually has to be told.
+        "mac.scan_ph": ["en": "KHAYT-SPOOL:… or a tracking link",
+                        "ar": "KHAYT-SPOOL:… أو رابط تتبّع"],
+        "mac.scan_open":  ["en": "Open", "ar": "فتح"],
+        "mac.scan_unknown": ["en": "That is not a Khayt label.", "ar": "هذا ليس ملصق خيط."],
         "mac.export_accounting_where": [
             "en": "Two files are written here: one of invoices and one of expenses.",
             "ar": "يُكتب هنا ملفان: ملف للفواتير وآخر للمصروفات."],

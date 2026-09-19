@@ -249,6 +249,15 @@ private struct GoMenu: View {
         Button(Words.upfront("mac.calc_title")) { shop.shelf = .calculator }
             .keyboardShortcut("k", modifiers: [.command, .shift])
 
+        // ⇧⌘S, checked against every shortcut in the app rather than guessed
+        // at — SwiftUI drops a clashing one silently, and the note above says
+        // what that cost last time.
+        //
+        // A scanner types and presses Return, so the useful thing a keyboard
+        // shortcut does here is put the cursor where the typing will land.
+        Button(Words.upfront("mac.scan_title") + "\u{2026}") { shop.scanning = true }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
+
         Divider()
         // Three screens the sidebar has always had and this menu never listed,
         // so the only way to reach them was to click. "Use the menu bar to give
