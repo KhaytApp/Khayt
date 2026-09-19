@@ -6,6 +6,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The shop's suppliers can be kept here.** A supplier is not a contact
+  card: its price list is where the price of a drafted purchase order comes
+  from — the quoted rate per kilogram, in preference to dividing a spool's own
+  cost by its weight. This app has READ that list since it learned to draft an
+  order, and could not write a line of it, so a shop that had negotiated a
+  better rate had to open the other window to record it and every order drafted
+  here went on using the old figure. Suppliers are on the shelf screen now,
+  under the rack, where the other app keeps them: who they are, what they sell,
+  how long they take, what they have cost, and what they quote. The purchase
+  log that app writes is left exactly as it was found — this form writes the
+  fields it shows and nothing else — and deleting a supplier leaves the orders
+  that named it alone, because an order records who the shop bought from at the
+  time.
+
 - **(Mac) The shelf offers to order what is low, in one go.** One line at the
   top: how many things need ordering, and a button that drafts them all. What
   it counts is what is low AND has no order already on its way — offering to

@@ -5334,6 +5334,70 @@
    "createdAt": "2026-09-02"
   }
  ],
+ "suppliers": [
+  {
+   "id": "SUP-sample01",
+   "name": "Tuwaiq Filament Supply",
+   "category": "filament",
+   "phone": "+966 55 402 1180",
+   "leadDays": 5,
+   "website": "https://tuwaiq-filament.example",
+   "notes": "Ask for Salem — he holds the PETG",
+   "priceList": [
+    {
+     "material": "Sunlu PETG",
+     "pricePerKg": 85
+    },
+    {
+     "material": "PLA+ 2.0",
+     "pricePerKg": 72
+    }
+   ],
+   "purchases": [
+    {
+     "date": "2026-07-18",
+     "amount": 640,
+     "item": "4 spools PETG",
+     "notes": ""
+    },
+    {
+     "date": "2026-08-22",
+     "amount": 310,
+     "item": "2 spools PLA+",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "id": "SUP-sample02",
+   "name": "Jeddah Packaging",
+   "category": "packaging",
+   "phone": "+966 56 771 9043",
+   "leadDays": 12,
+   "website": "",
+   "notes": "",
+   "priceList": [],
+   "purchases": [
+    {
+     "date": "2026-09-05",
+     "amount": 120,
+     "item": "200 mailing bags",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "id": "SUP-sample03",
+   "name": "Riyadh Tool House",
+   "category": "tools",
+   "phone": "",
+   "leadDays": null,
+   "website": "https://riyadh-tools.example",
+   "notes": "",
+   "priceList": [],
+   "purchases": []
+  }
+ ],
  "purchaseOrders": [
   {
    "id": "PO-sample01",

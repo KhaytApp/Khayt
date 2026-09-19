@@ -3955,6 +3955,126 @@ final class Shop {
         return plainString(o["itemId"]) ?? ""
     }
 
+    // MARK: - Who the shop buys from
+
+    /// The supplier being written down or corrected, or nil.
+    var editingSupplier: Supplier?
+
+    /// The suppliers, as a screen reads them, by name.
+    ///
+    /// Sorted rather than left in book order because the book's order is the
+    /// order they were added in, which nobody remembers.
+    var suppliers: [Supplier] {
+        supplierRows.compactMap(Supplier.init(row:))
+            .sorted { a, b in
+                a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+            }
+    }
+
+    /// Write a supplier down, or correct one.
+    ///
+    /// ── WHAT IS MERGED, AND WHY IT IS NOT A REPLACEMENT ───────────────────
+    ///
+    /// Only the fields this form offers are written; everything else on the row
+    /// stays. A supplier carries `purchases` — the log the other app writes —
+    /// and a save that re-encoded the whole record from a form that has never
+    /// heard of it would empty the shop's purchase history, which is exactly
+    /// how a Mac product save once dropped a product's part costs and re-priced
+    /// it at a quarter of what it was worth.
+    func saveSupplier(_ supplier: Supplier) async {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        guard !supplier.name.trimmingCharacters(in: .whitespaces).isEmpty else {
+            moveProblem = words.callIt("sup.name_required"); return
+        }
+
+        var undo: [ChangedRecord] = []
+        do {
+            try StoreWriter.update(build) { root in
+                var rows = Self.rows(root, "suppliers")
+                let edits = supplier.edits
+                if let at = rows.firstIndex(where: { Self.recordId($0) == supplier.id }),
+                   case .object(var record) = rows[at] {
+                    undo.append(ChangedRecord(collection: "suppliers", id: supplier.id,
+                                              was: record))
+                    for (key, value) in edits { record[key] = value }
+                    StoreWriter.stamp(&record)
+                    rows[at] = .object(record)
+                } else {
+                    var record = edits
+                    record["id"] = .string(Self.uid("sup"))
+                    // The other app creates one with an empty log rather than
+                    // no log, and every reader of it — the price history chart,
+                    // the total-spent column — walks the array without
+                    // checking. Writing the field makes the row the same shape
+                    // whichever app made it.
+                    record["purchases"] = .array([])
+                    StoreWriter.stamp(&record)
+                    rows.append(.object(record))
+                }
+                root["suppliers"] = .array(rows)
+            }
+            if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("sup.edit")) }
+            editingSupplier = nil
+            await load(source)
+            moveNotices = [words.callIt("sup.saved")]
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
+    /// Take a supplier off the list.
+    ///
+    /// The orders that name it are LEFT ALONE, and that is deliberate: a
+    /// purchase order records who the shop bought from at the time, and tidying
+    /// up a contact list is not permission to rewrite what happened. The order
+    /// keeps the name it was written with — `supplierName` is on the order
+    /// itself, which is why it is there.
+    func deleteSupplier(_ id: String) async {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        var removed: [String: JSONValue]?
+        do {
+            try StoreWriter.update(build) { root in
+                var rows = Self.rows(root, "suppliers")
+                guard let at = rows.firstIndex(where: { Self.recordId($0) == id }),
+                      case .object(let was) = rows[at] else { return }
+                removed = was
+                rows.remove(at: at)
+                root["suppliers"] = .array(rows)
+            }
+            if let removed { registerSupplierUndo(removed) }
+            await load(source)
+            moveNotices = [words.callIt("sup.deleted")]
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
+    /// Put a deleted supplier back, with its purchase log intact.
+    private func registerSupplierUndo(_ record: [String: JSONValue]) {
+        guard let undoManager, let build = source.build,
+              case .string(let id)? = record["id"] else { return }
+        undoManager.setActionName(words.callIt("sup.deleted"))
+        undoManager.registerUndo(withTarget: self) { shop in
+            do {
+                try StoreWriter.update(build) { root in
+                    var rows = Self.rows(root, "suppliers")
+                    guard !rows.contains(where: { Self.recordId($0) == id }) else { return }
+                    rows.append(.object(record))
+                    root["suppliers"] = .array(rows)
+                }
+                Task { await shop.deleteSupplier(id) }
+            } catch {
+                shop.moveProblem = String(describing: error)
+            }
+        }
+    }
+
     // MARK: - Money an old defect took off the book
 
     /// Orders whose deposit was erased when their payment plan was saved.
