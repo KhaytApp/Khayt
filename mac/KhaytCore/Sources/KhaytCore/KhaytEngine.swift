@@ -5319,6 +5319,34 @@ public actor KhaytEngine {
     }
 
     /// The languages the shop writes its own text in — one or two, never none.
+    /// The name a reader should see for each of these clients.
+    ///
+    /// `lib/content-languages.js`'s `read`, which is what `/api/clients` calls
+    /// before it puts a name on the wire: it tries the language asked for only
+    /// if the shop writes in it, then the shop's own languages, then the rest.
+    /// A shop that writes its customers down in Turkish has Turkish names, and
+    /// an English interface does not turn them into a stale `nameEn` left over
+    /// from setup.
+    ///
+    /// It exists because a device reading the STORE gets none of that. The
+    /// record holds `nameTr`; the resolution is the server's, and a client
+    /// reading raw records would fall back to showing the customer's id.
+    ///
+    /// Empty string where a client has no name in any language — the caller
+    /// decides what to show instead, because "" and "CLI-8A5045" are different
+    /// kinds of nothing.
+    public func clientNames(_ clients: [[String: JSONValue]],
+                            settings: [String: JSONValue],
+                            language: String) throws -> [String] {
+        try runtime.call2(#"""
+        ARG0.map(function (c) {
+          return String(globalThis.KhaytContentLanguages.read(c, 'name', ARG2, ARG1)
+            || (c && (c.name || c.company)) || '');
+        })
+        """#, [.array(clients.map(JSONValue.object)), .object(settings), .string(language)],
+                          as: [String].self)
+    }
+
     public func contentLanguages(settings: [String: JSONValue]) throws -> [String] {
         try runtime.call2("KhaytContentLanguages.contentLangs(ARG0)", [.object(settings)], as: [String].self)
     }

@@ -1216,6 +1216,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   a shop with a printer plugged in, which is why the fixtures for it are written
   by hand and say so.
 
+- **(iOS) A shop that keeps its books in a third language saw its client list as
+  a column of ids.** Which of a customer's names a reader gets is
+  `lib/content-languages.js`'s decision, made against the shop's own content
+  languages — and the store spells anything outside English and Arabic as
+  `name_tr`, `name_de`, not `nameEn`/`nameAr`. `/api/clients` resolves that
+  before it sends a name; reading the book gets no such help, so `displayName`
+  fell through to the customer's id.
+
+  The rule now runs on the phone, through the same module, so the book and the
+  wire agree. The app also reads the canonical `name` the server has been
+  sending all along and which it previously ignored — the server had been
+  covering for that by copying the resolved name into `nameEn`, which is why
+  nobody noticed.
+
+  This is the third of its kind, and they all have one shape: a field the LAN
+  server COMPUTES that the store does not hold. The other two were a spool's
+  initial weight and whether a machine has a live connection.
+
 ## [3.8.0] - 2026-09-18
 
 The work since 3.7.0, released as stable. Individual entries are kept below;
