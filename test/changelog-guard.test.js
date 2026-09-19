@@ -168,3 +168,90 @@ test('every released section has entries under it', () => {
     .map(({ name }) => name);
   assert.deepEqual(empty, [], `released sections with no entries: ${empty.join(', ')}`);
 });
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * WHERE an entry landed.
+ *
+ * #1399 put its line six hundred lines below where its author wrote it — inside
+ * a section that had already shipped — because the anchor it matched had moved
+ * under it. #1400's rebase did the same thing to 117 lines at once. Both files
+ * read perfectly afterwards, and every check passed.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const { placement } = require('../scripts/check-changelog.js');
+
+/** The file as a PR leaves it. */
+const AFTER = [
+  '# Changelog',                       // 1
+  '',                                  // 2
+  '## [Unreleased]',                   // 3
+  '',                                  // 4
+  '### Changed',                       // 5
+  '',                                  // 6
+  '- **A new thing.** Said here.',     // 7
+  '',                                  // 8
+  '## [3.8.0] - 2026-09-18',           // 9
+  '',                                  // 10
+  '- **A shipped thing.** Said then.', // 11
+  '',                                  // 12
+  '- **A smuggled thing.** Said late.',// 13
+].join('\n');
+
+test('an entry added under [Unreleased] is where it belongs', () => {
+  const diff = ['@@ -6,0 +7 @@', '+- **A new thing.** Said here.'].join('\n');
+  assert.deepEqual(placement(diff, AFTER), { ok: true, misplaced: [] });
+});
+
+test('an entry added inside a shipped section is refused', () => {
+  const diff = ['@@ -12,0 +13 @@', '+- **A smuggled thing.** Said late.'].join('\n');
+  const r = placement(diff, AFTER);
+  assert.equal(r.ok, false);
+  assert.equal(r.misplaced.length, 1);
+  assert.equal(r.misplaced[0].section, '3.8.0');
+});
+
+test('a release cut writes its own section and is allowed', () => {
+  // The one time writing into a version section is right: the PR adds the
+  // heading and the entries together.
+  const cut = [
+    '# Changelog', '', '## [Unreleased]', '', '## [4.0.0-alpha.26] - 2026-09-19', '',
+    '- **A cut thing.** Shipped now.', '', '## [3.8.0] - 2026-09-18',
+  ].join('\n');
+  const diff = [
+    '@@ -3,0 +4,4 @@',
+    '+',
+    '+## [4.0.0-alpha.26] - 2026-09-19',
+    '+',
+    '+- **A cut thing.** Shipped now.',
+  ].join('\n');
+  assert.deepEqual(placement(diff, cut), { ok: true, misplaced: [] });
+});
+
+test('context and removed lines keep the line count honest', () => {
+  // The bullet below is the 13th line of the new file only if a removed line
+  // is NOT counted and the context lines are. Get that wrong and the check
+  // blames the wrong section — or clears a real one.
+  const diff = [
+    '@@ -9,5 +9,5 @@',
+    ' ## [3.8.0] - 2026-09-18',
+    ' ',
+    ' - **A shipped thing.** Said then.',
+    '-- **A removed thing.** Gone.',
+    ' ',
+    '+- **A smuggled thing.** Said late.',
+  ].join('\n');
+  const r = placement(diff, AFTER);
+  assert.equal(r.ok, false, 'the smuggled entry was not found');
+  assert.equal(r.misplaced[0].section, '3.8.0');
+});
+
+test('a changelog with no headings at all is not this rule\'s business', () => {
+  const diff = ['@@ -1,0 +1 @@', '+- **A thing.**'].join('\n');
+  assert.equal(placement(diff, '- **A thing.**').ok, true);
+});
+
+test('an empty diff passes, and garbage does not throw', () => {
+  assert.equal(placement('', AFTER).ok, true);
+  assert.equal(placement(null, null).ok, true);
+  assert.equal(placement('not a diff at all', AFTER).ok, true);
+});
