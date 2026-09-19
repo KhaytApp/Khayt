@@ -1199,6 +1199,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Pinned against the shop's real sample book, where all eleven queued jobs are
   assigned and not one records a name.
 
+- **(iOS) Every machine said "No live connection", including the connected
+  ones.** `hasPrinterApi` is derived rather than stored: `lib/lan-server.js`
+  computes it on the way out, and a machine in the book carries only the
+  `printerApi` object it is derived from. That was harmless while the screens
+  read the wire. It stopped being harmless when they began reading the book —
+  a raw record decoded to nil, the Machines screen read nil as false, and a shop
+  with printers plugged in and reporting was told none of them could be reached.
+
+  The rule is now applied where both paths pass: the wire's boolean when it is
+  sent, derived from `printerApi` when it is not, with `"none"` treated as the
+  configured absence it is.
+
+  The shop's sample book could not have caught this — not one of its five
+  machines has a `printerApi` configured, so both paths agree on false. It takes
+  a shop with a printer plugged in, which is why the fixtures for it are written
+  by hand and say so.
+
 ## [3.8.0] - 2026-09-18
 
 The work since 3.7.0, released as stable. Individual entries are kept below;
