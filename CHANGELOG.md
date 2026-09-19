@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) More of something can be ordered from the shelf.** A spool, or the
+  row that says a consumable is running out, can raise a purchase order here.
+  It is a DRAFT: an order is something a shop hands a supplier, so the app
+  writes one down and leaves the sending to you. The price is what a gram of
+  that material actually costs — the supplier's quoted rate where the shop has
+  recorded one, the spool's own cost divided by its weight otherwise — and a
+  material nothing prices is ordered with no price at all rather than a price
+  of nothing.
+
 - **(Mac) What the shop has on order is shown here, and can be received.** The
   Windows app has had purchase orders since 3.0; this one had none at all, so a
   shop working here could not see what was coming, book goods in when they

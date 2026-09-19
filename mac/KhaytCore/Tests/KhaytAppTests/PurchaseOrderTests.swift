@@ -172,6 +172,71 @@ struct PurchaseOrderTests {
         #expect(po["receivedAt"] == .string("2026-09-19"))
     }
 
+    // MARK: - Drafting one
+
+    @Test("a drafted filament order asks for a spool, priced per gram")
+    func draftingFilament() async throws {
+        let engine = try KhaytEngine()
+        let item: JSONValue = .object(["id": .string("sp-1"), "material": .string("PLA+"),
+                                       "cost": .number(85), "spoolWeight": .number(1000)])
+        let price = try await engine.perGramPrice(item: item, suppliers: [])
+        #expect(price.perG == 0.085, "an 85 SAR spool of 1,000 g")
+
+        let drafted = try await engine.draftOrder(
+            item: item, ask: ["status": .string("draft"), "unitPrice": .number(price.perG)],
+            id: "PO-1", today: "2026-09-19", supplierName: "")
+        guard case .object(let po) = drafted else { Issue.record("no order"); return }
+        #expect(po["qty"] == .number(1000), "a spool, where the item names no reorder quantity")
+        #expect(po["unitPrice"] == .number(0.085))
+        #expect(po["status"] == .string("draft"), "drafted, not ordered")
+        #expect(po["itemName"] == .string("PLA+"))
+        #expect(po["kind"] == nil, "a filament order carries no kind")
+
+        // The whole order, which is what the audit would have read as 63,750.
+        #expect(((po["qty"].flatMap { if case .number(let n) = $0 { return n } else { return nil } } ?? 0)
+                 * 0.085) == 85)
+    }
+
+    @Test("a drafted consumable order asks for one, in the shop's own unit")
+    func draftingConsumable() async throws {
+        let engine = try KhaytEngine()
+        let drafted = try await engine.draftOrder(
+            item: .object(["id": .string("c-1"), "name": .string("Kapton tape"),
+                           "unit": .string("roll")]),
+            ask: ["status": .string("draft"), "kind": .string("consumable")],
+            id: "PO-2", today: "2026-09-19", supplierName: "")
+        guard case .object(let po) = drafted else { Issue.record("no order"); return }
+        #expect(po["qty"] == .number(1), "1,000 is a spool; it is not a default for tape")
+        #expect(po["unit"] == .string("roll"))
+        #expect(po["itemName"] == .string("Kapton tape"), "a consumable is named, not described")
+        #expect(po["unitPrice"] == nil, "nothing priced it, so it carries no price")
+    }
+
+    @Test("a material nothing prices is drafted without a price")
+    func unpricedMaterialsDraftWithoutOne() async throws {
+        // A price of zero would read as free to every reader downstream —
+        // including the expense a receipt books.
+        let engine = try KhaytEngine()
+        let price = try await engine.perGramPrice(
+            item: .object(["id": .string("sp-9"), "material": .string("Nylon")]), suppliers: [])
+        #expect(price.perG == 0)
+    }
+
+    @Test("a supplier's quoted price wins, and is per kilo")
+    func supplierPriceWins() async throws {
+        let engine = try KhaytEngine()
+        let price = try await engine.perGramPrice(
+            item: .object(["id": .string("sp-1"), "material": .string("PLA+"),
+                           "cost": .number(85), "spoolWeight": .number(1000)]),
+            suppliers: [.object(["id": .string("S1"), "name": .string("Tuwaiq"),
+                                 "priceList": .array([.object([
+                                     "material": .string("PLA+"),
+                                     "pricePerKg": .number(70)])])])])
+        #expect(price.perG == 0.07, "70 a kilo is 0.07 a gram")
+        #expect(price.supplierId == "S1")
+        #expect(price.supplierName == "Tuwaiq")
+    }
+
     // MARK: - The thousandfold orders
 
     @Test("an order priced per spool is found, with both figures")
@@ -239,5 +304,8 @@ struct PurchaseOrderTests {
         #expect(floor.contains("SuspectOrdersCard(shop: shop)"),
                 "the thousandfold orders are found and never shown")
         #expect(window.contains("ReceiveSheet(shop: shop, order:"), "nothing can be received")
+        #expect(floor.contains("shop.draftOrder(") , "nothing can be ordered")
+        #expect(floor.contains("mac.draft_an_order"),
+                "the action promises to order rather than to draft")
     }
 }
