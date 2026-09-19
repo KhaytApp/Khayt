@@ -5740,8 +5740,13 @@ final class Shop {
             // a UTF-8 CSV without one as the system code page, and turns a
             // shop's Arabic customer names into mojibake — is the rule's
             // decision to make and to change.
+            // THE READER'S LANGUAGE, as the other app passes it. A bilingual
+            // shop's customer is written down twice and the export has to pick
+            // one; picking the name stamped on the order picks English every
+            // time, whoever is reading.
             let invoices = try await engine.invoiceCsv(
-                orderRows, settings: settingsDict, clients: clientRows, format: format)
+                orderRows, settings: settingsDict, clients: clientRows, format: format,
+                language: words.language)
             let expenses = try await engine.expenseCsv(expenseRows, format: format)
             let a = dir.appending(path: "khayt-invoices-\(day).csv")
             let b = dir.appending(path: "khayt-expenses-\(day).csv")

@@ -1602,15 +1602,54 @@ public actor KhaytEngine {
     /// deciding that, and deciding it differently from the other one.
     public func invoiceCsv(_ orders: [JSONValue], settings: [String: JSONValue],
                            clients: [JSONValue], format: String,
+                           language: String = "en",
                            from: String = "", to: String = "") throws -> String {
         // The PROFILE is still `lib/tax.js` — eight bundled modules read it, so
         // it has not moved — but which orders are invoices, and whose name goes
         // on each row, is `KhaytCore.AccountingRows` now.
         let profile: JSONValue = (try? runtime.call2(
             "KhaytTax.profileFromSettings(ARG0)", [.object(settings)], as: JSONValue.self)) ?? .null
-        let rows = AccountingRows.invoiceRows(orders: orders, settings: settings,
-                                              clients: clients,
-                                              tax: AccountingRows.tax(profile: profile))
+
+        // ── WHOSE NAME GOES ON THE ROW ────────────────────────────────────
+        //
+        // `renderer/analytics.js` hands this rule a `localName`; this app
+        // handed it nothing, so the fallback read `client.name` — a field
+        // Khayt writes on no customer — and the name came off the ORDER
+        // instead, where it is stamped in English at the moment the job is
+        // taken. For a bilingual shop that means the same quarter exports as
+        // "KAUST Prototyping Lab" from this Mac and "مختبر النماذج — كاوست"
+        // from the other app: two accountant's files for one set of invoices,
+        // which is exactly what this function's own comment promises cannot
+        // happen.
+        //
+        // Resolved through `content-languages`, the same rule and the same way
+        // `clientValue` above does it. The stamped name on the order stays as
+        // the fallback the rule already had, for an order whose customer has
+        // since been deleted.
+        var nameById: [String: String] = [:]
+        if !clients.isEmpty {
+            let names: [String] = (try? runtime.call2(#"""
+                (function (clients, settings, lang) {
+                  return clients.map(function (c) {
+                    return String(globalThis.KhaytContentLanguages.read(c, 'name', lang, settings)
+                      || (c && (c.name || c.company)) || '');
+                  });
+                })(ARG0, ARG1, ARG2)
+                """#, [.array(clients), .object(settings), .string(language)],
+                as: [String].self)) ?? []
+            for (i, row) in clients.enumerated() where i < names.count {
+                guard case .object(let c) = row, let id = c["id"] else { continue }
+                nameById[JSSemantics.text(id)] = names[i]
+            }
+        }
+
+        let rows = AccountingRows.invoiceRows(
+            orders: orders, settings: settings, clients: clients,
+            tax: AccountingRows.tax(profile: profile),
+            localName: nameById.isEmpty ? nil : { client in
+                guard case .object(let c) = client, let id = c["id"] else { return "" }
+                return nameById[JSSemantics.text(id)] ?? ""
+            })
         // `buildInvoiceCsv` is a formatter and stays where it is: it lays out
         // four accounting packages' column orders, which is a table, not a rule.
         return try runtime.call2(
