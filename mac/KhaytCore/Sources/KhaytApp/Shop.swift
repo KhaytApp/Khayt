@@ -508,6 +508,12 @@ final class Shop {
             // answer changes only when the book does, and the list is walked
             // by a banner that draws on every screen.
             erasedDeposits = (try? await engine?.erasedDeposits(orders: orderRows)) ?? []
+            // What one plate holds, from the packer rather than from a number
+            // typed twice in Swift.
+            if let limits = try? await engine?.plateDefaults() {
+                batchMaxHours = limits.maxHours
+                batchMaxGrams = limits.maxGrams
+            }
             giftCardStatuses = (try? await engine?.giftCardStatuses(
                 giftCardRows, today: Self.today())) ?? [:]
             wasteLog = Self.decode(root, "wasteLog", as: WasteEntry.self)
@@ -4737,9 +4743,12 @@ final class Shop {
     /// reason `scheduleIdle` is.
     private(set) var batchIdle = false
 
-    /// What one plate will take. The rule's own defaults, read from it rather
-    /// than typed here — a Swift copy of 24 and 1000 would go stale the day the
-    /// shared rule changed its mind.
+    /// What one plate will take.
+    ///
+    /// Seeded from the rule's own `DEFAULTS` when the book loads, not typed
+    /// here: a Swift copy of 24 and 1,000 is a copy that goes stale the day the
+    /// shared rule changes its mind. These are the values until then, so the
+    /// fields are never blank while the engine is still starting.
     var batchMaxHours: Double = 24
     var batchMaxGrams: Double = 1000
 

@@ -151,17 +151,35 @@ struct BatchSheet: View {
         }
     }
 
-    /// "12.5 hours · 340 g" — the shop's own words for hours, and the
-    /// catalogue's for grams. Never "12.5h", which is English on a panel read
+    /// "12.5 hours · 340 g" — the shop's own words for hours and for grams.
+    ///
+    /// Never "12.5h · 340g": those letters are English, and this panel is read
     /// in Arabic on the same Mac.
+    ///
+    /// ── AND NEVER `mac.grams_left` ────────────────────────────────────────
+    ///
+    /// That string says "{n} g LEFT" — it is about what remains on a spool,
+    /// not about what a job weighs. Borrowed here it read "23.7 hrs ·
+    /// 2190.6000000000004 g left" against a job, which is a sentence about the
+    /// wrong subject AND raw float noise. Found by photographing the sheet; no
+    /// test can see a caption that is grammatical, translated and about
+    /// something else.
+    private func weight(_ grams: Double) -> String {
+        // Whole grams. A plate is planned to the gram at best, and 0.1 g of
+        // float residue is not a measurement.
+        String(Int(grams.rounded())) + " " + shop.words.callIt("common.grams")
+    }
+
+    private func hours(_ value: Double) -> String {
+        String(format: "%.1f ", value) + shop.words.callIt("common.hours")
+    }
+
     private func hoursAndGrams(_ job: KhaytEngine.PlateJob) -> String {
-        String(format: "%.1f ", job.hours) + shop.words.callIt("common.hours")
-            + " · " + shop.words.callIt("mac.grams_left", ["n": .number(job.grams)])
+        hours(job.hours) + " · " + weight(job.grams)
     }
 
     private func plateTotals(_ plate: KhaytEngine.PlatePlan.Plate) -> String {
-        String(format: "%.1f ", plate.hours) + shop.words.callIt("common.hours")
-            + " · " + shop.words.callIt("mac.grams_left", ["n": .number(plate.grams)])
+        hours(plate.hours) + " · " + weight(plate.grams)
     }
 }
 

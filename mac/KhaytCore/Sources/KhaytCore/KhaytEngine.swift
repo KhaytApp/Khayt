@@ -873,6 +873,22 @@ public actor KhaytEngine {
         return try runtime.call("KhaytPaymentPlan", "buildSchedule", [arg], as: [Installment].self)
     }
 
+    /// What one plate holds when nobody has said otherwise.
+    ///
+    /// Read from the rule rather than written here. 24 hours and 1,000 g were
+    /// typed into the Swift twice over — once as the packer's argument and once
+    /// as the field's initial value — and a second copy of a shared constant is
+    /// a copy that goes stale the day the rule changes its mind.
+    public func plateDefaults() throws -> PlateLimits {
+        try runtime.call2("globalThis.KhaytPlateNesting.DEFAULTS", [], as: PlateLimits.self)
+    }
+
+    /// The two limits a plate runs out of.
+    public struct PlateLimits: Decodable, Sendable {
+        public let maxHours: Double
+        public let maxGrams: Double
+    }
+
     /// Pack waiting jobs onto plates: by material first, then by what fits.
     ///
     /// The other app's Batch Print Planner, which this one had no answer to at

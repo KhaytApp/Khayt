@@ -968,6 +968,87 @@ extension SampleShopTests {
                 "no sample model is missing a figure, so the honesty path never draws")
     }
 
+    // MARK: - The screens added after the book was written
+
+    @Test("a job is paying over months, with one payment already collected")
+    func aPlanIsMidCollection() throws {
+        // Without this the payment-plan sheet has only ever been seen EMPTY:
+        // its rows, its progress line and the collected state are three things
+        // nobody could look at, in a shop whose whole purpose is being designed
+        // against.
+        let planned = try Self.rows("printLog").filter { row in
+            if case .array(let rows)? = row["instalments"] { return !rows.isEmpty }
+            return false
+        }
+        #expect(!planned.isEmpty, "no sample job has a payment plan")
+
+        let rows: [[String: JSONValue]] = planned.flatMap { row -> [[String: JSONValue]] in
+            guard case .array(let list)? = row["instalments"] else { return [] }
+            return list.compactMap { if case .object(let o) = $0 { return o } else { return nil } }
+        }
+        let collected = rows.filter { if case .bool(true)? = $0["paid"] { return true } else { return false } }
+        #expect(!collected.isEmpty, "every instalment is outstanding — the collected row never draws")
+        #expect(collected.count < rows.count, "every instalment is collected — the outstanding row never draws")
+
+        // The base travels with the plan, or collecting a row silently uses
+        // the older rule and the deposit is double-counted.
+        for row in planned {
+            #expect(row["instalmentBase"] != nil,
+                    "a sample plan with no instalmentBase reads as one written before Sep 2026")
+        }
+    }
+
+    @Test("a plan's rows add up to what the job still owed when it was made")
+    func aPlanCoversTheBalance() throws {
+        // A sample plan that billed the gross price would be the exact bug the
+        // generator was fixed for, sitting in the book every screen is designed
+        // against.
+        for row in try Self.rows("printLog") {
+            guard case .array(let list)? = row["instalments"], !list.isEmpty,
+                  case .number(let base)? = row["instalmentBase"],
+                  case .number(let price)? = row["price"] else { continue }
+            let total = list.reduce(0.0) { sum, entry in
+                guard case .object(let e) = entry, case .number(let amount)? = e["amount"] else { return sum }
+                return sum + amount
+            }
+            #expect(abs(total - (price - base)) < 0.05,
+                    "the plan asks for \(total) against a balance of \(price - base)")
+        }
+    }
+
+    @Test("the rewards programme is on, and the customers span its tiers")
+    func loyaltySpansItsTiers() async throws {
+        // Off, the points section never draws at all. On with one tier, the
+        // "no tier yet" customer and the top tier are the same picture.
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(shop.loyaltyOn, "the rewards programme is off, so its screen never draws")
+
+        var tiers: Set<String> = []
+        var withoutATier = 0
+        var spent = 0
+        for person in shop.customers.prefix(12) {
+            guard let standing = await shop.loyalty(of: person.id) else { continue }
+            if let tier = standing.tier { tiers.insert(tier) } else if standing.earned > 0 { withoutATier += 1 }
+            if standing.redeemed > 0 { spent += 1 }
+        }
+        #expect(tiers.count >= 2, "every customer is in the same tier: \(tiers)")
+        #expect(withoutATier > 0, "no customer is below the first tier, so that case never draws")
+        #expect(spent > 0, "nobody has spent points, so the 'redeemed' line never draws")
+    }
+
+    @Test("the sample book carries no money the app would ask to repair")
+    func theSampleBookIsNotBroken() async throws {
+        // The deposit-audit banner and the over-redeemed report are REPAIR
+        // states. Putting one in the sample shop would put a red warning across
+        // the top of every screenshot the app is reviewed from — so they are
+        // deliberately absent here and exercised from fixtures of their own.
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(shop.erasedDeposits.isEmpty,
+                "the sample book carries an erased deposit, so every screen now warns about money")
+    }
+
     @Test("every machine in the sample shop says which kind it is")
     func everyMachineSaysSo() throws {
         for m in try Self.rows("machines") {
