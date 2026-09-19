@@ -1316,6 +1316,233 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   server COMPUTES that the store does not hold. The other two were a spool's
   initial weight and whether a machine has a live connection.
 
+- **(iOS + Mac) The phone can work out what it changed while the Mac was away,
+  and the Mac can take it back.** Neither half invents a rule. The phone
+  computes an outbox with `KhaytCloudOutbox.changesToSend` — the function the
+  desktop already pushes with — against a baseline written at the moment of the
+  pull, when the book and the baseline are by definition identical. The Mac
+  folds it with `KhaytSync.applyDeltas`, the function every device already pulls
+  with. A phone gets no private theory about what a change is, which is the only
+  reason it may write to a shop's book at all.
+
+  What protects the book is the fold, not the route: `applyDeltas` keeps the
+  higher revision, so a phone carrying a stale record cannot undo work done at
+  the desk — it is counted as skipped and discarded. Pinned by a test that
+  sends exactly that.
+
+  And a partial book cannot delete a shop's history. `changesToSend` emits a
+  delta only for a record the phone *holds* at a higher rev, and takes
+  tombstones only from the store's own collection — so a phone carrying 200 of
+  3,140 orders says nothing at all about the 2,940 it was never given. That is a
+  property of the shared rule rather than caution on the phone's side, and it is
+  verified against the rule rather than assumed.
+
+  `POST /api/store/deltas` is **off unless the Mac app switches it on**. Taking a
+  phone's edits is a decision about a shop's book, so the capability is nil by
+  default and an unwired build answers 405 and says so, rather than failing as
+  though something broke.
+
+  Nothing sends yet: the phone can compute its outbox and the Mac can accept
+  one, but no screen writes offline and the app does not wire the capability.
+  The protocol is in place and tested; turning it on is a separate change.
+
+- **(iOS) The screens read the shop's own records.** Five of them could not load
+  at all against the native Mac: it serves `/api/status`, `/api/queue` and
+  `/api/store`, and orders, inventory, clients, machines and the waiting list
+  have no endpoint on it — those live only in the Electron desktop's LAN server.
+  They now read the book this phone already holds, so they work against either
+  desktop and keep working when neither is in reach.
+
+  Four of the models decode a raw store record unchanged; that was proven by
+  decoding the sample shop's actual records with the shipping structs rather
+  than assumed. The queue is not one of them, and it is the reason the queue
+  goes through `KhaytEngine.lanQueueBody` — the same rule the Mac serves, run
+  locally — which decides which orders are in the queue instead of the phone
+  holding its own opinion.
+
+  Reads come from the book FIRST rather than falling back to it. A screen fed
+  live while its neighbour is fed locally is a phone whose two screens disagree
+  about the same shop; freshness is kept by refreshing the book in the
+  background, at most once a minute, and never by making a screen wait on the
+  network to draw records the phone already has.
+
+- **(Mac + iOS) The phone finds the shop instead of asking for its address.**
+  Pairing has meant reading an IP address and a port off one machine's Settings
+  screen and typing them into a wizard on another — the worst five minutes a
+  shop spends with this product, and a step that comes undone by itself when the
+  router hands the Mac a different address next week.
+
+  The Mac now advertises `_khayt._tcp` whenever its LAN API is bound to the
+  network, under the shop's own name, and the phone offers a list. Not when it
+  is bound to loopback: a client that found that could never connect to it, and
+  a setup step that looks like it is working until it is not is worse than one
+  that is plainly absent.
+
+  The advert carries whether that Mac serves `GET /api/store`, which is the
+  difference between a companion that keeps working away from the desk and one
+  that empties the moment it loses the Mac — so the list says which before
+  anybody commits. The PIN is deliberately not advertised: it can change while
+  the server is up, and a stale "no PIN needed" is the phone telling a shop
+  something untrue, where a 401 says it accurately.
+
+  Typing the address by hand is still there, and not as a fallback for flaky
+  discovery: the Electron desktop does not advertise at all, and plenty of
+  buildings block Bonjour between their wireless and wired halves. Removing it
+  would make those shops unpairable rather than inconvenienced.
+
+  An Arabic shop name is truncated by bytes rather than characters, because
+  Bonjour's limit is 63 bytes and Arabic is two a letter — over it, the service
+  does not register at all and the shop simply never appears.
+
+- **(iOS) Pairing now takes a copy of the shop's book.** The one moment a phone
+  is certainly on the shop's Wi-Fi with the PIN freshly typed is the moment it
+  finishes pairing, so that is when it asks for the book. It cannot fail the
+  pairing: `GET /api/store` is served by the native Mac app and not by the
+  Electron desktop most shops still run, and a phone that refused to pair with
+  the app the shop actually has would be worse than one that cannot work
+  offline. If the book arrives, the screen says how many records came with it;
+  if it does not, it says what that means — that the phone will keep asking for
+  every screen and will empty when the Mac is out of reach. When history has
+  stayed behind on the Mac it says that too, so the phone never looks like it
+  holds a shop it does not.
+
+  Unpairing forgets the book, and the `.prev` rollback copy with it. That copy
+  is the same client list, one write behind.
+
+- **(iOS) The phone keeps the shop's book, and writes it the way the Mac
+  does.** The companion has had a cache of the desktop's *answers* — one file
+  per endpoint, read-only by design, writes refused rather than queued. That is
+  the right shape only while the desktop is the one thing that can compute
+  anything. A screen fed by `/api/queue`'s reply can show the queue and nothing
+  else, and it cannot answer a question nobody thought to cache in advance.
+
+  Now the phone can hold the book itself, in the shape the desktop keeps it on
+  disk — a working set of it, not all of it, and it keeps beside the records a
+  description of what it was NOT sent. That part is not bookkeeping: a partial
+  book that reads as a complete one is worse than no book, because a screen
+  would total the two hundred orders it has and report a three-year-old shop as
+  having done two hundred. A phone that does not know what it is missing answers
+  "no" to "may I total this", rather than guessing. `StoreWriter` moved into `KhaytCore` so that the phone writes through
+  the Mac's writer rather than a second one: the read happens inside the write,
+  so a second caller cannot put back what it saw before the first change; the
+  swap is atomic with an fsync before it; the old copy rolls to `.prev`, which
+  is the one generation of rollback a corrupt book is recovered from; and the
+  size ceiling is the one every backup is built to hold. A phone writing with
+  `Data.write(to:)` would have had to learn all four the same way they were
+  learned the first time.
+
+  Unpairing removes the rollback copy as well as the book. A `.prev` left behind
+  holds the same client list as the file that was deleted.
+
+- **(iOS) The phone runs the shop's own business logic.** `KhaytCore` — the
+  package the Mac app already computes every figure through — now builds for
+  iOS too, and the companion links it. That is one line in the manifest and no
+  change to any of its 29 source files: there is no AppKit in the target, and
+  JavaScriptCore is a system framework on iOS exactly as it is on macOS, so the
+  shop's tax engine, pricing, payment plans and split-order money run on the
+  phone unchanged, with nothing bundled and no second implementation.
+
+  The companion has never computed anything. Every figure on its screens came
+  down the wire from the desktop, which is why it goes blank the moment the
+  desktop is out of reach — and it is used in the back room and at the
+  machines, which is where the Wi-Fi is worst. Working without the desk means
+  the phone needs the shop's arithmetic in its pocket, and there were only ever
+  two ways to get it there: run the shop's engine, or write a second one in
+  Swift. A second one would earn the right to be wrong in a second, different
+  way, and every future fix would have to be made twice. A test on an iOS
+  simulator asks the engine for 15% inclusive VAT on 1,000 and pins it to
+  Node's answer to the halala, so the day the two diverge is the day it fails.
+
+  The floor is iOS 26, matching the Mac. It does cost something the macOS floor
+  did not: iOS 26 needs an A13, so the iPhone XR and XS are out. What makes it
+  affordable is that the companion has not shipped — the App Store is still "a
+  future path" in its own README — so there is no shop on an XS to strand, only
+  a 2018 phone nobody will buy new. Free today, expensive after the first shop
+  installs it, which is why it is settled now.
+
+- **(iOS) Every spool in the shop looked unopened.** The spool detail screen
+  printed *Remaining 860 g* and *Initial weight 860 g* for the same spool,
+  because it read `weight` for both. In the store `weight` is what is LEFT on
+  the spool and `spoolWeight` is the full roll — `renderer/inventory.js` totals
+  a shop's filament with `(+spool.remaining || +spool.weight || 0)` and divides
+  cost by `spoolWeight` for a price per kilo. The phone's model never read
+  `spoolWeight` at all, so the only number it had to show was the remaining one,
+  twice.
+
+  The desktop's own rule for what is left now lives in one place on the phone
+  rather than being written out by hand at each screen that needed it — two had
+  it, and the third would have been the one to forget.
+
+  Found by a new guard that decodes the shop's real sample book with the
+  shipping models. The wire contract check could not have caught it: it measures
+  against a fixture, and a fixture is written to suit the model.
+
+- **(iOS) Unpairing said it kept the PIN, while deleting it.** The sentence under
+  *Unpair this device* read "Clears paired state; PIN stays in Keychain until you
+  change it", in both languages, long after `unpair()` had started deleting that
+  Keychain item — the audit records the deletion as a fix and nobody went back to
+  the sentence describing what it replaced. A privacy claim is the worst kind of
+  string to have pointing the wrong way, and this one told a shop its PIN was
+  kept at the moment it was destroyed.
+
+  It had since drifted the other way too: unpairing now also forgets the shop's
+  book, its `.prev` rollback copy and its scope file. The footer says what
+  actually happens, and a guard pins the claim to the three calls that make it
+  true — because the sentence and the code have now been edited by different
+  people at different times twice.
+
+  Also corrected: the Arabic for the post-processing stat tile was `"ما بعد"` —
+  the preposition "after" with nothing after it — where the status label already
+  said `"ما بعد الطباعة"`. That key is not referenced by any screen today, so
+  nobody has read it; it is fixed before the redesign starts using it.
+
+- **(iOS) The queue screen could not load a single real shop's queue.** The
+  companion opens on the queue, and `QueueOrder.priority` was typed as a string.
+  The desktop has never sent one: `lib/order-new.js` writes `priority: false` on
+  every order it creates and `lib/order-edit.js` writes
+  `priority: wanted !== 'normal'` — always a boolean, with the word kept
+  separately in `priorityLevel` — and `queueJson` passes the field straight
+  through, so both servers put a boolean on the wire. A `Codable` mismatch does
+  not blank a field, it throws, and it throws for the whole array: one order was
+  enough to empty the screen. No view has ever drawn this field.
+
+  The check that exists to catch exactly this could not see it. The iOS contract
+  guard builds its own fixture, and the fixture said `priority: 'high'` — a shape
+  nothing in the product writes — so it certified a contract that held only
+  inside the guard. The fixture now carries what the desktop carries, and with
+  the old model restored it fails, which is how this was confirmed rather than
+  assumed.
+
+- **(iOS) The companion did not compile, and nothing in CI noticed.** `shipped`
+  was added to the order-status list — the enum learned it, the English label
+  learned it — but the switch that translates a status for an Arabic shop did
+  not, and in Swift a switch that does not cover its enum is a compile error,
+  not a missing string. So `ios/` was broken on `main` outright. The reason it
+  went unseen is worth more than the fix: the required checks never run
+  `xcodebuild`, and the iOS contract check compiles `KhaytModels.swift` by
+  itself — which is one of the files that WAS finished. Both Arabic and
+  English already had the word.
+
+- **(iOS companion) A shipped order showed the English word "shipped" to an
+  Arabic shop.** The phone's status list is a closed set and `shipped` was
+  added to the desktop without it, so every badge fell back to the raw status
+  name. The same thing happened with "quote" and "delivered" before it. The
+  check that exists to catch exactly this could not: it reads the desktop's
+  status list out of `renderer/analytics.js`, but only ran on changes to the
+  phone's own files — never on the file it takes its truth from. It runs on
+  that file now, and a new test covers the other half nothing was watching:
+  that every status the phone can show has a word in both its languages.
+
+- **Security (Mac): a printer camera that answered with a redirect was handed
+  the printer's own credential.** A camera is allowed to be a separate device
+  from the printer it belongs to, and the request to it carries the printer's
+  API key. macOS follows redirects by itself, so a camera answering "look over
+  there instead" had that key delivered to wherever it pointed — and the check
+  that the address was allowed had already run, before the request, and never
+  saw the second hop. Redirects are now refused outright rather than followed
+  and questioned afterwards, which is what the Windows and Linux app has always
+  done. A camera that redirects now reads as a camera that refused.
+
 ## [3.8.0] - 2026-09-18
 
 The work since 3.7.0, released as stable. Individual entries are kept below;
@@ -1363,8 +1590,8 @@ label that was only ever visual, so the reader announced "number edit" and
 stopped, on a settings screen carrying fifty-six number boxes.
 
 **Khayt for macOS is a real app now, and it updates itself.** It is on its own
-version line and its own notes, so the entries below marked *(Mac)* are its
-work rather than this release's. What matters here is that the two apps agree:
+version line and its own notes, so its changes are listed there rather than
+here — as the phone companion's are. What matters here is that the two apps agree:
 the rules that decide money, tax, scheduling and pricing are one implementation
 tested against both.
 
@@ -2230,127 +2457,6 @@ tested against both.
 
 ### Added
 
-- **(iOS + Mac) The phone can work out what it changed while the Mac was away,
-  and the Mac can take it back.** Neither half invents a rule. The phone
-  computes an outbox with `KhaytCloudOutbox.changesToSend` — the function the
-  desktop already pushes with — against a baseline written at the moment of the
-  pull, when the book and the baseline are by definition identical. The Mac
-  folds it with `KhaytSync.applyDeltas`, the function every device already pulls
-  with. A phone gets no private theory about what a change is, which is the only
-  reason it may write to a shop's book at all.
-
-  What protects the book is the fold, not the route: `applyDeltas` keeps the
-  higher revision, so a phone carrying a stale record cannot undo work done at
-  the desk — it is counted as skipped and discarded. Pinned by a test that
-  sends exactly that.
-
-  And a partial book cannot delete a shop's history. `changesToSend` emits a
-  delta only for a record the phone *holds* at a higher rev, and takes
-  tombstones only from the store's own collection — so a phone carrying 200 of
-  3,140 orders says nothing at all about the 2,940 it was never given. That is a
-  property of the shared rule rather than caution on the phone's side, and it is
-  verified against the rule rather than assumed.
-
-  `POST /api/store/deltas` is **off unless the Mac app switches it on**. Taking a
-  phone's edits is a decision about a shop's book, so the capability is nil by
-  default and an unwired build answers 405 and says so, rather than failing as
-  though something broke.
-
-  Nothing sends yet: the phone can compute its outbox and the Mac can accept
-  one, but no screen writes offline and the app does not wire the capability.
-  The protocol is in place and tested; turning it on is a separate change.
-
-
-- **(iOS) The screens read the shop's own records.** Five of them could not load
-  at all against the native Mac: it serves `/api/status`, `/api/queue` and
-  `/api/store`, and orders, inventory, clients, machines and the waiting list
-  have no endpoint on it — those live only in the Electron desktop's LAN server.
-  They now read the book this phone already holds, so they work against either
-  desktop and keep working when neither is in reach.
-
-  Four of the models decode a raw store record unchanged; that was proven by
-  decoding the sample shop's actual records with the shipping structs rather
-  than assumed. The queue is not one of them, and it is the reason the queue
-  goes through `KhaytEngine.lanQueueBody` — the same rule the Mac serves, run
-  locally — which decides which orders are in the queue instead of the phone
-  holding its own opinion.
-
-  Reads come from the book FIRST rather than falling back to it. A screen fed
-  live while its neighbour is fed locally is a phone whose two screens disagree
-  about the same shop; freshness is kept by refreshing the book in the
-  background, at most once a minute, and never by making a screen wait on the
-  network to draw records the phone already has.
-
-
-- **(Mac + iOS) The phone finds the shop instead of asking for its address.**
-  Pairing has meant reading an IP address and a port off one machine's Settings
-  screen and typing them into a wizard on another — the worst five minutes a
-  shop spends with this product, and a step that comes undone by itself when the
-  router hands the Mac a different address next week.
-
-  The Mac now advertises `_khayt._tcp` whenever its LAN API is bound to the
-  network, under the shop's own name, and the phone offers a list. Not when it
-  is bound to loopback: a client that found that could never connect to it, and
-  a setup step that looks like it is working until it is not is worse than one
-  that is plainly absent.
-
-  The advert carries whether that Mac serves `GET /api/store`, which is the
-  difference between a companion that keeps working away from the desk and one
-  that empties the moment it loses the Mac — so the list says which before
-  anybody commits. The PIN is deliberately not advertised: it can change while
-  the server is up, and a stale "no PIN needed" is the phone telling a shop
-  something untrue, where a 401 says it accurately.
-
-  Typing the address by hand is still there, and not as a fallback for flaky
-  discovery: the Electron desktop does not advertise at all, and plenty of
-  buildings block Bonjour between their wireless and wired halves. Removing it
-  would make those shops unpairable rather than inconvenienced.
-
-  An Arabic shop name is truncated by bytes rather than characters, because
-  Bonjour's limit is 63 bytes and Arabic is two a letter — over it, the service
-  does not register at all and the shop simply never appears.
-
-
-- **(iOS) Pairing now takes a copy of the shop's book.** The one moment a phone
-  is certainly on the shop's Wi-Fi with the PIN freshly typed is the moment it
-  finishes pairing, so that is when it asks for the book. It cannot fail the
-  pairing: `GET /api/store` is served by the native Mac app and not by the
-  Electron desktop most shops still run, and a phone that refused to pair with
-  the app the shop actually has would be worse than one that cannot work
-  offline. If the book arrives, the screen says how many records came with it;
-  if it does not, it says what that means — that the phone will keep asking for
-  every screen and will empty when the Mac is out of reach. When history has
-  stayed behind on the Mac it says that too, so the phone never looks like it
-  holds a shop it does not.
-
-  Unpairing forgets the book, and the `.prev` rollback copy with it. That copy
-  is the same client list, one write behind.
-
-- **(iOS) The phone keeps the shop's book, and writes it the way the Mac
-  does.** The companion has had a cache of the desktop's *answers* — one file
-  per endpoint, read-only by design, writes refused rather than queued. That is
-  the right shape only while the desktop is the one thing that can compute
-  anything. A screen fed by `/api/queue`'s reply can show the queue and nothing
-  else, and it cannot answer a question nobody thought to cache in advance.
-
-  Now the phone can hold the book itself, in the shape the desktop keeps it on
-  disk — a working set of it, not all of it, and it keeps beside the records a
-  description of what it was NOT sent. That part is not bookkeeping: a partial
-  book that reads as a complete one is worse than no book, because a screen
-  would total the two hundred orders it has and report a three-year-old shop as
-  having done two hundred. A phone that does not know what it is missing answers
-  "no" to "may I total this", rather than guessing. `StoreWriter` moved into `KhaytCore` so that the phone writes through
-  the Mac's writer rather than a second one: the read happens inside the write,
-  so a second caller cannot put back what it saw before the first change; the
-  swap is atomic with an fsync before it; the old copy rolls to `.prev`, which
-  is the one generation of rollback a corrupt book is recovered from; and the
-  size ceiling is the one every backup is built to hold. A phone writing with
-  `Data.write(to:)` would have had to learn all four the same way they were
-  learned the first time.
-
-  Unpairing removes the rollback copy as well as the book. A `.prev` left behind
-  holds the same client list as the file that was deleted.
-
 - **(Repo) `KhaytCore` is flagged as shared, and a guard holds it to that.**
   A package filed under `mac/` now ships inside an iPhone, and nothing about a
   Mac session makes that visible. Adding `import AppKit` to it is a completely
@@ -2364,32 +2470,6 @@ tested against both.
   iOS contract workflow now triggers on `mac/KhaytCore/**` as well, so the
   compiler that actually holds the iOS SDK reports on the commit that broke it
   rather than on some later one. CLAUDE.md says all of this out loud.
-
-- **(iOS) The phone runs the shop's own business logic.** `KhaytCore` — the
-  package the Mac app already computes every figure through — now builds for
-  iOS too, and the companion links it. That is one line in the manifest and no
-  change to any of its 29 source files: there is no AppKit in the target, and
-  JavaScriptCore is a system framework on iOS exactly as it is on macOS, so the
-  shop's tax engine, pricing, payment plans and split-order money run on the
-  phone unchanged, with nothing bundled and no second implementation.
-
-  The companion has never computed anything. Every figure on its screens came
-  down the wire from the desktop, which is why it goes blank the moment the
-  desktop is out of reach — and it is used in the back room and at the
-  machines, which is where the Wi-Fi is worst. Working without the desk means
-  the phone needs the shop's arithmetic in its pocket, and there were only ever
-  two ways to get it there: run the shop's engine, or write a second one in
-  Swift. A second one would earn the right to be wrong in a second, different
-  way, and every future fix would have to be made twice. A test on an iOS
-  simulator asks the engine for 15% inclusive VAT on 1,000 and pins it to
-  Node's answer to the halala, so the day the two diverge is the day it fails.
-
-  The floor is iOS 26, matching the Mac. It does cost something the macOS floor
-  did not: iOS 26 needs an A13, so the iPhone XR and XS are out. What makes it
-  affordable is that the companion has not shipped — the App Store is still "a
-  future path" in its own README — so there is no shop on an XS to strand, only
-  a 2018 phone nobody will buy new. Free today, expensive after the first shop
-  installs it, which is why it is settled now.
 
 - **A job can be marked shipped.** Between finishing a job and handing it over
   there was nowhere to say it had gone in the post, so a parcel sitting with a
@@ -2683,24 +2763,6 @@ tested against both.
 
 ### Fixed
 
-- **(iOS) Every spool in the shop looked unopened.** The spool detail screen
-  printed *Remaining 860 g* and *Initial weight 860 g* for the same spool,
-  because it read `weight` for both. In the store `weight` is what is LEFT on
-  the spool and `spoolWeight` is the full roll — `renderer/inventory.js` totals
-  a shop's filament with `(+spool.remaining || +spool.weight || 0)` and divides
-  cost by `spoolWeight` for a price per kilo. The phone's model never read
-  `spoolWeight` at all, so the only number it had to show was the remaining one,
-  twice.
-
-  The desktop's own rule for what is left now lives in one place on the phone
-  rather than being written out by hand at each screen that needed it — two had
-  it, and the third would have been the one to forget.
-
-  Found by a new guard that decodes the shop's real sample book with the
-  shipping models. The wire contract check could not have caught it: it measures
-  against a fixture, and a fixture is written to suit the model.
-
-
 - **A screen reader could not say which box you were in.** Across the app 178
   fields showed a label — "Layer height (mm)", "Infill (%)" — that was only
   ever visual: nothing tied the words to the box beneath them, so a screen
@@ -2713,53 +2775,6 @@ tested against both.
   only cue is placeholder text — and they need wording, in nine languages,
   rather than a rename.
 
-- **(iOS) Unpairing said it kept the PIN, while deleting it.** The sentence under
-  *Unpair this device* read "Clears paired state; PIN stays in Keychain until you
-  change it", in both languages, long after `unpair()` had started deleting that
-  Keychain item — the audit records the deletion as a fix and nobody went back to
-  the sentence describing what it replaced. A privacy claim is the worst kind of
-  string to have pointing the wrong way, and this one told a shop its PIN was
-  kept at the moment it was destroyed.
-
-  It had since drifted the other way too: unpairing now also forgets the shop's
-  book, its `.prev` rollback copy and its scope file. The footer says what
-  actually happens, and a guard pins the claim to the three calls that make it
-  true — because the sentence and the code have now been edited by different
-  people at different times twice.
-
-  Also corrected: the Arabic for the post-processing stat tile was `"ما بعد"` —
-  the preposition "after" with nothing after it — where the status label already
-  said `"ما بعد الطباعة"`. That key is not referenced by any screen today, so
-  nobody has read it; it is fixed before the redesign starts using it.
-
-- **(iOS) The queue screen could not load a single real shop's queue.** The
-  companion opens on the queue, and `QueueOrder.priority` was typed as a string.
-  The desktop has never sent one: `lib/order-new.js` writes `priority: false` on
-  every order it creates and `lib/order-edit.js` writes
-  `priority: wanted !== 'normal'` — always a boolean, with the word kept
-  separately in `priorityLevel` — and `queueJson` passes the field straight
-  through, so both servers put a boolean on the wire. A `Codable` mismatch does
-  not blank a field, it throws, and it throws for the whole array: one order was
-  enough to empty the screen. No view has ever drawn this field.
-
-  The check that exists to catch exactly this could not see it. The iOS contract
-  guard builds its own fixture, and the fixture said `priority: 'high'` — a shape
-  nothing in the product writes — so it certified a contract that held only
-  inside the guard. The fixture now carries what the desktop carries, and with
-  the old model restored it fails, which is how this was confirmed rather than
-  assumed.
-
-
-- **(iOS) The companion did not compile, and nothing in CI noticed.** `shipped`
-  was added to the order-status list — the enum learned it, the English label
-  learned it — but the switch that translates a status for an Arabic shop did
-  not, and in Swift a switch that does not cover its enum is a compile error,
-  not a missing string. So `ios/` was broken on `main` outright. The reason it
-  went unseen is worth more than the fix: the required checks never run
-  `xcodebuild`, and the iOS contract check compiles `KhaytModels.swift` by
-  itself — which is one of the files that WAS finished. Both Arabic and
-  English already had the word.
-
 - **A Mac test accused the tablet server of holding connections open when it
   was not.** The read-timeout tests lowered a shared setting, ran, and put it
   back — and the test runner runs them side by side, so one test's restore
@@ -2770,16 +2785,6 @@ tested against both.
   timeout belongs to a server now rather than to the whole app, so there is
   nothing shared to race on — and the same search found one more test with the
   same shape, in a different file, which is now fixed too.
-
-- **(iOS companion) A shipped order showed the English word "shipped" to an
-  Arabic shop.** The phone's status list is a closed set and `shipped` was
-  added to the desktop without it, so every badge fell back to the raw status
-  name. The same thing happened with "quote" and "delivered" before it. The
-  check that exists to catch exactly this could not: it reads the desktop's
-  status list out of `renderer/analytics.js`, but only ran on changes to the
-  phone's own files — never on the file it takes its truth from. It runs on
-  that file now, and a new test covers the other half nothing was watching:
-  that every status the phone can show has a word in both its languages.
 
 - **The customer tracking link and the calendar subscription link both stopped
   working the moment a shop set a LAN PIN.** Both carry their own key — a
@@ -2805,7 +2810,6 @@ tested against both.
   it by accident. Seven other addresses decode the same way and the intake form
   reads a cookie the customer's own browser sends. A request that cannot be
   understood is answered "bad request" now, and the server carries on.
-
 
 - **A printer's utilisation was capped at 100%, so the machine worth buying a
   second of was invisible.** "Printer utilisation" on Reports clamped the
@@ -3139,7 +3143,6 @@ tested against both.
 - **The sidebar's card says which book is open.** On the sample shop it says
   so, and the card is the menu that switches back to the shop's own.
 
-
 - **No email has left Khayt since 31 August, and nothing said so.** Three
   functions — the status notification to a customer, *Email* on an order or
   quote, and the printer-alert digest — each open with
@@ -3212,7 +3215,6 @@ tested against both.
   megabyte to draw a small tile.** Every icon route served the same 1024px file
   whatever size the manifest asked for. There is a maskable icon now too, so
   Android stops letterboxing the tile inside its adaptive shell.
-
 
 - **A printer was credited with colours it does not have.** Adding a Prusa CORE
   One gave Khayt a machine it believed could print five colours. Five is what a
@@ -3317,16 +3319,6 @@ tested against both.
   and that is what got notarised. `--notarize` now works on the app already
   built, and the release refuses to publish a bundle with no feed, no public
   key, no embedded Sparkle or no stapled ticket.
-
-- **Security (Mac): a printer camera that answered with a redirect was handed
-  the printer's own credential.** A camera is allowed to be a separate device
-  from the printer it belongs to, and the request to it carries the printer's
-  API key. macOS follows redirects by itself, so a camera answering "look over
-  there instead" had that key delivered to wherever it pointed — and the check
-  that the address was allowed had already run, before the request, and never
-  saw the second hop. Redirects are now refused outright rather than followed
-  and questioned afterwards, which is what the Windows and Linux app has always
-  done. A camera that redirects now reads as a camera that refused.
 
 - **(Maintainers) The Mac app could not be notarised, so it could not open on
   any Mac but the one that built it.** It was signed with a real Developer ID
