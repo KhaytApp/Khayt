@@ -197,6 +197,14 @@ private struct BookMenu: View {
         // sheet. A shop uses one of these and uses it every quarter; the
         // choice is a property of the shop, not a question to be asked each
         // time, and a submenu remembers nothing but costs nothing either.
+        // The shop's own copy of everything, in a form a spreadsheet opens.
+        // Beside the other two exports because the question a shop is asking
+        // when it reaches this menu is "get my data out", and which of the
+        // three it wants is the next question rather than a different screen.
+        Button(Words.upfront("mac.export_csv")) {
+            Task { await shop.exportEverythingAsCsv() }
+        }
+        .disabled(shop.source.build == nil)
         Menu(Words.upfront("mac.export_accounting")) {
             ForEach(Shop.accountingFormats, id: \.0) { key, name in
                 Button(name) { Task { await shop.exportForAccounting(format: key) } }

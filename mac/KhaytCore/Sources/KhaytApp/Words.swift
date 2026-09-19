@@ -1637,6 +1637,12 @@ final class Words {
             "ar": "لم يُختر خيط، لذا لا تشمل هذه التسعيرة تكلفة المادة."],
         "mac.export_accounting": ["en": "Export for the Accountant",
                                   "ar": "تصدير للمحاسب"],
+        // "Export all data (CSV)" is what the other app calls it; said the
+        // same way here so a shop that has used one recognises the other.
+        "mac.export_csv":       ["en": "Export All Data (CSV)…",
+                                 "ar": "تصدير كل البيانات (CSV)…"],
+        "mac.export_csv_where": ["en": "Choose a folder for the CSV files",
+                                 "ar": "اختر مجلداً لملفات CSV"],
         "mac.export_accounting_where": [
             "en": "Two files are written here: one of invoices and one of expenses.",
             "ar": "يُكتب هنا ملفان: ملف للفواتير وآخر للمصروفات."],

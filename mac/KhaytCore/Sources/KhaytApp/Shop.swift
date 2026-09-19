@@ -5579,6 +5579,60 @@ final class Shop {
         }
     }
 
+    /// Every collection of the book as its own spreadsheet.
+    ///
+    /// ── WHY THIS IS NOT THE ACCOUNTING EXPORT, OR THE JSON ONE ────────────
+    ///
+    /// Three exports, three different questions. `exportForSharing` writes
+    /// redacted JSON for a support thread. `exportForAccounting` writes the two
+    /// files a bookkeeper's software reads. This one is the shop's own copy of
+    /// everything in a form it can open: orders, customers, products, the
+    /// shelf, expenses, machines, suppliers and purchase orders, one CSV each.
+    /// Khayt has offered it since 3.0 as "Export all data (CSV)" and this app
+    /// offered nothing like it, so a shop working here could not take its own
+    /// book out in a form a spreadsheet opens.
+    ///
+    /// READ FROM DISK, for the reason `exportForSharing` gives: the screens
+    /// decode two collections out of thirty-three, and a bundle built from
+    /// those would be a bundle missing thirty-one.
+    ///
+    /// The columns, the quoting and the formula-injection guard are all
+    /// `lib/csv-bundle.js`'s. A Swift writer joining the same fields with
+    /// commas would have lost the last one, which is the one that matters: a
+    /// spreadsheet opens a CSV and runs what looks like a formula.
+    func exportEverythingAsCsv() async {
+        spendProblem = nil
+        spendNote = nil
+        guard let build = source.build, let engine else {
+            spendProblem = words.callIt("mac.move_sample"); return
+        }
+        // A FOLDER, not a file: there are up to eight of them, and asking eight
+        // times where to put a file is a dialogue nobody finishes.
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = words.callIt("common.save")
+        panel.message = words.callIt("mac.export_csv_where")
+        guard panel.runModal() == .OK, let dir = panel.url else { return }
+        do {
+            let root = try JSONDecoder().decode([String: JSONValue].self,
+                                                from: Data(contentsOf: build.storeURL))
+            let files = try await engine.csvBundle(root)
+            guard !files.isEmpty else {
+                spendProblem = words.callIt("set.csv_export_empty"); return
+            }
+            for file in files {
+                try Data(file.content.utf8).write(to: dir.appending(path: file.name),
+                                                  options: .atomic)
+            }
+            spendNote = words.callIt("set.csv_exported",
+                                     ["n": .number(Double(files.count))])
+        } catch {
+            spendProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+        }
+    }
+
     /// The accounting packages `lib/accounting-export.js` lays out columns for.
     ///
     /// The names are the products' own and are deliberately NOT translated —

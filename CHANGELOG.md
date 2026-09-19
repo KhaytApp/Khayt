@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The shop can take its whole book out as spreadsheets.** Khayt has had
+  "Export all data (CSV)" since 3.0 — a file per collection, in a form a
+  spreadsheet opens — and this app had nothing like it: the JSON export is for
+  a support thread and the accounting export is two files for a bookkeeper,
+  neither of which is a shop's own copy of its own work. It is on the Book menu
+  now, and asks for one folder rather than once per file. What the columns are,
+  how they are quoted, and the guard that stops a cell beginning with `=` being
+  run as a formula are all the shared rule's.
+
 - **"Export all data (CSV)" was mostly empty columns.** The customer's name,
   the product's name and price, and what is left on a spool and what it held
   new — all blank, in every row of every export, because the file was reading
