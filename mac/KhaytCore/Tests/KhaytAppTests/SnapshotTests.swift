@@ -230,6 +230,49 @@ import KhaytCore
         try render(MachineSheet(shop: shop, existing: shop.machines.first),
                    "29-machine-words", size: CGSize(width: MachineSheet.width, height: 560))
     }
+    /// The supplier sheets, which no picture has ever been taken of.
+    ///
+    /// Three of them, and the last is the one worth looking at: a purchase log
+    /// is a list of small numbers in mixed units, and the question a photograph
+    /// answers is whether a row with nothing typed on it still reads as a row.
+    @Test("the supplier sheets render, with their words")
+    func supplierSheets() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        // The one with the most behind it: a sheet photographed against the
+        // emptiest record in the book is a picture of the empty state, and
+        // there is a separate one of that below.
+        let supplier = try #require(shop.suppliers.max { $0.purchases.count < $1.purchases.count })
+        #expect(supplier.purchases.count > 1, "the sample supplier has nothing to draw")
+
+        // `SheetFrame` takes the CONTENT width and adds its own margin, so a
+        // picture taken at the sheet's `width` comes back cropped through the
+        // trailing column.
+        // ON A BACKGROUND, and not only for looks. A sheet draws none of its
+        // own — the window behind it does — so `ImageRenderer` returns a page
+        // whose only opaque pixels are the glyphs. The blank-page guard then
+        // finds one colour (the text) and reports a sheet full of words as
+        // blank, which is exactly what it did here first time round.
+        try render(SupplierSheet(shop: shop, supplier: supplier).background(Khayt.surface),
+                   "60-supplier-words",
+                   size: CGSize(width: SheetMetrics.outerWidth(SupplierSheet.width), height: 560))
+        try render(PurchaseLogSheet(shop: shop, supplier: supplier).background(Khayt.surface),
+                   "61-log-purchase-words",
+                   size: CGSize(width: SheetMetrics.outerWidth(PurchaseLogSheet.width),
+                                height: 420))
+        try render(PurchaseHistorySheet(shop: shop, supplier: supplier).background(Khayt.surface),
+                   "62-purchase-history-words",
+                   size: CGSize(width: SheetMetrics.outerWidth(PurchaseHistorySheet.width),
+                                height: 320))
+
+        // And the card they are reached from, including the supplier nothing
+        // has been bought from — the row that draws a dash rather than 0.00.
+        try render(SuppliersCard(shop: shop)
+                       .card(padding: 14)
+                       .frame(width: 720).padding(Metric.screen).background(Khayt.ground),
+                   "63-suppliers-card", size: CGSize(width: 760, height: 260))
+    }
+
     /// The import banner, which nobody had looked at.
     ///
     /// A batch of five hundred models is minutes of work behind one line of

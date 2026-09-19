@@ -16,6 +16,9 @@ import KhaytCore
 /// the supplier's invoice calls the stuff, and forcing it onto the shelf's own
 /// list would either refuse a purchase or quietly re-label it.
 struct PurchaseLogSheet: View {
+    /// See `NewJobSheet.width`.
+    static let width: CGFloat = 460
+
     @Bindable var shop: Shop
     let supplier: Supplier
 
@@ -36,7 +39,7 @@ struct PurchaseLogSheet: View {
     static let units = ["spool", "kg", "g", "L", "piece", "roll", "box"]
 
     var body: some View {
-        SheetFrame(width: 460) {
+        SheetFrame(width: Self.width) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(shop.words.callIt("sup.log_purchase")).font(.headline)
                 Text(supplier.name).font(.callout).foregroundStyle(.secondary).lineLimit(1)
@@ -162,11 +165,14 @@ struct PurchaseLogSheet: View {
 /// a row in it is corrected by writing the correction down rather than by
 /// editing history.
 struct PurchaseHistorySheet: View {
+    /// See `NewJobSheet.width`.
+    static let width: CGFloat = 520
+
     @Bindable var shop: Shop
     let supplier: Supplier
 
     var body: some View {
-        SheetFrame(width: 520) {
+        SheetFrame(width: Self.width) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(supplier.name).font(.headline)
                 Text(shop.words.callIt("sup.history"))
