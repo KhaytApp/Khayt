@@ -17,6 +17,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   history and the expense together, which is the part that has gone wrong
   before.
 
+- **The price a reorder is drafted at is one rule now.** What a gram of a
+  material costs — the supplier's quoted rate where there is one, the spool's
+  own cost divided by its weight otherwise — is decided in one place. The
+  division is the point: a per-spool figure against a quantity measured in
+  grams is what once made auto-drafted orders about a thousand times too
+  expensive, and the macOS app can now draft one without a second copy of it.
+
 - **Receiving a purchase order is one rule now, not one per app.** What arrives
   when goods are booked in — the order, the spool or the consumable, the line in
   that spool's history and the expense — is decided in one place and written
