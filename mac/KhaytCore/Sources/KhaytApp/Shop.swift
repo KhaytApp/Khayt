@@ -3548,6 +3548,36 @@ final class Shop {
         var activity: String? = nil
     }
 
+    // MARK: - Labels for work going out the door
+
+    /// The shop's portal address, for a label's QR to point at.
+    ///
+    /// Empty when the cloud is not connected, which is what makes
+    /// `ShelfLabels.orderCode` fall back to the code the shop's own phone
+    /// reads rather than printing a link to nowhere.
+    var cloudLabelBase: String {
+        guard cloudConnected, case .object(let cloud)? = settingsDict["cloud"],
+              case .string(let url)? = cloud["url"] else { return "" }
+        return url
+    }
+
+    /// Build a printable sheet of ORDER labels, for the jobs given.
+    ///
+    /// The shelf could be labelled from this app and a job could not, so a box
+    /// going out of the door had to be labelled from the other one. Same sheet
+    /// builder, same QR rule, same preview before anything is printed.
+    func askForOrderLabels(_ ids: [Order.ID]) async {
+        let chosen = orderRows.filter { row in
+            guard let id = Self.recordId(row) else { return false }
+            return ids.contains(id)
+        }
+        guard !chosen.isEmpty, let engine else { return }
+        let entries = chosen.map { ShelfLabels.entry(forOrder: $0, shop: self) }
+        let heading = words.callIt("lbl.orders")
+        guard let html = try? await engine.labelSheet(entries, heading: heading) else { return }
+        pendingLabels = LabelSheetRequest(html: html, count: chosen.count)
+    }
+
     // MARK: - What the customer thought
 
     /// The job whose rating is being written down, or nil.

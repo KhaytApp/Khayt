@@ -71,6 +71,61 @@ enum ShelfLabels {
         if let img = qr(code(for: spool.id)) { fields["qr"] = .string(img) }
         return .object(fields)
     }
+
+    // MARK: - A label for a job going out the door
+
+    /// What a scanner reads off an ORDER label.
+    ///
+    /// The shop's own portal link when the cloud is connected and the job has a
+    /// tracking token, so a customer scanning the box lands on their own job —
+    /// and `KHAYT-ORDER:<id>` otherwise, which is what the shop's own phone
+    /// reads. `renderer/labels.js` decides it exactly this way, and a box
+    /// labelled from one app must scan the same as a box labelled from the
+    /// other.
+    static func orderCode(id: String, trackingToken: String?, cloudURL: String?,
+                          cloudOn: Bool) -> String {
+        guard cloudOn, let base = cloudURL, !base.isEmpty,
+              let token = trackingToken, !token.isEmpty else { return "KHAYT-ORDER:" + id }
+        // `String(c.url).replace(/\/+$/, '')` — EVERY trailing slash, not one.
+        var trimmed = base
+        while trimmed.hasSuffix("/") { trimmed.removeLast() }
+        return trimmed + "/p/" + token
+    }
+
+    /// One job's label, in the shape `lib/labels.js` expects.
+    ///
+    /// The same three lines the other app prints: who it is for, what it is
+    /// made of, and when it is due. Built from the RAW row rather than from
+    /// `Order`, because `material` and `trackingToken` are fields that type
+    /// does not carry, and widening it for a label would be the wrong place.
+    @MainActor
+    static func entry(forOrder row: JSONValue, shop: Shop) -> JSONValue {
+        guard case .object(let o) = row else { return .object([:]) }
+        func text(_ key: String) -> String {
+            guard let v = o[key], JSSemantics.truthy(v) else { return "" }
+            return JSSemantics.text(v)
+        }
+        let id = text("id")
+        var lines: [JSONValue] = []
+        // The customer's resolved name where there is one, else whatever the
+        // job itself was written with — the same fallback the other app takes.
+        let named = shop.customers.first { $0.id == text("clientId") }?.name ?? ""
+        let who = named.isEmpty ? text("client") : named
+        if !who.isEmpty { lines.append(.string(who)) }
+        if !text("material").isEmpty { lines.append(.string(text("material"))) }
+        if !text("dueDate").isEmpty {
+            lines.append(.string(shop.words.callIt("lbl.due") + " " + text("dueDate")))
+        }
+        var fields: [String: JSONValue] = [
+            "title": .string(text("project").isEmpty ? id : text("project")),
+            "lines": .array(lines),
+            "sub": .string(id),
+        ]
+        let payload = orderCode(id: id, trackingToken: text("trackingToken"),
+                                cloudURL: shop.cloudLabelBase, cloudOn: shop.cloudConnected)
+        if let img = qr(payload) { fields["qr"] = .string(img) }
+        return .object(fields)
+    }
 }
 
 /// The sheet, laid out and printed by WebKit.
