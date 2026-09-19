@@ -113,7 +113,58 @@ function fitForRelease(body, opts = {}) {
   };
 }
 
-module.exports = { sectionFor, fitForRelease, GITHUB_BODY_LIMIT, DEFAULT_MAX_CHARS };
+/**
+ * Entries addressed to whoever maintains this repo, not to a shop.
+ *
+ * `(Maintainers)` and `(Repo)` are written into the bullet by the author to say
+ * exactly that. They belong in CHANGELOG.md — that is the record — but a shop
+ * reading its update dialog has no use for "the release script ran a comment",
+ * and in 3.8.0 they were 22,000 characters of the 126,885 that would not fit.
+ *
+ * The alternative was letting `fitForRelease` trim the overflow from the END,
+ * which lands in `### Fixed` and would have dropped fourteen entries including
+ * "Break-even was telling shops to bill LESS than they must" and "The cash-flow
+ * chart counted a deposit as the whole job". Cutting the notes a shop cannot use
+ * to keep the money bugs it can is the trade that needed making.
+ *
+ * NOT folded into `sectionFor`. That function feeds the update-consent gate
+ * (`scripts/e2e-update-consent-smoke.mjs` reads it), and what a shop is asked to
+ * agree to must stay exactly what the file says. This shapes the RELEASE BODY
+ * and nothing else.
+ */
+const MAINTAINER_BULLET = /^- \*\*\((?:Maintainers|Repo)\)/;
+
+function withoutMaintainerNotes(body) {
+  const lines = String(body || '').split('\n');
+  const kept = [];
+  let dropping = false;
+  let removed = 0;
+  for (const line of lines) {
+    if (/^- /.test(line)) {
+      dropping = MAINTAINER_BULLET.test(line);
+      if (dropping) { removed++; continue; }
+    } else if (dropping) {
+      // A bullet runs until the next bullet or the next heading.
+      if (/^#{2,3} /.test(line)) dropping = false;
+      else continue;
+    }
+    kept.push(line);
+  }
+
+  // A subsection emptied of every bullet is a heading with nothing under it.
+  const out = [];
+  for (let i = 0; i < kept.length; i++) {
+    if (/^### /.test(kept[i])) {
+      let j = i + 1;
+      while (j < kept.length && !/^#{2,3} /.test(kept[j]) && !/^- /.test(kept[j])) j++;
+      if (j >= kept.length || /^#{2,3} /.test(kept[j])) { i = j - 1; continue; }
+    }
+    out.push(kept[i]);
+  }
+  return { text: out.join('\n').replace(/\n{3,}/g, '\n\n').trim(), removed };
+}
+
+module.exports = { sectionFor, fitForRelease, withoutMaintainerNotes, GITHUB_BODY_LIMIT, DEFAULT_MAX_CHARS };
 
 if (require.main === module) {
   const version = process.argv[2];
@@ -129,10 +180,16 @@ if (require.main === module) {
     console.error('carrying a "Before you update" section cannot ask them to agree to it.');
     process.exit(1);
   }
-  const fitted = fitForRelease(body, { version });
+  const shopFacing = withoutMaintainerNotes(body);
+  if (shopFacing.removed) {
+    console.error(`changelog-section: ${version} — ${shopFacing.removed} maintainer-marked `
+      + `entr${shopFacing.removed === 1 ? 'y' : 'ies'} lifted out of the release body `
+      + `(${body.length} -> ${shopFacing.text.length} characters). They stay in CHANGELOG.md.`);
+  }
+  const fitted = fitForRelease(shopFacing.text, { version });
   if (fitted.truncated) {
     // stderr, so the workflow log says so while stdout stays the notes.
-    console.error(`changelog-section: ${version} is ${body.length} characters, over the `
+    console.error(`changelog-section: ${version} is ${shopFacing.text.length} characters, over the `
       + `${DEFAULT_MAX_CHARS} budget — ${fitted.omitted} trimmed from the END, `
       + `with a link to the full changelog. The "Before you update" section is at the `
       + `top of an entry and is kept.`);
