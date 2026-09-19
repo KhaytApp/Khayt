@@ -36,6 +36,15 @@ public actor KhaytEngine {
         "accounting-export",
         "pricing",
         "payment-plan",
+        // Deposits erased by the instalment-save defect (#500). The code is
+        // fixed; books written before it are not, and this app could not even
+        // TELL a shop its own figures were wrong — it reported it nowhere,
+        // while the other app has had a banner for it since the fix.
+        //
+        // AFTER `payment-plan` by habit rather than need: it reads nothing
+        // from it, but the two are the same subject and a reader looking for
+        // one should find the other.
+        "deposit-audit",
         "split-order",
         "business-scope",
                 // Which printer should take which job, and in what order.
@@ -1000,6 +1009,81 @@ public actor KhaytEngine {
         public let reason: String?
         public let card: JSONValue?
         public let entry: JSONValue?
+    }
+
+    // MARK: - Money an old defect took off the book
+
+    /// Orders whose recorded deposit was erased when their plan was saved.
+    ///
+    /// Report only. The figures are the shop's own — the deposit it took and
+    /// the instalment rows it marked paid — recovered from the record rather
+    /// than guessed at, and nothing is written until somebody asks for it.
+    public func erasedDeposits(orders: [JSONValue]) throws -> [ErasedDeposit] {
+        // `orders` is the argument, not a literal: `call` takes `[Encodable]`,
+        // so a bare `.array(...)` has nothing to infer from.
+        try runtime.call("KhaytDepositAudit", "findErasedDeposits",
+                         [JSONValue.array(orders)], as: [ErasedDeposit].self)
+    }
+
+    /// One order, and the cash its own record says it should be holding.
+    public struct ErasedDeposit: Decodable, Sendable, Identifiable {
+        public let order: JSONValue
+        public let deposit: Double
+        public let currentPaid: Double
+        /// The deposit plus every instalment row already marked paid.
+        public let recovered: Double
+        /// What the order is understating by — and so what it is over-billing
+        /// the customer for.
+        public let lost: Double
+
+        public var id: String {
+            if case .object(let o) = order, case .string(let id)? = o["id"] { return id }
+            return ""
+        }
+
+        public var project: String {
+            guard case .object(let o) = order else { return id }
+            if case .string(let name)? = o["project"], !name.isEmpty { return name }
+            return id
+        }
+    }
+
+    /// Put one order's paid figure back, and say what it was.
+    ///
+    /// THE RULE DOES THE REPAIR, NOT THIS APP. `restoreDeposit` mutates the
+    /// record it is handed, which does not survive the bridge — so the whole
+    /// thing runs in one expression and the repaired order comes BACK, for the
+    /// caller to write. It also refuses an order that no longer looks
+    /// affected, which is what makes a stale list harmless.
+    public func restoreDeposit(orders: [JSONValue], orderId: String) throws -> DepositRepair {
+        try runtime.call2("""
+        (function () {
+          var A = globalThis.KhaytDepositAudit;
+          var hits = A.findErasedDeposits(ARG0);
+          var entry = null;
+          for (var i = 0; i < hits.length; i += 1) {
+            if (hits[i].order && hits[i].order.id === ARG1) { entry = hits[i]; break; }
+          }
+          if (!entry) return { ok: false, error: 'gone', order: null, before: 0, after: 0 };
+          var res = A.restoreDeposit(entry);
+          if (!res.ok) return { ok: false, error: res.error, order: null, before: 0, after: 0 };
+          return {
+            ok: true, error: null, order: entry.order,
+            before: res.before.paidAmount, after: res.after.paidAmount,
+          };
+        })()
+        """, [.array(orders), .string(orderId)], as: DepositRepair.self)
+    }
+
+    /// What a repair did, and the order to write.
+    public struct DepositRepair: Decodable, Sendable {
+        public let ok: Bool
+        /// 'gone' when the order is no longer affected — someone else fixed it,
+        /// or the plan changed underneath the list.
+        public let error: String?
+        public let order: JSONValue?
+        public let before: Double
+        public let after: Double
     }
 
     // MARK: - Splitting a job

@@ -1025,6 +1025,12 @@ final class Words {
                                 "ar": "قيمة النقطة الواحدة"],
         "mac.points_explains": ["en": "Points are earned on what the shop keeps — after tax, credit notes and anything written off — and are spent as store credit.",
                                 "ar": "تُحتسب النقاط على ما يبقى للورشة فعلياً — بعد الضريبة وإشعارات الدائن وما شُطب — وتُصرف كرصيد لدى الورشة."],
+        // The rule refused the repair: the order no longer looks affected —
+        // someone put it back on another Mac, or its plan changed under the
+        // list. Not an error in the app, and not silence either.
+        "mac.deposit_not_affected": ["en": "That order no longer looks affected — its figures may have been corrected already.",
+                                     "ar": "لم يعد هذا الطلب يبدو متأثراً — ربما صُححت أرقامه سلفاً."],
+        "mac.review":               ["en": "Review", "ar": "مراجعة"],
         "mac.rating_out_of_range": ["en": "A rating is one to five stars.",
                                     "ar": "التقييم من نجمة إلى خمس نجوم."],
         "mac.licence_set":   ["en": "Record Licence",   "ar": "تسجيل الترخيص"],

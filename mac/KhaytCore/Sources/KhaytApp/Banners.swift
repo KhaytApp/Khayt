@@ -14,6 +14,21 @@ struct MoveBanners: View {
     let shop: Shop
 
     var body: some View {
+        // MONEY THE BOOK IS UNDERSTATING. Not a move's answer like the rest of
+        // these, and it sits at the top for that reason: it is true until
+        // somebody acts on it, on every screen, and what it is about is the
+        // shop chasing customers for money they have already paid.
+        if !shop.erasedDeposits.isEmpty {
+            Banner(text: shop.words.callIt("dep.head") + " "
+                   + shop.words.callIt("dep.total",
+                                       ["n": .string(Money.text(shop.depositsUnaccounted,
+                                                                shop.currency))]),
+                   symbol: "exclamationmark.triangle", tint: Khayt.attention) {
+                Button(shop.words.callIt("mac.review") + "\u{2026}") {
+                    shop.reviewingDeposits = true
+                }
+            }
+        }
         if let problem = shop.moveProblem {
             Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention)
         }
