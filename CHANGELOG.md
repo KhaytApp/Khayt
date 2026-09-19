@@ -3352,6 +3352,100 @@ tested against both.
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.27] - 2026-09-19
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Twelve changes. Five of them are purchase orders, which this app did not have
+at all: a shop working here could not see what was on its way, book it in when
+it arrived, or raise a new one. Four more are things the Windows app could do
+and this one could not — a payment plan, a customer's points, what can run
+together on one plate, and the deposits an old defect took off the book. The
+last three are fixes, one of them a security fix.
+
+### Added
+
+- **What the shop has on order is on the shelf screen.** What is still to
+  come, from whom, and when it is due. "Is more coming?" is a question you
+  have while looking at a thin rack, not one you go to another screen to ask.
+
+- **A delivery is booked in from the row it arrives against.** The sheet opens
+  on what is still outstanding and counts in the order's own unit — grams for
+  filament, the shop's own word for everything else. Receiving writes the
+  order, the spool or the consumable, that spool's own history and the expense
+  together, which is the part that has gone wrong before.
+
+- **Orders priced per spool instead of per gram are found and put right.** They
+  ask for about a thousand times the real amount — 2,000 g of an 85-a-kilo
+  spool written as 170,000 rather than 170. Both figures are shown side by
+  side, and nothing changes until you say so.
+
+- **More of something can be ordered from the shelf.** A spool, or the row
+  that says a consumable is running out. It writes a DRAFT: an order is
+  something a shop hands a supplier, so the app fills it in and leaves the
+  sending to you. The price is what a gram of that material actually costs —
+  the supplier's quoted rate where the shop has recorded one, the spool's own
+  cost divided by its weight otherwise — and a material nothing prices is
+  ordered with no price rather than a price of nothing.
+
+- **And everything low can be ordered in one go.** One line at the top of the
+  shelf: how many things need ordering, and a button that drafts them all. It
+  counts what is low AND has nothing already on its way, so it will not order
+  something twice, and it shows you what it is about to order first.
+
+- **A customer paying over months can be set up and collected here.** Three
+  payments, a month apart, on what the job still owes. This app could already
+  read a plan — the Spending screen ages each instalment from its own due date
+  — but it could not write one or collect one, so a plan agreed on the phone
+  had to be recorded in the other window. Taking a plan off a job leaves the
+  money, because the money arrived.
+
+- **A customer's points are shown, and can be spent.** What they have earned,
+  what they have spent and what is left, redeemed into store credit in one
+  step. The rewards programme can be switched on here too, in Settings →
+  Payments — that was the other window's alone, while the points accrued for
+  both.
+
+- **What can run together on one plate.** Tick the waiting jobs, say what one
+  plate will take in hours and grams, and it groups them by material —
+  filaments cannot be mixed on a plate — and fills each plate by print time. A
+  job too big for a plate on its own gets one and is marked as such rather
+  than quietly left out. Nothing is written: a plate is a way of running the
+  work, not a field on a record.
+
+- **Deposits an old defect took off the book are found, and put back.** Saving
+  an order that had a payment plan used to erase the deposit recorded against
+  it, so those orders show less paid than they should and their balance is too
+  high — a shop chasing customers for money they had handed over. The code was
+  fixed long ago; books written before it were not. There is a banner now, and
+  a review sheet showing each order's figure beside what its own record says it
+  should be. Nothing changes until you ask, one order at a time, and ⌘Z puts it
+  back.
+
+### Fixed
+
+- **A job nobody charged for no longer says it has been paid.** The jobs table
+  read "settled" against every job with nothing outstanding — which is also
+  true of a job that was never priced, and plenty of shops use Khayt as a print
+  log rather than a ledger. A book of twenty finished, unpriced jobs said
+  "settled" twenty times. Both that and its 0.00 total are a dash now, and the
+  customers screen no longer says it either.
+
+- **A printer camera that answered with a redirect was handed the printer's own
+  credential.** A camera is allowed to be a separate device from the printer it
+  belongs to, and the request to it carries the printer's API key. macOS
+  follows redirects by itself, so a camera answering "look over there instead"
+  had that key delivered wherever it pointed — and the check that the address
+  was allowed had already run, before the request, and never saw the second
+  hop. Redirects are refused outright now, which is what the Windows and Linux
+  app has always done.
+
+- **The release notes linked to a page that was not there.** Every macOS
+  release so far opened with a link that answered 404: the notes are written in
+  Khayt's own repository, where that link is right, and published on the Mac
+  app's releases, where it is not. They carry full addresses now.
+
 ## [4.0.0-alpha.26] - 2026-09-19
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
