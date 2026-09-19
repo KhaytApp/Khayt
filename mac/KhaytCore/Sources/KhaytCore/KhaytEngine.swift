@@ -1195,6 +1195,42 @@ public actor KhaytEngine {
         public let expense: JSONValue?
     }
 
+    /// Draft a purchase order for one item.
+    ///
+    /// `ask` carries whatever the caller has decided — a quantity, a price, a
+    /// supplier — and everything it leaves out the rule fills in: a spool's own
+    /// reorder quantity or 1,000 g, ONE of a consumable rather than a kilo of
+    /// screws, and no price at all where nothing prices it.
+    public func draftOrder(item: JSONValue, ask: [String: JSONValue],
+                           id: String, today: String, supplierName: String) throws -> JSONValue {
+        let arg: [String: JSONValue] = [
+            "item": item, "ask": .object(ask), "id": .string(id),
+            "today": .string(today), "supplierName": .string(supplierName),
+        ]
+        return try runtime.call("KhaytPurchaseOrders", "draft", [arg], as: JSONValue.self)
+    }
+
+    /// What a gram of this material costs, for an order to be priced at.
+    ///
+    /// The supplier's quoted rate where there is one, the spool's own cost
+    /// divided by its weight otherwise — and the division is the point. A
+    /// per-SPOOL figure against a quantity measured in grams is what made every
+    /// auto-drafted order about a thousand times too expensive, which is why
+    /// `po-audit` exists.
+    public func perGramPrice(item: JSONValue, suppliers: [JSONValue]) throws -> ReorderPrice {
+        try runtime.call("KhaytReorder", "perGramPriceFor",
+                         [item, JSONValue.array(suppliers)], as: ReorderPrice.self)
+    }
+
+    /// What an order would be priced at, and who quoted it.
+    public struct ReorderPrice: Decodable, Sendable {
+        /// Zero when nothing prices this material — the caller writes no price
+        /// rather than a price of nothing.
+        public let perG: Double
+        public let supplierId: String?
+        public let supplierName: String
+    }
+
     /// Close an order by hand: the goods are all in, whatever was counted.
     public func closeOrder(_ order: JSONValue, today: String) throws -> JSONValue {
         try runtime.call("KhaytPurchaseOrders", "close", [order, .string(today)], as: JSONValue.self)

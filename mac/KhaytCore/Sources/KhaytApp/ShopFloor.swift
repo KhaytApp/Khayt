@@ -731,6 +731,20 @@ struct Inventory: View {
                                     }
                                     Divider()
                                     if shop.canMoveJobs {
+                                        // ORDER MORE. Drafted, never sent: a
+                                        // purchase order is something a shop
+                                        // hands a supplier, and an app that
+                                        // sent one because somebody chose a
+                                        // menu item would have done something
+                                        // on their behalf they cannot take
+                                        // back. It appears on the card above
+                                        // as a draft.
+                                        Button(shop.words.callIt("mac.draft_an_order")) {
+                                            Task {
+                                                shop.moveProblem = await shop.draftOrder(
+                                                    for: spool.id, consumable: false)
+                                            }
+                                        }
                                         Button(shop.words.callIt("mac.edit_spool")) {
                                             shop.editingSpool = spool
                                         }
@@ -824,6 +838,20 @@ struct ConsumablesCard: View {
                     if need.suggestQty > 0 {
                         Text("\(shop.words.callIt("reorder.suggest")) \(Self.qty(need.suggestQty)) \(need.unit)")
                             .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                    }
+                }
+            }
+            // The row that says a thing is running out is the row to order it
+            // from. A draft, like a spool's — and the quantity is the rule's
+            // own reorder figure, not the suggestion beside it, because that
+            // suggestion is a forecast and an order is a commitment.
+            .contextMenu {
+                if shop.canMoveJobs {
+                    Button(shop.words.callIt("mac.draft_an_order")) {
+                        Task {
+                            shop.moveProblem = await shop.draftOrder(
+                                for: need.id, consumable: true)
+                        }
                     }
                 }
             }

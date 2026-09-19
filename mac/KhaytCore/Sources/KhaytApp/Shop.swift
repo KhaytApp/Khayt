@@ -389,6 +389,14 @@ final class Shop {
             // figures a part is costed at. `lib/public-quote.js` builds a
             // customer's price from one of these, so a shop with none cannot
             // quote publicly at all.
+            // Who the shop buys from, and what they quote. Read raw because the
+            // price rule reads a supplier's whole price list, and picking which
+            // of it matters belongs in the rule.
+            if case .array(let sellers)? = root["suppliers"] {
+                supplierRows = sellers
+            } else {
+                supplierRows = []
+            }
             // What has been ordered and not yet arrived. Read raw for the same
             // reason the consumables are: the rule reads fields this app has no
             // model for, and deciding which of them matter belongs in the rule.
@@ -3610,6 +3618,9 @@ final class Shop {
     /// Purchase orders, as the book holds them.
     private(set) var purchaseOrderRows: [JSONValue] = []
 
+    /// The shop's suppliers, with whatever they quote.
+    private(set) var supplierRows: [JSONValue] = []
+
     /// Orders asking for about a thousand times what they should.
     private(set) var suspectOrders: [KhaytEngine.SuspectOrder] = []
 
@@ -3629,6 +3640,73 @@ final class Shop {
                 if a.orderedAt != b.orderedAt { return a.orderedAt < b.orderedAt }
                 return a.id < b.id
             }
+    }
+
+    /// Order more of something.
+    ///
+    /// ── WHAT THIS APP DECIDES, WHICH IS ALMOST NOTHING ────────────────────
+    ///
+    /// How much to ask for, what to call the order, whether it is counted in
+    /// grams or the shop's own unit, and what a gram costs are all decided by
+    /// `lib/purchase-orders.js` and `lib/reorder.js`. This finds the record,
+    /// asks them, and writes what comes back.
+    ///
+    /// The price is the one worth naming: a per-SPOOL cost against a quantity
+    /// measured in GRAMS is what made auto-drafted orders about a thousand
+    /// times too expensive, and it is why `po-audit` exists. That division is
+    /// the shared rule's, not this app's.
+    ///
+    /// Drafted, never ordered. A purchase order is something a shop sends to a
+    /// supplier, and an app that sent one because somebody chose a menu item
+    /// would be doing something on their behalf that they cannot take back.
+    ///
+    /// Returns nil when it worked, or what to tell the shop.
+    func draftOrder(for itemId: String, consumable: Bool) async -> String? {
+        guard let build = source.build, StoreLock.weOwnIt(build) else {
+            return words.callIt("mac.read_only")
+        }
+        guard let engine else { return words.callIt("mac.move_no_engine") }
+
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                let shelf = Self.rows(root, consumable ? "consumables" : "inventory")
+                guard let item = shelf.first(where: { Self.recordId($0) == itemId }) else {
+                    throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
+                }
+                var ask: [String: JSONValue] = ["status": .string("draft")]
+                var supplierName = ""
+                if consumable {
+                    ask["kind"] = .string("consumable")
+                } else {
+                    // A material nothing prices carries NO price, rather than a
+                    // price of nothing: `draft` leaves `unitPrice` out when the
+                    // caller asks for none, and a receipt against an order with
+                    // no price books no expense instead of one for zero.
+                    let price = try await engine.perGramPrice(item: item,
+                                                              suppliers: Self.rows(root, "suppliers"))
+                    if price.perG > 0 { ask["unitPrice"] = .number(price.perG) }
+                    if let id = price.supplierId, !id.isEmpty { ask["supplierId"] = .string(id) }
+                    supplierName = price.supplierName
+                }
+                let drafted = try await engine.draftOrder(
+                    item: item, ask: ask, id: Self.uid("PO"),
+                    today: Self.localDay(), supplierName: supplierName)
+
+                var orders = Self.rows(root, "purchaseOrders")
+                orders.insert(drafted, at: 0)
+                root["purchaseOrders"] = .array(orders)
+            }
+        } catch let refusal as MoveRefused {
+            return refusal.sentence
+        } catch {
+            return String(describing: error)
+        }
+        await load(source)
+        return nil
     }
 
     /// Book goods in against an order.

@@ -1041,6 +1041,12 @@ final class Words {
         // recorded at the counter.
         "mac.plan_cash_stays": ["en": "The payment is no longer marked collected. Money already recorded on the job stays — change that on the payment sheet.",
                                 "ar": "لم تعد الدفعة مؤشَّرة كمستلمة. المبلغ المسجَّل على الطلب يبقى كما هو — تُعدّله من نافذة الدفع."],
+        // DRAFT, and the word is the point. A purchase order is something a
+        // shop hands a supplier; an app that sent one because somebody chose a
+        // menu item would have acted on their behalf in a way they cannot take
+        // back. "Order more" would have promised exactly that.
+        "mac.draft_an_order": ["en": "Draft a purchase order",
+                               "ar": "إنشاء مسودة أمر شراء"],
         "mac.overpriced_orders": ["en": "Priced per spool", "ar": "مسعّرة بالبكرة"],
         "mac.orders_word":     ["en": "on order",  "ar": "قيد الطلب"],
         "mac.orders_word_one": ["en": "on order",  "ar": "قيد الطلب"],
