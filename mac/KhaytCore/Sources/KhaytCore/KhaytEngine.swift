@@ -1195,6 +1195,79 @@ public actor KhaytEngine {
         public let expense: JSONValue?
     }
 
+    /// What the shop is low on and has NOT already ordered.
+    ///
+    /// ── WHY THE DEDUPE IS THE POINT ───────────────────────────────────────
+    ///
+    /// A shelf screen can say "three things are low" from the stock figures
+    /// alone. An OFFER TO ORDER them cannot: two of the three may already be on
+    /// their way, and drafting a second order for something already coming is
+    /// how a shop ends up with four kilos of a filament it uses twice a year.
+    /// `itemsNeedingDraftPo` and `consumablesNeedingDraftPo` are the rules that
+    /// know, and they read the open orders to do it.
+    ///
+    /// `partGrams` and `isLow` are not optional in practice. The defaults read
+    /// `part.grams` and nothing — a Khayt part records `printWeight`, so the
+    /// default finds none, every rate is zero and nothing is ever suggested.
+    /// The same trap the shelf's runway line fell into.
+    public func needsOrdering(spools: [JSONValue], consumables: [JSONValue],
+                              orders: [JSONValue], purchaseOrders: [JSONValue],
+                              settings: [String: JSONValue], now: Date) throws -> [ToOrder] {
+        try runtime.call2("""
+            (function (a) {
+              var filament = KhaytReorder.itemsNeedingDraftPo(
+                KhaytReorder.reorderSuggestions(a.spools, a.orders, {
+                  now: a.now, windowDays: 30, leadDays: 14, targetDays: 45,
+                  partGrams: KhaytOrderDeduction.partGramsConsumed,
+                  isLow: function (item) {
+                    return KhaytOrderDeduction.isLowStock(item, a.settings);
+                  },
+                }),
+                a.purchaseOrders);
+              var bits = KhaytConsumableReorder.consumablesNeedingDraftPo(
+                KhaytConsumableReorder.consumableSuggestions(a.consumables, a.orders, {
+                  now: a.now, windowDays: 30, leadDays: 14,
+                }),
+                a.purchaseOrders);
+              return filament.map(function (s) {
+                return {
+                  id: String(s.id == null ? '' : s.id),
+                  label: String(s.label == null ? '' : s.label),
+                  quantity: Number(s.suggestG || 0),
+                  consumable: false,
+                  unit: '',
+                };
+              }).concat(bits.map(function (s) {
+                return {
+                  id: String(s.id == null ? '' : s.id),
+                  label: String(s.label == null ? '' : s.label),
+                  quantity: Number(s.suggestQty || 0),
+                  consumable: true,
+                  unit: String(s.unit == null ? '' : s.unit),
+                };
+              }));
+            })(ARG0)
+            """,
+            [.object([
+                "spools": .array(spools), "consumables": .array(consumables),
+                "orders": .array(orders), "purchaseOrders": .array(purchaseOrders),
+                "settings": .object(settings),
+                "now": .number(now.timeIntervalSince1970 * 1000),
+            ])],
+            as: [ToOrder].self)
+    }
+
+    /// One thing to order, and how much of it the rule would ask for.
+    public struct ToOrder: Decodable, Sendable, Identifiable {
+        public let id: String
+        public let label: String
+        /// Grams, or the shop's own unit.
+        public let quantity: Double
+        public let consumable: Bool
+        /// Empty for filament, which is always grams.
+        public let unit: String
+    }
+
     /// Draft a purchase order for one item.
     ///
     /// `ask` carries whatever the caller has decided — a quantity, a price, a

@@ -529,6 +529,21 @@ final class Shop {
             // answer changes only when the book does, and the list is walked
             // by a banner that draws on every screen.
             erasedDeposits = (try? await engine?.erasedDeposits(orders: orderRows)) ?? []
+
+            // AFTER `orderRows`, and that is not tidiness. The rate a
+            // reorder figure is built from comes from the jobs, so asking
+            // this before the book's orders are read answers from an empty
+            // one: the shelf offered a different count on the first load
+            // than on the second, and the first was the wrong one.
+            // What is low AND not already coming. The dedupe is why this is
+            // asked of the rule rather than counted off the low badges: two of
+            // three low things may already be on their way, and offering to
+            // order them again is how a shelf ends up with four kilos of
+            // something a shop uses twice a year.
+            needsOrdering = (try? await engine?.needsOrdering(
+                spools: inventoryRows, consumables: consumableRows, orders: orderRows,
+                purchaseOrders: purchaseOrderRows, settings: settingsDict,
+                now: Date())) ?? []
             // What one plate holds, from the packer rather than from a number
             // typed twice in Swift.
             if let limits = try? await engine?.plateDefaults() {
@@ -3621,6 +3636,9 @@ final class Shop {
     /// The shop's suppliers, with whatever they quote.
     private(set) var supplierRows: [JSONValue] = []
 
+    /// What is low and has not already been ordered.
+    private(set) var needsOrdering: [KhaytEngine.ToOrder] = []
+
     /// Orders asking for about a thousand times what they should.
     private(set) var suspectOrders: [KhaytEngine.SuspectOrder] = []
 
@@ -3641,6 +3659,81 @@ final class Shop {
                 return a.id < b.id
             }
     }
+
+    /// Draft an order for everything that is low and not already coming.
+    ///
+    /// ONE WRITE, not one per item. A shop that pressed this and got four of
+    /// six orders because the fifth item had been deleted underneath would have
+    /// a book it cannot reason about; the whole batch lands or none of it does.
+    ///
+    /// The list is re-read INSIDE the write for the same reason every other
+    /// write here re-reads: what was low a minute ago may be on its way now.
+    ///
+    /// Returns the number drafted, or nil with `moveProblem` set.
+    func draftWhatIsLow() async -> Int? {
+        guard let build = source.build, StoreLock.weOwnIt(build) else {
+            moveProblem = words.callIt("mac.read_only"); return nil
+        }
+        guard let engine else { moveProblem = words.callIt("mac.move_no_engine"); return nil }
+
+        var drafted = 0
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                let wanted = try await engine.needsOrdering(
+                    spools: Self.rows(root, "inventory"),
+                    consumables: Self.rows(root, "consumables"),
+                    orders: Self.rows(root, "printLog"),
+                    purchaseOrders: Self.rows(root, "purchaseOrders"),
+                    settings: Self.settings(root), now: Date())
+                guard !wanted.isEmpty else { throw NothingWasLow() }
+
+                var orders = Self.rows(root, "purchaseOrders")
+                let suppliers = Self.rows(root, "suppliers")
+                let today = Self.localDay()
+                for want in wanted {
+                    let shelf = Self.rows(root, want.consumable ? "consumables" : "inventory")
+                    guard let item = shelf.first(where: { Self.recordId($0) == want.id }) else { continue }
+                    var ask: [String: JSONValue] = [
+                        "status": .string("draft"),
+                        // The RULE's figure for how much to buy, not a default:
+                        // it is what covers the days of cover the shop asked
+                        // for, and a spool's own reorder quantity would ignore
+                        // how fast this one is actually going.
+                        "qty": .number(want.quantity),
+                    ]
+                    var supplierName = ""
+                    if want.consumable {
+                        ask["kind"] = .string("consumable")
+                    } else {
+                        let price = try await engine.perGramPrice(item: item, suppliers: suppliers)
+                        if price.perG > 0 { ask["unitPrice"] = .number(price.perG) }
+                        if let id = price.supplierId, !id.isEmpty { ask["supplierId"] = .string(id) }
+                        supplierName = price.supplierName
+                    }
+                    orders.insert(try await engine.draftOrder(
+                        item: item, ask: ask, id: Self.uid("PO"),
+                        today: today, supplierName: supplierName), at: 0)
+                    drafted += 1
+                }
+                root["purchaseOrders"] = .array(orders)
+            }
+        } catch is NothingWasLow {
+            moveProblem = words.callIt("po.none_needed"); return nil
+        } catch let refusal as MoveRefused {
+            moveProblem = refusal.sentence; return nil
+        } catch {
+            moveProblem = String(describing: error); return nil
+        }
+        await load(source)
+        return drafted
+    }
+
+    /// Nothing was low by the time the write opened. Not a fault.
+    private struct NothingWasLow: Error {}
 
     /// Order more of something.
     ///

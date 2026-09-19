@@ -237,6 +237,111 @@ struct PurchaseOrderTests {
         #expect(price.supplierName == "Tuwaiq")
     }
 
+    // MARK: - What is low and not already coming
+
+    static func spool(_ id: String, material: String, weight: Double) -> JSONValue {
+        .object(["id": .string(id), "material": .string(material),
+                 "weight": .number(weight),
+                 "cost": .number(85), "spoolWeight": .number(1000)])
+    }
+
+    /// A finished job that used this spool, so the rule has a RATE.
+    ///
+    /// Without one it will not say how much to buy — see
+    /// `lowWithNoHistoryOffersNothing`, which is the behaviour rather than a
+    /// gap in this fixture.
+    static func usedIt(_ spoolId: String, grams: Double, daysAgo: Double) -> JSONValue {
+        let day = Date().addingTimeInterval(-daysAgo * 86_400)
+        let iso = ISO8601DateFormatter().string(from: day)
+        return .object([
+            "id": .string("J-" + spoolId), "status": .string("completed"),
+            "completedAt": .string(iso), "date": .string(String(iso.prefix(10))),
+            "parts": .array([.object([
+                "spoolId": .string(spoolId), "printWeight": .number(grams),
+                "qty": .number(1),
+            ])]),
+        ])
+    }
+
+    @Test("something low with no order on it is offered")
+    func lowThingsAreOffered() async throws {
+        let engine = try KhaytEngine()
+        let wanted = try await engine.needsOrdering(
+            spools: [Self.spool("sp-1", material: "PLA+", weight: 50)],
+            consumables: [], orders: [Self.usedIt("sp-1", grams: 600, daysAgo: 5)],
+            purchaseOrders: [], settings: [:], now: Date())
+        #expect(wanted.count == 1)
+        #expect(wanted[0].id == "sp-1")
+        #expect(!wanted[0].consumable)
+        #expect(wanted[0].quantity > 0, "an offer with no quantity is nothing to agree to")
+    }
+
+    @Test("something already on its way is NOT offered again")
+    func openOrdersSuppressTheOffer() async throws {
+        // The whole reason this asks the rule rather than counting low badges:
+        // drafting a second order for something already coming is how a shelf
+        // ends up with four kilos of a filament a shop uses twice a year.
+        let engine = try KhaytEngine()
+        let wanted = try await engine.needsOrdering(
+            spools: [Self.spool("sp-1", material: "PLA+", weight: 50)],
+            consumables: [], orders: [Self.usedIt("sp-1", grams: 600, daysAgo: 5)],
+            purchaseOrders: [Self.order("PO-1", qty: 1000)],   // itemId sp-1
+            settings: [:], now: Date())
+        #expect(wanted.isEmpty)
+    }
+
+    @Test("an order that has already arrived does not suppress the offer")
+    func receivedOrdersDoNotSuppress() async throws {
+        // A delivered order is history. The shelf is low again and nothing is
+        // coming.
+        let engine = try KhaytEngine()
+        let wanted = try await engine.needsOrdering(
+            spools: [Self.spool("sp-1", material: "PLA+", weight: 50)],
+            consumables: [], orders: [Self.usedIt("sp-1", grams: 600, daysAgo: 5)],
+            purchaseOrders: [Self.order("PO-1", qty: 1000, status: "received")],
+            settings: [:], now: Date())
+        #expect(wanted.count == 1)
+    }
+
+    @Test("a healthy shelf offers nothing")
+    func healthyShelvesOfferNothing() async throws {
+        let engine = try KhaytEngine()
+        let wanted = try await engine.needsOrdering(
+            spools: [Self.spool("sp-1", material: "PLA+", weight: 900)],
+            consumables: [], orders: [Self.usedIt("sp-1", grams: 100, daysAgo: 20)],
+            purchaseOrders: [], settings: [:], now: Date())
+        #expect(wanted.isEmpty)
+    }
+
+    @Test("something low that nothing has used offers no quantity, so it is not listed")
+    func lowWithNoHistoryOffersNothing() async throws {
+        // The rule will not invent how much to buy. With no usage and nothing
+        // committed it has no figure, and a made-up one lands on a purchase
+        // order — so the item is left off rather than ordered by guess.
+        //
+        // The shelf still SAYS it is low; this is only about offering to order.
+        let engine = try KhaytEngine()
+        let wanted = try await engine.needsOrdering(
+            spools: [Self.spool("sp-1", material: "PLA+", weight: 50)],
+            consumables: [], orders: [], purchaseOrders: [], settings: [:], now: Date())
+        #expect(wanted.isEmpty)
+    }
+
+    @Test("a low consumable is offered in its own unit")
+    func lowConsumablesAreOffered() async throws {
+        let engine = try KhaytEngine()
+        let wanted = try await engine.needsOrdering(
+            spools: [], consumables: [.object([
+                "id": .string("c-1"), "name": .string("Mailing bags"),
+                "unit": .string("each"), "stock": .number(0), "minStock": .number(50),
+            ])],
+            orders: [], purchaseOrders: [], settings: [:], now: Date())
+        #expect(wanted.count == 1)
+        #expect(wanted[0].consumable)
+        #expect(wanted[0].unit == "each", "a count of bags asked for in grams is nobody's order")
+        #expect(wanted[0].quantity > 0, "an offer with no quantity is nothing to agree to")
+    }
+
     // MARK: - The thousandfold orders
 
     @Test("an order priced per spool is found, with both figures")
@@ -307,5 +412,7 @@ struct PurchaseOrderTests {
         #expect(floor.contains("shop.draftOrder(") , "nothing can be ordered")
         #expect(floor.contains("mac.draft_an_order"),
                 "the action promises to order rather than to draft")
+        #expect(floor.contains("shop.draftWhatIsLow()"),
+                "nothing offers to order what is low")
     }
 }
