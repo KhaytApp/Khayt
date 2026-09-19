@@ -156,7 +156,37 @@ actor BookReader {
     }
 
     func inventory() throws -> [InventorySpool] { try decode("inventory") }
-    func clients() throws -> [Client] { try decode("clients") }
+    /// The shop's clients, each under the name the shop actually calls them.
+    ///
+    /// The store holds `nameEn`, `nameAr`, `nameTr` — whatever the shop writes
+    /// in — and the choice between them is `lib/content-languages.js`'s, not
+    /// this app's. `/api/clients` applies that rule before it sends a name; a
+    /// device reading the book has to apply it itself, or fall through to
+    /// showing the customer's id.
+    func clients() async throws -> [Client] {
+        let store = try book.read()
+        var clients: [Client] = try decode("clients", from: store)
+        guard case .array(let rows)? = store["clients"], rows.count == clients.count else {
+            return clients
+        }
+        let records = rows.compactMap { row -> [String: JSONValue]? in
+            guard case .object(let o) = row else { return nil }
+            return o
+        }
+        guard records.count == clients.count else { return clients }
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = store["settings"] { settings = s }
+        let language = Locale.current.language.languageCode?.identifier ?? "en"
+        guard let names = try? await engine().clientNames(records, settings: settings,
+                                                          language: language) else {
+            return clients
+        }
+        for i in clients.indices where i < names.count {
+            let resolved = names[i].trimmingCharacters(in: .whitespacesAndNewlines)
+            if !resolved.isEmpty { clients[i].name = resolved }
+        }
+        return clients
+    }
     func machines() throws -> [MachineInfo] { try decode("machines") }
 
     func waitingList() throws -> [WaitingListItem] {
@@ -176,7 +206,11 @@ actor BookReader {
     /// writing a second mapping here would be the thing this whole arrangement
     /// exists to avoid.
     private func decode<T: Decodable>(_ collection: String) throws -> [T] {
-        let store = try book.read()
+        try decode(collection, from: book.read())
+    }
+
+    private func decode<T: Decodable>(_ collection: String,
+                                      from store: [String: JSONValue]) throws -> [T] {
         guard case .array(let rows)? = store[collection] else { return [] }
         let data = try JSONEncoder().encode(JSONValue.array(rows))
         return try JSONDecoder().decode([T].self, from: data)

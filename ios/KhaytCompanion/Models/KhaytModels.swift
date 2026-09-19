@@ -229,12 +229,30 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
 
 struct Client: Codable, Identifiable, Sendable {
     let id: String
+    /// The name this reader should see, already resolved.
+    ///
+    /// `/api/clients` sends it — `KhaytContentLanguages.read(c, 'name', …)`
+    /// against the shop's own content languages — and this app ignored it,
+    /// reading `nameEn`/`nameAr` instead. The server compensated by stuffing
+    /// the resolved name into `nameEn` when a shop wrote neither, which is why
+    /// nobody noticed.
+    ///
+    /// Reading the book gets no such help: the record holds whatever the shop
+    /// writes in, `nameTr` included, and neither of the two keys this app knew
+    /// about. `displayName` then fell through to the customer's id, so a
+    /// Turkish shop's client list read CLI-8A5045 down the page.
+    var name: String?
     let nameEn: String?
     let nameAr: String?
     let phone: String?
     let email: String?
 
     var displayName: String {
+        // The resolved name first: it is the shop's own answer to "what is this
+        // customer called", in whichever language the shop keeps its books.
+        if let name = name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            return name
+        }
         let en = nameEn?.trimmingCharacters(in: .whitespacesAndNewlines)
         let ar = nameAr?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let en, !en.isEmpty { return en }
