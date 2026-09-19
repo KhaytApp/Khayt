@@ -10,6 +10,8 @@ const {
   planBalance,
   markInstallmentPaid,
   dueInstallments,
+  monthlyPlan,
+  collectionTotals,
 } = require('../lib/payment-plan');
 
 /**
@@ -292,4 +294,99 @@ test('a plan is dated by the LOCAL calendar day, not UTC', () => {
   } finally {
     global.Date = RealDate;
   }
+});
+
+
+/* ── monthlyPlan: the plan a shop is offered ─────────────────────────────── */
+
+test('monthlyPlan: three payments covering what is owed, a month then 30 days apart', () => {
+  const s = monthlyPlan({ owed: 900, today: new Date(2026, 4, 10) }); // 10 May
+  assert.equal(s.length, 3);
+  assert.deepEqual(s.map(e => e.amount), [300, 300, 300]);
+  assert.equal(scheduledTotal(s), 900);
+  assert.equal(s[0].dueDate, '2026-06-10', 'the first payment falls a calendar month out');
+  assert.equal(s[1].dueDate, '2026-07-10');
+  assert.equal(s[2].dueDate, '2026-08-09', 'the rest follow at 30 days, not calendar months');
+});
+
+test('monthlyPlan: a plan generated on the 31st does not skip a month', () => {
+  // new Date(2026, 1, 31) is the 3rd of MARCH — so the first payment used to
+  // land two months out and February was never billed.
+  const s = monthlyPlan({ owed: 300, today: new Date(2026, 0, 31) }); // 31 Jan
+  assert.equal(s[0].dueDate, '2026-02-28', 'clamped to the last day February has');
+
+  const leap = monthlyPlan({ owed: 300, today: new Date(2028, 0, 31) }); // 31 Jan 2028
+  assert.equal(leap[0].dueDate, '2028-02-29', 'and a leap year has one more');
+
+  const thirty = monthlyPlan({ owed: 300, today: new Date(2026, 2, 31) }); // 31 Mar
+  assert.equal(thirty[0].dueDate, '2026-04-30', 'April has 30');
+});
+
+test('monthlyPlan: a day string is read in the shop\'s own calendar, not UTC', () => {
+  // new Date('2026-01-31') is UTC midnight — the 30th for any shop west of
+  // Greenwich, so its first payment landed a month out from the wrong day.
+  const fromString = monthlyPlan({ owed: 300, today: '2026-01-31' });
+  const fromDate = monthlyPlan({ owed: 300, today: new Date(2026, 0, 31) });
+  assert.deepEqual(fromString.map(e => e.dueDate), fromDate.map(e => e.dueDate));
+  assert.equal(fromString[0].dueDate, '2026-02-28');
+});
+
+test('monthlyPlan: nothing owed is no plan, not a plan of zeroes', () => {
+  assert.deepEqual(monthlyPlan({ owed: 0, today: new Date(2026, 4, 10) }), []);
+  assert.deepEqual(monthlyPlan({ owed: -50, today: new Date(2026, 4, 10) }), []);
+  assert.deepEqual(monthlyPlan({}), []);
+});
+
+test('monthlyPlan: the count and interval are the caller\'s when it has an opinion', () => {
+  const s = monthlyPlan({ owed: 400, today: new Date(2026, 4, 10), installments: 4, intervalDays: 7 });
+  assert.equal(s.length, 4);
+  assert.equal(s[1].dueDate, '2026-06-17');
+});
+
+/* ── collectionTotals: what collected rows do to the order's cash ────────── */
+
+test('collectionTotals: a generated plan collects ON TOP of the deposit', () => {
+  // The plan covers the BALANCE, so its rows are money beyond what the order
+  // already held.
+  const out = collectionTotals({
+    price: 3000, paidAmount: 1000, instalmentBase: 1000,
+    instalments: [{ amount: 666.67, paid: true }, { amount: 666.67, paid: false },
+                  { amount: 666.66, paid: false }],
+  });
+  assert.equal(out.collected, 666.67);
+  assert.equal(out.paidAmount, 1666.67);
+  assert.equal(out.paymentStatus, 'partial');
+});
+
+test('collectionTotals: a hand-built plan with no base keeps the old rule', () => {
+  // Its amounts mean whatever the shop decided, and such a schedule has always
+  // spanned the whole price.
+  const out = collectionTotals({
+    price: 2000, paidAmount: 500,
+    instalments: [{ amount: 2000, paid: true }],
+  });
+  assert.equal(out.paidAmount, 2000);
+  assert.equal(out.paymentStatus, 'paid');
+});
+
+test('collectionTotals: cash taken at the counter since is never destroyed', () => {
+  const out = collectionTotals({
+    price: 3000, paidAmount: 2500, instalmentBase: 1000,
+    instalments: [{ amount: 500, paid: true }],
+  });
+  assert.equal(out.paidAmount, 2500, 'base + collected would have been 1500');
+});
+
+test('collectionTotals: an empty or absent plan reports what the order holds', () => {
+  assert.equal(collectionTotals({ price: 1000, paidAmount: 250 }).paidAmount, 250);
+  assert.equal(collectionTotals({ price: 1000, paidAmount: 250 }).paymentStatus, 'partial');
+  assert.equal(collectionTotals({ price: 1000, paidAmount: 0 }).paymentStatus, 'unpaid');
+});
+
+test('collectionTotals: sub-cent drift settles an order', () => {
+  const out = collectionTotals({
+    price: 2000, paidAmount: 0,
+    instalments: [{ amount: 1999.999, paid: true }],
+  });
+  assert.equal(out.paymentStatus, 'paid');
 });

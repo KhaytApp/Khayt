@@ -65,11 +65,21 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     let shippedAt: String?
     let dueDate: String?
     let parts: [Part]
+    /// The payment plan written on this job, in the order it is collected.
+    /// Empty on the great majority of jobs — a plan is something a shop sets up
+    /// deliberately, for a customer paying over months.
+    let instalments: [PlanRow]
+    /// The cash the order held when the plan was generated. See
+    /// `collectionTotals` in `lib/payment-plan.js`: without it, collecting a
+    /// row either destroys the deposit or leaves it outstanding forever.
+    /// Absent on a hand-built plan, and on every plan made before Sep 2026.
+    let instalmentBase: Double?
 
     private enum CodingKeys: String, CodingKey {
         case id, date, status, project, client, currency, price, paidAmount, costBasis
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
         case machineId, clientId, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
+        case instalments, instalmentBase
     }
 
     /// THREE FIELDS A NEW JOB HAS NOT GOT YET.
@@ -113,6 +123,45 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         shippedAt = try c.decodeIfPresent(String.self, forKey: .shippedAt)
         dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate)
         parts = try c.decodeIfPresent([Part].self, forKey: .parts) ?? []
+        instalments = try c.decodeIfPresent([PlanRow].self, forKey: .instalments) ?? []
+        instalmentBase = try c.decodeIfPresent(Double.self, forKey: .instalmentBase)
+    }
+
+    /// One payment of a plan, as Khayt writes it.
+    ///
+    /// `paid` is the flag the shop sets and every reader honours; `paidAt` is
+    /// the day it was collected, and is a RECORD rather than the truth — a row
+    /// with `paid` false and a `paidAt` on it is not collected. Written this way
+    /// by `renderer/order-flows.js`, which is why it is read this way here.
+    struct PlanRow: Decodable, Hashable, Identifiable, Sendable {
+        /// Minted by whichever app created the plan. Defaulted because a row
+        /// typed into an older build has none, and a plan that will not decode
+        /// is a plan this app would silently drop on the next save.
+        let id: String
+        let amount: Double
+        /// 'YYYY-MM-DD'. Empty on a row a shop added and has not dated yet.
+        let dueDate: String
+        let note: String
+        let paid: Bool
+        let paidAt: String?
+
+        private enum CodingKeys: String, CodingKey { case id, amount, dueDate, note, paid, paidAt }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decodeIfPresent(String.self, forKey: .id) ?? ""
+            amount = try c.decodeIfPresent(Double.self, forKey: .amount) ?? 0
+            dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate) ?? ""
+            note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+            paid = try c.decodeIfPresent(Bool.self, forKey: .paid) ?? false
+            paidAt = try c.decodeIfPresent(String.self, forKey: .paidAt)
+        }
+
+        init(id: String, amount: Double, dueDate: String, note: String = "",
+             paid: Bool = false, paidAt: String? = nil) {
+            self.id = id; self.amount = amount; self.dueDate = dueDate
+            self.note = note; self.paid = paid; self.paidAt = paidAt
+        }
     }
 
     struct Part: Decodable, Hashable, Identifiable, Sendable {

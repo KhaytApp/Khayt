@@ -1893,14 +1893,11 @@ function openOrderEditor(orderId) {
           return;
         }
         if (draft.instalments.length && !(await confirmModal(t('inst.replace_q') || 'Replace the current installments?', { danger: true }))) return;
-        const today = new Date();
-        // Clamp to the target month's length: new Date(2026, 1, 31) silently
-        // rolls over into March, so an instalment plan generated on the 31st
-        // skipped February entirely.
-        const _fdY = today.getFullYear(), _fdM = today.getMonth() + 1;
-        const _lastDay = new Date(_fdY, _fdM + 1, 0).getDate();
-        const firstDue = localDateStr(new Date(_fdY, _fdM, Math.min(today.getDate(), _lastDay)));
-        const schedule = KhaytPaymentPlan.buildSchedule({ total, depositAmount: 0, installments: 3, firstDueDate: firstDue, intervalDays: 30 });
+        // Three payments a month apart, and the month-length clamp that keeps a
+        // plan generated on the 31st from skipping February, both live in
+        // lib/payment-plan.js — so the macOS app offers the same plan rather
+        // than a second copy of this arithmetic.
+        const schedule = KhaytPaymentPlan.monthlyPlan({ owed: total });
         draft.instalments = schedule.map((s, i) => ({ id: uid('INS'), amount: s.amount, dueDate: s.dueDate, note: '', paid: false, paidAt: null }));
         // The cash the order ALREADY held when this plan was built. The save path
         // needs it to add instalment payments to the deposit rather than taking
@@ -2099,49 +2096,19 @@ function openOrderEditor(orderId) {
       if (cmpEl && cmpEl.value) {
         order.completedAt = new Date(cmpEl.value).toISOString();
       }
-      // Update paidAmount from instalments if present
+      // What the collected rows do to the order's cash figures — the deposit
+      // that must not be overwritten, the base that must not be double-counted,
+      // and settling against the PRICE rather than the instalment total — is
+      // lib/payment-plan.js's `collectionTotals`, shared with the macOS app.
       if (draft.instalments.length > 0) {
-        const instPaid = draft.instalments.filter(ins => ins.paid).reduce((s, ins) => s + (+ins.amount || 0), 0);
-        // paidAmount is the authoritative CASH figure — the deposit is written
-        // straight into it at order creation, and payStatus()/orderOwedBase()
-        // both read it. Assigning instPaid over it destroyed that deposit: the
-        // plan generator builds a schedule with depositAmount:0 spanning the
-        // full price, so a freshly generated plan has instPaid = 0 and a 500
-        // deposit vanished with no ledger entry the moment the order was saved.
-        // Instalment payments are additional cash, so ADD them to what the order
-        // already held — but only when the schedule is known to cover the
-        // BALANCE rather than the gross price.
-        //
-        // Math.max was right only BECAUSE the generator used to span the full
-        // price: a 3,000 job with a 1,000 deposit got a 3,000 plan, so max(1000,
-        // 3000) = 3000 and the order settled. It also meant the customer was
-        // billed 4,000 for a 3,000 job, which is what the generator fix stopped.
-        // With a 2,000 plan, max(1000, 2000) = 2000 and the order shows 1,000
-        // owed FOREVER — the customer has paid in full and is still chased.
-        //
-        // instalmentBase is the cash that existed when the plan was generated,
-        // written only by that generator. Plans made before it — and hand-built
-        // ones, whose amounts mean whatever the shop decided — have none, and
-        // keep the old rule, which is the right one for a schedule that already
-        // spans the whole price.
-        //
-        // Still wrapped in Math.max, and that is not belt-and-braces. paidAmount
-        // can have grown since the plan was made — a payment taken at the counter
-        // and typed straight in — and `base + instPaid` would then be LOWER than
-        // what the order already holds, destroying that cash. Which is precisely
-        // the bug money-integrity.test.js exists to catch, and it caught this.
-        const instBase = draft.instalmentBase;
-        const fromPlan = (typeof instBase === 'number' && instBase >= 0)
-          ? Math.round((instBase + instPaid) * 100) / 100
-          : instPaid;
-        order.paidAmount = Math.max(+order.paidAmount || 0, fromPlan);
-        // Settled against the ORDER PRICE, not the instalment total. Instalment
-        // amounts are freely editable, so a partial plan (two 100 rows on a
-        // 2,000 order) marked paid reported the whole order as settled — and
-        // paymentStatus is what the payment_received/paid webhooks carry.
-        const owed = +order.price || 0;
-        const paid = order.paidAmount;
-        order.paymentStatus = paid <= 0 ? 'unpaid' : (owed > 0 && paid + 0.005 >= owed ? 'paid' : 'partial');
+        const totals = KhaytPaymentPlan.collectionTotals({
+          price: order.price,
+          paidAmount: order.paidAmount,
+          instalments: draft.instalments,
+          instalmentBase: draft.instalmentBase,
+        });
+        order.paidAmount = totals.paidAmount;
+        order.paymentStatus = totals.paymentStatus;
       }
       // Delete removed files from disk
       if (pendingFileDeletes.length > 0 && window.hubAPI?.deleteOrderFile) {

@@ -50,6 +50,14 @@ public struct Installment: Codable, Sendable, Equatable {
     public let paidAt: String?
 }
 
+/// What an order's cash figures become once a plan's rows are collected.
+public struct PlanTotals: Codable, Sendable, Equatable {
+    public let paidAmount: Double
+    public let paymentStatus: String
+    /// The collected rows' total on its own — what this plan has brought in.
+    public let collected: Double
+}
+
 /// The money a job's price, deposit and credit notes divide into when it is
 /// split across machines.
 public struct SplitShare: Codable, Sendable, Equatable {

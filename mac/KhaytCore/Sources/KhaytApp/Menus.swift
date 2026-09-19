@@ -399,6 +399,15 @@ private struct JobMenu: View {
         }
         .keyboardShortcut("p", modifiers: [.command, .shift])
         .disabled(!canMove)
+        // PAYING OVER MONTHS. Beside Record payment because it is the same
+        // question at a different distance: one is cash that has arrived, the
+        // other is what was agreed about the cash still to come. No shortcut —
+        // a plan is set up once in a job's life, and the two keys either side
+        // of this one are used every day.
+        Button(Words.upfront("inst.title") + "\u{2026}") {
+            if let one = job { shop.planFor = one }
+        }
+        .disabled(!canMove)
         Button(Words.upfront("ord.hold_btn")) {
             guard let one = job else { return }
             shop.pendingHold = Shop.PendingHold(id: one.id, project: one.project)

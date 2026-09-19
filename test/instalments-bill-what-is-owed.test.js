@@ -127,14 +127,26 @@ test('the new string exists in every locale', () => {
  * the value it now produces.
  * ------------------------------------------------------------------ */
 
-/** The save path's rule, read out of the shipped source. */
+/**
+ * The save path's rule.
+ *
+ * This used to slice the expression out of `renderer/order-flows.js` and run it
+ * through `new Function`, because the rule lived in a window this process
+ * cannot open. It is `collectionTotals` in `lib/payment-plan.js` now — shared
+ * with the macOS app, which collects instalments of its own — so the four
+ * properties below are checked against the rule itself.
+ *
+ * `price` is irrelevant to the figure being asserted here (it decides
+ * paid/partial, not the amount), so it is passed as 0 and left out of the way.
+ */
 function paidAmountRule(order, draft, instPaid) {
-  const src = read('renderer/order-flows.js');
-  const at = src.indexOf('const instBase = draft.instalmentBase;');
-  assert.ok(at > 0, 'the paidAmount rule is gone');
-  const body = src.slice(at, src.indexOf(';\n', src.indexOf('order.paidAmount =', at)) + 1);
-  const fn = new Function('order', 'draft', 'instPaid', `${body}; return order.paidAmount;`);
-  return fn({ ...order }, draft, instPaid);
+  const { collectionTotals } = require('../lib/payment-plan.js');
+  return collectionTotals({
+    price: 0,
+    paidAmount: order.paidAmount,
+    instalments: [{ amount: instPaid, paid: true }],
+    instalmentBase: draft.instalmentBase,
+  }).paidAmount;
 }
 
 test('a plan covering the balance settles the order', () => {

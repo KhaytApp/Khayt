@@ -1086,6 +1086,51 @@ public actor KhaytEngine {
         public let after: Double
     }
 
+    /// What one job still owes, in its OWN currency.
+    ///
+    /// The plan generator's input, and not a subtraction this app may do for
+    /// itself: `orderOwedRaw` takes gift cards and credit notes off the price
+    /// as well as the cash, and a plan built on price − paidAmount would bill a
+    /// customer for a credit note they were already given.
+    public func owedRaw(order: JSONValue) throws -> Double {
+        try runtime.call("KhaytOrderMoney", "orderOwedRaw", [order], as: Double.self)
+    }
+
+    /// The plan a shop is offered when it asks for one: three payments, a
+    /// calendar month out then thirty days apart, covering what is OWED.
+    ///
+    /// `owed`, never the gross price — a job with a deposit already taken
+    /// produced a schedule billing that deposit a second time. The month-length
+    /// clamp (a plan made on the 31st must not skip February) is the shared
+    /// rule's, not this app's.
+    public func monthlyPlan(owed: Double, today: String,
+                            installments: Int = 3, intervalDays: Int = 30) throws -> [Installment] {
+        let arg: [String: JSONValue] = [
+            "owed": .number(owed), "today": .string(today),
+            "installments": .number(Double(installments)),
+            "intervalDays": .number(Double(intervalDays)),
+        ]
+        return try runtime.call("KhaytPaymentPlan", "monthlyPlan", [arg], as: [Installment].self)
+    }
+
+    /// What a plan's collected rows make of an order's cash figures.
+    ///
+    /// Not arithmetic this app is free to do for itself: the deposit that must
+    /// not be overwritten, the base that must not be double-counted, and
+    /// settling against the PRICE rather than the instalment total are three
+    /// ways money has been destroyed here before, and all three live in
+    /// `lib/payment-plan.js`.
+    public func collectionTotals(price: Double, paidAmount: Double,
+                                 instalments: [JSONValue],
+                                 instalmentBase: Double?) throws -> PlanTotals {
+        var arg: [String: JSONValue] = [
+            "price": .number(price), "paidAmount": .number(paidAmount),
+            "instalments": .array(instalments),
+        ]
+        if let base = instalmentBase { arg["instalmentBase"] = .number(base) }
+        return try runtime.call("KhaytPaymentPlan", "collectionTotals", [arg], as: PlanTotals.self)
+    }
+
     // MARK: - Splitting a job
 
     /// Divide price, deposit and credit notes across machines by cost weight.
