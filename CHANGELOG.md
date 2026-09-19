@@ -17,6 +17,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   beside what its own record says it should be. Nothing is changed until you
   ask, one order at a time, and ⌘Z puts it back.
 
+- **(Mac) The download page's release notes linked to a page that was not
+  there.** Every macOS release so far opened with a link to VERSIONING.md that
+  answered 404: the notes are written in Khayt's own repository, where that
+  link is right, and published on the Mac app's releases, where it is not. The
+  notes carry full addresses now, so the link goes where it says.
+
 - **(Mac) What can run together on one plate is worked out here.** The
   scheduler answers which printer takes a job, which a shop with one machine
   already knows. What it needs is the other question — what can go in the same
