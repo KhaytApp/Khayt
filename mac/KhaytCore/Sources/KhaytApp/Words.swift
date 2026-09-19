@@ -1045,6 +1045,10 @@ final class Words {
         // shop hands a supplier; an app that sent one because somebody chose a
         // menu item would have acted on their behalf in a way they cannot take
         // back. "Order more" would have promised exactly that.
+        "mac.to_order":     ["en": "things to order", "ar": "أشياء بحاجة للطلب"],
+        "mac.to_order_one": ["en": "thing to order",  "ar": "شيء بحاجة للطلب"],
+        "mac.to_order_two": ["en": "things to order", "ar": "شيئان بحاجة للطلب"],
+        "mac.draft_them":   ["en": "Draft the orders", "ar": "إنشاء المسودات"],
         "mac.draft_an_order": ["en": "Draft a purchase order",
                                "ar": "إنشاء مسودة أمر شراء"],
         "mac.overpriced_orders": ["en": "Priced per spool", "ar": "مسعّرة بالبكرة"],

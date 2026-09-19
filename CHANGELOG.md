@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The shelf offers to order what is low, in one go.** One line at the
+  top: how many things need ordering, and a button that drafts them all. What
+  it counts is what is low AND has no order already on its way — offering to
+  order something already coming is how a shelf ends up with four kilos of a
+  filament a shop uses twice a year. It shows what it will order before it does
+  it, and drafts rather than sends, like every other order this app raises.
+
 - **(Mac) More of something can be ordered from the shelf.** A spool, or the
   row that says a consumable is running out, can raise a purchase order here.
   It is a DRAFT: an order is something a shop hands a supplier, so the app

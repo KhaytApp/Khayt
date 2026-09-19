@@ -668,6 +668,19 @@ struct Inventory: View {
                     // searched for — the search box filters spools, so a full
                     // consumables list beside three filtered cards describes a
                     // different set from the one on screen.
+                    // ── WHAT IS LOW AND NOT ALREADY COMING ────────────────
+                    //
+                    // One line, above everything, and only when there is
+                    // something to do about it. The count is the RULE's — what
+                    // is low AND has no open order — rather than the low
+                    // badges, because offering to order something already on
+                    // its way is how a shelf ends up with four kilos of
+                    // a filament the shop uses twice a year.
+                    if !shop.needsOrdering.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        ToOrderRow(shop: shop)
+                            .padding(.bottom, 14)
+                    }
                     if !needs.isEmpty, shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         ConsumablesCard(needs: needs, shop: shop)
                             .card(rail: needs.contains(where: \.low) ? Khayt.attention : nil,
@@ -771,6 +784,51 @@ struct Inventory: View {
         // finish even when nobody has touched the stock.
         .task(id: shop.consumableSignature) {
             needs = await shop.consumableNeeds()
+        }
+    }
+}
+
+/// The one line that turns "these are low" into an order.
+///
+/// It says what it will do and how many, and then confirms — because a batch
+/// that drafts six orders is six things a shop has to look over afterwards, and
+/// a button that did it on one click would be doing paperwork on their behalf.
+///
+/// Drafts, like every other order this app raises. Sending is the shop's.
+private struct ToOrderRow: View {
+    @Bindable var shop: Shop
+    @State private var confirming = false
+    @State private var drafted: Int?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "shippingbox").foregroundStyle(Khayt.attention)
+            Text(shop.words.counting(shop.needsOrdering.count, "mac.to_order"))
+                .font(.callout)
+            Spacer(minLength: 8)
+            if let drafted {
+                Text(shop.words.callIt("po.batch_done", ["n": .number(Double(drafted))]))
+                    .font(.caption).foregroundStyle(Khayt.done)
+            }
+            Button(shop.words.callIt("mac.draft_them")) { confirming = true }
+                .disabled(!shop.canMoveJobs)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .card(rail: Khayt.attention, padding: 0)
+        .confirmationDialog(
+            shop.words.callIt("po.batch_confirm",
+                              ["n": .number(Double(shop.needsOrdering.count))]),
+            isPresented: $confirming, titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.draft_them")) {
+                Task { drafted = await shop.draftWhatIsLow() }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        } message: {
+            // WHAT IT WILL ACTUALLY ORDER, before it is ordered. A count alone
+            // asks a shop to agree to six figures it has not seen.
+            Text(shop.needsOrdering.map(\.label).joined(separator: "\n"))
         }
     }
 }
