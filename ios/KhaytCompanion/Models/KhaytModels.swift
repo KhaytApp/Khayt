@@ -229,12 +229,34 @@ struct InventorySpool: Codable, Identifiable, Sendable {
     var sku: String?
     var printTemp: Int?
     var bedTemp: Int?
+    /// What the spool held when it arrived, which is NOT `weight`.
+    ///
+    /// The store calls the full spool `spoolWeight` and calls what is left on it
+    /// `weight` — `renderer/inventory.js` divides cost by `spoolWeight` for a
+    /// price per kilo, and subtracts prints from `weight`. The wire has its own
+    /// pair of names for the same two facts, `weightTotal` and
+    /// `weightRemaining`, so both spellings are read here.
+    var initialWeight: Double?
 
     enum CodingKeys: String, CodingKey {
         case id, material, brand, color, weight, remaining, cost, purchasedAt, addedAt
         case materialType, lot, sku, printTemp, bedTemp
-        case weightRemaining, weightTotal
+        case weightRemaining, weightTotal, spoolWeight
     }
+
+    /// What is left on the spool.
+    ///
+    /// ── THE DESKTOP'S RULE, IN ONE PLACE ─────────────────────────────────
+    ///
+    /// `renderer/inventory.js` totals a shop's filament with
+    /// `(+spool.remaining || +spool.weight || 0)` — so a record with no
+    /// `remaining` is not a spool of unknown fullness, it is a spool whose
+    /// remaining grams are in `weight`. Every shop's book written by the
+    /// desktop's own form is that shape: `weight: 860, spoolWeight: 1000`.
+    ///
+    /// Two screens had this fallback written out by hand. A third would have
+    /// forgotten it, and the symptom is a blank where a number belongs.
+    var remainingGrams: Double? { remaining ?? weight }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -254,6 +276,8 @@ struct InventorySpool: Codable, Identifiable, Sendable {
             ?? c.decodeIfPresent(Double.self, forKey: .weightRemaining)
         weight = try c.decodeIfPresent(Double.self, forKey: .weight)
             ?? c.decodeIfPresent(Double.self, forKey: .weightTotal)
+        initialWeight = try c.decodeIfPresent(Double.self, forKey: .weightTotal)
+            ?? c.decodeIfPresent(Double.self, forKey: .spoolWeight)
     }
 
     func encode(to encoder: Encoder) throws {

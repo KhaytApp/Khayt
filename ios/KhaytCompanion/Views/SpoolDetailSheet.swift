@@ -48,8 +48,13 @@ struct SpoolDetailSheet: View {
                         Label("Low stock", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
                     }
-                    if let weight = spool.weight {
-                        LabeledContent("Initial weight", value: "\(Int(weight)) g")
+                    // `spool.weight` is what is LEFT, not what it started as —
+                    // the store keeps the full spool in `spoolWeight`. This
+                    // printed the remaining grams under "Initial weight", so a
+                    // 860 g spool of a 1 kg roll read 860 / 860: every spool in
+                    // the shop looked unopened.
+                    if let initial = spool.initialWeight {
+                        LabeledContent("Initial weight", value: "\(Int(initial)) g")
                     }
                     if let purchased = spool.purchasedAt {
                         LabeledContent("Purchased", value: purchased)
@@ -141,7 +146,7 @@ struct SpoolDetailSheet: View {
     }
 
     private var remainingGrams: Int {
-        localRemaining ?? Int(spool.remaining ?? spool.weight ?? 0)
+        localRemaining ?? Int(spool.remainingGrams ?? 0)
     }
 
     private func saveRemaining() async {

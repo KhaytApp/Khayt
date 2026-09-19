@@ -184,7 +184,7 @@ private struct SpoolRow: View {
                 }
             }
             HStack(spacing: 8) {
-                if let remaining = spool.remaining ?? spool.weight {
+                if let remaining = spool.remainingGrams {
                     Text("\(Int(remaining)) g")
                         .font(.caption)
                         .foregroundStyle(spool.isLowStock ? KhaytDesign.warn : KhaytDesign.textDim)

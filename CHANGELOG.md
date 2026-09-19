@@ -2596,6 +2596,24 @@ tested against both.
 
 ### Fixed
 
+- **(iOS) Every spool in the shop looked unopened.** The spool detail screen
+  printed *Remaining 860 g* and *Initial weight 860 g* for the same spool,
+  because it read `weight` for both. In the store `weight` is what is LEFT on
+  the spool and `spoolWeight` is the full roll — `renderer/inventory.js` totals
+  a shop's filament with `(+spool.remaining || +spool.weight || 0)` and divides
+  cost by `spoolWeight` for a price per kilo. The phone's model never read
+  `spoolWeight` at all, so the only number it had to show was the remaining one,
+  twice.
+
+  The desktop's own rule for what is left now lives in one place on the phone
+  rather than being written out by hand at each screen that needed it — two had
+  it, and the third would have been the one to forget.
+
+  Found by a new guard that decodes the shop's real sample book with the
+  shipping models. The wire contract check could not have caught it: it measures
+  against a fixture, and a fixture is written to suit the model.
+
+
 - **A screen reader could not say which box you were in.** Across the app 178
   fields showed a label — "Layer height (mm)", "Infill (%)" — that was only
   ever visual: nothing tied the words to the box beneath them, so a screen
