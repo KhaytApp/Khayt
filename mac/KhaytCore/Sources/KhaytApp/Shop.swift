@@ -4980,6 +4980,22 @@ final class Shop {
 
     /// Record an expense.
     ///
+    /// What the note on a receipt line reads like, or nil.
+    ///
+    /// The whole answer is `lib/expense-categorize.js` — the keyword list, the
+    /// Arabic terms, and the "most distinct hits wins" tie-break are all the
+    /// shared rule's, so a receipt filed on the Mac is filed where Khayt would
+    /// have filed it. A second keyword list in Swift would have drifted from
+    /// that one the first time somebody added a word to either.
+    ///
+    /// Nil when nothing matches, which is most notes, and nil when there is no
+    /// engine: a suggestion is a convenience and its absence must never stop a
+    /// shop recording what it spent.
+    func categoryFor(_ note: String) async -> String? {
+        guard let engine, !note.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        return try? await engine.suggestedCategory(for: note)
+    }
+
     /// The record is `lib/expense-book.js`'s, so this app and Khayt write the
     /// same one. A budget the month has now gone past is said afterwards, by
     /// the same rule the Electron page says it with — a warning, not a refusal:

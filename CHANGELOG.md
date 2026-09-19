@@ -22,6 +22,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   at the time, which is why that name sits on the order rather than being
   looked up.
 
+- **(Mac) A receipt suggests what it is.** Khayt has read the note on an
+  expense and offered a category since long before this app existed — "Aramex
+  courier to Jeddah" is shipping, "فاتورة كهرباء" is electricity — and only the
+  other window ever asked. The same rule answers here now, under the same
+  field, and it is still only an offer: the keyword list is short on purpose,
+  and a form that quietly re-filed what the shop had already chosen would be
+  wrong in its own books without ever saying so. Nothing is suggested when
+  nothing matches, which is most receipts.
+
 - **(Mac) The shelf offers to order what is low, in one go.** One line at the
   top: how many things need ordering, and a button that drafts them all. What
   it counts is what is low AND has no order already on its way — offering to

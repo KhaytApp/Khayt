@@ -402,6 +402,11 @@ public actor KhaytEngine {
         // and Reports screens are built on; each was inline in a renderer
         // handler before, which is why only the Electron window had them.
         "expense-book",
+        // Guessing a category from what the shop typed on the receipt line.
+        // Suggestion only, applied by a tap: the keyword list is short and a
+        // form that silently re-filed "PLA nozzle cleaner" as filament would
+        // be wrong in the shop's own books without ever saying so.
+        "expense-categorize",
         "waste-entry",
         // A spool, as the shelf records it, and what correcting one means.
         // The two writers were inline in renderer/inventory.js, so only the
@@ -5777,6 +5782,19 @@ public actor KhaytEngine {
     public func newExpense(_ input: [String: JSONValue], id: String, today: String) throws -> Written {
         try runtime.call2("KhaytExpenseBook.newExpense(ARG0, {id: ARG1, today: ARG2})",
                           [.object(input), .string(id), .string(today)], as: Written.self)
+    }
+
+    /// What the note on a receipt suggests the expense is: `lib/expense-categorize.js`.
+    ///
+    /// Nil when nothing matches confidently, which is most of the time — the
+    /// keyword list is deliberately short. A SUGGESTION, never an answer: the
+    /// other app offers it as a link beside the picker and changes nothing
+    /// until it is tapped, and this app does the same. A form that silently
+    /// re-filed what a shop had already chosen would be wrong in its books
+    /// without ever saying so.
+    public func suggestedCategory(for text: String) throws -> String? {
+        try runtime.call2("KhaytExpenseCategorize.suggestCategory(ARG0)",
+                          [.string(text)], as: String?.self)
     }
 
     /// Whether a category has gone past its monthly budget, AFTER the expense
