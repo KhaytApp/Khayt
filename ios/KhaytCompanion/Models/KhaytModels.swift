@@ -93,6 +93,35 @@ struct QueueOrder: Codable, Identifiable, Sendable {
     var displayClient: String {
         client?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "—"
     }
+
+    /// The same order with its printer named.
+    ///
+    /// ── WHY AN ASSIGNED JOB READ AS "UNASSIGNED" ─────────────────────────
+    ///
+    /// An order carries `machineId`. It does not carry the printer's NAME:
+    /// `lib/order-new.js` writes `machineId` and nothing else, and `queueJson`
+    /// passes `machine` straight through — so for every job a shop assigned at
+    /// the desk, the phone received `machine: null` and drew the row without a
+    /// printer, and the detail sheet printed "Unassigned".
+    ///
+    /// The one exception made it look like a display quirk rather than a gap:
+    /// when the PHONE assigns a machine, `lib/lan-server.js` looks the name up
+    /// and writes both fields. So the same job read as unassigned until somebody
+    /// reassigned it from the phone, and then named itself correctly.
+    ///
+    /// The id was always there and so was the machine list. This joins them.
+    func namingMachine(from machines: [MachineInfo]) -> QueueOrder {
+        // A name already on the order wins: it is what the desktop recorded at
+        // assignment time, and a machine since renamed should not silently
+        // rewrite the history of a job.
+        if let machine, !machine.isEmpty { return self }
+        guard let machineId, !machineId.isEmpty,
+              let named = machines.first(where: { $0.id == machineId })?.name,
+              !named.isEmpty else { return self }
+        return QueueOrder(id: id, project: project, client: client, status: status,
+                          machine: named, machineId: machineId,
+                          dueDate: dueDate, priority: priority)
+    }
 }
 
 struct MachineInfo: Codable, Identifiable, Sendable {

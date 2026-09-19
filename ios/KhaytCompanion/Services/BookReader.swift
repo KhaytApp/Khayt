@@ -64,7 +64,21 @@ actor BookReader {
     func queue() async throws -> [QueueOrder] {
         let store = try book.read()
         let json = try await engine().lanQueueBody(store: .object(store))
-        return try JSONDecoder().decode([QueueOrder].self, from: Data(json.utf8))
+        let orders = try JSONDecoder().decode([QueueOrder].self, from: Data(json.utf8))
+        // The book holds the machines as well as the jobs, so the printer can be
+        // named here rather than left as an id the screens cannot render. Done
+        // once, at the point the two are together, instead of threading the
+        // machine list through every row that wants to draw a printer.
+        let machines = (try? self.machinesUnsafe(from: store)) ?? []
+        return orders.map { $0.namingMachine(from: machines) }
+    }
+
+    /// The machines out of an already-read store, so `queue()` does not read the
+    /// book from disk twice for one screen.
+    private func machinesUnsafe(from store: [String: JSONValue]) throws -> [MachineInfo] {
+        guard case .array(let rows)? = store["machines"] else { return [] }
+        let data = try JSONEncoder().encode(JSONValue.array(rows))
+        return try JSONDecoder().decode([MachineInfo].self, from: data)
     }
 
     /// The masthead figures, also the Mac's own rule rather than a second count.

@@ -109,6 +109,46 @@ final class BookContractTests: XCTestCase {
                              "no order carried a priority — the case that broke the queue is untested")
     }
 
+    /// An assigned job must not read as unassigned.
+    func testTheQueueNamesThePrinterARealShopAssigned() async throws {
+        let shop = try sampleShop()
+
+        // Every job in this shop's queue is on a printer, and not one of them
+        // carries the printer's NAME — `order-new.js` writes `machineId` alone.
+        guard case .array(let log)? = shop["printLog"] else { return XCTFail("no orders") }
+        let live = log.compactMap { row -> [String: JSONValue]? in
+            guard case .object(let o) = row, case .string(let s)? = o["status"],
+                  ["pending", "printing", "post", "qc"].contains(s) else { return nil }
+            return o
+        }
+        XCTAssertGreaterThan(live.count, 0)
+        XCTAssertEqual(live.filter { $0["machine"] != nil }.count, 0,
+                       "this shop now records machine names, so the fixture no longer covers the gap")
+        XCTAssertEqual(live.filter { $0["machineId"] != nil }.count, live.count,
+                       "every queued job should be assigned to a printer by id")
+
+        // Read the way a screen reads it.
+        let dir = FileManager.default.temporaryDirectory
+            .appending(path: "named-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let book = CompanionBook(directory: dir)
+        try book.replace(with: shop, scope: nil)
+
+        let queue = try await BookReader(book: book).queue()
+        XCTAssertGreaterThan(queue.count, 0)
+
+        let named = queue.filter { ($0.machine?.isEmpty == false) }
+        XCTAssertEqual(named.count, queue.count, """
+            \(queue.count - named.count) of \(queue.count) queued jobs have no printer name.
+            They are assigned — every one carries a machineId — so the row draws no printer
+            and the detail sheet says "Unassigned" for a job that is on a machine.
+            """)
+        // And it is a real name from the shop's own list, not the id echoed back.
+        XCTAssertNotNil(named.first(where: { $0.machine == "Bambu X1C" || $0.machine == "Prusa CORE One" }),
+                        "the names do not match the shop's machines")
+    }
+
     /// The statuses a real shop's book actually contains, against what the app
     /// can name. `cancelled` lives in shipping books and is not in the desktop's
     /// own STATUSES list, which is why `status` is a String on the wire and the
