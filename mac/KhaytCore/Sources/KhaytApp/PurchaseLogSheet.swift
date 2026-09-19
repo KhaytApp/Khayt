@@ -185,9 +185,13 @@ struct PurchaseHistorySheet: View {
                                 .font(.caption).foregroundStyle(.secondary)
                                 .monospacedDigit().frame(width: 84, alignment: .leading)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(bought.item.isEmpty
-                                     ? shop.words.callIt("sup.purchase_item") : bought.item)
+                                // A DASH, not the field's own label. Drawing
+                                // "Item / Description" where the shop typed
+                                // nothing puts the question on screen as
+                                // though it were the answer.
+                                Text(bought.item.isEmpty ? "—" : bought.item)
                                     .lineLimit(1)
+                                    .foregroundStyle(bought.item.isEmpty ? .secondary : .primary)
                                 if let said = bought.said {
                                     Text(said).font(.caption).foregroundStyle(.secondary)
                                         .lineLimit(1)
