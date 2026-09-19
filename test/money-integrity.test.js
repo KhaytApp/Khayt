@@ -19,16 +19,31 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
  */
 
 test('a reorder unit price is per GRAM, not per spool', () => {
-  // item.cost is the whole spool's cost. createPurchaseOrder multiplies
-  // unitPrice by a qty measured in grams, so returning it undivided made every
+  // item.cost is the whole spool's cost. A purchase order multiplies unitPrice
+  // by a qty measured in grams, so returning it undivided made every
   // auto-drafted PO ~1000x too expensive: 750 g of an 85/kg spool quoted at
   // 63,750 instead of 63.75.
+  //
+  // The rule moved into `lib/reorder.js` so the macOS app can draft an order
+  // without a second copy of the division. Driven here rather than read out of
+  // the renderer's source — and the renderer is checked for going through it.
+  const { perGramPriceFor } = require('../lib/reorder.js');
+  assert.equal(perGramPriceFor({ material: 'PLA+', cost: 85, spoolWeight: 1000 }, []).perG, 0.085,
+    'an 85 SAR spool of 1,000 g is 0.085 a gram');
+  // Rounded the way the order books it: 0.085 × 750 is 63.74999999999999 in
+  // binary, and money is rounded once at the end rather than asserted raw.
+  const perG = perGramPriceFor({ material: 'PLA+', cost: 85, spoolWeight: 1000 }, []).perG;
+  assert.equal(Math.round(perG * 750 * 100) / 100, 63.75,
+    '750 g of it, which the undivided figure quoted as 63,750');
+  // A quoted supplier price is per KILO and divides too.
+  assert.equal(perGramPriceFor({ material: 'PLA+' },
+    [{ id: 'S1', name: 'T', priceList: [{ material: 'PLA+', pricePerKg: 70 }] }]).perG, 0.07);
+  // Nothing prices it: no price, rather than a price of nothing.
+  assert.equal(perGramPriceFor({ material: 'Nylon' }, []).perG, 0);
+
   const src = read('renderer/inventory.js');
-  const fn = src.slice(src.indexOf('function resolveReorderPrice'), src.indexOf('function maybeAutoDraftPurchaseOrders'));
-  assert.match(fn, /perSpool\s*\/\s*Math\.max\(1,\s*\+item\.spoolWeight/,
-    'the item.cost fallback must divide by spoolWeight to reach a per-gram rate');
-  assert.equal(/const perG = \(\+item\.cost\) \|\|/.test(fn), false,
-    'undivided item.cost is a per-spool figure and must not be returned as perG');
+  assert.match(src, /KhaytReorder\.perGramPriceFor\(/,
+    'the renderer divides the spool cost itself again');
 });
 
 test('the per-gram arithmetic agrees with how stock is valued', () => {

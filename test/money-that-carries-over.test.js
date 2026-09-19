@@ -37,8 +37,19 @@ test('the calculator is fed the spool SIZE, not what is left of it', () => {
 
 test('every other cost site already divides by the spool size', () => {
   // The reason the above has one right answer rather than two defensible ones.
-  assert.match(read('renderer/inventory.js'), /perSpool \/ Math\.max\(1, \+item\.spoolWeight \|\| 1000\)/);
+  //
+  // The drafting side of it now lives in `lib/reorder.js` (the renderer calls
+  // `perGramPriceFor`) and the audit that hunts the old mistake still has its
+  // own copy of the division, deliberately: it is checking what a price SHOULD
+  // have been, and a shared helper it also fed would agree with itself.
+  assert.match(read('lib/reorder.js'), /perSpool \/ Math\.max\(1, \+row\.spoolWeight \|\| 1000\)/);
   assert.match(read('lib/po-audit.js'), /perSpool \/ Math\.max\(1, \+item\.spoolWeight \|\| 1000\)/);
+
+  // And the two agree on the figure, which is the property those two lines are
+  // standing in for.
+  const { perGramPriceFor } = require('../lib/reorder.js');
+  const item = { material: 'PLA+', cost: 85, spoolWeight: 1000 };
+  assert.equal(perGramPriceFor(item, []).perG, 0.085);
 });
 
 test('the rush fee does not survive the job it was for', () => {
