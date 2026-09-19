@@ -48,7 +48,13 @@ struct CustomersTable: View {
             .width(min: 140, ideal: 210)
 
             TableColumn(shop.words.callIt("flow.owed"), value: \.owed) { person in
-                if person.isSettled {
+                // Nothing owed because nothing was ever charged is a dash, not
+                // "settled" — the same distinction the jobs table draws.
+                if !person.hasAPrice {
+                    Text("—")
+                        .foregroundStyle(.quaternary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                } else if person.isSettled {
                     Text(shop.words.callIt("mac.settled"))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
@@ -283,11 +289,15 @@ struct CustomerInspector: View {
                                     .foregroundStyle(.tertiary)
                                 }
                                 Spacer(minLength: 8)
-                                Text(Money.figure(job.isSettled ? job.price : job.owed))
+                                Text(job.price > 0
+                                     ? Money.figure(job.isSettled ? job.price : job.owed)
+                                     : "—")
                                     .font(.callout)
                                     .monospacedDigit()
-                                    .foregroundStyle(job.isSettled ? AnyShapeStyle(.tertiary)
-                                                                   : AnyShapeStyle(.primary))
+                                    .foregroundStyle(job.price <= 0
+                                                     ? AnyShapeStyle(.quaternary)
+                                                     : (job.isSettled ? AnyShapeStyle(.tertiary)
+                                                                      : AnyShapeStyle(.primary)))
                             }
                             .padding(.vertical, 2)
                         }

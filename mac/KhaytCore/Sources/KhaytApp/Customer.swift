@@ -23,6 +23,15 @@ struct Customer: Identifiable, Hashable, Sendable {
     var overdueCount: Int { orders.count { $0.isOverdue() } }
     var isSettled: Bool { owed < 0.005 }
 
+    /// Whether anything this customer's work was ever priced at.
+    ///
+    /// `isSettled` is `owed < 0.005`, which is equally true of a customer whose
+    /// jobs were never priced — and a shop that uses Khayt as a print log has
+    /// a whole book like that. Saying "settled" about them is the app claiming
+    /// money changed hands. See `OrdersTable.Owed`, which had the same fault
+    /// one row at a time.
+    var hasAPrice: Bool { billed > 0.005 }
+
     /// The most recent job, by date. What "last seen" means for a shop.
     var lastJob: Date? { orders.compactMap(\.day).max() }
 

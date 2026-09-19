@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A job nobody charged for no longer says it has been paid.** The jobs
+  table read "settled" against every job with nothing outstanding — which is
+  also true of a job that was never priced, and plenty of shops use Khayt as a
+  print log rather than a ledger. A book of twenty finished, unpriced jobs said
+  "settled" twenty times, and showed a total of 0.00 for each. Both are a dash
+  now: nothing was owed and nothing was paid. The customers screen said the
+  same thing about a customer whose work was never priced, and now does not.
+
 - **(Mac) Deposits an old defect took off the book are found here, and put
   back.** Saving an order that had a payment plan used to erase the deposit
   already recorded against it, so those orders show less paid than they should
