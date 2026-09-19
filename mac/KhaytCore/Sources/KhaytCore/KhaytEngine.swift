@@ -407,6 +407,12 @@ public actor KhaytEngine {
         // form that silently re-filed "PLA nozzle cleaner" as filament would
         // be wrong in the shop's own books without ever saying so.
         "expense-categorize",
+        // Every collection as its own spreadsheet — the "Export all data
+        // (CSV)" backup. The columns, the quoting and the formula-injection
+        // guard are all decided there, which is what keeps a Mac export and an
+        // Electron export the same set of files. It reads `content-languages`
+        // for a record's name, and that is bundled already.
+        "csv-bundle",
         "waste-entry",
         // A spool, as the shelf records it, and what correcting one means.
         // The two writers were inline in renderer/inventory.js, so only the
@@ -5795,6 +5801,26 @@ public actor KhaytEngine {
     public func suggestedCategory(for text: String) throws -> String? {
         try runtime.call2("KhaytExpenseCategorize.suggestCategory(ARG0)",
                           [.string(text)], as: String?.self)
+    }
+
+    /// Every collection of a book as its own CSV: `lib/csv-bundle.js`.
+    ///
+    /// Empty collections are left out by the rule, so a shop with no machines
+    /// gets no `machines.csv` rather than a file with a header and no rows.
+    ///
+    /// The quoting is the rule's, and so is the guard that matters: a cell
+    /// beginning `=`, `+`, `-` or `@` is neutralised, because a spreadsheet
+    /// opens a CSV and runs what looks like a formula. A Swift writer that
+    /// joined the same fields with commas would have lost that.
+    public func csvBundle(_ snapshot: [String: JSONValue]) throws -> [CsvFile] {
+        try runtime.call2("KhaytCsvBundle.buildCsvBundle(ARG0)",
+                          [.object(snapshot)], as: [CsvFile].self)
+    }
+
+    /// One spreadsheet, named as the rule names it.
+    public struct CsvFile: Decodable, Sendable {
+        public let name: String
+        public let content: String
     }
 
     /// Whether a category has gone past its monthly budget, AFTER the expense
