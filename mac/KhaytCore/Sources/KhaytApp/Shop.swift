@@ -10037,6 +10037,91 @@ final class Shop {
                                          clients: clientRows)
     }
 
+    // MARK: - Who a message would reach
+
+    /// Whether the campaign sheet is open.
+    var planningCampaign = false
+
+    /// What a campaign is narrowed to.
+    ///
+    /// Every field is OPTIONAL and absent means "do not narrow by this" — the
+    /// rule reads `!= null`, so a zero is a real filter (spent at least
+    /// nothing, which is everybody) and nil is no filter at all. A form that
+    /// sent zeroes for its empty boxes would quietly change what "not ordered
+    /// in N days" means the moment somebody cleared the field.
+    struct Segment: Equatable, Sendable {
+        var channel = "email"
+        var minSpend: Double?
+        var noOrderDays: Double?
+        var activeWithinDays: Double?
+        var tag = ""
+        var tier = ""
+
+        /// The channels the rule knows. `sms` and `whatsapp` both read the
+        /// phone number; they are separate because what is DONE with the
+        /// number differs, and that is the sending app's business.
+        static let channels = ["email", "whatsapp"]
+
+        var criteria: [String: JSONValue] {
+            var out: [String: JSONValue] = [:]
+            if let minSpend { out["minSpend"] = .number(minSpend) }
+            if let noOrderDays { out["noOrderDays"] = .number(noOrderDays) }
+            if let activeWithinDays { out["activeWithinDays"] = .number(activeWithinDays) }
+            let cleanTag = tag.trimmingCharacters(in: .whitespaces)
+            if !cleanTag.isEmpty { out["tag"] = .string(cleanTag) }
+            if !tier.isEmpty { out["tier"] = .string(tier) }
+            return out
+        }
+    }
+
+    /// Who this segment reaches, in the order the rule returns them.
+    ///
+    /// ── WHAT THIS APP DELIBERATELY DOES NOT DECIDE ────────────────────────
+    ///
+    /// Who is in and who is out is entirely `lib/campaigns.js`: the spend, the
+    /// days since the last order, the tag, the tier, and — the one that
+    /// matters — that a customer who has opted out of marketing is never in the
+    /// list, whatever the segment says. A host that filtered on its own side
+    /// would be a second opinion about consent, and the wrong one eventually.
+    ///
+    /// The tiers are worked out here only because a Swift closure cannot cross
+    /// into JavaScriptCore; they are still `lib/loyalty.js`'s answer.
+    func campaignRecipients(_ segment: Segment) async -> [KhaytEngine.Recipient] {
+        guard let engine else { return [] }
+        var tiers: [String: JSONValue] = [:]
+        if loyaltyOn, !segment.tier.isEmpty {
+            for row in clientRows {
+                guard let id = Self.recordId(row) else { continue }
+                if let standing = await loyalty(of: id), let name = standing.tier {
+                    tiers[id] = .string(name)
+                }
+            }
+        }
+        return (try? await engine.campaignRecipients(
+            clients: clientRows, orders: orderRows, criteria: segment.criteria,
+            channel: segment.channel, tiers: tiers, now: Date())) ?? []
+    }
+
+    /// One message as one customer would read it.
+    ///
+    /// Shown BEFORE anything is sent, and shown for a real recipient rather
+    /// than for a made-up one: `{{name}}` going out empty is the fault this
+    /// rule's own comments are about, and the only way to see it is to fill it
+    /// in for somebody the list actually contains.
+    func campaignPreview(_ body: String, for recipient: KhaytEngine.Recipient) async -> String {
+        guard let engine else { return body }
+        let money = Money.text(recipient.stats.totalSpend, currency)
+        var payload: [String: JSONValue] = ["client": recipient.client]
+        payload["stats"] = .object([
+            "completedCount": .number(Double(recipient.stats.completedCount)),
+            "totalSpend": .number(recipient.stats.totalSpend),
+            "lastOrderDate": .string(recipient.stats.lastOrderDate),
+        ])
+        return (try? await engine.fillCampaignTemplate(
+            body, recipient: .object(payload), spend: money,
+            settings: settingsValue)) ?? body
+    }
+
     /// Turn a customer's points into store credit.
     ///
     /// TWO RECORDS, ONE SWAP. The gift card and the ledger row are written

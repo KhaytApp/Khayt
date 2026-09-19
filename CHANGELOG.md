@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Who a message would reach, and what it would say to each of them.**
+  Khayt has segmented customers for a campaign since 3.0 — spend, how long
+  since they last ordered, a tag, a loyalty tier — and only the other window
+  could ask. The Mac can ask now: it says how many customers a segment reaches
+  and shows the message with its merge fields filled in for one of them, which
+  is the only way to see that the greeting actually fills. A customer who has
+  opted out of marketing is never in the list, whatever the segment says —
+  that is the shared rule's decision and this app cannot override it. **It does
+  not send.** Sending is the next step and is still done in the other app; a
+  screen that could send is a screen that can send by accident, and what a shop
+  needs first is to see the list.
+
 - **"Export all data (CSV)" was mostly empty columns.** The customer's name,
   the product's name and price, and what is left on a spool and what it held
   new — all blank, in every row of every export, because the file was reading
