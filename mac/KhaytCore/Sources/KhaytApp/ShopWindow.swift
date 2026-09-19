@@ -559,6 +559,7 @@ struct WindowSheets: ViewModifier {
             .sheet(item: $shop.droppingFrom) { DropObjectSheet(shop: shop, machine: $0) }
             .sheet(isPresented: $shop.findingPrinters) { FindPrintersSheet(shop: shop) }
             .sheet(item: $shop.ratingFor) { RatingSheet(shop: shop, job: $0) }
+            .sheet(item: $shop.planFor) { PaymentPlanSheet(shop: shop, job: $0) }
             .sheet(isPresented: $shop.pausingProduction) { PauseSheet(shop: shop) }
             // Cancelling throws away every hour already in the plate, and no
             // printer asks twice. Pause and resume are each other's undo and are

@@ -3634,6 +3634,148 @@ final class Shop {
         }
     }
 
+    // MARK: - Paying over months
+
+    /// The job whose payment plan is open, or nil.
+    ///
+    /// ── WHY THIS HAD TO EXIST ─────────────────────────────────────────────
+    ///
+    /// A customer paying a large job over three months could be SET UP only in
+    /// the Electron app. This app read the plan — aged debt on the Spending
+    /// screen already bills each instalment from its own due date — and could
+    /// neither write one nor collect one. A Mac-only shop that agreed a plan on
+    /// the phone had nowhere to put it, and `engine.buildSchedule` sat in the
+    /// engine with tests and no caller: the rule was right and nothing reached
+    /// it. That is this book's most-repeated fault, not a missing screen.
+    var planFor: Order?
+
+    /// Write a plan onto a job: three payments, a month apart, covering what is
+    /// still owed.
+    ///
+    /// Every figure here comes from `lib/payment-plan.js` and
+    /// `lib/order-money.js`. What is OWED — not the price — is the rule's own
+    /// subtraction, gift cards and credit notes included: a plan built on
+    /// price − paidAmount bills a customer for a credit note they were already
+    /// given, and one built on the gross price bills the deposit twice.
+    func makePlan(_ id: Order.ID) async {
+        await writeToOneOrder(id, named: words.callIt("inst.generate")) { order, engine, _ in
+            let owed = try await engine.owedRaw(order: order)
+            guard case .object(var record) = order else {
+                throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
+            }
+            guard owed > 0 else {
+                // Two different refusals, because they need two different
+                // answers: a job with no price needs one typing in, and a
+                // settled job needs nothing at all.
+                let price = (Self.plainNumber(record["price"]) ?? 0)
+                throw MoveRefused(sentence: self.words.callIt(
+                    price > 0 ? "inst.nothing_owed" : "inst.need_price"))
+            }
+            let plan = try await engine.monthlyPlan(owed: owed, today: Self.localDay())
+            guard !plan.isEmpty else {
+                throw MoveRefused(sentence: self.words.callIt("inst.nothing_owed"))
+            }
+            record["instalments"] = .array(plan.map { row in
+                .object([
+                    "id": .string(Self.uid("INS")),
+                    "amount": .number(row.amount),
+                    "dueDate": .string(row.dueDate),
+                    "note": .string(""),
+                    "paid": .bool(false),
+                    "paidAt": .null,
+                ])
+            })
+            // The cash the job holds RIGHT NOW. The plan covers the balance, so
+            // its rows are money on top of this rather than instead of it —
+            // without this figure, collecting the plan in full either erases the
+            // deposit or leaves it owed forever. Written only here, by the
+            // generator, exactly as Khayt writes it.
+            record["instalmentBase"] = .number((Self.plainNumber(record["paidAmount"]) ?? 0))
+            return OneOrderEdit(order: .object(record),
+                                activity: "\(id) → " + self.words.callIt("inst.title"))
+        }
+    }
+
+    /// Collect one payment of a plan — or put it back.
+    ///
+    /// ── UNCOLLECTING DOES NOT TAKE THE MONEY BACK ─────────────────────────
+    ///
+    /// `collectionTotals` never returns less than the job already holds, and
+    /// that is deliberate: `paidAmount` is the authoritative cash figure and can
+    /// have grown since the plan was made — a payment taken at the counter and
+    /// typed straight in. Lowering it here would destroy that cash. So clearing
+    /// a row clears the ROW, and the notice says where the cash figure is
+    /// corrected. An immediate mis-tap is ⌘Z, which puts both back.
+    func collect(_ id: Order.ID, rowId: String, collected: Bool) async {
+        await writeToOneOrder(id, named: words.callIt("inst.mark_paid")) { order, engine, _ in
+            guard case .object(var record) = order,
+                  case .array(let rows)? = record["instalments"] else {
+                throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
+            }
+            let today = Self.localDay()
+            var written: [JSONValue] = []
+            var found = false
+            for row in rows {
+                guard case .object(var entry) = row else { written.append(row); continue }
+                if case .string(let rid)? = entry["id"], rid == rowId {
+                    found = true
+                    entry["paid"] = .bool(collected)
+                    // The day it was collected, cleared when it is put back:
+                    // a row reading "not collected" with a collection date on
+                    // it is a row two readers would answer differently.
+                    entry["paidAt"] = collected ? .string(today) : .null
+                }
+                written.append(.object(entry))
+            }
+            guard found else { throw MoveRefused(sentence: self.words.callIt("mac.move_gone")) }
+
+            let held = (Self.plainNumber(record["paidAmount"]) ?? 0)
+            var base: Double?
+            if case .number(let b)? = record["instalmentBase"] { base = b }
+            let totals = try await engine.collectionTotals(
+                price: (Self.plainNumber(record["price"]) ?? 0), paidAmount: held,
+                instalments: written, instalmentBase: base)
+            record["instalments"] = .array(written)
+            record["paidAmount"] = .number(totals.paidAmount)
+            record["paymentStatus"] = .string(totals.paymentStatus)
+            if !collected && totals.paidAmount >= held {
+                self.moveNotices = [self.words.callIt("mac.plan_cash_stays")]
+            }
+            return OneOrderEdit(order: .object(record))
+        }
+    }
+
+    /// Take the plan off a job.
+    ///
+    /// The plan goes; the money does not. Cash already collected stays on
+    /// `paidAmount` because it was received — a schedule is an agreement about
+    /// WHEN, not a record of what arrived. `instalmentBase` goes with the plan:
+    /// it is meaningless without one, and a stale base left behind would be
+    /// added to the next plan's collections.
+    func dropPlan(_ id: Order.ID) async {
+        await writeToOneOrder(id, named: words.callIt("common.remove")) { order, _, _ in
+            guard case .object(var record) = order else {
+                throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
+            }
+            record["instalments"] = .null
+            record["instalmentBase"] = .null
+            return OneOrderEdit(order: .object(record))
+        }
+    }
+
+    /// What one job still owes, by the rule every other owed figure uses.
+    ///
+    /// Asked of the engine rather than subtracted here: `orderOwedRaw` takes
+    /// gift cards and credit notes off as well as the cash, and it is the same
+    /// figure the masthead and the Spending screen already show — a second
+    /// subtraction would give the plan sheet an opinion of its own about what a
+    /// customer owes.
+    func owedOn(_ id: Order.ID) async -> Double? {
+        guard let engine,
+              let raw = orderRows.first(where: { Self.recordId($0) == id }) else { return nil }
+        return try? await engine.owedRaw(order: raw)
+    }
+
     // MARK: - What the customer thought
 
     /// The job whose rating is being written down, or nil.

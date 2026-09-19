@@ -1031,6 +1031,16 @@ final class Words {
         "mac.deposit_not_affected": ["en": "That order no longer looks affected — its figures may have been corrected already.",
                                      "ar": "لم يعد هذا الطلب يبدو متأثراً — ربما صُححت أرقامه سلفاً."],
         "mac.review":               ["en": "Review", "ar": "مراجعة"],
+        // What a plan IS, said before one is offered. "Generate plan" on an
+        // empty sheet is a button whose result the shop learns by pressing it.
+        "mac.plan_explains": ["en": "Three payments, a month apart, covering what this job still owes. Each is collected here as it arrives.",
+                              "ar": "ثلاث دفعات، بين كل واحدة شهر، تغطي ما تبقى على هذا الطلب. تُسجَّل كل دفعة هنا عند استلامها."],
+        // Said when a collected row is put back: the ROW changes, the cash does
+        // not. `collectionTotals` never lowers `paidAmount` — it can have grown
+        // since the plan was made, and taking it down would destroy money
+        // recorded at the counter.
+        "mac.plan_cash_stays": ["en": "The payment is no longer marked collected. Money already recorded on the job stays — change that on the payment sheet.",
+                                "ar": "لم تعد الدفعة مؤشَّرة كمستلمة. المبلغ المسجَّل على الطلب يبقى كما هو — تُعدّله من نافذة الدفع."],
         "mac.rating_out_of_range": ["en": "A rating is one to five stars.",
                                     "ar": "التقييم من نجمة إلى خمس نجوم."],
         "mac.licence_set":   ["en": "Record Licence",   "ar": "تسجيل الترخيص"],

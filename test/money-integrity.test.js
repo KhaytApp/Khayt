@@ -65,54 +65,60 @@ test('voided invoices are excluded everywhere revenue is totalled', () => {
 
 test('saving instalments cannot destroy a recorded deposit', () => {
   // paidAmount is the authoritative cash figure and holds the deposit from
-  // order creation. The plan generator builds a schedule with depositAmount:0
-  // spanning the full price, so a freshly generated plan has instPaid = 0 —
-  // assigning it over paidAmount erased a 500 deposit on save, silently.
+  // order creation. The plan generator builds a schedule with depositAmount:0,
+  // so a freshly generated plan has nothing collected — assigning that over
+  // paidAmount erased a 500 deposit on save, silently.
   //
-  // This pinned the exact expression `Math.max(+order.paidAmount || 0, instPaid)`
-  // and so failed when the rule legitimately changed — the plan generator now
-  // builds a schedule covering the BALANCE, so instalment payments have to be
-  // ADDED to the deposit rather than compared against it, or an order paid in
-  // full shows the deposit still outstanding forever.
-  //
-  // But the PROPERTY was right and catching something real: the first version of
-  // that change dropped the Math.max, and `base + instPaid` is lower than
-  // paidAmount whenever cash was taken at the counter and typed straight in — so
-  // it destroyed exactly the money this test is named after. Assert the property.
+  // This test used to pin an expression in renderer/order-flows.js and eval a
+  // slice of that file. The rule is `collectionTotals` in lib/payment-plan.js
+  // now — shared with the macOS app, which has a plan editor of its own — so
+  // the property is asserted against the rule itself, and the renderer is only
+  // checked for still going through it.
+  const { collectionTotals } = require('../lib/payment-plan');
   const src = read('renderer/order-flows.js');
   assert.equal(/^\s*order\.paidAmount = instPaid;\s*$/m.test(src), false,
     'the unconditional overwrite destroyed deposits');
-  assert.match(src, /order\.paidAmount = Math\.max\(\+order\.paidAmount \|\| 0, fromPlan\);/,
-    'paidAmount can move downward again — cash recorded outside the plan is destroyed');
+  assert.match(src, /KhaytPaymentPlan\.collectionTotals\(/,
+    'the renderer must reach the shared rule, not re-derive paidAmount');
 
   // Driven, not just read: the rule must never return less than it was given.
-  const at = src.indexOf('const instBase = draft.instalmentBase;');
-  assert.ok(at > 0, 'the paidAmount rule is gone');
-  const body = src.slice(at, src.indexOf(';\n', src.indexOf('order.paidAmount =', at)) + 1);
-  const rule = new Function('order', 'draft', 'instPaid', `${body}; return order.paidAmount;`);
-  for (const [held, draft, instPaid] of [
-    [1000, { instalmentBase: 1000 }, 0],        // plan made, nothing paid yet
-    [1500, { instalmentBase: 1000 }, 0],        // 500 taken at the counter since
-    [1500, { instalmentBase: 1000 }, 666.67],   // …and one row paid
-    [1000, {}, 0],                              // a legacy plan, nothing paid
-    [2500, {}, 100],                            // a legacy plan, cash beyond it
+  for (const [held, base, collected] of [
+    [1000, 1000, 0],        // plan made, nothing paid yet
+    [1500, 1000, 0],        // 500 taken at the counter since
+    [1500, 1000, 666.67],   // …and one row paid
+    [1000, undefined, 0],   // a legacy plan, nothing paid
+    [2500, undefined, 100], // a legacy plan, cash beyond it
   ]) {
-    assert.ok(rule({ paidAmount: held }, draft, instPaid) >= held,
+    const out = collectionTotals({
+      price: 3000, paidAmount: held, instalmentBase: base,
+      instalments: [{ amount: collected, paid: true }],
+    });
+    assert.ok(out.paidAmount >= held,
       `paidAmount went DOWN from ${held} — recorded cash was destroyed`);
   }
   // And it does add, or the order never settles.
-  assert.equal(rule({ paidAmount: 1000 }, { instalmentBase: 1000 }, 2000), 3000,
-    'a plan covering the balance no longer settles the order');
+  assert.equal(collectionTotals({
+    price: 3000, paidAmount: 1000, instalmentBase: 1000,
+    instalments: [{ amount: 2000, paid: true }],
+  }).paidAmount, 3000, 'a plan covering the balance no longer settles the order');
 });
 
 test('"fully paid" is decided against the order price, not the instalment total', () => {
   // Instalment amounts are freely editable, so a partial plan (two 100 rows on
   // a 2,000 order) marked paid reported the whole order settled — and
   // paymentStatus is what the payment_received / paid webhooks carry.
-  const src = read('renderer/order-flows.js');
-  assert.equal(/instPaid >= totalInst \? 'paid'/.test(src), false,
-    'comparing against the instalment total lets a partial plan report as settled');
-  assert.match(src, /const owed = \+order\.price \|\| 0;/, 'the comparison must anchor on the order price');
+  const { collectionTotals } = require('../lib/payment-plan');
+  const partial = collectionTotals({
+    price: 2000, paidAmount: 0,
+    instalments: [{ amount: 100, paid: true }, { amount: 100, paid: true }],
+  });
+  assert.equal(partial.paymentStatus, 'partial',
+    'a plan that does not cover the price cannot report the order settled');
+  const settled = collectionTotals({
+    price: 2000, paidAmount: 0,
+    instalments: [{ amount: 2000, paid: true }],
+  });
+  assert.equal(settled.paymentStatus, 'paid');
 });
 
 test('the paid/partial decision behaves correctly at the boundary', () => {

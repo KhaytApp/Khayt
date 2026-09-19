@@ -42,6 +42,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   customer pane now shows what they have earned, what they have spent and what
   is left, and redeems it into a gift card in one step. It is in Settings →
   Payments, off unless the shop turns it on.
+- **(Mac) A customer paying over months can be set up and collected here.**
+  Khayt has always been able to agree a payment plan — three payments, a month
+  apart, on what a job still owes. This app could read one: the Spending screen
+  already ages each instalment from its own due date rather than the order's.
+  It could not write one and could not collect one, so a shop that agreed a
+  plan on the phone had to open the Windows app to record it. There is a
+  "Payment plan" item on a job now, beside Record payment: what a plan would
+  be and what the job owes before you make one, then the payments in the order
+  they fall due, each collected with one click. Taking a plan off a job leaves
+  the money, because the money arrived.
 
 - **(Mac) A job going out the door can be labelled here.** The filament shelf
   could be labelled from this app and a parcel could not, so a box leaving the
