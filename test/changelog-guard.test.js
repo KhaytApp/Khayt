@@ -105,3 +105,66 @@ test('the Mac tests, build script and manifest are not shipped code', () => {
     assert.equal(isWatched(file), false, `${file} should not demand a changelog line`);
   }
 });
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * THE FILE ITSELF, not just the rule that asks for an entry.
+ *
+ * A rebase whose CHANGELOG conflict was resolved by keeping both sides put a
+ * SECOND `## [3.8.0]` heading — with the released section's whole summary —
+ * between `[Unreleased]` and the 117 entries below it. Nothing failed. The
+ * entries were still in the file, still in order, still readable; they had
+ * simply stopped belonging to `[Unreleased]`, so the Mac's next cut would have
+ * found its notes empty and written a release with none.
+ *
+ * `check-changelog.js` could not see it: it asks whether a PR touched the file,
+ * not what the file says. These read the file.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const { readFileSync } = require('node:fs');
+const { join } = require('node:path');
+
+/** Every `## [version]` heading, in the order they appear. */
+function headings() {
+  const text = readFileSync(join(__dirname, '..', 'CHANGELOG.md'), 'utf8');
+  return text.split('\n')
+    .map((line) => /^## \[([^\]]+)\]/.exec(line))
+    .filter(Boolean)
+    .map((m) => m[1]);
+}
+
+test('no version has two sections in the changelog', () => {
+  const seen = new Map();
+  for (const version of headings()) seen.set(version, (seen.get(version) || 0) + 1);
+  const twice = [...seen].filter(([, n]) => n > 1).map(([v, n]) => `${v} × ${n}`);
+  assert.deepEqual(twice, [], `a version is written twice — the entries under the \
+first copy belong to whatever section precedes it, and the next cut will not \
+find them:\n  ${twice.join('\n  ')}`);
+});
+
+test('[Unreleased] is the first section, and there is exactly one', () => {
+  // Two release lines share it — Electron's and the Mac's — so an entry that
+  // falls out of it falls out of BOTH their notes.
+  const all = headings();
+  assert.equal(all.filter((v) => v === 'Unreleased').length, 1, 'expected one [Unreleased]');
+  assert.equal(all[0], 'Unreleased', '[Unreleased] must be the first section');
+});
+
+test('every released section has entries under it', () => {
+  // An empty section is a cut that wrote its notes from an empty [Unreleased]
+  // — which is exactly what the duplicate heading above would have produced.
+  //
+  // Two sections carry prose and no entries ON PURPOSE, and both say why in
+  // their own text: a release candidate that is `beta.19` under another name
+  // and changes no behaviour, and the last 2.0.x patch, whose notes live in
+  // GitHub Releases. Named here rather than pattern-matched, so a third one
+  // has to be argued for.
+  const PROSE_ONLY = new Set(['3.6.0-rc.1', '2.0.16']);
+  const text = readFileSync(join(__dirname, '..', 'CHANGELOG.md'), 'utf8');
+  const parts = text.split(/^## \[/m).slice(1);
+  const empty = parts
+    .map((part) => ({ name: part.slice(0, part.indexOf(']')), body: part }))
+    .filter(({ name, body }) => name !== 'Unreleased' && !PROSE_ONLY.has(name)
+                                && !/^- /m.test(body))
+    .map(({ name }) => name);
+  assert.deepEqual(empty, [], `released sections with no entries: ${empty.join(', ')}`);
+});
