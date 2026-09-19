@@ -5355,16 +5355,37 @@
    ],
    "purchases": [
     {
-     "date": "2026-07-18",
+     "id": "PCH-sample01",
+     "date": "2026-05-09",
      "amount": 640,
-     "item": "4 spools PETG",
-     "notes": ""
+     "item": "8 spools Sunlu PETG",
+     "notes": "",
+     "quantity": 8,
+     "unit": "spool",
+     "materialType": "Sunlu PETG",
+     "unitPrice": 80
     },
     {
+     "id": "PCH-sample02",
+     "date": "2026-07-18",
+     "amount": 510,
+     "item": "6 spools Sunlu PETG",
+     "notes": "",
+     "quantity": 6,
+     "unit": "spool",
+     "materialType": "Sunlu PETG",
+     "unitPrice": 85
+    },
+    {
+     "id": "PCH-sample03",
      "date": "2026-08-22",
      "amount": 310,
-     "item": "2 spools PLA+",
-     "notes": ""
+     "item": "5 kg PLA+ 2.0, loose",
+     "notes": "Bought by weight this time",
+     "quantity": 5,
+     "unit": "kg",
+     "materialType": "PLA+ 2.0",
+     "unitPrice": 62
     }
    ]
   },
@@ -5379,10 +5400,15 @@
    "priceList": [],
    "purchases": [
     {
+     "id": "PCH-sample04",
      "date": "2026-09-05",
      "amount": 120,
      "item": "200 mailing bags",
-     "notes": ""
+     "notes": "Order #4471",
+     "quantity": 200,
+     "unit": "piece",
+     "materialType": "",
+     "unitPrice": null
     }
    ]
   },

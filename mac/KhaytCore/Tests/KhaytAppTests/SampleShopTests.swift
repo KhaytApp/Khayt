@@ -529,6 +529,25 @@ extension SampleShopTests {
                 "every sample supplier quotes, so the ordinary contact-only one is never drawn")
         #expect(suppliers.contains { $0.totalSpent > 0 },
                 "nothing has been bought from anybody, so the money column is all dashes")
+
+        // ── THE CASE `supplier-prices` EXISTS FOR ─────────────────────────
+        //
+        // The same material bought two ways: spools, then loose by the
+        // kilogram. Comparing those two figures says the shop's PETG got
+        // cheaper when it did nothing of the sort, and a sample that cannot
+        // reach the case has never drawn the card that handles it.
+        let log = suppliers.flatMap(\.purchases)
+        #expect(!log.isEmpty, "no purchase has ever been logged, so the history sheet is empty")
+        let units = Set(log.map(\.unit))
+        #expect(units.count > 1, "every sample purchase is counted the same way")
+        let byMaterial = Dictionary(grouping: log.filter { !$0.materialType.isEmpty },
+                                    by: \.materialType)
+        #expect(byMaterial.values.contains { $0.count > 1 },
+                "nothing was bought twice, so no price can be compared with an earlier one")
+        #expect(log.contains { $0.materialType.isEmpty },
+                "every sample purchase names a material, so the untagged case is never drawn")
+        #expect(log.contains { $0.unitPrice == nil },
+                "every sample purchase carries a unit price, so the one that does not is never drawn")
         #expect(suppliers.contains { $0.totalSpent == 0 },
                 "everything has been bought from somebody, so the dash is never drawn")
         #expect(suppliers.contains { $0.leadDays != nil },

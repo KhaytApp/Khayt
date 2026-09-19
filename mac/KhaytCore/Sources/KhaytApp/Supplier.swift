@@ -33,9 +33,66 @@ struct Supplier: Identifiable, Hashable, Sendable {
     /// What this supplier quotes, per kilogram, per material.
     var priceList: [Quote]
 
+    /// What has been bought from it, newest first — the log the other app
+    /// keeps and this one can now add to.
+    let purchases: [Purchase]
+
     /// How many purchases have been logged against it, and what they came to.
-    let purchaseCount: Int
-    let totalSpent: Double
+    var purchaseCount: Int { purchases.count }
+    var totalSpent: Double {
+        (purchases.reduce(0) { $0 + $1.amount } * 100).rounded() / 100
+    }
+
+    /// One thing bought, as the book records it.
+    ///
+    /// The unit is carried and never assumed: `lib/supplier-prices.js` compares
+    /// prices only within a unit family, because a spool of PLA bought for 75
+    /// and a kilogram of PLA bought for 22 are not the same purchase getting
+    /// cheaper.
+    struct Purchase: Identifiable, Hashable, Sendable {
+        let id: String
+        let date: String
+        let amount: Double
+        let item: String
+        let notes: String
+        let quantity: Double
+        let unit: String
+        let materialType: String
+        /// Nil where the shop did not say. NOT the amount divided by the
+        /// quantity: that division is the rule's to make, and writing a figure
+        /// the shop did not give turns a guess into a fact in its own book.
+        let unitPrice: Double?
+
+        /// The second line of a row: what it was, in what unit, and the note.
+        var said: String? {
+            var parts: [String] = []
+            if !materialType.isEmpty { parts.append(materialType) }
+            if quantity > 0, !unit.isEmpty {
+                let n = quantity == quantity.rounded()
+                    ? String(Int(quantity)) : String(format: "%.2f", quantity)
+                parts.append("\(n) \(unit)")
+            }
+            if !notes.isEmpty { parts.append(notes) }
+            return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        }
+
+        @MainActor
+        init?(row: JSONValue) {
+            guard case .object(let o) = row else { return nil }
+            // A log written before purchases carried ids still reads: the id is
+            // only needed to tell two rows apart on screen.
+            self.id = Shop.plainString(o["id"]) ?? UUID().uuidString
+            self.date = Shop.plainString(o["date"]) ?? ""
+            self.amount = Shop.plainNumber(o["amount"]) ?? 0
+            self.item = Shop.plainString(o["item"]) ?? ""
+            self.notes = Shop.plainString(o["notes"]) ?? ""
+            self.quantity = Shop.plainNumber(o["quantity"]) ?? 1
+            self.unit = Shop.plainString(o["unit"]) ?? ""
+            self.materialType = Shop.plainString(o["materialType"]) ?? ""
+            let priced = Shop.plainNumber(o["unitPrice"]) ?? 0
+            self.unitPrice = priced > 0 ? priced : nil
+        }
+    }
 
     /// A quoted rate: a material, and what a kilo of it costs.
     struct Quote: Identifiable, Hashable, Sendable {
@@ -58,8 +115,7 @@ struct Supplier: Identifiable, Hashable, Sendable {
     /// A new one, before it has been saved.
     static func blank() -> Supplier {
         Supplier(id: "", name: "", category: "other", phone: "", leadDays: nil,
-                 website: "", notes: "", priceList: [],
-                 purchaseCount: 0, totalSpent: 0)
+                 website: "", notes: "", priceList: [], purchases: [])
     }
 
     @MainActor
@@ -88,20 +144,15 @@ struct Supplier: Identifiable, Hashable, Sendable {
             self.priceList = []
         }
         if case .array(let bought)? = o["purchases"] {
-            self.purchaseCount = bought.count
-            self.totalSpent = bought.reduce(0) { sum, p in
-                guard case .object(let row) = p else { return sum }
-                return sum + (Shop.plainNumber(row["amount"]) ?? 0)
-            }
+            self.purchases = bought.compactMap(Purchase.init(row:))
         } else {
-            self.purchaseCount = 0
-            self.totalSpent = 0
+            self.purchases = []
         }
     }
 
     private init(id: String, name: String, category: String, phone: String,
                  leadDays: Int?, website: String, notes: String, priceList: [Quote],
-                 purchaseCount: Int, totalSpent: Double) {
+                 purchases: [Purchase]) {
         self.id = id
         self.name = name
         self.category = category
@@ -110,8 +161,7 @@ struct Supplier: Identifiable, Hashable, Sendable {
         self.website = website
         self.notes = notes
         self.priceList = priceList
-        self.purchaseCount = purchaseCount
-        self.totalSpent = totalSpent
+        self.purchases = purchases
     }
 
     /// What a save should put into the book, WITHOUT the fields this app does

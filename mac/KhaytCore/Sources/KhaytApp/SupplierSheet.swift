@@ -81,6 +81,17 @@ struct SuppliersCard: View {
                     Button(shop.words.callIt("common.edit")) {
                         shop.editingSupplier = supplier
                     }
+                    Button(shop.words.callIt("sup.log_purchase")) {
+                        shop.loggingPurchaseFor = supplier
+                    }
+                }
+                // Reading the log is not a write, so it does not wait on
+                // `canMoveJobs`: a read-only book can still say what it paid.
+                Button(shop.words.callIt("sup.history")) {
+                    shop.showingHistoryFor = supplier
+                }
+                if shop.canMoveJobs {
+                    Divider()
                     Button(shop.words.callIt("common.delete"), role: .destructive) {
                         Task { await shop.deleteSupplier(supplier.id) }
                     }
