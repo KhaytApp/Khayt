@@ -105,11 +105,31 @@ test('clientsOverRedeemed exists and is exported to the app', () => {
 });
 
 test('it needs no stored history — redeemed > earned is the whole condition', () => {
-  const src = code('renderer/clients.js');
-  const at = src.indexOf('function clientsOverRedeemed()');
-  const body = src.slice(at, at + 800);
-  assert.match(body, /if \(redeemed <= 0\) continue;/, 'clients who never redeemed are walked anyway');
-  assert.match(body, /redeemed > earned/, 'the condition changed');
+  // The detector moved into `lib/loyalty.js` with the sum it compares against,
+  // so the macOS app can answer the same question. This used to read the
+  // renderer's source for two expressions; it drives the rule instead, which
+  // is what those two expressions were standing in for.
+  require('../lib/order-money.js');
+  require('../lib/order-status.js');
+  require('../lib/tax.js');
+  const { overRedeemed } = require('../lib/loyalty.js');
+  const settings = { loyaltyEnabled: true, loyaltyPointsPerUnit: 1 };
+  const orders = [{ id: 'a', clientId: 'c1', status: 'completed', price: 100, date: '2026-01-01' }];
+  const clients = [{ id: 'c1', name: 'Acme' }, { id: 'c2', name: 'Beta' }];
+
+  // Nothing redeemed: not walked, not reported — no stored history required.
+  assert.deepEqual(overRedeemed({ orders, ledger: [], clients, settings }), []);
+
+  // Redeemed beyond what is now earned: reported, with the shortfall.
+  const ledger = [{ clientId: 'c1', type: 'redeem', points: 250 }];
+  const out = overRedeemed({ orders, ledger, clients, settings });
+  assert.equal(out.length, 1, 'the over-redeemed client is not reported');
+  assert.equal(out[0].id, 'c1');
+  assert.equal(out[0].over, 150);
+
+  // And a client who spent less than they earned is not an accusation.
+  const fine = [{ clientId: 'c1', type: 'redeem', points: 50 }];
+  assert.deepEqual(overRedeemed({ orders, ledger: fine, clients, settings }), []);
 });
 
 /* ── the report is wired, and says rather than does ────────────────────── */

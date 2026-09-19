@@ -1016,6 +1016,15 @@ final class Words {
         // grammatical, translated, and the wrong sentence.
         "mac.logo_accepts":  ["en": "PNG, JPEG, GIF or WebP, under 1 MB. It is kept inside the book, so it travels with every backup.",
                               "ar": "PNG أو JPEG أو GIF أو WebP، أقل من 1 ميغابايت. يُحفظ داخل الدفتر، فينتقل مع كل نسخة احتياطية."],
+        // The two numbers a rewards programme actually runs on. Khayt's own
+        // catalogue names the tiers and the switch but not these — its settings
+        // screen labels them in the markup — so they are this app's words.
+        "mac.points_per_unit": ["en": "Points per unit spent",
+                                "ar": "النقاط لكل وحدة إنفاق"],
+        "mac.points_worth":    ["en": "Each point is worth",
+                                "ar": "قيمة النقطة الواحدة"],
+        "mac.points_explains": ["en": "Points are earned on what the shop keeps — after tax, credit notes and anything written off — and are spent as store credit.",
+                                "ar": "تُحتسب النقاط على ما يبقى للورشة فعلياً — بعد الضريبة وإشعارات الدائن وما شُطب — وتُصرف كرصيد لدى الورشة."],
         "mac.rating_out_of_range": ["en": "A rating is one to five stars.",
                                     "ar": "التقييم من نجمة إلى خمس نجوم."],
         "mac.licence_set":   ["en": "Record Licence",   "ar": "تسجيل الترخيص"],

@@ -926,6 +926,82 @@ public actor KhaytEngine {
         }
     }
 
+    // MARK: - Points a customer has earned
+
+    /// What a customer has earned, what they have spent, and what is left.
+    ///
+    /// ── WHY THE THREE COME BACK TOGETHER ──────────────────────────────────
+    ///
+    /// Asking for them one at a time would walk the whole book three times,
+    /// and — worse — could answer from three different readings of it if a
+    /// write landed between two of the calls. A balance that disagrees with
+    /// its own parts is the one thing a customer will notice.
+    ///
+    /// Every exclusion behind `earned` is the shared rule's: a voided order is
+    /// not a sale, nor is a personal print or one refunded by a credit note,
+    /// points are earned on the value the shop KEEPS rather than the tax it
+    /// collects, and orders priced in different currencies are converted
+    /// rather than added together. Four times the real figure, between them.
+    public func loyalty(orders: [JSONValue], ledger: [JSONValue], clientId: String,
+                        settings: [String: JSONValue], clients: [JSONValue]) throws -> LoyaltyStanding {
+        try runtime.call2("""
+        (function () {
+          var L = globalThis.KhaytLoyalty;
+          var arg = { orders: ARG0, clientId: ARG2, settings: ARG3, clients: ARG4 };
+          var tier = L.tierFor(arg);
+          var earned = L.earnedBy(arg);
+          var spent = L.redeemedBy(ARG1, ARG2);
+          return {
+            earned: earned,
+            redeemed: spent,
+            available: Math.max(0, earned - spent),
+            tier: (tier && tier.name) ? String(tier.name) : null,
+            multiplier: (tier && +tier.pointsMultiplier) || 1,
+          };
+        })()
+        """, [.array(orders), .array(ledger), .string(clientId),
+              .object(settings), .array(clients)], as: LoyaltyStanding.self)
+    }
+
+    /// Where a customer stands in the programme.
+    public struct LoyaltyStanding: Decodable, Sendable, Equatable {
+        public let earned: Int
+        public let redeemed: Int
+        /// Earned less spent, never below zero — correcting an over-award
+        /// lowers what somebody has earned, and a balance cannot go negative.
+        public let available: Int
+        /// The tier's own name, for showing. Nil when the shop writes no tiers.
+        public let tier: String?
+        public let multiplier: Double
+    }
+
+    /// Turn points into store credit — as records, not as writes.
+    ///
+    /// Two records come back and the caller writes BOTH or neither: the gift
+    /// card the customer spends, and the ledger row that stops the same points
+    /// being spent again next month. Store credit goes through the gift-card
+    /// rail Khayt already has rather than touching an order's money.
+    public func redeemLoyalty(clientId: String, clientName: String, points: Int,
+                              rate: Double, code: String, cardId: String,
+                              entryId: String, now: String) throws -> Redemption {
+        let arg: [String: JSONValue] = [
+            "clientId": .string(clientId), "clientName": .string(clientName),
+            "points": .number(Double(points)), "rate": .number(rate),
+            "code": .string(code), "cardId": .string(cardId),
+            "entryId": .string(entryId), "ts": .string(now),
+        ]
+        return try runtime.call("KhaytLoyalty", "redemption", [arg], as: Redemption.self)
+    }
+
+    /// The two records a redemption is.
+    public struct Redemption: Decodable, Sendable {
+        public let ok: Bool
+        /// 'no_points' when there is nothing to redeem.
+        public let reason: String?
+        public let card: JSONValue?
+        public let entry: JSONValue?
+    }
+
     // MARK: - Splitting a job
 
     /// Divide price, deposit and credit notes across machines by cost weight.

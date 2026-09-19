@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytCore
 
 /// The shop's customers, and what each of them owes.
 struct CustomersTable: View {
@@ -141,6 +142,13 @@ struct CustomerInspector: View {
     @State private var newKind = "call"
     @State private var newNote = ""
 
+    /// Where this customer stands in the rewards programme. Held in state
+    /// because the sum runs in the engine, which is an actor — a view cannot
+    /// ask it a question in the middle of drawing.
+    @State private var standing: KhaytEngine.LoyaltyStanding?
+    @State private var redeeming = false
+    @State private var problem: String?
+
     var body: some View {
         if let person = shop.selectedCustomer {
             ScrollView {
@@ -215,6 +223,10 @@ struct CustomerInspector: View {
                             DetailLine(shop.words.callIt("mac.past_due"), "\(person.overdueCount)", warn: true)
                         }
                     }
+                    if shop.loyaltyOn, standing != nil {
+                        LayerRule()
+                        loyaltySection(person)
+                    }
                     LayerRule()
                     // What follows this customer into every job, and what has
                     // been said to them. Only for someone written down: a
@@ -283,8 +295,66 @@ struct CustomerInspector: View {
                 }
                 .padding(16)
             }
+            // Asked again whenever the selection moves, and after a
+            // redemption: a balance that still reads as it did before the
+            // points were spent is the one thing a customer will notice.
+            .task(id: person.id) {
+                problem = nil
+                standing = await shop.loyalty(of: person.id)
+            }
         } else {
             EmptyHere(title: shop.words.callIt("mac.no_customer"), message: shop.words.callIt("mac.no_customer_hint"), mark: .clients)
+        }
+    }
+
+    /// WHAT THEY HAVE EARNED.
+    ///
+    /// Drawn only when the shop runs a programme at all — a points line on a
+    /// customer who earns none is a screen inventing something the shop never
+    /// agreed to. Every figure is `lib/loyalty.js`'s; this app adds none of
+    /// them.
+    ///
+    /// Pulled out of the inspector's body rather than written inline: that
+    /// body is long enough that adding a branch to it made the Swift compiler
+    /// give up type-checking it outright.
+    @ViewBuilder
+    private func loyaltySection(_ person: Customer) -> some View {
+        // NOT `if let standing` — the shorthand binding of a @State property
+        // inside a ViewBuilder crashes the Swift 6.4 compiler outright
+        // (an assertion in TypeCheckDecl, no diagnostic, no line). Bound to a
+        // name of its own it compiles.
+        if let held = standing {
+            DetailSection(shop.words.callIt("loyalty.points")) {
+                // What is LEFT is the figure a customer asks about; what they
+                // have spent only explains why it is not what they earned.
+                DetailLine(shop.words.callIt("loyalty.points"),
+                           "\(held.available)", strong: held.available > 0)
+                if held.redeemed > 0 {
+                    DetailLine(shop.words.callIt("inst.paid"),
+                               "\(held.redeemed)", dim: true)
+                }
+                if let tier = held.tier, !tier.isEmpty {
+                    DetailLine(shop.words.callIt("set.loyalty"), tier, dim: true)
+                }
+                if shop.canMoveJobs {
+                    Button(shop.words.callIt("loyalty.redeem_btn")) {
+                        Task {
+                            redeeming = true
+                            problem = await shop.redeemPoints(person.id)
+                            standing = await shop.loyalty(of: person.id)
+                            redeeming = false
+                        }
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                    // Nothing to redeem is said by the button being unavailable,
+                    // not by a message after it was pressed.
+                    .disabled(held.available <= 0 || redeeming)
+                }
+                if let said = problem {
+                    Text(said).font(.caption).foregroundStyle(.secondary)
+                }
+            }
         }
     }
 

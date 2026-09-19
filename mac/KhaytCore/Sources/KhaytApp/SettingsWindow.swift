@@ -439,6 +439,12 @@ struct PaymentsPane: View {
         var bankName = "", accountHolder = "", iban = ""
         var accepted: Set<String> = []
         var paymentInstructions = ""
+        /// The rewards programme. A shop working only on this Mac could never
+        /// turn it on: the switch was in the other app, so its customers'
+        /// points were a screen it could not reach.
+        var loyaltyEnabled = false
+        var loyaltyPointsPerUnit = 1.0
+        var loyaltyRedeemRate = 0.01
 
         @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
             let r = SettingsReader(settings: settings)
@@ -446,14 +452,27 @@ struct PaymentsPane: View {
             if case .array(let list)? = settings["acceptedPayments"] {
                 accepted = Set(list.compactMap(Shop.plainString))
             }
+            // The rule's own defaults when the shop has set none — a point per
+            // unit, a hundred points to the unit — so the pane opens showing
+            // what a redemption would actually be worth rather than zero.
+            var perUnit = 1.0
+            if case .number(let n)? = settings["loyaltyPointsPerUnit"], n > 0 { perUnit = n }
+            var rate = 0.01
+            if case .number(let n)? = settings["loyaltyRedeemRate"], n > 0 { rate = n }
+            var on = false
+            if case .bool(true)? = settings["loyaltyEnabled"] { on = true }
             return Draft(bankName: r.text("bankName"), accountHolder: r.text("accountHolder"), iban: r.text("iban"),
-                         accepted: accepted, paymentInstructions: r.text("paymentInstructions"))
+                         accepted: accepted, paymentInstructions: r.text("paymentInstructions"),
+                         loyaltyEnabled: on, loyaltyPointsPerUnit: perUnit, loyaltyRedeemRate: rate)
         }
         @MainActor func form() -> [String: JSONValue] {
             ["bankName": .string(bankName), "accountHolder": .string(accountHolder), "iban": .string(iban),
              // In Khayt's own order, not the set's: the invoice lists them.
              "acceptedPayments": .array(Shop.paymentMethods.filter(accepted.contains).map(JSONValue.string)),
-             "paymentInstructions": .string(paymentInstructions)]
+             "paymentInstructions": .string(paymentInstructions),
+             "loyaltyEnabled": .bool(loyaltyEnabled),
+             "loyaltyPointsPerUnit": .number(loyaltyPointsPerUnit),
+             "loyaltyRedeemRate": .number(loyaltyRedeemRate)]
         }
     }
 
@@ -480,6 +499,26 @@ struct PaymentsPane: View {
                 }
                 Section(shop.words.callIt("set.payment_instructions")) {
                     TextEditor(text: $draft.paymentInstructions).frame(height: 70).font(.body)
+                }
+                Section(shop.words.callIt("set.loyalty")) {
+                    Toggle(shop.words.callIt("set.loyalty_enabled"), isOn: $draft.loyaltyEnabled)
+                    // The two numbers only mean anything once it is on, and a
+                    // pane that asks for them anyway is asking about a
+                    // programme the shop has not agreed to run.
+                    if draft.loyaltyEnabled {
+                        row(shop.words.callIt("mac.points_per_unit")) {
+                            TextField("", value: $draft.loyaltyPointsPerUnit,
+                                      format: .number.precision(.fractionLength(0...2)))
+                                .monospacedDigit()
+                        }
+                        row(shop.words.callIt("mac.points_worth")) {
+                            TextField("", value: $draft.loyaltyRedeemRate,
+                                      format: .number.precision(.fractionLength(0...4)))
+                                .monospacedDigit()
+                        }
+                        Text(shop.words.callIt("mac.points_explains"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
             .formStyle(.grouped)

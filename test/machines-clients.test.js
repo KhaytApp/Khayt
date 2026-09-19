@@ -18,6 +18,13 @@ test('machineServiceStatus marks service due when interval exceeded', () => {
 
 test('getClientTier returns highest qualifying loyalty tier', () => {
   require('../renderer/currency.js');
+  // The tier rule moved into lib/loyalty.js so the macOS app could read it
+  // too, and index.html loads that file as a <script> — requiring it here does
+  // the same thing, so this exercises the shared rule rather than finding it
+  // absent and reading null.
+  require('../lib/order-money.js');
+  require('../lib/order-status.js');
+  require('../lib/loyalty.js');
   global.settings = {
     loyaltyEnabled: true,
     loyaltyTiers: [
