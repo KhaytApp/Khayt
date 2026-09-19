@@ -504,6 +504,10 @@ final class Shop {
             // here, and a card issued without its ledger row is points spent
             // twice.
             loyaltyRows = (root["loyaltyLedger"].flatMap { if case .array(let r) = $0 { r } else { nil } }) ?? []
+            // Money an old defect took off the book. Asked once per load: the
+            // answer changes only when the book does, and the list is walked
+            // by a banner that draws on every screen.
+            erasedDeposits = (try? await engine?.erasedDeposits(orders: orderRows)) ?? []
             giftCardStatuses = (try? await engine?.giftCardStatuses(
                 giftCardRows, today: Self.today())) ?? [:]
             wasteLog = Self.decode(root, "wasteLog", as: WasteEntry.self)
@@ -3580,6 +3584,54 @@ final class Shop {
         let heading = words.callIt("lbl.orders")
         guard let html = try? await engine.labelSheet(entries, heading: heading) else { return }
         pendingLabels = LabelSheetRequest(html: html, count: chosen.count)
+    }
+
+    // MARK: - Money an old defect took off the book
+
+    /// Orders whose deposit was erased when their payment plan was saved.
+    ///
+    /// ── WHY THIS APP HAD TO GROW ONE ──────────────────────────────────────
+    ///
+    /// Saving an order that had instalments used to write the collected
+    /// instalment total straight over `paidAmount`, erasing the deposit the
+    /// shop had already taken. The code is fixed; the books written before it
+    /// are not. Khayt has shown a banner about it since the fix — this app
+    /// showed nothing, so a shop working here was chasing customers for money
+    /// they had already handed over and had no way to find out.
+    ///
+    /// Read at load with everything else, because the answer only changes when
+    /// the book does.
+    private(set) var erasedDeposits: [KhaytEngine.ErasedDeposit] = []
+
+    /// What the affected orders are understating by, in total.
+    var depositsUnaccounted: Double {
+        (erasedDeposits.reduce(0) { $0 + $1.lost } * 100).rounded() / 100
+    }
+
+    /// Whether the review sheet is open.
+    var reviewingDeposits = false
+
+    /// Put one order's paid figure back.
+    ///
+    /// Through `writeToOneOrder` like every other money edit, so it takes the
+    /// same ownership check, the same atomic swap and the same undo — a repair
+    /// a shop cannot take back would be a worse thing to offer than none.
+    ///
+    /// The REPAIR is the shared rule's: this app does not decide what the
+    /// figure should be, and the rule refuses an order that no longer looks
+    /// affected, which is what makes a list read a minute ago harmless.
+    func restoreDeposit(_ id: Order.ID) async {
+        await writeToOneOrder(id, named: words.callIt("dep.restore_btn")) { _, engine, root in
+            let out = try await engine.restoreDeposit(orders: Self.rows(root, "printLog"),
+                                                      orderId: id)
+            guard out.ok, let repaired = out.order else {
+                throw MoveRefused(sentence: self.words.callIt("mac.deposit_not_affected"))
+            }
+            // A money figure changing under a shop's feet is exactly what the
+            // activity log is for.
+            return OneOrderEdit(order: repaired,
+                                activity: "\(id) → " + self.words.callIt("dep.restored"))
+        }
     }
 
     // MARK: - What the customer thought

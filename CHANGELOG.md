@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Deposits an old defect took off the book are found here, and put
+  back.** Saving an order that had a payment plan used to erase the deposit
+  already recorded against it, so those orders show less paid than they should
+  and their outstanding balance is too high — a shop chasing customers for
+  money they had handed over. The code was fixed long ago; books written before
+  it were not, and this app said nothing at all while the other one has had a
+  banner about it since. There is a banner now, with what is unaccounted for
+  across the whole book, and a review sheet showing each order's current figure
+  beside what its own record says it should be. Nothing is changed until you
+  ask, one order at a time, and ⌘Z puts it back.
+
 - **(Mac) What can run together on one plate is worked out here.** The
   scheduler answers which printer takes a job, which a shop with one machine
   already knows. What it needs is the other question — what can go in the same
