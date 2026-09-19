@@ -3475,6 +3475,93 @@ tested against both.
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.28] - 2026-09-20
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Twelve changes. The shop's suppliers are the thread through most of them: who
+you buy from, what they quote, what you actually paid, and what that says about
+what a material costs you. The rest are things this app could not do, and four
+faults — two of which were wrong in both apps and had been for a year.
+
+### Added
+
+- **The shop's suppliers can be kept here.** A supplier is not a contact card:
+  its price list is where the price of a drafted purchase order comes from —
+  the quoted rate per kilogram, in preference to dividing a spool's own cost by
+  its weight. This app has READ that list since it learned to draft an order
+  and could not write a line of it, so a shop that had negotiated a better rate
+  had to open the other window, and every order drafted here went on using the
+  old figure.
+
+- **What was bought from a supplier can be written down, and read back.** A
+  purchase log is not an expense log: an expense is what the shop spent, and a
+  purchase is what a PRICE was, kept so the next one can be compared with it.
+  The unit is asked for and never assumed — a spool of PLA bought for 75 and a
+  kilogram bought for 22 are not the same purchase getting cheaper.
+
+- **What each material has actually cost, and whether that has moved.** The
+  shelf already said what the spools on it cost. This says what was paid, when,
+  and to whom, which is what you take to a supplier when you ask for a better
+  rate. Each material appears once per unit it was bought in, never merged;
+  grams and kilograms do become one figure, because they convert exactly, and
+  the row says when it converted.
+
+- **A label this app printed can be scanned back.** Khayt puts a code on every
+  label it prints — a spool gets its own, a parcel gets the order's or, with
+  the cloud connected, the customer's tracking link — and this app could print
+  them and not read one. ⇧⌘S, or Go → Scan a Label: the spool opens, or the job
+  is selected. A barcode scanner is a keyboard, so there is nothing to aim and
+  no button to press.
+
+- **A job can charge for something other than printing.** A design fee,
+  painting, a marketplace's cut. Each line is either an amount or a
+  percentage, and those are different things: the percentage is worked out by
+  the shared rule against the price before extras — after the margin, the
+  discount and the rounding — rather than by this app against something else.
+
+- **The whole book can be taken out as spreadsheets.** One file per collection,
+  in a form a spreadsheet opens. The two exports this app already had answer
+  different questions: redacted JSON for a support thread, and the two files a
+  bookkeeper's software reads. Neither is a shop's own copy of its own work.
+
+- **A receipt suggests what it is.** "Aramex courier to Jeddah" is shipping,
+  "فاتورة كهرباء" is electricity. Offered, never applied: the keyword list is
+  short, and a form that quietly re-filed what you had already chosen would be
+  wrong in your books without saying so.
+
+### Fixed
+
+- **"Export all data (CSV)" was mostly empty columns.** The customer's name,
+  the product's name and price, and what is left on a spool and what it held
+  new — all blank, in every row of every export, because the file was reading
+  field names the app does not write. The orders file was worse than blank: it
+  printed the JOB's name under the heading "Client", so every row said the
+  customer was called "Helmet build". Wrong in both apps, and it looked
+  perfectly well-formed, which is why nobody noticed.
+
+- **The accountant's file named bilingual customers in English only.** The
+  export now takes the name from the customer through the shop's own content
+  languages, the way the other app does, instead of falling back to the name
+  stamped on the order — which is written in English the moment a job is taken.
+  A shop writing its customers in Arabic exported the same quarter under two
+  different sets of names depending on which app it used.
+
+- **A shop with one of something was told "1 1".** Eight counted lines wrote
+  the number into the sentence and then had another put in front of it: "1 1
+  job unrecorded", "1 One job is late", "1 1 quoted price". Only ever wrong at
+  exactly one, which is the number a small shop sees most.
+
+- **Deleting a supplier left spools and orders pointing at nothing.** The other
+  app has always unpointed them; this one dropped the row and nothing else. The
+  name each order was written with is untouched — an invoice records who was
+  billed.
+
+- **Simple mode showed purchase orders it does not have.** The other app hides
+  the whole purchasing surface from a shop set to Simple, and this one showed
+  all of it.
+
 ## [4.0.0-alpha.27] - 2026-09-19
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
