@@ -146,7 +146,24 @@ struct BatchPlannerTests {
         #expect(Shop.voidedIds(rows) == ["A"])
     }
 
-    // MARK: - Wiring
+    @Test("what a plate holds is the rule's number, not a Swift copy of it")
+    func limitsComeFromTheRule() async throws {
+        // 24 hours and 1,000 g were typed into the Swift as well as read from
+        // the packer. Two copies of one constant is one that goes stale.
+        let engine = try KhaytEngine()
+        let limits = try await engine.plateDefaults()
+        #expect(limits.maxHours > 0)
+        #expect(limits.maxGrams > 0)
+
+        // And a plate really is packed to them: a job an hour over the limit
+        // gets a plate of its own.
+        let plan = try await engine.planPlates(jobs: [
+            .init(id: "A", project: "A", hours: limits.maxHours + 1, grams: 10, material: "PLA"),
+        ], maxHours: limits.maxHours, maxGrams: limits.maxGrams)
+        #expect(plan.plates.first?.oversize == true)
+    }
+
+    // MARK: - Wiring    // MARK: - Wiring
 
     @Test("the app actually offers it")
     func theAppReachesTheRule() throws {

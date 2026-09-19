@@ -837,6 +837,35 @@ final class Activator: NSObject, NSApplicationDelegate {
                     await settle()
                 }
             }
+            // THE PLAN, ON A JOB THAT HAS ONE. Not on `orders.first`: a job
+            // with no plan draws the sheet's empty state, which is the half
+            // that was already easy to see. The sample book carries one plan
+            // mid-collection precisely so the rows can be looked at.
+            if let planned = shop.orders.first(where: { !$0.instalments.isEmpty }) {
+                shop.planFor = planned
+                await settle()
+                captureSheet(named: "11b-payment-plan", into: dir)
+                shop.planFor = nil
+                await settle()
+            }
+            // And the empty half, which is a different screen: what a plan
+            // would be, and what the job owes before one exists.
+            if let unplanned = shop.orders.first(where: { $0.instalments.isEmpty && $0.price > 0 }) {
+                shop.planFor = unplanned
+                await settle()
+                captureSheet(named: "11c-payment-plan-empty", into: dir)
+                shop.planFor = nil
+                await settle()
+            }
+            // What can run together on one plate, with the suggestion already
+            // made — the button's own output is the screen worth looking at.
+            shop.planningBatch = true
+            await settle()
+            await shop.planBatch()
+            await settle()
+            captureSheet(named: "26b-batch", into: dir)
+            shop.planningBatch = false
+            await settle()
             shop.takingAJob = true
             await settle()
             captureSheet(named: "14-new-job", into: dir)

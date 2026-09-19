@@ -17,9 +17,18 @@ struct SampleFiguresTests {
         let shop = Shop()
         await shop.load(.sample)
         #expect(shop.orders.count == 42, "the sample lost or gained a job")
-        // What is owed, to the halalah. The figure every design note about this
-        // book was written against.
-        #expect(abs(shop.owed - 52_691.57) < 0.005, "owed is \(shop.owed)")
+        // What is owed, to the halalah.
+        //
+        // It was 52,691.57 for as long as no sample job had a payment plan.
+        // ORD-01011 has one now — three payments covering its balance, the
+        // first of them collected — so the book holds 2,269.18 more cash and
+        // owes exactly that much less. The plan is there so the payment-plan
+        // sheet can be looked at with rows on it; see `SampleShopTests`.
+        //
+        // The figure still belongs here: what this suite guards is that
+        // MEASURED ACTUALS move no money, and a deliberate change to the book
+        // is not that. It moves when somebody means it to and says so.
+        #expect(abs(shop.owed - 50_422.39) < 0.005, "owed is \(shop.owed)")
 
         let facts = try #require(shop.facts, "the dashboard computed nothing")
         #expect(facts.activeCount == 11, "open is \(facts.activeCount)")

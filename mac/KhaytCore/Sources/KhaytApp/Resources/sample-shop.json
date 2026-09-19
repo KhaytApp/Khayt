@@ -645,9 +645,36 @@
    "currency": "SAR",
    "costBasis": 4652.16,
    "paymentStatus": "partial",
-   "paidAmount": 6807.53,
+   "paidAmount": 9076.71,
    "paymentMethod": null,
    "paidAt": "2026-09-17",
+   "instalmentBase": 6807.53,
+   "instalments": [
+    {
+     "id": "INS-01011-1",
+     "amount": 2269.18,
+     "dueDate": "2026-08-25",
+     "note": "",
+     "paid": true,
+     "paidAt": "2026-08-26"
+    },
+    {
+     "id": "INS-01011-2",
+     "amount": 2269.18,
+     "dueDate": "2026-09-24",
+     "note": "",
+     "paid": false,
+     "paidAt": null
+    },
+    {
+     "id": "INS-01011-3",
+     "amount": 2269.17,
+     "dueDate": "2026-10-24",
+     "note": "",
+     "paid": false,
+     "paidAt": null
+    }
+   ],
    "timestamp": "2026-09-01T09:55:00Z",
    "completedAt": null,
    "deliveredAt": null,
@@ -2336,6 +2363,23 @@
     "Silk Gold"
    ]
   },
+  "loyaltyEnabled": true,
+  "loyaltyPointsPerUnit": 1,
+  "loyaltyRedeemRate": 0.01,
+  "loyaltyTiers": [
+   {
+    "name": "Silver",
+    "minOrders": 2,
+    "minSpend": 0,
+    "pointsMultiplier": 1
+   },
+   {
+    "name": "Gold",
+    "minOrders": 3,
+    "minSpend": 0,
+    "pointsMultiplier": 1.5
+   }
+  ],
   "fixedCosts": [
    {
     "name": "Workshop rent",
@@ -5290,7 +5334,30 @@
    "createdAt": "2026-09-02"
   }
  ],
+ "loyaltyLedger": [
+  {
+   "id": "LOY-sample01",
+   "clientId": "CLI-8A5045",
+   "type": "redeem",
+   "points": 5000,
+   "credit": 50,
+   "giftCardCode": "LOYSAMP1",
+   "ts": "2026-08-28T11:05:00.000Z"
+  }
+ ],
  "giftCards": [
+  {
+   "id": "GC-loysample",
+   "code": "LOYSAMP1",
+   "initialBalance": 50,
+   "balance": 50,
+   "issuedTo": "CLI-8A5045",
+   "issuedToName": "KAUST Prototyping Lab",
+   "issuedAt": "2026-08-28T11:05:00.000Z",
+   "expiresAt": null,
+   "redeemedOrders": [],
+   "source": "loyalty"
+  },
   {
    "id": "GC-mtsample01",
    "code": "TUWAIQ24",

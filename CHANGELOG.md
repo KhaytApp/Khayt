@@ -14,6 +14,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   now: nothing was owed and nothing was paid. The customers screen said the
   same thing about a customer whose work was never priced, and now does not.
 
+- **(Mac) The batch planner's weights are whole grams, and say what they are.**
+  A job's line read "2190.6000000000004 g left" — float noise, and a sentence
+  about what is left on a spool borrowed for what a job weighs. It says the
+  weight now, to the gram. What one plate holds also comes from the shared
+  rule rather than a number written into the Mac beside it.
+
 - **(Mac) Deposits an old defect took off the book are found here, and put
   back.** Saving an order that had a payment plan used to erase the deposit
   already recorded against it, so those orders show less paid than they should
@@ -50,6 +56,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   customer pane now shows what they have earned, what they have spent and what
   is left, and redeems it into a gift card in one step. It is in Settings →
   Payments, off unless the shop turns it on.
+
 - **(Mac) A customer paying over months can be set up and collected here.**
   Khayt has always been able to agree a payment plan — three payments, a month
   apart, on what a job still owes. This app could read one: the Spending screen
