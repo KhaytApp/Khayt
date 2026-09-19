@@ -4025,19 +4025,29 @@ final class Shop {
         }
     }
 
-    /// Take a supplier off the list.
+    /// Take a supplier off the list, and unpoint everything that pointed at it.
     ///
-    /// The orders that name it are LEFT ALONE, and that is deliberate: a
-    /// purchase order records who the shop bought from at the time, and tidying
-    /// up a contact list is not permission to rewrite what happened. The order
-    /// keeps the name it was written with — `supplierName` is on the order
-    /// itself, which is why it is there.
+    /// ── WHAT A DELETE HAS TO DO BESIDES DELETING ──────────────────────────
+    ///
+    /// A spool and a purchase order can each carry a `supplierId`, and dropping
+    /// the supplier row on its own leaves both pointing at a record that is not
+    /// there. `renderer/inventory.js` has always nulled those out and relinked
+    /// them on undo; this app dropped the row and nothing else, so a book
+    /// tidied on the Mac came out different from one tidied in the other
+    /// window — and the dangling id is the kind of thing that surfaces months
+    /// later as a screen that cannot draw.
+    ///
+    /// WHAT IS NOT TOUCHED is `supplierName` on the order. That is what the
+    /// shop actually bought from at the time, and tidying a contact list is
+    /// not permission to rewrite what happened — which is why the name is
+    /// written onto the order rather than looked up through the id.
     func deleteSupplier(_ id: String) async {
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
         var removed: [String: JSONValue]?
+        var unlinked: [ChangedRecord] = []
         do {
             try StoreWriter.update(build) { root in
                 var rows = Self.rows(root, "suppliers")
@@ -4046,8 +4056,9 @@ final class Shop {
                 removed = was
                 rows.remove(at: at)
                 root["suppliers"] = .array(rows)
+                unlinked = Self.unpointing(&root, from: id)
             }
-            if let removed { registerSupplierUndo(removed) }
+            if let removed { registerSupplierUndo(removed, relinking: unlinked) }
             await load(source)
             moveNotices = [words.callIt("sup.deleted")]
         } catch {
@@ -4055,8 +4066,51 @@ final class Shop {
         }
     }
 
-    /// Put a deleted supplier back, with its purchase log intact.
-    private func registerSupplierUndo(_ record: [String: JSONValue]) {
+    /// Which collections carry a pointer to a supplier.
+    ///
+    /// The other app's delete walks exactly these two, and a third one growing
+    /// the field on either side is the way this quietly stops being true.
+    static let pointAtSuppliers = ["inventory", "purchaseOrders"]
+
+    /// Null out every `supplierId` that names this supplier, and say what was
+    /// changed so an undo can point them back.
+    ///
+    /// Static and taking `root` so it can be driven by a test with a plain
+    /// book: the write path around it is an atomic swap against a real file,
+    /// which is not a thing a test can assert one field of.
+    static func unpointing(_ root: inout [String: JSONValue],
+                           from id: String) -> [ChangedRecord] {
+        var changed: [ChangedRecord] = []
+        for collection in pointAtSuppliers {
+            var records = rows(root, collection)
+            var touched = false
+            for i in records.indices {
+                guard case .object(var record) = records[i],
+                      plainString(record["supplierId"]) == id else { continue }
+                changed.append(ChangedRecord(collection: collection,
+                                             id: recordId(records[i]) ?? "",
+                                             was: record))
+                // NULL, not absent: the other app writes `= null`, and a field
+                // two apps spell differently is a field that reads differently
+                // depending on which one saved last.
+                record["supplierId"] = .null
+                StoreWriter.stamp(&record)
+                records[i] = .object(record)
+                touched = true
+            }
+            if touched { root[collection] = .array(records) }
+        }
+        return changed
+    }
+
+    /// Put a deleted supplier back, with its purchase log intact — and point
+    /// back at it everything that pointed at it before.
+    ///
+    /// An undo that returned the row and left the spools unlinked would be a
+    /// half-undo, and the half it left out is the half nobody would notice
+    /// until a drafted order was priced without the quote it should have had.
+    private func registerSupplierUndo(_ record: [String: JSONValue],
+                                      relinking unlinked: [ChangedRecord]) {
         guard let undoManager, let build = source.build,
               case .string(let id)? = record["id"] else { return }
         undoManager.setActionName(words.callIt("sup.deleted"))
@@ -4067,6 +4121,21 @@ final class Shop {
                     guard !rows.contains(where: { Self.recordId($0) == id }) else { return }
                     rows.append(.object(record))
                     root["suppliers"] = .array(rows)
+                    for (collection, wanted) in Dictionary(grouping: unlinked, by: \.collection) {
+                        var records = Self.rows(root, collection)
+                        let ids = Set(wanted.map(\.id))
+                        var touched = false
+                        for i in records.indices {
+                            guard case .object(var r) = records[i],
+                                  let rid = Self.recordId(records[i]), ids.contains(rid),
+                                  Self.plainString(r["supplierId"]) == nil else { continue }
+                            r["supplierId"] = .string(id)
+                            StoreWriter.stamp(&r)
+                            records[i] = .object(r)
+                            touched = true
+                        }
+                        if touched { root[collection] = .array(records) }
+                    }
                 }
                 Task { await shop.deleteSupplier(id) }
             } catch {
