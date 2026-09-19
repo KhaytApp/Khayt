@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A shop with one of something was told "1 1".** Eight counted lines
+  wrote the number into the sentence and then had another put in front of it,
+  so the Dashboard said "1 1 job unrecorded", the attention strip said "1 One
+  job is late", and the shelf said "1 1 quoted price". Only ever wrong at
+  exactly one, which is the number a small shop sees most. The Arabic was
+  right the whole time — it is the English that carried a second numeral — and
+  a test now reads every counted line out of the catalogue and fails on any
+  that says the number twice. It caught a ninth on its first day.
+
 - **(Mac) The accountant's file named bilingual customers in English only.**
   The export takes the customer's name from the customer, the way the other app
   does — through the shop's own content languages — instead of falling back to
