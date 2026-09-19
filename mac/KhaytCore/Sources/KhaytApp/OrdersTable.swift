@@ -144,7 +144,18 @@ struct OrdersTable: View {
             .customizationID("due")
 
             TableColumn(shop.words.callIt("common.total"), value: \.price) { job in
-                Text(Money.figure(job.price)).moneyStyle()
+                // ── A JOB WITH NO PRICE HAS NO TOTAL ──────────────────────
+                //
+                // Not 0.00. This shop's book is twenty finished jobs and one
+                // price: a column of `0.00` states twenty totals that were
+                // never set, and 0 is a figure a shop can genuinely charge.
+                // The dash is what every other column here draws when there
+                // is nothing to say.
+                if job.price > 0 {
+                    Text(Money.figure(job.price)).moneyStyle()
+                } else {
+                    Text("—").foregroundStyle(.quaternary)
+                }
             }
             .width(min: 80, ideal: 100)
             .alignment(.trailing)
@@ -328,7 +339,20 @@ private struct Owed: View {
     }
 
     var body: some View {
-        if job.isSettled {
+        // ── "SETTLED" IS A CLAIM THAT MONEY CHANGED HANDS ─────────────────
+        //
+        // `isSettled` is `owed < 0.005`, which is also true of a job that was
+        // never priced — and plenty of shops use Khayt as a print log rather
+        // than a ledger. Photographed against a book of twenty finished,
+        // unpriced jobs, this column read "settled" twenty times: the app
+        // telling a shop it had been paid for work it never charged for.
+        //
+        // Nothing was owed and nothing was paid. That is a dash.
+        if job.price <= 0 {
+            Text("—")
+                .foregroundStyle(.quaternary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        } else if job.isSettled {
             Text(words.callIt("mac.settled"))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
