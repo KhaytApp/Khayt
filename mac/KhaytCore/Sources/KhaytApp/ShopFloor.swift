@@ -676,7 +676,7 @@ struct Inventory: View {
                     // badges, because offering to order something already on
                     // its way is how a shelf ends up with four kilos of
                     // a filament the shop uses twice a year.
-                    if !shop.needsOrdering.isEmpty,
+                    if shop.has("purchasing"), !shop.needsOrdering.isEmpty,
                        shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         ToOrderRow(shop: shop)
                             .padding(.bottom, 14)
@@ -707,7 +707,7 @@ struct Inventory: View {
                     // looking at a thin rack, not one it goes to another
                     // screen to ask. Only when nothing is being searched for,
                     // for the reason the two cards above give.
-                    if !shop.openOrders.isEmpty,
+                    if shop.has("purchasing"), !shop.openOrders.isEmpty,
                        shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         OnOrderCard(shop: shop)
                             .card(padding: 14)
@@ -716,7 +716,7 @@ struct Inventory: View {
                     // Orders asking for about a thousand times what they
                     // should. Report only, and above the shelf because it is
                     // about money already spent rather than filament on it.
-                    if !shop.suspectOrders.isEmpty,
+                    if shop.has("purchasing"), !shop.suspectOrders.isEmpty,
                        shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         SuspectOrdersCard(shop: shop)
                             .card(rail: Khayt.attention, padding: 14)
@@ -743,7 +743,7 @@ struct Inventory: View {
                                         Task { await shop.askForShelfLabels([spool.id]) }
                                     }
                                     Divider()
-                                    if shop.canMoveJobs {
+                                    if shop.canMoveJobs, shop.has("purchasing") {
                                         // ORDER MORE. Drafted, never sent: a
                                         // purchase order is something a shop
                                         // hands a supplier, and an app that
@@ -779,7 +779,8 @@ struct Inventory: View {
                     // Shown even when empty, because a card that appeared only
                     // once there was a supplier would leave a shop no way to
                     // write down its first.
-                    if shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                    if shop.has("purchasing"),
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         SuppliersCard(shop: shop)
                             .card(padding: 14)
                             .padding(.bottom, 14)
@@ -918,7 +919,7 @@ struct ConsumablesCard: View {
             // own reorder figure, not the suggestion beside it, because that
             // suggestion is a forecast and an order is a commitment.
             .contextMenu {
-                if shop.canMoveJobs {
+                if shop.canMoveJobs, shop.has("purchasing") {
                     Button(shop.words.callIt("mac.draft_an_order")) {
                         Task {
                             shop.moveProblem = await shop.draftOrder(

@@ -75,9 +75,17 @@ struct SimpleModeHidesItTests {
 
     @Test("every gated feature has a screen, and every gated screen asks")
     func theGateAndTheShelvesAgree() {
-        // `maintenance` and `zatca` gate parts of a screen rather than a whole
-        // one — named here so adding a third does not pass by being forgotten.
-        let partsOfScreens: Set<String> = ["maintenance", "zatca"]
+        // `maintenance`, `zatca` and `purchasing` gate parts of a screen rather
+        // than a whole one — named here so adding a fourth does not pass by
+        // being forgotten. (It did not: this test is what stopped `purchasing`
+        // being added without being classified.)
+        //
+        // `purchasing` is the shelf's purchase-order surfaces — what is on
+        // order, the over-priced ones, the suppliers card, and the two ways of
+        // raising an order. The shelf itself is not gated: a Simple shop still
+        // has filament, and the other app hides the same parts of the same page
+        // rather than the page.
+        let partsOfScreens: Set<String> = ["maintenance", "zatca", "purchasing"]
         let wholeScreens = Set(Shop.gatedFeatures).subtracting(partsOfScreens)
         let gated = Set([Shop.Shelf.expenses, .reports].compactMap(Shop.gate(of:)))
         #expect(gated == wholeScreens, Comment(rawValue:

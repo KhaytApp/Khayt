@@ -3161,7 +3161,21 @@ final class Shop {
 
     /// Every key the tier registry knows. Asked for by name so a feature this
     /// app has not heard of is simply never gated, rather than silently off.
-    static let gatedFeatures = ["analytics", "expenses", "maintenance", "zatca"]
+    /// ── WHY `purchasing` JOINED THE LIST AND `loyalty` DID NOT ───────────
+    ///
+    /// Both are Professional features in `lib/feature-tiers.js`. What decides
+    /// whether this app gates one is not the tier table but what the OTHER app
+    /// actually shows: gating something Khayt draws for a Simple shop would
+    /// hide it here and nowhere else, which is the same disagreement the modes
+    /// exist to prevent, from the other end.
+    ///
+    /// `renderer/index.html` carries `pro-only` on the purchase-order section,
+    /// the suppliers card and the auto-draft switch — so a Simple shop sees no
+    /// purchase orders there, and saw all of them here. It does NOT carry it on
+    /// the loyalty settings card, so a Simple shop CAN switch the rewards
+    /// programme on in that window; hiding it here would take away something
+    /// the shop has and is using.
+    static let gatedFeatures = ["analytics", "expenses", "maintenance", "purchasing", "zatca"]
 
     /// Does this shop's mode include it? Unknown keys are on: a screen this
     /// app added and forgot to classify must not vanish.
