@@ -34,7 +34,7 @@ struct ScanSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            TextField("KHAYT-SPOOL:…", text: $code)
+            TextField(shop.words.callIt("mac.scan_ph"), text: $code)
                 .textFieldStyle(.roundedBorder)
                 .monospaced()
                 .focused($focused)
