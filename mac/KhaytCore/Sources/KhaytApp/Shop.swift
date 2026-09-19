@@ -2951,9 +2951,57 @@ final class Shop {
         }
     }
 
+    /// A charge that is not printing: a design fee, painting, a marketplace's
+    /// cut.
+    ///
+    /// ── WHY A PERCENTAGE IS A DIFFERENT THING FROM AN AMOUNT ──────────────
+    ///
+    /// `lib/pricing.js` resolves a percentage line against the EXTRAS BASE —
+    /// the job's price before extras — not against the final total, and not
+    /// against the parts' cost. A marketplace charging 6.5% charges it on what
+    /// the customer pays, so the two kinds cannot be collapsed into one number
+    /// here and handed over as an amount: the rule works the percentage out
+    /// AFTER the margin, the discount and the rounding, and it is the only
+    /// thing that knows the base.
+    struct ExtraLine: Identifiable, Hashable, Sendable {
+        /// Made here and kept for the form: a line has no id in the book, and
+        /// two blank rows must still be two rows while somebody is typing.
+        let id = UUID()
+        var label = ""
+        /// Nil for a flat amount; a percentage otherwise.
+        var pct: Double?
+        var amount: Double = 0
+
+        var isPercent: Bool { pct != nil }
+
+        /// The record, as `lib/pricing.js` and `lib/order-new.js` read it.
+        ///
+        /// A percentage line carries no `amount`: the resolved figure is the
+        /// rule's to work out, and writing one here would be a second answer
+        /// free to disagree with it.
+        var row: JSONValue {
+            var o: [String: JSONValue] = [
+                "label": .string(label.trimmingCharacters(in: .whitespacesAndNewlines)),
+            ]
+            if let pct { o["pct"] = .number(max(0, pct)) } else { o["amount"] = .number(max(0, amount)) }
+            return .object(o)
+        }
+
+        /// A line nobody finished typing is not a charge.
+        var isWorthKeeping: Bool {
+            if let pct { return pct > 0 }
+            return amount > 0
+        }
+
+        static func == (a: ExtraLine, b: ExtraLine) -> Bool {
+            a.id == b.id && a.label == b.label && a.pct == b.pct && a.amount == b.amount
+        }
+    }
+
     func previewQuote(baseCost: Double, margin: Double, discountPct: Double,
                       shippingCost: Double, rush: Bool,
-                      agreedAmount: Double = 0, rule: PriceRule = PriceRule()) async -> QuoteTotal? {
+                      agreedAmount: Double = 0, rule: PriceRule = PriceRule(),
+                      extraLines: [ExtraLine] = []) async -> QuoteTotal? {
         guard let engine else { return nil }
         var input: [String: JSONValue] = [
             "baseCost": .number(baseCost), "qty": .number(1),
@@ -2962,6 +3010,10 @@ final class Shop {
             "rushEnabled": .bool(rush), "business": .bool(true),
             "agreedAmount": .number(agreedAmount),
         ]
+        // Half-written rows are dropped rather than sent as zeroes: a zero
+        // amount is a line on the customer's invoice reading "Design fee 0.00".
+        let charges = extraLines.filter(\.isWorthKeeping)
+        if !charges.isEmpty { input["extraLines"] = .array(charges.map(\.row)) }
         for (key, value) in rule.fields { input[key] = value }
         // The shop's own rush percentage, or Khayt's default of twenty-five.
         if rush {
@@ -3023,7 +3075,8 @@ final class Shop {
                      margin: Double, discountPct: Double, shippingCost: Double,
                      deposit: Double, rush: Bool, asQuote: Bool,
                      fromProduct product: Product? = nil,
-                     rule: PriceRule = PriceRule()) -> [String: JSONValue] {
+                     rule: PriceRule = PriceRule(),
+                     extraLines: [ExtraLine] = []) -> [String: JSONValue] {
         var input: [String: JSONValue] = [
             "parts": .array(Self.partRows(parts, spools: spools,
                                           unnamed: words.callIt("mac.a_part"))),
@@ -3036,6 +3089,10 @@ final class Shop {
             "asQuote": .bool(asQuote),
         ]
         if let clientId { input["clientId"] = .string(clientId) }
+        // The charges that are not printing. Dropped when half-written, for
+        // the reason `previewQuote` gives.
+        let charges = extraLines.filter(\.isWorthKeeping)
+        if !charges.isEmpty { input["extraLines"] = .array(charges.map(\.row)) }
         // The last word on the total — rounded to a step, or typed — travels
         // to the rule, which writes how the price was reached on the record.
         for (key, value) in rule.fields { input[key] = value }

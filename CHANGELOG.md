@@ -36,6 +36,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   how they are quoted, and the guard that stops a cell beginning with `=` being
   run as a formula are all the shared rule's.
 
+- **(Mac) A job can charge for something other than printing.** A design fee,
+  painting, a marketplace's cut — Khayt has priced these since 3.0 and this
+  sheet could not carry one, so a shop that charges for anything but the print
+  had to take the job in the other window. There is an "Extra charges" row on a
+  new job now, and each line is either an amount or a **percentage**: those are
+  different things, and the percentage is worked out by the shared rule against
+  the price before extras — after the margin, the discount and the rounding —
+  rather than by this app against something else. A line nobody finished typing
+  is left off the job rather than written down as 0.00.
+
 - **"Export all data (CSV)" was mostly empty columns.** The customer's name,
   the product's name and price, and what is left on a spool and what it held
   new — all blank, in every row of every export, because the file was reading
