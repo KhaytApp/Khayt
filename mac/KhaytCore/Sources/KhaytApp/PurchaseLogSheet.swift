@@ -69,7 +69,7 @@ struct PurchaseLogSheet: View {
                 }
                 GridRow {
                     Text(shop.words.callIt("sup.material_type")).foregroundStyle(.secondary)
-                    TextField("PLA, PETG, Resin…", text: $material)
+                    TextField(shop.words.callIt("mac.material_ph"), text: $material)
                         .textFieldStyle(.roundedBorder)
                 }
                 GridRow {
