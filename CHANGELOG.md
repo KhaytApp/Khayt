@@ -16,9 +16,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   under the rack, where the other app keeps them: who they are, what they sell,
   how long they take, what they have cost, and what they quote. The purchase
   log that app writes is left exactly as it was found — this form writes the
-  fields it shows and nothing else — and deleting a supplier leaves the orders
-  that named it alone, because an order records who the shop bought from at the
-  time.
+  fields it shows and nothing else. Deleting a supplier unpoints the spools and
+  the orders that named it, exactly as the other app does, and leaves the name
+  each order was written with alone: an order records who the shop bought from
+  at the time, which is why that name sits on the order rather than being
+  looked up.
 
 - **(Mac) The shelf offers to order what is low, in one go.** One line at the
   top: how many things need ordering, and a button that drafts them all. What
