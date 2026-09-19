@@ -4522,6 +4522,102 @@ final class Shop {
         }
     }
 
+    // MARK: - What can go on one plate
+
+    /// Whether the batch planner is open.
+    var planningBatch = false
+
+    /// The proposed plates, or nil when nobody has asked yet.
+    ///
+    /// Held rather than recomputed on every redraw, for the reason the
+    /// scheduler's proposal is: rows that changed underneath the person reading
+    /// them cannot be acted on.
+    private(set) var batchPlates: KhaytEngine.PlatePlan?
+    /// Why there is no proposal — the app failing, not the shop having nothing.
+    private(set) var batchProblem: String?
+    /// There is no work to plan. A state, not a fault; kept apart for the same
+    /// reason `scheduleIdle` is.
+    private(set) var batchIdle = false
+
+    /// What one plate will take. The rule's own defaults, read from it rather
+    /// than typed here — a Swift copy of 24 and 1000 would go stale the day the
+    /// shared rule changed its mind.
+    var batchMaxHours: Double = 24
+    var batchMaxGrams: Double = 1000
+
+    /// The jobs the shop ticked. Empty means "everything below", which is what
+    /// the other app's planner does with an empty selection.
+    var batchChosen: Set<String> = []
+
+    /// The work a plate could be planned from: not finished, not a quote, not
+    /// voided. The other app's filter, through the same shared rule.
+    var batchCandidates: [Order] {
+        Self.planCandidates(orders, voided: Self.voidedIds(orderRows))
+    }
+
+    /// The filter itself, static so it can be shown to work without a book on
+    /// disk — the shape `schedulable` already uses, and for the same reason:
+    /// the version that lived inline could not be asked why it had dropped a
+    /// job.
+    ///
+    /// `finishedStatuses` is the shared vocabulary, held to `lib/order-status.js`
+    /// by `FinishedStatusTests` — NOT `status == "completed"`, which would leave
+    /// every delivered job sitting in the planner for ever.
+    static func planCandidates(_ jobs: [Order], voided: Set<String>) -> [Order] {
+        jobs.filter { job in
+            job.status != "quote" && !finishedStatuses.contains(job.status)
+                && !voided.contains(job.id)
+        }
+    }
+
+    /// The jobs the shop has written off. `Order` does not carry `voidedAt` —
+    /// nothing on screen needed it — so it is read off the raw record.
+    static func voidedIds(_ rows: [JSONValue]) -> Set<String> {
+        Set(rows.compactMap { row -> String? in
+            guard case .object(let o) = row, let id = recordId(row),
+                  let mark = o["voidedAt"], mark != .null else { return nil }
+            return id
+        })
+    }
+
+    /// Ask the shared packer what could run together.
+    ///
+    /// Reads only, and writes nothing at all — unlike the scheduler, there is
+    /// no "apply": a plate is a way of running the work, not a field on a
+    /// record. Khayt has never written one either.
+    func planBatch() async {
+        batchProblem = nil
+        batchIdle = false
+        batchPlates = nil
+        guard let engine else {
+            batchProblem = words.callIt("mac.move_no_engine"); return
+        }
+        let chosen = batchCandidates.filter { batchChosen.isEmpty || batchChosen.contains($0.id) }
+        guard !chosen.isEmpty else { batchIdle = true; return }
+        do {
+            batchPlates = try await engine.planPlates(
+                jobs: chosen.map(Self.plateJob),
+                maxHours: max(1, batchMaxHours), maxGrams: max(1, batchMaxGrams))
+        } catch {
+            batchProblem = String(describing: error)
+        }
+    }
+
+    /// What a job weighs and what of, for the packer.
+    ///
+    /// The weight is the PARTS', quantity included — a job's own record does
+    /// not carry one, and a plate packed on a per-part weight would fit four
+    /// copies of something in the space of one. The material is the first the
+    /// job's parts name, which is the other app's reading too: a plate cannot
+    /// mix filaments, so a job printed in two is planned by the first and the
+    /// shop sees the rest on the row.
+    static func plateJob(_ job: Order) -> KhaytEngine.PlateJob {
+        let grams = job.parts.reduce(0.0) { $0 + $1.printWeight * Double(max(1, $1.qty)) }
+        let material = job.parts.first(where: { !$0.material.isEmpty })?.material ?? ""
+        return KhaytEngine.PlateJob(id: job.id, project: job.project.isEmpty ? job.id : job.project,
+                                    hours: job.printTime, grams: grams, material: material)
+    }
+
     /// Ask the shared scheduler where the unassigned work should go.
     ///
     /// Reads only. `lib/scheduling.js` writes nothing and neither does this;

@@ -1159,6 +1159,8 @@ final class Words {
         // The scheduler with nothing to schedule. `sched.none_to_assign` is
         // shared with the Electron board and says the fact; this says why it
         // is not a problem, and lives here because only this app draws it.
+        "mac.nothing_to_plan_why": ["en": "Nothing is waiting to be printed. Finished work and quotes are not planned onto plates.",
+                                    "ar": "لا يوجد عمل ينتظر الطباعة. الأعمال المنتهية وعروض الأسعار لا تُوضع على الصواني."],
         "mac.nothing_to_assign_why": ["en": "Every job waiting for a machine already has one.",
                                       "ar": "كل طلب ينتظر آلة لديه واحدة بالفعل."],
         // Where the two numbers that used to be typed here now come from.

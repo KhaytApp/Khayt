@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) What can run together on one plate is worked out here.** The
+  scheduler answers which printer takes a job, which a shop with one machine
+  already knows. What it needs is the other question — what can go in the same
+  session — and Khayt has answered that since 3.0 with its batch planner, while
+  this app had no answer at all. Tick the waiting jobs, say what one plate will
+  take in hours and grams, and it groups them by material (filaments cannot be
+  mixed on a plate) and fills each plate by print time. A job too big for a
+  plate on its own gets one and is marked as such rather than quietly left out.
+  Nothing is written: a plate is a way of running the work, not a field on a
+  record.
+
 - **(Mac) A job going out the door can be labelled here.** The filament shelf
   could be labelled from this app and a parcel could not, so a box leaving the
   shop had to be labelled from the other one. Same sheet, same preview before
