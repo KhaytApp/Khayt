@@ -364,6 +364,12 @@ private struct JobMenu: View {
         .keyboardShortcut(".", modifiers: [.command, .shift])
         .disabled(!shop.canMoveJobs)
 
+        // WHAT CAN RUN TOGETHER. Beside the scheduler because they are the
+        // same question at two distances: that one picks the printer, this one
+        // picks the session. A shop with one machine only ever needs this half.
+        Button(Words.upfront("batch.title") + "\u{2026}") { shop.planningBatch = true }
+        .disabled(!shop.canMoveJobs)
+
         Divider()
         Button(Words.upfront("mac.edit_job")) {
             guard let one = job else { return }

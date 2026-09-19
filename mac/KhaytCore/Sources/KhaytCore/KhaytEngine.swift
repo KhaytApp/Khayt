@@ -54,6 +54,12 @@ public actor KhaytEngine {
         // downtime at all. `lead-time-publish` reads it the same way.
         "downtime",
         "scheduling",
+        // What can go on one plate together. The sibling of `scheduling`: that
+        // one decides WHICH PRINTER a job goes to, this one decides WHAT RUNS
+        // TOGETHER on a plate, and a shop with one machine needs the second far
+        // more than the first. Pure arithmetic — no clock, no dependency — so
+        // it sits beside the scheduler with nothing to order it against.
+        "plate-nesting",
         "loyalty",
         // How long a nozzle lasts, and what wears it out.
         //
@@ -856,6 +862,68 @@ public actor KhaytEngine {
             "firstDueDate": .string(firstDueDate), "intervalDays": .number(Double(intervalDays)),
         ]
         return try runtime.call("KhaytPaymentPlan", "buildSchedule", [arg], as: [Installment].self)
+    }
+
+    /// Pack waiting jobs onto plates: by material first, then by what fits.
+    ///
+    /// The other app's Batch Print Planner, which this one had no answer to at
+    /// all. First-Fit-Decreasing by print time inside each material, because
+    /// filaments cannot be mixed on one FDM plate — and a job too big for a
+    /// plate on its own is given one and FLAGGED rather than quietly dropped,
+    /// which is the behaviour worth keeping when a rule is shared.
+    public func planPlates(jobs: [PlateJob], maxHours: Double, maxGrams: Double) throws -> PlatePlan {
+        try runtime.call2(
+            "globalThis.KhaytPlateNesting.planPlates(ARG0, { maxHours: ARG1, maxGrams: ARG2 })",
+            [.array(jobs.map(\.json)), .number(maxHours), .number(maxGrams)],
+            as: PlatePlan.self)
+    }
+
+    /// One job as the packer wants it: what it takes, and what of.
+    public struct PlateJob: Sendable {
+        public let id: String
+        public let project: String
+        public let hours: Double
+        public let grams: Double
+        public let material: String
+
+        public init(id: String, project: String, hours: Double, grams: Double, material: String) {
+            self.id = id; self.project = project; self.hours = hours
+            self.grams = grams; self.material = material
+        }
+
+        var json: JSONValue {
+            .object(["id": .string(id), "project": .string(project),
+                     "hours": .number(hours), "grams": .number(grams),
+                     "material": .string(material)])
+        }
+    }
+
+    /// What the packer proposes.
+    public struct PlatePlan: Decodable, Sendable {
+        public let plates: [Plate]
+        public let totalJobs: Int
+        public let totalPlates: Int
+
+        public struct Plate: Decodable, Sendable, Identifiable {
+            /// Empty when the shop asked for materials to be mixed.
+            public let material: String
+            public let jobs: [Job]
+            public let hours: Double
+            public let grams: Double
+            /// One job that will not fit a plate by itself. It still gets a
+            /// plate — saying so is the point.
+            public let oversize: Bool
+
+            /// Stable across a redraw: the material and what is on it.
+            public var id: String { material + "|" + jobs.map(\.id).joined(separator: ",") }
+
+            public struct Job: Decodable, Sendable, Identifiable {
+                public let id: String
+                public let project: String
+                public let hours: Double
+                public let grams: Double
+            }
+        }
     }
 
     // MARK: - Splitting a job

@@ -552,6 +552,7 @@ struct WindowSheets: ViewModifier {
             .sheet(item: $shop.pendingQcFail) { QcFailSheet(shop: shop, subject: $0) }
             .sheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }
             .sheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }
+            .sheet(isPresented: $shop.planningBatch) { BatchSheet(shop: shop) }
             .sheet(item: $shop.editingCustomer) { CustomerSheet(shop: shop, existing: $0) }
             .sheet(item: $shop.editingProduct) { ProductSheet(shop: shop, existing: $0) }
             .sheet(item: $shop.droppingFrom) { DropObjectSheet(shop: shop, machine: $0) }
