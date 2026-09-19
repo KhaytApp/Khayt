@@ -3203,6 +3203,69 @@ tested against both.
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.26] - 2026-09-19
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Twelve changes. Nine of them move Khayt's own rules into the app; two are
+things this app could read and never write; and the last one lets the phone
+hand back work done away from the desk.
+
+### Added
+
+- **A customer's rating can be written down here.** A rating could reach the
+  book one way only — a customer opening the portal on their phone and
+  submitting it — so the ratings line on the Reports screen could never fill
+  for a shop that works on the Mac. There is a "Record rating" item on a
+  finished job now. What the shop writes down is still told apart from what a
+  customer sent in, because those are different facts.
+
+- **A job going out the door can be labelled here.** The filament shelf could
+  be labelled from this app and a parcel could not, so a box leaving the shop
+  had to be labelled from the Windows app. Same sheet of labels, same preview
+  before anything is printed, and the same code on the label: a link to the
+  customer's own page when the shop's cloud is connected, and a code the shop's
+  own phone reads otherwise.
+
+- **Work done on the phone comes back to the Mac.** The companion could read
+  the book and could not give anything back, so a job finished on the shop
+  floor had to be typed in again at the desk. The phone works out what it
+  changed with the same function the desktop pushes with, and this app folds it
+  in with the same function every device pulls with — a phone gets no private
+  theory about what a change is. The fold keeps the higher revision, so a phone
+  carrying a stale record cannot undo work done at the desk, and a phone holding
+  part of the book says nothing at all about the rest of it.
+
+### Changed
+
+- **Nine more of Khayt's shared rules now run natively**, which finishes the
+  analytics screens: how long a job takes, new customers against returning
+  ones, the quote funnel, which customers are worth keeping, what customers
+  said, whether the shop can take another job, what an hour earned and a gram
+  cost, whether a model fits a bed, and which machine is costing the shop.
+
+  Every one is checked against the original over thousands of generated inputs
+  before it ships, and that harness found six faults in the new code this time.
+  Two would have reached an accountant: a negative figure written into an
+  exported spreadsheet as text rather than as money, and a job with no recorded
+  stage slipping into a report filtered by stage. One would have reached a
+  customer: a project name ending in a Windows line break could have forged a
+  second line in a WhatsApp message.
+
+  It also stopped one rule leaving that could not: the 3MF converter reads the
+  bed-fit rule, so taking it out would have emptied every bed-fit warning from
+  every conversion report with nothing said. It stays where it is.
+
+  Four faults in the ORIGINALS came out of the same work, and all four are
+  fixed by the move. A machine booked three weeks over read as exactly full —
+  identical on screen to one with nothing waiting. A spool got dearer per gram
+  as it was used, so a nearly finished one cost a fortune, and the twelve-month
+  "trend" was one number repeated twelve times. A customer who asked for ten
+  quotes and bought nothing sat at the top of "lifetime value". And a customer
+  whose first two jobs landed on the same day counted as two new customers.
+
+
 ## [4.0.0-alpha.25] - 2026-09-18
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
