@@ -610,6 +610,8 @@ struct WindowSheets: ViewModifier {
             .sheet(isPresented: $shop.issuingGiftCard) { GiftCardSheet(shop: shop) }
             .sheet(item: $shop.editingMachine) { MachineSheet(shop: shop, existing: $0) }
             .sheet(item: $shop.editingSupplier) { SupplierSheet(shop: shop, supplier: $0) }
+            .sheet(item: $shop.loggingPurchaseFor) { PurchaseLogSheet(shop: shop, supplier: $0) }
+            .sheet(item: $shop.showingHistoryFor) { PurchaseHistorySheet(shop: shop, supplier: $0) }
             .sheet(item: $shop.restoring) { RestoreSheet(shop: shop, subject: $0) }
             .sheet(isPresented: $shop.checkingCloud) { CloudCheckSheet(shop: shop) }
             .sheet(isPresented: $shop.signingIntoCloud) { CloudSignInSheet(shop: shop) }

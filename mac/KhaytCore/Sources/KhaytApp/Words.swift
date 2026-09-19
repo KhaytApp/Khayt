@@ -1058,6 +1058,16 @@ final class Words {
         // field on a supplier that actually does something: a quoted rate is
         // what a drafted order is priced at, in preference to dividing a
         // spool's own cost by its weight.
+        // SAID, NOT WRITTEN. What the price per unit comes to when the shop
+        // gave an amount and a quantity but no unit price. The book keeps
+        // what was typed: filling a field nobody filled turns a division
+        // into a fact, and the price history compares what is in the book.
+        "mac.works_out_at": ["en": "Works out at", "ar": "يساوي"],
+        // The examples the other app puts in the same box, said here rather
+        // than typed into the field: `WordsAreTranslatedTests` refuses English
+        // spelled out in a view, and it is right to — a placeholder is text a
+        // shop reads.
+        "mac.material_ph": ["en": "PLA, PETG, Resin…", "ar": "PLA أو PETG أو راتنج…"],
         "mac.quotes_word":     ["en": "{n} quoted prices", "ar": "{n} أسعار مسجّلة"],
         "mac.quotes_word_one": ["en": "1 quoted price",    "ar": "سعر مسجّل واحد"],
         "mac.quotes_word_two": ["en": "2 quoted prices",   "ar": "سعران مسجّلان"],

@@ -3985,6 +3985,63 @@ final class Shop {
             }
     }
 
+    /// The supplier a purchase is being written against, or nil.
+    var loggingPurchaseFor: Supplier?
+
+    /// The supplier whose log is open, or nil.
+    var showingHistoryFor: Supplier?
+
+    /// Write down something bought from a supplier.
+    ///
+    /// ── WHY THIS IS NOT AN EXPENSE ────────────────────────────────────────
+    ///
+    /// It looks like one and is not. An expense is what the shop's books say it
+    /// spent; a supplier purchase is what a PRICE was, kept so the price
+    /// history can compare it with the next one. The other app keeps them apart
+    /// for exactly that reason and so does this: logging a purchase here writes
+    /// no expense, and recording an expense writes no purchase.
+    ///
+    /// Newest first, as the other app writes it (`purchases.unshift`) — the log
+    /// is read top-down and the last thing bought is the thing being looked
+    /// for.
+    func logPurchase(_ entry: [String: JSONValue], against supplierId: String) async {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        guard (Self.plainNumber(entry["amount"]) ?? 0) > 0 else {
+            moveProblem = words.callIt("sup.amount_required"); return
+        }
+
+        var undo: [ChangedRecord] = []
+        do {
+            try StoreWriter.update(build) { root in
+                var rows = Self.rows(root, "suppliers")
+                guard let at = rows.firstIndex(where: { Self.recordId($0) == supplierId }),
+                      case .object(var record) = rows[at] else {
+                    throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
+                }
+                undo.append(ChangedRecord(collection: "suppliers", id: supplierId, was: record))
+                var log: [JSONValue] = []
+                if case .array(let existing)? = record["purchases"] { log = existing }
+                var written = entry
+                written["id"] = .string(Self.uid("pch"))
+                log.insert(.object(written), at: 0)
+                record["purchases"] = .array(log)
+                StoreWriter.stamp(&record)
+                rows[at] = .object(record)
+                root["suppliers"] = .array(rows)
+            }
+            registerMoveUndo(undo, named: words.callIt("sup.log_purchase"))
+            await load(source)
+            moveNotices = [words.callIt("sup.purchase_saved")]
+        } catch let refusal as MoveRefused {
+            moveProblem = refusal.sentence
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
     /// Write a supplier down, or correct one.
     ///
     /// ── WHAT IS MERGED, AND WHY IT IS NOT A REPLACEMENT ───────────────────

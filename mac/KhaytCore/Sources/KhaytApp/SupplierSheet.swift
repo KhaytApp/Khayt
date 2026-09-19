@@ -81,6 +81,17 @@ struct SuppliersCard: View {
                     Button(shop.words.callIt("common.edit")) {
                         shop.editingSupplier = supplier
                     }
+                    Button(shop.words.callIt("sup.log_purchase")) {
+                        shop.loggingPurchaseFor = supplier
+                    }
+                }
+                // Reading the log is not a write, so it does not wait on
+                // `canMoveJobs`: a read-only book can still say what it paid.
+                Button(shop.words.callIt("sup.history")) {
+                    shop.showingHistoryFor = supplier
+                }
+                if shop.canMoveJobs {
+                    Divider()
                     Button(shop.words.callIt("common.delete"), role: .destructive) {
                         Task { await shop.deleteSupplier(supplier.id) }
                     }
@@ -128,6 +139,10 @@ struct SuppliersCard: View {
 /// rule's, and a form that asked for a price per gram would be inviting the
 /// thousand-fold error `po-audit` exists to find.
 struct SupplierSheet: View {
+    /// See `NewJobSheet.width`: the snapshot photographs the sheet at this
+    /// size, and a width typed twice is a picture cropped through the middle.
+    static let width: CGFloat = 460
+
     @Bindable var shop: Shop
     /// The supplier as the form has it. A copy: nothing reaches the book until
     /// Save.
@@ -148,7 +163,7 @@ struct SupplierSheet: View {
     }
 
     var body: some View {
-        SheetFrame(width: 460) {
+        SheetFrame(width: Self.width) {
             Text(shop.words.callIt(existing ? "sup.edit" : "sup.add"))
                 .font(.headline)
 
@@ -202,7 +217,12 @@ struct SupplierSheet: View {
                             .textFieldStyle(.roundedBorder)
                             .monospacedDigit()
                             .frame(width: 90)
-                        Text(shop.currency).font(.caption).foregroundStyle(.secondary)
+                        // The MARK, not the code: every other money field on
+                        // this app draws the riyal glyph, and a sheet that
+                        // says "SAR" beside one figure and ﷼ beside the next
+                        // reads as two different currencies.
+                        Text(Money.mark(shop.currency))
+                            .font(.caption).foregroundStyle(.secondary)
                         Button {
                             draft.priceList.removeAll { $0.id == quote.id }
                         } label: {

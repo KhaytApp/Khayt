@@ -33,6 +33,17 @@ enum SheetMetrics {
     /// stops short of the screen rather than exactly filling it.
     static let chrome: CGFloat = 160
 
+    /// The margin a sheet keeps between its content and its own edges.
+    ///
+    /// Named because a photograph has to know it: `SheetFrame(width:)` takes
+    /// the CONTENT width, so a picture taken at that number comes back cropped
+    /// through the trailing column — which is how the first supplier sheet
+    /// snapshots came out with the currency mark cut in half.
+    static let padding: CGFloat = 18
+
+    /// How wide a sheet of this content width actually is.
+    static func outerWidth(_ content: CGFloat) -> CGFloat { content + padding * 2 }
+
     /// The height available to a sheet, as a SEAM rather than a reading.
     ///
     /// A test measuring these sheets runs on whatever display the machine
@@ -103,7 +114,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
             footer
                 .frame(width: width, alignment: .leading)
         }
-        .padding(18)
+        .padding(SheetMetrics.padding)
         .frame(maxHeight: flat ? nil : ceiling)
         .fixedSize(horizontal: true, vertical: false)
     }

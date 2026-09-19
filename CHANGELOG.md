@@ -41,6 +41,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   does NOT hide from a Simple shop: gating it here would take away something
   that shop has and is using.
 
+- **(Mac) What was bought from a supplier can be written down here, and read
+  back.** A supplier's purchase log is not an expense log: an expense is what
+  the shop's books say it spent, and a purchase is what a PRICE was, kept so
+  the next one can be compared with it. Khayt has kept that log since 3.0 and
+  this app could only add up what was already in it. There is a "Log purchase"
+  on a supplier now — what was bought, how much of it, **in what unit**, and
+  what it cost — and a sheet that reads the whole log back with what the
+  supplier has cost in total. The unit is asked for and never assumed, because
+  a spool of PLA bought for 75 and a kilogram of PLA bought for 22 are not the
+  same purchase getting cheaper. Where a unit price is not given the sheet says
+  what it works out at and writes nothing: the figure a price comparison uses
+  is the one in the book, and filling in a field the shop left empty turns a
+  division into a fact.
+
 - **(Mac) The shop's suppliers can be kept here.** A supplier is not a contact
   card: its price list is where the price of a drafted purchase order comes
   from — the quoted rate per kilogram, in preference to dividing a spool's own
