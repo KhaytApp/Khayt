@@ -4,74 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-
-## [3.8.0] - 2026-09-18
-
-The work since 3.7.0, released as stable. Individual entries are kept below;
-this is what changed for you.
-
-**Your reports were reading off part of the book, and now read all of it.**
-Sixty-nine separate figures — across Reports, the P&L, expenses by category,
-waste and machine costs — were computed from a slice of the shop's records
-rather than the whole thing. "Net profit" on the Reports screen was a gross
-margin. "Maintenance Cost by Machine" was empty for every shop, always, and had
-been. Expenses by category and the P&L disagreed about the same money. The
-custom report's "Delivered" box returned nothing at all. **Numbers you have
-looked at before will move when you update**, and the ones you see now are the
-ones your own book supports. If you have been reconciling Khayt against your
-own spreadsheet and losing, this is the release that explains it.
-
-**The redesigned window is what Khayt opens with.** It was opt-in; it is now the
-default, and the things that were still missing from it are in place — one
-header per screen instead of two, the buttons that used to sit on the old screen
-now in the strip, the search field searching, every editor opening, and details
-opening when you select a model, a job or a customer. A big display gets more on
-it rather than larger things, and the Machine sheet is three panes instead of
-one long scroll. The old window is still there in Settings if you want it.
-
-**A quote can start from something you already make.** Take a job straight from
-a product in the catalogue and it arrives priced, with its tiers and its
-documents. Ask what to charge and the answer sits beside the figure you already
-have, over your own comparable work rather than a guess. A price can be adjusted
-after the job is taken, and a total can be rounded or simply typed — the last
-word stays yours. Where a product genuinely has nothing to price, the sheet says
-so instead of quietly reading zero.
-
-**You can see how much quoting turns into work.** How many quotes become jobs,
-and how much of the money follows, is now a figure rather than a feeling.
-"Can we take this job?" is answered with a date on the machines screen, the P&L
-reports by month as well as by quarter with the margin on each, and a report you
-have built can be kept, reopened and thrown away.
-
-**Two things behind the glass.** The pages Khayt Online serves your customers —
-the intake form, quote approval, order tracking — could not have had a
-customer's name, email and phone posted away from them by an injected form;
-nothing was leaking, and the policy that would stop one now names every route it
-needs to. And a screen reader can say which box you are in: 178 fields showed a
-label that was only ever visual, so the reader announced "number edit" and
-stopped, on a settings screen carrying fifty-six number boxes.
-
-**Khayt for macOS is a real app now, and it updates itself.** It is on its own
-version line and its own notes, so the entries below marked *(Mac)* are its
-work rather than this release's. What matters here is that the two apps agree:
-the rules that decide money, tax, scheduling and pricing are one implementation
-tested against both.
-
-### Security
-
-- **A customer's details cannot be posted away from the intake form.** The pages
-  Khayt Online serves your customers — the intake form, the quote approval, the
-  order tracking page — carried a content policy that named four rules and left
-  everything it did not name unrestricted. Nothing was leaking: every value those
-  pages print is escaped, and that has not changed. What was missing was the
-  second line behind it. If an injection ever did land, nothing stopped it
-  posting the name, email and phone from the intake form to another host, or
-  fetching a quote's contents out through an image. The policy now names where a
-  form may post, what may be loaded, and who may frame the page — all of it your
-  own shop, which is the only place these pages ever needed to reach. This
-  matters most with the remote tunnel switched on, where those pages answer from
-  the internet rather than your own network.
-
 ### Changed
 
 - **(Mac) A customer's rating can be written down here.** A rating could reach
@@ -361,6 +293,934 @@ tested against both.
   printing in the other is exactly the disagreement this work exists to
   prevent.
 
+- **(Mac) A job can be moved by right-clicking it.** Moving a job along is the
+  thing a shop does most, and it was the one thing only the menu bar could do.
+  The right-click menu on the orders table had edit, payment, hold, delivered
+  and the invoice, and no stages — so changing a status meant selecting the row
+  and going up to the menu bar for a decision already made about the row under
+  the pointer. A card on the board was worse: it had no right-click menu at
+  all, so moving a job two columns meant dragging it past the ones in between.
+  Both offer the stages now, and a card on the board offers everything the
+  table's menu does. It is one list in one place, and a move started from any
+  of the three asks the same questions and leaves the same record.
+
+- **(Mac) The Reports target was measured against a different set of jobs than
+  the figure beside it.** The monthly target on the Reports screen said it
+  counted finished, unvoided business — and filtered `completed` alone. The
+  quarters drawn beside it come from the shared profit rule, which counts a
+  legacy `delivered` job as finished too, so a shop that had marked work
+  delivered was comparing a target built from some of its jobs against an
+  actual built from all of them. Both sets are the same now. A test also scans
+  every Swift file the app is built from and fails on a status compared against
+  `"completed"` alone unless the site is listed with a reason, which is how
+  this one was found.
+
+- **(Mac) A photo of the finished print can be added to a job.** Portfolio has
+  always shown these and nothing on the Mac could add one — so its empty state
+  told a shop to "add a photo to a completed order" with nowhere to do it, and
+  the only way was the Windows app. Open a finished job and choose *Add a photo
+  of the print*. It is stored exactly as the other app stores it — the same two
+  sizes, the same folder, the same filename — so a photo added on either
+  machine is one photo, and the empty state now takes you to the finished jobs
+  rather than just telling you about them.
+
+- **(Mac) `GET /api/store` — enough of the book that a phone can stop asking.**
+  Every other LAN route answers a question, which assumes the asker is a screen
+  with a live connection. This one hands over records.
+
+  Not all of them. `printLog` is about half of a real shop's store and
+  `printFiles` another quarter, and none of that history has ever been on a
+  companion screen — so what travels is a working set: the settings, every
+  **unfinished** order whatever its age, the newest 200 finished ones, and the
+  clients, spools, machines and waiting list. A job stuck in QC for two months
+  is still in the shop, and a phone that dropped it for being old would hide the
+  very record somebody is chasing. `?scope=whole` still returns everything, for
+  a restore or a person with curl.
+
+  The reply is an envelope rather than a bare store, because the records alone
+  cannot say what was left out, and `omitted` names the withheld collections
+  instead of leaving them to be inferred from absence.
+
+  Secrets are masked by `KhaytCloudOutbox.forCloud` — the same rule the cloud
+  push uses, so a device on the LAN is trusted with exactly what the cloud is
+  trusted with and no more. Customers are not masked, because they are not a
+  secret, they are the book: which is why the owner PIN gates it, lockout
+  included. A failure answers 500 rather than an empty book, since a phone that
+  accepted `{}` would replace a shop it already had with nothing.
+
+- **(Mac) The shop's own saved messages can be sent from the Mac.** Khayt has
+  always let a shop write its own WhatsApp messages — "Hi {{client}}, your
+  order {{id}} is ready!" — and this shop wrote three. Nothing on the Mac could
+  read them. The only way to write to a customer here asked a model to compose
+  something, which needs a key, a connection and an agreement to send a
+  customer's details to a service; most shops have none of those and all of
+  them already have their own words. Now: pick one on a job, see it filled in,
+  change anything, and WhatsApp opens with the number and the message ready to
+  send. Nothing is sent without a person pressing send.
+
+  Both apps fill the message through one rule now, so a template written in
+  either goes out of the other with the same fields filled — and that fixed a
+  fault in the original, where a customer whose name happened to contain a
+  field name, or a `$` pattern, could rewrite the rest of the message.
+
+- **(Mac) The print library is in Spotlight.** This shop keeps 209 models in 13
+  projects, and finding one meant opening Khayt, going to the library and
+  typing. A Mac already has a search box one keystroke from anywhere, and an
+  app holding hundreds of things that puts none of them in it is asking to be
+  opened before it can be useful. Every model is now a result — its name, its
+  project, its material, its tags and its thumbnail — and choosing one opens
+  Khayt on that model with it selected, clearing whatever the library happened
+  to be filtered to. A result that brings the app forward onto a grid not
+  containing what was picked would be worse than no result, so that is the half
+  the tests are mostly about.
+
+  Model names, projects and tags only: jobs carry customer names and prices,
+  and putting those into a system-wide index is a decision for a shop to make
+  rather than one to be surprised by. The sample book is never indexed either —
+  nobody wants "Benchy" in their Mac's search because they once looked at the
+  demo. There is a switch in Settings under "On this Mac", and switching it off
+  empties what has already been indexed rather than merely stopping.
+
+- **(Mac) A photo of the finished print can be added to a model.** Khayt has
+  always preferred a photograph over the generated preview when showing a model
+  — it is the print as it came off the bed, which is what somebody is trying to
+  recognise — and there was no way to take one here: a photo could only be
+  attached in the Windows app. Drop a picture on the model's page or choose one.
+  It is stored exactly as Khayt stores it, so a photo added here is one the
+  other app draws without knowing where it came from.
+
+- **(Mac) Khayt can find a printer that moved and never announced itself.**
+  "Find moved printers" listened for printers advertising themselves on the
+  network, which is how most of them are found — and a Snapmaker U1 advertises
+  nothing at all. On the very network it was printing on, the answer was "no
+  printers found", while the printer sat two addresses away answering every
+  question put to it directly. So when listening turns up nothing, Khayt now
+  asks instead: the addresses around the one the machine used to be on, nearest
+  first, on the ports Khayt already speaks. Only the machines that have actually
+  gone quiet, only their own corner of the network, a short question each, and
+  never on a timer — it happens when you press the button and not otherwise. The
+  button says which of the two it is doing, because listening takes a second and
+  asking takes rather longer.
+
+- **(Mac) A machine's maintenance schedule can be set up here.** Khayt could
+  already show what each printer was due for and let you tick a task off, but
+  the tasks themselves could only be created in the Windows app — so a shop
+  whose only app is this one saw a schedule it had no way to write, which meant
+  no schedule at all. Add a task, change what it is called or how often it comes
+  round, or stop tracking it. A task can run on hours, on days, or on both: a
+  nozzle wears by hours and a filter ages by days. A new task counts from today,
+  so setting one up on a printer that has been running for two years does not
+  open it as instantly overdue — and changing an interval does not mark the task
+  done, so a task that is overdue now stays overdue.
+
+- **(Mac) A machine row says how hard the printer worked, not just what it
+  earned.** Hours run and utilisation beside the money, because a printer that
+  earned little in three hours and one that earned little in three hundred are
+  the same figure on the left and completely different machines. The hours are
+  what the prints TOOK where the printer measured them, and the row says how
+  many were estimates rather than implying it was all timed.
+
+- **(Mac) The rating chart says what full height means.** Its bars are drawn
+  against a fixed five rather than against the best month in the data, so a
+  bar's height means something absolute — and nothing on the card said what. A
+  marked line at five, so a half-height bar is legibly two and a half.
+
+- **(Mac) Machine downtime is drawn.** How long each printer stood out of
+  action, over three months, beside what its servicing cost — a repair costs
+  money and it costs time, and the second is usually the larger number. The
+  rule behind it has been in this app since the scheduler started using it to
+  decide which machine takes the next job; nothing ever showed it to the shop.
+  It counts the union of the booked-out windows rather than their sum, so a
+  belt change booked Monday to Wednesday and "waiting for the part" booked
+  Tuesday to Thursday are the 72 hours the machine was really unavailable, not
+  96. Machines that never went down are left off rather than drawn as rows of
+  zeros.
+
+- **(Mac) A service can be written down: what was done to a machine, when, and
+  what it cost.** This app could show what each printer was due for and let you
+  tick a task off, and none of that reached the record. Marking a nozzle change
+  done updated the schedule and wrote nothing to the service log — so a shop
+  doing its servicing here had no history of any of it when it looked in Khayt,
+  and every maintenance figure in both apps counted none of it: the machine
+  P&L subtracts these costs from a printer's profit, and the Reports chart
+  totals them. Ticking a task off now records the service as well, the way
+  Khayt has always done it, and each machine has a log you can add to and
+  delete from. Recording a repair as an expense too is offered and off by
+  default, because a machine's profit already has its servicing taken off it
+  and doing both counts the money twice.
+
+- **(Mac) Reports draws four figures it had no screen for: expenses by
+  category, where customers came from, what they thought of the work, and what
+  servicing each machine cost.** The rules behind all four were written and
+  tested for the other app and had stayed there, so the Mac could not answer
+  any of them — and every one of the four had a real fault fixed on the way in,
+  so the Mac gets the fixed version. The customer-source chart never counted
+  anyone who arrived through the shop's own intake form. The expense breakdown
+  summed the gross while the P&L above it charged the net, so the parts did not
+  add up to the whole they were a breakdown of. The rating chart's caption
+  counted every rating the shop had ever collected while the chart under it
+  covered six months, which is how forty happy reviews from last year go on
+  describing a bad quarter. And the maintenance chart read a per-machine
+  property nothing in Khayt has ever written, so it printed "No data yet"
+  however many services a shop had logged — the figures come from the flat
+  service log they actually live in, which this app already reads.
+
+- **(Mac) A customer can be given a lead source.** The Reports screen counts
+  customers by where they came from, and nothing on this app could set one — so
+  a shop that does not also run Khayt on Windows read "Other" for every
+  customer it had. The field was already carried through a save untouched;
+  it simply could not be entered. The list of sources is asked of the shared
+  rule rather than written down a second time, which is the fault that lost the
+  intake form's customers from the chart in the first place. A source this
+  build does not recognise is shown as itself and kept, not quietly refiled.
+
+- **(Mac) A zip of models can be added to the library.** A shop downloads a
+  model as a zip because that is how every model site hands one over, and
+  dropping one on the library did nothing at all — the import walks for `stl`,
+  `3mf`, `obj` and gcode, and a `.zip` is none of those, so it was skipped in
+  silence with no error and no model. Khayt reads the archive now, takes the
+  models out of it and leaves the readme and the render previews behind, and
+  groups what came out by the archive's own name the way a folder of models is
+  grouped by its folder. The zip itself is never consumed; it stays where you
+  put it.
+
+  Expanding an archive writes someone else's bytes onto the shop's disk, so it
+  goes through the same rule that guards a customer's upload
+  (`lib/upload-scan.js`): an archive naming a file outside itself, one that
+  expands to far more than it weighs, one with too many members, or one that is
+  not really a zip is refused with the reason said plainly. A shop's own
+  download came from a stranger too.
+
+- **(Mac) There is a way back out of a library folder.** Tapping a folder put
+  the whole grid inside it and left nothing on screen to get out again — the
+  routes were the sidebar's Library row and the Go menu, neither of which is
+  where somebody who has just tapped a folder is looking. There is a path at
+  the top now, "Library / Saudi Kings", with the first half doing the work, and
+  ⌘[ does it from the keyboard. It could not live in the filter bar below: that
+  draws nothing when there are no chips, so the plainest folder would have had
+  no way back at all.
+
+- **(Mac) A converted model goes into the library, and can put the original
+  aside.** A conversion used to end at a file in a folder. The shop then had to
+  go and import the thing it had just made — in the one app whose whole job is
+  knowing what models it has — so the converted file was the only model in the
+  building Khayt did not know about. It is added to the library now, and it
+  still lands in the folder the save panel asked about, because that is where
+  the shop just said to put it.
+
+  The save panel also offers to put the original aside. **Aside, not deleted.**
+  A job printed six months ago was printed from the original's bytes, and
+  removing them so the converted file could take the record's place would make
+  that job appear to have been printed from a file it never saw. So the record
+  keeps everything it had, gains the date and the id of what replaced it, and
+  stops being offered by the library; the file stays where it is. It can be
+  brought back. Keeping both is the default, because that is the answer that
+  loses nothing.
+
+- **(Mac) A customer's model can be priced by slicing it, not by guessing at
+  its shape.** The estimate from geometry is honest but blunt: it cannot know
+  about purge, and on a real four-colour dragon the shape said 13 g where the
+  slicer said 57. With this on, a cleared upload is sliced by the shop's own
+  slicer — the one it picks for this, or its default — and the slicer's own
+  weight and time are what the customer is shown. Off in a fresh book,
+  because it is the only setting in Khayt that writes a stranger's file down
+  and points a native binary at it. Anything missing — no slicer, a slicer
+  since removed, a slice that produced nothing — falls back to measuring the
+  shape rather than failing.
+
+- **(Mac) A listing can be taken off the catalogue.** There was no way to
+  delete a product here at all — the words for it had been sitting in the app
+  unused. Right-click a product in the grid or the table and it asks, in
+  Khayt's own sentence, which names what survives as well as what goes: the
+  photo is removed, past invoices are kept. Deleting also unlinks every job
+  that named the product and drops it from any quote bundle, because a job
+  pointing at a product that is not there is the kind of fault that surfaces
+  months later as a screen that cannot draw. All of it comes back with one
+  undo, except the pictures, whose bytes are gone — the record is restored
+  without them rather than naming files that no longer exist.
+
+- **(Mac) Settings → Online can switch public pricing on, and make the
+  printer preset it needs.** The customer-facing price is built from a saved
+  preset — a name and the seven figures a part is costed at — and the shared
+  rule refuses outright without one. Until now a preset could only be made in
+  the other app's calculator, so the Mac could serve the upload and never
+  answer. The pane now carries the whole block (the switch, the preset, the
+  material or a flat spool cost, margin, minimum, waste and the per-visitor
+  hourly ceiling), says plainly when there is no preset yet, and will make
+  one: name it, adjust the seven figures, and it is saved and chosen. A name
+  already in use replaces that preset rather than doubling it, which is the
+  other app's rule and the same id, so anything pointing at it still does.
+
+- **(Mac) A customer can price their own model on the intake form.** With
+  public pricing switched on, the form offers an upload: the file is measured
+  in memory, priced on the shop's own preset, spool cost, margin and waste
+  allowance, and the figure is shown as an indication rather than a quote. A
+  sliced file is taken at the slicer's own weight and time; an STL, OBJ or
+  3MF is measured by this app's own reader. Nothing is written to disk — the
+  model is read and dropped, so there is no stranger's file on the shop's
+  machine to keep or explain. When the request is submitted, the price
+  attached to it is the one THIS server produced, recalled by reference, so
+  a browser cannot post a figure of its own. The rules are the shared ones
+  (`lib/public-quote.js`, `lib/gcode-parse.js`), which the other app already
+  quotes through, so a customer is never shown a different sum from the one
+  the shop would reach for the same part.
+
+- **(Mac) The shop's due dates as a calendar subscription.** With the LAN
+  server on, Settings → Online shows the same `/calendar.ics` link the
+  Windows and Linux app offers: one all-day event per open job with a due
+  date, tentative until it is printing, for any calendar app on the shop's
+  Wi‑Fi. The feed is one shared module now (`lib/lan-calendar.js`), lifted
+  verbatim out of the Node route and held byte-identical to it; the
+  subscription token is minted into the book the first time the Mac serves.
+
+- **(Mac) "Where is my order": the customer's tracking page, served by the
+  Mac.** On a job under way or done, the inspector has "Copy tracking link":
+  the link points at this Mac, carries the job's own tracking token (minted
+  the first time, as the other app mints it) and opens the same page that
+  app serves — the stage of the order, its details, the shipping, and once it
+  is complete a short survey the customer can answer from the page. The page
+  is lifted verbatim out of the Node route into `lib/lan-order-page.js`, the
+  Node server draws from it, and the carriers directory moved from the
+  renderer into `lib/` so both hosts read the same carrier names and links.
+
+- **(Mac) Rounding and "Your own price" on the product sheet.** The two
+  controls Khayt's product editor has had all along — round to a step (up,
+  down or nearest) and a typed price that wins over everything — with the
+  price preview following them as they change. Until now a shop on the Mac
+  could see a catalogue price move and had no way to set it back.
+
+- **(Mac) The phone's live queue, served by the Mac.** A new Online tab in
+  Settings carries the LAN block the Windows and Linux app keeps under
+  "Advanced": enable the server, listen on the shop's Wi‑Fi, set the owner
+  PIN. Switch it on and a phone on the same network gets the same live queue
+  page, status API, queue API and installable home-screen icon that app
+  serves — the same bytes, from one shared module (`lib/lan-pages.js`), behind
+  the same PIN and the same lockout rules (`lib/lan-auth.js`), with the same
+  security headers on every response. Saving restarts the server when the
+  port or the PIN changed. The intake form, quote approval, the calendar feed
+  and the webhooks are still the other app's; they follow.
+
+- **(Mac) The customer intake form, served by the Mac.** With the LAN server
+  on, `/intake` on a phone or laptop on the shop's Wi‑Fi is the same request
+  form the Windows and Linux app serves — same page, same session cookie,
+  same limits on opening and submitting it, same consent record — and a
+  submitted request lands on the Waiting screen at once. The form's template
+  and the rule that turns a submission into a waiting-list entry are one
+  shared module now (`lib/lan-intake.js`); the Node server draws from it and
+  is held byte-identical to its old handlers. Not yet on the Mac: pricing an
+  uploaded model on the form (the form does not offer the upload here) and
+  the legacy intake PIN route.
+
+- **(Mac) A customer approves a quote from their phone.** On a job that is a
+  quote, the inspector has "Copy quote link": the link points at this Mac,
+  carries the job's own approval token (minted into the job the first time,
+  as the Windows and Linux app mints it), and opens the same quote page that
+  app serves — the parts, the total in the shop's currency, the expiry, and
+  one button. Approving moves the job to pending inside the write on the
+  newest book; a quote that expired, or was already approved, gets the same
+  answer the other app gives. The page's small companions (not found, bad
+  link, expired, cannot approve, approved) are lifted out of the Node routes
+  into `lib/lan-quote-page.js`, verbatim, and the Node server draws from
+  them; the rule's clock is injectable so both hosts can be held to it. Not
+  yet on the Mac: the order tracking page and the legacy POST /order/:id.
+
+- **(Mac) Whether the shop keeps its promises, on Reports → Best.** Of the
+  finished jobs that had a due date, how many were done by it, how many were
+  not and by how many days — and the promises missed, worst first, which the
+  other app's section never named. The same rule (`lib/on-time.js`), which the
+  other app's section now draws from.
+
+- **(Mac) What was thrown away, by month and by why, on the Waste screen.**
+  Six months of wasted grams stacked by failure type — the heaviest three by
+  name, the rest as "other" — with a key that says each type's grams. The same
+  rule as the other app's chart (`lib/waste-trend.js`), which now draws from it.
+
+- **(Mac) How long a job takes, on Reports → Best.** Six months of the
+  average from the day a job was taken to the day it was done, and under it
+  the products that take longest — average, fastest, slowest. The same rule as
+  the other app's two charts (`lib/cycle-time.js`), which now draw from it.
+
+- **(Mac) Cost and revenue trends, on the Reports screen.** Twelve months of
+  what an hour of printing earned and what a gram of material cost, under the
+  cash flow. The same rule as the other app's chart (`lib/cost-trends.js`),
+  which it now also draws from.
+
+- **(Mac) A customer's price agreements, standing order and communications
+  log.** The three things that follow a customer into every job were stored,
+  carried through a save untouched, and shown nowhere on the Mac — the help
+  said to edit them in the other app. The customer sheet now edits what they
+  have agreed to pay for particular things (a product word, a price, a note;
+  "bracket" covers "Wall bracket, steel") and their standing order (weekly to
+  quarterly, next date, paused, end date, skip a cycle). Choosing the customer
+  on a new job applies their discount and their agreed prices to the cart, and
+  a part added afterwards takes them too. The log of calls, messages and
+  meetings is in the customer's pane, newest first, and a line is written the
+  moment it is added — not when a sheet is saved. Both shapes the other app
+  writes are read.
+
+- **(Mac) Standing orders are made on the Mac.** When the book opens, every
+  schedule that is due produces its job — a copy of the customer's last
+  completed job with the previous run's payment, photos, actuals and dates
+  reset, the cycle's date as its due date and the cycle written on it — and the
+  toolbar says how many. The same rule the other app runs, so a book opened on
+  a Mac and a PC gets one job per cycle, not two.
+
+- **(Mac) What a model would take, before anybody slices it.** Khayt could
+  measure a mesh from the day it could read one and could never price one — a
+  model you had not printed showed a size and a triangle count and no answer to
+  the question you actually had. The library inspector now says what it would
+  take in filament and in hours.
+
+  **It does not ask how fast your printers are, because nobody knows that about
+  their own printer.** The estimator's hardest number had been the same guess
+  for everyone since it was written. It turns out not to need guessing: it only
+  ever appears multiplied by density, and that product is grams per hour —
+  which every job whose real weight and duration were recorded has measured.
+  So Khayt learns it from your own work, says how many jobs it learned from,
+  and says plainly when it is still using its own default instead.
+
+  It will not learn from a job nobody measured, from one job, or from a figure
+  divided across several parts — calibrating an estimator against its own
+  estimates teaches it nothing.
+
+  Settings → Preferences carries the four numbers you can answer for: density,
+  infill, wall thickness and waste. There is deliberately no field for the
+  speed.
+
+- **(Mac) A printer that changed address can be found again.** A DHCP lease
+  expires overnight, the router hands out a different address, and Khayt polls
+  a host that answers nothing. It said *offline* — which is also what it says
+  when a printer is switched off, and the two have completely different fixes.
+
+  A machine that has gone quiet now offers *Find it on the network*. Where the
+  printer announces the serial or the hardware address Khayt recorded — neither
+  of which moves with a lease — that is identity, and one click points Khayt at
+  it. Where the evidence is only that exactly one printer of the right model is
+  answering, it says so and asks you to check first, because pointing the app
+  at a machine is what it will later send commands through.
+
+  **What this was costing.** Khayt freezes a job's real filament and duration
+  on the edge out of printing, because the printer's counters reset when the
+  next job starts. Every print that finished while the address was stale is a
+  measurement that no longer exists — found exactly that way when a Snapmaker
+  U1 moved from .77 to .56 and the completion history came back empty rather
+  than short.
+
+- **(Mac) A model in your library can become a product.** The library knew what
+  each model weighs and how long it takes — parsed when you imported it — and
+  the catalogue asked you to type both in again. *Make a product from this* is
+  on the Model menu and on a model's right-click menu, and the product arrives
+  with its first part already filled: weight and time from what the slicer
+  measured, material and layer height from the setup you have had most success
+  with.
+
+  **It is joined to the model, not just named after it.** A part used to carry
+  the file's NAME — a filename somebody typed — so nothing else could follow
+  it. It carries the model's identity now, which is what makes "for this part,
+  at these settings, how far out is my estimate?" answerable later.
+
+  What the file cannot answer for is named on screen rather than left at zero,
+  because a zero that looks typed is worse than a blank you were told about.
+
+- **(Mac) The assistant has a screen of its own.** Khayt's AI features could be
+  switched on in the other app and not this one, so a shop on a Mac could be
+  told a feature was running and have no way to see — let alone refuse — what
+  it sends. Settings → AI assist now carries both halves together: which
+  provider you use, and a switch per feature with what each one transmits
+  written beside it.
+
+  **The two halves ship together deliberately.** A provider chooser on its own
+  would let you point Khayt at a vendor without being told that drafting a
+  customer reply sends their name, their order reference and their outstanding
+  balance. A list of switches on its own would name a vendor you had not
+  chosen. The one that sends a customer's data is badged as such, and nothing
+  on the screen works consent out for itself — it asks the same rule the gate
+  asks, so a feature can never read as off while it runs.
+
+  Your key is sealed with the book's own key before it is written, the same way
+  a printer's key is, because this file syncs, is backed up and is exported. A
+  key that cannot be sealed is refused rather than stored in the clear.
+
+- **(Mac) Khayt can tell you what is likely to go wrong before you quote.**
+  Select a model and the inspector says what a slicer would find: how much of
+  the surface overhangs past 45° and will need supports, how much is
+  near-horizontal underside that sags rather than merely printing rough, and
+  whether the walls average thinner than the nozzle can lay down.
+
+  Every line carries the measurement it is based on, so you can disagree with
+  it. A shop that supports everything by default can see at a glance which
+  line to scroll past, and a part with nothing wrong says so — "nothing to
+  flag on this one" is a different answer from not having looked.
+
+  **It works on the files you actually own.** The other Khayt computes the same
+  findings for a quote, but it has to build the whole triangle list to do it
+  and gives up past four million facets. Two models in this library are past
+  that. The Mac reads the mesh as a stream and keeps ninety-one numbers, so the
+  size of the file stops being the question.
+
+  Under Settings → Preferences you can choose *when* Khayt looks: **when you
+  ask**, which is the default, or **as each file is imported**. Reading a mesh
+  is a few seconds on a large model — paying that during an import answers
+  instantly forever after, and leaving it until you ask keeps imports fast.
+  Either way the answer is kept, so the same model is never read twice, and it
+  is thrown away if the file behind it is replaced.
+
+- **(Mac) Adding a spool can be a lookup instead of typing.** Start typing a
+  brand or a product — "bambu matte", "esun petg" — and Khayt offers the
+  filament and its colours from a bundled catalogue of 1,945 products, filling
+  in the name, the colour, its hex and the spool weight.
+
+  It fills in what a manufacturer can know and nothing else. Your cost, what the
+  roll weighs today, when you opened it and whether you have dried it are facts
+  about the spool in your hand, and nothing here invents them — and editing a
+  half-used roll never overwrites what is on it.
+
+  The list ships with the app, so it works with no connection and Khayt does not
+  tell anybody what you buy. It says how old it is rather than pretending to be
+  current. From the Open Filament Database, MIT-licensed — see
+  [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md).
+
+- **(Mac) A job's parts can be corrected.** They were read-only: a weight typed
+  wrong when the job was taken stayed wrong, and the only way to fix it was to
+  open the job in the other Khayt. Double-click a part to change its name,
+  filament, weight, hours or quantity.
+
+  **The price is not a field you type.** A part that weighs 40 g rather than
+  30 g costs more to make, so the figures you know are asked for and the price
+  follows from the same cost model the calculator uses. Correcting a weight
+  corrects the job.
+
+  Where the part came from a model in your library, *Fill from file* takes the
+  weight and time the slicer measured. It shows you both figures first rather
+  than overwriting quietly — a part may have been corrected on purpose — and it
+  says which fields the file could not answer for instead of leaving zeros that
+  look typed.
+
+- **(Mac) A print made of several files says so.** A head, two arms and a torso
+  are one thing you print, not four — but the Mac app showed a kit as a single
+  entry with the rest of its files invisible. The model's panel now lists every
+  file in the print, marks the one the card speaks for, and adds up what the
+  whole thing weighs on disk.
+
+  Where a file could not be measured it says so, and the total is left off
+  rather than quietly adding up the parts it could measure and presenting that
+  as the size of the print.
+
+- **(Mac) An invoice says whether it has actually been reported to ZATCA.**
+  Khayt already put the Phase 1 QR on the document. What the Mac app could not
+  tell you was whether an invoice you had handed a customer had been reported to
+  the tax authority at all — which is the part a Saudi shop can be penalised
+  for, and it was invisible on this side. A completed invoice now says
+  submitted, not submitted, rejected or errored, with the counter value and, if
+  it was refused, the reason it was refused.
+
+  It does not offer to submit. Signing the document needs code that only runs in
+  the Electron app, and a button here that could not finish the job would be
+  worse than a plain statement. Nothing appears at all on a shop that has not
+  switched Phase 2 on, because none of this applies to it.
+
+- **(Mac) Khayt remembers what a print actually worked at.** A file counted how
+  many times it printed and how many times it failed, but not *with what* — so
+  reprinting a bracket six months later you knew it had worked once and had no
+  idea on which printer, in which material, at which layer height. The model's
+  panel now lists the settings it has been printed at, marks the one to reach
+  for, and says plainly when nothing has worked yet rather than naming the least
+  broken option.
+
+  One bad print does not condemn a setup: filament runs out, a spool tangles,
+  somebody knocks the machine. Nine of ten is still a setup to reach for, and
+  one of four is not, however recently that one worked. A setup nobody has run
+  reads as untried rather than as a score of nought — and your own verdict
+  overrides the tally, because "it printed, but I did not like the finish" is a
+  judgement no counter can reach.
+
+- **(Mac) A print that exists at more than one size says so.** Big and small
+  carry their own weight and time, so the panel shows each with its own figures
+  and marks the one the estimate is about. Files that have only ever been one
+  thing — nearly all of them — are unchanged.
+
+- **(Mac) Khayt says what is about to run out that is not filament.** Glue, IPA,
+  mailing bags, spare nozzles — running out of one of those stops a job exactly
+  the way running out of filament does, and only filament reached the Mac app's
+  shelf. The inventory screen now leads with what needs ordering, in each item's
+  own unit.
+
+  Three different reasons put something on that list and they read differently:
+  it has run out, it is below the minimum you set, or nothing is wrong yet and
+  the rate you are getting through it says otherwise. The last is the one you
+  cannot see by looking at the rack. Where Khayt has no usage figure and you
+  have set no minimum, it says the item is low and stops there rather than
+  inventing a quantity to put on a supplier's order.
+
+- **(Mac) Khayt tells you what each printer is due for.** A machine card now
+  lists the recurring jobs set against that printer — replace the nozzle, clean
+  the plate, check the belts — with how far off each one is and a button to mark
+  it done. Amber when it is close, red when it is past, and nothing at all on a
+  printer nobody has set tasks up for.
+
+  The hours are the hours Khayt has logged, counting finished prints only. A
+  cancelled print used some of the machine's life in reality, but the log has no
+  honest figure for how many, and counting the whole estimate would bring
+  services forward on exactly the printers that fail most.
+
+- **(Mac) Khayt finds printers on your network.** Adding a machine meant knowing
+  its address and typing it — and a shop that has just plugged a printer in does
+  not know it, so the number gets copied by hand off the printer's own screen
+  across the room. *Find printers* on the machines screen asks the network
+  instead, and adding one fills in its address, its connection type and — when
+  Khayt recognises the model — its bed, nozzle and running cost.
+
+  The scan is owner-initiated and time-boxed, never on a timer, and macOS asks
+  your permission the first time. A printer Khayt can see but cannot yet speak
+  to says so rather than being added as though it were ready.
+
+- **(Mac) Khayt can tell a printer what to do.** The Mac app could watch seven
+  protocols and touch none of them: it knew a print was failing, it knew which
+  machine, and stopping it meant walking to the printer or opening the other
+  app. Pause, resume and cancel are on the machine card now, while something is
+  running. Cancelling asks first — it throws away every hour already in the
+  plate, and no printer asks twice.
+
+  **And on a Klipper or Moonraker printer, one object can be dropped from a
+  plate that is still printing.** For the single part that has come loose, while
+  the rest of the plate carries on. It cannot be undone, so the sheet names the
+  object and says so.
+
+- **(Mac) Khayt says what to run next.** It knew the queue and it knew which
+  printers were idle; putting the two together was a person doing it in their
+  head. The machines screen now proposes a job for each free printer — urgent
+  first, then due date, then longest waiting, and preferring the machine already
+  loaded with the right material so there is one fewer spool change.
+
+  **It proposes; you press Send.** No printer Khayt talks to can clear its own
+  plate, so an idle printer is very often an idle printer with yesterday's part
+  still on it. A machine is only offered once somebody has said its bed is clear
+  since its last print — and a machine waiting on that says so, rather than
+  quietly disappearing from the list.
+
+- **(Mac) Khayt has help, in your own language.** Sixteen articles — the book,
+  jobs, the board, customers, the library, the catalogue, the shelf, machines,
+  money, reports, cloud sync, backups, settings, the keyboard and what to do
+  when something is wrong — in English and Arabic, searchable, from the Help
+  menu or ⌘?. It opens in a window of its own so you can read it beside the
+  screen you are asking about, and it follows the language *Khayt* is set to
+  rather than the one the Mac is set to.
+
+- **(Mac) A product can be written down on the Mac.** The catalogue could be
+  read here and not added to: making a product meant opening the Windows and
+  Linux app. There is an editor now, with one tab per language your catalogue
+  carries rather than a fixed English and Arabic — a shop selling in German gets
+  a German tab. Everything the sheet does not show is left exactly as it was:
+  the parts, the prices per quantity, the photo and the documents.
+
+- **(Mac) The catalogue can be looked at, not only read.** A grid of photographs
+  beside the existing table, which stays the default because it is the only view
+  that puts margin next to weight. The library has had this argument made for it
+  since it shipped — a print shop recognises a thing by looking at it — and the
+  catalogue is where it is truest.
+
+- **(Mac) Importing models is on the library, and keeps your folders.** The only
+  way in was a menu item called "Add model" in the Book menu; the library screen
+  itself offered nothing, and dropping a folder on it did nothing. There is an
+  *Import models* button on the library now, and you can drag files or folders
+  straight onto it.
+
+  **It also keeps the grouping you already had.** Every imported model used to
+  arrive ungrouped, so a download of seven models in seven folders had to be
+  regrouped by hand. The folder a model came from is now the group it lands in —
+  and packaging folders are seen through: a model at
+  `Saudi Kings/King Abdulaziz/STL/presupported/crown.stl` is filed under *King
+  Abdulaziz*, not under *presupported*.
+
+- **(Mac) Three more things the app knew and never said.** Hunting the cause of
+  the Simple-mode fault turned up the same shape three more times: a shop was
+  never told that records in its book could not be read — the app had dropped
+  data and said nothing — never told that Khayt had closed unexpectedly the
+  time before, and never shown what syncing was doing. All three had been
+  written into the window Khayt stopped opening with, so they shipped in no
+  window at all. They are in the one that ships now, and a check reads both
+  windows to make sure nothing is left behind in the old one again.
+
+- **(Mac) Simple mode has never hidden anything.** A shop set to Simple saw
+  Expenses and Reports exactly as a Professional one did, in both the sidebar
+  and the menu bar. The rule was right, the setting reached the app, and the
+  check was written correctly — into the window Khayt used to open with. The
+  redesigned one has been the default since alpha.12 and never asked. The menu
+  and a reopened window never asked either, so the keyboard shortcuts went
+  straight to the screens. All three ask now, from one answer rather than three
+  copies of it, and a check holds them to it.
+
+  Khayt still cannot SET the mode on a Mac — that is done in the Windows app —
+  it can only honour one.
+
+- **(Mac) Khayt's Siri shortcuts have never worked, and nothing said so.** The
+  app declares two — "What is printing in Khayt" and "What is waiting in
+  Khayt" — and the step that publishes them to the system was looking in the
+  wrong folder on every build since it was written. It printed a line about it
+  that read like a known limitation rather than a fault, in the middle of a
+  build log, so the app shipped with no Shortcuts and no Siri and no way for
+  anybody to tell. Both now reach the system, and a build that cannot publish
+  them says so loudly instead.
+
+- **(Mac) The sample book expired overnight and took two tests with it.** The
+  demo shop's dates are written into a file and the calendar is not, so the
+  last job in its queue fell past due and the "at risk" projection — which only
+  reports work that will miss its date but has not yet — had nothing left to
+  say. Nobody changed anything; the day changed. The queue has been run forward
+  and there is now a check that fails a week before it can happen again,
+  saying what to move and why, so it lands as a chore rather than as a stranger's
+  branch breaking for no reason they can see.
+
+- **(Mac) Every repair typed into the Mac went into a field nothing reads, and
+  the machine P&L charged no maintenance at all.** The service log was written
+  under the name the other app keeps it under *in the browser's own storage* —
+  not the name it uses in the shop's book. The book has only ever had the
+  second. So a nozzle change logged on the Mac never appeared in Khayt, and the
+  figure that decides whether a printer is worth keeping was missing every
+  riyal a shop had spent servicing it, silently and on every real book.
+
+  Every test passed throughout, because the sample book had been written to
+  match the mistake. The key is checked against the other app's own source
+  now, so a fixture and a constant cannot agree with each other while both are
+  wrong. Repairs already typed into a Mac alpha are moved into the right place
+  the next time the book is opened — they are a shop's own work, not something
+  to drop.
+
+- **(Mac) The invoice and label sheets are laid out with everything they do not
+  need switched off.** Both are drawn by WebKit, because the document is the
+  same html Khayt prints and laying it out any other way would mean a second
+  answer to what an invoice looks like. It is still a browser handed a page
+  built out of a shop's own data, and it could run scripts and follow links —
+  so a link in an invoice note could have put a web page inside Khayt's own
+  window. Neither is possible now. The content was already escaped, so nothing
+  was getting through; these are the second and third locks.
+
+- **(Mac) Looking for a moved printer said nothing at all unless it worked.**
+  "Find it on the network" either found the printer and offered the move, or
+  left the screen exactly as it was — no "nothing answered", no "that could not
+  be saved", not even "moved to .56" when it had just done it. The messages were
+  being written the whole time and nothing drew them. On a screen a shop only
+  visits when something is already wrong, silence is the worst of the answers,
+  and the new sweep made the wait before it much longer.
+
+- **(Mac) An empty Utilisation column said nothing about why it was empty.**
+  Hours run against hours wanted needs somebody to have said what was wanted,
+  and a machine has no target hours a day until you fill one in — so every row
+  showed a dash, correctly and unhelpfully. A column of dashes reads as a figure
+  the app could not work out rather than one it was never given, and the field's
+  own hint is on the machine sheet, not on Reports. It says so now, once, under
+  the table, and only while no machine has a target at all.
+
+- **(Mac) A device on the shop's Wi-Fi could hold the LAN server's connections
+  open indefinitely.** A client that connected and then said nothing — or
+  announced a body and never sent it — was waited on for ever: no answer, no
+  close, the connection held until the app quit. Open enough of them and the
+  shop's own phones cannot get through. The Windows app never had this because
+  Node's web server applies its own time limits; this one is built directly on
+  the system's networking and had none. A request now has fifteen seconds to
+  arrive, after which the connection is let go. The clock stops the moment the
+  request is complete, so a slow connection is never cut off partway through
+  the answer it asked for.
+
+- **(Mac) A live print's percentage was captioned "as the printer shows it",
+  beside a number the printer was not showing.** Khayt reads the slicer's own
+  M73 figure, which counts elapsed TIME. A Snapmaker U1's panel counts file
+  position. Mid-print those genuinely differ — 57% here against 63% there on a
+  print measured end to end — so the caption promised an agreement that does
+  not exist, and a correct figure read as a fault. It says "of the estimated
+  time" now, which is what it measures. Khayt's is the better clock and that
+  was measured rather than assumed: across thirty samples of one print, its
+  figure predicted the finish to a mean of two minutes, against five for the
+  printer's own model and thirteen at its worst.
+
+- **(Mac) Dragging a card onto the new Shipped column would have written an
+  invalid status.** The board draws a column per stage and every column is a
+  drop target, so the moment Shipped got a column, dropping a card on it asked
+  to set `status: 'shipped'` — the exact thing the stage was designed as a
+  stamp to avoid, because a job with a status no "finished" set knows about
+  drops out of revenue, the P&L, the VAT return and a customer's lifetime
+  spend without anything reporting an error. The shared rules refuse the move
+  now, so no app can make it, and the board performs the stamp instead. Only
+  `shipped` is refused: `delivered` is derived the same way but is a status
+  older books really carry, and it has always been an allowed destination.
+
+- **(Mac) The shop's mode was ignored here, so a Simple shop saw the whole
+  Professional surface.** Khayt has two modes and `lib/feature-tiers.js` is
+  the single source of truth for what each includes — and this app read
+  `settings.mode` nowhere at all. Of the nine Professional features it has
+  built four, and all four were shown to everybody: full analytics, expense
+  tracking, machine maintenance and ZATCA e-invoicing. They are gated now,
+  so the two apps agree about what a shop has. A shop that switches to
+  Simple while looking at Reports or Expenses is moved to the Dashboard
+  rather than left on a screen that is no longer theirs. Only those four are
+  gated: a screen added later and never classified stays visible rather than
+  quietly disappearing. An enthusiast book — Bed Ready's mode, retired on
+  this side — is read as Simple exactly as `applyMode()` migrates it, so
+  opening one here does not strip its customers and invoices.
+
+- **(Mac) A resin printer's progress was captioned with a claim about a file
+  it does not have.** The machine card names which signal a percentage came
+  from, so that "by layer" and "by file position" can be told apart on a
+  Moonraker printer. It was meant to say that only for Moonraker, which is
+  the one adapter that chooses between two signals — but `lib/sdcp.js` sets
+  the same field, to `time` or `none`, and anything the card did not
+  recognise was captioned "by file position". So an Elegoo resin printer
+  reporting its own elapsed ticks was described in terms of a file it never
+  had. The adapter now decides whether to caption at all, and a signal this
+  app has not been taught is left undescribed rather than described wrongly.
+
+- **(Mac) A product made on the Mac was priced on its filament alone.** The
+  other app's calculator puts a labour rate, prep and post time, power draw,
+  electricity, wear and a failure allowance on every part it writes; this
+  sheet wrote none of them, and the shared pricing rule injects none on
+  purpose. So a product added here cost whatever its filament cost and
+  nothing else — on a real portrait, 10.57 where the true cost is 35.91,
+  because those seven figures are seven tenths of what it takes to make.
+  The part being added now carries the same starting figures the other app's
+  form carries, folded away under "Labour, power and wear" so they can be
+  changed before the part goes in, and a part already in the list that has
+  none of them says so instead of quietly costing less.
+
+- **(Mac) Saving a product no longer throws away its cost inputs or its
+  price.** The Mac product sheet rebuilt every part from the five fields it
+  shows, so the labour rate, prep and post time, power draw, wear and failure
+  rate the other app had priced the part with were dropped on save — a
+  portrait that cost 35.91 to make came back costing 10.57, and the product
+  re-priced itself from 50 to 13.74. The save also ignored the product's own
+  rounding and typed price. Now a part keeps every field the sheet does not
+  edit, and the product is priced through the shared rule with its rounding
+  and override, so the same product saves to the same price in both apps.
+
+- **(Mac) "New job from this" prices the job at the product's own rates.**
+  The job's parts were costed from grams and hours alone, so the same
+  portrait opened at 15 where the catalogue said 50. A part taken from a
+  product now carries the product's rates into the cost, and the job opens at
+  the catalogue price.
+
+- **(Mac) A job taken from the catalogue opens priced — this time with the
+  parts costed.** The earlier fix repaired the number parsing on this path
+  and added the "nothing to cost" notice, but nothing ever asked the cost
+  model what the product's parts cost: a part added by hand was costed, a
+  part copied from a product was not, so the cart arrived at nothing and the
+  total with it. The parts are costed on the way in now, exactly as a typed
+  part is, and a product priced by hand or rounded to a step opens the job
+  priced the same way.
+
+- **(Mac) The help caught up with the Reports and Waste screens.** The Reports
+  article lists cost and revenue trends, how long a job takes and on-time
+  delivery; the Money article says what the Waste pane draws.
+
+- **(Mac) The help said parts, price tiers, pictures and documents are edited
+  in the other app.** All four have been edited on the Mac since the product
+  sheet gained them; the catalogue and welcome articles now say what is
+  actually still elsewhere — most of the analytics, the storefront and portal,
+  and the LAN server.
+
+- **(Mac) An address a key must not travel to was accepted.** The Mac's own
+  `URL` is a small stand-in — JavaScriptCore has none — and it was missing the
+  three fields the address rule reads. So the check for credentials written
+  into an address never fired, and a self-hosted address came back as the
+  literal word "undefined" with the path stuck on the end.
+
+- **(Mac) Khayt no longer quits when you Quick Look a second model.** Going
+  through the library pressing ⌘Y, the app disappeared on the second one —
+  with no error, no crash report and nothing to look at afterwards. It is the
+  screen the Mac app is for, so this is worth a release of its own.
+
+- **(Mac) A model file could crash Khayt outright, and `v1="nan"` was enough.** Three
+  characters where a 3MF names one of a triangle's corners. Swift refuses to
+  turn a "not a number" into a whole number and stops the program rather than
+  guess, so one malformed or corrupt file took the app down — and because an
+  import reads a whole folder, it took the other three hundred models with it.
+  Unreadable corners are now dropped the way an out-of-range one already was.
+
+- **(Mac) A printer could crash Khayt by reporting a silly number.** The same fault
+  in two more places: a job id and a progress percentage read straight off the
+  network. Progress is also clamped to 0–100 now, so a printer claiming 5,000%
+  no longer says so on the shop floor.
+
+- **(Mac) The Preferences pane no longer heads two sections "App Preferences".**
+  The default language sat under one and the menu bar toggle under the other,
+  two rows apart, with nothing to say that the first follows your book to your
+  other Macs and the second does not. The second is headed "On this Mac" now.
+
+- **(Mac) Four screens had a search box that did nothing.** The calculator, the
+  colour studio, the reports and the dashboard are not lists, and the field on
+  them could be typed into to no effect — while saying "Job, customer or
+  number". It is gone from those. The catalogue, which *is* a list, now searches
+  by name, description, material and group; the shelf and the catalogue also
+  stop asking for a job number when what they filter is filament and products.
+
+
+## [3.8.0] - 2026-09-18
+
+The work since 3.7.0, released as stable. Individual entries are kept below;
+this is what changed for you.
+
+**Your reports were reading off part of the book, and now read all of it.**
+Sixty-nine separate figures — across Reports, the P&L, expenses by category,
+waste and machine costs — were computed from a slice of the shop's records
+rather than the whole thing. "Net profit" on the Reports screen was a gross
+margin. "Maintenance Cost by Machine" was empty for every shop, always, and had
+been. Expenses by category and the P&L disagreed about the same money. The
+custom report's "Delivered" box returned nothing at all. **Numbers you have
+looked at before will move when you update**, and the ones you see now are the
+ones your own book supports. If you have been reconciling Khayt against your
+own spreadsheet and losing, this is the release that explains it.
+
+**The redesigned window is what Khayt opens with.** It was opt-in; it is now the
+default, and the things that were still missing from it are in place — one
+header per screen instead of two, the buttons that used to sit on the old screen
+now in the strip, the search field searching, every editor opening, and details
+opening when you select a model, a job or a customer. A big display gets more on
+it rather than larger things, and the Machine sheet is three panes instead of
+one long scroll. The old window is still there in Settings if you want it.
+
+**A quote can start from something you already make.** Take a job straight from
+a product in the catalogue and it arrives priced, with its tiers and its
+documents. Ask what to charge and the answer sits beside the figure you already
+have, over your own comparable work rather than a guess. A price can be adjusted
+after the job is taken, and a total can be rounded or simply typed — the last
+word stays yours. Where a product genuinely has nothing to price, the sheet says
+so instead of quietly reading zero.
+
+**You can see how much quoting turns into work.** How many quotes become jobs,
+and how much of the money follows, is now a figure rather than a feeling.
+"Can we take this job?" is answered with a date on the machines screen, the P&L
+reports by month as well as by quarter with the margin on each, and a report you
+have built can be kept, reopened and thrown away.
+
+**Two things behind the glass.** The pages Khayt Online serves your customers —
+the intake form, quote approval, order tracking — could not have had a
+customer's name, email and phone posted away from them by an injected form;
+nothing was leaking, and the policy that would stop one now names every route it
+needs to. And a screen reader can say which box you are in: 178 fields showed a
+label that was only ever visual, so the reader announced "number edit" and
+stopped, on a settings screen carrying fifty-six number boxes.
+
+**Khayt for macOS is a real app now, and it updates itself.** It is on its own
+version line and its own notes, so the entries below marked *(Mac)* are its
+work rather than this release's. What matters here is that the two apps agree:
+the rules that decide money, tax, scheduling and pricing are one implementation
+tested against both.
+
+### Security
+
+- **A customer's details cannot be posted away from the intake form.** The pages
+  Khayt Online serves your customers — the intake form, the quote approval, the
+  order tracking page — carried a content policy that named four rules and left
+  everything it did not name unrestricted. Nothing was leaking: every value those
+  pages print is escaped, and that has not changed. What was missing was the
+  second line behind it. If an injection ever did land, nothing stopped it
+  posting the name, email and phone from the intake form to another host, or
+  fetching a quote's contents out through an image. The policy now names where a
+  form may post, what may be loaded, and who may frame the page — all of it your
+  own shop, which is the only place these pages ever needed to reach. This
+  matters most with the remote tunnel switched on, where those pages answer from
+  the internet rather than your own network.
+
+### Changed
+
 - **The machine figures at the top of Reports disagreed with the P&L table
   below them.** The overview worked out a machine's profit as revenue less what
   the parts cost, while the table underneath goes through the shared rule and
@@ -394,17 +1254,6 @@ tested against both.
   lengths, and `lib/downtime.js` is the one place that knows it. The windows a
   shop has stored are not touched: merging happens when the hours are counted,
   so "belt change" and "waiting for the part" both survive as written.
-
-- **(Mac) A job can be moved by right-clicking it.** Moving a job along is the
-  thing a shop does most, and it was the one thing only the menu bar could do.
-  The right-click menu on the orders table had edit, payment, hold, delivered
-  and the invoice, and no stages — so changing a status meant selecting the row
-  and going up to the menu bar for a decision already made about the row under
-  the pointer. A card on the board was worse: it had no right-click menu at
-  all, so moving a job two columns meant dragging it past the ones in between.
-  Both offer the stages now, and a card on the board offers everything the
-  table's menu does. It is one list in one place, and a move started from any
-  of the three asks the same questions and leaves the same record.
 
 - **Every customer who came in through the intake form was missing from the
   chart that says where customers come from.** Importing an order request
@@ -455,17 +1304,6 @@ tested against both.
   and the analytics defect chart would label it `t('waste.ft.' + type)` — which
   does not fall back, so a customer-facing report would print the literal
   string "waste.ft.whatever". Nothing is wrong today; this keeps it that way.
-
-- **(Mac) The Reports target was measured against a different set of jobs than
-  the figure beside it.** The monthly target on the Reports screen said it
-  counted finished, unvoided business — and filtered `completed` alone. The
-  quarters drawn beside it come from the shared profit rule, which counts a
-  legacy `delivered` job as finished too, so a shop that had marked work
-  delivered was comparing a target built from some of its jobs against an
-  actual built from all of them. Both sets are the same now. A test also scans
-  every Swift file the app is built from and fails on a status compared against
-  `"completed"` alone unless the site is listed with a reason, which is how
-  this one was found.
 
 - **"Net profit" on the Reports screen was a gross margin.** The figure was
   revenue less what the parts cost, which leaves out every expense the shop has
@@ -1309,15 +2147,6 @@ tested against both.
   does not register at all and the shop simply never appears.
 
 
-- **(Mac) A photo of the finished print can be added to a job.** Portfolio has
-  always shown these and nothing on the Mac could add one — so its empty state
-  told a shop to "add a photo to a completed order" with nowhere to do it, and
-  the only way was the Windows app. Open a finished job and choose *Add a photo
-  of the print*. It is stored exactly as the other app stores it — the same two
-  sizes, the same folder, the same filename — so a photo added on either
-  machine is one photo, and the empty state now takes you to the finished jobs
-  rather than just telling you about them.
-
 - **(iOS) Pairing now takes a copy of the shop's book.** The one moment a phone
   is certainly on the shop's Wi-Fi with the PIN freshly typed is the moment it
   finishes pairing, so that is when it asks for the book. It cannot fail the
@@ -1357,30 +2186,6 @@ tested against both.
 
   Unpairing removes the rollback copy as well as the book. A `.prev` left behind
   holds the same client list as the file that was deleted.
-
-- **(Mac) `GET /api/store` — enough of the book that a phone can stop asking.**
-  Every other LAN route answers a question, which assumes the asker is a screen
-  with a live connection. This one hands over records.
-
-  Not all of them. `printLog` is about half of a real shop's store and
-  `printFiles` another quarter, and none of that history has ever been on a
-  companion screen — so what travels is a working set: the settings, every
-  **unfinished** order whatever its age, the newest 200 finished ones, and the
-  clients, spools, machines and waiting list. A job stuck in QC for two months
-  is still in the shop, and a phone that dropped it for being old would hide the
-  very record somebody is chasing. `?scope=whole` still returns everything, for
-  a restore or a person with curl.
-
-  The reply is an envelope rather than a bare store, because the records alone
-  cannot say what was left out, and `omitted` names the withheld collections
-  instead of leaving them to be inferred from absence.
-
-  Secrets are masked by `KhaytCloudOutbox.forCloud` — the same rule the cloud
-  push uses, so a device on the LAN is trusted with exactly what the cloud is
-  trusted with and no more. Customers are not masked, because they are not a
-  secret, they are the book: which is why the owner PIN gates it, lockout
-  included. A failure answers 500 rather than an empty book, since a phone that
-  accepted `{}` would replace a shop it already had with nothing.
 
 - **(Repo) `KhaytCore` is flagged as shared, and a guard holds it to that.**
   A package filed under `mac/` now ships inside an iPhone, and nothing about a
@@ -1422,177 +2227,6 @@ tested against both.
   a 2018 phone nobody will buy new. Free today, expensive after the first shop
   installs it, which is why it is settled now.
 
-- **(Mac) The shop's own saved messages can be sent from the Mac.** Khayt has
-  always let a shop write its own WhatsApp messages — "Hi {{client}}, your
-  order {{id}} is ready!" — and this shop wrote three. Nothing on the Mac could
-  read them. The only way to write to a customer here asked a model to compose
-  something, which needs a key, a connection and an agreement to send a
-  customer's details to a service; most shops have none of those and all of
-  them already have their own words. Now: pick one on a job, see it filled in,
-  change anything, and WhatsApp opens with the number and the message ready to
-  send. Nothing is sent without a person pressing send.
-
-  Both apps fill the message through one rule now, so a template written in
-  either goes out of the other with the same fields filled — and that fixed a
-  fault in the original, where a customer whose name happened to contain a
-  field name, or a `$` pattern, could rewrite the rest of the message.
-
-- **(Mac) The print library is in Spotlight.** This shop keeps 209 models in 13
-  projects, and finding one meant opening Khayt, going to the library and
-  typing. A Mac already has a search box one keystroke from anywhere, and an
-  app holding hundreds of things that puts none of them in it is asking to be
-  opened before it can be useful. Every model is now a result — its name, its
-  project, its material, its tags and its thumbnail — and choosing one opens
-  Khayt on that model with it selected, clearing whatever the library happened
-  to be filtered to. A result that brings the app forward onto a grid not
-  containing what was picked would be worse than no result, so that is the half
-  the tests are mostly about.
-
-  Model names, projects and tags only: jobs carry customer names and prices,
-  and putting those into a system-wide index is a decision for a shop to make
-  rather than one to be surprised by. The sample book is never indexed either —
-  nobody wants "Benchy" in their Mac's search because they once looked at the
-  demo. There is a switch in Settings under "On this Mac", and switching it off
-  empties what has already been indexed rather than merely stopping.
-
-- **(Mac) A photo of the finished print can be added to a model.** Khayt has
-  always preferred a photograph over the generated preview when showing a model
-  — it is the print as it came off the bed, which is what somebody is trying to
-  recognise — and there was no way to take one here: a photo could only be
-  attached in the Windows app. Drop a picture on the model's page or choose one.
-  It is stored exactly as Khayt stores it, so a photo added here is one the
-  other app draws without knowing where it came from.
-
-
-- **(Mac) Khayt can find a printer that moved and never announced itself.**
-  "Find moved printers" listened for printers advertising themselves on the
-  network, which is how most of them are found — and a Snapmaker U1 advertises
-  nothing at all. On the very network it was printing on, the answer was "no
-  printers found", while the printer sat two addresses away answering every
-  question put to it directly. So when listening turns up nothing, Khayt now
-  asks instead: the addresses around the one the machine used to be on, nearest
-  first, on the ports Khayt already speaks. Only the machines that have actually
-  gone quiet, only their own corner of the network, a short question each, and
-  never on a timer — it happens when you press the button and not otherwise. The
-  button says which of the two it is doing, because listening takes a second and
-  asking takes rather longer.
-
-
-- **(Mac) A machine's maintenance schedule can be set up here.** Khayt could
-  already show what each printer was due for and let you tick a task off, but
-  the tasks themselves could only be created in the Windows app — so a shop
-  whose only app is this one saw a schedule it had no way to write, which meant
-  no schedule at all. Add a task, change what it is called or how often it comes
-  round, or stop tracking it. A task can run on hours, on days, or on both: a
-  nozzle wears by hours and a filter ages by days. A new task counts from today,
-  so setting one up on a printer that has been running for two years does not
-  open it as instantly overdue — and changing an interval does not mark the task
-  done, so a task that is overdue now stays overdue.
-
-- **(Mac) A machine row says how hard the printer worked, not just what it
-  earned.** Hours run and utilisation beside the money, because a printer that
-  earned little in three hours and one that earned little in three hundred are
-  the same figure on the left and completely different machines. The hours are
-  what the prints TOOK where the printer measured them, and the row says how
-  many were estimates rather than implying it was all timed.
-
-- **(Mac) The rating chart says what full height means.** Its bars are drawn
-  against a fixed five rather than against the best month in the data, so a
-  bar's height means something absolute — and nothing on the card said what. A
-  marked line at five, so a half-height bar is legibly two and a half.
-
-- **(Mac) Machine downtime is drawn.** How long each printer stood out of
-  action, over three months, beside what its servicing cost — a repair costs
-  money and it costs time, and the second is usually the larger number. The
-  rule behind it has been in this app since the scheduler started using it to
-  decide which machine takes the next job; nothing ever showed it to the shop.
-  It counts the union of the booked-out windows rather than their sum, so a
-  belt change booked Monday to Wednesday and "waiting for the part" booked
-  Tuesday to Thursday are the 72 hours the machine was really unavailable, not
-  96. Machines that never went down are left off rather than drawn as rows of
-  zeros.
-
-- **(Mac) A service can be written down: what was done to a machine, when, and
-  what it cost.** This app could show what each printer was due for and let you
-  tick a task off, and none of that reached the record. Marking a nozzle change
-  done updated the schedule and wrote nothing to the service log — so a shop
-  doing its servicing here had no history of any of it when it looked in Khayt,
-  and every maintenance figure in both apps counted none of it: the machine
-  P&L subtracts these costs from a printer's profit, and the Reports chart
-  totals them. Ticking a task off now records the service as well, the way
-  Khayt has always done it, and each machine has a log you can add to and
-  delete from. Recording a repair as an expense too is offered and off by
-  default, because a machine's profit already has its servicing taken off it
-  and doing both counts the money twice.
-
-- **(Mac) Reports draws four figures it had no screen for: expenses by
-  category, where customers came from, what they thought of the work, and what
-  servicing each machine cost.** The rules behind all four were written and
-  tested for the other app and had stayed there, so the Mac could not answer
-  any of them — and every one of the four had a real fault fixed on the way in,
-  so the Mac gets the fixed version. The customer-source chart never counted
-  anyone who arrived through the shop's own intake form. The expense breakdown
-  summed the gross while the P&L above it charged the net, so the parts did not
-  add up to the whole they were a breakdown of. The rating chart's caption
-  counted every rating the shop had ever collected while the chart under it
-  covered six months, which is how forty happy reviews from last year go on
-  describing a bad quarter. And the maintenance chart read a per-machine
-  property nothing in Khayt has ever written, so it printed "No data yet"
-  however many services a shop had logged — the figures come from the flat
-  service log they actually live in, which this app already reads.
-
-- **(Mac) A customer can be given a lead source.** The Reports screen counts
-  customers by where they came from, and nothing on this app could set one — so
-  a shop that does not also run Khayt on Windows read "Other" for every
-  customer it had. The field was already carried through a save untouched;
-  it simply could not be entered. The list of sources is asked of the shared
-  rule rather than written down a second time, which is the fault that lost the
-  intake form's customers from the chart in the first place. A source this
-  build does not recognise is shown as itself and kept, not quietly refiled.
-
-- **(Mac) A zip of models can be added to the library.** A shop downloads a
-  model as a zip because that is how every model site hands one over, and
-  dropping one on the library did nothing at all — the import walks for `stl`,
-  `3mf`, `obj` and gcode, and a `.zip` is none of those, so it was skipped in
-  silence with no error and no model. Khayt reads the archive now, takes the
-  models out of it and leaves the readme and the render previews behind, and
-  groups what came out by the archive's own name the way a folder of models is
-  grouped by its folder. The zip itself is never consumed; it stays where you
-  put it.
-
-  Expanding an archive writes someone else's bytes onto the shop's disk, so it
-  goes through the same rule that guards a customer's upload
-  (`lib/upload-scan.js`): an archive naming a file outside itself, one that
-  expands to far more than it weighs, one with too many members, or one that is
-  not really a zip is refused with the reason said plainly. A shop's own
-  download came from a stranger too.
-
-- **(Mac) There is a way back out of a library folder.** Tapping a folder put
-  the whole grid inside it and left nothing on screen to get out again — the
-  routes were the sidebar's Library row and the Go menu, neither of which is
-  where somebody who has just tapped a folder is looking. There is a path at
-  the top now, "Library / Saudi Kings", with the first half doing the work, and
-  ⌘[ does it from the keyboard. It could not live in the filter bar below: that
-  draws nothing when there are no chips, so the plainest folder would have had
-  no way back at all.
-
-- **(Mac) A converted model goes into the library, and can put the original
-  aside.** A conversion used to end at a file in a folder. The shop then had to
-  go and import the thing it had just made — in the one app whose whole job is
-  knowing what models it has — so the converted file was the only model in the
-  building Khayt did not know about. It is added to the library now, and it
-  still lands in the folder the save panel asked about, because that is where
-  the shop just said to put it.
-
-  The save panel also offers to put the original aside. **Aside, not deleted.**
-  A job printed six months ago was printed from the original's bytes, and
-  removing them so the converted file could take the record's place would make
-  that job appear to have been printed from a file it never saw. So the record
-  keeps everything it had, gains the date and the id of what replaced it, and
-  stops being offered by the library; the file stays where it is. It can be
-  brought back. Keeping both is the default, because that is the answer that
-  loses nothing.
-
 - **A job can be marked shipped.** Between finishing a job and handing it over
   there was nowhere to say it had gone in the post, so a parcel sitting with a
   courier looked exactly like one still on the bench. The board has a Shipped
@@ -1613,17 +2247,6 @@ tested against both.
   spend — in about forty places, and the one that got missed would have been a
   shop's money quietly going somewhere.
 
-- **(Mac) A customer's model can be priced by slicing it, not by guessing at
-  its shape.** The estimate from geometry is honest but blunt: it cannot know
-  about purge, and on a real four-colour dragon the shape said 13 g where the
-  slicer said 57. With this on, a cleared upload is sliced by the shop's own
-  slicer — the one it picks for this, or its default — and the slicer's own
-  weight and time are what the customer is shown. Off in a fresh book,
-  because it is the only setting in Khayt that writes a stranger's file down
-  and points a native binary at it. Anything missing — no slicer, a slicer
-  since removed, a slice that produced nothing — falls back to measuring the
-  shape rather than failing.
-
 - **A customer's upload is inspected before it is used.** Is it the kind of
   model its name claims; does an archive name a member outside the folder it
   would be opened in; does it expand out of all proportion to what arrived. A
@@ -1635,105 +2258,10 @@ tested against both.
   shop reads it: a parser bug in somebody else's C++ is not something a
   structural check can see.
 
-- **(Mac) A listing can be taken off the catalogue.** There was no way to
-  delete a product here at all — the words for it had been sitting in the app
-  unused. Right-click a product in the grid or the table and it asks, in
-  Khayt's own sentence, which names what survives as well as what goes: the
-  photo is removed, past invoices are kept. Deleting also unlinks every job
-  that named the product and drops it from any quote bundle, because a job
-  pointing at a product that is not there is the kind of fault that surfaces
-  months later as a screen that cannot draw. All of it comes back with one
-  undo, except the pictures, whose bytes are gone — the record is restored
-  without them rather than naming files that no longer exist.
-
-- **(Mac) Settings → Online can switch public pricing on, and make the
-  printer preset it needs.** The customer-facing price is built from a saved
-  preset — a name and the seven figures a part is costed at — and the shared
-  rule refuses outright without one. Until now a preset could only be made in
-  the other app's calculator, so the Mac could serve the upload and never
-  answer. The pane now carries the whole block (the switch, the preset, the
-  material or a flat spool cost, margin, minimum, waste and the per-visitor
-  hourly ceiling), says plainly when there is no preset yet, and will make
-  one: name it, adjust the seven figures, and it is saved and chosen. A name
-  already in use replaces that preset rather than doubling it, which is the
-  other app's rule and the same id, so anything pointing at it still does.
-
-- **(Mac) A customer can price their own model on the intake form.** With
-  public pricing switched on, the form offers an upload: the file is measured
-  in memory, priced on the shop's own preset, spool cost, margin and waste
-  allowance, and the figure is shown as an indication rather than a quote. A
-  sliced file is taken at the slicer's own weight and time; an STL, OBJ or
-  3MF is measured by this app's own reader. Nothing is written to disk — the
-  model is read and dropped, so there is no stranger's file on the shop's
-  machine to keep or explain. When the request is submitted, the price
-  attached to it is the one THIS server produced, recalled by reference, so
-  a browser cannot post a figure of its own. The rules are the shared ones
-  (`lib/public-quote.js`, `lib/gcode-parse.js`), which the other app already
-  quotes through, so a customer is never shown a different sum from the one
-  the shop would reach for the same part.
-
-- **(Mac) The shop's due dates as a calendar subscription.** With the LAN
-  server on, Settings → Online shows the same `/calendar.ics` link the
-  Windows and Linux app offers: one all-day event per open job with a due
-  date, tentative until it is printing, for any calendar app on the shop's
-  Wi‑Fi. The feed is one shared module now (`lib/lan-calendar.js`), lifted
-  verbatim out of the Node route and held byte-identical to it; the
-  subscription token is minted into the book the first time the Mac serves.
-
-- **(Mac) "Where is my order": the customer's tracking page, served by the
-  Mac.** On a job under way or done, the inspector has "Copy tracking link":
-  the link points at this Mac, carries the job's own tracking token (minted
-  the first time, as the other app mints it) and opens the same page that
-  app serves — the stage of the order, its details, the shipping, and once it
-  is complete a short survey the customer can answer from the page. The page
-  is lifted verbatim out of the Node route into `lib/lan-order-page.js`, the
-  Node server draws from it, and the carriers directory moved from the
-  renderer into `lib/` so both hosts read the same carrier names and links.
-
-- **(Mac) Rounding and "Your own price" on the product sheet.** The two
-  controls Khayt's product editor has had all along — round to a step (up,
-  down or nearest) and a typed price that wins over everything — with the
-  price preview following them as they change. Until now a shop on the Mac
-  could see a catalogue price move and had no way to set it back.
-
-- **(Mac) The phone's live queue, served by the Mac.** A new Online tab in
-  Settings carries the LAN block the Windows and Linux app keeps under
-  "Advanced": enable the server, listen on the shop's Wi‑Fi, set the owner
-  PIN. Switch it on and a phone on the same network gets the same live queue
-  page, status API, queue API and installable home-screen icon that app
-  serves — the same bytes, from one shared module (`lib/lan-pages.js`), behind
-  the same PIN and the same lockout rules (`lib/lan-auth.js`), with the same
-  security headers on every response. Saving restarts the server when the
-  port or the PIN changed. The intake form, quote approval, the calendar feed
-  and the webhooks are still the other app's; they follow.
 - The shared settings save (`lib/settings-edit.js`) now takes the LAN block
   from a form and merges it the way the Electron page always did: the fields
   shown over the stored block, a blank PIN keeps the current one, a port that
   is not a port is 3219. The Electron page is unchanged.
-
-- **(Mac) The customer intake form, served by the Mac.** With the LAN server
-  on, `/intake` on a phone or laptop on the shop's Wi‑Fi is the same request
-  form the Windows and Linux app serves — same page, same session cookie,
-  same limits on opening and submitting it, same consent record — and a
-  submitted request lands on the Waiting screen at once. The form's template
-  and the rule that turns a submission into a waiting-list entry are one
-  shared module now (`lib/lan-intake.js`); the Node server draws from it and
-  is held byte-identical to its old handlers. Not yet on the Mac: pricing an
-  uploaded model on the form (the form does not offer the upload here) and
-  the legacy intake PIN route.
-
-- **(Mac) A customer approves a quote from their phone.** On a job that is a
-  quote, the inspector has "Copy quote link": the link points at this Mac,
-  carries the job's own approval token (minted into the job the first time,
-  as the Windows and Linux app mints it), and opens the same quote page that
-  app serves — the parts, the total in the shop's currency, the expiry, and
-  one button. Approving moves the job to pending inside the write on the
-  newest book; a quote that expired, or was already approved, gets the same
-  answer the other app gives. The page's small companions (not found, bad
-  link, expired, cannot approve, approved) are lifted out of the Node routes
-  into `lib/lan-quote-page.js`, verbatim, and the Node server draws from
-  them; the rule's clock is injectable so both hosts can be held to it. Not
-  yet on the Mac: the order tracking page and the legacy POST /order/:id.
 
 - **The P&L by month as well as by quarter, with the margin on each.** On the
   Mac the Reports P&L page has a "By quarter / By month" switch and a Margin
@@ -1742,27 +2270,6 @@ tested against both.
   pro-rated — and a blended margin: money accumulated and divided once, on
   revenue net of tax, never the mean of per-job percentages. The other app's
   monthly revenue-against-expenses and margin charts draw from it now.
-
-- **(Mac) Whether the shop keeps its promises, on Reports → Best.** Of the
-  finished jobs that had a due date, how many were done by it, how many were
-  not and by how many days — and the promises missed, worst first, which the
-  other app's section never named. The same rule (`lib/on-time.js`), which the
-  other app's section now draws from.
-
-- **(Mac) What was thrown away, by month and by why, on the Waste screen.**
-  Six months of wasted grams stacked by failure type — the heaviest three by
-  name, the rest as "other" — with a key that says each type's grams. The same
-  rule as the other app's chart (`lib/waste-trend.js`), which now draws from it.
-
-- **(Mac) How long a job takes, on Reports → Best.** Six months of the
-  average from the day a job was taken to the day it was done, and under it
-  the products that take longest — average, fastest, slowest. The same rule as
-  the other app's two charts (`lib/cycle-time.js`), which now draw from it.
-
-- **(Mac) Cost and revenue trends, on the Reports screen.** Twelve months of
-  what an hour of printing earned and what a gram of material cost, under the
-  cash flow. The same rule as the other app's chart (`lib/cost-trends.js`),
-  which it now also draws from.
 
 - **A job's price can be adjusted after it is taken — in both apps.** The
   Mac's edit-job sheet and the order editor on Windows and Linux both take a
@@ -1780,26 +2287,6 @@ tested against both.
   arithmetic beside it, so it is never mistaken for one, and the job records
   which of the three reached its price (`computedPrice`, `priceSource`,
   `priceRound` or `priceOverride`; a plain job carries none of them).
-
-- **(Mac) A customer's price agreements, standing order and communications
-  log.** The three things that follow a customer into every job were stored,
-  carried through a save untouched, and shown nowhere on the Mac — the help
-  said to edit them in the other app. The customer sheet now edits what they
-  have agreed to pay for particular things (a product word, a price, a note;
-  "bracket" covers "Wall bracket, steel") and their standing order (weekly to
-  quarterly, next date, paused, end date, skip a cycle). Choosing the customer
-  on a new job applies their discount and their agreed prices to the cart, and
-  a part added afterwards takes them too. The log of calls, messages and
-  meetings is in the customer's pane, newest first, and a line is written the
-  moment it is added — not when a sheet is saved. Both shapes the other app
-  writes are read.
-
-- **(Mac) Standing orders are made on the Mac.** When the book opens, every
-  schedule that is due produces its job — a copy of the customer's last
-  completed job with the previous run's payment, photos, actuals and dates
-  reset, the cycle's date as its due date and the cycle written on it — and the
-  toolbar says how many. The same rule the other app runs, so a book opened on
-  a Mac and a PC gets one job per cycle, not two.
 
 - **The Mac app can say what a model IS, and tag it.** It could already file
   models into a project; category and tags were readable, filterable and
@@ -1819,106 +2306,6 @@ tested against both.
   network" in the Prusa app, or the camera answers "no stream" and the tile says
   it is waiting. Mac only for now — the Windows and Linux app has no decoder.
 
-- **(Mac) What a model would take, before anybody slices it.** Khayt could
-  measure a mesh from the day it could read one and could never price one — a
-  model you had not printed showed a size and a triangle count and no answer to
-  the question you actually had. The library inspector now says what it would
-  take in filament and in hours.
-
-  **It does not ask how fast your printers are, because nobody knows that about
-  their own printer.** The estimator's hardest number had been the same guess
-  for everyone since it was written. It turns out not to need guessing: it only
-  ever appears multiplied by density, and that product is grams per hour —
-  which every job whose real weight and duration were recorded has measured.
-  So Khayt learns it from your own work, says how many jobs it learned from,
-  and says plainly when it is still using its own default instead.
-
-  It will not learn from a job nobody measured, from one job, or from a figure
-  divided across several parts — calibrating an estimator against its own
-  estimates teaches it nothing.
-
-  Settings → Preferences carries the four numbers you can answer for: density,
-  infill, wall thickness and waste. There is deliberately no field for the
-  speed.
-
-- **(Mac) A printer that changed address can be found again.** A DHCP lease
-  expires overnight, the router hands out a different address, and Khayt polls
-  a host that answers nothing. It said *offline* — which is also what it says
-  when a printer is switched off, and the two have completely different fixes.
-
-  A machine that has gone quiet now offers *Find it on the network*. Where the
-  printer announces the serial or the hardware address Khayt recorded — neither
-  of which moves with a lease — that is identity, and one click points Khayt at
-  it. Where the evidence is only that exactly one printer of the right model is
-  answering, it says so and asks you to check first, because pointing the app
-  at a machine is what it will later send commands through.
-
-  **What this was costing.** Khayt freezes a job's real filament and duration
-  on the edge out of printing, because the printer's counters reset when the
-  next job starts. Every print that finished while the address was stale is a
-  measurement that no longer exists — found exactly that way when a Snapmaker
-  U1 moved from .77 to .56 and the completion history came back empty rather
-  than short.
-
-- **(Mac) A model in your library can become a product.** The library knew what
-  each model weighs and how long it takes — parsed when you imported it — and
-  the catalogue asked you to type both in again. *Make a product from this* is
-  on the Model menu and on a model's right-click menu, and the product arrives
-  with its first part already filled: weight and time from what the slicer
-  measured, material and layer height from the setup you have had most success
-  with.
-
-  **It is joined to the model, not just named after it.** A part used to carry
-  the file's NAME — a filename somebody typed — so nothing else could follow
-  it. It carries the model's identity now, which is what makes "for this part,
-  at these settings, how far out is my estimate?" answerable later.
-
-  What the file cannot answer for is named on screen rather than left at zero,
-  because a zero that looks typed is worse than a blank you were told about.
-
-- **(Mac) The assistant has a screen of its own.** Khayt's AI features could be
-  switched on in the other app and not this one, so a shop on a Mac could be
-  told a feature was running and have no way to see — let alone refuse — what
-  it sends. Settings → AI assist now carries both halves together: which
-  provider you use, and a switch per feature with what each one transmits
-  written beside it.
-
-  **The two halves ship together deliberately.** A provider chooser on its own
-  would let you point Khayt at a vendor without being told that drafting a
-  customer reply sends their name, their order reference and their outstanding
-  balance. A list of switches on its own would name a vendor you had not
-  chosen. The one that sends a customer's data is badged as such, and nothing
-  on the screen works consent out for itself — it asks the same rule the gate
-  asks, so a feature can never read as off while it runs.
-
-  Your key is sealed with the book's own key before it is written, the same way
-  a printer's key is, because this file syncs, is backed up and is exported. A
-  key that cannot be sealed is refused rather than stored in the clear.
-
-- **(Mac) Khayt can tell you what is likely to go wrong before you quote.**
-  Select a model and the inspector says what a slicer would find: how much of
-  the surface overhangs past 45° and will need supports, how much is
-  near-horizontal underside that sags rather than merely printing rough, and
-  whether the walls average thinner than the nozzle can lay down.
-
-  Every line carries the measurement it is based on, so you can disagree with
-  it. A shop that supports everything by default can see at a glance which
-  line to scroll past, and a part with nothing wrong says so — "nothing to
-  flag on this one" is a different answer from not having looked.
-
-  **It works on the files you actually own.** The other Khayt computes the same
-  findings for a quote, but it has to build the whole triangle list to do it
-  and gives up past four million facets. Two models in this library are past
-  that. The Mac reads the mesh as a stream and keeps ninety-one numbers, so the
-  size of the file stops being the question.
-
-  Under Settings → Preferences you can choose *when* Khayt looks: **when you
-  ask**, which is the default, or **as each file is imported**. Reading a mesh
-  is a few seconds on a large model — paying that during an import answers
-  instantly forever after, and leaving it until you ask keeps imports fast.
-  Either way the answer is kept, so the same model is never read twice, and it
-  is thrown away if the file behind it is replaced.
-
 - **Khayt's AI features work with the AI you already pay for.** They were
   Anthropic and nothing else. You can now choose OpenAI or Google Gemini
   instead — or point Khayt at any OpenAI-compatible address, which covers
@@ -1937,115 +2324,6 @@ tested against both.
   summary of what changed — the file is 0.78 MB on one line, so the diff alone
   tells a reviewer nothing.
 
-- **(Mac) Adding a spool can be a lookup instead of typing.** Start typing a
-  brand or a product — "bambu matte", "esun petg" — and Khayt offers the
-  filament and its colours from a bundled catalogue of 1,945 products, filling
-  in the name, the colour, its hex and the spool weight.
-
-  It fills in what a manufacturer can know and nothing else. Your cost, what the
-  roll weighs today, when you opened it and whether you have dried it are facts
-  about the spool in your hand, and nothing here invents them — and editing a
-  half-used roll never overwrites what is on it.
-
-  The list ships with the app, so it works with no connection and Khayt does not
-  tell anybody what you buy. It says how old it is rather than pretending to be
-  current. From the Open Filament Database, MIT-licensed — see
-  [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md).
-
-- **(Mac) A job's parts can be corrected.** They were read-only: a weight typed
-  wrong when the job was taken stayed wrong, and the only way to fix it was to
-  open the job in the other Khayt. Double-click a part to change its name,
-  filament, weight, hours or quantity.
-
-  **The price is not a field you type.** A part that weighs 40 g rather than
-  30 g costs more to make, so the figures you know are asked for and the price
-  follows from the same cost model the calculator uses. Correcting a weight
-  corrects the job.
-
-  Where the part came from a model in your library, *Fill from file* takes the
-  weight and time the slicer measured. It shows you both figures first rather
-  than overwriting quietly — a part may have been corrected on purpose — and it
-  says which fields the file could not answer for instead of leaving zeros that
-  look typed.
-
-- **(Mac) A print made of several files says so.** A head, two arms and a torso
-  are one thing you print, not four — but the Mac app showed a kit as a single
-  entry with the rest of its files invisible. The model's panel now lists every
-  file in the print, marks the one the card speaks for, and adds up what the
-  whole thing weighs on disk.
-
-  Where a file could not be measured it says so, and the total is left off
-  rather than quietly adding up the parts it could measure and presenting that
-  as the size of the print.
-
-- **(Mac) An invoice says whether it has actually been reported to ZATCA.**
-  Khayt already put the Phase 1 QR on the document. What the Mac app could not
-  tell you was whether an invoice you had handed a customer had been reported to
-  the tax authority at all — which is the part a Saudi shop can be penalised
-  for, and it was invisible on this side. A completed invoice now says
-  submitted, not submitted, rejected or errored, with the counter value and, if
-  it was refused, the reason it was refused.
-
-  It does not offer to submit. Signing the document needs code that only runs in
-  the Electron app, and a button here that could not finish the job would be
-  worse than a plain statement. Nothing appears at all on a shop that has not
-  switched Phase 2 on, because none of this applies to it.
-
-- **(Mac) Khayt remembers what a print actually worked at.** A file counted how
-  many times it printed and how many times it failed, but not *with what* — so
-  reprinting a bracket six months later you knew it had worked once and had no
-  idea on which printer, in which material, at which layer height. The model's
-  panel now lists the settings it has been printed at, marks the one to reach
-  for, and says plainly when nothing has worked yet rather than naming the least
-  broken option.
-
-  One bad print does not condemn a setup: filament runs out, a spool tangles,
-  somebody knocks the machine. Nine of ten is still a setup to reach for, and
-  one of four is not, however recently that one worked. A setup nobody has run
-  reads as untried rather than as a score of nought — and your own verdict
-  overrides the tally, because "it printed, but I did not like the finish" is a
-  judgement no counter can reach.
-
-- **(Mac) A print that exists at more than one size says so.** Big and small
-  carry their own weight and time, so the panel shows each with its own figures
-  and marks the one the estimate is about. Files that have only ever been one
-  thing — nearly all of them — are unchanged.
-
-- **(Mac) Khayt says what is about to run out that is not filament.** Glue, IPA,
-  mailing bags, spare nozzles — running out of one of those stops a job exactly
-  the way running out of filament does, and only filament reached the Mac app's
-  shelf. The inventory screen now leads with what needs ordering, in each item's
-  own unit.
-
-  Three different reasons put something on that list and they read differently:
-  it has run out, it is below the minimum you set, or nothing is wrong yet and
-  the rate you are getting through it says otherwise. The last is the one you
-  cannot see by looking at the rack. Where Khayt has no usage figure and you
-  have set no minimum, it says the item is low and stops there rather than
-  inventing a quantity to put on a supplier's order.
-
-- **(Mac) Khayt tells you what each printer is due for.** A machine card now
-  lists the recurring jobs set against that printer — replace the nozzle, clean
-  the plate, check the belts — with how far off each one is and a button to mark
-  it done. Amber when it is close, red when it is past, and nothing at all on a
-  printer nobody has set tasks up for.
-
-  The hours are the hours Khayt has logged, counting finished prints only. A
-  cancelled print used some of the machine's life in reality, but the log has no
-  honest figure for how many, and counting the whole estimate would bring
-  services forward on exactly the printers that fail most.
-
-- **(Mac) Khayt finds printers on your network.** Adding a machine meant knowing
-  its address and typing it — and a shop that has just plugged a printer in does
-  not know it, so the number gets copied by hand off the printer's own screen
-  across the room. *Find printers* on the machines screen asks the network
-  instead, and adding one fills in its address, its connection type and — when
-  Khayt recognises the model — its bed, nozzle and running cost.
-
-  The scan is owner-initiated and time-boxed, never on a timer, and macOS asks
-  your permission the first time. A printer Khayt can see but cannot yet speak
-  to says so rather than being added as though it were ready.
-
 - **(Maintainers) The mDNS codec runs on the Mac now.** `lib/mdns.js` was built
   on Node's `Buffer`, which JavaScriptCore does not have — so the one piece of
   wire-format code both apps need could be loaded by only one of them, and
@@ -2053,30 +2331,6 @@ tested against both.
   name compression. Two codecs is two chances to mis-read a packet arriving
   unauthenticated from the workshop network. It is `Uint8Array` throughout now;
   `Buffer` *is* a `Uint8Array`, so nothing in the Windows and Linux app changed.
-
-- **(Mac) Khayt can tell a printer what to do.** The Mac app could watch seven
-  protocols and touch none of them: it knew a print was failing, it knew which
-  machine, and stopping it meant walking to the printer or opening the other
-  app. Pause, resume and cancel are on the machine card now, while something is
-  running. Cancelling asks first — it throws away every hour already in the
-  plate, and no printer asks twice.
-
-  **And on a Klipper or Moonraker printer, one object can be dropped from a
-  plate that is still printing.** For the single part that has come loose, while
-  the rest of the plate carries on. It cannot be undone, so the sheet names the
-  object and says so.
-
-- **(Mac) Khayt says what to run next.** It knew the queue and it knew which
-  printers were idle; putting the two together was a person doing it in their
-  head. The machines screen now proposes a job for each free printer — urgent
-  first, then due date, then longest waiting, and preferring the machine already
-  loaded with the right material so there is one fewer spool change.
-
-  **It proposes; you press Send.** No printer Khayt talks to can clear its own
-  plate, so an idle printer is very often an idle printer with yesterday's part
-  still on it. A machine is only offered once somebody has said its bed is clear
-  since its last print — and a machine waiting on that says so, rather than
-  quietly disappearing from the list.
 
 - **One object can be dropped from a print that is already running.** A plate of
   twelve parts where one has come loose finishes with eleven good parts and a
@@ -2089,41 +2343,6 @@ tested against both.
   **It cannot be undone.** Klipper has no way to put an object back — the layers
   skipped while it was dropped are not reprinted — so anything asking for this
   has to name the object and say so first.
-
-- **(Mac) Khayt has help, in your own language.** Sixteen articles — the book,
-  jobs, the board, customers, the library, the catalogue, the shelf, machines,
-  money, reports, cloud sync, backups, settings, the keyboard and what to do
-  when something is wrong — in English and Arabic, searchable, from the Help
-  menu or ⌘?. It opens in a window of its own so you can read it beside the
-  screen you are asking about, and it follows the language *Khayt* is set to
-  rather than the one the Mac is set to.
-
-- **(Mac) A product can be written down on the Mac.** The catalogue could be
-  read here and not added to: making a product meant opening the Windows and
-  Linux app. There is an editor now, with one tab per language your catalogue
-  carries rather than a fixed English and Arabic — a shop selling in German gets
-  a German tab. Everything the sheet does not show is left exactly as it was:
-  the parts, the prices per quantity, the photo and the documents.
-
-- **(Mac) The catalogue can be looked at, not only read.** A grid of photographs
-  beside the existing table, which stays the default because it is the only view
-  that puts margin next to weight. The library has had this argument made for it
-  since it shipped — a print shop recognises a thing by looking at it — and the
-  catalogue is where it is truest.
-
-- **(Mac) Importing models is on the library, and keeps your folders.** The only
-  way in was a menu item called "Add model" in the Book menu; the library screen
-  itself offered nothing, and dropping a folder on it did nothing. There is an
-  *Import models* button on the library now, and you can drag files or folders
-  straight onto it.
-
-  **It also keeps the grouping you already had.** Every imported model used to
-  arrive ungrouped, so a download of seven models in seven folders had to be
-  regrouped by hand. The folder a model came from is now the group it lands in —
-  and packaging folders are seen through: a model at
-  `Saudi Kings/King Abdulaziz/STL/presupported/crown.stl` is filed under *King
-  Abdulaziz*, not under *presupported*.
-
 
 - **(Maintainers) The LAN server's gates are one implementation now.** The
   brute-force lockout, both global throttles, the PIN-strength rule for tunnel
@@ -2349,27 +2568,6 @@ tested against both.
   assumed.
 
 
-- **(Mac) Three more things the app knew and never said.** Hunting the cause of
-  the Simple-mode fault turned up the same shape three more times: a shop was
-  never told that records in its book could not be read — the app had dropped
-  data and said nothing — never told that Khayt had closed unexpectedly the
-  time before, and never shown what syncing was doing. All three had been
-  written into the window Khayt stopped opening with, so they shipped in no
-  window at all. They are in the one that ships now, and a check reads both
-  windows to make sure nothing is left behind in the old one again.
-
-- **(Mac) Simple mode has never hidden anything.** A shop set to Simple saw
-  Expenses and Reports exactly as a Professional one did, in both the sidebar
-  and the menu bar. The rule was right, the setting reached the app, and the
-  check was written correctly — into the window Khayt used to open with. The
-  redesigned one has been the default since alpha.12 and never asked. The menu
-  and a reopened window never asked either, so the keyboard shortcuts went
-  straight to the screens. All three ask now, from one answer rather than three
-  copies of it, and a check holds them to it.
-
-  Khayt still cannot SET the mode on a Mac — that is done in the Windows app —
-  it can only honour one.
-
 - **(iOS) The companion did not compile, and nothing in CI noticed.** `shipped`
   was added to the order-status list — the enum learned it, the English label
   learned it — but the switch that translates a status for an Arabic shop did
@@ -2379,24 +2577,6 @@ tested against both.
   `xcodebuild`, and the iOS contract check compiles `KhaytModels.swift` by
   itself — which is one of the files that WAS finished. Both Arabic and
   English already had the word.
-
-- **(Mac) Khayt's Siri shortcuts have never worked, and nothing said so.** The
-  app declares two — "What is printing in Khayt" and "What is waiting in
-  Khayt" — and the step that publishes them to the system was looking in the
-  wrong folder on every build since it was written. It printed a line about it
-  that read like a known limitation rather than a fault, in the middle of a
-  build log, so the app shipped with no Shortcuts and no Siri and no way for
-  anybody to tell. Both now reach the system, and a build that cannot publish
-  them says so loudly instead.
-
-- **(Mac) The sample book expired overnight and took two tests with it.** The
-  demo shop's dates are written into a file and the calendar is not, so the
-  last job in its queue fell past due and the "at risk" projection — which only
-  reports work that will miss its date but has not yet — had nothing left to
-  say. Nobody changed anything; the day changed. The queue has been run forward
-  and there is now a check that fails a week before it can happen again,
-  saying what to move and why, so it lands as a chore rather than as a stranger's
-  branch breaking for no reason they can see.
 
 - **A Mac test accused the tablet server of holding connections open when it
   was not.** The read-timeout tests lowered a shared setting, ran, and put it
@@ -2408,61 +2588,6 @@ tested against both.
   timeout belongs to a server now rather than to the whole app, so there is
   nothing shared to race on — and the same search found one more test with the
   same shape, in a different file, which is now fixed too.
-
-- **(Mac) Every repair typed into the Mac went into a field nothing reads, and
-  the machine P&L charged no maintenance at all.** The service log was written
-  under the name the other app keeps it under *in the browser's own storage* —
-  not the name it uses in the shop's book. The book has only ever had the
-  second. So a nozzle change logged on the Mac never appeared in Khayt, and the
-  figure that decides whether a printer is worth keeping was missing every
-  riyal a shop had spent servicing it, silently and on every real book.
-
-  Every test passed throughout, because the sample book had been written to
-  match the mistake. The key is checked against the other app's own source
-  now, so a fixture and a constant cannot agree with each other while both are
-  wrong. Repairs already typed into a Mac alpha are moved into the right place
-  the next time the book is opened — they are a shop's own work, not something
-  to drop.
-
-- **(Mac) The invoice and label sheets are laid out with everything they do not
-  need switched off.** Both are drawn by WebKit, because the document is the
-  same html Khayt prints and laying it out any other way would mean a second
-  answer to what an invoice looks like. It is still a browser handed a page
-  built out of a shop's own data, and it could run scripts and follow links —
-  so a link in an invoice note could have put a web page inside Khayt's own
-  window. Neither is possible now. The content was already escaped, so nothing
-  was getting through; these are the second and third locks.
-
-
-- **(Mac) Looking for a moved printer said nothing at all unless it worked.**
-  "Find it on the network" either found the printer and offered the move, or
-  left the screen exactly as it was — no "nothing answered", no "that could not
-  be saved", not even "moved to .56" when it had just done it. The messages were
-  being written the whole time and nothing drew them. On a screen a shop only
-  visits when something is already wrong, silence is the worst of the answers,
-  and the new sweep made the wait before it much longer.
-
-
-- **(Mac) An empty Utilisation column said nothing about why it was empty.**
-  Hours run against hours wanted needs somebody to have said what was wanted,
-  and a machine has no target hours a day until you fill one in — so every row
-  showed a dash, correctly and unhelpfully. A column of dashes reads as a figure
-  the app could not work out rather than one it was never given, and the field's
-  own hint is on the machine sheet, not on Reports. It says so now, once, under
-  the table, and only while no machine has a target at all.
-
-
-- **(Mac) A device on the shop's Wi-Fi could hold the LAN server's connections
-  open indefinitely.** A client that connected and then said nothing — or
-  announced a body and never sent it — was waited on for ever: no answer, no
-  close, the connection held until the app quit. Open enough of them and the
-  shop's own phones cannot get through. The Windows app never had this because
-  Node's web server applies its own time limits; this one is built directly on
-  the system's networking and had none. A request now has fifteen seconds to
-  arrive, after which the connection is let go. The clock stops the moment the
-  request is complete, so a slow connection is never cut off partway through
-  the answer it asked for.
-
 
 - **(iOS companion) A shipped order showed the English word "shipped" to an
   Arabic shop.** The phone's status list is a closed set and `shipped` was
@@ -2514,17 +2639,6 @@ tested against both.
   and the overview above already use, and the cap is a committed test rather
   than a comment.
 
-- **(Mac) A live print's percentage was captioned "as the printer shows it",
-  beside a number the printer was not showing.** Khayt reads the slicer's own
-  M73 figure, which counts elapsed TIME. A Snapmaker U1's panel counts file
-  position. Mid-print those genuinely differ — 57% here against 63% there on a
-  print measured end to end — so the caption promised an agreement that does
-  not exist, and a correct figure read as a fault. It says "of the estimated
-  time" now, which is what it measures. Khayt's is the better clock and that
-  was measured rather than assumed: across thirty samples of one print, its
-  figure predicted the finish to a mean of two minutes, against five for the
-  printer's own model and thirteen at its worst.
-
 - **(Maintainers) Nothing proved that Simple mode actually hides anything.**
   Every test loaded the sample book, which carries no mode at all and is
   therefore Professional, and asserted that every gated screen was present — so
@@ -2537,17 +2651,6 @@ tested against both.
   read the edited book. Three tests now cover it: Simple loses what its mode
   excludes and keeps what is not gated, an enthusiast book reads as Simple but
   keeps its customers, and a book with no mode keeps everything.
-
-- **(Mac) Dragging a card onto the new Shipped column would have written an
-  invalid status.** The board draws a column per stage and every column is a
-  drop target, so the moment Shipped got a column, dropping a card on it asked
-  to set `status: 'shipped'` — the exact thing the stage was designed as a
-  stamp to avoid, because a job with a status no "finished" set knows about
-  drops out of revenue, the P&L, the VAT return and a customer's lifetime
-  spend without anything reporting an error. The shared rules refuse the move
-  now, so no app can make it, and the board performs the stamp instead. Only
-  `shipped` is refused: `delivered` is derived the same way but is a status
-  older books really carry, and it has always been an allowed destination.
 
 - **Twenty-two more figures were computed from part of the book.** Khayt
   wrote `delivered` before it wrote `completed` with a `deliveredAt` beside
@@ -2576,20 +2679,6 @@ tested against both.
   such field reclaims nothing, so nothing about an older book changes; and a
   shop that is not registered reclaims nothing at all. A receipt claiming more
   tax than it paid cannot drive a category below zero.
-
-- **(Mac) The shop's mode was ignored here, so a Simple shop saw the whole
-  Professional surface.** Khayt has two modes and `lib/feature-tiers.js` is
-  the single source of truth for what each includes — and this app read
-  `settings.mode` nowhere at all. Of the nine Professional features it has
-  built four, and all four were shown to everybody: full analytics, expense
-  tracking, machine maintenance and ZATCA e-invoicing. They are gated now,
-  so the two apps agree about what a shop has. A shop that switches to
-  Simple while looking at Reports or Expenses is moved to the Dashboard
-  rather than left on a screen that is no longer theirs. Only those four are
-  gated: a screen added later and never classified stays visible rather than
-  quietly disappearing. An enthusiast book — Bed Ready's mode, retired on
-  this side — is read as Simple exactly as `applyMode()` migrates it, so
-  opening one here does not strip its customers and invoices.
 
 - **The mode comparison was short of two things a shop actually gets.** The
   product catalogue and the portfolio are both hidden from the commerce-free
@@ -2638,29 +2727,6 @@ tested against both.
   now, over what was stored, so a field a newer build wrote survives a save
   by an older pane.
 
-- **(Mac) A resin printer's progress was captioned with a claim about a file
-  it does not have.** The machine card names which signal a percentage came
-  from, so that "by layer" and "by file position" can be told apart on a
-  Moonraker printer. It was meant to say that only for Moonraker, which is
-  the one adapter that chooses between two signals — but `lib/sdcp.js` sets
-  the same field, to `time` or `none`, and anything the card did not
-  recognise was captioned "by file position". So an Elegoo resin printer
-  reporting its own elapsed ticks was described in terms of a file it never
-  had. The adapter now decides whether to caption at all, and a signal this
-  app has not been taught is left undescribed rather than described wrongly.
-
-- **(Mac) A product made on the Mac was priced on its filament alone.** The
-  other app's calculator puts a labour rate, prep and post time, power draw,
-  electricity, wear and a failure allowance on every part it writes; this
-  sheet wrote none of them, and the shared pricing rule injects none on
-  purpose. So a product added here cost whatever its filament cost and
-  nothing else — on a real portrait, 10.57 where the true cost is 35.91,
-  because those seven figures are seven tenths of what it takes to make.
-  The part being added now carries the same starting figures the other app's
-  form carries, folded away under "Labour, power and wear" so they can be
-  changed before the part goes in, and a part already in the list that has
-  none of them says so instead of quietly costing less.
-
 - **Time left on a Klipper printer is the figure the machine itself shows.**
   Khayt worked the number out from the layer count, and a layer count assumes
   every layer costs the same. Measured on a U1 printing a part whose lower
@@ -2674,31 +2740,6 @@ tested against both.
   each other. Layers stay the fallback: a file with no `M73` behaves exactly
   as before, including the relief whose byte position read 0.7% at 19% done.
 
-- **(Mac) Saving a product no longer throws away its cost inputs or its
-  price.** The Mac product sheet rebuilt every part from the five fields it
-  shows, so the labour rate, prep and post time, power draw, wear and failure
-  rate the other app had priced the part with were dropped on save — a
-  portrait that cost 35.91 to make came back costing 10.57, and the product
-  re-priced itself from 50 to 13.74. The save also ignored the product's own
-  rounding and typed price. Now a part keeps every field the sheet does not
-  edit, and the product is priced through the shared rule with its rounding
-  and override, so the same product saves to the same price in both apps.
-
-- **(Mac) "New job from this" prices the job at the product's own rates.**
-  The job's parts were costed from grams and hours alone, so the same
-  portrait opened at 15 where the catalogue said 50. A part taken from a
-  product now carries the product's rates into the cost, and the job opens at
-  the catalogue price.
-
-- **(Mac) A job taken from the catalogue opens priced — this time with the
-  parts costed.** The earlier fix repaired the number parsing on this path
-  and added the "nothing to cost" notice, but nothing ever asked the cost
-  model what the product's parts cost: a part added by hand was costed, a
-  part copied from a product was not, so the cart arrived at nothing and the
-  total with it. The parts are costed on the way in now, exactly as a typed
-  part is, and a product priced by hand or rounded to a step opens the job
-  priced the same way.
-
 - **The monthly revenue-against-expenses and margin charts disagreed with
   the P&L beside them.** They summed `completed` only (a legacy delivered job
   vanished), skipped the trade check, booked the customer's VAT as revenue
@@ -2706,10 +2747,6 @@ tested against both.
   of per-job percentages — one small job at 80% coloured a 10% month green.
   Both draw from the P&L rule by month now, so a month's revenue, spending
   and margin are one set of figures wherever they are shown.
-
-- **(Mac) The help caught up with the Reports and Waste screens.** The Reports
-  article lists cost and revenue trends, how long a job takes and on-time
-  delivery; the Money article says what the Waste pane draws.
 
 - **A job finished under the older `delivered` status was missing from eight
   rules — the quarterly P&L among them.** Khayt's own rule keeps a handed-over
@@ -2775,12 +2812,6 @@ tested against both.
   editor appended the new line and then cut the log to two hundred from the
   end — dropping the note just written. The Mac keeps the newest two hundred;
   the other app's editor is unchanged and is noted here.
-
-- **(Mac) The help said parts, price tiers, pictures and documents are edited
-  in the other app.** All four have been edited on the Mac since the product
-  sheet gained them; the catalogue and welcome articles now say what is
-  actually still elsewhere — most of the analytics, the storefront and portal,
-  and the LAN server.
 
 - **A model can be deleted from the library on the Mac.** There was no way to:
   the menu offered Quick Look, Reveal, Open, Convert and Copy name, and a model
@@ -2953,29 +2984,6 @@ tested against both.
   privacy screen, telling a shop its customer data went to Anthropic when it
   was going wherever that shop had pointed Khayt.
 
-- **(Mac) An address a key must not travel to was accepted.** The Mac's own
-  `URL` is a small stand-in — JavaScriptCore has none — and it was missing the
-  three fields the address rule reads. So the check for credentials written
-  into an address never fired, and a self-hosted address came back as the
-  literal word "undefined" with the path stuck on the end.
-
-- **(Mac) Khayt no longer quits when you Quick Look a second model.** Going
-  through the library pressing ⌘Y, the app disappeared on the second one —
-  with no error, no crash report and nothing to look at afterwards. It is the
-  screen the Mac app is for, so this is worth a release of its own.
-
-- **(Mac) A model file could crash Khayt outright, and `v1="nan"` was enough.** Three
-  characters where a 3MF names one of a triangle's corners. Swift refuses to
-  turn a "not a number" into a whole number and stops the program rather than
-  guess, so one malformed or corrupt file took the app down — and because an
-  import reads a whole folder, it took the other three hundred models with it.
-  Unreadable corners are now dropped the way an out-of-range one already was.
-
-- **(Mac) A printer could crash Khayt by reporting a silly number.** The same fault
-  in two more places: a job id and a progress percentage read straight off the
-  network. Progress is also clamped to 0–100 now, so a printer claiming 5,000%
-  no longer says so on the shop floor.
-
 - **Security: the AI address field accepted `http://` to anywhere.** Khayt lets
   you point its AI features at your own endpoint — a model on your own machine,
   or a gateway inside the Kingdom — and sends your API key in a header. Typed
@@ -3002,11 +3010,6 @@ tested against both.
   photographed as a full scroll as well as a window: a settings window is 364
   points tall and the Operations pane is 1823, so four fifths of it had never
   been in a picture.
-
-- **(Mac) The Preferences pane no longer heads two sections "App Preferences".**
-  The default language sat under one and the menu bar toggle under the other,
-  two rows apart, with nothing to say that the first follows your book to your
-  other Macs and the second does not. The second is headed "On this Mac" now.
 
 - **Changing the AI provider no longer undoes a consent box you just ticked.**
   The provider chooser redraws the feature list — every row says which provider
@@ -3042,13 +3045,6 @@ tested against both.
   a claim Khayt makes on your behalf. Machines whose multi-material is built in
   — a Snapmaker U1's toolchanger, a J1's IDEX, the dual-extruder UltiMakers —
   are unchanged.
-
-- **(Mac) Four screens had a search box that did nothing.** The calculator, the
-  colour studio, the reports and the dashboard are not lists, and the field on
-  them could be typed into to no effect — while saying "Job, customer or
-  number". It is gone from those. The catalogue, which *is* a list, now searches
-  by name, description, material and group; the shelf and the catalogue also
-  stop asking for a job number when what they filter is filament and products.
 
 - **A shop that had never inspected anything was shown a 0% pass rate.** Which
   reads as "everything failed" about a shop that has simply not started. Both
