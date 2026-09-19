@@ -92,3 +92,54 @@ test("3.8.0's release body fits without trimming a single shop-facing entry", ()
     + `${shopFacing.removed} maintainer entries, still over the ${DEFAULT_MAX_CHARS} budget. `
     + 'The overflow would be trimmed from the END, which is inside "### Fixed".');
 });
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * A RELATIVE LINK IS RELATIVE TO THE REPOSITORY IT IS READ IN.
+ *
+ * The notes are written in this repository's CHANGELOG.md and published on a
+ * release in KhaytApp/khayt-mac. Every Mac alpha so far has opened with
+ * `[VERSIONING.md](./VERSIONING.md)`, which on that release page resolves to
+ * https://github.com/KhaytApp/khayt-mac/blob/main/VERSIONING.md — a 404,
+ * verified against the live page. Nobody reported it; a dead link in release
+ * notes reads as the reader's own mistake.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const { withAbsoluteLinks } = require('../scripts/changelog-section.js');
+
+test('a relative link becomes absolute against the repository it was written in', () => {
+  assert.equal(
+    withAbsoluteLinks('see [VERSIONING.md](./VERSIONING.md)'),
+    'see [VERSIONING.md](https://github.com/KhaytApp/Khayt/blob/main/VERSIONING.md)');
+  assert.equal(
+    withAbsoluteLinks('[the spec](docs/KHAYT-3.0-QC-SPEC.md)'),
+    '[the spec](https://github.com/KhaytApp/Khayt/blob/main/docs/KHAYT-3.0-QC-SPEC.md)');
+});
+
+test('a link that already goes somewhere is left exactly as written', () => {
+  for (const line of [
+    '[releases](https://github.com/khaytapp/Khayt/releases)',
+    '[mail](mailto:hi@khaytapp.com)',
+    '[same-protocol](//example.test/x)',
+    '[within the page](#before-you-update)',
+  ]) {
+    assert.equal(withAbsoluteLinks(line), line, line);
+  }
+});
+
+test('the link text and a title are untouched', () => {
+  assert.equal(
+    withAbsoluteLinks('[VERSIONING.md](./VERSIONING.md "how versions work")'),
+    '[VERSIONING.md](https://github.com/KhaytApp/Khayt/blob/main/VERSIONING.md "how versions work")');
+});
+
+test('the real alpha.26 section comes out with a link that resolves', () => {
+  // The section as shipped, through the same call the release lane makes.
+  const fs = require('fs');
+  const path = require('path');
+  const text = fs.readFileSync(path.join(__dirname, '..', 'CHANGELOG.md'), 'utf8');
+  const section = sectionFor(text, '4.0.0-alpha.26');
+  assert.ok(section, 'the alpha.26 section is gone');
+  const out = withAbsoluteLinks(section);
+  assert.doesNotMatch(out, /\]\(\.\//, 'a relative link survived into the release body');
+  assert.match(out, /https:\/\/github\.com\/KhaytApp\/Khayt\/blob\/main\/VERSIONING\.md/);
+});

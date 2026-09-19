@@ -164,7 +164,47 @@ function withoutMaintainerNotes(body) {
   return { text: out.join('\n').replace(/\n{3,}/g, '\n\n').trim(), removed };
 }
 
-module.exports = { sectionFor, fitForRelease, withoutMaintainerNotes, GITHUB_BODY_LIMIT, DEFAULT_MAX_CHARS };
+/* ────────────────────────────────────────────────────────────────────────────
+ * A RELATIVE LINK IS RELATIVE TO THE REPOSITORY IT IS READ IN.
+ *
+ * These notes are written in KhaytApp/Khayt's CHANGELOG.md, where
+ * `[VERSIONING.md](./VERSIONING.md)` is correct, and they are PUBLISHED on a
+ * release in KhaytApp/khayt-mac, where that path does not exist. Every Mac
+ * alpha so far has shipped notes whose first line links to a 404 — checked:
+ *
+ *     https://github.com/KhaytApp/khayt-mac/blob/main/VERSIONING.md → 404
+ *
+ * Nobody reported it, which is what a dead link in release notes does: the
+ * reader assumes they misread something and moves on.
+ *
+ * Rewritten here rather than in the changelog, because the changelog's own
+ * reader is the repository the file lives in and the link is right for them.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Where a relative link in the changelog actually points. */
+const SOURCE_REPO = 'https://github.com/KhaytApp/Khayt/blob/main/';
+
+/**
+ * Make every relative markdown link absolute against the repository the
+ * changelog lives in.
+ *
+ * Only relative ones: anything with a scheme, an anchor, or a protocol-relative
+ * `//` is left exactly as written.
+ *
+ * @param {string} text  release notes
+ * @returns {string}
+ */
+function withAbsoluteLinks(text) {
+  return String(text || '').replace(/\]\(([^)\s]+)(\s+"[^"]*")?\)/g, (whole, target, title) => {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('//') || target.startsWith('#')) {
+      return whole;
+    }
+    const cleaned = target.replace(/^\.\//, '');
+    return `](${SOURCE_REPO}${cleaned}${title || ''})`;
+  });
+}
+
+module.exports = { sectionFor, fitForRelease, withoutMaintainerNotes, withAbsoluteLinks, GITHUB_BODY_LIMIT, DEFAULT_MAX_CHARS };
 
 if (require.main === module) {
   const version = process.argv[2];
@@ -186,7 +226,8 @@ if (require.main === module) {
       + `entr${shopFacing.removed === 1 ? 'y' : 'ies'} lifted out of the release body `
       + `(${body.length} -> ${shopFacing.text.length} characters). They stay in CHANGELOG.md.`);
   }
-  const fitted = fitForRelease(shopFacing.text, { version });
+  // Before the budget, so the longer absolute links are what gets measured.
+  const fitted = fitForRelease(withAbsoluteLinks(shopFacing.text), { version });
   if (fitted.truncated) {
     // stderr, so the workflow log says so while stdout stays the notes.
     console.error(`changelog-section: ${version} is ${shopFacing.text.length} characters, over the `
