@@ -6,6 +6,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **Receiving a purchase order is one rule now, not one per app.** What arrives
+  when goods are booked in — the order, the spool or the consumable, the line in
+  that spool's history and the expense — is decided in one place and written
+  together. It behaves exactly as it did; what changes is that the macOS app can
+  reach it, which is what a purchase-order screen there will need.
+
 - **(Mac) A job nobody charged for no longer says it has been paid.** The jobs
   table read "settled" against every job with nothing outstanding — which is
   also true of a job that was never priced, and plenty of shops use Khayt as a

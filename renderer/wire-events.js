@@ -2144,64 +2144,29 @@ function wireEvents() {
           const w = Math.max(0, num(modal.querySelector('#poRecvWeight').value, 0));
           if (w <= 0) { toast(t('exp.amount_required') || 'Enter a weight', 'error'); return false; }
           const notes = modal.querySelector('#poRecvNotes').value.trim();
-          if (isCons) {
-            // Restock the consumable, not a spool. Looking this up in `inventory`
-            // would find nothing, restock nothing, and still mark the order
-            // received — goods paid for and silently absent from stock.
-            const cons = consumables.find(x => x.id === po.itemId);
-            if (cons) {
-              cons.stock = Math.max(0, (+cons.stock || 0) + w);   // no 99000 cap; that is a spool's
-              renderConsumables();
-            }
-          } else {
-            const invItem = inventory.find(i => i.id === po.itemId);
-            if (invItem) {
-              invItem.weight = Math.min((invItem.weight || 0) + w, 99000);
-              if (!invItem.usageHistory) invItem.usageHistory = [];
-              invItem.usageHistory.unshift({ type: 'received', orderId: po.id, weightUsed: -w, date: localDateStr(), notes });
-              if (invItem.usageHistory.length > 200) invItem.usageHistory.length = 200;
-              renderInventory();
-            }
-          }
-          po.receivedSoFar = alreadyReceived + w;
-          if (ordered > 0 && po.receivedSoFar >= ordered) {
-            po.status = 'received';
-            po.receivedAt = localDateStr();
-            toast(t('po.received_toast') + ' · +' + w + unitLbl, 'success');
-          } else {
-            po.status = 'partial';
-            toast(t('po.partial') + ' · +' + w + unitLbl, 'success');
-          }
-          // Automatically create an expense record for the received goods.
-          //
-          // A purchase order prices itself one way and one way only: `unitPrice`
-          // against `qty`, per gram for filament and per unit of the shop's own
-          // for a consumable. Both therefore multiply out identically and there
-          // is no /1000 — the per-KILO rate that division assumed lived in
-          // `unitCost`, which, like `totalCost`, no version of the app has ever
-          // written. Every filament receipt booked nothing at all: the spool was
-          // paid for and absent from the material spend that pricing and the
-          // per-kilo analytics are derived from.
-          const unitPrice = +po.unitPrice || 0;
-          if (unitPrice > 0) {
-            const expAmount = +(w * unitPrice).toFixed(2);
-            if (expAmount > 0) {
-              expenses.push({
-                id:       uid('EXP'),
-                date:     localDateStr(),
-                amount:   expAmount,
-                // Glue and bags are not filament. Booking them there inflates the
-                // material spend that feeds pricing and the per-kilo figures in
-                // analytics. There is no consumables category, so `other` — which
-                // is merely unspecific, where `filament` would be wrong.
-                category: isCons ? 'other' : 'filament',
-                note:     `${t('po.receive') || 'PO receive'}: ${po.id}${notes ? ' — ' + notes : ''}`,
-                orderId:  null,
-                poId:     po.id,
-              });
-              renderExpenses?.();
-            }
-          }
+
+          // WHAT RECEIVING GOODS DOES lives in `lib/purchase-orders.js`: the
+          // order, the shelf or the consumable, the history line and the
+          // expense come back together, and are written together. Both faults
+          // this chain has carried — a consumable restocking nothing, and a
+          // filament receipt booking no expense — were one of those four
+          // records going missing on its own.
+          const isConsRecv = KhaytPurchaseOrders.isConsumableOrder(po);
+          const cons = isConsRecv ? consumables.find(x => x.id === po.itemId) : null;
+          const invItem = isConsRecv ? null : inventory.find(i => i.id === po.itemId);
+          const done = KhaytPurchaseOrders.receive({
+            po, item: invItem, consumable: cons, quantity: w, notes,
+            today: localDateStr(), expenseId: uid('EXP'),
+            expenseLabel: t('po.receive') || 'PO receive',
+          });
+          if (!done.ok) { toast(t('exp.amount_required') || 'Enter a weight', 'error'); return false; }
+
+          Object.assign(po, done.po);
+          if (done.consumable && cons) { Object.assign(cons, done.consumable); renderConsumables(); }
+          if (done.item && invItem) { Object.assign(invItem, done.item); renderInventory(); }
+          if (done.expense) { expenses.push(done.expense); renderExpenses?.(); }
+          toast((done.complete ? t('po.received_toast') : t('po.partial')) + ' · +' + w + unitLbl,
+                'success');
           saveAll();
           renderPurchaseOrders();
           return true;
@@ -2211,8 +2176,9 @@ function wireEvents() {
     if (closePo) {
       const po = purchaseOrders.find(p => p.id === closePo.dataset.id);
       if (po) {
-        po.status = 'received';
-        po.receivedAt = localDateStr();
+        // Closing by hand is the rule's too, so an order closed here and an
+        // order closed on the Mac end up in the same state.
+        Object.assign(po, KhaytPurchaseOrders.close(po, localDateStr()));
         saveAll();
         renderPurchaseOrders();
         toast(t('po.received_toast'), 'success');
