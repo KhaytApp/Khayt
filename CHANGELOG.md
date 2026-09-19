@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) What the shop has on order is shown here, and can be received.** The
+  Windows app has had purchase orders since 3.0; this one had none at all, so a
+  shop working here could not see what was coming, book goods in when they
+  arrived, or be told about the orders priced per spool instead of per gram —
+  which ask for about a thousand times the real amount. The shelf screen now
+  says what is on its way, receives a delivery in whatever unit the order is
+  counted in, and flags the over-priced ones with both figures side by side.
+  Receiving writes the order, the spool or the consumable, that spool's own
+  history and the expense together, which is the part that has gone wrong
+  before.
+
 - **Receiving a purchase order is one rule now, not one per app.** What arrives
   when goods are booked in — the order, the spool or the consumable, the line in
   that spool's history and the expense — is decided in one place and written

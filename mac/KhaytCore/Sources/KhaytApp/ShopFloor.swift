@@ -688,6 +688,27 @@ struct Inventory: View {
                             .card(rail: Khayt.brand, padding: 14)
                             .padding(.bottom, 14)
                     }
+                    // ── WHAT IS COMING, BESIDE WHAT IS HERE ───────────────
+                    //
+                    // "Is more on the way?" is a question a shop has while
+                    // looking at a thin rack, not one it goes to another
+                    // screen to ask. Only when nothing is being searched for,
+                    // for the reason the two cards above give.
+                    if !shop.openOrders.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        OnOrderCard(shop: shop)
+                            .card(padding: 14)
+                            .padding(.bottom, 14)
+                    }
+                    // Orders asking for about a thousand times what they
+                    // should. Report only, and above the shelf because it is
+                    // about money already spent rather than filament on it.
+                    if !shop.suspectOrders.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        SuspectOrdersCard(shop: shop)
+                            .card(rail: Khayt.attention, padding: 14)
+                            .padding(.bottom, 14)
+                    }
                     LazyVGrid(columns: columns, spacing: 14) {
                         ForEach(shown) { spool in
                             SpoolCard(spool: spool, shop: shop,

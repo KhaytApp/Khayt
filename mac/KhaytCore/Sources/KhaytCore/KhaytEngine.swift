@@ -464,6 +464,16 @@ public actor KhaytEngine {
         // a consumable is undefined, and NaN <= threshold is false, so an empty
         // shelf reads as "not low" and never appears).
         "consumable-reorder",
+        // What a purchase order IS, and what receiving one does to the book.
+        // Four records move together — the order, the spool or the consumable,
+        // that spool's history line, and an expense — and both faults this
+        // chain has carried were one of the four going missing on its own.
+        //
+        // `po-audit` beside it: the orders priced per SPOOL where a per-gram
+        // rate was expected ask for roughly a thousand times the real amount,
+        // and until now this app could not even tell a shop it had them.
+        "purchase-orders",
+        "po-audit",
         // PORTED to `Currencies`, and still bundled: `lib/portal-refresh.js`
         // reads `KhaytCurrencies` through `sibling()` at run time, so removing
         // it from the bundle would leave the portal printing "EUR" where the
@@ -1145,6 +1155,122 @@ public actor KhaytEngine {
         ]
         if let base = instalmentBase { arg["instalmentBase"] = .number(base) }
         return try runtime.call("KhaytPaymentPlan", "collectionTotals", [arg], as: PlanTotals.self)
+    }
+
+    // MARK: - What the shop has on order
+
+    /// Book goods in against an order.
+    ///
+    /// FOUR RECORDS, ONE ANSWER. The rule returns the order, the spool or the
+    /// consumable it restocks, and the expense — and the caller writes all of
+    /// them or none. Both faults this chain has carried were one of the four
+    /// going missing on its own: a consumable order that restocked nothing and
+    /// marked itself received, and a filament receipt that booked no expense at
+    /// all.
+    public func receiveGoods(order: JSONValue, item: JSONValue?, consumable: JSONValue?,
+                             quantity: Double, notes: String, today: String,
+                             expenseId: String, expenseLabel: String) throws -> GoodsReceived {
+        var arg: [String: JSONValue] = [
+            "po": order, "quantity": .number(quantity), "notes": .string(notes),
+            "today": .string(today), "expenseId": .string(expenseId),
+            "expenseLabel": .string(expenseLabel),
+        ]
+        if let item { arg["item"] = item }
+        if let consumable { arg["consumable"] = consumable }
+        return try runtime.call("KhaytPurchaseOrders", "receive", [arg], as: GoodsReceived.self)
+    }
+
+    /// What a receipt changes. Absent members are records this receipt does not
+    /// touch — a consumable order moves no spool, and an order with no price
+    /// books no expense rather than one for nothing.
+    public struct GoodsReceived: Decodable, Sendable {
+        public let ok: Bool
+        /// 'no_order' or 'no_quantity' when it refuses.
+        public let reason: String?
+        /// True when what has arrived now covers what was ordered.
+        public let complete: Bool?
+        public let po: JSONValue?
+        public let item: JSONValue?
+        public let consumable: JSONValue?
+        public let expense: JSONValue?
+    }
+
+    /// Close an order by hand: the goods are all in, whatever was counted.
+    public func closeOrder(_ order: JSONValue, today: String) throws -> JSONValue {
+        try runtime.call("KhaytPurchaseOrders", "close", [order, .string(today)], as: JSONValue.self)
+    }
+
+    /// Whether an order is counted in the shop's own unit rather than grams.
+    ///
+    /// Absent `kind` reads as filament, and that is not a default — it is what
+    /// every order written before consumables could be ordered carries, and
+    /// reading one as a consumable would restock the wrong collection.
+    public func isConsumableOrder(_ order: JSONValue) throws -> Bool {
+        try runtime.call("KhaytPurchaseOrders", "isConsumableOrder", [order], as: Bool.self)
+    }
+
+    /// Orders priced per SPOOL where a per-gram rate was expected — about a
+    /// thousand times the real amount.
+    ///
+    /// Report only. A purchase order may already have been sent to a supplier,
+    /// so nothing is rewritten without the owner looking at both figures.
+    public func suspectOrders(_ orders: [JSONValue],
+                              inventory: [JSONValue]) throws -> [SuspectOrder] {
+        try runtime.call("KhaytPoAudit", "findSuspectPurchaseOrders",
+                         [JSONValue.array(orders), JSONValue.array(inventory)],
+                         as: [SuspectOrder].self)
+    }
+
+    /// One order asking for far more than it should, with what it should say.
+    public struct SuspectOrder: Decodable, Sendable, Identifiable {
+        public let po: JSONValue
+        public let currentTotal: Double
+        /// Nil when the linked item carries no cost to derive a price from —
+        /// the shop has to set that one by hand.
+        public let suggestedTotal: Double?
+        public let suggested: Double?
+
+        public var id: String {
+            if case .object(let o) = po, case .string(let id)? = o["id"] { return id }
+            return ""
+        }
+
+        public var itemName: String {
+            guard case .object(let o) = po else { return id }
+            if case .string(let name)? = o["itemName"], !name.isEmpty { return name }
+            return id
+        }
+    }
+
+    /// Correct one order's unit price, and hand the order back to be written.
+    ///
+    /// The rule mutates the record it is handed and a mutation does not survive
+    /// the bridge, so the lookup and the correction run in one expression.
+    public func correctOrderPrice(orders: [JSONValue], inventory: [JSONValue],
+                                  orderId: String) throws -> PriceCorrection {
+        try runtime.call2("""
+        (function () {
+          var A = globalThis.KhaytPoAudit;
+          var suspects = A.findSuspectPurchaseOrders(ARG0, ARG1);
+          var entry = null;
+          for (var i = 0; i < suspects.length; i += 1) {
+            if (suspects[i].po && suspects[i].po.id === ARG2) { entry = suspects[i]; break; }
+          }
+          if (!entry) return { ok: false, error: 'gone', po: null, before: 0, after: 0 };
+          var res = A.applyCorrection(entry);
+          if (!res.ok) return { ok: false, error: res.error, po: null, before: 0, after: 0 };
+          return { ok: true, error: null, po: entry.po, before: res.before, after: res.after };
+        })()
+        """, [.array(orders), .array(inventory), .string(orderId)], as: PriceCorrection.self)
+    }
+
+    /// What a correction did, and the order to write.
+    public struct PriceCorrection: Decodable, Sendable {
+        public let ok: Bool
+        public let error: String?
+        public let po: JSONValue?
+        public let before: Double
+        public let after: Double
     }
 
     // MARK: - Splitting a job

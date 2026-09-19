@@ -1041,6 +1041,18 @@ final class Words {
         // recorded at the counter.
         "mac.plan_cash_stays": ["en": "The payment is no longer marked collected. Money already recorded on the job stays — change that on the payment sheet.",
                                 "ar": "لم تعد الدفعة مؤشَّرة كمستلمة. المبلغ المسجَّل على الطلب يبقى كما هو — تُعدّله من نافذة الدفع."],
+        "mac.overpriced_orders": ["en": "Priced per spool", "ar": "مسعّرة بالبكرة"],
+        "mac.orders_word":     ["en": "on order",  "ar": "قيد الطلب"],
+        "mac.orders_word_one": ["en": "on order",  "ar": "قيد الطلب"],
+        // Said BEFORE save, not discovered afterwards: an order with no price
+        // on it books no expense, and a shop reconciling its spend should know
+        // which receipts will never appear there.
+        "mac.receipt_books_nothing": ["en": "This order carries no price, so receiving it records no spending.",
+                                      "ar": "لا يحمل هذا الطلب سعراً، لذا لن يُسجَّل أي مصروف عند استلامه."],
+        // The rule refused: the order no longer looks over-priced — someone
+        // corrected it on another Mac, or its linked item changed.
+        "mac.order_not_suspect": ["en": "That order no longer looks over-priced — it may have been corrected already.",
+                                  "ar": "لم يعد هذا الطلب يبدو مبالغاً في سعره — ربما صُحِّح سلفاً."],
         "mac.rating_out_of_range": ["en": "A rating is one to five stars.",
                                     "ar": "التقييم من نجمة إلى خمس نجوم."],
         "mac.licence_set":   ["en": "Record Licence",   "ar": "تسجيل الترخيص"],
