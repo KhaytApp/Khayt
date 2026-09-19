@@ -112,6 +112,72 @@ struct FeatureModeTests {
         }
     }
 
+    /// THE GAP THIS CLOSED.
+    ///
+    /// Purchase orders arrived on the Mac in 4.0.0-alpha.27 and arrived
+    /// ungated: `renderer/index.html` carries `pro-only` on the purchase-order
+    /// section, the suppliers card and the auto-draft switch, so a Simple shop
+    /// sees none of it in the other window and saw all of it here. Two apps
+    /// disagreeing about what a shop has is exactly what the modes exist to
+    /// stop.
+    ///
+    /// The source check is the half that matters: `has("purchasing")` coming
+    /// back false proves the rule, and proves nothing at all about whether any
+    /// screen asks.
+    @Test("a Simple shop sees no purchase orders, as it sees none in the other app")
+    func simpleHidesPurchasing() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(shop.engineProblem == nil, "no engine means this proves nothing")
+
+        shop.pretendMode("simple")
+        await shop.readFeatures()
+        #expect(!shop.has("purchasing"))
+        shop.pretendMode("professional")
+        await shop.readFeatures()
+        #expect(shop.has("purchasing"), "purchasing did not come back for a Professional shop")
+
+        // And every shelf surface that raises or shows one asks.
+        let floor = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appending(path: "Sources/KhaytApp/ShopFloor.swift"),
+            encoding: .utf8)
+        let asks = floor.ranges(of: "has(\"purchasing\")").count
+        #expect(asks >= 5, Comment(rawValue:
+            "only \(asks) shelf surfaces ask whether this shop has purchase orders — "
+            + "what is on order, what is over-priced, the batch draft, the suppliers "
+            + "card and the two draft menu items all must"))
+    }
+
+    /// AND WHY LOYALTY IS NOT GATED, although the tier table calls it
+    /// Professional.
+    ///
+    /// The loyalty settings card in `renderer/index.html` carries no
+    /// `pro-only` class, so a Simple shop can switch the rewards programme on
+    /// in the other window. Gating it here would hide from that shop something
+    /// it has and is using — the same disagreement, from the other end. If the
+    /// other app ever gates it, this test is the place that says so.
+    @Test("loyalty is deliberately not gated here, because the other app does not gate it")
+    func loyaltyIsNotGated() throws {
+        #expect(!Shop.gatedFeatures.contains("loyalty"))
+        let html = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent().appending(path: "renderer/index.html"),
+            encoding: .utf8)
+        // The card the switch lives in. If it grows a `pro-only` class this
+        // fails, and the answer is to gate it here rather than to loosen this.
+        guard let at = html.range(of: "set_loyaltyEnabled") else {
+            Issue.record("the loyalty switch has moved — this check has rotted"); return
+        }
+        let card = html[html.index(at.lowerBound, offsetBy: -600)..<at.lowerBound]
+        #expect(!card.contains("pro-only"),
+                "the other app now hides loyalty from Simple shops, so this app must too")
+    }
+
     @Test("an enthusiast book is read as Simple, and keeps its customers")
     func enthusiastReadsAsSimple() async throws {
         let shop = Shop()

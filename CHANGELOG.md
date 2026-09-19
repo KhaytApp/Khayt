@@ -22,6 +22,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   English nor Arabic gets its own names too: which of a record's names to print
   is the shop's own content-language rule, not a pick between two fields.
 
+- **(Mac) A Simple shop no longer sees purchase orders it cannot see in the
+  other app.** Purchase orders arrived here in 4.0.0-alpha.27, and arrived
+  ungated: the other app hides the whole purchasing surface from a shop set to
+  Simple — what is on order, the over-priced ones, the suppliers list, and
+  every way of raising an order — and this app showed all of it. Two apps
+  disagreeing about what a shop has is the thing the two modes exist to
+  prevent. Professional is unchanged, and so is loyalty, which the other app
+  does NOT hide from a Simple shop: gating it here would take away something
+  that shop has and is using.
+
 - **(Mac) The shop's suppliers can be kept here.** A supplier is not a contact
   card: its price list is where the price of a drafted purchase order comes
   from — the quoted rate per kilogram, in preference to dividing a spool's own
