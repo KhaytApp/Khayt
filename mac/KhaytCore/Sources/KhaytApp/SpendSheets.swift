@@ -22,6 +22,10 @@ struct ExpenseSheet: View {
     @State private var note = ""
     @State private var orderId = ""
     @State private var recurring = ""
+    /// What the note reads like, when the shared rule is confident enough to
+    /// say. Held in state because the engine is an actor and a view cannot ask
+    /// it a question while it is drawing.
+    @State private var suggestion: String?
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -87,6 +91,28 @@ struct ExpenseSheet: View {
                     TextField(shop.words.callIt("exp.note_ph"), text: $note)
                         .textFieldStyle(.roundedBorder)
                 }
+                // ── WHAT THE RECEIPT READS LIKE ───────────────────────────
+                //
+                // Offered, never applied. The keyword list is short on
+                // purpose, and a form that quietly re-filed what the shop had
+                // already chosen would be wrong in its own books without ever
+                // saying so. The other app puts the same suggestion under the
+                // same field, and it is the same rule answering.
+                if let suggestion, suggestion != category {
+                    GridRow {
+                        Color.clear.frame(height: 0)
+                        HStack(spacing: 6) {
+                            Text(shop.words.callIt("exp.suggested") + ":")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Button(shop.words.callIt("exp.cat." + suggestion)) {
+                                category = suggestion
+                            }
+                            .buttonStyle(.borderless)
+                            .font(.caption)
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
                 GridRow {
                     Text(shop.words.callIt("exp.recurring")).foregroundStyle(.secondary)
                     Picker("", selection: $recurring) {
@@ -119,6 +145,12 @@ struct ExpenseSheet: View {
         .padding(18)
         .frame(width: Self.width)
         .onAppear { focused = true }
+        // Re-asked as the note is typed, which is when the answer can change.
+        // `.task(id:)` cancels the one in flight, so a shop typing quickly asks
+        // once rather than once per keystroke.
+        .task(id: note) {
+            suggestion = await shop.categoryFor(note)
+        }
     }
 
     private func commit() {
