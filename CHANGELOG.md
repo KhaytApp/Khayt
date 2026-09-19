@@ -13,7 +13,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   exactly one, which is the number a small shop sees most. The Arabic was
   right the whole time — it is the English that carried a second numeral — and
   a test now reads every counted line out of the catalogue and fails on any
-  that says the number twice.
+  that says the number twice. It caught a ninth on its first day.
 
 - **(Mac) The accountant's file named bilingual customers in English only.**
   The export takes the customer's name from the customer, the way the other app

@@ -1073,7 +1073,7 @@ final class Words {
         "mac.price_history": ["en": "What materials have cost",
                               "ar": "ما كلّفته المواد"],
         "mac.purchases_word":     ["en": "{n} purchases", "ar": "{n} مشتريات"],
-        "mac.purchases_word_one": ["en": "1 purchase",    "ar": "شراء واحد"],
+        "mac.purchases_word_one": ["en": "{n} purchase",  "ar": "شراء واحد"],
         "mac.purchases_word_two": ["en": "2 purchases",   "ar": "شراءان"],
         "mac.cheapest_was": ["en": "cheapest", "ar": "الأرخص"],
         // Said, because a group that quietly mixed grams with kilograms would
