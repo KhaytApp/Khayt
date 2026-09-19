@@ -5334,6 +5334,39 @@
    "createdAt": "2026-09-02"
   }
  ],
+ "purchaseOrders": [
+  {
+   "id": "PO-sample01",
+   "itemId": "sp-2",
+   "itemName": "Sunlu PETG",
+   "supplierId": null,
+   "supplierName": "Tuwaiq Filament Supply",
+   "qty": 2000,
+   "unitPrice": 0.085,
+   "estimatedDelivery": "2026-09-26",
+   "status": "ordered",
+   "orderedAt": "2026-09-12",
+   "receivedAt": null,
+   "notes": ""
+  },
+  {
+   "id": "PO-sample02",
+   "kind": "consumable",
+   "unit": "each",
+   "itemId": "CONS-02",
+   "itemName": "Mailing bags 250×350",
+   "supplierId": null,
+   "supplierName": "Jeddah Packaging",
+   "qty": 200,
+   "unitPrice": 0.6,
+   "estimatedDelivery": null,
+   "status": "partial",
+   "receivedSoFar": 50,
+   "orderedAt": "2026-09-05",
+   "receivedAt": null,
+   "notes": ""
+  }
+ ],
  "loyaltyLedger": [
   {
    "id": "LOY-sample01",

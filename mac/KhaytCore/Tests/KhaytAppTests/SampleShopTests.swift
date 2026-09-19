@@ -1037,6 +1037,37 @@ extension SampleShopTests {
         #expect(spent > 0, "nobody has spent points, so the 'redeemed' line never draws")
     }
 
+    @Test("something is on order, and one delivery is part-arrived")
+    func somethingIsOnOrder() async throws {
+        // Without this the "on order" card and the receive sheet have only
+        // ever been seen EMPTY — and the part-arrived case is the one worth
+        // looking at, because it is the one where the box has to be typed in.
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(shop.openOrders.count >= 2, "nothing is on order in the sample shop")
+        #expect(shop.openOrders.contains { $0.receivedSoFar > 0 },
+                "every order is untouched, so the part-arrived row never draws")
+        #expect(shop.openOrders.contains { $0.unit.isEmpty },
+                "no filament order, so the grams path never draws")
+        #expect(shop.openOrders.contains { !$0.unit.isEmpty },
+                "no consumable order, so the shop's-own-unit path never draws")
+        // Each one is linked to something the shelf actually holds, or
+        // receiving it would restock nothing.
+        for order in shop.openOrders {
+            let row = try #require(Self.rows("purchaseOrders").first {
+                if case .string(let id)? = $0["id"] { return id == order.id }
+                return false
+            })
+            guard case .string(let itemId)? = row["itemId"] else {
+                Issue.record("\(order.id) is linked to nothing"); continue
+            }
+            let shelf = try Self.rows("inventory") + Self.rows("consumables")
+            #expect(shelf.contains { if case .string(let id)? = $0["id"] { return id == itemId }
+                                     else { return false } },
+                    "\(order.id) points at \(itemId), which is on no shelf")
+        }
+    }
+
     @Test("the sample book carries no money the app would ask to repair")
     func theSampleBookIsNotBroken() async throws {
         // The deposit-audit banner and the over-redeemed report are REPAIR
@@ -1047,6 +1078,8 @@ extension SampleShopTests {
         await shop.load(.sample)
         #expect(shop.erasedDeposits.isEmpty,
                 "the sample book carries an erased deposit, so every screen now warns about money")
+        #expect(shop.suspectOrders.isEmpty,
+                "the sample book carries a thousandfold purchase order, so the shelf now warns")
     }
 
     @Test("every machine in the sample shop says which kind it is")

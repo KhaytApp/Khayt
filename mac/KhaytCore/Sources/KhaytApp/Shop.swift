@@ -389,6 +389,19 @@ final class Shop {
             // figures a part is costed at. `lib/public-quote.js` builds a
             // customer's price from one of these, so a shop with none cannot
             // quote publicly at all.
+            // What has been ordered and not yet arrived. Read raw for the same
+            // reason the consumables are: the rule reads fields this app has no
+            // model for, and deciding which of them matter belongs in the rule.
+            if case .array(let ordered)? = root["purchaseOrders"] {
+                purchaseOrderRows = ordered
+            } else {
+                purchaseOrderRows = []
+            }
+            // Orders priced per SPOOL where a per-gram rate was expected — a
+            // thousand times the real amount. Report only, and this app could
+            // not even say so until now.
+            suspectOrders = (try? await engine?.suspectOrders(purchaseOrderRows,
+                                                             inventory: inventoryRows)) ?? []
             if case .array(let saved)? = root["printers"] { presetRows = saved } else { presetRows = [] }
             // The print files as written. `files` above is the decoded model;
             // this is what the setups and versions rules read, which is a wider
@@ -3590,6 +3603,185 @@ final class Shop {
         let heading = words.callIt("lbl.orders")
         guard let html = try? await engine.labelSheet(entries, heading: heading) else { return }
         pendingLabels = LabelSheetRequest(html: html, count: chosen.count)
+    }
+
+    // MARK: - What the shop has on order
+
+    /// Purchase orders, as the book holds them.
+    private(set) var purchaseOrderRows: [JSONValue] = []
+
+    /// Orders asking for about a thousand times what they should.
+    private(set) var suspectOrders: [KhaytEngine.SuspectOrder] = []
+
+    /// The order being received, or nil.
+    var receivingGoods: PurchaseOrder?
+
+    /// Everything still to arrive, worst-waited first.
+    ///
+    /// A received order is history; what a shop looking at a thin shelf wants
+    /// to know is what is COMING. `received` orders are left out for that
+    /// reason, not hidden.
+    var openOrders: [PurchaseOrder] {
+        purchaseOrderRows.compactMap(PurchaseOrder.init(row:))
+            .filter { $0.status != "received" }
+            .sorted { a, b in
+                // Oldest first: the one waited on longest is the one to chase.
+                if a.orderedAt != b.orderedAt { return a.orderedAt < b.orderedAt }
+                return a.id < b.id
+            }
+    }
+
+    /// Book goods in against an order.
+    ///
+    /// ── FOUR RECORDS, ONE WRITE ───────────────────────────────────────────
+    ///
+    /// The order, the spool or the consumable, that spool's history line, and
+    /// an expense. The shared rule returns all four and this writes all four in
+    /// ONE swap — both faults this chain has carried were one of them going
+    /// missing on its own: a consumable order that restocked nothing and marked
+    /// itself received, and a filament receipt that booked no expense at all.
+    ///
+    /// Returns nil when it worked, or what to tell the shop.
+    func receiveGoods(_ id: String, quantity: Double, notes: String) async -> String? {
+        guard let build = source.build, StoreLock.weOwnIt(build) else {
+            return words.callIt("mac.read_only")
+        }
+        guard let engine else { return words.callIt("mac.move_no_engine") }
+        guard quantity > 0 else { return words.callIt("exp.amount_required") }
+
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                // Read INSIDE the write: a receipt computed from the in-memory
+                // copy would put a stale shelf back. `StoreWriter` says so.
+                var orders = Self.rows(root, "purchaseOrders")
+                guard let at = orders.firstIndex(where: { Self.recordId($0) == id }) else {
+                    throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
+                }
+                let order = orders[at]
+                let consumable = try await engine.isConsumableOrder(order)
+                let itemId = Self.itemId(of: order)
+
+                var shelf = Self.rows(root, "inventory")
+                var bits = Self.rows(root, "consumables")
+                let spoolAt = consumable ? nil : shelf.firstIndex { Self.recordId($0) == itemId }
+                let bitAt = consumable ? bits.firstIndex { Self.recordId($0) == itemId } : nil
+
+                let done = try await engine.receiveGoods(
+                    order: order,
+                    item: spoolAt.map { shelf[$0] },
+                    consumable: bitAt.map { bits[$0] },
+                    quantity: quantity, notes: notes, today: Self.localDay(),
+                    expenseId: Self.uid("EXP"),
+                    expenseLabel: self.words.callIt("po.receive"))
+                guard done.ok, let written = done.po else {
+                    throw MoveRefused(sentence: self.words.callIt("exp.amount_required"))
+                }
+
+                orders[at] = written
+                root["purchaseOrders"] = .array(orders)
+                if let spoolAt, let item = done.item {
+                    shelf[spoolAt] = item
+                    root["inventory"] = .array(shelf)
+                }
+                if let bitAt, let bit = done.consumable {
+                    bits[bitAt] = bit
+                    root["consumables"] = .array(bits)
+                }
+                if let expense = done.expense {
+                    var spend = Self.rows(root, "expenses")
+                    spend.append(expense)
+                    root["expenses"] = .array(spend)
+                }
+            }
+        } catch let refusal as MoveRefused {
+            return refusal.sentence
+        } catch {
+            return String(describing: error)
+        }
+        await load(source)
+        return nil
+    }
+
+    /// Close an order by hand: the goods are all in, whatever was counted.
+    func closeOrder(_ id: String) async -> String? {
+        await writeToOnePurchaseOrder(id) { order, engine in
+            try await engine.closeOrder(order, today: Self.localDay())
+        }
+    }
+
+    /// Correct one order priced per spool where a per-gram rate was expected.
+    ///
+    /// The rule decides the figure and refuses an order that no longer looks
+    /// affected — which is what makes a list read a minute ago harmless.
+    func correctOrderPrice(_ id: String) async -> String? {
+        guard let build = source.build, StoreLock.weOwnIt(build) else {
+            return words.callIt("mac.read_only")
+        }
+        guard let engine else { return words.callIt("mac.move_no_engine") }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var orders = Self.rows(root, "purchaseOrders")
+                let out = try await engine.correctOrderPrice(
+                    orders: orders, inventory: Self.rows(root, "inventory"), orderId: id)
+                guard out.ok, let fixed = out.po,
+                      let at = orders.firstIndex(where: { Self.recordId($0) == id }) else {
+                    throw MoveRefused(sentence: self.words.callIt("mac.order_not_suspect"))
+                }
+                orders[at] = fixed
+                root["purchaseOrders"] = .array(orders)
+            }
+        } catch let refusal as MoveRefused {
+            return refusal.sentence
+        } catch {
+            return String(describing: error)
+        }
+        await load(source)
+        return nil
+    }
+
+    /// One purchase order changed by a rule, written through the same swap.
+    private func writeToOnePurchaseOrder(
+        _ id: String,
+        change: @escaping (JSONValue, KhaytEngine) async throws -> JSONValue
+    ) async -> String? {
+        guard let build = source.build, StoreLock.weOwnIt(build) else {
+            return words.callIt("mac.read_only")
+        }
+        guard let engine else { return words.callIt("mac.move_no_engine") }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var orders = Self.rows(root, "purchaseOrders")
+                guard let at = orders.firstIndex(where: { Self.recordId($0) == id }) else {
+                    throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
+                }
+                orders[at] = try await change(orders[at], engine)
+                root["purchaseOrders"] = .array(orders)
+            }
+        } catch let refusal as MoveRefused {
+            return refusal.sentence
+        } catch {
+            return String(describing: error)
+        }
+        await load(source)
+        return nil
+    }
+
+    /// Which shelf record an order restocks.
+    static func itemId(of order: JSONValue) -> String {
+        guard case .object(let o) = order else { return "" }
+        return plainString(o["itemId"]) ?? ""
     }
 
     // MARK: - Money an old defect took off the book
