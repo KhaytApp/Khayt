@@ -20,6 +20,10 @@ import Foundation
 /// actually gave was dropped. It falls back to the job's own date.
 public enum RatingTrend {
 
+    /// The statuses that mean a job is finished, and so has something to rate.
+    /// The same pair every other reader uses — `delivered` is PAST completed.
+    public static let finishedStatuses: Set<String> = ["completed", "delivered"]
+
     /// How many ratings there must be before a trend is worth drawing.
     public static let minResponses = 3
     public static let minRating = 1.0

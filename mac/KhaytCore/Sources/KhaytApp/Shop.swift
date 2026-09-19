@@ -3548,6 +3548,66 @@ final class Shop {
         var activity: String? = nil
     }
 
+    // MARK: - What the customer thought
+
+    /// The job whose rating is being written down, or nil.
+    var ratingFor: Order?
+
+    /// Record what a customer said about a finished job.
+    ///
+    /// ── WHY THIS HAD TO EXIST ─────────────────────────────────────────────
+    ///
+    /// A rating could only reach this book one way: a customer opening the
+    /// portal on their phone and submitting it. A shop that rings a customer
+    /// and hears "yes, five out of five" had nowhere to put it — while the
+    /// Reports screen draws a ratings line that, on a Mac-only shop, could
+    /// never fill.
+    ///
+    /// `recordedAt`, NOT `submittedAt`. The customer portal writes
+    /// `submittedAt` and this writes `recordedAt`, which is the other app's own
+    /// split: one is the customer saying it, the other is the shop writing it
+    /// down, and a book that cannot tell them apart has lost the difference.
+    func recordRating(_ id: Order.ID, rating: Int, comment: String) async {
+        // Bounds from the rule that READS them, so a rating this app writes is
+        // one the chart will draw. `RatingTrend.ratingOf` refuses anything
+        // outside 1–5, and a rating stored outside it would sit in the book
+        // looking recorded and count for nothing.
+        guard Double(rating) >= RatingTrend.minRating,
+              Double(rating) <= RatingTrend.maxRating else {
+            moveProblem = words.callIt("mac.rating_out_of_range"); return
+        }
+        let comment = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+        let now = ISO8601DateFormatter().string(from: Date())
+        await writeToOneOrder(id, named: words.callIt("ord.record_survey")) { order, _, _ in
+            guard case .object(var o) = order else {
+                throw MoveRefused(sentence: self.words.callIt("mac.move_refused"))
+            }
+            // Only a FINISHED job has anything to rate — the other app offers
+            // this on finished work alone, and a rating on a job still on the
+            // bench would be counted by every reader as the finished job's.
+            guard case .string(let status)? = o["status"],
+                  RatingTrend.finishedStatuses.contains(status) else {
+                throw MoveRefused(sentence: self.words.callIt("mac.not_finished_yet"))
+            }
+            o["survey"] = .object(["rating": .number(Double(rating)),
+                                   "comment": .string(comment),
+                                   "recordedAt": .string(now)])
+            return OneOrderEdit(order: .object(o),
+                                activity: "\(id) rated \(rating)/5")
+        }
+    }
+
+    /// What a job already carries, for the sheet to open on.
+    func ratingOn(_ id: Order.ID) -> (rating: Int, comment: String) {
+        guard let row = orderRows.first(where: { Self.recordId($0) == id }),
+              case .object(let o) = row, case .object(let survey)? = o["survey"]
+        else { return (0, "") }
+        let rating = Int(JSSemantics.number(survey["rating"]))
+        var comment = ""
+        if case .string(let c)? = survey["comment"] { comment = c }
+        return (rating, comment)
+    }
+
     // MARK: - Several prints that are one object
 
     /// The kits in this book, each already totalled.

@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytCore
 
 /// The menu bar.
 ///
@@ -370,6 +371,13 @@ private struct JobMenu: View {
         }
         .keyboardShortcut("e", modifiers: [.command, .shift])
         .disabled(!canMove)
+        // WHAT THE CUSTOMER THOUGHT. Offered on finished work only, the way
+        // the other app offers it — a rating on a job still on the bench would
+        // be counted by every reader as the finished job's.
+        Button(Words.upfront("ord.record_survey") + "\u{2026}") {
+            if let one = job { shop.ratingFor = one }
+        }
+        .disabled(!canMove || !(job.map { RatingTrend.finishedStatuses.contains($0.status) } ?? false))
         Button(Words.upfront("pay.modal_title")) {
             guard let one = job else { return }
             shop.pendingPayment = Shop.PendingHold(id: one.id, project: one.project)

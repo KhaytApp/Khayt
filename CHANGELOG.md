@@ -74,6 +74,12 @@ tested against both.
 
 ### Changed
 
+- **(Mac) A customer's rating can be written down here.** A rating could reach
+  the book one way only — a customer submitting it through the portal on their
+  phone — so the ratings line on Reports could never fill for a shop that works
+  on the Mac. There is a "Record rating" item on a finished job now, and what
+  the shop writes down is still told apart from what a customer sent in.
+
 - **(Mac) Which customers are worth keeping is worked out natively.** Lifetime
   value, how often each comes back, and how badly it would hurt to lose the
   biggest one all run in the app now. A quote is still not lifetime value — a
