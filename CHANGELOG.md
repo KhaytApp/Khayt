@@ -6,6 +6,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The accountant's file named bilingual customers in English only.**
+  The export takes the customer's name from the customer, the way the other app
+  does — through the shop's own content languages — instead of falling back to
+  the name stamped on the order, which is written in English at the moment a
+  job is taken. A shop that writes its customers in Arabic exported the same
+  quarter under two different sets of names depending on which app it used,
+  which is exactly what that export exists not to do. An order whose customer
+  has since been deleted still carries the name it was written with: an invoice
+  records who was billed.
+
 - **(Mac) The shop can take its whole book out as spreadsheets.** Khayt has had
   "Export all data (CSV)" since 3.0 — a file per collection, in a form a
   spreadsheet opens — and this app had nothing like it: the JSON export is for
