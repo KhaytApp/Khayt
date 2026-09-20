@@ -1694,10 +1694,10 @@ final class Words {
                                    "ar": "عميل واحد سيصله هذا"],
         "mac.campaign_reach_two": ["en": "2 customers would get this",
                                    "ar": "عميلان سيصلهما هذا"],
-        // THE COUNT IS IN THE QUESTION. "Send this?" is a question nobody can
-        // answer; "Send this to 38 customers?" is one they can.
-        "mac.campaign_confirm": ["en": "Send this to {n} customers?",
-                                 "ar": "إرسال هذا إلى {n} عميلاً؟"],
+        // THE COUNT IS IN THE QUESTION — and the question itself is the other
+        // app's `camp.confirm`, which is translated into nine languages. Only
+        // the HINT is written here, because the other app has no equivalent:
+        // it does not say that the run cannot be taken back.
         "mac.campaign_confirm_hint": ["en": "One message each, a third of a second apart. It cannot be taken back.",
                                       "ar": "رسالة لكل عميل، بفاصل ثلث ثانية. لا يمكن التراجع عن ذلك."],
         // Refused BY NAME, the way a move through an SMTP provider is: the

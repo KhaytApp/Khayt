@@ -153,7 +153,11 @@ struct CampaignTests {
             .deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp/CampaignSheet.swift"), encoding: .utf8)
         #expect(sheet.contains("confirmationDialog"), "Send goes straight out")
-        #expect(sheet.contains("mac.campaign_confirm"), "the question does not name the count")
+        #expect(sheet.contains("camp.confirm"), "the question does not name the count")
+        #expect(!sheet.contains("\"mac.campaign_confirm\""), Comment(rawValue:
+            "the question is asked with a Mac-only string again. `camp.confirm` is the "
+            + "other app's and is translated into nine languages; this one would be "
+            + "English for seven of them, in the one moment to be sure it is understood"))
         #expect(sheet.contains("confirming = true"),
                 "the Send button sends rather than asking")
         // And the only call that sends is behind that dialog.
