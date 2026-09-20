@@ -75,9 +75,24 @@ test('the picker is wired to something exported', () => {
 });
 
 test('the category is saved, trimmed', () => {
-  assert.match(inv, /draft\.category\s+= \(draft\.category \|\| ''\)\.trim\(\)/,
-    'the category is not persisted, or keeps stray whitespace');
+  // This used to pin the renderer's own `draft.category = (…).trim()` line.
+  // That line is gone: the trim — and the clamp, the booleans and what a blank
+  // category means — moved to lib/consumable-edit.js when the Mac needed the
+  // same answers. Pinning the text would now fail on a lift that changed no
+  // behaviour at all, so this asserts the BEHAVIOUR and, separately, that the
+  // editor still routes through the rule that provides it.
+  const { newConsumable, applyEdit } = require('../lib/consumable-edit.js');
+  assert.equal(newConsumable({ name: 'x', category: '  Spares  ' }, { id: 'C' })
+    .consumable.category, 'Spares', 'a category is not trimmed on the way in');
+  const existing = { id: 'C', name: 'x', category: 'Spares' };
+  applyEdit(existing, { category: '  Fasteners ' });
+  assert.equal(existing.category, 'Fasteners', 'an edited category is not trimmed');
+
   assert.match(inv, /data-f="category"/, 'the editor has no category field');
+  assert.match(inv, /KhaytConsumableEdit\.(newConsumable|applyEdit)/,
+    'the editor no longer saves through the shared rule');
+  assert.match(html, /<script src="\.\.\/lib\/consumable-edit\.js"><\/script>/,
+    'lib/consumable-edit.js is never loaded, so saving throws');
 });
 
 test('the editor suggests categories the shop already uses', () => {
