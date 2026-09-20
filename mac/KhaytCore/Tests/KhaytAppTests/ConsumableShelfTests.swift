@@ -204,4 +204,70 @@ struct ConsumableShelfTests {
         #expect(gate.contains("canMoveJobs"),
                 Comment(rawValue: "the consumables card is gated on the shelf alone: \(gate)"))
     }
+
+    // MARK: - The write, on the book this shop actually has
+
+    /// The shop this was built for has `"consumables": []`, and a book written
+    /// by an older Khayt may not carry the key at all. Both are the state the
+    /// feature is FOR, and both are the state it is easiest to get wrong — the
+    /// card was shipped hidden on exactly this book once already.
+    @Test("the first consumable lands in a book that has none",
+          arguments: [true, false])
+    func firstOneLands(_ keyPresent: Bool) async throws {
+        var root: [String: JSONValue] = ["settings": .object(["currency": .string("SAR")])]
+        if keyPresent { root["consumables"] = .array([]) }
+        let url = try Self.tempStore(root)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let engine = try KhaytEngine()
+        let made = try await engine.newConsumable(
+            ["name": .string("Isopropyl alcohol"), "stock": .string("4"),
+             "unit": .string("L"), "minStock": .string("2")], id: "CNS-1")
+        guard let record = made.consumable else { Issue.record("refused"); return }
+
+        try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+            var shelf = Shop.rows(root, "consumables")
+            shelf.append(record)
+            root["consumables"] = .array(shelf)
+        }
+
+        let after = try Self.read(url)
+        let shelf = Shop.rows(after, "consumables")
+        #expect(shelf.count == 1,
+                Comment(rawValue: "the shelf holds \(shelf.count) with the key "
+                        + (keyPresent ? "present" : "absent")))
+        guard case .object(let item)? = shelf.first else { Issue.record("not a record"); return }
+        #expect(Self.string(item["name"]) == "Isopropyl alcohol")
+        #expect(Self.string(item["id"]) == "CNS-1")
+        // And it is decodable by the screen that has to draw it — a record the
+        // rule writes and the model cannot read is the same bug one step later.
+        let drawn = try Self.decode(.object(item))
+        #expect(drawn.onHand == 4)
+        #expect(drawn.isLow == false, "four litres against a minimum of two")
+    }
+
+    @Test("the sample shop's other shelf cannot be changed, and it says why")
+    func sampleRefuses() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        await shop.saveConsumable(["name": .string("Glue")], id: nil)
+        #expect(shop.spendProblem == shop.words.callIt("mac.move_sample"))
+        await shop.deleteConsumable("anything")
+        #expect(shop.spendProblem == shop.words.callIt("mac.move_sample"))
+    }
+
+    // MARK: -
+
+    static func tempStore(_ root: [String: JSONValue]) throws -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appending(path: "khayt-consumable-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appending(path: "khayt-store.json")
+        try JSONEncoder().encode(root).write(to: url)
+        return url
+    }
+
+    static func read(_ url: URL) throws -> [String: JSONValue] {
+        try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: url))
+    }
 }
