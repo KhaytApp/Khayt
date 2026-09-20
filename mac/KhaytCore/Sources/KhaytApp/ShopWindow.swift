@@ -613,6 +613,7 @@ struct WindowSheets: ViewModifier {
             .sheet(item: $shop.loggingPurchaseFor) { PurchaseLogSheet(shop: shop, supplier: $0) }
             .sheet(item: $shop.showingHistoryFor) { PurchaseHistorySheet(shop: shop, supplier: $0) }
             .sheet(item: $shop.spoolHistoryFor) { SpoolHistorySheet(shop: shop, spool: $0) }
+            .sheet(item: $shop.billingOrder) { BillSheet(shop: shop, order: $0) }
             .sheet(item: $shop.restoring) { RestoreSheet(shop: shop, subject: $0) }
             .sheet(isPresented: $shop.checkingCloud) { CloudCheckSheet(shop: shop) }
             .sheet(isPresented: $shop.scanning) { ScanSheet(shop: shop) }

@@ -87,9 +87,10 @@ test('every purchase-order field the app reads is one createPurchaseOrder writes
   // renderer's save handler into `lib/supplier-invoice.js` for the same reason
   // receiving did — the Mac app records one too — so its keys are taken from
   // the real function here rather than hand-listed, exactly as above.
-  const billKeys = Object.keys(
-    require('../lib/supplier-invoice.js').record(filamentPo(),
-                                                 { number: 'INV-1', amount: 63.75, date: '2026-09-19' }));
+  const SI = require('../lib/supplier-invoice.js');
+  const billKeys = [...Object.keys(SI.record(filamentPo(),
+                                             { number: 'INV-1', amount: 63.75, date: '2026-09-19' })),
+                    ...Object.keys(SI.settle(filamentPo(), true))];
   const written = new Set([...Object.keys(filamentPo()), ...Object.keys(consumablePo()),
                            ...receivedKeys, ...billKeys]);
 
@@ -100,11 +101,11 @@ test('every purchase-order field the app reads is one createPurchaseOrder writes
   const FILES = ['renderer/inventory.js', 'renderer/wire-events.js', 'lib/po-audit.js',
                  'lib/purchase-orders.js', 'lib/supplier-invoice.js'];
 
-  // A purchase order is never the paid one until something says so, and nothing
-  // does: there is no "mark supplier invoice paid" control yet. Absent reads as
-  // unpaid, which is the safe direction for an AP aging bar, so this is a
-  // missing feature rather than a wrong number — unlike the fields above it.
-  const KNOWN_UNWRITTEN = new Set(['invoicePaid']);
+  // EMPTY, and it should stay that way. It held `invoicePaid` for as long as
+  // nothing could write one — the aging bar read it, so every billed order
+  // counted as owing forever. `lib/supplier-invoice.js` settles a bill now and
+  // its keys are read from the real function below, like the rest.
+  const KNOWN_UNWRITTEN = new Set();
 
   const assigned = new Set();
   const reads = new Map();

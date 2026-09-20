@@ -552,6 +552,7 @@ final class Shop {
             // three low things may already be on their way, and offering to
             // order them again is how a shelf ends up with four kilos of
             // something a shop uses twice a year.
+            unsettledRows = (try? await engine?.billsOwing(purchaseOrderRows)) ?? []
             needsOrdering = (try? await engine?.needsOrdering(
                 spools: inventoryRows, consumables: consumableRows, orders: orderRows,
                 purchaseOrders: purchaseOrderRows, settings: settingsDict,
@@ -3801,6 +3802,20 @@ final class Shop {
     /// A received order is history; what a shop looking at a thin shelf wants
     /// to know is what is COMING. `received` orders are left out for that
     /// reason, not hidden.
+    /// Orders whose goods are here and whose bill is not settled.
+    ///
+    /// Either no invoice has been recorded, or one has and nobody has said it
+    /// was paid. `lib/supplier-invoice.js` decides which — the same rule that
+    /// decides whether a bill matches — so a list this app shows and a figure
+    /// the other app totals cannot drift apart.
+    ///
+    /// This is deliberately NOT the other app's AP aging filter, which also
+    /// counts money committed on orders that have not arrived. That answers
+    /// "what have we taken on"; this answers "whose bill is sitting here".
+    var billsToSettle: [PurchaseOrder] { unsettledRows.compactMap(PurchaseOrder.init(row:)) }
+
+    private(set) var unsettledRows: [JSONValue] = []
+
     var openOrders: [PurchaseOrder] {
         purchaseOrderRows.compactMap(PurchaseOrder.init(row:))
             .filter { $0.status != "received" }
@@ -4111,6 +4126,34 @@ final class Shop {
         if let made = await draftWhatIsLow(), made > 0 { autoDrafted = made }
     }
 
+    /// Say a supplier's bill has been paid — or that it has not, after all.
+    ///
+    /// Merged onto the order rather than replacing it, like every other write
+    /// to one: a purchase order carries plenty this does not know about.
+    func settleBill(_ id: String, paid: Bool) async -> String? {
+        await writeToOnePurchaseOrder(id) { order, engine in
+            guard case .object(var row) = order else { return order }
+            for (key, value) in try await engine.settleBill(paid) { row[key] = value }
+            return .object(row)
+        }
+    }
+
+    /// Record a supplier's bill against an order whose goods already arrived.
+    ///
+    /// The receive sheet takes one at the moment the box is opened, which is
+    /// when it usually arrives. This is the other case: a bill that turns up a
+    /// week later, against an order that has left the "still to come" card.
+    func recordBill(_ id: String, _ bill: Bill) async -> String? {
+        guard bill.isWorthRecording else { return nil }
+        return await writeToOnePurchaseOrder(id) { order, engine in
+            guard case .object(var row) = order else { return order }
+            let recorded = try await engine.recordSupplierInvoice(
+                on: order, number: bill.number, amount: bill.amount, date: bill.day)
+            for (key, value) in recorded.fields { row[key] = value }
+            return .object(row)
+        }
+    }
+
     /// Close an order by hand: the goods are all in, whatever was counted.
     func closeOrder(_ id: String) async -> String? {
         await writeToOnePurchaseOrder(id) { order, engine in
@@ -4212,6 +4255,9 @@ final class Shop {
     var showingHistoryFor: Supplier?
     /// The spool whose usage log is open, if any.
     var spoolHistoryFor: Spool?
+    /// The order whose supplier bill is being typed in, if any. Set when a
+    /// bill turns up after the goods rather than with them.
+    var billingOrder: PurchaseOrder?
 
     /// Write down something bought from a supplier.
     ///
