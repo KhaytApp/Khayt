@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) What a consumable IS is a shared rule now, not a save
+  handler.** Adding or correcting glue, IPA, mailing bags or nozzles lived
+  inside `renderer/inventory.js`'s modal — the trim, the clamp to zero, the
+  booleans and what a blank category means — so only the Electron window could
+  do it. `lib/consumable-edit.js` holds those answers now and that window calls
+  it, unchanged in behaviour (the full suite passes, 4948 tests). This is the
+  half the Mac needs: it draws "what is about to run out that is not filament"
+  from a shelf it has never been able to put anything on.
+
 - **A model pack can be a RAR or a 7-Zip, and can be bigger than 32 MB.** Two
   faults with one cause — the library only ever opened a zip, and judged a file
   the shop already had on its own disk by the size limit meant for a stranger

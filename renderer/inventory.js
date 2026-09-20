@@ -2341,9 +2341,12 @@ function renderConsumables() {
 
 function openConsumableEditor(id) {
   const existing = id ? consumables.find(c => c.id === id) : null;
+  // The blank one comes from the shared rule, so the fields a new consumable
+  // starts with are the fields the rule writes — and the Mac's sheet opens on
+  // the same record. See lib/consumable-edit.js.
   const draft = existing
     ? { ...existing }
-    : { id: uid('CNS'), name: '', stock: 0, unit: '', cost: 0, minStock: 0, usagePerHour: 0, isPackaging: false };
+    : { ...KhaytConsumableEdit.newConsumable({ name: 'x' }, { id: uid('CNS') }).consumable, name: '' };
 
   const bodyHtml = `
     <label>${escapeHtml(t('cons.name'))}</label>
@@ -2400,21 +2403,15 @@ function openConsumableEditor(id) {
       });
     },
     onSave(modal) {
-      const name = draft.name?.trim ? draft.name.trim() : '';
-      if (!name) { toast(t('cons.name_ph'), 'error'); return false; }
-      draft.name         = name;
-      draft.stock        = Math.max(0, num(draft.stock, 0));
-      draft.cost         = Math.max(0, num(draft.cost, 0));
-      draft.minStock     = Math.max(0, num(draft.minStock, 0));
-      draft.unit         = (draft.unit || '').trim();
-      draft.category     = (draft.category || '').trim();
-      draft.usagePerHour = Math.max(0, num(draft.usagePerHour, 0));
-      draft.isPackaging  = !!(modal.querySelector('#consIsPackaging')?.checked);
-      if (existing) {
-        Object.assign(existing, draft);
-      } else {
-        consumables.push(draft);
-      }
+      // Every one of these — the trim, the clamp to zero, the booleans, and
+      // what a blank category means — is lib/consumable-edit.js's answer now,
+      // so this window and the Mac's sheet cannot drift apart on any of them.
+      draft.isPackaging = !!(modal.querySelector('#consIsPackaging')?.checked);
+      const written = existing
+        ? KhaytConsumableEdit.applyEdit(existing, draft)
+        : KhaytConsumableEdit.newConsumable(draft, { id: draft.id });
+      if (written.refused) { toast(t('cons.name_ph'), 'error'); return false; }
+      if (!existing) consumables.push(written.consumable);
       saveAll();
       renderConsumables();
       toast(t('cons.saved'), 'success');
