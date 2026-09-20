@@ -23,6 +23,8 @@ struct CampaignSheet: View {
 
     @State private var segment = Shop.Segment()
     @State private var body_ = ""
+    /// The one line a customer reads before deciding whether to open it.
+    @State private var subject = ""
     @State private var recipients: [KhaytEngine.Recipient] = []
     @State private var preview = ""
     @State private var minSpendText = ""
@@ -83,6 +85,29 @@ struct CampaignSheet: View {
             }
 
             Divider()
+
+            // ── THE SUBJECT ──────────────────────────────────────────────
+            //
+            // A campaign this app sent went out under the shop's name as its
+            // subject and nothing else, because there was nowhere to type one.
+            // The other window has had this field since the feature existed,
+            // and it is the line that decides whether any of the rest is read.
+            //
+            // `{{name}}` works here exactly as it does in the message — "A
+            // note from your printer, Layla" — so it is filled per recipient
+            // rather than sent as literal braces. Left empty, the shop's own
+            // name is used.
+            VStack(alignment: .leading, spacing: 6) {
+                Text(shop.words.callIt("camp.subject")).foregroundStyle(.secondary)
+                TextField(shop.words.callIt("camp.subject_ph"), text: $subject)
+                    .textFieldStyle(.roundedBorder)
+                    // The other app's cap, kept: a subject longer than this is
+                    // cut by the mail client anyway, and one app truncating
+                    // where the other does not is two different emails.
+                    .onChange(of: subject) {
+                        if subject.count > 160 { subject = String(subject.prefix(160)) }
+                    }
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(shop.words.callIt("camp.message")).foregroundStyle(.secondary)
@@ -188,10 +213,11 @@ struct CampaignSheet: View {
 
     private func send() {
         let text = body_
+        let line = subject
         let list = recipients
         sending = true
         Task {
-            result = await shop.sendCampaign(text, to: list)
+            result = await shop.sendCampaign(text, subject: line, to: list)
             sending = false
         }
     }

@@ -10501,14 +10501,15 @@ final class Shop {
     /// log the other app keeps — in the same shape, in the same place.
     ///
     /// Returns what to tell the shop.
-    func sendCampaign(_ body: String, to recipients: [KhaytEngine.Recipient]) async -> String {
+    func sendCampaign(_ body: String, subject: String = "",
+                      to recipients: [KhaytEngine.Recipient]) async -> String {
         guard !recipients.isEmpty else { return words.callIt("camp.none") }
         guard !body.trimmingCharacters(in: .whitespaces).isEmpty else {
             return words.callIt("camp.need_body")
         }
         guard await canSendCampaign() else { return words.callIt("mac.campaign_needs_http") }
 
-        let headline = shopName
+        let typed = subject.trimmingCharacters(in: .whitespacesAndNewlines)
         var sent = 0
         var failed = 0
         for recipient in recipients {
@@ -10516,6 +10517,20 @@ final class Shop {
             // and the count it is shown afterwards is what actually went.
             if Task.isCancelled { break }
             let filled = await campaignPreview(body, for: recipient)
+            // ── THE SUBJECT IS A TEMPLATE TOO ─────────────────────────────
+            //
+            // `{{name}}` in a subject line is the whole reason to have one —
+            // "A note from your printer, Layla" is opened and "Acme 3D" is
+            // not — so it goes through the SAME fill the message does rather
+            // than being pasted in raw. Filling the body and not the subject
+            // would put the literal characters `{{name}}` in the one line a
+            // customer sees before deciding whether to open it.
+            //
+            // Empty falls back to the shop's name. The other app falls back to
+            // the literal word "Khayt", which names the software rather than
+            // the sender; a customer has never heard of it.
+            let headline = typed.isEmpty ? shopName
+                : await campaignPreview(typed, for: recipient)
             let mail = OrderEmail(to: recipient.contact, subject: headline,
                                   // The shop's own newlines are the paragraphs
                                   // it meant, and an HTML mail eats them.
