@@ -74,6 +74,14 @@ struct LibraryGrid: View {
                                     // each allowed a folder called `Blue`, and
                                     // opening one of them must not show both.
                                     .onTapGesture { shop.shelf = .library(path) }
+                                    // MOVING THE WHOLE FOLDER, because the
+                                    // alternative is opening it, selecting all
+                                    // of it and typing a path exactly — once
+                                    // per folder, and a library imported flat
+                                    // is a great many folders.
+                                    .contextMenu {
+                                        FolderMoveMenu(shop: shop, path: path)
+                                    }
                             case .file(let file):
                                 cell(for: file).id(file.id)
                             }
@@ -457,5 +465,35 @@ enum Format {
         let f = NumberFormatter()
         f.numberStyle = .decimal
         return f.string(from: n as NSNumber) ?? "\(n)"
+    }
+}
+
+
+/// Where a folder can be moved to: any other folder, or out to the top.
+///
+/// Its own descendants are left out — a folder moved inside itself would write
+/// a path containing its own prefix, and it would vanish from the level it was
+/// on. `moveFolder` refuses that too; this simply does not offer it.
+private struct FolderMoveMenu: View {
+    @Bindable var shop: Shop
+    let path: String
+
+    private var destinations: [String] {
+        shop.folderPaths.filter { $0 != path && !Shop.isUnder($0, path) }
+    }
+
+    var body: some View {
+        Menu(shop.words.callIt("mac.move_folder")) {
+            if path.contains(ImportGrouping.separator) {
+                Button(shop.words.callIt("mac.move_to_top")) {
+                    Task { await shop.moveFolder(path, under: nil) }
+                }
+                Divider()
+            }
+            ForEach(destinations, id: \.self) { target in
+                Button(target) { Task { await shop.moveFolder(path, under: target) } }
+            }
+        }
+        .disabled(!shop.canMoveJobs)
     }
 }
