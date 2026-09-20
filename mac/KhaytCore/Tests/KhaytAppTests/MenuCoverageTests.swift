@@ -104,8 +104,16 @@ struct MenuCoverageTests {
         #expect(!grid.isEmpty, "LibraryGrid.swift moved")
         #expect(grid.contains("GroupCrumb(shop: shop, group: group)"),
                 "nothing on screen leaves a library folder")
-        #expect(grid.contains("shop.shelf = .library(nil)"),
+        // ONE LEVEL UP, which at the top IS out — `above.last?.path` is nil
+        // there. This used to pin the literal `.library(nil)`, and a folder
+        // three deep that jumped straight to the top on ⌘[ would have passed
+        // it while being the wrong behaviour. What matters is that the button
+        // goes somewhere, and that somewhere is computed from where you are.
+        #expect(grid.contains("shop.shelf = .library(above.last?.path)"),
                 "the way back does not go anywhere")
+        #expect(grid.contains("ForEach(above.dropLast()"), Comment(rawValue:
+            "a project several levels deep offers no way to the middle of it — only "
+            + "back one step at a time or out altogether"))
         // Drawn above the filter bar, which renders nothing without chips.
         let crumbAt = grid.range(of: "GroupCrumb(shop: shop")?.lowerBound
         let barAt = grid.range(of: "LibraryFilterBar(shop: shop)")?.lowerBound

@@ -30,12 +30,62 @@ struct ImportGroupingTests {
             chosen: folder("/Downloads/Dragon")) == "Dragon")
     }
 
-    @Test("a subfolder that names a model wins over the folder chosen")
-    func deepestName() {
-        // Seven kings in one download: each is its own group, not all "Kings".
+    @Test("every level that names something is kept, in order")
+    func theWholePath() {
+        // Seven kings in one download: each is its own folder INSIDE Kings,
+        // rather than seven siblings with the download's name lost. `STL` is
+        // walked through as before.
         #expect(ImportGrouping.group(
             for: folder("/Downloads/Kings/King Abdulaziz/STL/head.stl"),
-            chosen: folder("/Downloads/Kings")) == "King Abdulaziz")
+            chosen: folder("/Downloads/Kings")) == "Kings/King Abdulaziz")
+    }
+
+    @Test("a project with levels keeps them, and its loose files stay at the top")
+    func theReportedCase() {
+        // The library showed "only the files in the first folder, all sub
+        // folders skipped": every file WAS imported, and the ones below the
+        // top level landed in sibling folders instead of inside the project.
+        let root = folder("/Downloads/MyProject")
+        #expect(ImportGrouping.group(for: folder("/Downloads/MyProject/base.stl"),
+                                     chosen: root) == "MyProject")
+        #expect(ImportGrouping.group(for: folder("/Downloads/MyProject/pose 1/Blue/a.stl"),
+                                     chosen: root) == "MyProject/pose 1/Blue")
+        #expect(ImportGrouping.group(for: folder("/Downloads/MyProject/pose 2/Grey/b.stl"),
+                                     chosen: root) == "MyProject/pose 2/Grey")
+    }
+
+    @Test("a path too long to be written down keeps the two levels that say most")
+    func withinTheLimit() {
+        // `LibraryFile.normalise` cuts a group at 60 UTF-16 units, the same as
+        // the other app, so a longer path would be sliced mid-segment and read
+        // as a folder nobody made. The project and the folder the file sat in
+        // are what survive; the levels between them go first.
+        let long = ["Saudi Kings Collection 2026",
+                    "Commissioned Reproductions",
+                    "King Abdulaziz Al Saud",
+                    "Head and Shoulders"]
+        let fitted = ImportGrouping.fitting(long)
+        #expect(fitted.utf16.count <= 60, Comment(rawValue: "\(fitted.utf16.count): \(fitted)"))
+        #expect(fitted.hasSuffix("Head and Shoulders"),
+                "the folder it actually sat in was dropped")
+        #expect(fitted.hasPrefix("Saudi Kings Collection 2026"),
+                "the project it belongs to was dropped before the levels between")
+        #expect(fitted == "Saudi Kings Collection 2026/Head and Shoulders",
+                Comment(rawValue: fitted))
+
+        // Three levels that DO fit are all kept — the trim only bites when the
+        // limit is actually reached.
+        #expect(ImportGrouping.fitting(["Saudi Kings Collection 2026",
+                                        "Commissioned Reproductions", "Head"])
+                == "Saudi Kings Collection 2026/Commissioned Reproductions/Head")
+
+        // Short paths are untouched.
+        #expect(ImportGrouping.fitting(["MyProject", "pose 1", "Blue"])
+                == "MyProject/pose 1/Blue")
+        // And one level that cannot fit is handed over as it is, to be cut by
+        // the rule that owns the limit rather than by a second one here.
+        let huge = String(repeating: "A", count: 80)
+        #expect(ImportGrouping.fitting([huge]) == huge)
     }
 
     /// A file picked on its own is one thing the shop chose, not a set.
