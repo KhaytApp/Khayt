@@ -15,6 +15,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   so a project reassembles a folder at a time. A folder is never offered a home
   inside itself.
 
+- **(Mac) The library takes what a shop is actually sent.** It held six kinds
+  of file; a STEP a customer emailed could not go in at all, so it stayed in
+  Downloads and the library was not the whole library. It now takes CAD a
+  client sends (STEP, IGES, SolidWorks, Fusion, OpenSCAD), the mesh formats
+  other tools write (FBX, PLY, AMF), machine files (including bgcode and UFP)
+  and the resin formats a resin shop's library is entirely made of — twenty-two
+  kinds in all. **Filed, not measured**: the ones carrying no mesh this app can
+  read get no thumbnail and no dimensions, exactly as a G-code always has, and
+  every screen that needs measurements passes over them rather than guessing.
+  Reading a STEP properly means tessellating curved surfaces, which is a CAD
+  kernel and not a parser; the app does not pretend otherwise.
+
 - **A spool that was dried can be recorded as dried.** Khayt decides whether
   filament is damp from one field — the day it was last dried — and nothing in
   either app was writing it. The Windows and Linux app's drying log kept its

@@ -73,7 +73,35 @@ enum LibraryImport {
     /// What a print library holds. `zip` is deliberately absent: Khayt unpacks
     /// an archive into several records and that is a decision with a dialog
     /// attached, not a file copy.
-    static let kinds: Set<String> = ["stl", "3mf", "obj", "gcode", "gco", "g"]
+    ///
+    /// ── CATALOGUING IS NOT MEASURING ──────────────────────────────────────
+    ///
+    /// Half of these carry no mesh this app can read, and that is fine: a
+    /// `gcode` has been in this list since it was written and is a list of
+    /// moves, not a model. `Mesh.readGeometry` returns nil, the record has no
+    /// bounds, and every screen that needs bounds skips it — which is already
+    /// how the library treats a model it could not measure.
+    ///
+    /// What the shop gets is the file FILED: named, grouped, tagged,
+    /// searchable, and beside the job it belongs to. A STEP a client emailed
+    /// could not be put in the library at all, so it lived in Downloads and
+    /// the library was not the whole library.
+    ///
+    /// STEP first, because it is what engineering customers send. Reading one
+    /// properly means tessellating NURBS surfaces — a B-rep kernel, not a
+    /// parser — so this app does not pretend to have measured it.
+    static let kinds: Set<String> = [
+        // Meshes it can read and measure.
+        "stl", "3mf", "obj",
+        // CAD a customer sends. Filed, not measured.
+        "step", "stp", "iges", "igs", "sldprt", "f3d", "ipt", "scad",
+        // Meshes other tools write, which a shop keeps beside the print.
+        "fbx", "ply", "amf",
+        // Machine files.
+        "gcode", "gco", "g", "bgcode", "ufp", "nc",
+        // Resin, which a resin shop's library is entirely made of.
+        "ctb", "cbddlp", "photon", "pwmx", "goo", "lys",
+    ]
 
     /// A name for the file inside the record's folder.
     ///
