@@ -4126,6 +4126,52 @@ final class Shop {
         if let made = await draftWhatIsLow(), made > 0 { autoDrafted = made }
     }
 
+    /// Write down that a spool was dried today.
+    ///
+    /// ── THE APP NAGGED AND COULD NOT BE ANSWERED ──────────────────────────
+    ///
+    /// The shelf draws `due` and `overdue` from `lib/filament-dryness.js`,
+    /// which reads `driedAt` and nothing else. This app had no field for it
+    /// and no action, so a spool it called overdue stayed overdue for ever —
+    /// an app asking for something it will not accept.
+    ///
+    /// Through `spool-edit.js` like every other change to a spool, so the one
+    /// rule that decides what a spool record may hold keeps deciding it.
+    func markDried(_ id: String, on day: String? = nil) async -> String? {
+        guard let build = source.build, StoreLock.weOwnIt(build) else {
+            return words.callIt("mac.read_only")
+        }
+        guard let engine else { return words.callIt("mac.move_no_engine") }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var shelf = Self.rows(root, "inventory")
+                guard let at = shelf.firstIndex(where: { Self.recordId($0) == id }),
+                      case .object(let was) = shelf[at] else {
+                    throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
+                }
+                let out = try await engine.editSpool(
+                    shelf[at],
+                    input: ["material": .string(Self.plainString(was["material"]) ?? ""),
+                            "driedAt": .string(day ?? Self.localDay())],
+                    settings: Self.settings(root), today: Self.today())
+                guard case .object(var record) = out.spool else { return }
+                StoreWriter.stamp(&record)
+                shelf[at] = .object(record)
+                root["inventory"] = .array(shelf)
+            }
+        } catch let refusal as MoveRefused {
+            return refusal.sentence
+        } catch {
+            return String(describing: error)
+        }
+        await load(source)
+        return nil
+    }
+
     /// Say a supplier's bill has been paid — or that it has not, after all.
     ///
     /// Merged onto the order rather than replacing it, like every other write

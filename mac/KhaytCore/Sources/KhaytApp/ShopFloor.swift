@@ -785,6 +785,17 @@ struct Inventory: View {
                                             shop.spoolHistoryFor = spool
                                         }
                                     }
+                                    // ANSWERING THE NAG WHERE IT APPEARS.
+                                    //
+                                    // The card above says `due` or `overdue`
+                                    // for this spool and there was no way to
+                                    // say it had been dried — an app asking
+                                    // for something it would not accept. A
+                                    // write, so it waits on `canMoveJobs`.
+                                    Button(shop.words.callIt("mac.mark_dried")) {
+                                        Task { shop.moveProblem = await shop.markDried(spool.id) }
+                                    }
+                                    .disabled(!shop.canMoveJobs)
                                     Divider()
                                     if shop.canMoveJobs, shop.has("purchasing") {
                                         // ORDER MORE. Drafted, never sent: a

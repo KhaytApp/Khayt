@@ -1711,6 +1711,11 @@ final class Words {
         // number in an Arabic column is drawn by the catalogue like any other.
         "mac.celsius": ["en": "°C", "ar": "°م"],
         "mac.mm_s": ["en": "mm/s", "ar": "مم/ث"],
+        // DRIED TODAY. The other app has a whole drying LOG and a word for
+        // it (`inv.dry_log`), but none for the single act — it opens a sheet
+        // and asks for a date, a temperature and a duration. This app answers
+        // the nag where the nag appears, and a menu item needs its own words.
+        "mac.mark_dried": ["en": "Dried today", "ar": "جُفّفت اليوم"],
         "mac.spool_history": ["en": "Where this went", "ar": "أين ذهب هذا"],
         "mac.spool_history_empty": ["en": "Nothing has been printed with this spool yet.",
                                     "ar": "لم يُطبع شيء بهذه البكرة بعد."],

@@ -1988,7 +1988,12 @@ function openDryingLog(itemId) {
       const tempC    = parseFloat(modal.querySelector('#dryTemp').value)     || null;
       const durationH = parseFloat(modal.querySelector('#dryDuration').value) || null;
       const notes    = modal.querySelector('#dryNotes').value.trim();
-      item.dryingLog.unshift({ id: uid('DRY'), date, tempC, durationH, notes });
+      // `driedAt` TOO, through the shared rule. `dryStatus` reads that field
+      // and nothing else, so a drying recorded only in this log left the same
+      // app still calling the spool overdue — and the Mac, which draws the
+      // same verdict, with no way to clear it at all.
+      Object.assign(item, KhaytFilamentDryness.recordDrying(
+        item, { id: uid('DRY'), date, tempC, durationH, notes }));
       saveAll();
       renderInventory();
       toast(t('inv.dry_add'), 'success');
