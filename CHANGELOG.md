@@ -6,6 +6,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A customer could be sent a campaign here but could not ask to stop.**
+  The shared rule has always refused to put an opted-out customer on a list,
+  whatever the segment says — but only the other app could record that they had
+  asked. A shop that sent a campaign from the Mac and then read "please stop
+  emailing me" had to open the other window to honour it, which is sending in
+  one place and recording consent in another. The customer sheet has the box
+  now. Nothing was ever lost in the meantime: a Mac save carries through fields
+  it does not offer, so an opt-out set in the other app survived.
+
+- **(Mac) The question before sending a campaign was asked in English.** "Send
+  to 38 customers?" is the other app's own sentence and it exists in nine
+  languages; the Mac had been asking with a copy written in two. A German shop
+  was asked in English at the one moment it matters that the question is
+  understood.
+
 - **(Mac) A campaign's subject line could not be typed.** Every message this
   app sent went out under the shop's name and nothing else, because there was
   nowhere to write a subject — and the subject is the line a customer reads

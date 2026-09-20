@@ -49,10 +49,18 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
     /// the other app appends from one screen and prepends from another, so a
     /// reader sorts by `at`.
     let commLog: [CommEntry]
+    /// This customer has asked not to be marketed to.
+    ///
+    /// The shared rule already refuses to put them on a campaign list —
+    /// `lib/campaigns.js` drops them whatever the segment says — but until
+    /// this app could SET it, a shop reading "please stop emailing me" had to
+    /// open the other one to honour it. Sending from here and recording
+    /// consent there is the wrong way round.
+    let marketingOptOut: Bool
 
     private enum CodingKeys: String, CodingKey {
         case id, nameEn, nameAr, phone, email, cr, vat, notes, defaultDiscount, createdAt
-        case priceList, recurring, commLog, source
+        case priceList, recurring, commLog, source, marketingOptOut
     }
 
     /// Is there anything under the heading?
@@ -101,6 +109,9 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         } else {
             recurring = nil
         }
+        // Absent means not opted out, which is the only safe default to read
+        // — but note that it is NOT the safe default to WRITE. See `record`.
+        marketingOptOut = ((try? c.decodeIfPresent(Bool.self, forKey: .marketingOptOut)) ?? nil) ?? false
         let log = (try? c.decodeIfPresent([JSONValue].self, forKey: .commLog)) ?? nil
         commLog = (log ?? []).compactMap {
             if case .object(let o) = $0 { return CommEntry(raw: o) } else { return nil }
@@ -111,12 +122,13 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
          email: String = "", cr: String = "", vat: String = "", notes: String = "",
          source: String = "", defaultDiscount: Double = 0, createdAt: String? = nil,
          priceList: [PriceAgreement] = [], recurring: Recurring? = nil,
-         commLog: [CommEntry] = []) {
+         commLog: [CommEntry] = [], marketingOptOut: Bool = false) {
         self.id = id; self.nameEn = nameEn; self.nameAr = nameAr
         self.phone = phone; self.email = email; self.cr = cr; self.vat = vat
         self.notes = notes; self.source = source
         self.defaultDiscount = defaultDiscount; self.createdAt = createdAt
         self.priceList = priceList; self.recurring = recurring; self.commLog = commLog
+        self.marketingOptOut = marketingOptOut
     }
 
     /// The record, as `clients` holds it — what the customer sheet saves.
@@ -137,6 +149,15 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             "defaultDiscount": .number(defaultDiscount),
             "createdAt": createdAt.map(JSONValue.string) ?? .null,
             "priceList": .array(priceList.map { .object($0.raw) }),
+            // ALWAYS WRITTEN, including when it is false.
+            //
+            // `saveCustomer` carries through any key this record omits, which
+            // is what protects the comms log and the fields this app does not
+            // offer. Omitting a FALSE here would use that same mechanism to
+            // put a stored `true` back — so a shop that ticked the box in this
+            // app, then reopened the sheet and unticked it, would be unable to
+            // undo it. Consent has to be writable in both directions.
+            "marketingOptOut": .bool(marketingOptOut),
         ]
         if let recurring { out["recurring"] = .object(recurring.raw) }
         return out
@@ -168,7 +189,17 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             source: key == \Client.source ? value : source,
             defaultDiscount: defaultDiscount,
             createdAt: createdAt,
-            priceList: priceList, recurring: recurring, commLog: commLog)
+            priceList: priceList, recurring: recurring, commLog: commLog,
+            marketingOptOut: marketingOptOut)
+    }
+
+    /// The same customer, marketed to or not.
+    func marketed(_ wanted: Bool) -> Client {
+        Client(id: id, nameEn: nameEn, nameAr: nameAr, phone: phone, email: email,
+               cr: cr, vat: vat, notes: notes, source: source,
+               defaultDiscount: defaultDiscount, createdAt: createdAt,
+               priceList: priceList, recurring: recurring, commLog: commLog,
+               marketingOptOut: !wanted)
     }
 
     /// The same customer with a different price list.

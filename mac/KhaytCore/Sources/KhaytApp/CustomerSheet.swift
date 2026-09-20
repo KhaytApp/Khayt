@@ -204,6 +204,26 @@ struct CustomerSheet: View {
                 TextField("", text: binding(\.notes), axis: .vertical)
                     .textFieldStyle(.roundedBorder).lineLimit(2...4)
             }
+            // ── ASKED NOT TO BE MARKETED TO ───────────────────────────────
+            //
+            // `lib/campaigns.js` has always refused to put this customer on a
+            // list, whatever the segment says. What was missing is that this
+            // app could not SET it — so a shop that sent a campaign from here
+            // and then read "please stop emailing me" had to open the other
+            // app to honour it. Sending in one place and recording consent in
+            // another is the wrong way round, and it is the sort of thing a
+            // shop discovers only after the second email.
+            //
+            // The word is the other app's (`camp.opt_out`), which carries it
+            // in nine languages; a Mac-only phrasing would be English for
+            // seven of them.
+            GridRow {
+                Color.clear.frame(height: 0)
+                Toggle(shop.words.callIt("camp.opt_out"), isOn: Binding(
+                    get: { draft.marketingOptOut },
+                    set: { draft = draft.marketed(!$0) }))
+                    .toggleStyle(.checkbox)
+            }
         }
     }
 

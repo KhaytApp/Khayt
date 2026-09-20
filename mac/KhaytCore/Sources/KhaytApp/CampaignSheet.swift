@@ -176,8 +176,12 @@ struct CampaignSheet: View {
         }
         // THE COUNT IS IN THE QUESTION. "Send this?" is a question nobody can
         // answer; "Send this to 38 customers?" is one they can.
+        // The question is the OTHER APP'S, `camp.confirm`, which carries it in
+        // nine languages. The Mac-only phrasing this used to have was written
+        // in two, so a German shop was asked in English before sending to its
+        // whole customer list — the one moment to be sure it is understood.
         .confirmationDialog(
-            shop.words.callIt("mac.campaign_confirm",
+            shop.words.callIt("camp.confirm",
                               ["n": .number(Double(recipients.count))]),
             isPresented: $confirming, titleVisibility: .visible
         ) {
