@@ -17,6 +17,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   opened on. This is what the demo data in the Windows and Linux app has always
   done; the richer book this app ships did not.
 
+- **(Mac) Etsy's three fees had to be typed onto every quote by hand.** Khayt
+  has priced a marketplace's cut since 3.0 — a percentage of the price before
+  extras is exactly what a marketplace charges against — but somebody had to
+  remember the numbers. Pick the marketplace on a new job instead and its
+  charges go on: Etsy, Shopify, eBay, Amazon, WooCommerce, Salla and Zid, each
+  showing what it charges before anything is added. Picking again replaces
+  those charges rather than stacking a second copy of them, and the lines a
+  shop typed itself are never touched. The rates are a starting point, not an
+  authority — they change, they vary by country and category, and a shop on a
+  legacy plan pays different ones — so every line lands in the table as an
+  ordinary charge that can be edited or deleted, and a shop that has saved its
+  own rates gets those.
+
 - **(Mac) A shop with one of something was told "1 1".** Eight counted lines
   wrote the number into the sentence and then had another put in front of it,
   so the Dashboard said "1 1 job unrecorded", the attention strip said "1 One

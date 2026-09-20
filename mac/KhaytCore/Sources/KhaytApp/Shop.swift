@@ -2983,6 +2983,13 @@ final class Shop {
         /// Nil for a flat amount; a percentage otherwise.
         var pct: Double?
         var amount: Double = 0
+        /// The marketplace this line came from, for lines a shop did not type.
+        ///
+        /// It is what makes picking Etsy twice REPLACE Etsy's three charges
+        /// instead of stacking a second copy of them — which a shop would only
+        /// notice on the finished invoice. Nil for a line the shop wrote, and
+        /// those are never touched by the picker.
+        var platformId: String?
 
         var isPercent: Bool { pct != nil }
 
@@ -2996,6 +3003,9 @@ final class Shop {
                 "label": .string(label.trimmingCharacters(in: .whitespacesAndNewlines)),
             ]
             if let pct { o["pct"] = .number(max(0, pct)) } else { o["amount"] = .number(max(0, amount)) }
+            // Carried onto the saved job the way the other app carries it, so
+            // a quote reopened there still knows which lines are Etsy's.
+            if let platformId { o["platformId"] = .string(platformId) }
             return .object(o)
         }
 
@@ -3007,7 +3017,61 @@ final class Shop {
 
         static func == (a: ExtraLine, b: ExtraLine) -> Bool {
             a.id == b.id && a.label == b.label && a.pct == b.pct && a.amount == b.amount
+                && a.platformId == b.platformId
         }
+    }
+
+    // MARK: - A marketplace's cut
+
+    /// The marketplaces a shop can sell through, named.
+    ///
+    /// Asked of the rule rather than listed here: `lib/integrations-registry.js`
+    /// and `lib/platform-fees.js` already agree on what a platform is called,
+    /// and a third list in Swift is how three things come to disagree.
+    func platforms() async -> [KhaytEngine.Platform] {
+        guard let engine else { return [] }
+        let ids = (try? await engine.platformIds()) ?? []
+        var out: [KhaytEngine.Platform] = []
+        for id in ids {
+            // `try?` on a call that already returns an optional flattens to
+            // one level, so this is the platform or nothing.
+            if let p = try? await engine.platform(id, settings: settingsDict) { out.append(p) }
+        }
+        return out
+    }
+
+    /// The quote lines a marketplace adds, ready for the form.
+    func feeLines(for platformId: String) async -> [ExtraLine] {
+        guard let engine,
+              let rows = try? await engine.platformFeeLines(platformId, settings: settingsDict)
+        else { return [] }
+        return rows.compactMap { row in
+            guard case .object(let o) = row,
+                  let label = Self.plainString(o["label"]), !label.isEmpty else { return nil }
+            var line = ExtraLine()
+            line.label = label
+            line.platformId = Self.plainString(o["platformId"])
+            if case .number(let pct)? = o["pct"] { line.pct = pct }
+            else if case .number(let amount)? = o["amount"] { line.amount = amount }
+            return line
+        }
+    }
+
+    /// The shop's own lines, in the order they were typed, followed by the
+    /// picked marketplace's — or by nothing, when the picker is cleared.
+    ///
+    /// The shop's lines are never reordered and never dropped: somebody typed
+    /// them, and a picker that quietly rewrote them would be a picker nobody
+    /// could use twice.
+    func applyingPlatform(_ platformId: String?, to lines: [ExtraLine]) async -> [ExtraLine] {
+        let kept = lines.filter { $0.platformId == nil }
+        guard let platformId, !platformId.isEmpty else { return kept }
+        return kept + (await feeLines(for: platformId))
+    }
+
+    /// Which marketplace these lines already carry, if any.
+    static func platformOn(_ lines: [ExtraLine]) -> String? {
+        lines.compactMap(\.platformId).first
     }
 
     func previewQuote(baseCost: Double, margin: Double, discountPct: Double,
