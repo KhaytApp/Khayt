@@ -551,6 +551,13 @@ struct OperationsPane: View {
         /// drawn a bar against these since it was built and there was nowhere
         /// to set one, so every shop read a budget of zero.
         var budgets: [String: Double] = [:]
+        /// Draft purchase orders for what is low, without being asked.
+        ///
+        /// Opt-in and drafts only — the shop still reviews them before any of
+        /// them is sent. The switch was in the other app, so a shop working
+        /// only on this Mac had a setting in its own book that nothing here
+        /// could turn on or off.
+        var autoDraftPo = false
         var payReminderEnabled = false, payReminderGrace = 3.0
         var quoteFollowUpEnabled = false, quoteFollowUpWindow = 2.0
 
@@ -577,6 +584,7 @@ struct OperationsPane: View {
                 qcEnabled: qc.flag("enabled"), qcRequireInspector: qc.flag("requireInspector"),
                 qcRequirePhotoOnFail: qc.flag("requirePhotoOnFail"), qcWarrantyDays: qc.number("warrantyDays", 30),
                 monthlyGoal: r.number("monthlyGoal", 0),
+                autoDraftPo: r.flag("autoDraftPo"),
                 payReminderEnabled: pay.flag("enabled"), payReminderGrace: pay.number("graceDays", 3),
                 quoteFollowUpEnabled: follow.flag("enabled"),
                 quoteFollowUpWindow: follow.number("windowDays", 2))
@@ -602,6 +610,7 @@ struct OperationsPane: View {
              "qc": .object(["enabled": .bool(qcEnabled), "requireInspector": .bool(qcRequireInspector),
                             "requirePhotoOnFail": .bool(qcRequirePhotoOnFail), "warrantyDays": .number(qcWarrantyDays)]),
              "monthlyGoal": .number(monthlyGoal),
+             "autoDraftPo": .bool(autoDraftPo),
              // `settings-edit` rebuilds `expBudgets` from ITS category list
              // whenever this field is present, so every category has to be in
              // here — a partial map would silently zero the ones left out.
@@ -721,6 +730,14 @@ struct OperationsPane: View {
                         .disabled(!draft.quoteFollowUpEnabled)
                 } footer: {
                     Text(shop.words.callIt("set.quote_followup_hint"))
+                }
+                // Beside the other two opt-in automations, which is what it is.
+                // The words are the other app's — it has had this switch all
+                // along — so they arrive in nine languages rather than two.
+                Section {
+                    Toggle(shop.words.callIt("reorder.auto_toggle"), isOn: $draft.autoDraftPo)
+                } footer: {
+                    Text(shop.words.callIt("reorder.auto_hint"))
                 }
                 Section(shop.words.callIt("set.qc_head")) {
                     Toggle(shop.words.callIt("set.qc_enabled"), isOn: $draft.qcEnabled)

@@ -241,6 +241,13 @@
         graceDays: clamp(0, 90, num(r.graceDays, 3)),
       };
     }
+    // Opt-in: draft purchase orders for what is low, without being asked.
+    //
+    // The other app has written this straight onto `settings` since it was
+    // added, so this rule never needed to know it. The Mac saves its settings
+    // ONLY through here — a pane sends a form and this decides what lands — so
+    // a key it does not know is a switch that silently does nothing.
+    if (has(f, 'autoDraftPo'))          out.autoDraftPo          = !!f.autoDraftPo;
     if (has(f, 'minOrderAmount'))       out.minOrderAmount       = Math.max(0, num(f.minOrderAmount, 0));
     if (has(f, 'rushFeeEnabled'))       out.rushFeeEnabled       = !!f.rushFeeEnabled;
     if (has(f, 'rushFeePct'))           out.rushFeePct           = clamp(0, 500, num(f.rushFeePct, 25));

@@ -14,6 +14,19 @@ struct MoveBanners: View {
     let shop: Shop
 
     var body: some View {
+        // ORDERS THIS APP DRAFTED BY ITSELF, because the shop asked it to.
+        //
+        // Drafts only, and the shop reviews them before any is sent — but the
+        // book changed while nobody was typing, and an app that alters a
+        // shop's records with nothing on screen to say so is the shape of
+        // every "where did that come from" question.
+        if shop.autoDrafted > 0 {
+            Banner(text: shop.words.callIt("reorder.auto_drafted",
+                                           ["n": .number(Double(shop.autoDrafted))]),
+                   symbol: "doc.badge.plus", tint: Role.text2) {
+                Button(shop.words.callIt("common.ok")) { shop.autoDrafted = 0 }
+            }
+        }
         // MONEY THE BOOK IS UNDERSTATING. Not a move's answer like the rest of
         // these, and it sits at the top for that reason: it is true until
         // somebody acts on it, on every screen, and what it is about is the
