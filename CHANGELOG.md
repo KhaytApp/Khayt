@@ -3721,6 +3721,98 @@ tested against both.
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.32] - 2026-09-20
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Two shelves and a library. The library takes twenty-two kinds of file instead
+of six, opens RAR and 7-Zip packs, has stopped refusing anything over 32 MB,
+and sends a deleted model to the Trash. The filament shelf can be added to —
+it could not be, and nothing said so. And the other shelf, the one holding
+glue and bags and nozzles, can be kept here at all for the first time.
+
+### Changed
+
+- **(Mac) A spool can be added to the shelf.** It could not. The sheet that
+  adds one was written, with its own heading and the catalogue lookup that
+  only makes sense for a spool nobody has typed yet; the code that writes the
+  record was written, and has a passing test; the switch between them was
+  declared, wired to the sheet, and reset after every save. Nothing in the app
+  ever turned that switch ON, so a shop could correct a spool here and had to
+  go to the other app to buy one. Nothing failed, because every piece of it
+  was right on its own — and the comment listing which screens have no actions
+  named the shelf, so the absence read as a decision somebody had made. *New
+  Spool* is on the shelf now, beside the ones Machines, Expenses, Waste and
+  the catalogue have always had. A test now refuses any sheet the app can
+  present and nothing can open.
+
+- **(Mac) The other shelf can be kept here: glue, IPA, bags, nozzles.** Khayt
+  has always worked out what is about to run out that is not filament, and
+  this app has always drawn it — from a shelf it had no way to put anything
+  on. The record was written only by the Windows and Linux app's form, so a
+  shop that uses the Mac had an empty shelf and a card that could only ever
+  say nothing, which reads as "nothing is running out". A consumable can be
+  added, corrected and taken off here now, and a shelf with nothing on it yet
+  says so and offers the way to fill it rather than hiding itself. And the
+  card was only ever the urgent half: the rule it draws deliberately leaves
+  out anything that is neither low nor due soon, so the rest of the shelf was
+  invisible even to a shop that had one. It lists everything now, low first,
+  with what the rule said about cover and quantity kept on the rows it spoke
+  about. Shelves —
+  Packaging, Spares, Cleaning, whatever the shop calls them — can be typed on
+  an item and picked between, one spelling each however it is typed, with the
+  things nobody filed reachable under their own heading rather than only
+  under "all".
+
+- **(Mac) The library takes what a shop is actually sent.** It held six kinds
+  of file; a STEP a customer emailed could not go in at all, so it stayed in
+  Downloads and the library was not the whole library. It now takes CAD a
+  client sends (STEP, IGES, SolidWorks, Fusion, OpenSCAD), the mesh formats
+  other tools write (FBX, PLY, AMF), machine files (including bgcode and UFP)
+  and the resin formats a resin shop's library is entirely made of — twenty-two
+  kinds in all. **Filed, not measured**: the ones carrying no mesh this app can
+  read get no thumbnail and no dimensions, exactly as a G-code always has, and
+  every screen that needs measurements passes over them rather than guessing.
+  Reading a STEP properly means tessellating curved surfaces, which is a CAD
+  kernel and not a parser; the app does not pretend otherwise.
+
+- **A model pack can be a RAR or a 7-Zip, and can be bigger than 32 MB.** Two
+  faults with one cause — the library only ever opened a zip, and judged a file
+  the shop already had on its own disk by the size limit meant for a stranger
+  posting one over the internet. A pack of any ordinary size was refused as
+  "too large", and a RAR was not refused at all: it simply was not an archive
+  as far as the import was concerned, so dropping one in reported nothing to
+  import. RAR, 7-Zip and gzipped archives open now, a local import is allowed
+  a gigabyte, and an archive that unpacks to more than half a gigabyte is
+  stopped part way rather than after it has filled the disk.
+
+- **(Mac) Deleting a model sends it to the Trash.** It deleted the file
+  outright, so a model removed by mistake was gone — there is no undo for this
+  inside the app by design, and there was none outside it either. It goes to
+  the Trash now, where the Finder is the undo. A disk with no wastebasket — a
+  network share, some external drives — still deletes rather than refusing,
+  because the shop asked for it gone and only *where* it goes has changed.
+
+- **(Mac) A folder can be moved into another one, taking everything under it.**
+  Keeping the folders a project came with helps the next import and does
+  nothing for a library already filed flat — and the tree it came from is not
+  recorded anywhere, so nothing can reconstruct it. Putting one back by hand
+  meant opening each folder, selecting all of it and typing a path exactly.
+  Right-click a folder and move it instead: what is inside keeps its own depth,
+  so a project reassembles a folder at a time. A folder is never offered a home
+  inside itself.
+
+- **A spool that was dried can be recorded as dried.** Khayt decides whether
+  filament is damp from one field — the day it was last dried — and nothing in
+  either app was writing it. The Windows and Linux app's drying log kept its
+  own list and never touched that field, and its main window did not even load
+  the rule that reads it; (Mac) this app drew "due" and "overdue" on the shelf
+  with no way at all to answer them, so a spool it called overdue stayed
+  overdue for ever. The log now sets the date, and a spool can be marked dried
+  from the shelf where the warning appears. The newest drying wins, so writing
+  down one that was forgotten cannot make a spool look older than it is.
+
 ## [4.0.0-alpha.31] - 2026-09-20
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
