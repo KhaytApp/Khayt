@@ -55,6 +55,9 @@ final class Shop {
     var archivedCount: Int { files.count { $0.isArchived } }
     private(set) var machines: [Machine] = []
     private(set) var spools: [Spool] = []
+    /// The other shelf, decoded for drawing. `consumableRows` stays the raw
+    /// truth the rules are handed; this is what the screen lists.
+    private(set) var consumables: [Consumable] = []
     /// The shop's own record of its customers. Read from the `clients`
     /// collection, which this app did not open until it needed to point a new
     /// job at one.
@@ -328,6 +331,7 @@ final class Shop {
             skipped = decoded.skipped
             machines = Self.decode(root, "machines", as: Machine.self)
             spools = Self.decode(root, "inventory", as: Spool.self)
+            consumables = Self.decode(root, "consumables", as: Consumable.self)
             let library = Self.decodeFiles(root)
             files = library.items
             skipped += library.skipped
@@ -642,6 +646,7 @@ final class Shop {
             tagsInUse = []
             machines = []
             spools = []
+            consumables = []
             messageTemplates = []
             wear = [:]
             libraryRoots = nil
@@ -7877,6 +7882,132 @@ final class Shop {
         } catch {
             spendProblem = String(describing: error)
         }
+    }
+
+    // MARK: - The other shelf
+
+    /// Which consumable sheet is open, if any. The record rather than its id,
+    /// so `sheet(item:)` presents it — the shape `editingSpool` uses.
+    var editingConsumable: Consumable?
+    var addingConsumable = false
+    /// The shelf the list is narrowed to. Empty is all of them; the rule's
+    /// NUL-prefixed sentinel is the uncategorised bucket.
+    var consumableCategory = ""
+
+    /// Add one, or correct one.
+    ///
+    /// The same shape as `saveSpool`, and for the same reasons: read the shelf
+    /// INSIDE the write (the in-memory copy lags every in-flight write), and
+    /// hand the record to the rule rather than rebuilding it, so the fields
+    /// neither this app nor the rule knows about survive.
+    func saveConsumable(_ input: [String: JSONValue], id: Consumable.ID?) async {
+        spendProblem = nil
+        spendNote = nil
+        guard let build = source.build else {
+            spendProblem = words.callIt("mac.move_sample"); return
+        }
+        guard let engine else {
+            spendProblem = words.callIt("mac.move_no_engine"); return
+        }
+        var undo: [ChangedRecord] = []
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var shelf = Self.rows(root, "consumables")
+                if let id {
+                    guard let at = shelf.firstIndex(where: { Self.recordId($0) == id }),
+                          case .object(let was) = shelf[at] else {
+                        throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
+                    }
+                    let out = try await engine.editConsumable(shelf[at], input: input)
+                    if out.refused != nil {
+                        throw MoveRefused(sentence: self.words.callIt("cons.name_ph"))
+                    }
+                    guard case .object(var record) = out.consumable else { return }
+                    undo.append(ChangedRecord(collection: "consumables", id: id, was: was))
+                    StoreWriter.stamp(&record)
+                    shelf[at] = .object(record)
+                } else {
+                    let made = try await engine.newConsumable(input, id: Self.uid("CNS"))
+                    guard let record = made.consumable else {
+                        throw MoveRefused(sentence: self.words.callIt("cons.name_ph"))
+                    }
+                    shelf.append(record)
+                }
+                root["consumables"] = .array(shelf)
+            }
+            if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("cons.edit_title")) }
+            editingConsumable = nil
+            addingConsumable = false
+            await load(source)
+            spendNote = words.callIt("cons.saved")
+        } catch let refusal as MoveRefused {
+            spendProblem = refusal.sentence
+        } catch {
+            spendProblem = String(describing: error)
+        }
+    }
+
+    /// Take one off the shelf.
+    ///
+    /// Nothing else points at a consumable the way an order points at a spool,
+    /// so this really is just the row — but the deduction paths have spent it,
+    /// and those records name it by id. They keep the id they were written
+    /// with, which reads back as an item no longer on the shelf rather than as
+    /// a changed history.
+    func deleteConsumable(_ id: Consumable.ID) async {
+        spendProblem = nil
+        spendNote = nil
+        guard let build = source.build else {
+            spendProblem = words.callIt("mac.move_sample"); return
+        }
+        var undo: [ChangedRecord] = []
+        do {
+            try StoreWriter.update(build) { root in
+                var shelf = Self.rows(root, "consumables")
+                guard let at = shelf.firstIndex(where: { Self.recordId($0) == id }),
+                      case .object(let was) = shelf[at] else { return }
+                undo.append(ChangedRecord(collection: "consumables", id: id, was: was))
+                shelf.remove(at: at)
+                root["consumables"] = .array(shelf)
+            }
+            if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("cons.title")) }
+            await load(source)
+            spendNote = words.callIt("inv.removed")
+        } catch {
+            spendProblem = String(describing: error)
+        }
+    }
+
+    /// The shelves the consumables are on, each with its count — and the
+    /// selection to actually use, which the rule drops when the chosen shelf
+    /// has been emptied.
+    func consumableShelves() async -> (categories: [KhaytEngine.ConsumableCategory],
+                                       selected: String, uncategorised: String) {
+        guard let engine, !consumableRows.isEmpty else { return ([], "", "") }
+        let cats = (try? await engine.consumableCategories(consumableRows)) ?? []
+        let chosen = (try? await engine.consumableSelection(consumableRows,
+                                                            selected: consumableCategory)) ?? ""
+        let none = (try? await engine.consumableUncategorised()) ?? ""
+        return (cats, chosen, none)
+    }
+
+    /// The categories this shop already uses, for the editor to offer.
+    func consumableCategorySuggestions() async -> [String] {
+        guard let engine, !consumableRows.isEmpty else { return [] }
+        return (try? await engine.consumableSuggestions(consumableRows)) ?? []
+    }
+
+    /// The ids on one shelf. Ids rather than records, because the rows are the
+    /// raw truth and the screen draws the decoded `consumables`.
+    func consumableIds(inCategory selected: String) async -> [String]? {
+        guard let engine, !selected.isEmpty else { return nil }
+        guard let rows = try? await engine.consumablesInCategory(consumableRows,
+                                                                 selected: selected) else { return nil }
+        return rows.compactMap { Self.recordId($0) }
     }
 
     // MARK: - Taking a product off the catalogue

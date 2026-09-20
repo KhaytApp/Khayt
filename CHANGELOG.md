@@ -6,6 +6,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The other shelf can be kept here: glue, IPA, bags, nozzles.** Khayt
+  has always worked out what is about to run out that is not filament, and
+  this app has always drawn it — from a shelf it had no way to put anything
+  on. The record was written only by the Windows and Linux app's form, so a
+  shop that uses the Mac had an empty shelf and a card that could only ever
+  say nothing, which reads as "nothing is running out". A consumable can be
+  added, corrected and taken off here now. And the card was only ever the
+  urgent half: the rule it draws deliberately leaves out anything that is
+  neither low nor due soon, so the rest of the shelf was invisible even to a
+  shop that had one. It lists everything now, low first, with what the rule
+  said about cover and quantity kept on the rows it spoke about. Shelves —
+  Packaging, Spares, Cleaning, whatever the shop calls them — can be typed on
+  an item and picked between, one spelling each however it is typed, with the
+  things nobody filed reachable under their own heading rather than only
+  under "all".
+
 - **(Maintainers) What a consumable IS is a shared rule now, not a save
   handler.** Adding or correcting glue, IPA, mailing bags or nozzles lived
   inside `renderer/inventory.js`'s modal — the trim, the clamp to zero, the

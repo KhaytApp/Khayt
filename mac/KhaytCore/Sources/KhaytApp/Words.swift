@@ -1541,6 +1541,11 @@ final class Words {
         "mac.filament_catalog": ["en": "Search the filament catalogue",
                                  "ar": "البحث في دليل الخيوط"],
         "mac.new_spool":     ["en": "New Spool",    "ar": "بكرة جديدة"],
+        // The other shelf. Every other `cons.` word is in the shared
+        // catalogue already, with its Arabic; these two are this sheet's own.
+        "cons.unit_ph":      ["en": "each / ml / roll", "ar": "حبة / مل / لفة"],
+        "cons.min_stock_note": ["en": "Empty counts as low whatever this says.",
+                                "ar": "النفاد يُعد انخفاضاً مهما كانت هذه القيمة."],
         "mac.swatch":        ["en": "Swatch",       "ar": "اللون"],
         "mac.telegram_sent":   ["en": "Telegram message sent.", "ar": "أُرسلت رسالة تيليجرام."],
         "mac.telegram_failed": ["en": "The job was saved, but the Telegram message did not go out:",
