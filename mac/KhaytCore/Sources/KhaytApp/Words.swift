@@ -1706,6 +1706,11 @@ final class Words {
         // is a shared key for the heading (`inv.spool_history`) but none for
         // the empty state this app needs, so both are written here to keep the
         // pair in one place rather than half-borrowed.
+        // UNITS for the filament settings. The other app hard-codes "°C" and
+        // "mm/s" into its markup; here they are words, because a unit beside a
+        // number in an Arabic column is drawn by the catalogue like any other.
+        "mac.celsius": ["en": "°C", "ar": "°م"],
+        "mac.mm_s": ["en": "mm/s", "ar": "مم/ث"],
         "mac.spool_history": ["en": "Where this went", "ar": "أين ذهب هذا"],
         "mac.spool_history_empty": ["en": "Nothing has been printed with this spool yet.",
                                     "ar": "لم يُطبع شيء بهذه البكرة بعد."],
