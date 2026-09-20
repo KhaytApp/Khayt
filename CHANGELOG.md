@@ -23,6 +23,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   network share, some external drives — still deletes rather than refusing,
   because the shop asked for it gone and only *where* it goes has changed.
 
+- **(Maintainers) What the geometry key cannot tell apart is written down.**
+  Checking a real library for duplicates by that key returned 28 sets — almost
+  every one a mirrored pair, a left arm against a right arm, with no
+  byte-identical duplicates at all. A mirror preserves the triangle count, the
+  box and the volume, which is the whole key, and the signed volume that looks
+  like the missing information is positive for both. Nothing is built on this
+  today; it is a comment and a test so that anything built on it later does not
+  offer to delete half a pair.
+
 - **(Mac) A folder can be moved into another one, taking everything under it.**
   Keeping the folders a project came with helps the next import and does
   nothing for a library already filed flat — and the tree it came from is not
