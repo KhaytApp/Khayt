@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) The first consumable is proven to land, on the book this
+  shop actually has.** The tests covered the shared rules and the screen's own
+  restatement of "low", and never the write itself on an EMPTY shelf — which
+  is the state the whole feature exists for, and the one already got wrong
+  once. Covered both ways now: a book carrying `"consumables": []` (what this
+  shop's book holds) and one with no such key at all (what an older Khayt
+  wrote), with the written record decoded back through the model that has to
+  draw it. Removing the append fails both.
+
 - **(Mac) The empty consumables shelf offers the way to fill it.** The button
   that adds the first one is in that card's header, and the card was drawn
   only when the shelf already had something on it — so a shop with none got no
