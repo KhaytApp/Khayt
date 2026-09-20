@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Where a spool went can be read here.** Every deduction has always
+  been written against the spool — the date, the job, the grams — and this app
+  held that record without a screen for it. Right-click a spool that has been
+  printed with and the log opens: newest first, with what it has been spent on
+  altogether at the bottom. That total is the arithmetic somebody would
+  otherwise do on paper when a shelf count disagrees with the book, which is
+  the only reason to open it. The sample shop gained two spools with history
+  and kept two without, so both halves of the screen can actually be looked at.
+
 - **(Mac) "Draft purchase orders when stock hits its reorder point" is a
   switch this app both honours and offers.** The setting has been in the
   shop's own book since the other app added it, and this one neither read it

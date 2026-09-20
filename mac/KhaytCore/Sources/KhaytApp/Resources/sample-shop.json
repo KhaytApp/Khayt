@@ -3875,6 +3875,10 @@
  "inventory": [
   {
    "id": "sp-1",
+   "usageHistory": [
+    {"date": "2026-06-15", "project": "Kaaba desk piece", "orderId": "ORD-01002", "weightUsed": 752.84},
+    {"date": "2026-08-29", "project": "Ramadan lantern", "orderId": "ORD-01016", "weightUsed": 232.02}
+   ],
    "material": "PLA+ 2.0",
    "cost": 75,
    "weight": 860,
@@ -3891,6 +3895,10 @@
   },
   {
    "id": "sp-2",
+   "usageHistory": [
+    {"date": "2026-05-16", "project": "Prosthetic socket trial", "orderId": "ORD-01012", "weightUsed": 78.62},
+    {"date": "2026-08-03", "project": "Camera rig plate", "orderId": "ORD-01009", "weightUsed": 297.78}
+   ],
    "material": "Sunlu PETG",
    "cost": 85,
    "weight": 720,

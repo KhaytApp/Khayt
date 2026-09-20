@@ -19,7 +19,8 @@ struct SpoolFillTests {
               weight: left, spoolWeight: new, openedAt: nil, storage: nil,
               colourVariant: nil, color: nil, materialType: nil, lot: nil,
               purchasedAt: nil, unit: nil, reorderPoint: nil, reorderQty: nil,
-              printTemp: nil, bedTemp: nil, maxSpeed: nil, priceHistory: nil)
+              printTemp: nil, bedTemp: nil, maxSpeed: nil, priceHistory: nil,
+              usageHistory: nil)
     }
 
     @Test("a spool that knows what it weighed new is wound to what is left")

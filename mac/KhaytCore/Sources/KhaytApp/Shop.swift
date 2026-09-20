@@ -4210,6 +4210,8 @@ final class Shop {
 
     /// The supplier whose log is open, or nil.
     var showingHistoryFor: Supplier?
+    /// The spool whose usage log is open, if any.
+    var spoolHistoryFor: Spool?
 
     /// Write down something bought from a supplier.
     ///
