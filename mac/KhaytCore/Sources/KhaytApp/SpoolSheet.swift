@@ -40,6 +40,12 @@ struct SpoolSheet: View {
     @State private var bedTemp: Double = 0
     @State private var maxSpeed: Double = 0
     @State private var openedAt: Date?
+    /// When this spool was bought. Filament takes up moisture from the day it
+    /// is made, so its age is a fact about how it will print.
+    @State private var purchasedAt: Date?
+    /// How much to order when it runs low. Zero means the shop has not said,
+    /// and the drafting rule falls back to a kilo.
+    @State private var reorderQty: Double = 0
     @State private var colours: [String] = []
     /// Catalogue matches for whatever has been typed into the material field.
     @State private var catalogue: [KhaytEngine.FilamentHit] = []
@@ -200,6 +206,27 @@ struct SpoolSheet: View {
                 // is a claim about the filament; an empty box is the truth,
                 // which is that nobody has said. The rule agrees — it stores
                 // nothing for a value that is not above zero.
+                // ── HOW MUCH TO ORDER WHEN IT RUNS LOW ────────────────
+                //
+                // `lib/purchase-orders.js` reads `reorderQty` when it drafts,
+                // and falls back to a KILO when there is none. Nothing could
+                // set it here, so every order this app drafted asked for a
+                // kilo of whatever it was — including for a shop that buys
+                // 250 g spools or 5 kg boxes. That became visible the moment
+                // this app learnt to draft them without being asked.
+                //
+                // Blank rather than zero when unset: the fallback is the
+                // rule's to choose, and a nought written here would be this
+                // app deciding to order nothing.
+                GridRow {
+                    Text(shop.words.callIt("inv.reorder_qty")).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        TextField("", value: $reorderQty, format: .number.precision(.fractionLength(0)))
+                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                        Text(unit.isEmpty ? shop.words.callIt("mac.grams") : unit)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 GridRow {
                     Text(shop.words.callIt("inv.print_temp")).foregroundStyle(.secondary)
                     degrees($printTemp)
@@ -221,6 +248,26 @@ struct SpoolSheet: View {
                     TextField("", text: $lot).textFieldStyle(.roundedBorder)
                 }
                 if !isNew {
+                    // WHEN IT WAS BOUGHT, beside when it was opened. The two
+                    // answer different questions — how long it has been in the
+                    // building, and how long it has been breathing — and a
+                    // spool bought a year ago and opened yesterday is not the
+                    // same spool as the other way round.
+                    GridRow {
+                        Text(shop.words.callIt("inv.purchased_on")).foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            Toggle("", isOn: Binding(
+                                get: { purchasedAt != nil },
+                                set: { purchasedAt = $0 ? (purchasedAt ?? Date()) : nil }))
+                                .labelsHidden()
+                            if let bought = purchasedAt {
+                                DatePicker("", selection: Binding(get: { bought },
+                                                                  set: { purchasedAt = $0 }),
+                                           in: ...Date(), displayedComponents: .date)
+                                    .labelsHidden()
+                            }
+                        }
+                    }
                     GridRow {
                         Text(shop.words.callIt("inv.opened_on")).foregroundStyle(.secondary)
                         // Optional: a sealed spool has not been opened, and a
@@ -295,6 +342,8 @@ struct SpoolSheet: View {
         bedTemp = spool.bedTemp ?? 0
         maxSpeed = spool.maxSpeed ?? 0
         openedAt = Order.day(spool.openedAt)
+        purchasedAt = Order.day(spool.purchasedAt)
+        reorderQty = spool.reorderQty ?? 0
         focused = true
     }
 
@@ -359,6 +408,7 @@ struct SpoolSheet: View {
             // Sent even at zero, which is how the rule is told to CLEAR one:
             // it stores nothing for a value that is not above zero, so a shop
             // that empties the box empties the field.
+            "reorderQty": .number(reorderQty),
             "printTemp": .number(printTemp),
             "bedTemp": .number(bedTemp),
             "maxSpeed": .number(maxSpeed),
@@ -367,6 +417,7 @@ struct SpoolSheet: View {
             // Absent means "leave it as it is", so a cleared date has to be
             // sent as an empty string rather than left out.
             input["openedAt"] = .string(openedAt.map { Shop.today($0) } ?? "")
+            input["purchasedAt"] = .string(purchasedAt.map { Shop.today($0) } ?? "")
         }
         let id = existing?.id
         dismiss()
