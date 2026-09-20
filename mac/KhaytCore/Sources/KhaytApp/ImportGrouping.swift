@@ -27,9 +27,25 @@ import Foundation
 /// "files" and "presupported" — worse than no grouping, because it looks
 /// deliberate.
 ///
-/// So the rule walks UP from the file until it finds a folder name that is
-/// about the MODEL rather than about the format or the state of the file, and
-/// stops at the folder the shop actually chose.
+/// So the rule keeps every folder that is about the MODEL and drops the ones
+/// that are about the format or the state of a file. What comes back is a
+/// PATH — `Saudi Kings/King Abdulaziz` — because a project with levels in it
+/// is a project with levels in it.
+///
+/// ── IT USED TO RETURN ONLY THE DEEPEST ONE ────────────────────────────────
+///
+/// That flattened a shop's project the moment it had any shape. Importing
+///
+///     MyProject/pose 1/Blue/part.stl
+///     MyProject/pose 2/Grey/part.stl
+///     MyProject/base.stl
+///
+/// filed those under `Blue`, `Grey` and `MyProject` — three SIBLING folders,
+/// with the project holding only whatever sat at its top level and the poses
+/// gone altogether. Reported as the library showing "only the files in the
+/// first folder, all sub folders skipped", and from the shop's side that is
+/// exactly what it looks like: every file was imported, and they landed
+/// somewhere other than inside the project.
 enum ImportGrouping {
 
     /// Folder names that describe a format, a state, or a container — never a
@@ -60,6 +76,14 @@ enum ImportGrouping {
         "textures", "texture", "scenes", "scene", "thumbnails", "thumbs",
     ]
 
+    /// The separator between levels of a group path.
+    ///
+    /// A forward slash, because that is what the shop's own folders use and
+    /// what the other app will show if it never learns to split on it: a
+    /// folder called `MyProject/pose 1` reads as a path to anybody, where a
+    /// private sentinel would read as a mistake. See `LibraryFile.groupPath`.
+    static let separator = "/"
+
     /// The group for one file, or nil when it should stay ungrouped.
     ///
     /// - Parameters:
@@ -80,16 +104,44 @@ enum ImportGrouping {
         guard fileParts.count > chosenParts.count,
               Array(fileParts.prefix(chosenParts.count)) == chosenParts else { return nil }
 
-        // Folders BELOW what was chosen, deepest last, with the filename dropped.
-        var below = Array(fileParts.dropFirst(chosenParts.count).dropLast())
+        // Folders BELOW what was chosen, with the filename dropped.
+        let below = Array(fileParts.dropFirst(chosenParts.count).dropLast())
 
-        // Deepest first: the most specific folder that names something wins.
-        while let candidate = below.popLast() {
-            if let name = meaningful(candidate) { return name }
+        // The chosen folder is the root of the path, then every folder under it
+        // that names something. `STL` and `presupported` fall out here, so
+        // `Kings/King Abdulaziz/STL/head.stl` is `Kings/King Abdulaziz` and not
+        // `Kings/King Abdulaziz/STL`.
+        var levels: [String] = []
+        if let root = meaningful(chosen.lastPathComponent) { levels.append(root) }
+        levels += below.compactMap(meaningful)
+        return levels.isEmpty ? nil : fitting(levels)
+    }
+
+    /// A path short enough to survive being written down.
+    ///
+    /// ── SIXTY CHARACTERS IS NOT THIS APP'S RULE TO CHANGE ─────────────────
+    ///
+    /// `LibraryFile.normalise` slices a group name at 60 UTF-16 units, exactly
+    /// as `KhaytOrganise.groupOf` does, and `OrganiseParityTests` holds the two
+    /// together. A longer path would be cut MID-SEGMENT — `MyProject/pose 1/Ve`
+    /// — which is worse than a shorter path, because it reads as a folder the
+    /// shop never made.
+    ///
+    /// So the levels that survive are the ones that say the most: the project
+    /// it belongs to, and the folder it actually sat in. The levels between
+    /// them go first, then the root, and a single level too long to fit is
+    /// handed over anyway to be cut by the rule that owns the limit.
+    static func fitting(_ levels: [String]) -> String {
+        var kept = levels
+        while kept.count > 2, tooLong(kept) {
+            kept.remove(at: kept.count - 2)          // the level just above the leaf
         }
-        // Nothing below was a name — so the chosen folder itself is the group.
-        // This is the ordinary case: "Saudi Kings/STL/crown.stl".
-        return meaningful(chosen.lastPathComponent)
+        if kept.count == 2, tooLong(kept) { kept.removeFirst() }
+        return kept.joined(separator: separator)
+    }
+
+    private static func tooLong(_ levels: [String]) -> Bool {
+        levels.joined(separator: separator).utf16.count > 60
     }
 
     /// The folder name as a group, or nil when it says nothing about a model.

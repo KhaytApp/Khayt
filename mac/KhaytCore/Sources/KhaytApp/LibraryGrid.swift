@@ -61,7 +61,7 @@ struct LibraryGrid: View {
                               spacing: Wide.tileGap) {
                         ForEach(shop.shownEntries) { entry in
                             switch entry {
-                            case .folder(let name, let count, let cover):
+                            case .folder(let name, let path, let count, let cover):
                                 FolderCell(name: name, count: count,
                                            thumbnail: cover.flatMap { shop.thumbnail(for: $0) },
                                            words: shop.words)
@@ -69,7 +69,11 @@ struct LibraryGrid: View {
                                     // A folder OPENS. The shelf already filters
                                     // by group, so entering one is setting it —
                                     // the sidebar and the grid stay one idea.
-                                    .onTapGesture { shop.shelf = .library(name) }
+                                    //
+                                    // The PATH, not the name: two projects are
+                                    // each allowed a folder called `Blue`, and
+                                    // opening one of them must not show both.
+                                    .onTapGesture { shop.shelf = .library(path) }
                             case .file(let file):
                                 cell(for: file).id(file.id)
                             }
@@ -218,14 +222,38 @@ private struct GroupCrumb: View {
     @Bindable var shop: Shop
     let group: String
 
+    /// Every level above this one, outermost first, with the path to each.
+    ///
+    /// A trail rather than one Back button, because a project three deep needs
+    /// a way to the middle of it and not only to the top: `MyProject/pose 1`
+    /// offers "All models" and "MyProject", which is how a folder window has
+    /// worked since before this app existed.
+    private var above: [(name: String, path: String)] {
+        let parts = group.components(separatedBy: ImportGrouping.separator)
+        guard parts.count > 1 else { return [] }
+        var out: [(String, String)] = []
+        for (i, part) in parts.dropLast().enumerated() {
+            out.append((part, parts.prefix(i + 1).joined(separator: ImportGrouping.separator)))
+        }
+        return out
+    }
+
+    /// The level being looked at — the last part, not the whole path.
+    private var here: String {
+        group.components(separatedBy: ImportGrouping.separator).last ?? group
+    }
+
     var body: some View {
         HStack(spacing: 6) {
             Button {
-                shop.shelf = .library(nil)
+                // UP ONE, not all the way out. ⌘[ means back in every Mac app,
+                // and from three levels deep "back" is the level above — going
+                // to the top from there is a jump nobody asked for.
+                shop.shelf = .library(above.last?.path)
             } label: {
                 HStack(spacing: 3) {
                     Image(systemName: "chevron.backward").font(.caption2.weight(.semibold))
-                    Text(shop.words.callIt("mac.all_models"))
+                    Text(above.last?.name ?? shop.words.callIt("mac.all_models"))
                 }
             }
             .buttonStyle(.link)
@@ -236,8 +264,15 @@ private struct GroupCrumb: View {
             .keyboardShortcut("[", modifiers: .command)
             .help(shop.words.callIt("mac.leave_group"))
 
+            // The levels between the top and here, each one a way back to it.
+            ForEach(above.dropLast(), id: \.path) { step in
+                Text(verbatim: "/").foregroundStyle(.quaternary)
+                Button(step.name) { shop.shelf = .library(step.path) }
+                    .buttonStyle(.link).lineLimit(1)
+            }
+
             Text(verbatim: "/").foregroundStyle(.quaternary)
-            Text(group).fontWeight(.medium).lineLimit(1)
+            Text(here).fontWeight(.medium).lineLimit(1)
             // What is in it, so the count a shop tapped is still on screen.
             Text(verbatim: "\(shop.shownFiles.count)")
                 .monospacedDigit()

@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A project with folders inside it keeps them.** Importing a project
+  several levels deep filed every model under the *deepest* folder that named
+  something, so `MyProject/pose 1/Blue` became a folder called `Blue` sitting
+  beside the project rather than inside it — and the project itself held only
+  whatever sat at its top level. Reported as the library showing only the
+  first folder with all the sub-folders skipped, and from the shelf that is
+  exactly what it looked like: nothing was skipped, every model was imported,
+  and they landed somewhere other than where they came from. The folders nest
+  now, opening one shows the level below it, and the way back is a trail
+  rather than a jump to the top. Libraries already filed under a single name
+  are untouched.
+
 - **(Mac) How much to order when a spool runs low, and when it was bought.**
   The drafting rule has always read a spool's own reorder quantity and fallen
   back to a kilo when there is none — and nothing here could set one, so every

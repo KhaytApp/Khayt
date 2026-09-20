@@ -9993,11 +9993,25 @@ final class Shop {
     /// Only at the TOP of the library. Inside a folder the shelf already
     /// carries the group, and the grid is the files in it — a folder within a
     /// folder is a different feature and this is not pretending to be it.
+    /// Is this file's group the folder being looked at, or somewhere beneath
+    /// it?
+    ///
+    /// The separator matters: `MyProject` must not swallow `MyProjectile`, so
+    /// a deeper match has to be on `MyProject/` and never on the bare prefix.
+    static func isUnder(_ group: String?, _ folder: String) -> Bool {
+        guard let group else { return false }
+        return group == folder || group.hasPrefix(folder + ImportGrouping.separator)
+    }
+
     var shownEntries: [LibraryEntry] {
-        guard case .library(let group) = shelf, group == nil else {
+        guard case .library(let group) = shelf else {
             return shownFiles.map { LibraryEntry.file($0) }
         }
-        return LibraryEntry.top(of: shownFiles, order: librarySort.order)
+        // INSIDE a folder as well as at the top. A project with levels shows
+        // its sub-folders when it is opened; before this it showed a flat list
+        // of everything beneath it, which is the same flattening the import
+        // was doing and just as hard to read.
+        return LibraryEntry.top(of: shownFiles, under: group, order: librarySort.order)
     }
 
     /// One axis of the library filter: a name, or the things that have none.
@@ -10067,7 +10081,7 @@ final class Shop {
     private func libraryPool(skipping axis: LibraryAxis) -> [JSONValue] {
         var rows = libraryRows
         if case .library(let group) = shelf, let group {
-            rows = rows.filter { Self.rowGroup($0) == group }
+            rows = rows.filter { Self.isUnder(Self.rowGroup($0), group) }
         }
         if axis != .unfiled, libraryUnfiledOnly {
             rows = rows.filter { Self.rowGroup($0) == nil }
@@ -10181,7 +10195,7 @@ final class Shop {
         // the things the shop is choosing between today.
         if !libraryShowArchived { rows = rows.filter { !$0.isArchived } }
         if case .library(let group) = shelf, let group {
-            rows = rows.filter { $0.groupName == group }
+            rows = rows.filter { Self.isUnder($0.groupName, group) }
         }
         // Every axis narrows at once, deliberately: "the busts in the Saudi
         // Kings" is the question a library of hundreds is actually asked — the

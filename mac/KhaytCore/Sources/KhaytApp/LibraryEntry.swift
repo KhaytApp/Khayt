@@ -22,14 +22,18 @@ import Foundation
 /// picture from what it holds — see `cover` — and a shop that wants a
 /// particular one can say so later without this changing.
 enum LibraryEntry: Identifiable, Hashable {
-    /// A project. `count` is how many files are inside it.
-    case folder(name: String, count: Int, cover: LibraryFile?)
+    /// A project, or a level inside one.
+    ///
+    /// `name` is the LEVEL, as it is drawn — `pose 1`. `path` is the whole way
+    /// there — `MyProject/pose 1` — which is what opening it sets, because two
+    /// projects are each allowed a folder called `Blue`.
+    case folder(name: String, path: String, count: Int, cover: LibraryFile?)
     /// A file that belongs to no project.
     case file(LibraryFile)
 
     var id: String {
         switch self {
-        case .folder(let name, _, _): return "folder:" + name
+        case .folder(_, let path, _, _): return "folder:" + path
         case .file(let f): return "file:" + f.id
         }
     }
@@ -41,33 +45,52 @@ enum LibraryEntry: Identifiable, Hashable {
     ///
     /// `order` compares two files, and is the library's own sort so that the
     /// loose half of the screen matches the inside of a folder.
-    static func top(of files: [LibraryFile], order: (LibraryFile, LibraryFile) -> Bool)
-    -> [LibraryEntry] {
-        var byGroup: [String: [LibraryFile]] = [:]
-        var loose: [LibraryFile] = []
+    /// What to draw at one level of the library.
+    ///
+    /// `under` is the folder being looked inside, or nil at the top. A file
+    /// belongs HERE when its group is exactly `under`; anything deeper becomes
+    /// a sub-folder named by its next level, so `MyProject/pose 1/Blue` seen
+    /// from `MyProject` is a folder called `pose 1`.
+    ///
+    /// ── IT USED TO GROUP BY THE WHOLE NAME ────────────────────────────────
+    ///
+    /// Which was right while a group was one word and wrong the moment it
+    /// became a path: `MyProject`, `MyProject/pose 1` and `MyProject/pose 2`
+    /// would have been three unrelated folders sitting beside each other, which
+    /// is the flattening this change exists to undo, in a new place.
+    static func top(of files: [LibraryFile], under: String? = nil,
+                    order: (LibraryFile, LibraryFile) -> Bool) -> [LibraryEntry] {
+        let prefix = (under.map { $0 + ImportGrouping.separator }) ?? ""
+        var byLevel: [String: [LibraryFile]] = [:]
+        var here: [LibraryFile] = []
         for file in files {
-            if let group = file.groupName, !group.isEmpty {
-                byGroup[group, default: []].append(file)
-            } else {
-                loose.append(file)
+            let group = file.groupName ?? ""
+            if group == (under ?? "") {
+                here.append(file)                       // sits at this level
+                continue
             }
+            guard under == nil || group.hasPrefix(prefix) else { continue }
+            // The next level down, and everything below it counts towards it.
+            let rest = String(group.dropFirst(prefix.count))
+            let level = rest.components(separatedBy: ImportGrouping.separator).first ?? rest
+            guard !level.isEmpty else { continue }
+            byLevel[level, default: []].append(file)
         }
 
-        let folders = byGroup
-            .map { name, held in
-                LibraryEntry.folder(name: name, count: held.count,
+        let folders = byLevel
+            .map { level, held in
+                LibraryEntry.folder(name: level, path: prefix + level, count: held.count,
                                     cover: Self.cover(of: held, order: order))
             }
             // By name, because a folder is a place and places do not reorder
             // themselves when a file inside one changes.
             .sorted { lhs, rhs in
-                guard case .folder(let a, _, _) = lhs, case .folder(let b, _, _) = rhs else {
-                    return false
-                }
+                guard case .folder(let a, _, _, _) = lhs,
+                      case .folder(let b, _, _, _) = rhs else { return false }
                 return a.localizedStandardCompare(b) == .orderedAscending
             }
 
-        return folders + loose.map { LibraryEntry.file($0) }
+        return folders + here.sorted(by: order).map { LibraryEntry.file($0) }
     }
 
     /// The picture a folder wears.
