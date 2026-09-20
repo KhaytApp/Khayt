@@ -16,6 +16,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   When it does draft something it says so on screen, rather than leaving a
   changed book to be discovered.
 
+- **(Mac) What has already been sent is shown, instead of only recorded.**
+  Every campaign either app sends has been written into the shop's book since
+  campaigns existed, and no screen in either has ever drawn it — the record was
+  kept and could not be read. The campaign sheet now lists the last runs: the
+  day, how many went, and how many did not. Failures are named only when there
+  were some, because a line reading "0 failed" every time is a line nobody
+  reads on the day it says 2.
+
 - **(Mac) A customer could be sent a campaign here but could not ask to stop.**
   The shared rule has always refused to put an opted-out customer on a list,
   whatever the segment says — but only the other app could record that they had
