@@ -659,9 +659,9 @@ struct Inventory: View {
             // The empty states are about the WHOLE shelf, not the filament on
             // it. Gating them on spools alone hid the consumables list entirely
             // from a shop that keeps glue and bags but buys filament as it goes.
-            if shop.spools.isEmpty && needs.isEmpty {
+            if shop.spools.isEmpty && shop.consumables.isEmpty {
                 EmptyHere(title: shop.words.callIt("mac.no_filament"), mark: .filament)
-            } else if shown.isEmpty && needs.isEmpty {
+            } else if shown.isEmpty && shop.consumables.isEmpty {
                 NothingMatched(shop: shop, mark: .filament)
             } else {
                 ScrollView {
@@ -684,9 +684,16 @@ struct Inventory: View {
                         ToOrderRow(shop: shop)
                             .padding(.bottom, 14)
                     }
-                    if !needs.isEmpty, shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                    // The WHOLE shelf now, not only what is urgent on it —
+                    // see `ConsumablesCard`. Still only when nothing is being
+                    // searched for: the search box filters spools, so a full
+                    // consumables list beside three filtered cards describes a
+                    // different set from the one on screen.
+                    if !shop.consumables.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         ConsumablesCard(needs: needs, shop: shop)
-                            .card(rail: needs.contains(where: \.low) ? Khayt.attention : nil,
+                            .card(rail: shop.consumables.contains(where: \.isLow)
+                                  ? Khayt.attention : nil,
                                   padding: 14)
                             .padding(.bottom, 14)
                     }
@@ -916,88 +923,242 @@ private struct ToOrderRow: View {
 /// Every quantity is in the item's own unit. There is no grams figure here on
 /// purpose — naming one grams is how "4 boxes" becomes "4 g" on a supplier's
 /// order form.
+/// The other shelf, and what is running low on it.
+///
+/// ── IT USED TO BE THE SECOND HALF ONLY ────────────────────────────────────
+///
+/// This drew `consumableNeeds` — the rule's answer to "what is about to run
+/// out that is not filament" — and nothing else. That rule filters: `if (!low
+/// && daysLeft > leadDays) continue`. So the card showed the urgent items and
+/// there was no way to see the shelf, and no way to put anything on it: the
+/// record was written only by the other app's modal.
+///
+/// On the shop this was written for that came to an empty card, because the
+/// live book holds ZERO consumables — the Mac is the app they use, and the Mac
+/// could not add one. A screen that can only ever say nothing reads as
+/// "nothing is running out".
+///
+/// So the shelf is the list now, and the rule's answer is merged ONTO it by
+/// id: every consumable is a row, and a row the rule has an opinion about
+/// carries its days of cover and its suggested quantity. Nothing the rule said
+/// is lost, and the items it is silent about are no longer invisible.
 struct ConsumablesCard: View {
     let needs: [KhaytEngine.ConsumableNeed]
     let shop: Shop
+    /// The shelves, as `lib/consumable-categories.js` groups them, and which
+    /// one is chosen. Held rather than asked: the engine is an actor, and a
+    /// view cannot await it while drawing.
+    @State private var shelves: [KhaytEngine.ConsumableCategory] = []
+    @State private var chosen = ""
+    /// The rule's sentinel for "no category of its own". NUL-prefixed, so it
+    /// is never drawn — `cons.cat_none` is said in its place.
+    @State private var uncategorised = ""
+    /// The ids on the chosen shelf. Nil means all of them.
+    @State private var onShelf: [String]?
+
+    /// What the rule said, by id, so a row can carry it.
+    private var forecast: [String: KhaytEngine.ConsumableNeed] {
+        Dictionary(needs.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    /// Everything on the shelf, narrowed to the chosen category, low first.
+    ///
+    /// Low first rather than by days of cover: the rule already sorts its own
+    /// answer that way, and this list contains items it never spoke about.
+    /// Within each half, the shop's own order is kept.
+    private var rows: [Consumable] {
+        let all = shop.consumables
+        let narrowed = onShelf.map { ids in
+            let want = Set(ids)
+            return all.filter { want.contains($0.id) }
+        } ?? all
+        return narrowed.sorted { a, b in
+            a.isLow == b.isLow ? false : a.isLow
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text(shop.words.callIt("cons.title")).font(.headline)
-                Spacer()
                 // How many of them are already out or below their minimum, as
                 // against merely forecast to be. The two are different jobs:
-                // one is a trip to the shop today.
-                let low = needs.filter(\.low).count
+                // one is a trip to the shop today. Counted over the WHOLE
+                // shelf, not the chosen category — a shop narrowing to
+                // Packaging still wants to know the IPA has run out.
+                let low = shop.consumables.filter(\.isLow).count
                 if low > 0 {
                     Text("\(low) \(shop.words.callIt("cons.low"))")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Khayt.attention)
                 }
+                Spacer()
+                // Nothing to choose between until there are at least two
+                // shelves — the same threshold the other app uses.
+                if shelves.count > 1 { picker }
+                if shop.canMoveJobs {
+                    Button {
+                        shop.addingConsumable = true
+                    } label: {
+                        Image(systemName: "plus").font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.borderless)
+                    .help(shop.words.callIt("cons.add_title"))
+                }
             }
-            VStack(alignment: .leading, spacing: 7) {
-                ForEach(needs) { Need(need: $0, shop: shop) }
+            if rows.isEmpty {
+                // Only reachable with a filter on, since the rule drops a
+                // selection whose shelf has been emptied — but say which, and
+                // offer the way out, rather than showing a blank.
+                HStack(spacing: 8) {
+                    Text(shop.words.callIt("cons.cat_empty"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button(shop.words.callIt("cons.cat_all")) { choose("") }
+                        .buttonStyle(.link).font(.caption)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 7) {
+                    ForEach(rows) { item in
+                        Row(item: item, need: forecast[item.id], shop: shop,
+                            showCategory: chosen.isEmpty)
+                    }
+                }
             }
         }
+        .task(id: shop.consumableSignature) { await reload() }
     }
 
-    private struct Need: View {
-        let need: KhaytEngine.ConsumableNeed
+    @ViewBuilder private var picker: some View {
+        Menu {
+            Button(shop.words.callIt("cons.cat_all")) { choose("") }
+            Divider()
+            ForEach(shelves) { shelf in
+                // NEVER the sentinel's own label — it is a NUL-prefixed string
+                // and renders as a replacement character.
+                Button("\(shelf.key == uncategorised ? shop.words.callIt("cons.cat_none") : shelf.label) (\(shelf.count))") {
+                    choose(shelf.key == uncategorised ? uncategorised : shelf.label)
+                }
+            }
+        } label: {
+            Text(chosenLabel).font(.caption)
+        }
+        .menuStyle(.borderlessButton).fixedSize()
+    }
+
+    private var chosenLabel: String {
+        if chosen.isEmpty { return shop.words.callIt("cons.cat_all") }
+        if chosen == uncategorised { return shop.words.callIt("cons.cat_none") }
+        return chosen
+    }
+
+    private func choose(_ selection: String) {
+        shop.consumableCategory = selection
+        Task { await reload() }
+    }
+
+    private func reload() async {
+        let answer = await shop.consumableShelves()
+        shelves = answer.categories
+        uncategorised = answer.uncategorised
+        // The RULE's selection, not the stored one: it returns '' when the
+        // chosen shelf has nothing on it any more, which is what stops a shop
+        // staring at an empty list under a heading that still names it.
+        chosen = answer.selected
+        shop.consumableCategory = answer.selected
+        onShelf = await shop.consumableIds(inCategory: answer.selected)
+    }
+
+    /// One consumable, with whatever the reorder rule had to say about it.
+    private struct Row: View {
+        let item: Consumable
+        let need: KhaytEngine.ConsumableNeed?
         let shop: Shop
+        /// Only when the list is not already narrowed to it — the picker says
+        /// it otherwise.
+        let showCategory: Bool
+
+        private var unit: String { (item.unit ?? "").trimmingCharacters(in: .whitespaces) }
 
         var body: some View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(need.label.isEmpty ? shop.words.callIt("mac.unnamed") : need.label)
-                        .font(.callout)
-                        .foregroundStyle(need.label.isEmpty ? AnyShapeStyle(.secondary)
-                                                            : AnyShapeStyle(.primary))
-                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        Text(item.title(shop.words))
+                            .font(.callout).lineLimit(1)
+                        if showCategory, let category = item.category,
+                           !category.trimmingCharacters(in: .whitespaces).isEmpty {
+                            Text(category)
+                                .font(.caption2)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(Khayt.recessed, in: Capsule())
+                                .foregroundStyle(.secondary)
+                        }
+                        if item.isPackaging == true {
+                            Text(shop.words.callIt("cons.packaging_badge"))
+                                .font(.caption2)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(Khayt.attention.opacity(0.16), in: Capsule())
+                                .foregroundStyle(Khayt.attention)
+                        }
+                    }
                     Text(stockLine).font(.caption2).foregroundStyle(.tertiary)
                 }
                 Spacer(minLength: 6)
                 VStack(alignment: .trailing, spacing: 1) {
-                    if need.low {
+                    if item.isLow {
                         Text(shop.words.callIt("cons.low"))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Khayt.attention)
                     } else if let cover {
                         Text(cover).font(.caption).foregroundStyle(.secondary).monospacedDigit()
                     }
-                    // What to buy, where the rule was willing to commit to a
+                    // What to buy, where the RULE was willing to commit to a
                     // figure. It refuses when there is no rate and no minimum,
                     // and an invented number there lands on a purchase order.
-                    if need.suggestQty > 0 {
+                    if let need, need.suggestQty > 0 {
                         Text("\(shop.words.callIt("reorder.suggest")) \(Self.qty(need.suggestQty)) \(need.unit)")
                             .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
                     }
                 }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) {
+                if shop.canMoveJobs { shop.editingConsumable = item }
             }
             // The row that says a thing is running out is the row to order it
             // from. A draft, like a spool's — and the quantity is the rule's
             // own reorder figure, not the suggestion beside it, because that
             // suggestion is a forecast and an order is a commitment.
             .contextMenu {
-                if shop.canMoveJobs, shop.has("purchasing") {
-                    Button(shop.words.callIt("mac.draft_an_order")) {
-                        Task {
-                            shop.moveProblem = await shop.draftOrder(
-                                for: need.id, consumable: true)
+                if shop.canMoveJobs {
+                    Button(shop.words.callIt("cons.edit_title")) { shop.editingConsumable = item }
+                    if shop.has("purchasing"), need != nil {
+                        Button(shop.words.callIt("mac.draft_an_order")) {
+                            Task {
+                                shop.moveProblem = await shop.draftOrder(
+                                    for: item.id, consumable: true)
+                            }
                         }
+                    }
+                    Divider()
+                    Button(shop.words.callIt("common.delete"), role: .destructive) {
+                        Task { await shop.deleteConsumable(item.id) }
                     }
                 }
             }
         }
 
+        /// What is on hand, in the shop's own word for it.
         private var stockLine: String {
-            "\(shop.words.callIt("reorder.in_stock")): \(Self.qty(need.stock)) \(need.unit)"
+            let counted = "\(shop.words.callIt("reorder.in_stock")): \(Self.qty(item.onHand))"
+            return unit.isEmpty ? counted : "\(counted) \(unit)"
         }
 
-        /// Days of cover, where there is a forecast at all. Nil means nothing is
-        /// consuming this — which is not the same as none left, and must not be
-        /// drawn as "0 days".
+        /// Days of cover, where the rule had a forecast at all. Nil means
+        /// nothing is consuming this — which is not the same as none left, and
+        /// must not be drawn as "0 days".
         private var cover: String? {
-            guard let days = need.daysLeft else { return nil }
+            guard let days = need?.daysLeft else { return nil }
             return "\(Self.qty(days)) \(shop.words.callIt("common.days"))"
         }
 

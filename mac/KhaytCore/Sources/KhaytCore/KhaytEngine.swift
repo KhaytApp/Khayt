@@ -517,6 +517,7 @@ public actor KhaytEngine {
         // It leaves the bundle when its last JavaScript reader does.
         "currencies",
         "consumable-categories",
+        "consumable-edit",
         // What a print file has been printed WITH, and what it has been
         // printed AS. Two different relationships and the library needs both:
         // a setup is one combination of machine, material and layer height
@@ -2466,6 +2467,18 @@ public actor KhaytEngine {
     /// every quantity here is in the item's own unit, and there is no grams
     /// figure at all. Naming one grams is how "4 boxes" becomes "4 g" on a
     /// supplier's order form.
+    /// One shelf of consumables, as `lib/consumable-categories.js` groups them.
+    public struct ConsumableCategory: Decodable, Sendable, Hashable, Identifiable {
+        /// The folded spelling — lower-cased, single-spaced — or the
+        /// uncategorised sentinel. This is what `filterByCategory` is asked
+        /// with, never the label.
+        public let key: String
+        /// The spelling the shop actually typed, for drawing.
+        public let label: String
+        public let count: Int
+        public var id: String { key }
+    }
+
     public struct ConsumableNeed: Decodable, Sendable, Hashable, Identifiable {
         public let id: String
         public let label: String
@@ -6117,6 +6130,67 @@ public actor KhaytEngine {
     public func spoolColours(settings: [String: JSONValue], material: String) throws -> [String] {
         try runtime.call2("KhaytSpoolEdit.coloursFor(ARG0, ARG1)",
                           [.object(settings), .string(material)], as: [String].self)
+    }
+
+    // MARK: - The other shelf
+
+    /// A new consumable — glue, IPA, mailing bags, brass nozzles.
+    public func newConsumable(_ input: [String: JSONValue], id: String) throws -> ConsumableWritten {
+        try runtime.call2("KhaytConsumableEdit.newConsumable(ARG0, {id: ARG1})",
+                          [.object(input), .string(id)], as: ConsumableWritten.self)
+    }
+
+    /// Correct one.
+    ///
+    /// `applyEdit` mutates the record it is given and returns only the verdict,
+    /// so the record is handed back out of the same expression — the same shape
+    /// `editSpool` uses, and for the same reason: a record built afresh here
+    /// would drop every field neither this app nor the rule knows about.
+    public func editConsumable(_ consumable: JSONValue,
+                               input: [String: JSONValue]) throws -> ConsumableEdited {
+        try runtime.call2(
+            "(function(){var c = ARG0;"
+          + " var out = KhaytConsumableEdit.applyEdit(c, ARG1);"
+          + " return {consumable: c, refused: out.refused};})()",
+            [consumable, .object(input)], as: ConsumableEdited.self)
+    }
+
+    /// The shelves these consumables are on, each with its count.
+    ///
+    /// The uncategorised bucket comes back keyed and LABELLED with the rule's
+    /// own sentinel, which is a NUL-prefixed string. Never draw that label —
+    /// ask `consumableUncategorised` and say a word instead.
+    public func consumableCategories(_ items: [JSONValue]) throws -> [ConsumableCategory] {
+        try runtime.call2("KhaytConsumableCategories.categories(ARG0)",
+                          [.array(items)], as: [ConsumableCategory].self)
+    }
+
+    /// The sentinel standing for "no category of its own".
+    public func consumableUncategorised() throws -> String {
+        try runtime.call2("KhaytConsumableCategories.UNCATEGORISED", [], as: String.self)
+    }
+
+    /// The items on one shelf. An empty selection means all of them.
+    public func consumablesInCategory(_ items: [JSONValue],
+                                      selected: String) throws -> [JSONValue] {
+        try runtime.call2("KhaytConsumableCategories.filterByCategory(ARG0, ARG1)",
+                          [.array(items), .string(selected)], as: [JSONValue].self)
+    }
+
+    /// The selection to actually use, given what is on the shelf NOW.
+    ///
+    /// Returns '' when the chosen category has nothing in it any more. Without
+    /// this the shop empties a category and is left looking at an empty list
+    /// under a heading still naming it, which reads as data loss.
+    public func consumableSelection(_ items: [JSONValue], selected: String) throws -> String {
+        try runtime.call2("KhaytConsumableCategories.resolveSelection(ARG0, ARG1)",
+                          [.array(items), .string(selected)], as: String.self)
+    }
+
+    /// The categories this shop already uses, for the editor to offer.
+    public func consumableSuggestions(_ items: [JSONValue]) throws -> [String] {
+        try runtime.call2("KhaytConsumableCategories.suggestions(ARG0)",
+                          [.array(items)], as: [String].self)
     }
 
     // MARK: - The machines

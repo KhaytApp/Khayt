@@ -483,6 +483,18 @@ public struct SpoolEdited: Decodable, Sendable {
     public let colourAdded: String?
 }
 
+/// A new consumable, or the reason there is not one.
+public struct ConsumableWritten: Decodable, Sendable {
+    public let consumable: JSONValue?
+    public let refused: String?
+}
+
+/// A corrected consumable, or the reason it was refused.
+public struct ConsumableEdited: Decodable, Sendable {
+    public let consumable: JSONValue
+    public let refused: String?
+}
+
 /// What the shop is owed, aged.
 public struct Receivables: Decodable, Sendable, Equatable {
     public let rows: [Row]
