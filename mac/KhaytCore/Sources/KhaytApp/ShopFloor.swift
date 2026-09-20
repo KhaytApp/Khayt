@@ -760,6 +760,21 @@ struct Inventory: View {
                                     Button(shop.words.callIt("mac.print_labels")) {
                                         Task { await shop.askForShelfLabels([spool.id]) }
                                     }
+                                    // WHERE IT WENT. A read like labelling, so
+                                    // it does not wait on `canMoveJobs`: the
+                                    // whole point is to answer a shelf count
+                                    // that disagrees with the book, and a
+                                    // second machine looking at the same book
+                                    // is exactly when that is asked.
+                                    //
+                                    // Offered only when there is something to
+                                    // show. An empty sheet is a menu item that
+                                    // teaches a shop the feature does nothing.
+                                    if !(spool.usageHistory ?? []).isEmpty {
+                                        Button(shop.words.callIt("mac.spool_history")) {
+                                            shop.spoolHistoryFor = spool
+                                        }
+                                    }
                                     Divider()
                                     if shop.canMoveJobs, shop.has("purchasing") {
                                         // ORDER MORE. Drafted, never sent: a

@@ -1702,6 +1702,14 @@ final class Words {
         // is no shared word to borrow — the other one writes the same log and
         // shows it nowhere.
         "mac.campaign_log": ["en": "Already sent", "ar": "أُرسل سابقاً"],
+        // WHERE A SPOOL WENT. The other app calls this "Spool history"; there
+        // is a shared key for the heading (`inv.spool_history`) but none for
+        // the empty state this app needs, so both are written here to keep the
+        // pair in one place rather than half-borrowed.
+        "mac.spool_history": ["en": "Where this went", "ar": "أين ذهب هذا"],
+        "mac.spool_history_empty": ["en": "Nothing has been printed with this spool yet.",
+                                    "ar": "لم يُطبع شيء بهذه البكرة بعد."],
+        "mac.spool_history_total": ["en": "Used altogether", "ar": "المستخدم إجمالاً"],
         "mac.campaign_confirm_hint": ["en": "One message each, a third of a second apart. It cannot be taken back.",
                                       "ar": "رسالة لكل عميل، بفاصل ثلث ثانية. لا يمكن التراجع عن ذلك."],
         // Refused BY NAME, the way a move through an SMTP provider is: the

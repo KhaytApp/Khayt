@@ -185,6 +185,42 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
         let date: String
     }
 
+    /// Where this spool actually went: one entry per job it was deducted for.
+    ///
+    /// Written by the deduction chain in BOTH apps and read by neither this
+    /// one nor any screen it has — the shop's own book holds it and nothing
+    /// shows it. It is the answer to "what happened to that kilo", which is
+    /// the question a shelf count raises every time it disagrees.
+    let usageHistory: [Use]?
+
+    struct Use: Decodable, Hashable, Sendable, Identifiable {
+        /// `YYYY-MM-DD`.
+        let date: String
+        /// The job it went to, as it was named at the time. A job since
+        /// renamed keeps the name the spool was spent under, which is what a
+        /// record of what happened means.
+        let project: String
+        let orderId: String
+        let weightUsed: Double
+
+        /// Made from the row rather than stored: the book writes no id here,
+        /// and two deductions on one day for one job are two entries.
+        var id: String { date + "|" + orderId + "|" + String(weightUsed) }
+
+        private enum CodingKeys: String, CodingKey { case date, project, orderId, weightUsed }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            date = ((try? c.decodeIfPresent(String.self, forKey: .date)) ?? nil) ?? ""
+            project = ((try? c.decodeIfPresent(String.self, forKey: .project)) ?? nil) ?? ""
+            orderId = ((try? c.decodeIfPresent(String.self, forKey: .orderId)) ?? nil) ?? ""
+            weightUsed = ((try? c.decodeIfPresent(Double.self, forKey: .weightUsed)) ?? nil) ?? 0
+        }
+    }
+
+    /// What this spool has been spent on altogether, in its own unit.
+    var totalUsed: Double { (usageHistory ?? []).reduce(0) { $0 + $1.weightUsed } }
+
     /// How a shop picks this spool out of a list: what it is, and where — the
     /// two things that tell one 1kg PLA apart from another on the same shelf.
     ///
