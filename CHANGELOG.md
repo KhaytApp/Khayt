@@ -6,6 +6,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **A spool that was dried can be recorded as dried.** Khayt decides whether
+  filament is damp from one field — the day it was last dried — and nothing in
+  either app was writing it. The Windows and Linux app's drying log kept its
+  own list and never touched that field, and its main window did not even load
+  the rule that reads it; (Mac) this app drew "due" and "overdue" on the shelf
+  with no way at all to answer them, so a spool it called overdue stayed
+  overdue for ever. The log now sets the date, and a spool can be marked dried
+  from the shelf where the warning appears. The newest drying wins, so writing
+  down one that was forgotten cannot make a spool look older than it is.
+
 - **(Mac) A project with folders inside it keeps them.** Importing a project
   several levels deep filed every model under the *deepest* folder that named
   something, so `MyProject/pose 1/Blue` became a folder called `Blue` sitting
