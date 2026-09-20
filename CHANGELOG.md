@@ -3585,6 +3585,97 @@ tested against both.
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.30] - 2026-09-20
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Eight changes, six of which are the same fault found six times: something the
+shop's own book already held that this app could not read, or could not write.
+A customer's request not to be marketed to. What a supplier charged. What a
+filament should be printed at. Where a spool went. Every campaign already sent.
+Whether to draft an order when stock runs low. None of it was missing from the
+book — only from the screen.
+
+The other two are the campaign this app learnt to send in alpha.29, finished:
+it had nowhere to type a subject, and it asked the question before sending in
+English to every shop.
+
+### Added
+
+- **(Mac) What a filament should be printed at can be written down here.**
+  Nozzle temperature, bed temperature and maximum speed have been stored
+  against a spool by the shared rule since it was written, and this app
+  decoded all three while offering a field for none — so a shop working here
+  could not record the one thing it looks up every time a new spool goes on.
+  Neither the sample book nor a real one carries a single temperature, which
+  is what that looks like from the outside: not a shop that chose not to
+  record them, one that could not. An empty box stays empty rather than
+  becoming a zero, because a bed temperature of 0°C is a claim and "nobody has
+  said" is the truth.
+
+- **(Mac) Where a spool went can be read here.** Every deduction has always
+  been written against the spool — the date, the job, the grams — and this app
+  held that record without a screen for it. Right-click a spool that has been
+  printed with and the log opens: newest first, with what it has been spent on
+  altogether at the bottom. That total is the arithmetic somebody would
+  otherwise do on paper when a shelf count disagrees with the book, which is
+  the only reason to open it. The sample shop gained two spools with history
+  and kept two without, so both halves of the screen can actually be looked at.
+
+- **(Mac) What has already been sent is shown, instead of only recorded.**
+  Every campaign either app sends has been written into the shop's book since
+  campaigns existed, and no screen in either has ever drawn it — the record was
+  kept and could not be read. The campaign sheet now lists the last runs: the
+  day, how many went, and how many did not. Failures are named only when there
+  were some, because a line reading "0 failed" every time is a line nobody
+  reads on the day it says 2.
+
+- **(Mac) The supplier's own bill can be recorded against what arrived — and
+  the app says whether it matches.** Type the invoice number, amount and date
+  while booking goods in, and if the amount disagrees with what the order said
+  it would cost, it says so there and then, while the delivery is still in the
+  room and somebody can ring the supplier. Optional in every field: a shop that
+  files the paper and records only the reference has recorded something worth
+  keeping. Both apps ask the same rule whether an invoice matches, so neither
+  can tell a shop it was overcharged while the other says it was not.
+
+### Changed
+
+- **(Mac) "Draft purchase orders when stock hits its reorder point" is a
+  switch this app both honours and offers.** The setting has been in the
+  shop's own book since the other app added it, and this one neither read it
+  nor had anywhere to change it — so a shop working here had an automation it
+  could not reach. It is opt-in, off by default, and writes **drafts**, which
+  the shop still reviews before any of them is sent; the shared rule refuses
+  anything already on its way, so opening the app twice does not order twice.
+  When it does draft something it says so on screen, rather than leaving a
+  changed book to be discovered.
+
+- **(Mac) A customer could be sent a campaign here but could not ask to stop.**
+  The shared rule has always refused to put an opted-out customer on a list,
+  whatever the segment says — but only the other app could record that they had
+  asked. A shop that sent a campaign from the Mac and then read "please stop
+  emailing me" had to open the other window to honour it, which is sending in
+  one place and recording consent in another. The customer sheet has the box
+  now. Nothing was ever lost in the meantime: a Mac save carries through fields
+  it does not offer, so an opt-out set in the other app survived.
+
+- **(Mac) The question before sending a campaign was asked in English.** "Send
+  to 38 customers?" is the other app's own sentence and it exists in nine
+  languages; the Mac had been asking with a copy written in two. A German shop
+  was asked in English at the one moment it matters that the question is
+  understood.
+
+- **(Mac) A campaign's subject line could not be typed.** Every message this
+  app sent went out under the shop's name and nothing else, because there was
+  nowhere to write a subject — and the subject is the line a customer reads
+  before deciding whether to open any of the rest. There is a field for it now,
+  and `{{name}}` works in it exactly as it does in the message, so "A note from
+  your printer, Layla" arrives filled in rather than as literal braces. Left
+  empty it still uses the shop's name; the other app falls back to the word
+  "Khayt", which names the software rather than the sender.
+
 ## [4.0.0-alpha.29] - 2026-09-20
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
