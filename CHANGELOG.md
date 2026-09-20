@@ -65,6 +65,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the price before extras — after the margin, the discount and the rounding —
   rather than by this app against something else. A line nobody finished typing
   is left off the job rather than written down as 0.00.
+- **(Mac) Who a message would reach, and what it would say to each of them.**
+  Khayt has segmented customers for a campaign since 3.0 — spend, how long
+  since they last ordered, a tag, a loyalty tier — and only the other window
+  could ask. The Mac can ask now: it says how many customers a segment reaches
+  and shows the message with its merge fields filled in for one of them, which
+  is the only way to see that the greeting actually fills. A customer who has
+  opted out of marketing is never in the list, whatever the segment says —
+  that is the shared rule's decision and this app cannot override it. Then it
+  sends: one email each, a third of a second apart, behind a question that
+  names the count — "Send this to 38 customers?" — because "Send this?" is a
+  question nobody can answer. The run can be stopped part way, both the sent
+  and the failed counts come back, and it is written into the shop's campaign
+  log the same way the other app writes it. A shop that mails through its own
+  SMTP server is refused by name and still sends these from the Windows and
+  Linux app, which is the same line a job move already draws.
 
 - **"Export all data (CSV)" was mostly empty columns.** The customer's name,
   the product's name and price, and what is left on a spool and what it held

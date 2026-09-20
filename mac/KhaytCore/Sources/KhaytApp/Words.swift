@@ -1680,6 +1680,32 @@ final class Words {
                         "ar": "KHAYT-SPOOL:… أو رابط تتبّع"],
         "mac.scan_open":  ["en": "Open", "ar": "فتح"],
         "mac.scan_unknown": ["en": "That is not a Khayt label.", "ar": "هذا ليس ملصق خيط."],
+        // WHO A CAMPAIGN WOULD REACH. The other app has no word for the
+        // count, because it draws a number beside a fixed label; this says the
+        // whole sentence, which is what a shop about to write to forty people
+        // is actually reading.
+        "mac.campaign_reach":     ["en": "{n} customers would get this",
+                                   "ar": "{n} عملاء سيصلهم هذا"],
+        // `{n}`, not a typed "1": `counting` puts a numeral in front of any
+        // value that neither carries `{n}` nor spells the number out, so a
+        // literal 1 here reads "1 1 customer would get this". The Arabic says
+        // واحد, which the same rule recognises and leaves alone.
+        "mac.campaign_reach_one": ["en": "{n} customer would get this",
+                                   "ar": "عميل واحد سيصله هذا"],
+        "mac.campaign_reach_two": ["en": "2 customers would get this",
+                                   "ar": "عميلان سيصلهما هذا"],
+        // THE COUNT IS IN THE QUESTION. "Send this?" is a question nobody can
+        // answer; "Send this to 38 customers?" is one they can.
+        "mac.campaign_confirm": ["en": "Send this to {n} customers?",
+                                 "ar": "إرسال هذا إلى {n} عميلاً؟"],
+        "mac.campaign_confirm_hint": ["en": "One message each, a third of a second apart. It cannot be taken back.",
+                                      "ar": "رسالة لكل عميل، بفاصل ثلث ثانية. لا يمكن التراجع عن ذلك."],
+        // Refused BY NAME, the way a move through an SMTP provider is: the
+        // question is not "can this app email" but "can it email through
+        // this", and a shop on SMTP still has the other app.
+        "mac.campaign_needs_http": ["en": "Campaigns go through SendGrid or Mailgun. A shop on its own SMTP server still sends these from the Windows and Linux app.",
+                                    "ar": "تُرسل الحملات عبر SendGrid أو Mailgun. أما المتجر الذي يستخدم خادم SMTP خاصاً به فيرسلها من تطبيق ويندوز ولينكس."],
+        "mac.whatsapp": ["en": "WhatsApp", "ar": "واتساب"],
         "mac.export_accounting_where": [
             "en": "Two files are written here: one of invoices and one of expenses.",
             "ar": "يُكتب هنا ملفان: ملف للفواتير وآخر للمصروفات."],
