@@ -23,11 +23,20 @@ import KhaytCore
 @MainActor
 struct SampleShopTests {
 
+    /// The book AS THE APP READS IT — moved to today by `SampleBook`, the same
+    /// way `Shop.load(.sample)` moves it.
+    ///
+    /// Everything below asks whether the sample still covers a case, and half
+    /// of those cases are about dates: a month with a reading and a month
+    /// without, a task far enough past due to stay overdue, a schedule that
+    /// reads as one the sample never runs. Measured against the FILE those
+    /// answers change every day the calendar moves; measured against the book
+    /// the app shows, they do not change at all.
     static func book() throws -> [String: JSONValue] {
         let url = Bundle.module.url(forResource: "sample-shop", withExtension: "json")!
         let raw = try JSONDecoder().decode(JSONValue.self, from: try Data(contentsOf: url))
         guard case .object(let o) = raw else { throw Oops.shape }
-        return o
+        return SampleBook.rebased(o, to: Date())
     }
 
     enum Oops: Error { case shape }
@@ -610,9 +619,12 @@ extension SampleShopTests {
                 "every sample machine has tasks, so the no-tasks card is never drawn")
     }
 
-    /// A task whose status depends on the wall clock drifts: one set to be
-    /// "due" when this file was written reads "overdue" a month later, and the
-    /// case it was added to cover stops being covered.
+    /// A task whose status depends on the wall clock USED to drift: one set to
+    /// be "due" when this file was written read "overdue" a month later, and
+    /// the case it was added to cover stopped being covered. The book moves
+    /// with the calendar now, so what this pins is the placement — the task is
+    /// far enough past due that it reads as overdue and not as one that has
+    /// just come round.
     @Test("a date-driven sample task cannot drift out of the case it covers")
     func dateTasksAreStable() throws {
         let iso = ISO8601DateFormatter()
@@ -855,11 +867,11 @@ extension SampleShopTests {
         #expect(clients.count { !$0.commLog.isEmpty } >= 2, "only one customer has ever been spoken to")
     }
 
-    /// A running schedule in the sample is due, and stays due: the sample book
-    /// is read-only, so nothing ever advances it, and a date that was "next
-    /// week" when the file was written would be "last week" a fortnight later
-    /// and read as a shop that forgot. Far in the past, it reads as what it
-    /// is — a schedule the sample never runs.
+    /// A running schedule in the sample is due, and stays due. The sample book
+    /// is read-only, so nothing ever advances it: a date that read "next week"
+    /// would read as a shop that forgot, rather than as what it is — a schedule
+    /// the sample never runs. Well in the past is how that reads, and the book
+    /// moving with the calendar is what keeps it there.
     @Test("a running sample schedule cannot drift out of the case it covers")
     func schedulesAreStable() throws {
         let clients = try Self.rows("clients").map {

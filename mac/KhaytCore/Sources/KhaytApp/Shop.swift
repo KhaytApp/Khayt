@@ -295,7 +295,13 @@ final class Shop {
         self.source = source
     }
 
-    func load(_ next: Source) async {
+    /// `asOf` is the day the book is read on. It defaults to today and is only
+    /// ever passed by `SampleBookAgesTests`, which loads the sample book on
+    /// days nobody has lived through to prove it cannot age out of the case the
+    /// screens are built against. Everything the day reaches — the rebasing of
+    /// the sample's dates, and the projection that reads them — takes it from
+    /// here, so the two cannot be asked about different days.
+    func load(_ next: Source, asOf day: Date = Date()) async {
         source = next
         problem = nil
         skipped = []
@@ -307,7 +313,13 @@ final class Shop {
                       let data = try? Data(contentsOf: url) else {
                     throw Failure.missingSample
                 }
-                root = try JSONDecoder().decode([String: JSONValue].self, from: data)
+                // Moved to sit where it sat the day it was written — see
+                // `SampleBook`. A fixed book and a moving calendar drift
+                // apart, and the screens that draw the difference between
+                // today and a due date are the ones that lose their case.
+                root = SampleBook.rebased(
+                    try JSONDecoder().decode([String: JSONValue].self, from: data),
+                    to: day)
             case .store(let build):
                 root = try StoreReader(build: build).raw
             }
@@ -485,7 +497,7 @@ final class Shop {
                                                      now: Date())) ?? [:]
             spoolDryness = (try? await engine?.dryness(spools: inventoryRows, now: Date())) ?? [:]
             timeline = await Self.project(orders: orders, engine: engine,
-                                          settings: settingsDict)
+                                          settings: settingsDict, on: day)
             // Once per book rather than per right-click: the list is twenty-two
             // fixed entries and a context menu is built while a grid draws.
             printerProfiles = (try? await engine?.printerProfiles()) ?? []
@@ -10209,8 +10221,12 @@ final class Shop {
     ///
     /// The start day is the SHOP'S calendar day, not UTC's. A projection made
     /// at one in the morning in Riyadh must not be dated yesterday.
+    /// `on` is the day the projection starts from. It defaults to today and is
+    /// only ever passed by `SampleBookAgesTests`, which walks the sample book
+    /// years forward to prove it cannot age out of the case it covers.
     static func project(orders: [Order], engine: KhaytEngine?,
-                        settings: [String: JSONValue]) async -> KhaytEngine.Timeline? {
+                        settings: [String: JSONValue],
+                        on day: Date = Date()) async -> KhaytEngine.Timeline? {
         guard let engine else { return nil }
         let onTheFloor: Set<String> = ["pending", "printing", "post", "qc", "on_hold"]
         let queued = orders.filter { onTheFloor.contains($0.status) }
@@ -10226,7 +10242,7 @@ final class Shop {
             ])
         }
         let daily = (try? await engine.dailyWorkingHours(settings: settings)) ?? 8
-        let today = DateFormatter.shopDay.string(from: Date())
+        let today = DateFormatter.shopDay.string(from: day)
         return try? await engine.timeline(jobs: jobs, dailyHours: daily, startDate: today)
     }
 
