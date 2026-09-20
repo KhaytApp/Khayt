@@ -16,6 +16,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   a gigabyte, and an archive that unpacks to more than half a gigabyte is
   stopped part way rather than after it has filled the disk.
 
+- **(Mac) Deleting a model sends it to the Trash.** It deleted the file
+  outright, so a model removed by mistake was gone — there is no undo for this
+  inside the app by design, and there was none outside it either. It goes to
+  the Trash now, where the Finder is the undo. A disk with no wastebasket — a
+  network share, some external drives — still deletes rather than refusing,
+  because the shop asked for it gone and only *where* it goes has changed.
+
 - **(Mac) A folder can be moved into another one, taking everything under it.**
   Keeping the folders a project came with helps the next import and does
   nothing for a library already filed flat — and the tree it came from is not
