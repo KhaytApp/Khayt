@@ -4577,13 +4577,13 @@ function recordSupplierInvoice(poId) {
       const number = modal.querySelector('#poSupInvNum').value.trim();
       const amount = parseFloat(modal.querySelector('#poSupInvAmount').value) || 0;
       const date   = modal.querySelector('#poSupInvDate').value;
-      po.supplierInvoice = { number, amount, date };
-      // Check discrepancy: compare invoiced amount vs. PO expected amount
-      // PO stores qty (grams) and unitPrice (per gram); the old formula used
-      // weightOrdered/unitCost which are never set, so expected was always 0 and
-      // no discrepancy ever flagged.
-      const expectedAmt = (+po.qty || 0) * (+po.unitPrice || 0);
-      po.invoiceDiscrepancy = expectedAmt > 0 && Math.abs(amount - expectedAmt) > 1;
+      // The rule is `lib/supplier-invoice.js`, asked rather than repeated: the
+      // Mac app records a supplier's bill too, and two apps deciding
+      // separately whether one matches is how they come to disagree about
+      // whether a shop was overcharged. The arithmetic that used to be here —
+      // and the note about `weightOrdered`/`unitCost`, which nothing writes —
+      // is preserved there, with a test.
+      Object.assign(po, KhaytSupplierInvoice.record(po, { number, amount, date }));
       saveAll();
       renderPurchaseOrders();
       toast(t('common.save'), 'success');

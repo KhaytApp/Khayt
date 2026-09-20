@@ -505,6 +505,11 @@ public actor KhaytEngine {
         // and until now this app could not even tell a shop it had them.
         "purchase-orders",
         "po-audit",
+        // The supplier's own bill against the order it belongs to. The
+        // arithmetic lived inside `renderer/inventory.js`'s save handler until
+        // this app learnt to receive a purchase order and needed the same
+        // answer about whether the two agree.
+        "supplier-invoice",
         // PORTED to `Currencies`, and still bundled: `lib/portal-refresh.js`
         // reads `KhaytCurrencies` through `sibling()` at run time, so removing
         // it from the bundle would leave the portal printing "EUR" where the
@@ -6342,6 +6347,54 @@ public actor KhaytEngine {
                                  settings: [String: JSONValue]) throws -> [JSONValue] {
         try runtime.call2("KhaytPlatformFees.feeLinesFor(ARG0, ARG1)",
                           [.string(id), .object(settings)], as: [JSONValue].self)
+    }
+
+    // MARK: - The supplier's own bill
+
+    /// What a purchase order said it would cost, and whether the bill agrees.
+    ///
+    /// Both answers are `lib/supplier-invoice.js`'s. A shop that records a bill
+    /// in one app and reads the verdict in the other must be told the same
+    /// thing, and "is this invoice wrong?" is exactly the question two
+    /// implementations would eventually answer differently.
+    public struct InvoiceRecord: Decodable, Sendable, Equatable {
+        public let supplierInvoice: Bill
+        public let invoiceDiscrepancy: Bool
+
+        public struct Bill: Decodable, Sendable, Equatable {
+            public let number: String
+            public let amount: Double
+            public let date: String
+        }
+
+        /// The two fields, ready to merge onto the order's row — never to
+        /// replace it, because an order carries plenty this does not know.
+        public var fields: [String: JSONValue] {
+            ["supplierInvoice": .object(["number": .string(supplierInvoice.number),
+                                         "amount": .number(supplierInvoice.amount),
+                                         "date": .string(supplierInvoice.date)]),
+             "invoiceDiscrepancy": .bool(invoiceDiscrepancy)]
+        }
+    }
+
+    /// What the order expected to cost: quantity times the unit price.
+    public func expectedInvoiceAmount(_ order: JSONValue) throws -> Double {
+        try runtime.call2("KhaytSupplierInvoice.expectedAmount(ARG0)",
+                          [order], as: Double.self)
+    }
+
+    /// The bill as it should be written down, with the verdict attached.
+    public func recordSupplierInvoice(on order: JSONValue, number: String,
+                                      amount: Double, date: String) throws -> InvoiceRecord {
+        try runtime.call2(
+            "KhaytSupplierInvoice.record(ARG0, {number: ARG1, amount: ARG2, date: ARG3})",
+            [order, .string(number), .number(amount), .string(date)], as: InvoiceRecord.self)
+    }
+
+    /// Whether a bill can be recorded against this order yet — the goods have
+    /// to have arrived.
+    public func canBillOrder(_ order: JSONValue) throws -> Bool {
+        try runtime.call2("KhaytSupplierInvoice.canRecord(ARG0)", [order], as: Bool.self)
     }
 
     /// Who owes the shop money, and how long they have owed it.

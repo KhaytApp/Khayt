@@ -3960,7 +3960,16 @@ final class Shop {
     /// itself received, and a filament receipt that booked no expense at all.
     ///
     /// Returns nil when it worked, or what to tell the shop.
-    func receiveGoods(_ id: String, quantity: Double, notes: String) async -> String? {
+    /// `invoice` is the supplier's own bill, when it arrived with the goods —
+    /// which is the usual way it arrives. Empty means none was typed, and the
+    /// order is booked in exactly as before.
+    ///
+    /// It is recorded HERE rather than from a list of received orders because
+    /// this app deliberately has no such list: `OnOrderCard` answers what is
+    /// still to come, and a received order is history. The moment the box is
+    /// opened is also the moment somebody is holding the invoice.
+    func receiveGoods(_ id: String, quantity: Double, notes: String,
+                      invoice: Bill = Bill()) async -> String? {
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             return words.callIt("mac.read_only")
         }
@@ -4000,6 +4009,17 @@ final class Shop {
                 }
 
                 orders[at] = written
+                // The bill, if one came with the goods. Merged onto the row the
+                // receipt just wrote — never onto a copy read before it — and
+                // merged rather than replacing, because an order carries plenty
+                // neither this app nor the rule knows about.
+                if invoice.isWorthRecording, case .object(var row) = written {
+                    let bill = try await engine.recordSupplierInvoice(
+                        on: written, number: invoice.number,
+                        amount: invoice.amount, date: invoice.day)
+                    for (key, value) in bill.fields { row[key] = value }
+                    orders[at] = .object(row)
+                }
                 root["purchaseOrders"] = .array(orders)
                 if let spoolAt, let item = done.item {
                     shelf[spoolAt] = item
@@ -4022,6 +4042,38 @@ final class Shop {
         }
         await load(source)
         return nil
+    }
+
+    /// What a supplier charged, as the shop typed it off the invoice.
+    struct Bill: Hashable, Sendable {
+        var number = ""
+        var amount: Double = 0
+        var day = ""
+
+        /// A bill nobody typed is not a bill.
+        ///
+        /// A NUMBER ALONE IS ENOUGH. A shop that files the invoice and records
+        /// only its reference has recorded something worth keeping, and
+        /// refusing it until an amount is typed would lose that.
+        var isWorthRecording: Bool {
+            !number.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || amount > 0
+        }
+    }
+
+    /// Does this bill agree with what the order said it would cost?
+    ///
+    /// "matched", "mismatch", or "none" when nothing has been typed yet —
+    /// three words rather than a boolean, because a screen drawing two states
+    /// out of `false` has to guess which one it means.
+    func billVerdict(on order: PurchaseOrder, bill: Shop.Bill) async -> String {
+        guard let engine, bill.isWorthRecording else { return "none" }
+        let row = JSONValue.object(["qty": .number(order.qty),
+                                    "unitPrice": .number(order.unitPrice ?? 0),
+                                    "status": .string(order.status)])
+        guard let recorded = try? await engine.recordSupplierInvoice(
+            on: row, number: bill.number, amount: bill.amount, date: bill.day)
+        else { return "none" }
+        return recorded.invoiceDiscrepancy ? "mismatch" : "matched"
     }
 
     /// Close an order by hand: the goods are all in, whatever was counted.
