@@ -170,4 +170,38 @@ struct ConsumableShelfTests {
         #expect(shelves.contains { $0.label == "Packaging" && $0.count == 2 })
         #expect(shelves.contains { $0.label == "Spares" })
     }
+
+    /// The way to add the first consumable must not be behind having one.
+    ///
+    /// Shipped and caught the same night. The "+" that adds a consumable is
+    /// in the card's header, and the card was drawn only
+    /// `if !shop.consumables.isEmpty` — so a shop with an empty shelf got no
+    /// card, no button, and no way in. That is the exact gap this screen was
+    /// built to close, rebuilt one level down, and it was invisible because
+    /// the screen was photographed against the SAMPLE book, which has six.
+    /// This shop's own book holds nought.
+    ///
+    /// A source read, because a SwiftUI body cannot be instantiated and asked
+    /// what it would draw. Anchored on the two names rather than on the whole
+    /// line, so rewording the condition does not fail it.
+    @Test("an empty shelf still offers the way to fill it")
+    func emptyShelfIsStillReachable() {
+        let dir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp/ShopFloor.swift")
+        let text = (try? String(contentsOf: dir, encoding: .utf8)) ?? ""
+        #expect(!text.isEmpty, "ShopFloor.swift was not read — the path is wrong")
+
+        // The gate on the card itself: the nearest `if` ABOVE where the card
+        // is built. Found that way rather than by matching the condition's
+        // text, because the screen has another `consumables.isEmpty` in its
+        // own whole-screen empty state and the first match was that one.
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard let built = lines.firstIndex(where: { $0.contains("ConsumablesCard(needs:") }) else {
+            Issue.record("the consumables card is never built"); return
+        }
+        let gate = lines[..<built].last { $0.contains("if ") } ?? ""
+        #expect(gate.contains("canMoveJobs"),
+                Comment(rawValue: "the consumables card is gated on the shelf alone: \(gate)"))
+    }
 }
