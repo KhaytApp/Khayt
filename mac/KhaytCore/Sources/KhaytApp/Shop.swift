@@ -10530,7 +10530,7 @@ final class Shop {
             // the literal word "Khayt", which names the software rather than
             // the sender; a customer has never heard of it.
             let headline = typed.isEmpty ? shopName
-                : await campaignPreview(typed, for: recipient)
+                : Self.oneLine(await campaignPreview(typed, for: recipient))
             let mail = OrderEmail(to: recipient.contact, subject: headline,
                                   // The shop's own newlines are the paragraphs
                                   // it meant, and an HTML mail eats them.
@@ -10547,6 +10547,21 @@ final class Shop {
         var said = words.callIt("camp.done") + ": " + String(sent)
         if failed > 0 { said += " · " + String(failed) + " " + words.callIt("camp.failed") }
         return said
+    }
+
+    /// A subject is one line, whatever the fill put in it.
+    ///
+    /// The newline cannot be TYPED — the field is a single-line one — but it
+    /// can arrive through `{{name}}`, because a customer's name is data and
+    /// data holds whatever somebody once pasted into it. Neither provider this
+    /// app posts to can be injected with it: SendGrid takes JSON and Mailgun a
+    /// URL-encoded form, and both escape it. The one that could is SMTP, where
+    /// a header ends at a newline and the next line is a new header — and SMTP
+    /// is the provider this app does not have YET. Normalising here means the
+    /// day it arrives, this is not the thing that was forgotten.
+    static func oneLine(_ s: String) -> String {
+        s.split(whereSeparator: \.isNewline).joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
     }
 
     /// What was sent, when, and how it went.

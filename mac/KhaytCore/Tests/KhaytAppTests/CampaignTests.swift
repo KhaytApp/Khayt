@@ -204,6 +204,19 @@ struct CampaignTests {
         #expect(!filled.contains("{{"), "the subject went out with braces in it")
     }
 
+    @Test("a subject is one line, whatever a customer's name turns out to hold")
+    func theSubjectIsOneLine() {
+        // The newline cannot be typed into the field — it arrives through
+        // `{{name}}`, because a customer's name is data. Harmless on the two
+        // providers this app posts to and NOT harmless over SMTP, where a
+        // header ends at a newline and the next line is a new header.
+        #expect(Shop.oneLine("A note from\nyour printer") == "A note from your printer")
+        #expect(Shop.oneLine("Layla\r\nBcc: someone@example.com")
+                == "Layla Bcc: someone@example.com")
+        #expect(Shop.oneLine("  spaced  ") == "spaced")
+        #expect(Shop.oneLine("ordinary subject") == "ordinary subject")
+    }
+
     @Test("the sheet has somewhere to type a subject, and sends what was typed")
     func theSubjectIsWired() throws {
         let sheet = try String(contentsOf: URL(fileURLWithPath: #filePath)
