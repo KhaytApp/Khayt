@@ -620,6 +620,10 @@ final class Shop {
             await readSlicers()
             remeasureIfDue()
             createRecurringIfDue()
+            // Beside the standing orders, which is the same kind of thing: a
+            // write the shop asked to have made for it. After the book has
+            // loaded, because it reads what is already on order to decide.
+            await autoDraftIfAsked()
             // The library, in this Mac's own search. Compares before it works,
             // so a book that reloads unchanged costs one string comparison —
             // and takes the library back OUT when the sample is opened.
@@ -4074,6 +4078,37 @@ final class Shop {
             on: row, number: bill.number, amount: bill.amount, date: bill.day)
         else { return "none" }
         return recorded.invoiceDiscrepancy ? "mismatch" : "matched"
+    }
+
+    // MARK: - Drafting what is low, without being asked
+
+    /// How many orders the last automatic draft made, until it is read.
+    ///
+    /// SAID, not silent. The other app drafts on boot and shows a toast; this
+    /// app writes to the shop's book the same way and owes it the same
+    /// sentence. A store that changed itself with nothing on screen to say so
+    /// is the shape of every "where did that come from" question.
+    var autoDrafted = 0
+
+    /// Draft for what is low, if the shop asked to have that done for it.
+    ///
+    /// ── WHY IT IS SAFE TO DO WITHOUT ASKING ───────────────────────────────
+    ///
+    /// Three reasons, and it needs all three. It is OPT-IN and off by default.
+    /// It writes DRAFTS, which are not orders — a shop reviews and sends them.
+    /// And the rule refuses anything already on its way: `itemsNeedingDraftPo`
+    /// reads the open purchase orders, so running twice does not order twice.
+    ///
+    /// Only when this app owns the book. A second copy drafting against the
+    /// same shelf is how one shortage becomes two orders.
+    func autoDraftIfAsked() async {
+        guard case .bool(true)? = settingsDict["autoDraftPo"],
+              let build = source.build, StoreLock.weOwnIt(build),
+              !needsOrdering.isEmpty
+        else { return }
+        // The same path the button takes, so there is one way an order gets
+        // drafted rather than a quiet second one beside it.
+        if let made = await draftWhatIsLow(), made > 0 { autoDrafted = made }
     }
 
     /// Close an order by hand: the goods are all in, whatever was counted.

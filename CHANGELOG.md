@@ -6,6 +6,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) "Draft purchase orders when stock hits its reorder point" is a
+  switch this app both honours and offers.** The setting has been in the
+  shop's own book since the other app added it, and this one neither read it
+  nor had anywhere to change it — so a shop working here had an automation it
+  could not reach. It is opt-in, off by default, and writes **drafts**, which
+  the shop still reviews before any of them is sent; the shared rule refuses
+  anything already on its way, so opening the app twice does not order twice.
+  When it does draft something it says so on screen, rather than leaving a
+  changed book to be discovered.
+
 - **(Mac) A customer could be sent a campaign here but could not ask to stop.**
   The shared rule has always refused to put an opted-out customer on a list,
   whatever the segment says — but only the other app could record that they had
