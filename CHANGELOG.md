@@ -21,6 +21,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   was asked in English at the one moment it matters that the question is
   understood.
 
+- **(Mac) The supplier's own bill can be recorded against what arrived — and
+  the app says whether it matches.** Type the invoice number, amount and date
+  while booking goods in, and if the amount disagrees with what the order said
+  it would cost, it says so there and then, while the delivery is still in the
+  room and somebody can ring the supplier. Optional in every field: a shop that
+  files the paper and records only the reference has recorded something worth
+  keeping. Both apps ask the same rule whether an invoice matches, so neither
+  can tell a shop it was overcharged while the other says it was not.
+
 - **(Mac) A campaign's subject line could not be typed.** Every message this
   app sent went out under the shop's name and nothing else, because there was
   nowhere to write a subject — and the subject is the line a customer reads

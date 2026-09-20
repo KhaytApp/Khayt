@@ -18,6 +18,11 @@ struct ReceiveSheet: View {
 
     @State private var amount: Double = 0
     @State private var notes = ""
+    /// The supplier's own bill, when it came with the goods.
+    @State private var bill = Shop.Bill()
+    /// "matched", "mismatch", or "none" — the rule's word, held because the
+    /// engine is an actor and a view cannot ask it a question while drawing.
+    @State private var verdict = "none"
     @State private var problem: String?
     @State private var started = false
     @FocusState private var focused: Bool
@@ -60,6 +65,48 @@ struct ReceiveSheet: View {
                     Text(shop.words.callIt("po.notes")).foregroundStyle(.secondary)
                     TextField("", text: $notes).textFieldStyle(.roundedBorder)
                 }
+                // ── THE SUPPLIER'S OWN BILL ───────────────────────────
+                //
+                // Recorded here because this app has no list of received
+                // orders to record it from — `OnOrderCard` answers what is
+                // still to come, and history is deliberately left off it. The
+                // moment the box is opened is also the moment somebody is
+                // holding the invoice, which is the better moment anyway: a
+                // figure that does not match can be questioned while the
+                // delivery is still in the room.
+                //
+                // Every field is optional. A shop that files the paper and
+                // types only the reference has recorded something worth
+                // keeping.
+                GridRow {
+                    Text(shop.words.callIt("po.sup_inv_num")).foregroundStyle(.secondary)
+                    TextField("", text: $bill.number).textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    Text(shop.words.callIt("po.sup_inv_amount")).foregroundStyle(.secondary)
+                    TextField("", value: $bill.amount,
+                              format: .number.precision(.fractionLength(0...2)))
+                        .textFieldStyle(.roundedBorder).monospacedDigit()
+                }
+                GridRow {
+                    Text(shop.words.callIt("po.sup_inv_date")).foregroundStyle(.secondary)
+                    TextField("", text: $bill.day).textFieldStyle(.roundedBorder)
+                }
+            }
+
+            // ── AND WHETHER IT AGREES, BEFORE SAVE RATHER THAN AFTER ──────
+            //
+            // The verdict is `lib/supplier-invoice.js`'s, the same one the
+            // other app shows as a badge on its purchase-order list. Said here
+            // it is worth something: the order expected 63.75 and the invoice
+            // says 637.50, and somebody can ring the supplier today.
+            if verdict != "none" {
+                Label(shop.words.callIt(verdict == "mismatch" ? "po.ap_mismatch"
+                                                              : "po.ap_matched"),
+                      systemImage: verdict == "mismatch"
+                          ? "exclamationmark.triangle" : "checkmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(verdict == "mismatch" ? Khayt.attention : Role.text2)
             }
 
             // What this will book, said before it is booked. An order with no
@@ -89,9 +136,15 @@ struct ReceiveSheet: View {
                     .disabled(amount <= 0)
             }
         }
+        // Asked of the rule on every change, rather than compared here: a
+        // tolerance written twice is two tolerances, and the day one of them
+        // moves a shop is told its invoice matches in one app and not the
+        // other.
+        .task(id: bill) { verdict = await shop.billVerdict(on: order, bill: bill) }
         .onAppear {
             guard !started else { return }
             started = true
+            bill.day = Shop.localDay()
             // What is still to come. An order with no quantity on it has
             // nothing to offer, so the shop types what arrived.
             amount = order.outstanding
@@ -103,8 +156,10 @@ struct ReceiveSheet: View {
         let id = order.id
         let quantity = amount
         let note = notes
+        let paper = bill
         Task {
-            let said = await shop.receiveGoods(id, quantity: quantity, notes: note)
+            let said = await shop.receiveGoods(id, quantity: quantity, notes: note,
+                                               invoice: paper)
             if said == nil { shop.receivingGoods = nil } else { problem = said }
         }
     }

@@ -83,15 +83,22 @@ test('every purchase-order field the app reads is one createPurchaseOrder writes
     po: filamentPo(), item: { id: 'SPOOL-1', weight: 0, usageHistory: [] },
     quantity: 10, today: '2026-09-19', expenseId: 'EXP-1',
   }).po);
+  // And the SUPPLIER'S BILL, which is the third writer. It moved out of the
+  // renderer's save handler into `lib/supplier-invoice.js` for the same reason
+  // receiving did — the Mac app records one too — so its keys are taken from
+  // the real function here rather than hand-listed, exactly as above.
+  const billKeys = Object.keys(
+    require('../lib/supplier-invoice.js').record(filamentPo(),
+                                                 { number: 'INV-1', amount: 63.75, date: '2026-09-19' }));
   const written = new Set([...Object.keys(filamentPo()), ...Object.keys(consumablePo()),
-                           ...receivedKeys]);
+                           ...receivedKeys, ...billKeys]);
 
   // The purchase-order lifecycle: drafting, rendering, receiving, auditing.
   // lib/csv-bundle.js is deliberately absent — its `po.date`/`po.total` are ||
   // fallbacks for an externally-shaped snapshot, sitting behind the canonical
   // names, and the export is asserted behaviourally below instead.
   const FILES = ['renderer/inventory.js', 'renderer/wire-events.js', 'lib/po-audit.js',
-                 'lib/purchase-orders.js'];
+                 'lib/purchase-orders.js', 'lib/supplier-invoice.js'];
 
   // A purchase order is never the paid one until something says so, and nothing
   // does: there is no "mark supplier invoice paid" control yet. Absent reads as
@@ -156,9 +163,23 @@ test('the three places that price an order agree on one figure', () => {
   const po = filamentPo();
   const orderTotal = po.qty * po.unitPrice;
 
-  const inv = decomment(read('renderer/inventory.js'));
-  assert.match(inv, /const expectedAmt = \(\+po\.qty \|\| 0\) \* \(\+po\.unitPrice \|\| 0\);/,
+  // The invoice check used to be an expression inside the renderer's save
+  // handler and this pinned its exact TEXT. It is `lib/supplier-invoice.js`
+  // now, because the Mac app records a bill too — so what is pinned is the
+  // FIGURE, which is what the test is named for and is a stronger claim than
+  // the presence of a particular line.
+  const SI = require('../lib/supplier-invoice.js');
+  assert.equal(SI.expectedAmount(po), orderTotal,
     'the supplier-invoice check totals the order some other way');
+  assert.equal(SI.expectedAmount({ qty: po.qty }), 0,
+    'an order missing its unit price expects something, so every draft would flag');
+
+  // And the renderer must GO THROUGH it rather than totalling the order again.
+  const inv = decomment(read('renderer/inventory.js'));
+  assert.match(inv, /KhaytSupplierInvoice\.record\(/,
+    'the renderer decides for itself whether a supplier invoice matches');
+  assert.doesNotMatch(inv, /const expectedAmt =/,
+    'the old inline total is back beside the shared rule, free to disagree with it');
 
   const A = require('../lib/po-audit.js');
   const [suspect] = A.findSuspectPurchaseOrders(
