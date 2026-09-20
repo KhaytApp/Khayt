@@ -1715,6 +1715,13 @@ final class Words {
         // it (`inv.dry_log`), but none for the single act — it opens a sheet
         // and asks for a date, a temperature and a duration. This app answers
         // the nag where the nag appears, and a menu item needs its own words.
+        // MOVING A WHOLE FOLDER. The other app files a SELECTION into a
+        // group and has no word for moving a folder, because its library has
+        // no folders to move.
+        "mac.move_folder": ["en": "Move to…", "ar": "نقل إلى…"],
+        "mac.move_to_top": ["en": "Top level", "ar": "المستوى الأعلى"],
+        "mac.move_into_itself": ["en": "A folder cannot be moved inside itself.",
+                                 "ar": "لا يمكن نقل مجلد داخل نفسه."],
         "mac.mark_dried": ["en": "Dried today", "ar": "جُفّفت اليوم"],
         "mac.spool_history": ["en": "Where this went", "ar": "أين ذهب هذا"],
         "mac.spool_history_empty": ["en": "Nothing has been printed with this spool yet.",

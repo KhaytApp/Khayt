@@ -1138,6 +1138,52 @@ final class Shop {
     /// stamps a new revision, because a record that went backwards would look
     /// to the next sync like the change never happened and the other machine's
     /// copy would win.
+    /// Move a whole folder — and everything under it — somewhere else.
+    ///
+    /// ── WHY A FOLDER AND NOT A SELECTION ──────────────────────────────────
+    ///
+    /// Filing models into a group has always worked on a SELECTION, which is
+    /// right when a shop is picking out six of forty. It is the wrong tool for
+    /// repairing a library: a project that was imported flat is twenty-three
+    /// folders holding hundreds of files, and putting them back by hand means
+    /// opening each one, selecting all of it, and typing a path exactly.
+    ///
+    /// This is the same write, addressed by PATH. The subtree moves with it,
+    /// so `Blue` going under `Helmet/pose 1` takes anything below `Blue` too.
+    ///
+    /// `under` is nil to move a folder out to the top level.
+    func moveFolder(_ path: String, under newParent: String?) async {
+        let leaf = path.components(separatedBy: ImportGrouping.separator).last ?? path
+        let parent = (newParent?.isEmpty == false) ? newParent : nil
+        let destination = parent.map { $0 + ImportGrouping.separator + leaf } ?? leaf
+        guard destination != path else { return }
+        // A folder cannot be moved inside itself: `Helmet` under `Helmet/pose 1`
+        // would write a path that contains its own prefix and the folder would
+        // vanish from the level it was on.
+        guard !Self.isUnder(destination, path) else {
+            writeProblem = words.callIt("mac.move_into_itself"); return
+        }
+        let moving = files.filter { Self.isUnder($0.groupName, path) }
+        guard !moving.isEmpty else { return }
+
+        // Each file keeps its own depth BELOW the folder being moved, so a
+        // three-level project arrives as a three-level project.
+        var wanted: [LibraryFile.ID: String] = [:]
+        for file in moving {
+            let rest = (file.groupName ?? "").dropFirst(path.count)
+            wanted[file.id] = destination + rest
+        }
+        editFiles(Set(moving.map(\.id)),
+                  named: words.callIt("mac.file_in", ["name": .string(destination)])) { record in
+            guard case .string(let id)? = record["id"], let to = wanted[id] else { return }
+            // BOTH fields, as `KhaytOrganise.assign` writes them — the older
+            // build's dialog writes only `folder`, and sync merges whole
+            // records last-writer-wins.
+            record["group"] = .string(to)
+            record["folder"] = .string(to)
+        }
+    }
+
     private func editFiles(_ ids: Set<LibraryFile.ID>, named actionName: String,
                            change: @escaping (inout [String: JSONValue]) -> Void) {
         guard let build = source.build, !ids.isEmpty else { return }
@@ -9775,6 +9821,21 @@ final class Shop {
     }
 
     var ungroupedCount: Int { files.count { $0.groupName == nil } }
+
+    /// Every folder in the library, including the levels between — so a file
+    /// filed under `A/B/C` offers `A`, `A/B` and `A/B/C` as places to move to,
+    /// not only the leaf it happens to sit in.
+    var folderPaths: [String] {
+        var seen = Set<String>()
+        for group in files.compactMap(\.groupName) {
+            var parts: [String] = []
+            for level in group.components(separatedBy: ImportGrouping.separator) {
+                parts.append(level)
+                seen.insert(parts.joined(separator: ImportGrouping.separator))
+            }
+        }
+        return seen.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
 
     // MARK: - What the shell needs to draw itself
     //

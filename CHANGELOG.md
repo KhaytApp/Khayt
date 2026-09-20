@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A folder can be moved into another one, taking everything under it.**
+  Keeping the folders a project came with helps the next import and does
+  nothing for a library already filed flat — and the tree it came from is not
+  recorded anywhere, so nothing can reconstruct it. Putting one back by hand
+  meant opening each folder, selecting all of it and typing a path exactly.
+  Right-click a folder and move it instead: what is inside keeps its own depth,
+  so a project reassembles a folder at a time. A folder is never offered a home
+  inside itself.
+
 - **A spool that was dried can be recorded as dried.** Khayt decides whether
   filament is damp from one field — the day it was last dried — and nothing in
   either app was writing it. The Windows and Linux app's drying log kept its
