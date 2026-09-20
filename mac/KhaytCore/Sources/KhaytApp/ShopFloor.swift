@@ -1079,14 +1079,35 @@ struct ConsumablesCard: View {
 
         private var unit: String { (item.unit ?? "").trimmingCharacters(in: .whitespaces) }
 
+        /// The shelf this item is on, WHEN that is a second fact.
+        ///
+        /// A shop that calls its packaging shelf "Packaging" and ticks the
+        /// packaging box gets two chips reading the same word — the category
+        /// and the badge are different facts (which shelf it is on; whether
+        /// one comes off per shipment) that happen to share a spelling, and on
+        /// the sample shop that is two of the six rows. One fact said twice in
+        /// two colours reads as a fault in the app, not as two facts.
+        ///
+        /// Folded the way `lib/consumable-categories.js` folds a category, so
+        /// "packaging" and "Packaging " collide with the badge too.
+        private var shelfChip: String? {
+            let said = (item.category ?? "").trimmingCharacters(in: .whitespaces)
+            guard !said.isEmpty else { return nil }
+            guard item.isPackaging == true else { return said }
+            let fold = { (v: String) in
+                v.lowercased().split(separator: " ", omittingEmptySubsequences: true)
+                    .joined(separator: " ")
+            }
+            return fold(said) == fold(shop.words.callIt("cons.packaging_badge")) ? nil : said
+        }
+
         var body: some View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 5) {
                         Text(item.title(shop.words))
                             .font(.callout).lineLimit(1)
-                        if showCategory, let category = item.category,
-                           !category.trimmingCharacters(in: .whitespaces).isEmpty {
+                        if showCategory, let category = shelfChip {
                             Text(category)
                                 .font(.caption2)
                                 .padding(.horizontal, 5).padding(.vertical, 1)

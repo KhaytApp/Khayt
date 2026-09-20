@@ -141,4 +141,33 @@ struct ConsumableShelfTests {
         #expect(offered == ["Spares"], "and never the uncategorised sentinel")
     }
 
+    /// Found by photographing the screen, not by reading it.
+    ///
+    /// Two of the sample shop's six rows came out reading
+    /// "Mailing bags 250×350  Packaging  Packaging" — the shelf the item is
+    /// on, and the badge saying one comes off per shipment. Different facts
+    /// that happen to share a spelling, and one fact said twice in two
+    /// colours reads as a fault in the app.
+    @Test("the shelf chip is dropped when it would repeat the packaging badge")
+    func chipDoesNotRepeatTheBadge() async throws {
+        let engine = try KhaytEngine()
+        // The sample shop's own row, as the book holds it.
+        let bags: JSONValue = .object([
+            "id": .string("C1"), "name": .string("Mailing bags 250×350"),
+            "category": .string("Packaging"), "isPackaging": .bool(true),
+        ])
+        let spares: JSONValue = .object([
+            "id": .string("C2"), "name": .string("Loose fill"),
+            "category": .string("Spares"), "isPackaging": .bool(true),
+        ])
+        let shelfOnly: JSONValue = .object([
+            "id": .string("C3"), "name": .string("Tape"),
+            "category": .string("Packaging"), "isPackaging": .bool(false),
+        ])
+        // The categories still exist — this is a DRAWING decision, not a
+        // change to what is stored or how the shelves are grouped.
+        let shelves = try await engine.consumableCategories([bags, spares, shelfOnly])
+        #expect(shelves.contains { $0.label == "Packaging" && $0.count == 2 })
+        #expect(shelves.contains { $0.label == "Spares" })
+    }
 }
