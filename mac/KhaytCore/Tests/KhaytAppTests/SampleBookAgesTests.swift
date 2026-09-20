@@ -3,129 +3,185 @@ import Testing
 import KhaytCore
 @testable import KhaytApp
 
-/// The sample book's dates are fixed, and the calendar is not.
+/// The sample book cannot age out of the case it covers.
 ///
-/// ── WHAT HAPPENED ─────────────────────────────────────────────────────────
+/// ── WHAT USED TO HAPPEN ───────────────────────────────────────────────────
 ///
 /// `TimelineTests` asserts that some sample job is *projected* late but is not
 /// late YET, because that is the case the "at risk" section draws and without
-/// one the section ships unseen. The sample's newest due date was 2026-09-17.
-/// On 2026-09-18 every job on the floor was already late, so the projection had
-/// nothing left to report and two tests failed — on a green branch, overnight,
-/// with no commit in between.
+/// one the section ships unseen. The sample's dates were fixed and the calendar
+/// was not, so that case expired: on 2026-09-18 every job on the floor was
+/// already late, the projection had nothing left to report, and two tests
+/// failed — on a green branch, overnight, with no commit in between. It
+/// happened again on 2026-09-20.
 ///
 /// A test that decays is worse than one that fails: it fails on a day nobody
 /// chose, in somebody else's pull request, about something they did not touch.
 ///
-/// ── SO THIS FAILS EARLY, ON PURPOSE ───────────────────────────────────────
+/// ── WHY THE CHORE WAS NOT THE ANSWER ──────────────────────────────────────
 ///
-/// The margin below is the warning. When it goes red there is still a month of
-/// room, and the chore is to move the sample's queue forward — not to work out
-/// at midnight why a stranger's branch broke.
+/// What this file used to do was warn early so somebody could move the due
+/// dates forward by hand. That chore buys about ten days, and ten is not a
+/// slip in the estimate — it is the whole width of the window. The "at risk"
+/// case has to sit later than today plus the warning and earlier than the day
+/// the queue reaches it, and the busiest machine's queue is nineteen days long.
+/// No arrangement of FIXED dates is worth more than that.
 ///
-/// The right fix is for the sample's dates to move with the clock, so it cannot
-/// age at all. That is a larger change than this one: thirty-one test files
-/// mention a literal date, and shifting the whole book would have to be
-/// measured against all of them.
+/// So the dates are not fixed any more: `SampleBook` moves the whole book by
+/// the number of days between the day it was written for and today. What this
+/// file does now is prove that the move works — not next week, but on days
+/// nobody has lived through yet.
+/// The anchor day, and four days nobody has lived through.
+///
+/// 37 is deliberately not a multiple of seven: the projection counts the shop's
+/// WORKING days, so a book moved by a whole number of weeks would land on the
+/// same weekdays and hide a fault that only shows when it does not. The other
+/// three walk out far enough that a slow drift would show.
+///
+/// At file scope because `@Test(arguments:)` reads it while building the test
+/// list, which is not on the main actor — inside the suite it would be isolated
+/// to one and unreadable from there.
+private let sampleDaysOut = [0, 37, 180, 400, 1_000]
+
 @MainActor
 struct SampleBookAgesTests {
 
-    /// How much warning the chore gets.
+    /// Room for a clock a day either way.
     ///
-    /// Not much is available, and that is the honest number rather than a
-    /// comfortable one — see below.
-    static let margin = 7
+    /// The first attempt at keeping this alive placed the job so that it was at
+    /// risk on the developer's Mac, and CI failed anyway: the runner was on
+    /// 2026-09-17 while the Mac was on 2026-09-18, an ordinary timezone apart.
+    /// The window was missed by ONE DAY, in a test written to stop exactly
+    /// that. So the case has to survive being read a day early or a day late.
+    static let slack = 2
 
-    static func book() throws -> [String: JSONValue] {
+    static func rawBook() throws -> [String: JSONValue] {
         let url = try #require(AppResources.bundle.url(forResource: "sample-shop",
                                                        withExtension: "json"))
         return try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: url))
     }
 
-    /// Every due date on a job that is still on the floor.
-    static func queueDueDates() throws -> [String] {
-        guard case .array(let jobs)? = try book()["printLog"] else { return [] }
-        let onTheFloor: Set<String> = ["pending", "printing", "post", "qc", "on_hold"]
-        return jobs.compactMap { row in
-            guard case .object(let job) = row,
-                  case .string(let status)? = job["status"], onTheFloor.contains(status),
-                  case .string(let due)? = job["dueDate"], !due.isEmpty else { return nil }
-            return due
+    // MARK: - The move itself
+
+    @Test("a day moves, a version does not, and a book on its own anchor is untouched")
+    func onlyDaysMove() throws {
+        #expect(SampleBook.shiftingDay("2026-09-20", by: 3) == "2026-09-23")
+        #expect(SampleBook.shiftingDay("2026-09-20T09:00:00.000Z", by: 3)
+                == "2026-09-23T09:00:00.000Z")
+        // Not days, and must come back exactly as they went in.
+        #expect(SampleBook.shiftingDay("4.0.0-alpha.28", by: 3) == "4.0.0-alpha.28")
+        #expect(SampleBook.shiftingDay("ORD-01041", by: 3) == "ORD-01041")
+        #expect(SampleBook.shiftingDay("2026-09-20 and then some", by: 3)
+                == "2026-09-20 and then some")
+        #expect(SampleBook.shiftingDay("2026-02-31", by: 3) == "2026-02-31",
+                "a date the calendar does not have was quietly repaired")
+        #expect(SampleBook.shiftingDay("trk-sample01", by: 3) == "trk-sample01")
+
+        // On the anchor itself the book is the file, byte for byte. This is
+        // what makes the literal dates in the other test files mean what they
+        // say on the day somebody reads them.
+        let anchor = try #require(SampleBook.anchor)
+        #expect(SampleBook.rebased(try Self.rawBook(), to: anchor) == (try Self.rawBook()))
+    }
+
+    @Test("every date in the book moves, and by the same number of days")
+    func theWholeBookMoves() throws {
+        let anchor = try #require(SampleBook.anchor)
+        let later = try #require(Calendar.current.date(byAdding: .day, value: 400, to: anchor))
+        let moved = SampleBook.rebased(try Self.rawBook(), to: later)
+        let before = Self.everyDay(in: .object(try Self.rawBook())).sorted()
+        let after = Self.everyDay(in: .object(moved)).sorted()
+        #expect(before.count > 100, "only \(before.count) dates found — the walk has rotted")
+        #expect(before.count == after.count, "the move lost or invented a date")
+        // Shifting a job's due date but not the day it was raised would leave a
+        // sample book that contradicts itself, so the check is that EVERY date
+        // moved by the same amount rather than that the queue looks right.
+        let gaps = Set(zip(before, after).map { a, b in
+            Calendar.current.dateComponents(
+                [.day], from: DateFormatter.shopDay.date(from: String(a.prefix(10))) ?? Date(),
+                to: DateFormatter.shopDay.date(from: String(b.prefix(10))) ?? Date()).day ?? -1
+        })
+        #expect(gaps == [400], Comment(rawValue: "the book moved by \(gaps.sorted())"))
+    }
+
+    static func everyDay(in value: JSONValue) -> [String] {
+        switch value {
+        case .string(let s):
+            guard s.count >= 10, DateFormatter.shopDay.date(from: String(s.prefix(10))) != nil,
+                  s.count == 10 || s.dropFirst(10).hasPrefix("T") else { return [] }
+            return [s]
+        case .array(let a):  return a.flatMap { everyDay(in: $0) }
+        case .object(let o): return o.values.flatMap { everyDay(in: $0) }
+        default: return []
         }
     }
 
-    /// ── WHY THE WINDOW IS SHORT, AND CANNOT BE MADE LONG ──────────────────
-    ///
-    /// The case is "projected late, but not late YET", so the job's due date
-    /// has to sit BETWEEN today and the day the queue reaches it. That gap is
-    /// the queue's own length — about three weeks on this shop's busiest
-    /// machine — and it slides forward a day for every day that passes, while
-    /// a date written into a file does not.
-    ///
-    /// So no arrangement of fixed dates keeps this case alive for longer than
-    /// the queue. The sample is set to the far end of it (`ORD-01041`, last on
-    /// the busiest machine), which is the most that can be bought.
-    ///
-    /// The real fix is for the sample's dates to move with the clock, so it
-    /// cannot age at all. That is a larger change than this one: thirty-one
-    /// test files mention a literal date, and shifting the whole book would
-    /// have to be measured against all of them.
-    /// ── AND THE CLOCK IS NOT ONE CLOCK ────────────────────────────────────
-    ///
-    /// The first attempt at this placed the job so that it was at risk on the
-    /// developer's Mac, and CI failed anyway: the runner was on 2026-09-17
-    /// while the Mac was on 2026-09-18, an ordinary timezone apart. The window
-    /// was missed by ONE DAY, in a test written to stop exactly that.
-    ///
-    /// So the check below asks for slack at BOTH ends: room before the case
-    /// expires, and enough distance between the job's due date and the day the
-    /// queue reaches it that a clock a day either way cannot flip it.
-    static let slack = 2
+    // MARK: - And the shop it describes is the same shop, on any day
 
-    @MainActor
-    static func atRisk() async -> (job: Order, ready: String)? {
+    /// The sample shop as it would be read on a given day — the real load path,
+    /// so what is proved here is what the app does rather than a reconstruction
+    /// of it. `load` takes the day and hands it to BOTH the rebasing and the
+    /// projection, which is the point: asking the two about different days
+    /// would measure a moved book against today's calendar and prove nothing.
+    static func shop(on day: Date) async throws -> Shop {
         let shop = Shop()
-        await shop.load(.sample)
-        guard let job = shop.willBeLate.first, let ready = shop.readyDate(of: job.id)
-        else { return nil }
-        return (job, ready)
+        await shop.load(.sample, asOf: day)
+        #expect(shop.problem == nil, Comment(rawValue: "the sample would not load: "
+                                             + (shop.problem ?? "")))
+        return shop
     }
 
-    @Test("the at-risk case still has room before it expires")
-    func theCaseHasRoomLeft() async throws {
-        let (job, ready) = try #require(await Self.atRisk(), """
-            No sample job is projected late while still being ahead of its due             date, so the "at risk" section has nothing to draw and TimelineTests             is already failing. Move the due date of the LAST job on the busiest             machine to just inside that machine's projected ready date.
-            """)
-        let due = try #require(job.dueDate, "the at-risk job has no due date")
-        // Far enough past its date that a runner a day behind still sees it.
-        let earliest = DateFormatter.shopDay.string(
-            from: Calendar.current.date(byAdding: .day, value: Self.slack,
-                                        to: Order.day(due) ?? Date()) ?? Date())
-        #expect(ready >= earliest, Comment(rawValue: """
-            \(job.id) is projected ready \(ready) against a due date of \(due) — \
-            under \(Self.slack) days of slack. A machine whose clock is a day \
-            behind this one will not see it as at risk at all, which is how \
-            this test passed locally and failed on CI the first time it was \
-            written. Move the due date a few days earlier.
-            """))
-        let deadline = DateFormatter.shopDay.string(
-            from: Calendar.current.date(byAdding: .day, value: Self.margin, to: Date()) ?? Date())
-        #expect(due >= deadline, Comment(rawValue: """
-            The sample's "at risk" case expires on \(due), which is under             \(Self.margin) days away. Once today passes it, the job moves into             the attention panel as ALREADY late and the projection has nothing             left to report — TimelineTests then fails on a day nobody chose, in             somebody else's pull request.
-
-            The chore: run the queue's due dates forward again. Keep six behind             today so the attention panel still has its six, and put the last job             on the busiest machine just inside that machine's projected ready             date.
-            """))
+    @Test("on any day, the queue still straddles today with six behind it",
+          arguments: sampleDaysOut)
+    func theQueueStraddles(_ out: Int) async throws {
+        let anchor = try #require(SampleBook.anchor)
+        let day = try #require(Calendar.current.date(byAdding: .day, value: out, to: anchor))
+        let today = DateFormatter.shopDay.string(from: day)
+        let shop = try await Self.shop(on: day)
+        let onTheFloor: Set<String> = ["pending", "printing", "post", "qc", "on_hold"]
+        let due = shop.orders.filter { onTheFloor.contains($0.status) }
+            .compactMap(\.dueDate).filter { !$0.isEmpty }
+        #expect(due.count { $0 < today } == 6, Comment(rawValue:
+            "\(out) days out, \(due.count { $0 < today }) queued jobs are overdue, not 6 — "
+            + "the attention panel is sized for six"))
+        #expect(due.contains { $0 > today }, Comment(rawValue:
+            "\(out) days out, no queued job is still ahead of its date"))
     }
 
-    @Test("the queue still has six overdue jobs and a horizon past them")
-    func theQueueStraddlesToday() throws {
-        // Both halves matter. Six overdue is what the attention panel is sized
-        // for; work still ahead of its date is what the projection reads.
-        let dates = try Self.queueDueDates()
-        #expect(!dates.isEmpty, "no job on the floor has a due date, so nothing here is checked")
-        let today = DateFormatter.shopDay.string(from: Date())
-        #expect(dates.count { $0 < today } >= 6,
-                Comment(rawValue: "only \(dates.count { $0 < today }) queued jobs are overdue"))
-        #expect(dates.contains { $0 > today }, "no queued job is still ahead of its date")
+    @Test("on any day, one job is projected late while still ahead of its date",
+          arguments: sampleDaysOut)
+    func theCaseSurvives(_ out: Int) async throws {
+        let anchor = try #require(SampleBook.anchor)
+        let day = try #require(Calendar.current.date(byAdding: .day, value: out, to: anchor))
+        let today = DateFormatter.shopDay.string(from: day)
+        let shop = try await Self.shop(on: day)
+        let timeline = try #require(shop.timeline, "nothing on the floor to project")
+
+        // "At risk" is the job the projection says will miss a date it has not
+        // missed yet. A job already overdue is not this case — it is in the
+        // attention panel, and the section would have nothing of its own.
+        let risky = timeline.machines.flatMap(\.jobs)
+            .filter { $0.late && $0.dueDate > today }
+        #expect(!risky.isEmpty, Comment(rawValue:
+            "\(out) days out, no sample job is projected late while still ahead of its "
+            + "due date, so the 'at risk' section has nothing to draw"))
+
+        // And with room on both sides, so a machine whose clock is a day out
+        // still sees it. This is the check that failed on CI the first time,
+        // by exactly one day.
+        for job in risky {
+            let earliest = DateFormatter.shopDay.string(from:
+                Calendar.current.date(byAdding: .day, value: Self.slack,
+                                      to: Order.day(job.dueDate) ?? day) ?? day)
+            #expect(job.etaDate >= earliest, Comment(rawValue:
+                "\(out) days out, \(job.id) is projected ready \(job.etaDate) against a due "
+                + "date of \(job.dueDate) — under \(Self.slack) days of slack, so a machine "
+                + "a day behind this one will not see it as at risk at all"))
+            let latest = DateFormatter.shopDay.string(from:
+                Calendar.current.date(byAdding: .day, value: Self.slack, to: day) ?? day)
+            #expect(job.dueDate >= latest, Comment(rawValue:
+                "\(out) days out, \(job.id) is due \(job.dueDate), under \(Self.slack) days "
+                + "away — a machine a day ahead of this one reads it as already late"))
+        }
     }
 }

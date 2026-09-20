@@ -33,23 +33,24 @@ struct SampleFiguresTests {
         let facts = try #require(shop.facts, "the dashboard computed nothing")
         #expect(facts.activeCount == 11, "open is \(facts.activeCount)")
 
-        // ── LATE IS A FUNCTION OF TODAY, AND WAS PINNED AS IF IT WERE NOT ──
+        // ── LATE IS A FUNCTION OF TODAY, AND IS PINNED AGAIN ──────────────
         //
         // This read `lateCount == 6` and passed for as long as it did only
-        // because nobody ran it on the wrong day. The sample's due dates are
-        // ABSOLUTE — `ORD-01001` is due 2026-09-12 — so a job crosses into
-        // late every time the calendar moves, and the figure went to 9 the
-        // morning after this was last green. A test that fails on a date is a
-        // test that will be edited to whatever today says, which is how a
-        // guard stops guarding.
+        // because nobody ran it on the wrong day: the sample's due dates were
+        // ABSOLUTE, so a job crossed into late every time the calendar moved
+        // and the figure went to 9 the morning after this was last green. It
+        // was loosened to `>= 6` then, because a test that fails on a date is
+        // a test that will be edited to whatever today says.
         //
-        // What this suite is actually for is the CLAIM in its own name: eight
-        // jobs gaining measured actuals moved no money. Lateness is not money
-        // and never was. So what is pinned is the property of the DATA rather
-        // than of the clock — the sample still carries overdue work for the
-        // attention list to find, and has not quietly lost it.
-        #expect(facts.lateCount >= 6,
-                "the sample has stopped carrying overdue work: late is \(facts.lateCount)")
+        // `SampleBook` moves the whole book with the calendar now, so six is
+        // six on any day the app is opened — see `SampleBookAgesTests`, which
+        // proves it a thousand days out. The figure goes back to being pinned,
+        // which is what it was always for: the attention panel is sized for
+        // six, and a sample that quietly gains a seventh or loses one changes
+        // a screen nobody would think to look at.
+        #expect(facts.lateCount == 6, Comment(rawValue:
+            "the sample carries \(facts.lateCount) overdue jobs, not the six the "
+            + "attention panel is drawn for"))
         #expect(facts.lateCount <= facts.activeCount,
                 "more jobs are late (\(facts.lateCount)) than are open (\(facts.activeCount))")
         // FIVE machines, not the three filament printers this book started

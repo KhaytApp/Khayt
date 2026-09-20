@@ -128,7 +128,10 @@ struct RemeasureTests {
         let shop = try String(contentsOf: sources.appending(path: "Shop.swift"), encoding: .utf8)
         let command = try String(contentsOf: sources.appending(path: "ImportCommand.swift"), encoding: .utf8)
         // In `load`, after the book's own reads, not before them.
-        let load = shop.range(of: "func load(_ next: Source) async {")
+        // The signature without its parameter list: what this is looking for
+        // is WHERE `load` starts, and pinning the whole line made adding an
+        // argument to it read as the remeasure pass having been unwired.
+        let load = shop.range(of: "func load(_ next: Source")
         let call = shop.range(of: "remeasureIfDue()")
         let slicers = shop.range(of: "await readSlicers()")
         #expect(load != nil && call != nil && slicers != nil)

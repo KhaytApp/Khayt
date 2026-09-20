@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The sample shop was a year behind by the time anybody opened it.**
+  "Explore with sample data" shipped a book with fixed dates, so every day that
+  passed pushed it further into the past: a queue that was meant to straddle
+  today — some work overdue, some still ahead of its date, one job the
+  projection says will miss a deadline it has not missed yet — became a queue
+  where everything was simply late, and the screens that draw the difference
+  had nothing left to show. The book now moves with the calendar: it is read as
+  the shop it describes, in the same week of its own life, whatever day it is
+  opened on. This is what the demo data in the Windows and Linux app has always
+  done; the richer book this app ships did not.
+
 - **(Mac) A shop with one of something was told "1 1".** Eight counted lines
   wrote the number into the sentence and then had another put in front of it,
   so the Dashboard said "1 1 job unrecorded", the attention strip said "1 One
