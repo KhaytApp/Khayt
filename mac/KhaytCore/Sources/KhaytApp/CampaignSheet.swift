@@ -119,6 +119,39 @@ struct CampaignSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            // ── AND WHAT HAS ALREADY GONE OUT ────────────────────────────
+            //
+            // Both apps have written `settings.campaignLog` since campaigns
+            // existed and neither has ever shown it: grep the repository and
+            // every hit is a write. A record an app keeps and cannot show is
+            // the same defect as a field it reads and cannot set.
+            //
+            // "Did that go?" is the first question after mailing forty people,
+            // and the answer was already on disk. Three runs, because this is
+            // a reminder rather than a report — a shop that wants the whole
+            // history has it in its own book.
+            if !shop.campaignRuns.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(shop.words.callIt("mac.campaign_log")).foregroundStyle(.secondary)
+                    ForEach(shop.campaignRuns.prefix(3)) { run in
+                        HStack(spacing: 6) {
+                            Text(run.day).monospacedDigit()
+                            Text("·")
+                            Text(shop.words.callIt("camp.done") + " " + String(run.sent))
+                                .monospacedDigit()
+                            // Only when there were any. "0 failed" on every
+                            // line teaches a shop to stop reading the line.
+                            if run.failed > 0 {
+                                Text("· " + String(run.failed) + " "
+                                     + shop.words.callIt("camp.failed"))
+                                    .monospacedDigit().foregroundStyle(Khayt.attention)
+                            }
+                        }
+                        .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             // ── WHO, AND WHAT THEY WOULD READ ─────────────────────────────
             //
             // The count alone is not the answer. A shop about to write to

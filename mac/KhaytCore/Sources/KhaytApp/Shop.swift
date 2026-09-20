@@ -10651,6 +10651,50 @@ final class Shop {
             .trimmingCharacters(in: .whitespaces)
     }
 
+    /// One campaign that went out: when, to how many, and how it went.
+    struct CampaignRun: Identifiable, Hashable, Sendable {
+        let id: String
+        /// `YYYY-MM-DD`, the shop's day rather than the timestamp's instant.
+        let day: String
+        let reached: Int
+        let sent: Int
+        let failed: Int
+    }
+
+    /// The last campaigns, newest first.
+    ///
+    /// ── WRITTEN BY BOTH APPS AND READ BY NEITHER ──────────────────────────
+    ///
+    /// `settings.campaignLog` has been written since campaigns existed and
+    /// there has never been a screen for it — grepping the repository finds
+    /// exactly two hits, and both are writes. A record an app keeps and cannot
+    /// show is the same defect as a field it reads and cannot set, which is
+    /// what the marketing opt-out was: half a feature, in the other direction.
+    ///
+    /// It matters more now this app sends. "Did that go?" is the first
+    /// question after pressing a button that mails forty people, and the
+    /// answer was already on disk.
+    var campaignRuns: [CampaignRun] { Self.campaignRuns(in: settingsDict) }
+
+    /// The decode on its own, so it can be driven over a book this app has not
+    /// loaded — including the shapes the other app's older writes left behind.
+    static func campaignRuns(in settings: [String: JSONValue]) -> [CampaignRun] {
+        guard case .array(let rows)? = settings["campaignLog"] else { return [] }
+        return rows.compactMap { row in
+            guard case .object(let o) = row else { return nil }
+            let at = Self.plainString(o["at"]) ?? ""
+            guard !at.isEmpty else { return nil }
+            return CampaignRun(
+                id: at,
+                // The day, not the instant: a list of times to the second is a
+                // list nobody reads, and the shop asks "did I send this week".
+                day: String(at.prefix(10)),
+                reached: Int(Self.plainNumber(o["recipients"]) ?? 0),
+                sent: Int(Self.plainNumber(o["sent"]) ?? 0),
+                failed: Int(Self.plainNumber(o["failed"]) ?? 0))
+        }.reversed()
+    }
+
     /// What was sent, when, and how it went.
     ///
     /// The other app keeps the last fifty runs on `settings.campaignLog`; this

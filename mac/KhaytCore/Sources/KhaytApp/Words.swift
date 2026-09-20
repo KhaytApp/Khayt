@@ -1698,6 +1698,10 @@ final class Words {
         // app's `camp.confirm`, which is translated into nine languages. Only
         // the HINT is written here, because the other app has no equivalent:
         // it does not say that the run cannot be taken back.
+        // WHAT HAS ALREADY GONE OUT. Neither app has ever drawn this, so there
+        // is no shared word to borrow — the other one writes the same log and
+        // shows it nowhere.
+        "mac.campaign_log": ["en": "Already sent", "ar": "أُرسل سابقاً"],
         "mac.campaign_confirm_hint": ["en": "One message each, a third of a second apart. It cannot be taken back.",
                                       "ar": "رسالة لكل عميل، بفاصل ثلث ثانية. لا يمكن التراجع عن ذلك."],
         // Refused BY NAME, the way a move through an SMTP provider is: the
