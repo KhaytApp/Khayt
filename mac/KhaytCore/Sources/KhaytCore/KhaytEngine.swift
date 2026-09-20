@@ -35,6 +35,11 @@ public actor KhaytEngine {
         // this list, so both are satisfied.
         "accounting-export",
         "pricing",
+        // A marketplace's cut, as quote lines. It needs `pricing` only in the
+        // sense that the lines it emits are the ones `pricing` already
+        // resolves — percentages against the pre-extras subtotal, flat amounts
+        // as they are — so there is nothing here the calculator has to learn.
+        "platform-fees",
         "payment-plan",
         // Deposits erased by the instalment-save defect (#500). The code is
         // fixed; books written before it are not, and this app could not even
@@ -6285,6 +6290,58 @@ public actor KhaytEngine {
     public func emailProviderIsHttp(_ provider: String) throws -> Bool {
         try runtime.call2("KhaytOrderEmail.isHttpProvider(ARG0)",
                           [.string(provider)], as: Bool.self)
+    }
+
+    // MARK: - A marketplace's cut
+
+    /// One marketplace a shop can sell through, and what it charges.
+    ///
+    /// `lines` is what the fee actually IS — "6.5% + 3% + 0.20" — and it is
+    /// shown before anything is added to a customer's quote, because the rates
+    /// are a starting point and not an authority: marketplaces change them,
+    /// they vary by country and category, and a shop on a legacy plan pays
+    /// different ones. Getting this wrong quietly is worse than not shipping
+    /// it.
+    public struct Platform: Decodable, Sendable, Identifiable, Equatable {
+        public let id: String
+        public let name: String
+        public let lines: [Line]
+
+        public struct Line: Decodable, Sendable, Equatable {
+            public let key: String
+            public let label: String
+            /// One of the two is set. A percentage resolves against the job's
+            /// price before extras — which is what a marketplace charges
+            /// against — and a flat fee adds as it is.
+            public let pct: Double?
+            public let amount: Double?
+        }
+    }
+
+    /// The marketplaces a shop can pick, in the order the other app lists them.
+    public func platformIds() throws -> [String] {
+        try runtime.call2("KhaytPlatformFees.platformIds()", [], as: [String].self)
+    }
+
+    /// What a marketplace charges: the shop's own edits where it has made any,
+    /// the shipped defaults otherwise.
+    ///
+    /// A saved schedule REPLACES rather than merges, because merging would make
+    /// a line the shop deliberately deleted reappear on the next update — an
+    /// invisible charge on a customer's quote, which is the worst thing this
+    /// can do.
+    public func platform(_ id: String, settings: [String: JSONValue]) throws -> Platform? {
+        try runtime.call2("KhaytPlatformFees.platformFor(ARG0, ARG1)",
+                          [.string(id), .object(settings)], as: Platform?.self)
+    }
+
+    /// The quote lines for a marketplace, in the shape the calculator already
+    /// appends — each carrying the platform it came from, so picking twice
+    /// replaces rather than stacks a second copy of the same three charges.
+    public func platformFeeLines(_ id: String,
+                                 settings: [String: JSONValue]) throws -> [JSONValue] {
+        try runtime.call2("KhaytPlatformFees.feeLinesFor(ARG0, ARG1)",
+                          [.string(id), .object(settings)], as: [JSONValue].self)
     }
 
     /// Who owes the shop money, and how long they have owed it.

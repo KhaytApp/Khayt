@@ -82,6 +82,12 @@ struct NewJobSheet: View {
     /// cut. Empty for most jobs, which is why the row only appears once there
     /// is one.
     @State private var extraLines: [Shop.ExtraLine] = []
+    /// The marketplaces a shop can sell through, and which one this job is for.
+    ///
+    /// Held rather than asked while drawing: the engine is an actor, and a view
+    /// cannot ask it a question in the middle of a body.
+    @State private var platforms: [KhaytEngine.Platform] = []
+    @State private var platformId = ""
     /// "Price agreement applied" — said once, under the customer, when
     /// choosing them changed a figure in the cart.
     @State private var agreementNote: String?
@@ -157,6 +163,13 @@ struct NewJobSheet: View {
         // growing the window past the screen.
         .frame(width: Self.width)
         .frame(maxHeight: 640)
+        .task {
+            platforms = await shop.platforms()
+            // A draft reopened already carrying a marketplace's lines must
+            // show that marketplace, or the control is lying about the quote
+            // it is sitting on.
+            platformId = Shop.platformOn(extraLines) ?? ""
+        }
         .onAppear {
             margin = shop.defaultMargin
             // ── FROM A PRODUCT, IF THE SHOP ASKED FOR ONE ─────────────────
@@ -498,6 +511,55 @@ struct NewJobSheet: View {
             // collapsed into one field here. The picker is the whole reason
             // this is not just a number.
             //
+            // ── A MARKETPLACE'S CUT, WITHOUT TYPING IT EVERY TIME ─────────
+            //
+            // Asked for twice by the same shop: "Etsy for instance charges two
+            // percentage based fees and a relisting fee of .20 for each item
+            // sold." Half of it already worked — those are three ordinary
+            // extra lines — and what was missing is that somebody had to
+            // remember Etsy's three numbers and type them onto every quote.
+            //
+            // THE SCHEDULE IS SHOWN, not a resolved total. Each line's own
+            // money is already drawn beside it in the rows below, and a second
+            // figure here would be a separate computation free to go stale
+            // against the quote it is describing.
+            //
+            // The rates are a STARTING POINT and not an authority —
+            // marketplaces change them, they vary by country and category, and
+            // a shop on a legacy plan pays different ones. Every line lands in
+            // the table below as an ordinary charge the shop can edit or
+            // delete, which is why picking one is safe.
+            if !platforms.isEmpty {
+                GridRow {
+                    Text(shop.words.callIt("calc.platform_fees"))
+                        .gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary).fixedSize()
+                    HStack(spacing: 8) {
+                        Picker("", selection: $platformId) {
+                            Text(shop.words.callIt("calc.platform_none")).tag("")
+                            ForEach(platforms) { Text($0.name).tag($0.id) }
+                        }
+                        .labelsHidden().frame(width: 190)
+                        // "6.5% + 3% + 0.20" — what it is, before it is added.
+                        if let picked = platforms.first(where: { $0.id == platformId }) {
+                            Text(picked.lines.map { line in
+                                line.pct.map { Money.fieldValue($0) + "%" }
+                                    ?? Money.figure(line.amount ?? 0)
+                            }.joined(separator: " + "))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                // PICKING REPLACES, it does not stack. Clicking twice would
+                // otherwise put a second copy of Etsy's three charges on the
+                // quote, which a shop only notices on the finished invoice.
+                // The shop's own typed lines are kept exactly as they are.
+                .onChange(of: platformId) {
+                    let want = platformId
+                    Task { extraLines = await shop.applyingPlatform(want, to: extraLines) }
+                }
+            }
+
             // The row only appears once there is a line, because most jobs
             // have none and an empty table is a row of furniture.
             GridRow {
