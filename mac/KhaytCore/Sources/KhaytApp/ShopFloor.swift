@@ -689,7 +689,17 @@ struct Inventory: View {
                     // searched for: the search box filters spools, so a full
                     // consumables list beside three filtered cards describes a
                     // different set from the one on screen.
-                    if !shop.consumables.isEmpty,
+                    // ── AND WHEN THERE IS NOTHING ON IT YET ───────────
+                    //
+                    // Shown on an EMPTY shelf too, whenever the shop can edit
+                    // one. The way to add the first consumable is the button
+                    // in this card's header, so gating the card on the shelf
+                    // being non-empty put the only way in behind having
+                    // already been in — which is the very gap this screen was
+                    // built to close, rebuilt one level down. This shop's own
+                    // book holds nought consumables, so that is not a corner
+                    // case for them; it is every day.
+                    if !shop.consumables.isEmpty || shop.canMoveJobs,
                        shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         ConsumablesCard(needs: needs, shop: shop)
                             .card(rail: shop.consumables.contains(where: \.isLow)
@@ -1006,7 +1016,14 @@ struct ConsumablesCard: View {
                     .help(shop.words.callIt("cons.add_title"))
                 }
             }
-            if rows.isEmpty {
+            if shop.consumables.isEmpty {
+                // Nothing on the shelf at all — as against nothing in the
+                // chosen category. One line, because a shop that does not
+                // track consumables should not be nagged by a card; the way
+                // in is the button in the header above.
+                Text(shop.words.callIt("cons.empty"))
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if rows.isEmpty {
                 // Only reachable with a filter on, since the rule drops a
                 // selection whose shelf has been emptied — but say which, and
                 // offer the way out, rather than showing a blank.

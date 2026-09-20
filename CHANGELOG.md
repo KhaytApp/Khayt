@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The empty consumables shelf offers the way to fill it.** The button
+  that adds the first one is in that card's header, and the card was drawn
+  only when the shelf already had something on it — so a shop with none got no
+  card, no button, and no way in. That is the gap the shelf was built to close,
+  rebuilt one level down, and it is not a corner case: this shop's own book
+  holds none, which is exactly why the shelf was built. The card is shown on an
+  empty shelf now, wherever the shop can edit one, saying so in one line.
+
 - **(Mac) The other shelf can be kept here: glue, IPA, bags, nozzles.** Khayt
   has always worked out what is about to run out that is not filament, and
   this app has always drawn it — from a shelf it had no way to put anything
