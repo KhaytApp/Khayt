@@ -201,4 +201,41 @@ struct MenuCoverageTests {
                 "the window publishes nothing for ⌘F to act on")
         #expect(text.contains("focusSearchWhenAsked"))
     }
+
+    /// Every sheet the window can present has something that presents it.
+    ///
+    /// `addingSpool` was declared on `Shop`, bound to `SpoolSheet(existing:
+    /// nil)`, and set back to false after a save. Nothing in the whole app
+    /// ever set it to TRUE — so the sheet's new-spool half, its catalogue
+    /// lookup, and `saveSpool(id: nil)` (which has its own passing test) were
+    /// all unreachable, and a shop could correct a spool on the Mac but never
+    /// add one. Nothing failed, because every piece was individually right.
+    ///
+    /// Read as source for the reason the rest of this file is: a `View` body
+    /// cannot be instantiated and asked which sheets it offers.
+    @Test("a sheet nothing can open is not a sheet")
+    func everyPresentedSheetHasAWayIn() {
+        let app = Self.source("ShopWindow.swift")
+        // `.sheet(isPresented: $shop.NAME)` — the one-way flags. A `sheet(item:)`
+        // is presented by assigning the item itself, so it cannot be dead this
+        // way, and a Toggle or Picker bound to `$shop.NAME` sets it through the
+        // binding.
+        let pattern = #/\.sheet\(isPresented: \$shop\.([a-zA-Z]+)\)/#
+        let presented = app.matches(of: pattern).map { String($0.1) }
+        #expect(presented.count > 5, "only \(presented.count) sheets found — the parse is wrong")
+
+        // Everything the app is, in one string, so a setter anywhere counts.
+        let dir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir,
+                     includingPropertiesForKeys: nil)) ?? []
+        let everything = files.filter { $0.pathExtension == "swift" }
+            .compactMap { try? String(contentsOf: $0, encoding: .utf8) }
+            .joined(separator: "\n")
+
+        let dead = presented.filter { !everything.contains("\($0) = true") }
+        #expect(dead.isEmpty,
+                Comment(rawValue: "presented but never opened: \(dead.joined(separator: ", "))"))
+    }
 }
