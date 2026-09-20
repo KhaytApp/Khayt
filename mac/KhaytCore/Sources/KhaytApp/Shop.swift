@@ -10990,9 +10990,31 @@ final class Shop {
     /// confirmed first, in the same words; every file in the model's own
     /// folder is deleted and the record goes regardless — but a file that
     /// would not go is SAID, because the record was once removed and "File
-    /// deleted" shown while the bytes stayed on disk. No undo: the files are
-    /// gone, and an undo that puts the record back without them is a model
-    /// that looks present and is not.
+    /// deleted" shown while the bytes stayed on disk.
+    ///
+    /// ── TO THE TRASH, NOT OFF THE DISK ────────────────────────────────────
+    ///
+    /// This used `removeItem`, so a model a shop deleted was gone: no undo in
+    /// the app by design, and none outside it either. The codebase argues the
+    /// opposite case elsewhere in its own words — a duplicate is refused
+    /// rather than overwritten because "a duplicate is recoverable, a deletion
+    /// is not" — and then deleted permanently.
+    ///
+    /// `trashItem` puts it where every other Mac app puts it, so the Finder is
+    /// the undo. The record still goes regardless and there is still no undo
+    /// inside the app: a record restored without its bytes is a model that
+    /// looks present and is not.
+    /// To the Trash, falling back to deleting outright.
+    ///
+    /// A volume with no Trash — a network share, some external disks — refuses
+    /// `trashItem`, and a model that could not be deleted because the disk it
+    /// is on has no wastebasket would be a worse answer than the old one. The
+    /// shop asked for it gone; this only changes WHERE it goes when it can.
+    nonisolated static func trash(_ url: URL) throws {
+        do { try FileManager.default.trashItem(at: url, resultingItemURL: nil) }
+        catch { try FileManager.default.removeItem(at: url) }
+    }
+
     func deleteLibraryFile(_ file: LibraryFile) async {
         importProblem = nil
         importNote = nil
@@ -11005,9 +11027,9 @@ final class Shop {
             let contents = (try? FileManager.default.contentsOfDirectory(at: dir,
                 includingPropertiesForKeys: nil)) ?? []
             for url in contents {
-                do { try FileManager.default.removeItem(at: url) } catch { allGone = false }
+                do { try Self.trash(url) } catch { allGone = false }
             }
-            if allGone { try? FileManager.default.removeItem(at: dir) }
+            if allGone { try? Self.trash(dir) }
         }
         do {
             try StoreWriter.update(build) { root in
