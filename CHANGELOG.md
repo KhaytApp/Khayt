@@ -15,6 +15,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   half the Mac needs: it draws "what is about to run out that is not filament"
   from a shelf it has never been able to put anything on.
 
+- **(Mac) A spool can be added to the shelf.** It could not. The sheet that
+  adds one was written, with its own heading and the catalogue lookup that
+  only makes sense for a spool nobody has typed yet; the code that writes the
+  record was written, and has a passing test; the switch between them was
+  declared, wired to the sheet, and reset after every save. Nothing in the app
+  ever turned that switch ON, so a shop could correct a spool here and had to
+  go to the other app to buy one. Nothing failed, because every piece of it
+  was right on its own — and the comment listing which screens have no actions
+  named the shelf, so the absence read as a decision somebody had made. *New
+  Spool* is on the shelf now, beside the ones Machines, Expenses, Waste and
+  the catalogue have always had. A test now refuses any sheet the app can
+  present and nothing can open.
+
 - **A model pack can be a RAR or a 7-Zip, and can be bigger than 32 MB.** Two
   faults with one cause — the library only ever opened a zip, and judged a file
   the shop already had on its own disk by the size limit meant for a stranger

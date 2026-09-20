@@ -51,7 +51,8 @@ private struct ScreenToolbar<C: ToolbarContent>: ViewModifier {
 ///
 /// The order follows `ShopWindow.classicScreens`, which is the order the app
 /// decides what to show. Anything not listed simply has no actions: the
-/// Dashboard, the library, the inventory, the customers, the calculator.
+/// Dashboard, the customers, the calculator. (The inventory was on that list
+/// and should not have been — see the New Spool item below.)
 struct ScreenActions: View {
     @Bindable var shop: Shop
     /// The detail panel's switch, shared with `ShopWindow` through the same
@@ -89,6 +90,21 @@ struct ScreenActions: View {
                     shop.schedulingWork = true
                 }
                 plus("mach.add", enabled: shop.canMoveJobs) { shop.addingMachine = true }
+            } else if shop.showingInventory {
+                // THE SHELF HAD NO WAY TO PUT ANYTHING ON IT.
+                //
+                // `SpoolSheet` has always handled a spool that is not on the
+                // shelf yet — its own heading, the catalogue lookup that only
+                // makes sense for a new one — and `Shop.saveSpool(id: nil)`
+                // has always written it, with a test. `addingSpool` was
+                // declared, bound to the sheet, and reset on save. Nothing
+                // ever set it to TRUE, so none of that was reachable and a
+                // shop could correct a spool here but never add one.
+                //
+                // The comment above this struct listed the inventory among
+                // the screens that "simply have no actions", which is how it
+                // stayed unnoticed: the absence read as a decision.
+                plus("mac.new_spool", enabled: shop.canMoveJobs) { shop.addingSpool = true }
             } else if shop.showingExpenses {
                 period
                 plus("exp.add_title", enabled: shop.canMoveJobs) { shop.addingExpense = true }
