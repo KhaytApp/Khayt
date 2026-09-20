@@ -3514,6 +3514,60 @@ tested against both.
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.29] - 2026-09-20
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Three changes. Two of them are things this app could not do — write to a
+segment of customers, and charge a marketplace's cut — and the third is the
+sample shop, which had been quietly ageing out of the case it was built to
+show.
+
+### Added
+
+- **(Mac) Who a message would reach, and what it would say to each of them.**
+  Khayt has segmented customers for a campaign since 3.0 — spend, how long
+  since they last ordered, a tag, a loyalty tier — and only the other window
+  could ask. The Mac can ask now: it says how many customers a segment reaches
+  and shows the message with its merge fields filled in for one of them, which
+  is the only way to see that the greeting actually fills. A customer who has
+  opted out of marketing is never in the list, whatever the segment says —
+  that is the shared rule's decision and this app cannot override it. Then it
+  sends: one email each, a third of a second apart, behind a question that
+  names the count — "Send this to 38 customers?" — because "Send this?" is a
+  question nobody can answer. The run can be stopped part way, both the sent
+  and the failed counts come back, and it is written into the shop's campaign
+  log the same way the other app writes it. A shop that mails through its own
+  SMTP server is refused by name and still sends these from the Windows and
+  Linux app, which is the same line a job move already draws.
+
+- **(Mac) Etsy's three fees had to be typed onto every quote by hand.** Khayt
+  has priced a marketplace's cut since 3.0 — a percentage of the price before
+  extras is exactly what a marketplace charges against — but somebody had to
+  remember the numbers. Pick the marketplace on a new job instead and its
+  charges go on: Etsy, Shopify, eBay, Amazon, WooCommerce, Salla and Zid, each
+  showing what it charges before anything is added. Picking again replaces
+  those charges rather than stacking a second copy of them, and the lines a
+  shop typed itself are never touched. The rates are a starting point, not an
+  authority — they change, they vary by country and category, and a shop on a
+  legacy plan pays different ones — so every line lands in the table as an
+  ordinary charge that can be edited or deleted, and a shop that has saved its
+  own rates gets those.
+
+### Changed
+
+- **(Mac) The sample shop was a year behind by the time anybody opened it.**
+  "Explore with sample data" shipped a book with fixed dates, so every day that
+  passed pushed it further into the past: a queue that was meant to straddle
+  today — some work overdue, some still ahead of its date, one job the
+  projection says will miss a deadline it has not missed yet — became a queue
+  where everything was simply late, and the screens that draw the difference
+  had nothing left to show. The book now moves with the calendar: it is read as
+  the shop it describes, in the same week of its own life, whatever day it is
+  opened on. This is what the demo data in the Windows and Linux app has always
+  done; the richer book this app ships did not.
+
 ## [4.0.0-alpha.28] - 2026-09-20
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
