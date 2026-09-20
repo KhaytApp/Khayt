@@ -6,6 +6,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) How much to order when a spool runs low, and when it was bought.**
+  The drafting rule has always read a spool's own reorder quantity and fallen
+  back to a kilo when there is none — and nothing here could set one, so every
+  order this app drafted asked for a kilo of whatever it was, for a shop
+  buying 250 g spools and for one buying 5 kg boxes alike. That was tolerable
+  while drafting was a button somebody pressed and read; it stopped being
+  tolerable the same day this app learnt to draft without being asked. The
+  purchase date is beside it: bought and opened answer different questions,
+  and filament takes up moisture from the day it is made.
+
 - **(Mac) What a filament should be printed at can be written down here.**
   Nozzle temperature, bed temperature and maximum speed have been stored
   against a spool by the shared rule since it was written, and this app
