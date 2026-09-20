@@ -3618,6 +3618,52 @@ tested against both.
   gates an update sits at the top of an entry, and trimming the other way would
   have quietly un-gated a release that moves a shop's data.
 
+## [4.0.0-alpha.31] - 2026-09-20
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Three changes. The first is a fault found in daily use and is the reason this
+release exists: a project imported with folders inside it lost them, and the
+library showed the project holding only whatever sat at its top level. The
+other two finish the purchase-order chain — how much to order when something
+runs low, and settling the bill when it arrives.
+
+### Changed
+
+- **(Mac) A project with folders inside it keeps them.** Importing a project
+  several levels deep filed every model under the *deepest* folder that named
+  something, so `MyProject/pose 1/Blue` became a folder called `Blue` sitting
+  beside the project rather than inside it — and the project itself held only
+  whatever sat at its top level. Reported as the library showing only the
+  first folder with all the sub-folders skipped, and from the shelf that is
+  exactly what it looked like: nothing was skipped, every model was imported,
+  and they landed somewhere other than where they came from. The folders nest
+  now, opening one shows the level below it, and the way back is a trail
+  rather than a jump to the top. Libraries already filed under a single name
+  are untouched.
+
+- **(Mac) How much to order when a spool runs low, and when it was bought.**
+  The drafting rule has always read a spool's own reorder quantity and fallen
+  back to a kilo when there is none — and nothing here could set one, so every
+  order this app drafted asked for a kilo of whatever it was, for a shop
+  buying 250 g spools and for one buying 5 kg boxes alike. That was tolerable
+  while drafting was a button somebody pressed and read; it stopped being
+  tolerable the same day this app learnt to draft without being asked. The
+  purchase date is beside it: bought and opened answer different questions,
+  and filament takes up moisture from the day it is made.
+
+- **A supplier's bill can be marked paid — and one that arrives late can be
+  recorded at all.** Whether a bill had been settled was a field the Windows
+  and Linux app's payables figure read and *nothing* in either app ever wrote,
+  so every order that had been billed counted as still owing for ever. It can
+  be written now. (Mac) And because a received order leaves the "still to
+  come" card, a bill that turns up a week after the goods had nowhere to go:
+  there is a short list of orders whose goods are here and whose bill is not
+  settled, with the supplier, what the order came to, and a warning on any
+  bill that did not match what was expected — said where somebody is deciding
+  whether to pay it.
+
 ## [4.0.0-alpha.30] - 2026-09-20
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
