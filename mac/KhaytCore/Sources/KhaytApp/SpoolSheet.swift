@@ -34,6 +34,11 @@ struct SpoolSheet: View {
     @State private var weight: Double = 1000
     @State private var lot = ""
     @State private var reorderPoint: Double = 200
+    /// What this filament wants to be printed at. Zero means the shop has not
+    /// said, and the rule stores nothing rather than a nought.
+    @State private var printTemp: Double = 0
+    @State private var bedTemp: Double = 0
+    @State private var maxSpeed: Double = 0
     @State private var openedAt: Date?
     @State private var colours: [String] = []
     /// Catalogue matches for whatever has been typed into the material field.
@@ -184,6 +189,33 @@ struct SpoolSheet: View {
                         Text(shop.words.callIt("mac.grams")).foregroundStyle(.secondary)
                     }
                 }
+                // ── WHAT THIS FILAMENT WANTS ──────────────────────────
+                //
+                // `lib/spool-edit.js` has stored these three since it was
+                // written and this app had no field for any of them, so a shop
+                // working here could not write down the one thing it looks up
+                // every time a new spool goes on: what to set the nozzle to.
+                //
+                // Blank rather than zero when unset. A bed temperature of 0°C
+                // is a claim about the filament; an empty box is the truth,
+                // which is that nobody has said. The rule agrees — it stores
+                // nothing for a value that is not above zero.
+                GridRow {
+                    Text(shop.words.callIt("inv.print_temp")).foregroundStyle(.secondary)
+                    degrees($printTemp)
+                }
+                GridRow {
+                    Text(shop.words.callIt("inv.bed_temp")).foregroundStyle(.secondary)
+                    degrees($bedTemp)
+                }
+                GridRow {
+                    Text(shop.words.callIt("inv.max_speed")).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        TextField("", value: $maxSpeed, format: .number.precision(.fractionLength(0)))
+                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                        Text(shop.words.callIt("mac.mm_s")).foregroundStyle(.secondary)
+                    }
+                }
                 GridRow {
                     Text(shop.words.callIt("inv.lot")).foregroundStyle(.secondary)
                     TextField("", text: $lot).textFieldStyle(.roundedBorder)
@@ -259,6 +291,9 @@ struct SpoolSheet: View {
         unit = shop.unit(of: spool)?.unit ?? "g"
         lot = spool.lot ?? ""
         reorderPoint = spool.reorderPoint ?? 200
+        printTemp = spool.printTemp ?? 0
+        bedTemp = spool.bedTemp ?? 0
+        maxSpeed = spool.maxSpeed ?? 0
         openedAt = Order.day(spool.openedAt)
         focused = true
     }
@@ -301,6 +336,15 @@ struct SpoolSheet: View {
         colours = (try? await engine.spoolColours(settings: shop.settingsDict, material: material)) ?? []
     }
 
+    /// A temperature box: the number, then °C. Empty when nobody has said.
+    private func degrees(_ value: Binding<Double>) -> some View {
+        HStack(spacing: 4) {
+            TextField("", value: value, format: .number.precision(.fractionLength(0)))
+                .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+            Text(shop.words.callIt("mac.celsius")).foregroundStyle(.secondary)
+        }
+    }
+
     private func commit() {
         var input: [String: JSONValue] = [
             "material": .string(material),
@@ -312,6 +356,12 @@ struct SpoolSheet: View {
             "lot": .string(lot),
             "colourVariant": .string(colourVariant),
             "reorderPoint": .number(reorderPoint),
+            // Sent even at zero, which is how the rule is told to CLEAR one:
+            // it stores nothing for a value that is not above zero, so a shop
+            // that empties the box empties the field.
+            "printTemp": .number(printTemp),
+            "bedTemp": .number(bedTemp),
+            "maxSpeed": .number(maxSpeed),
         ]
         if !isNew {
             // Absent means "leave it as it is", so a cleared date has to be

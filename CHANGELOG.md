@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) What a filament should be printed at can be written down here.**
+  Nozzle temperature, bed temperature and maximum speed have been stored
+  against a spool by the shared rule since it was written, and this app
+  decoded all three while offering a field for none — so a shop working here
+  could not record the one thing it looks up every time a new spool goes on.
+  Neither the sample book nor a real one carries a single temperature, which
+  is what that looks like from the outside: not a shop that chose not to
+  record them, one that could not. An empty box stays empty rather than
+  becoming a zero, because a bed temperature of 0°C is a claim and "nobody has
+  said" is the truth.
+
 - **(Mac) Where a spool went can be read here.** Every deduction has always
   been written against the spool — the date, the job, the grams — and this app
   held that record without a screen for it. Right-click a spool that has been
