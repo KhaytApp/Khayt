@@ -16,6 +16,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   purchase date is beside it: bought and opened answer different questions,
   and filament takes up moisture from the day it is made.
 
+- **A supplier's bill can be marked paid — and one that arrives late can be
+  recorded at all.** Whether a bill had been settled was a field the Windows
+  and Linux app's payables figure read and *nothing* in either app ever wrote,
+  so every order that had been billed counted as still owing for ever. It can
+  be written now. (Mac) And because a received order leaves the "still to
+  come" card, a bill that turns up a week after the goods had nowhere to go:
+  there is a short list of orders whose goods are here and whose bill is not
+  settled, with the supplier, what the order came to, and a warning on any
+  bill that did not match what was expected — said where somebody is deciding
+  whether to pay it.
+
 - **(Mac) What a filament should be printed at can be written down here.**
   Nozzle temperature, bed temperature and maximum speed have been stored
   against a spool by the shared rule since it was written, and this app

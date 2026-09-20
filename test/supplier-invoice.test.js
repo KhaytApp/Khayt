@@ -52,3 +52,36 @@ test('a bill can only be recorded once the goods have arrived', () => {
   assert.strictEqual(inv.canRecord({ status: 'ordered' }), false);
   assert.strictEqual(inv.canRecord(null), false);
 });
+
+test('owing is the goods that are here and the bills that are not settled', () => {
+  const base = { qty: 750, unitPrice: 0.085 };
+  const rows = [
+    { ...base, id: 'ordered', status: 'ordered' },
+    { ...base, id: 'arrived-unbilled', status: 'received' },
+    { ...base, id: 'billed-unpaid', status: 'received', supplierInvoice: { amount: 63.75 } },
+    { ...base, id: 'settled', status: 'received', supplierInvoice: { amount: 63.75 }, invoicePaid: true },
+    { ...base, id: 'part-delivery', status: 'partial' },
+  ];
+  assert.deepStrictEqual(inv.owing(rows).map((p) => p.id),
+    ['arrived-unbilled', 'billed-unpaid', 'part-delivery']);
+  assert.deepStrictEqual(inv.owing(null), []);
+});
+
+test('an order still on its way is not a bill to settle', () => {
+  // This is where `owing` deliberately parts company with the other app's AP
+  // aging filter, which ALSO counts money committed on orders that have not
+  // arrived. That answers "what have we taken on"; this answers "whose bill is
+  // sitting here", and sharing one filter would have merged two questions.
+  assert.deepStrictEqual(inv.owing([{ id: 'X', status: 'draft' }]), []);
+  assert.deepStrictEqual(inv.owing([{ id: 'Y', status: 'ordered' }]), []);
+});
+
+test('settling writes the one field the aging bar reads, both ways', () => {
+  // `invoicePaid` was read by that bar and written by NOTHING in either app,
+  // so every billed order counted as owing forever. This is the write.
+  assert.deepStrictEqual(inv.settle({}, true), { invoicePaid: true });
+  assert.deepStrictEqual(inv.settle({}, false), { invoicePaid: false },
+    'a bill marked paid by mistake cannot be un-marked');
+  assert.deepStrictEqual(inv.settle({}, 'yes'), { invoicePaid: true },
+    'a truthy value became something other than a boolean on the record');
+});

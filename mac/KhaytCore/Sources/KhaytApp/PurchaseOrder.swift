@@ -32,6 +32,11 @@ struct PurchaseOrder: Identifiable, Hashable, Sendable {
     let orderedAt: String
     let estimatedDelivery: String?
 
+    /// Has a supplier's bill been recorded against this order?
+    let hasBill: Bool
+    /// Was it recorded and found not to agree with what the order expected?
+    let billMismatched: Bool
+
     /// What is still to come, never below zero.
     var outstanding: Double { max(0, qty - receivedSoFar) }
 
@@ -51,6 +56,11 @@ struct PurchaseOrder: Identifiable, Hashable, Sendable {
         self.unitPrice = Shop.plainNumber(o["unitPrice"])
         self.status = Shop.plainString(o["status"]) ?? "ordered"
         self.orderedAt = Shop.plainString(o["orderedAt"]) ?? ""
+        // The VERDICT is the rule's, stored on the row when the bill was
+        // recorded; this only reads what is there.
+        self.hasBill = o["supplierInvoice"] != nil
+        if case .bool(true)? = o["invoiceDiscrepancy"] { self.billMismatched = true }
+        else { self.billMismatched = false }
         let due = Shop.plainString(o["estimatedDelivery"]) ?? ""
         self.estimatedDelivery = due.isEmpty ? nil : due
     }

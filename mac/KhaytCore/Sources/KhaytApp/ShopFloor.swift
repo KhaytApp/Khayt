@@ -731,6 +731,16 @@ struct Inventory: View {
                             .card(padding: 14)
                             .padding(.bottom, 14)
                     }
+                    // WHOSE BILL IS SITTING HERE. Below what is still coming,
+                    // because the goods arriving is the earlier question — and
+                    // only when there is one, since most shops most days have
+                    // none and a card saying so is furniture.
+                    if shop.has("purchasing"), !shop.billsToSettle.isEmpty,
+                       shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        BillsCard(shop: shop)
+                            .card(padding: 14)
+                            .padding(.bottom, 14)
+                    }
                     // Orders asking for about a thousand times what they
                     // should. Report only, and above the shelf because it is
                     // about money already spent rather than filament on it.

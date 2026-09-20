@@ -6391,6 +6391,21 @@ public actor KhaytEngine {
             [order, .string(number), .number(amount), .string(date)], as: InvoiceRecord.self)
     }
 
+    /// The orders whose goods are here and whose bill is not settled.
+    public func billsOwing(_ orders: [JSONValue]) throws -> [JSONValue] {
+        try runtime.call2("KhaytSupplierInvoice.owing(ARG0)", [.array(orders)],
+                          as: [JSONValue].self)
+    }
+
+    /// Mark a bill settled, or un-settle one marked by mistake.
+    ///
+    /// A boolean rather than a date: the question is "is this still owed", and
+    /// a shop that needs to know WHEN it paid has that on its bank statement.
+    public func settleBill(_ paid: Bool) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytSupplierInvoice.settle(null, ARG0)", [.bool(paid)],
+                          as: [String: JSONValue].self)
+    }
+
     /// Whether a bill can be recorded against this order yet — the goods have
     /// to have arrived.
     public func canBillOrder(_ order: JSONValue) throws -> Bool {

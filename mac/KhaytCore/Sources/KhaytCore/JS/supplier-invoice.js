@@ -97,7 +97,40 @@ function state(po) {
   return po.invoiceDiscrepancy ? 'mismatch' : 'matched';
 }
 
-const api = { TOLERANCE, expectedAmount, canRecord, discrepancy, record, state };
+/**
+ * Mark a bill settled, or un-settle one marked by mistake.
+ *
+ * `invoicePaid` was READ by the other app's AP aging bar and written by
+ * nothing, in either app — `test/po-cost-fields.test.js` carried it on a
+ * known-unwritten list — so every order that had been billed counted as owing
+ * forever and the bar could only grow. This is the write.
+ *
+ * A boolean rather than a date. The question the aging bar asks is "is this
+ * still owed", and a shop that knows WHEN it paid has that on its bank
+ * statement; inventing a field for it here would be a second record of
+ * something the bank already keeps.
+ */
+function settle(po, paid) {
+  return { invoicePaid: !!paid };
+}
+
+/**
+ * The orders that still want attention from whoever pays the bills: the goods
+ * are here, and either no bill has been recorded or one has and is unpaid.
+ *
+ * The other app filtered for this inline while drawing its aging bar. It is
+ * here so that the list a shop is shown and the bar it is measured by cannot
+ * disagree — and so the Mac, which draws no bar, can still show the list.
+ */
+function owing(orders) {
+  return (Array.isArray(orders) ? orders : []).filter((po) => {
+    if (!po || !canRecord(po)) return false;      // not arrived: nothing to settle
+    return !po.supplierInvoice || !po.invoicePaid;
+  });
+}
+
+const api = { TOLERANCE, expectedAmount, canRecord, discrepancy, record, state,
+              settle, owing };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof globalThis !== 'undefined') globalThis.KhaytSupplierInvoice = api;
