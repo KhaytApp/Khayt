@@ -6,6 +6,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **A model pack can be a RAR or a 7-Zip, and can be bigger than 32 MB.** Two
+  faults with one cause — the library only ever opened a zip, and judged a file
+  the shop already had on its own disk by the size limit meant for a stranger
+  posting one over the internet. A pack of any ordinary size was refused as
+  "too large", and a RAR was not refused at all: it simply was not an archive
+  as far as the import was concerned, so dropping one in reported nothing to
+  import. RAR, 7-Zip and gzipped archives open now, a local import is allowed
+  a gigabyte, and an archive that unpacks to more than half a gigabyte is
+  stopped part way rather than after it has filled the disk.
+
 - **(Mac) A folder can be moved into another one, taking everything under it.**
   Keeping the folders a project came with helps the next import and does
   nothing for a library already filed flat — and the tree it came from is not

@@ -8140,14 +8140,21 @@ public actor KhaytEngine {
         public let ok: Bool
         public let reason: String?
     }
+    /// `maxBytes` overrides the rule's own cap, which is the INTAKE route's:
+    /// thirty-two megabytes, sized for a stranger posting a file over HTTP. A
+    /// model pack a shop already has on its own disk is not that, and routinely
+    /// larger — so a local import passes its own budget rather than being told
+    /// its file is too big to open.
     public func scanUpload(ext: String, size: Int, header: String,
-                           entries: [JSONValue]? = nil) throws -> UploadVerdict {
+                           entries: [JSONValue]? = nil,
+                           maxBytes: Int? = nil) throws -> UploadVerdict {
         var facts: [String: JSONValue] = [
             "ext": .string(ext), "size": .number(Double(size)), "header": .string(header),
         ]
         if let entries { facts["entries"] = .array(entries) }
-        return try runtime.call2("globalThis.KhaytUploadScan.verdict(ARG0)", [.object(facts)],
-                                 as: UploadVerdict.self)
+        let opts: [String: JSONValue] = maxBytes.map { ["maxBytes": .number(Double($0))] } ?? [:]
+        return try runtime.call2("globalThis.KhaytUploadScan.verdict(ARG0, ARG1)",
+                                 [.object(facts), .object(opts)], as: UploadVerdict.self)
     }
 
     /// The statuses `lib/order-status.js` counts as finished — so a Swift
