@@ -185,6 +185,52 @@ struct CampaignTests {
                 == shop.words.callIt("mac.campaign_needs_http"))
     }
 
+    @Test("the subject is a template too, and an empty one is the shop's name")
+    func theSubjectFillsIn() async throws {
+        // The fault this is here for: a campaign whose MESSAGE filled in and
+        // whose SUBJECT went out reading the literal characters `{{name}}` —
+        // in the one line a customer reads before deciding whether to open it.
+        let engine = try KhaytEngine()
+        let recipient = JSONValue.object([
+            "client": .object(["id": .string("C7"), "nameEn": .string("Layla Design Studio")]),
+            "stats": .object(["completedCount": .number(2), "totalSpend": .number(300),
+                              "lastOrderDate": .string("2026-08-01")]),
+        ])
+        let filled = try await engine.fillCampaignTemplate(
+            "A note from your printer, {{name}}",
+            recipient: recipient, spend: "300.00",
+            settings: .object(["contentLangs": .array([.string("en")])]))
+        #expect(filled == "A note from your printer, Layla Design Studio")
+        #expect(!filled.contains("{{"), "the subject went out with braces in it")
+    }
+
+    @Test("a subject is one line, whatever a customer's name turns out to hold")
+    func theSubjectIsOneLine() {
+        // The newline cannot be typed into the field — it arrives through
+        // `{{name}}`, because a customer's name is data. Harmless on the two
+        // providers this app posts to and NOT harmless over SMTP, where a
+        // header ends at a newline and the next line is a new header.
+        #expect(Shop.oneLine("A note from\nyour printer") == "A note from your printer")
+        #expect(Shop.oneLine("Layla\r\nBcc: someone@example.com")
+                == "Layla Bcc: someone@example.com")
+        #expect(Shop.oneLine("  spaced  ") == "spaced")
+        #expect(Shop.oneLine("ordinary subject") == "ordinary subject")
+    }
+
+    @Test("the sheet has somewhere to type a subject, and sends what was typed")
+    func theSubjectIsWired() throws {
+        let sheet = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/CampaignSheet.swift"), encoding: .utf8)
+        #expect(sheet.contains("camp.subject"), "there is nowhere to type a subject")
+        #expect(sheet.contains("subject: line"),
+                "the sheet collects a subject and then does not send it")
+        // The other app caps it at 160; one app truncating where the other
+        // does not is two different emails from one book.
+        #expect(sheet.contains("prefix(160)"), "the subject is not capped as the other app caps it")
+    }
+
     @Test("which providers can be posted to is the shared rule's answer")
     func providerIsNotDecidedHere() async throws {
         // A second copy of that list in Swift is how two apps come to disagree

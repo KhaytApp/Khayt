@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A campaign's subject line could not be typed.** Every message this
+  app sent went out under the shop's name and nothing else, because there was
+  nowhere to write a subject — and the subject is the line a customer reads
+  before deciding whether to open any of the rest. There is a field for it now,
+  and `{{name}}` works in it exactly as it does in the message, so "A note from
+  your printer, Layla" arrives filled in rather than as literal braces. Left
+  empty it still uses the shop's name; the other app falls back to the word
+  "Khayt", which names the software rather than the sender.
+
 - **(Mac) The sample shop was a year behind by the time anybody opened it.**
   "Explore with sample data" shipped a book with fixed dates, so every day that
   passed pushed it further into the past: a queue that was meant to straddle
