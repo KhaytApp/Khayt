@@ -10309,6 +10309,200 @@ final class Shop {
                                          clients: clientRows)
     }
 
+    // MARK: - Who a message would reach
+
+    /// Whether the campaign sheet is open.
+    var planningCampaign = false
+
+    /// What a campaign is narrowed to.
+    ///
+    /// Every field is OPTIONAL and absent means "do not narrow by this" — the
+    /// rule reads `!= null`, so a zero is a real filter (spent at least
+    /// nothing, which is everybody) and nil is no filter at all. A form that
+    /// sent zeroes for its empty boxes would quietly change what "not ordered
+    /// in N days" means the moment somebody cleared the field.
+    struct Segment: Equatable, Sendable {
+        var channel = "email"
+        var minSpend: Double?
+        var noOrderDays: Double?
+        var activeWithinDays: Double?
+        var tag = ""
+        var tier = ""
+
+        /// The channels the rule knows. `sms` and `whatsapp` both read the
+        /// phone number; they are separate because what is DONE with the
+        /// number differs, and that is the sending app's business.
+        static let channels = ["email", "whatsapp"]
+
+        var criteria: [String: JSONValue] {
+            var out: [String: JSONValue] = [:]
+            if let minSpend { out["minSpend"] = .number(minSpend) }
+            if let noOrderDays { out["noOrderDays"] = .number(noOrderDays) }
+            if let activeWithinDays { out["activeWithinDays"] = .number(activeWithinDays) }
+            let cleanTag = tag.trimmingCharacters(in: .whitespaces)
+            if !cleanTag.isEmpty { out["tag"] = .string(cleanTag) }
+            if !tier.isEmpty { out["tier"] = .string(tier) }
+            return out
+        }
+    }
+
+    /// Who this segment reaches, in the order the rule returns them.
+    ///
+    /// ── WHAT THIS APP DELIBERATELY DOES NOT DECIDE ────────────────────────
+    ///
+    /// Who is in and who is out is entirely `lib/campaigns.js`: the spend, the
+    /// days since the last order, the tag, the tier, and — the one that
+    /// matters — that a customer who has opted out of marketing is never in the
+    /// list, whatever the segment says. A host that filtered on its own side
+    /// would be a second opinion about consent, and the wrong one eventually.
+    ///
+    /// The tiers are worked out here only because a Swift closure cannot cross
+    /// into JavaScriptCore; they are still `lib/loyalty.js`'s answer.
+    func campaignRecipients(_ segment: Segment) async -> [KhaytEngine.Recipient] {
+        guard let engine else { return [] }
+        var tiers: [String: JSONValue] = [:]
+        if loyaltyOn, !segment.tier.isEmpty {
+            for row in clientRows {
+                guard let id = Self.recordId(row) else { continue }
+                if let standing = await loyalty(of: id), let name = standing.tier {
+                    tiers[id] = .string(name)
+                }
+            }
+        }
+        return (try? await engine.campaignRecipients(
+            clients: clientRows, orders: orderRows, criteria: segment.criteria,
+            channel: segment.channel, tiers: tiers, now: Date())) ?? []
+    }
+
+    /// One message as one customer would read it.
+    ///
+    /// Shown BEFORE anything is sent, and shown for a real recipient rather
+    /// than for a made-up one: `{{name}}` going out empty is the fault this
+    /// rule's own comments are about, and the only way to see it is to fill it
+    /// in for somebody the list actually contains.
+    func campaignPreview(_ body: String, for recipient: KhaytEngine.Recipient) async -> String {
+        guard let engine else { return body }
+        let money = Money.text(recipient.stats.totalSpend, currency)
+        var payload: [String: JSONValue] = ["client": recipient.client]
+        payload["stats"] = .object([
+            "completedCount": .number(Double(recipient.stats.completedCount)),
+            "totalSpend": .number(recipient.stats.totalSpend),
+            "lastOrderDate": .string(recipient.stats.lastOrderDate),
+        ])
+        return (try? await engine.fillCampaignTemplate(
+            body, recipient: .object(payload), spend: money,
+            settings: settingsValue)) ?? body
+    }
+
+    /// Whether this shop can send a campaign from here at all.
+    ///
+    /// THE QUESTION IS THE PROVIDER, NOT THE CHANNEL. SendGrid and Mailgun are
+    /// one HTTPS POST each and this app makes them; `custom` is SMTP, which it
+    /// does not speak — the same line `moveJob` draws, drawn once more here
+    /// rather than guessed at.
+    /// The provider the shop configured, or empty.
+    var emailProvider: String {
+        guard case .object(let config)? = settingsDict["emailConfig"] else { return "" }
+        return Self.plainString(config["provider"]) ?? ""
+    }
+
+    /// Asked of the shared rule, not answered here: which providers are one
+    /// HTTPS POST is `lib/order-email.js`'s list, and a second copy of it in
+    /// Swift is how the two apps come to disagree about whether a customer
+    /// could have been told.
+    func canSendCampaign() async -> Bool {
+        guard let engine else { return false }
+        return (try? await engine.emailProviderIsHttp(emailProvider)) ?? false
+    }
+
+    /// Write to everybody the segment reaches.
+    ///
+    /// ── WHY EMAIL AND NOT "A CHANNEL" ─────────────────────────────────────
+    ///
+    /// The other app offers SMS and WhatsApp here too, through a provider the
+    /// shop configures. This app has no SMS client at all, and a single
+    /// WhatsApp message from here opens `wa.me` in a browser — a person
+    /// pressing send once, which is not a thing forty of can be done. A button
+    /// offering a channel it cannot honour is a button that quietly does
+    /// nothing for most of a list, so the sheet offers the one it can do
+    /// properly.
+    ///
+    /// ── AND WHY ONE AT A TIME, SLOWLY ─────────────────────────────────────
+    ///
+    /// 350 ms between sends, which is the other app's throttle. A provider
+    /// handed forty messages at once starts refusing them, and a refusal
+    /// halfway through is the worst outcome here: some customers written to,
+    /// some not, and nothing to say which. So each send is counted, the count
+    /// of both is what comes back, and the whole run goes into the campaign
+    /// log the other app keeps — in the same shape, in the same place.
+    ///
+    /// Returns what to tell the shop.
+    func sendCampaign(_ body: String, to recipients: [KhaytEngine.Recipient]) async -> String {
+        guard !recipients.isEmpty else { return words.callIt("camp.none") }
+        guard !body.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return words.callIt("camp.need_body")
+        }
+        guard await canSendCampaign() else { return words.callIt("mac.campaign_needs_http") }
+
+        let headline = shopName
+        var sent = 0
+        var failed = 0
+        for recipient in recipients {
+            // Cancellable: a shop that closes the sheet halfway has stopped,
+            // and the count it is shown afterwards is what actually went.
+            if Task.isCancelled { break }
+            let filled = await campaignPreview(body, for: recipient)
+            let mail = OrderEmail(to: recipient.contact, subject: headline,
+                                  // The shop's own newlines are the paragraphs
+                                  // it meant, and an HTML mail eats them.
+                                  html: filled.replacingOccurrences(of: "\n", with: "<br>"),
+                                  provider: emailProvider)
+            moveProblem = nil
+            await post(mail)
+            if moveProblem == nil { sent += 1 } else { failed += 1 }
+            try? await Task.sleep(for: .milliseconds(350))
+        }
+        moveProblem = nil
+        await recordCampaign(reached: recipients.count, sent: sent, failed: failed)
+
+        var said = words.callIt("camp.done") + ": " + String(sent)
+        if failed > 0 { said += " · " + String(failed) + " " + words.callIt("camp.failed") }
+        return said
+    }
+
+    /// What was sent, when, and how it went.
+    ///
+    /// The other app keeps the last fifty runs on `settings.campaignLog`; this
+    /// writes the same records into the same place. A shop that sends from one
+    /// app and looks in the other should find one history, not two.
+    private func recordCampaign(reached: Int, sent: Int, failed: Int) async {
+        guard let build = source.build else { return }
+        do {
+            try StoreWriter.update(build) { root in
+                var settings: [String: JSONValue] = [:]
+                if case .object(let s)? = root["settings"] { settings = s }
+                var log: [JSONValue] = []
+                if case .array(let existing)? = settings["campaignLog"] { log = existing }
+                log.append(.object([
+                    "at": .string(ISO8601DateFormatter().string(from: Date())),
+                    "channel": .string("email"),
+                    "recipients": .number(Double(reached)),
+                    "sent": .number(Double(sent)),
+                    "failed": .number(Double(failed)),
+                ]))
+                // FIFTY, as the other app keeps it: this lives on the settings
+                // record, which is read on every load.
+                if log.count > 50 { log = Array(log.suffix(50)) }
+                settings["campaignLog"] = .array(log)
+                root["settings"] = .object(settings)
+            }
+            await load(source)
+        } catch {
+            // The messages went out. Failing to write the note afterwards is
+            // not a reason to tell the shop its campaign failed.
+        }
+    }
+
     /// Turn a customer's points into store credit.
     ///
     /// TWO RECORDS, ONE SWAP. The gift card and the ledger row are written

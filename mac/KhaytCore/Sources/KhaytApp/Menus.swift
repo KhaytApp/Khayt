@@ -168,6 +168,7 @@ private struct BookMenu: View {
         // feature off, is an advertisement in a menu.
         if shop.aiAssistantAllowed {
             Button(Words.upfront("mac.ask_the_book") + "\u{2026}") { shop.askingTheBook = true }
+            Button(Words.upfront("camp.title") + "\u{2026}") { shop.planningCampaign = true }
         }
 
         // Signing in, which is what a book carried to a new Mac needs first:

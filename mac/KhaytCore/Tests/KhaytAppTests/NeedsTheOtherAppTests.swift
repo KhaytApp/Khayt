@@ -86,6 +86,10 @@ struct NeedsTheOtherAppTests {
             "Runs in the Windows and Linux app for now",            // ai.*
             "Do it in Khayt so it is sent",                         // outbound.*
             "Another app has this book open",                       // not a gap: a lock
+            // The SAME gap as the line above it, said on a second screen: a
+            // campaign is email, and email on an SMTP shop is `outbound.email.smtp`.
+            // Two sentences, one dependency — so this is not a new Gap.
+            "Campaigns go through SendGrid or Mailgun",             // outbound.email.smtp
         ]
         let undeclared = pointers.filter { said in
             !allowed.contains { said.hasPrefix($0) }
