@@ -292,14 +292,38 @@ struct LibraryImportTests {
 
     // MARK: - What it will take
 
-    @Test("only the kinds Khayt reads are accepted")
-    func kinds() {
+    @Test("the library holds what a shop prints from, not only what this app reads")
+    func kinds() throws {
         for good in ["stl", "3mf", "obj", "gcode", "gco"] {
             #expect(LibraryImport.kinds.contains(good))
         }
+        // ── STEP USED TO BE REFUSED, AND THE REASON WAS NEVER WRITTEN ─────
+        //
+        // This asserted `!kinds.contains("step")` with no comment beside it,
+        // under a name saying the list is what Khayt READS. That was never
+        // quite the rule: `gcode` has been in the list since it was written
+        // and is a list of moves, not a model.
+        //
+        // The rule is what a print shop KEEPS. A STEP a customer emailed could
+        // not go in the library at all, so it lived in Downloads and the
+        // library was not the whole library. It is filed, not measured —
+        // `Mesh.readGeometry` returns nil and every screen that needs bounds
+        // skips it, exactly as it already does for a gcode.
+        #expect(LibraryImport.kinds.contains("step"))
+        #expect(LibraryImport.kinds.contains("stp"))
+        #expect(LibraryImport.kinds.contains("ctb"), "a resin shop's library is these")
+
+        // And a file with no mesh reader is still refused a measurement rather
+        // than given a wrong one.
+        #expect(try Mesh.readGeometry(URL(fileURLWithPath: "/x.step"), ext: "step") == nil)
+
         // An archive is several records and a dialog, not a file copy.
         #expect(!LibraryImport.kinds.contains("zip"))
-        #expect(!LibraryImport.kinds.contains("step"))
+        // Nor is a picture or a licence: a model pack is mostly those, and a
+        // library that filed them would be a folder listing.
+        for wrong in ["png", "jpg", "txt", "pdf", "md"] {
+            #expect(!LibraryImport.kinds.contains(wrong), Comment(rawValue: wrong))
+        }
     }
 }
 
