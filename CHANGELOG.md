@@ -6,6 +6,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A shop on its own mail server can send from the Mac now, and any
+  shop can set email up here at all.** Khayt sends a customer's update through
+  SendGrid, Mailgun, or a shop's own SMTP server, and the Mac could do the
+  first two. The third was refused by name and the shop was told to go and do
+  it in the Windows and Linux app — which is not an answer when the Mac is the
+  app you are using. It speaks SMTP itself now, on port 465 or on 587 with the
+  upgrade to an encrypted connection that most mail servers ask for, and it
+  will not send your password to a server that refuses to encrypt.
+
+- **(Everyone) A stored key or password could be replaced but never forgotten,
+  and two ways to be told a customer was not emailed.** "Forget the stored key"
+  on the assistant settings could be switched on and saved and left the key
+  exactly where it was — a shop that meant to revoke a key would believe it
+  had. Asking for a stored secret to be forgotten now forgets it, on the
+  assistant and on the new email settings both. Separately, the check for
+  whether a mail server offered to encrypt matched the word "STARTTLS"
+  anywhere in the server's reply, so a server whose greeting merely contained
+  it could talk either app into sending a password over an unencrypted
+  connection; it has to be offered properly now. And the list of moves a shop
+  can have emailed lived in two places that could disagree, which is a switch
+  that never fires or one that cannot be turned off.
+
+
 - **(Mac) The board can be worked from the keyboard.** It could not be at all:
   the library was the only screen in the app with arrow keys, and the board is
   the one a shop stands at with a part in one hand. The arrows walk the

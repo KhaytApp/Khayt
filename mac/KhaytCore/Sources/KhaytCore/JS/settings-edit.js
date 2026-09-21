@@ -353,9 +353,21 @@
         baseUrl: has(a, 'baseUrl') ? safeBaseUrl(a.baseUrl, held.baseUrl || '') : (held.baseUrl || ''),
         model: has(a, 'model') ? String(a.model == null ? '' : a.model).trim() : (held.model || ''),
         // The key is OPAQUE here — sealed by the host before it arrives, and
-        // never inspected or re-encoded. Absent keeps what is stored, which is
-        // what a masked field means.
-        apiKey: has(a, 'apiKey') && String(a.apiKey || '') ? a.apiKey : (held.apiKey || ''),
+        // never inspected or re-encoded.
+        //
+        // ── ABSENT KEEPS, EMPTY CLEARS, AND THOSE ARE NOT THE SAME ────────
+        //
+        // Absent means "the field showed dots and nobody typed in it". An
+        // EMPTY STRING means somebody asked for the stored key to be
+        // forgotten, which is a switch on the Mac's settings screen and the
+        // only way to take a key back out of a book.
+        //
+        // This used to read `has(a, 'apiKey') && String(a.apiKey || '')`,
+        // which treats both the same — so the switch was drawn, could be
+        // turned on, saved, and left the key exactly where it was. A control
+        // that cannot do the one thing it names is worse than no control: a
+        // shop that meant to revoke a key believes it has.
+        apiKey: has(a, 'apiKey') ? String(a.apiKey || '') : (held.apiKey || ''),
         features,
       };
     }
@@ -392,13 +404,14 @@
       out.emailConfig = {
         ...held,
         provider,
-        apiKey: has(e, 'apiKey') && String(e.apiKey || '') ? e.apiKey : (held.apiKey || ''),
+        // Absent keeps, empty clears — see the note on `ai.apiKey` above.
+        apiKey: has(e, 'apiKey') ? String(e.apiKey || '') : (held.apiKey || ''),
         domain: text('domain'),
         smtpHost: text('smtpHost').toLowerCase(),
         smtpPort: port >= 1 && port <= 65535 ? port : 587,
         smtpUser: text('smtpUser'),
-        smtpPassword: has(e, 'smtpPassword') && String(e.smtpPassword || '')
-          ? e.smtpPassword : (held.smtpPassword || ''),
+        smtpPassword: has(e, 'smtpPassword')
+          ? String(e.smtpPassword || '') : (held.smtpPassword || ''),
         smtpSecure: !!keep('smtpSecure', false),
         fromEmail: text('fromEmail'),
         fromName: text('fromName'),

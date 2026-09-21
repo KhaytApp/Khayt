@@ -1489,6 +1489,43 @@ final class Words {
                               "ar": "حذف المفتاح المحفوظ"],
         "mac.ai_key_unsealed": ["en": "That key could not be encrypted, so it was not saved. The book syncs and is backed up, and a key in the clear would go with it.",
                                 "ar": "لم يتمكّن خيط من تشفير المفتاح، فلم يُحفظ. الدفتر يُزامن ويُنسخ احتياطيًا، والمفتاح غير المشفّر سينتقل معه."],
+        // ── SETTING EMAIL UP, WHICH THIS APP COULD NOT DO ─────────────────
+        //
+        // The shared catalogue already names every field — `set.email_provider`,
+        // `set.smtp_host`, `set.smtp_pass` and the rest — because the other
+        // app's screen has had them for years. What is here is only what that
+        // screen never had to say: the two secrets this app seals itself, and
+        // the sentences a shop needs when a send goes wrong.
+        "mac.email_forget_key": ["en": "Forget the stored API key",
+                                 "ar": "حذف مفتاح الواجهة المحفوظ"],
+        "mac.email_forget_pass": ["en": "Forget the stored password",
+                                  "ar": "حذف كلمة المرور المحفوظة"],
+        "mac.email_unsealed": ["en": "That could not be encrypted, so nothing was saved. The book syncs and is backed up, and a password in the clear would go with it.",
+                               "ar": "تعذّر التشفير، فلم يُحفظ شيء. الدفتر يُزامن ويُنسخ احتياطيًا، وكلمة المرور غير المشفّرة ستنتقل معه."],
+        // 465 and 587 are not two ways of saying the same thing, and a shop
+        // that picks the wrong one gets a failure that names neither.
+        "mac.smtp_ports": ["en": "Port 465 is encrypted from the start. Port 587 starts in the clear and asks the server to encrypt — and Khayt will not send your password if the server refuses.",
+                           "ar": "المنفذ 465 مشفّر من البداية. المنفذ 587 يبدأ دون تشفير ثم يطلب من الخادم تشفير الاتصال — ولن يرسل خيط كلمة مرورك إن رفض الخادم."],
+        "mac.email_no_triggers": ["en": "Nothing is set to send yet, so no customer will be emailed.",
+                                  "ar": "لم يُحدَّد أي حدث للإرسال، فلن يصل أي عميل بريد."],
+        "mac.email_mailto_hint": ["en": "This opens a message in your mail app for you to send yourself. Khayt cannot send it for you, so campaigns and automatic updates stay off.",
+                                  "ar": "يفتح هذا رسالة في تطبيق البريد لديك لترسلها بنفسك. لا يستطيع خيط إرسالها نيابةً عنك، لذا تبقى الحملات والتحديثات التلقائية معطّلة."],
+        "mac.email_no_shop_address": ["en": "This shop has no email address in Settings, so there is nowhere to send a test.",
+                                      "ar": "لا يوجد بريد للمحل في الإعدادات، فلا مكان لإرسال رسالة تجريبية إليه."],
+        "mac.email_test_subject": ["en": "Khayt — test email", "ar": "خيط — رسالة تجريبية"],
+        "mac.email_test_body": ["en": "This is a test from Khayt. Email is working.",
+                                "ar": "هذه رسالة تجريبية من خيط. البريد يعمل."],
+        "mac.email_test_failed": ["en": "The test did not send:",
+                                  "ar": "لم تُرسل الرسالة التجريبية:"],
+        // The moves a shop can have emailed. The keys come from
+        // `lib/order-email.js`; these are that list said in the shop's own
+        // language, and a trigger added there without a word here still draws
+        // readably — see `EmailSettings.label`.
+        "mac.email_when_printing": ["en": "Printing starts", "ar": "عند بدء الطباعة"],
+        "mac.email_when_post": ["en": "It goes to finishing", "ar": "عند الانتقال إلى التشطيب"],
+        "mac.email_when_completed": ["en": "It is ready to collect", "ar": "عند الجاهزية للاستلام"],
+        "mac.email_when_quote": ["en": "A quote is made", "ar": "عند إنشاء عرض سعر"],
+        "mac.email_when_payment_received": ["en": "A payment arrives", "ar": "عند استلام دفعة"],
         "risk.looking": ["en": "Reading the mesh…", "ar": "جارٍ قراءة المجسّم…"],
         "risk.clear": ["en": "Nothing to flag on this one.", "ar": "لا ملاحظات على هذا الملف."],
         "risk.not_looked": ["en": "Khayt has not looked at this mesh yet. Reading it takes a few seconds on a large model.",

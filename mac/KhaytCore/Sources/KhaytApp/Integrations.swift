@@ -112,6 +112,14 @@ struct IntegrationsPane: View {
                     }
                 }
 
+                // How the shop sends email, on the page where the rest of
+                // reaching a customer lives. It saves ITSELF rather than
+                // through the bar below, for the reason the templates do and
+                // one more: two of its fields are sealed secrets, which have
+                // to be encrypted at the moment of saving and never held in a
+                // draft that a revert could write back.
+                EmailSettings(shop: shop)
+
                 // The shop's own messages, on the page where the rest of
                 // reaching a customer lives. They are a COLLECTION rather than
                 // a setting, so they save on their own rather than through the
