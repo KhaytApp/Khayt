@@ -735,9 +735,15 @@ import KhaytCore
         let shop = Shop()
         await shop.load(.sample)
         let engine = try #require(shop.engine)
-        // Pinned for the same reason the sample guard pins it: the rate is
-        // measured over a trailing window.
-        let now = try #require(ISO8601DateFormatter().date(from: "2026-09-05T00:00:00Z"))
+        // TODAY, because the book is rebased to today.
+        //
+        // This was pinned to a literal, and a literal clock against a book
+        // that MOVES is the decay itself: `SampleShopTests.book()` rebases to
+        // `Date()`, so every day widened the gap by one until a consumable
+        // crossed a threshold and the shelf no longer had four things on it.
+        // It went red on 22 Sep 2026 having passed on the same commit the
+        // evening before, on `main`, for every open PR at once.
+        let now = Date()
         let needs = try await engine.consumableNeeds(
             consumables: shop.consumableRows, orders: shop.orderRows, now: now)
         #expect(needs.count >= 4, "not enough on the shelf to judge the card")

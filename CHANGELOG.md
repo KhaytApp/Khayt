@@ -6,6 +6,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) Two tests read the sample book at a date that stopped
+  moving with it.** The sample shop is re-dated to today every time it is
+  opened, so it never shows a queue entirely in the past — and two tests asked
+  what the consumables shelf looked like on a fixed date. A fixed date against
+  a book that moves drifts apart by a day every day, and on 22 September one of
+  the sample's consumables crossed from "still above its minimum but running
+  out soon" into "low", the case emptied, and both tests failed on `main`
+  having passed on the same commit the evening before. Five open pull requests
+  went red at once, each looking as though it had broken something. They read
+  the book at today now, and a new guard fails the build if a test ever again
+  pins a clock over data that moves.
+
+
 - **(Mac) The Riyal mark is Khayt's own now, drawn rather than borrowed.** The
   face every money figure is set in has no Riyal sign in it, so the mark beside
   the digits was being taken from a different face — a different cut and a

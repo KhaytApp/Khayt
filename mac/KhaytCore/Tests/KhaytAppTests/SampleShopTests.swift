@@ -484,7 +484,11 @@ extension SampleShopTests {
         let shelf = try Self.rows("consumables")
         #expect(!shelf.isEmpty, "no consumables — the card is never drawn")
 
-        let now = try #require(ISO8601DateFormatter().date(from: "2026-09-05T00:00:00Z"))
+        // TODAY, and it must be: `book()` above rebases the sample to
+        // `Date()`, so a literal here is a fixed clock against a moving book
+        // and the two drift apart by a day every day. See the note in
+        // `SnapshotTests.consumableNeeds` — this pair went red together.
+        let now = Date()
         let needs = try await KhaytEngine().consumableNeeds(
             consumables: shelf.map { JSONValue.object($0) },
             orders: try Self.rows("printLog").map { JSONValue.object($0) },
