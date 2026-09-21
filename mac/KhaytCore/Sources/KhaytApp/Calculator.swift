@@ -51,6 +51,16 @@ struct Calculator: View {
     /// gives a confidently wrong answer to the one question it exists for.
     @State private var spoolId: String?
     @State private var machineId: String?
+    /// Which saved preset the figures start from. Nil is Khayt's own openers.
+    @State private var presetId: String?
+    /// The seven figures, as typed. Seeded from the preset and the machine,
+    /// and sent as part of the PART — where `costPart` lets them win over
+    /// everything, which is the rule's own documented order.
+    @State private var rates: [String: String] = [:]
+    /// What the preset and machine resolve to, for seeding and for Reset.
+    @State private var resolved: [String: Double] = [:]
+    @State private var showRates = false
+    @State private var newPresetName = ""
     @State private var margin = 30.0
     @State private var discount = 0.0
     @State private var rush = false
@@ -61,6 +71,104 @@ struct Calculator: View {
     private var gramsValue: Double { Double(grams.replacingOccurrences(of: ",", with: ".")) ?? 0 }
     private var hoursValue: Double { Double(hours.replacingOccurrences(of: ",", with: ".")) ?? 0 }
     /// Nothing to price until there is something to print.
+    /// ── WHAT IT IS BEING COSTED AT, AND HOW TO CHANGE IT ────────────────
+    ///
+    /// The screen used to pick a machine and stop there, on the argument that
+    /// picking one beats typing seven numbers — which is right, and was not
+    /// the whole story: a machine carries only its power draw and its wear
+    /// rate. Labour, prep, post, electricity and the failure allowance came
+    /// from `lib/print-rates.js`'s openers whatever the shop had written down,
+    /// and there was nowhere on this Mac to say otherwise. A shop paying a
+    /// different wage was quoted at 90 an hour for ever.
+    ///
+    /// So: the figures are SHOWN, seeded from the preset and the machine, and
+    /// editable. Typing one sends it as part of the part, where the shared
+    /// rule already lets a part's own value win — no new precedence is
+    /// invented here.
+    @ViewBuilder private var ratesSection: some View {
+        DisclosureGroup(isExpanded: $showRates) {
+            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                rateRow("calc.labor.rate", "laborRate", unit: shop.currency)
+                rateRow("calc.labor.prep", "prepTime", unit: shop.words.callIt("common.hours"))
+                rateRow("calc.labor.post", "postTime", unit: shop.words.callIt("common.hours"))
+                rateRow("calc.machine.wear", "wearRate", unit: shop.currency)
+                rateRow("calc.machine.power", "powerDraw", unit: "W")
+                rateRow("calc.machine.elec", "elecRate", unit: shop.currency)
+                rateRow("calc.labor.failure", "failureRate", unit: "%")
+            }
+            .padding(.top, 6)
+            HStack(spacing: 8) {
+                Button(shop.words.callIt("mac.calc_rates_reset")) { seedRates() }
+                    .disabled(!ratesEdited)
+                Spacer(minLength: 0)
+                // Keeping them is the difference between answering today's
+                // question and not being asked it again.
+                TextField(shop.words.callIt("calc.machine.preset_name_ph"), text: $newPresetName)
+                    .textFieldStyle(.roundedBorder).frame(width: 140)
+                Button(shop.words.callIt("calc.machine.save_preset")) {
+                    Task {
+                        var out: [String: Double] = [:]
+                        for key in Shop.Preset.rateKeys { out[key] = typed(key) }
+                        if let id = await shop.savePreset(name: newPresetName, rates: out) {
+                            presetId = id
+                            newPresetName = ""
+                        }
+                    }
+                }
+                .disabled(newPresetName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(.top, 8)
+        } label: {
+            HStack(spacing: 6) {
+                Text(shop.words.callIt("mac.calc_cost_rates")).font(.caption.weight(.semibold))
+                if ratesEdited {
+                    Text(shop.words.callIt("mac.calc_rates_edited"))
+                        .font(.caption2).foregroundStyle(Khayt.attention)
+                }
+            }
+        }
+    }
+
+    private func rateRow(_ key: String, _ field: String, unit: String) -> some View {
+        GridRow {
+            Text(shop.words.callIt(key)).gridColumnAlignment(.trailing)
+                .font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                TextField("", text: Binding(get: { rates[field] ?? "" },
+                                            set: { rates[field] = $0 }))
+                    .textFieldStyle(.roundedBorder).frame(width: 70).monospacedDigit()
+                Text(unit).font(.caption2).foregroundStyle(.tertiary)
+                Spacer()
+            }
+        }
+    }
+
+    /// One typed figure, or what the preset and machine resolved to.
+    private func typed(_ key: String) -> Double {
+        let said = (rates[key] ?? "").replacingOccurrences(of: ",", with: "")
+            .trimmingCharacters(in: .whitespaces)
+        if said.isEmpty { return resolved[key] ?? 0 }
+        return max(0, Double(said) ?? 0)
+    }
+
+    /// Whether anything differs from what the preset and machine say. Drives
+    /// the Reset button and the word beside the heading, so a shop can see at
+    /// a glance that this quote is not on its standing rates.
+    private var ratesEdited: Bool {
+        Shop.Preset.rateKeys.contains { key in
+            abs(typed(key) - (resolved[key] ?? 0)) > 0.0001
+        }
+    }
+
+    /// Fill the fields from the rule's own answer for this preset and machine.
+    private func seedRates() {
+        var out: [String: String] = [:]
+        for (key, value) in resolved {
+            out[key] = value == value.rounded() ? String(Int(value)) : String(value)
+        }
+        rates = out
+    }
+
     private var hasInput: Bool { gramsValue > 0 || hoursValue > 0 }
 
     var body: some View {
@@ -104,8 +212,20 @@ struct Calculator: View {
                                     Text(machine.name).tag(String?.some(machine.id))
                                 }
                             }
+                            // The shop's own rates. A machine carries two of
+                            // the seven; a preset carries all of them, and
+                            // until now this screen asked for neither.
+                            if !shop.presets.isEmpty {
+                                Picker(shop.words.callIt("calc.machine.preset"), selection: $presetId) {
+                                    Text(shop.words.callIt("mac.calc_rates_default")).tag(String?.none)
+                                    ForEach(shop.presets) { preset in
+                                        Text(preset.name).tag(String?.some(preset.id))
+                                    }
+                                }
+                            }
                             Spacer(minLength: 0)
                         }
+                        ratesSection
                     }
                     .card()
                 }
@@ -179,6 +299,15 @@ struct Calculator: View {
         }
         .background(Khayt.ground)
         .task(id: recomputeKey) { await recompute() }
+        // The rule's own answer for this preset and machine. Re-asked when
+        // either moves, and the fields follow UNLESS the shop has typed over
+        // them — overwriting a typed labour rate because a machine was picked
+        // would throw away the thing they came here to change.
+        .task(id: "\(presetId ?? "")|\(machineId ?? "")") {
+            let edited = ratesEdited
+            resolved = await shop.resolvedRates(presetId: presetId, machineId: machineId)
+            if !edited { seedRates() }
+        }
         // The book may not have loaded when this screen first appears, so the
         // default is chosen when the spools arrive rather than at init.
         .onChange(of: shop.spools.map(\.id)) { _, ids in
@@ -320,13 +449,25 @@ struct Calculator: View {
     /// Everything the answer depends on, in one value, so the recompute runs
     /// when any of it moves and not once per keystroke per field.
     private var recomputeKey: String {
-        "\(grams)|\(hours)|\(qty)|\(spoolId ?? "")|\(machineId ?? "")|\(margin)|\(discount)|\(rush)"
+        // The typed rates are in here too, so changing a labour rate moves
+        // the answer the same way changing the weight does.
+        let typedRates = Shop.Preset.rateKeys.map { "\($0):\(rates[$0] ?? "")" }.joined(separator: ",")
+        return "\(grams)|\(hours)|\(qty)|\(spoolId ?? "")|\(machineId ?? "")|"
+             + "\(presetId ?? "")|\(margin)|\(discount)|\(rush)|\(typedRates)"
     }
 
     private func recompute() async {
         guard hasInput else { costed = nil; quoted = nil; return }
+        // Only the figures actually typed travel with the part. Sending all
+        // seven every time would make every quote look edited, and would beat
+        // a machine's own power draw with a copy of it.
+        var extra: [String: JSONValue] = [:]
+        for key in Shop.Preset.rateKeys where !(rates[key] ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
+            extra[key] = .number(typed(key))
+        }
         let part = await shop.costedPart(spoolId: spoolId, grams: gramsValue,
-                                         hours: hoursValue, qty: qty, machineId: machineId)
+                                         hours: hoursValue, qty: qty, machineId: machineId,
+                                         presetId: presetId, extra: extra)
         costed = part
         quoted = await shop.previewQuote(baseCost: (part?.cost ?? 0) * Double(qty),
                                          margin: margin, discountPct: discount,

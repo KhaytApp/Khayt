@@ -1541,6 +1541,11 @@ final class Words {
         "mac.filament_catalog": ["en": "Search the filament catalogue",
                                  "ar": "البحث في دليل الخيوط"],
         "mac.new_spool":     ["en": "New Spool",    "ar": "بكرة جديدة"],
+        // The calculator's own rates, which it could not show or change.
+        "mac.calc_cost_rates":    ["en": "Cost rates", "ar": "أسعار التكلفة"],
+        "mac.calc_rates_default": ["en": "Khayt's defaults", "ar": "الإعدادات الافتراضية"],
+        "mac.calc_rates_edited":  ["en": "edited", "ar": "مُعدَّل"],
+        "mac.calc_rates_reset":   ["en": "Reset", "ar": "إعادة"],
         // The other shelf. Every other `cons.` word is in the shared
         // catalogue already, with its Arabic; these two are this sheet's own.
         "cons.unit_ph":      ["en": "each / ml / roll", "ar": "حبة / مل / لفة"],
