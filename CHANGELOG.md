@@ -1981,6 +1981,157 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [4.0.0-alpha.33] - 2026-09-21
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The release where the app stops sending you somewhere else. A shop on its own
+mail server was refused by name and told to go and use the Windows and Linux
+app; Settings said three AI features run there too, while this Mac performs all
+four; the calculator costed every job at figures nobody here could change. None
+of those was the book being wrong — each was the app being wrong about itself.
+Email can now be set up here at all, which it never could.
+
+Reports opened on a page that drew a slice of itself, and the board could not
+be touched from the keyboard. Beside them the screens move: a card travels to
+its new column, a figure arrives at its reading instead of appearing at it, and
+the shelf answers the pointer.
+
+### Changed
+
+- **(Mac) The Profit & Loss page showed a slice of itself.** The page a shop
+  opens Reports on had five things stacked down it — the quarter drawn out, the
+  table, and three charts — in a column that could not scroll. The column is
+  far taller than any window, so what was drawn was an arbitrary band across
+  the middle of it: no tabs along the top, an empty space where the figures
+  should be, and "Cash flow" clipped off at the bottom edge. Every other page
+  in Reports could already scroll, including the panel down the right of this
+  very one. It scrolls now, and the table is drawn the height of what is in it
+  — a shop with two quarters was being shown room for eight, then a gap.
+
+- **(Mac) The calculator can be told what the shop actually charges.** It
+  costed every part at Khayt's opening figures — 90 an hour of labour, a
+  quarter hour of prep, half an hour after — and there was nowhere on this Mac
+  to say otherwise. A shop could write its own seven figures down as a printer
+  preset, see them listed, and be quoted at 90 an hour for ever: the rule has
+  always taken a preset and this app never passed one, so the numbers were
+  saved and then ignored by the one screen they are for. Reported by a shop
+  asking where labour is adjusted. The calculator picks a preset beside the
+  machine now, shows the seven figures it is costing at, and lets any of them
+  be typed over for the quote in hand — with the shop's own rates one click
+  away again, and a way to save what was typed as a preset without leaving the
+  screen. A machine still carries the two figures a printer knows about
+  itself, and still wins on those.
+
+- **(Mac) Settings said three AI features run in the other app. This Mac does
+  all four.** Price advice, the drafted reply and the assistant were each built
+  here — a screen that asks, a method that answers, and the shared rule behind
+  it — and the list that decides whether to print "Runs in the Windows and
+  Linux app for now" was never updated past the first one. So a shop reading
+  its own settings was told to go and use the other app for three things this
+  one was already doing. The note is gone from all three, and a test now holds
+  that list to the chain each feature actually has: a feature claimed here must
+  be reachable from a screen, and one that is reachable must not be disclaimed.
+
+- **(Mac) A shop on its own mail server can send from the Mac now, and any
+  shop can set email up here at all.** Khayt sends a customer's update through
+  SendGrid, Mailgun, or a shop's own SMTP server, and the Mac could do the
+  first two. The third was refused by name and the shop was told to go and do
+  it in the Windows and Linux app — which is not an answer when the Mac is the
+  app you are using. It speaks SMTP itself now, on port 465 or on 587 with the
+  upgrade to an encrypted connection that most mail servers ask for, and it
+  will not send your password to a server that refuses to encrypt.
+
+  Underneath that was a larger gap nobody had named: there was no email
+  settings screen on the Mac at all. Every way this app sends mail reads
+  settings that only the other app could write, so a Mac shop could use an
+  account somebody else had set up and could set up none of its own. Settings →
+  Integrations now has the provider, the from address, the keys or the server
+  details, which moves get emailed, and a Send test email button that tells you
+  what a mail server said rather than that "it failed".
+
+- **(Everyone) A stored key or password could be replaced but never forgotten,
+  and two ways to be told a customer was not emailed.** "Forget the stored key"
+  on the assistant settings could be switched on and saved and left the key
+  exactly where it was — a shop that meant to revoke a key would believe it
+  had. Asking for a stored secret to be forgotten now forgets it, on the
+  assistant and on the new email settings both. Separately, the check for
+  whether a mail server offered to encrypt matched the word "STARTTLS"
+  anywhere in the server's reply, so a server whose greeting merely contained
+  it could talk either app into sending a password over an unencrypted
+  connection; it has to be offered properly now. And the list of moves a shop
+  can have emailed lived in two places that could disagree, which is a switch
+  that never fires or one that cannot be turned off.
+
+- **(Mac) A shop with a webhook switched on could move a job and could not
+  record the money for it.** Recording a payment asked where that would reach
+  outside the shop, and refused if the answer was anybody at all — including
+  through the three channels this app sends on every job it moves. Moving the
+  same job was allowed, because that path knew which channels it could carry
+  and this one did not. It is one answer for both doors now: only a thing the
+  app genuinely cannot send is a refusal, and a shop on its own SMTP server is
+  still told so, by name. The payment carries its webhooks out as well — a
+  refusal traded for a silent non-send would be the worse of the two, and the
+  shared rule was not passing on which email provider was configured, so the
+  one host that can post to some and not others had no way to ask.
+
+- **(Mac) The storefront says when it last spoke, and whether it was heard.**
+  Khayt tells the shop's online pricing how busy the shop is, on a timer, in
+  the background — and when that failed it wrote a line to a log no shop ever
+  sees. Whether it had never run, or run and been refused, was the first
+  question ever asked of it and could not be answered from inside the app. It
+  is on Settings → Online now, beside the rest of the storefront, in words
+  rather than as an alarm: a promise to a website is not worth interrupting
+  somebody mid-job for.
+
+- **(Mac) The board can be worked from the keyboard.** It could not be at all:
+  the library was the only screen in the app with arrow keys, and the board is
+  the one a shop stands at with a part in one hand. The arrows walk the
+  selection between cards and across columns — skipping empty ones, so crossing
+  a board with seven columns and three in use is one press rather than four —
+  and Return opens the selected job. ⌘→ and ⌘← still move the job itself, so
+  the two are never confused: an arrow changes what is selected, an arrow with
+  ⌘ changes where the work is. In a mirrored window the arrows follow the
+  screen, and at the ends nothing is swallowed, so the beep still means there
+  is nothing that way.
+
+- **(Mac) The count beside a job moves with it, the shelf answers the pointer,
+  and a job can be sent along without naming where.** Moving a job changes a
+  count in the sidebar at the same instant the card lands in its new column —
+  the card travelled and the number jumped, which is one reading told two ways.
+  They move together now. The shelf had nothing that responded at all: a spool
+  card lifts under the pointer like the board's cards and the machine tiles do,
+  and the weight rolls down when a finished job takes grams off it, which is
+  the most physical thing that happens in the whole app and used to happen with
+  no motion at all. And ⌘→ / ⌘← send the selected job one step along the way
+  work goes, or back — the board's order of COLUMNS puts hold between pending
+  and printing, so stepping by column would read "get on with it" as "stop";
+  this follows the order of work instead and offers nothing at all on a held
+  job, because where that resumes to is a decision rather than a step.
+
+- **(Mac) The board draws the thing it exists for.** A job changing column is
+  the one moment a board is for, and it was the one moment it did not draw: the
+  card vanished from one column and appeared in another between two frames. It
+  travels now. The cards answer the pointer as well — the screen a shop stands
+  in front of had nothing on it that lifted or turned the cursor, while the
+  machine tiles on the dashboard have done both for months. And the figures
+  arrive rather than appear: the counts, the revenue, the percentage beside a
+  running print and the goal bar all move to their new reading instead of
+  snapping to it, on the timings the app already had written down. Nothing
+  loops, nothing bounces, and every one of them is still under the setting that
+  switches motion off — two of them were not, because they had been written
+  with the number typed out instead of the name, and a test refuses that now.
+
+- **(Mac) A button said `common.ok`.** The banner that appears when Khayt has
+  drafted purchase orders by itself asked for a word neither this app's own
+  table nor the shared catalogue has, and a word that resolves nowhere is
+  rendered as its own name — so the button that dismisses it read
+  `common.ok`, in Arabic as well. It says Close now, which is a word both
+  catalogues already have. Every one of the 1,375 words this app asks for is
+  now checked against the real catalogue, in both languages, so a button can
+  no longer be labelled with the name of the thing it was supposed to say.
+
 ## [3.8.0] - 2026-09-21
 
 The work since 3.7.0, released as stable. Individual entries are kept below;
