@@ -4,7 +4,7 @@ Living priorities for maintainers. Not a public commitment calendar — reorder 
 
 ## Now (post-3.8.0, the Electron line closed — on `main`)
 
-**Stable is v3.8.0**, published 2026-09-18 — cut from `main` with no beta line, carrying the report corrections (sixty-nine figures that had been computed from part of the book), the redesigned window as the default, quoting from the catalogue, the Khayt Online content-policy hardening and the label fix that lets a screen reader name a field. **No macOS build**: `BUILD_MAC` was left false, so a macOS shop on the Electron app stays on 3.7.0. The previous stable was v3.7.0, PUBLISHED 2026-09-11 on all three platforms and verified
+**Stable is v3.8.0**, published 2026-09-21 — cut from `main` with no beta line, carrying the report corrections (sixty-nine figures that had been computed from part of the book), the redesigned window as the default, quoting from the catalogue, the Khayt Online content-policy hardening and the label fix that lets a screen reader name a field. **No macOS build**: `BUILD_MAC` was left false, so a macOS shop on the Electron app stays on 3.7.0. The previous stable was v3.7.0, PUBLISHED 2026-09-11 on all three platforms and verified
 manifest-by-manifest (see [docs/RELEASE-HOLD.md](./docs/RELEASE-HOLD.md)) — the
 3.7.0 line, cut from `main` rather than
 promoted from `v3.7.0-beta.25` unchanged, because 225 commits had landed since

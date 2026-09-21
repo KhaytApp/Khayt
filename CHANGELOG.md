@@ -6,17 +6,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
-- **(Maintainers) A sheet that could never open, and the guard that said it
-  could not exist.** The confirmation for passing a job out of inspection was
-  declared, bound to the window and cleared with the others, and nothing ever
-  gave it a value — the question was folded into the completion sheet long ago
-  and the old surface was left behind. No shop ever saw it and nothing was
-  lost: the notes it would have taken are recorded by the sheet that replaced
-  it. The leftovers are gone, and the guard that finds this class now covers
-  the sheets it had deliberately skipped — it had been reasoned that those
-  cannot go dead, which was true about the mechanism and silent about whether
-  anybody used them.
-
 - **(Mac) The Profit & Loss page showed a slice of itself.** The page a shop
   opens Reports on had five things stacked down it — the quarter drawn out, the
   table, and three charts — in a column that could not scroll. The column is
@@ -54,16 +43,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   switches motion off — two of them were not, because they had been written
   with the number typed out instead of the name, and a test refuses that now.
 
-- **(Maintainers) A design token that went stale is now a failing test.** The
-  extractor reads the Mac app's colours, card geometry, type scale and motion
-  out of the Swift and stops dead if one is renamed — but it cannot notice that
-  nobody ran it. Change a colour, commit, and the generated stylesheet the
-  design tool builds from still holds the old one, with every design made from
-  then on quietly off-brand. It is regenerated into a temp file and compared on
-  every run now, and the failure says which command to run. Only the VALUES:
-  if the card or the sidebar row changes shape the mirror still has to be
-  updated by hand, and a green run here does not say otherwise.
-
 - **(Mac) Settings said three AI features run in the other app. This Mac does
   all four.** Price advice, the drafted reply and the assistant were each built
   here — a screen that asks, a method that answers, and the shared rule behind
@@ -83,7 +62,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   now checked against the real catalogue, in both languages, so a button can
   no longer be labelled with the name of the thing it was supposed to say.
 
-
 - **(Mac) The calculator can be told what the shop actually charges.** It
   costed every part at Khayt's opening figures — 90 an hour of labour, a
   quarter hour of prep, half an hour after — and there was nowhere on this Mac
@@ -97,29 +75,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   away again, and a way to save what was typed as a preset without leaving the
   screen. A machine still carries the two figures a printer knows about
   itself, and still wins on those.
-
-- **(Maintainers) The design system knows how Khayt moves.** The React mirror
-  that Claude Design builds with carried every colour, type step and the card
-  geometry out of the Mac app's own source — and no motion at all, while
-  `Motion.swift` holds a deliberate vocabulary and argues it out: `hover` is
-  "quicker than a person can notice", `progress` is slow *because* it stands
-  for hours of work. A design tool asked for something livelier had nothing of
-  Khayt's to reach for and would have invented its own. The extractor now reads
-  `Motion.swift` as a fourth source — four durations with their curves, the
-  breath and the lift — and fails loudly on a rename exactly as it does for a
-  colour. Two opt-in props come with it: a card that *opens* something lifts,
-  and a job printing right now gets the one breathing dot this system has.
-  Reduce Motion takes every duration to zero and stops the breath, which is
-  `Motion.swift`'s own position and now travels with the tokens.
-
-- **(Maintainers) The first consumable is proven to land, on the book this
-  shop actually has.** The tests covered the shared rules and the screen's own
-  restatement of "low", and never the write itself on an EMPTY shelf — which
-  is the state the whole feature exists for, and the one already got wrong
-  once. Covered both ways now: a book carrying `"consumables": []` (what this
-  shop's book holds) and one with no such key at all (what an older Khayt
-  wrote), with the written record decoded back through the model that has to
-  draw it. Removing the append fails both.
 
 - **(Mac) The empty consumables shelf offers the way to fill it.** The button
   that adds the first one is in that card's header, and the card was drawn
@@ -145,15 +100,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   things nobody filed reachable under their own heading rather than only
   under "all".
 
-- **(Maintainers) What a consumable IS is a shared rule now, not a save
-  handler.** Adding or correcting glue, IPA, mailing bags or nozzles lived
-  inside `renderer/inventory.js`'s modal — the trim, the clamp to zero, the
-  booleans and what a blank category means — so only the Electron window could
-  do it. `lib/consumable-edit.js` holds those answers now and that window calls
-  it, unchanged in behaviour (the full suite passes, 4948 tests). This is the
-  half the Mac needs: it draws "what is about to run out that is not filament"
-  from a shelf it has never been able to put anything on.
-
 - **(Mac) A spool can be added to the shelf.** It could not. The sheet that
   adds one was written, with its own heading and the catalogue lookup that
   only makes sense for a spool nobody has typed yet; the code that writes the
@@ -167,31 +113,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the catalogue have always had. A test now refuses any sheet the app can
   present and nothing can open.
 
-- **A model pack can be a RAR or a 7-Zip, and can be bigger than 32 MB.** Two
-  faults with one cause — the library only ever opened a zip, and judged a file
-  the shop already had on its own disk by the size limit meant for a stranger
-  posting one over the internet. A pack of any ordinary size was refused as
-  "too large", and a RAR was not refused at all: it simply was not an archive
-  as far as the import was concerned, so dropping one in reported nothing to
-  import. RAR, 7-Zip and gzipped archives open now, a local import is allowed
-  a gigabyte, and an archive that unpacks to more than half a gigabyte is
-  stopped part way rather than after it has filled the disk.
-
 - **(Mac) Deleting a model sends it to the Trash.** It deleted the file
   outright, so a model removed by mistake was gone — there is no undo for this
   inside the app by design, and there was none outside it either. It goes to
   the Trash now, where the Finder is the undo. A disk with no wastebasket — a
   network share, some external drives — still deletes rather than refusing,
   because the shop asked for it gone and only *where* it goes has changed.
-
-- **(Maintainers) What the geometry key cannot tell apart is written down.**
-  Checking a real library for duplicates by that key returned 28 sets — almost
-  every one a mirrored pair, a left arm against a right arm, with no
-  byte-identical duplicates at all. A mirror preserves the triangle count, the
-  box and the volume, which is the whole key, and the signed volume that looks
-  like the missing information is positive for both. Nothing is built on this
-  today; it is a comment and a test so that anything built on it later does not
-  offer to delete half a pair.
 
 - **(Mac) A folder can be moved into another one, taking everything under it.**
   Keeping the folders a project came with helps the next import and does
@@ -214,16 +141,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Reading a STEP properly means tessellating curved surfaces, which is a CAD
   kernel and not a parser; the app does not pretend otherwise.
 
-- **A spool that was dried can be recorded as dried.** Khayt decides whether
-  filament is damp from one field — the day it was last dried — and nothing in
-  either app was writing it. The Windows and Linux app's drying log kept its
-  own list and never touched that field, and its main window did not even load
-  the rule that reads it; (Mac) this app drew "due" and "overdue" on the shelf
-  with no way at all to answer them, so a spool it called overdue stayed
-  overdue for ever. The log now sets the date, and a spool can be marked dried
-  from the shelf where the warning appears. The newest drying wins, so writing
-  down one that was forgotten cannot make a spool look older than it is.
-
 - **(Mac) A project with folders inside it keeps them.** Importing a project
   several levels deep filed every model under the *deepest* folder that named
   something, so `MyProject/pose 1/Blue` became a folder called `Blue` sitting
@@ -245,17 +162,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   tolerable the same day this app learnt to draft without being asked. The
   purchase date is beside it: bought and opened answer different questions,
   and filament takes up moisture from the day it is made.
-
-- **A supplier's bill can be marked paid — and one that arrives late can be
-  recorded at all.** Whether a bill had been settled was a field the Windows
-  and Linux app's payables figure read and *nothing* in either app ever wrote,
-  so every order that had been billed counted as still owing for ever. It can
-  be written now. (Mac) And because a received order leaves the "still to
-  come" card, a bill that turns up a week after the goods had nowhere to go:
-  there is a short list of orders whose goods are here and whose bill is not
-  settled, with the supplier, what the order came to, and a warning on any
-  bill that did not match what was expected — said where somebody is deciding
-  whether to pay it.
 
 - **(Mac) What a filament should be printed at can be written down here.**
   Nozzle temperature, bed temperature and maximum speed have been stored
@@ -400,6 +306,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the price before extras — after the margin, the discount and the rounding —
   rather than by this app against something else. A line nobody finished typing
   is left off the job rather than written down as 0.00.
+
 - **(Mac) Who a message would reach, and what it would say to each of them.**
   Khayt has segmented customers for a campaign since 3.0 — spend, how long
   since they last ordered, a tag, a loyalty tier — and only the other window
@@ -416,21 +323,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   SMTP server is refused by name and still sends these from the Windows and
   Linux app, which is the same line a job move already draws.
 
-- **"Export all data (CSV)" was mostly empty columns.** The customer's name,
-  the product's name and price, and what is left on a spool and what it held
-  new — all blank, in every row of every export, because the file was reading
-  field names the app does not write: `name` where Khayt writes `nameEn` and
-  `nameAr`, `price` where it writes `basePrice`, `remaining` and `total` where
-  the shelf writes `weight` and `spoolWeight`. The spreadsheets looked
-  perfectly well-formed, which is why nobody noticed. The orders file was worse
-  than blank: it printed the JOB's name under the heading "Client", so every
-  row said the customer was called "Helmet build", and the customer's name
-  appeared nowhere. It has its own Project column now, and the Client column
-  holds the client. What a job was printed in comes off its parts, where it
-  actually lives. Older spellings still work, behind the ones the app writes,
-  so an import or an older backup still exports. A shop writing in neither
-  English nor Arabic gets its own names too: which of a record's names to print
-  is the shop's own content-language rule, not a pick between two fields.
 - **(Mac) A label this app printed can be scanned back.** Khayt puts a code on
   every label it prints — a spool gets its own, a parcel gets the order's or,
   for a shop with the cloud connected, the customer's tracking link — and this
@@ -516,19 +408,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Receiving writes the order, the spool or the consumable, that spool's own
   history and the expense together, which is the part that has gone wrong
   before.
-
-- **The price a reorder is drafted at is one rule now.** What a gram of a
-  material costs — the supplier's quoted rate where there is one, the spool's
-  own cost divided by its weight otherwise — is decided in one place. The
-  division is the point: a per-spool figure against a quantity measured in
-  grams is what once made auto-drafted orders about a thousand times too
-  expensive, and the macOS app can now draft one without a second copy of it.
-
-- **Receiving a purchase order is one rule now, not one per app.** What arrives
-  when goods are booked in — the order, the spool or the consumable, the line in
-  that spool's history and the expense — is decided in one place and written
-  together. It behaves exactly as it did; what changes is that the macOS app can
-  reach it, which is what a purchase-order screen there will need.
 
 - **(Mac) A job nobody charged for no longer says it has been paid.** The jobs
   table read "settled" against every job with nothing outstanding — which is
@@ -2027,7 +1906,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
-## [3.8.0] - 2026-09-18
+## [3.8.0] - 2026-09-21
 
 The work since 3.7.0, released as stable. Individual entries are kept below;
 this is what changed for you.
@@ -2938,6 +2817,128 @@ tested against both.
   The UI accent has deliberately not moved with it. Every contrast ratio in
   `mac/README.md` was measured against the old cyan, so re-accenting is a
   measured pass rather than a substitution.
+
+- **(Maintainers) A sheet that could never open, and the guard that said it
+  could not exist.** The confirmation for passing a job out of inspection was
+  declared, bound to the window and cleared with the others, and nothing ever
+  gave it a value — the question was folded into the completion sheet long ago
+  and the old surface was left behind. No shop ever saw it and nothing was
+  lost: the notes it would have taken are recorded by the sheet that replaced
+  it. The leftovers are gone, and the guard that finds this class now covers
+  the sheets it had deliberately skipped — it had been reasoned that those
+  cannot go dead, which was true about the mechanism and silent about whether
+  anybody used them.
+
+- **(Maintainers) A design token that went stale is now a failing test.** The
+  extractor reads the Mac app's colours, card geometry, type scale and motion
+  out of the Swift and stops dead if one is renamed — but it cannot notice that
+  nobody ran it. Change a colour, commit, and the generated stylesheet the
+  design tool builds from still holds the old one, with every design made from
+  then on quietly off-brand. It is regenerated into a temp file and compared on
+  every run now, and the failure says which command to run. Only the VALUES:
+  if the card or the sidebar row changes shape the mirror still has to be
+  updated by hand, and a green run here does not say otherwise.
+
+- **(Maintainers) The design system knows how Khayt moves.** The React mirror
+  that Claude Design builds with carried every colour, type step and the card
+  geometry out of the Mac app's own source — and no motion at all, while
+  `Motion.swift` holds a deliberate vocabulary and argues it out: `hover` is
+  "quicker than a person can notice", `progress` is slow *because* it stands
+  for hours of work. A design tool asked for something livelier had nothing of
+  Khayt's to reach for and would have invented its own. The extractor now reads
+  `Motion.swift` as a fourth source — four durations with their curves, the
+  breath and the lift — and fails loudly on a rename exactly as it does for a
+  colour. Two opt-in props come with it: a card that *opens* something lifts,
+  and a job printing right now gets the one breathing dot this system has.
+  Reduce Motion takes every duration to zero and stops the breath, which is
+  `Motion.swift`'s own position and now travels with the tokens.
+
+- **(Maintainers) The first consumable is proven to land, on the book this
+  shop actually has.** The tests covered the shared rules and the screen's own
+  restatement of "low", and never the write itself on an EMPTY shelf — which
+  is the state the whole feature exists for, and the one already got wrong
+  once. Covered both ways now: a book carrying `"consumables": []` (what this
+  shop's book holds) and one with no such key at all (what an older Khayt
+  wrote), with the written record decoded back through the model that has to
+  draw it. Removing the append fails both.
+
+- **(Maintainers) What a consumable IS is a shared rule now, not a save
+  handler.** Adding or correcting glue, IPA, mailing bags or nozzles lived
+  inside `renderer/inventory.js`'s modal — the trim, the clamp to zero, the
+  booleans and what a blank category means — so only the Electron window could
+  do it. `lib/consumable-edit.js` holds those answers now and that window calls
+  it, unchanged in behaviour (the full suite passes, 4948 tests). This is the
+  half the Mac needs: it draws "what is about to run out that is not filament"
+  from a shelf it has never been able to put anything on.
+
+- **A model pack can be a RAR or a 7-Zip, and can be bigger than 32 MB.** Two
+  faults with one cause — the library only ever opened a zip, and judged a file
+  the shop already had on its own disk by the size limit meant for a stranger
+  posting one over the internet. A pack of any ordinary size was refused as
+  "too large", and a RAR was not refused at all: it simply was not an archive
+  as far as the import was concerned, so dropping one in reported nothing to
+  import. RAR, 7-Zip and gzipped archives open now, a local import is allowed
+  a gigabyte, and an archive that unpacks to more than half a gigabyte is
+  stopped part way rather than after it has filled the disk.
+
+- **(Maintainers) What the geometry key cannot tell apart is written down.**
+  Checking a real library for duplicates by that key returned 28 sets — almost
+  every one a mirrored pair, a left arm against a right arm, with no
+  byte-identical duplicates at all. A mirror preserves the triangle count, the
+  box and the volume, which is the whole key, and the signed volume that looks
+  like the missing information is positive for both. Nothing is built on this
+  today; it is a comment and a test so that anything built on it later does not
+  offer to delete half a pair.
+
+- **A spool that was dried can be recorded as dried.** Khayt decides whether
+  filament is damp from one field — the day it was last dried — and nothing in
+  either app was writing it. The Windows and Linux app's drying log kept its
+  own list and never touched that field, and its main window did not even load
+  the rule that reads it; (Mac) this app drew "due" and "overdue" on the shelf
+  with no way at all to answer them, so a spool it called overdue stayed
+  overdue for ever. The log now sets the date, and a spool can be marked dried
+  from the shelf where the warning appears. The newest drying wins, so writing
+  down one that was forgotten cannot make a spool look older than it is.
+
+- **A supplier's bill can be marked paid — and one that arrives late can be
+  recorded at all.** Whether a bill had been settled was a field the Windows
+  and Linux app's payables figure read and *nothing* in either app ever wrote,
+  so every order that had been billed counted as still owing for ever. It can
+  be written now. (Mac) And because a received order leaves the "still to
+  come" card, a bill that turns up a week after the goods had nowhere to go:
+  there is a short list of orders whose goods are here and whose bill is not
+  settled, with the supplier, what the order came to, and a warning on any
+  bill that did not match what was expected — said where somebody is deciding
+  whether to pay it.
+
+- **"Export all data (CSV)" was mostly empty columns.** The customer's name,
+  the product's name and price, and what is left on a spool and what it held
+  new — all blank, in every row of every export, because the file was reading
+  field names the app does not write: `name` where Khayt writes `nameEn` and
+  `nameAr`, `price` where it writes `basePrice`, `remaining` and `total` where
+  the shelf writes `weight` and `spoolWeight`. The spreadsheets looked
+  perfectly well-formed, which is why nobody noticed. The orders file was worse
+  than blank: it printed the JOB's name under the heading "Client", so every
+  row said the customer was called "Helmet build", and the customer's name
+  appeared nowhere. It has its own Project column now, and the Client column
+  holds the client. What a job was printed in comes off its parts, where it
+  actually lives. Older spellings still work, behind the ones the app writes,
+  so an import or an older backup still exports. A shop writing in neither
+  English nor Arabic gets its own names too: which of a record's names to print
+  is the shop's own content-language rule, not a pick between two fields.
+
+- **The price a reorder is drafted at is one rule now.** What a gram of a
+  material costs — the supplier's quoted rate where there is one, the spool's
+  own cost divided by its weight otherwise — is decided in one place. The
+  division is the point: a per-spool figure against a quantity measured in
+  grams is what once made auto-drafted orders about a thousand times too
+  expensive, and the macOS app can now draft one without a second copy of it.
+
+- **Receiving a purchase order is one rule now, not one per app.** What arrives
+  when goods are booked in — the order, the spool or the consumable, the line in
+  that spool's history and the expense — is decided in one place and written
+  together. It behaves exactly as it did; what changes is that the macOS app can
+  reach it, which is what a purchase-order screen there will need.
 
 ### Added
 
