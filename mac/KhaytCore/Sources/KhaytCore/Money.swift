@@ -343,6 +343,14 @@ public struct WebhookEffect: Decodable, Sendable {
 public struct PaymentRecorded: Decodable, Sendable {
     public let order: JSONValue
     public let effects: [String]
+    /// The webhooks this payment owes, WITH their event names.
+    ///
+    /// `effects` flattens each one to its type, which is enough to say what
+    /// happened and not enough to send anything: two webhooks on one payment
+    /// differ only in what they are called. A move has carried these since it
+    /// was written; a payment threw them away, so the Mac could only refuse to
+    /// record a payment that owed one.
+    public let webhookEffects: [WebhookEffect]?
 }
 
 /// A job handed over, or a job that was not ready to be.

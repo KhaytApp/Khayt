@@ -154,7 +154,15 @@
     if (email.provider && email.provider !== 'none' &&
         triggers.indexOf('payment_received') !== -1 && order && order.clientId) {
       const client = clients.find(x => x && x.id === order.clientId);
-      if (client && client.email) out.push({ channel: 'email', why: 'payment_received' });
+      // WITH THE PROVIDER. `order-status.js` has always carried `via` on its
+      // email reach, and this did not — so a host that can carry SOME email
+      // providers and not others had no way to ask which one this is. The Mac
+      // posts to SendGrid and Mailgun and has no SMTP client, so without this
+      // it had to treat every email reach as one it could not carry, and
+      // refused to record a payment it could in fact have announced.
+      if (client && client.email) {
+        out.push({ channel: 'email', why: 'payment_received', via: email.provider });
+      }
     }
 
     return out;

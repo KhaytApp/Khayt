@@ -9376,7 +9376,8 @@ public actor KhaytEngine {
     /// the wrong job.
     public func clearPayment(order: JSONValue) throws -> PaymentRecorded {
         try runtime.call2("(function(){var o = ARG0; var r = KhaytOrderPayment.clearPayment(o);"
-                        + " return { order: o, effects: r.effects.map(function(e){ return e.type; }) };})()",
+                        + " return { order: o, effects: r.effects.map(function(e){ return e.type; }),"
+                        + " webhookEffects: [] };})()",
                           [order], as: PaymentRecorded.self)
     }
 
@@ -9524,7 +9525,22 @@ private let PAYMENT_SCRIPT = """
   var order = ARG0, amount = ARG1, method = ARG2, paidAt = ARG3, today = ARG4;
   var r = KhaytOrderPayment.recordPayment(order, { amount: amount, method: method, paidAt: paidAt },
                                           { today: today });
-  return { order: order, effects: r.effects.map(function (e) { return e.type; }) };
+  // WITH their arguments, exactly as a move carries them. `effects` keeps the
+  // flat list of types — what happened — and this carries what has to be sent.
+  var webhookEffects = [];
+  r.effects.forEach(function (e) {
+    if (e.type === 'webhook' || e.type === 'order_webhook') {
+      webhookEffects.push({
+        kind: e.type, event: e.event,
+        newStatus: typeof e.newStatus === 'string' ? e.newStatus : null,
+      });
+    }
+  });
+  return {
+    order: order,
+    effects: r.effects.map(function (e) { return e.type; }),
+    webhookEffects: webhookEffects,
+  };
 })()
 """
 
