@@ -6,6 +6,35 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) What the shop pays every month can be entered here, so break-even
+  and the P&L stop pretending it has no overhead.** Reports has always told a
+  shop with nothing entered to "add rent, subscriptions and anything else that
+  is paid every month in Settings" — and this app's Settings had nowhere to do
+  it, so following the instruction arrived at a pane that did not exist. It is
+  in Settings → Business now, under Monthly costs.
+
+  It was not only a missing target. The Profit & Loss puts a quarter's share of
+  these into its figures, so a shop that has only ever used this app has been
+  shown a P&L computed as though the business had no costs at all — a wrong
+  number rather than a missing one.
+
+- **(Mac) Telegram alerts can be set up here, and low filament is one of
+  them.** Khayt has sent the shop's Telegram messages from this app for as long
+  as it has had them — a job finished, a job put on hold, a printer that stopped
+  answering — and there was nowhere on this Mac to say which bot, which chat, or
+  which of those you actually wanted. Settings → Integrations has all of it now,
+  with a Send a test message button that repeats what Telegram said rather than
+  "it failed". The bot token is encrypted with the rest of the book's secrets
+  and can be forgotten when you ask.
+
+  One of those switches would have done nothing here: the low-filament warning
+  was twelve lines inside the other app, so this one could offer the switch and
+  had nothing to send. It sends it now, once per launch, and it uses the SAME
+  rule that decides which spools get the low badge on the shelf — the old copy
+  read a threshold straight out of settings, so a spool could be badged low and
+  never warned about, or warned about and not badged.
+
+
 - **(Maintainers) A fault inside the shared rules left no trace at all.** This
   app asks those rules 263 questions and almost every one is asked in a way
   that swallows a failure — which is right, because a fault in one rule should

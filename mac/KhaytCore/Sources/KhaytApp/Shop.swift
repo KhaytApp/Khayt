@@ -146,6 +146,57 @@ final class Shop {
         settingsValue = .object(held)
     }
 
+    /// Whether this launch has already sent the low-stock warning.
+    ///
+    /// ── ONCE PER LAUNCH, WHICH IS WHAT THE OTHER APP DOES ─────────────────
+    ///
+    /// `checkTelegramLowStock` runs when the renderer loads and sends if
+    /// anything is low — so a shop that opens the app twice is told twice, and
+    /// that is the behaviour shops already have. This app loads the book far
+    /// more often than it launches (every save re-reads it), so sending on
+    /// every load would turn one warning into a stream of them.
+    ///
+    /// A flag rather than a stored timestamp: what is on disk syncs, and a
+    /// shop with two Macs would have one of them deciding the other had
+    /// already warned.
+    private var lowStockWarned = false
+
+    /// Tell the shop its filament is running out, if it asked to be told.
+    ///
+    /// The decision is entirely the shared rule's — which spools count as low
+    /// and whether there is a bot to tell — so this app cannot come to a
+    /// different conclusion from the shelf badges beside it.
+    private func warnAboutLowStock(_ spools: [JSONValue],
+                                   settings: [String: JSONValue]) async {
+        guard !lowStockWarned, let engine else { return }
+        guard let warning = try? await engine.lowStockWarning(spools, settings: settings) else {
+            return
+        }
+        // Set BEFORE the send, not after: a send that fails is still an
+        // attempt, and retrying it on the next of this launch's many loads is
+        // how a shop with an unreachable bot gets a hundred of them.
+        lowStockWarned = true
+        do {
+            let token = try await Secrets.open(warning.botToken, for: source)
+            try await Telegram.send(botToken: token, chatId: warning.chatId,
+                                    message: warning.message)
+        } catch {
+            // NOT shown to the shop. Nothing was asked for and nothing is
+            // waiting on it — unlike a move, which is refused when it cannot
+            // reach somebody. A banner about a warning nobody requested is
+            // itself the interruption it is warning about.
+            FileHandle.standardError.write(Data(
+                "low-stock telegram failed: \(error)\n".utf8))
+        }
+    }
+
+    /// Give a shop a Telegram bot, for a test. `pretendEmailConfig`'s sibling.
+    func pretendTelegram(_ config: [String: JSONValue]) {
+        var held: [String: JSONValue] = settingsDict
+        held["telegram"] = .object(config)
+        settingsValue = .object(held)
+    }
+
     /// Put a shop into a mode, for a test. The book on disk is not touched.
     func pretendMode(_ mode: String?) {
         var held: [String: JSONValue] = settingsDict
@@ -557,6 +608,7 @@ final class Shop {
             riskWhen = try? await engine?.riskWhen(settings: Self.settings(root))
             await rejudgeStoredRisks()
             lowSpools = (try? await engine?.lowStock(inventoryRows, settings: settingsDict)) ?? [:]
+            await warnAboutLowStock(inventoryRows, settings: Self.settings(root))
             spoolRunway = (try? await engine?.runway(spools: inventoryRows, orders: orderRows,
                                                      now: Date())) ?? [:]
             spoolDryness = (try? await engine?.dryness(spools: inventoryRows, now: Date())) ?? [:]

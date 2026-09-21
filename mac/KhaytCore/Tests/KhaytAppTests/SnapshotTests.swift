@@ -284,6 +284,34 @@ import KhaytCore
         ])
     }
 
+    /// The Telegram pane, for the reason the email one is here: a settings
+    /// pane the runner cannot reach is a pane nobody has looked at.
+    ///
+    /// TWO PICTURES, because the pane is two screens — the switches stay
+    /// hidden until there is a token and a chat to send to, since a switch
+    /// that cannot fire is a switch that misleads.
+    @Test("the Telegram settings render, before and after a bot is set up")
+    func telegramSettings() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+
+        func shoot(_ name: String, _ height: CGFloat, _ config: [String: JSONValue]) throws {
+            shop.pretendTelegram(config)
+            try render(VStack(alignment: .leading) { TelegramSettings(shop: shop) }
+                        .padding(20)
+                        .frame(width: 560),
+                       name, size: CGSize(width: 560, height: height))
+        }
+
+        try shoot("34-telegram-empty", 320, [:])
+        try shoot("35-telegram-set", 700, [
+            "botToken": .string("__enc__x"),
+            "chatId": .string("-1001234567890"),
+            "notifyOnComplete": .bool(true),
+            "notifyOnLowStock": .bool(true),
+        ])
+    }
+
     @Test("the sheets render, with their words")
     func sheets() async throws {
         let shop = Shop()

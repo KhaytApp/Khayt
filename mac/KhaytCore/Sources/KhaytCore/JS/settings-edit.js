@@ -371,6 +371,37 @@
         features,
       };
     }
+    // ── TELEGRAM, WHEN A FORM CARRIES IT ──────────────────────────────────
+    //
+    // Same reason as `emailConfig` below: `out.telegram` a hundred lines up
+    // keeps whatever is stored, because the only screen that ever wrote it was
+    // `renderer/settings.js`, which writes `settings.telegram` straight into
+    // the book. The Mac saves everything through this function, so without a
+    // branch here its Telegram screen would appear to save and change nothing.
+    //
+    // The bot token is OPAQUE — sealed by the host before it arrives — and
+    // absent keeps what is stored, which is what a masked field means. An
+    // empty string clears it, because forgetting a token has to be possible.
+    if (has(f, 'telegram')) {
+      const g = f.telegram || {};
+      const held = s.telegram || {};
+      const flag = (k, fallback) => (has(g, k) ? !!g[k] : (held[k] === undefined ? fallback : !!held[k]));
+      out.telegram = {
+        ...held,
+        botToken: has(g, 'botToken') ? String(g.botToken || '') : (held.botToken || ''),
+        chatId: has(g, 'chatId') ? String(g.chatId == null ? '' : g.chatId).trim() : (held.chatId || ''),
+        notifyOnComplete: flag('notifyOnComplete', false),
+        notifyOnHold: flag('notifyOnHold', false),
+        notifyOnLowStock: flag('notifyOnLowStock', false),
+        // The three printer alerts default ON, which is what
+        // `lib/printer-alerts.js` assumes when the key is absent — writing
+        // `false` for an unset key would switch off alerts nobody turned off.
+        notifyPrinterError: flag('notifyPrinterError', true),
+        notifyPrinterOffline: flag('notifyPrinterOffline', true),
+        notifyPrinterStall: flag('notifyPrinterStall', false),
+      };
+    }
+
     // ── EMAIL, WHEN A FORM CARRIES IT ─────────────────────────────────────
     //
     // `out.emailConfig` a hundred lines up keeps whatever is stored, because

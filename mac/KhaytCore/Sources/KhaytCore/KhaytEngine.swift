@@ -21,6 +21,10 @@ public actor KhaytEngine {
     /// The modules this engine exposes, in dependency order.
     static let modules = [
         "tax",
+        // The warning a shop gets when filament runs out. It was twelve lines
+        // inside the renderer, so this app drew the switch that turns it on
+        // and had nothing to send.
+        "low-stock-alert",
         // The file a shop gives its accountant. Two modules, and BOTH are
         // needed: `accounting-export` lays out the columns, and
         // `accounting-rows` decides what the rows say — that a quote is not an
@@ -1839,6 +1843,37 @@ public actor KhaytEngine {
 
     public func aiProviders() throws -> [AiProvider] {
         try runtime.call2("KhaytAiProviders.providers()", [], as: [AiProvider].self)
+    }
+
+    /// The low-stock warning this shop is owed, or nil.
+    ///
+    /// WHICH spools are low and WHETHER to warn are both shared rules, asked
+    /// in one call so the Swift never holds half the decision:
+    /// `KhaytOrderDeduction.isLowStock` picks the rows — the same rule the
+    /// shelf's badges use, so the message can never disagree with the screen —
+    /// and `KhaytLowStockAlert.wouldWarn` decides and writes the sentence.
+    ///
+    /// The bot token comes back with it because the rule is what knows whether
+    /// there is one; it is still the caller's job to open it.
+    public func lowStockWarning(_ spools: [JSONValue],
+                                settings: [String: JSONValue]) throws -> LowStockWarning? {
+        let warning: LowStockWarning = try runtime.call2("""
+            (function (rows, settings) {
+              const low = (rows || []).filter(
+                (s) => s && KhaytOrderDeduction.isLowStock(s, settings));
+              return KhaytLowStockAlert.wouldWarn({ settings, low });
+            })(ARG0, ARG1)
+            """,
+            [.array(spools), .object(settings)], as: LowStockWarning.self)
+        return warning.send ? warning : nil
+    }
+
+    public struct LowStockWarning: Decodable, Sendable, Equatable {
+        public let send: Bool
+        public let message: String
+        public let chatId: String
+        /// Sealed, as it sits in the book. Open it before sending.
+        public let botToken: String
     }
 
     // MARK: - Email

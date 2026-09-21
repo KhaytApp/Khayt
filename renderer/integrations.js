@@ -1697,16 +1697,18 @@ function firePrinterAlert(alert) {
 }
 
 function checkTelegramLowStock() {
-  const tg = settings.telegram;
-  if (!tg || !tg.botToken || !tg.chatId || !tg.notifyOnLowStock) return;
-  const threshold = settings.lowStockThreshold || 200;
-  const lowItems = inventory.filter(i => (+i.weight || 0) < threshold);
-  if (lowItems.length === 0) return;
-  const tgSafe = s => String(s ?? '').replace(/[\r\n\t]/g, ' ').slice(0, 100);
-  const names = lowItems.slice(0, 5).map(i => tgSafe(i.material)).join(', ');
-  const message = `⚠️ Low stock alert: ${names}${lowItems.length > 5 ? ` and ${lowItems.length - 5} more` : ''}`;
-  window.hubAPI?.sendTelegram?.({ botToken: tg.botToken, chatId: tg.chatId, message })
-    .catch(e => console.warn('Telegram low-stock notify failed:', e));
+  // The conditions and the words are `lib/low-stock-alert.js` now, and WHICH
+  // spools are low is `KhaytOrderDeduction.isLowStock` — the same rule the
+  // shelf badges use. This function carried its own copy of both: a `< 200`
+  // threshold read straight from settings, which is not what `isLowStock`
+  // decides, so a spool could be badged low on the shelf and never warned
+  // about (or warned about and not badged).
+  const low = (inventory || []).filter(s => KhaytOrderDeduction.isLowStock(s, settings));
+  const warning = KhaytLowStockAlert.wouldWarn({ settings, low });
+  if (!warning.send) return;
+  window.hubAPI?.sendTelegram?.({
+    botToken: warning.botToken, chatId: warning.chatId, message: warning.message,
+  }).catch(e => console.warn('Telegram low-stock notify failed:', e));
 }
 
 /* ── Feature 11: iCal Export ────────────────────────────────── */
