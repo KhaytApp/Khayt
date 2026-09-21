@@ -245,6 +245,37 @@ struct OnlinePane: View {
                     Text(shop.words.callIt("mac.lan_restart_note"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    // ── WHAT THE STOREFRONT WAS LAST TOLD ─────────────────
+                    //
+                    // The lead-time publisher runs on a timer, writes nothing
+                    // to the book, and reported only to stderr — so "did it
+                    // run at all" could be answered by somebody holding a
+                    // terminal and by nobody else. Its own comment says that
+                    // was the first question ever asked of it.
+                    //
+                    // Not an alert, deliberately: a storefront promise is not
+                    // worth interrupting a shop mid-work for. It is here, on
+                    // the pane a shop opens when it wonders about its
+                    // storefront.
+                    if let said = shop.leadTimeSaid {
+                        Divider()
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(shop.words.callIt("mac.lead_time_last"))
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text(said)
+                                .font(.caption)
+                                .foregroundStyle(shop.leadTimeProblem == nil
+                                                 ? AnyShapeStyle(.secondary)
+                                                 : AnyShapeStyle(Khayt.attention))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            if let at = shop.leadTimeAt {
+                                Text(at.formatted(date: .omitted, time: .shortened))
+                                    .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                            }
+                        }
+                    }
                 }
             }
             .formStyle(.grouped)

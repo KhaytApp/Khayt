@@ -6,6 +6,28 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A shop with a webhook switched on could move a job and could not
+  record the money for it.** Recording a payment asked where that would reach
+  outside the shop, and refused if the answer was anybody at all — including
+  through the three channels this app sends on every job it moves. Moving the
+  same job was allowed, because that path knew which channels it could carry
+  and this one did not. It is one answer for both doors now: only a thing the
+  app genuinely cannot send is a refusal, and a shop on its own SMTP server is
+  still told so, by name. The payment carries its webhooks out as well — a
+  refusal traded for a silent non-send would be the worse of the two, and the
+  shared rule was not passing on which email provider was configured, so the
+  one host that can post to some and not others had no way to ask.
+
+- **(Mac) The storefront says when it last spoke, and whether it was heard.**
+  Khayt tells the shop's online pricing how busy the shop is, on a timer, in
+  the background — and when that failed it wrote a line to a log no shop ever
+  sees. Whether it had never run, or run and been refused, was the first
+  question ever asked of it and could not be answered from inside the app. It
+  is on Settings → Online now, beside the rest of the storefront, in words
+  rather than as an alarm: a promise to a website is not worth interrupting
+  somebody mid-job for.
+
+
 - **(Mac) The Profit & Loss page showed a slice of itself.** The page a shop
   opens Reports on had five things stacked down it — the quarter drawn out, the
   table, and three charts — in a column that could not scroll. The column is

@@ -1541,6 +1541,8 @@ final class Words {
         "mac.filament_catalog": ["en": "Search the filament catalogue",
                                  "ar": "البحث في دليل الخيوط"],
         "mac.new_spool":     ["en": "New Spool",    "ar": "بكرة جديدة"],
+        // The storefront promise, which reported only to stderr.
+        "mac.lead_time_last": ["en": "Lead time last", "ar": "آخر مدة تسليم"],
         // The calculator's own rates, which it could not show or change.
         "mac.calc_cost_rates":    ["en": "Cost rates", "ar": "أسعار التكلفة"],
         "mac.calc_rates_default": ["en": "Khayt's defaults", "ar": "الإعدادات الافتراضية"],

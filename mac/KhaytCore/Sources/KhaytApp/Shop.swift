@@ -3602,23 +3602,89 @@ final class Shop {
     /// (`pay.method.*`), so the two apps offer one set of choices.
     static let paymentMethods = ["cash", "mada", "transfer", "stcpay", "applepay", "visa", "other"]
 
+    /// Of everywhere a change would reach, the ones this app cannot carry.
+    ///
+    /// ONE ANSWER FOR BOTH DOORS. This lived inside the status-move path, and
+    /// `recordPayment` had no equivalent — it refused whenever a payment would
+    /// reach ANYBODY, including through the three channels this app sends on
+    /// every move. So a shop with a webhook switched on could move a job and
+    /// could not record the money for it, and the sentence it was given named
+    /// a channel the app was perfectly able to use.
+    ///
+    /// A loop rather than a `filter`, because asking the module whether a
+    /// provider can be carried is a call into the engine actor, and an `await`
+    /// cannot happen inside a synchronous closure.
+    static func channelsThisAppCannotSend(_ reaches: [Outbound],
+                                          engine: KhaytEngine) async -> [Outbound] {
+        let canSend: Set<String> = ["telegram", "webhooks", "event_webhook"]
+        var out: [Outbound] = []
+        for reach in reaches {
+            if canSend.contains(reach.channel) { continue }
+            // Email only where the provider is one this app can POST to. A
+            // shop on its own SMTP server is still refused, by name.
+            if reach.channel == "email",
+               (try? await engine.emailProviderIsHttp(reach.via ?? "")) == true { continue }
+            // The customer's tracking link. `PortalClient` PUTs it.
+            if reach.channel == "portal" { continue }
+            out.append(reach)
+        }
+        return out
+    }
+
     /// Record what a customer has paid.
     ///
     /// One record changes, not three — but through the same door as a move, so
     /// the ownership check, the atomic swap and the undo are the ones already
     /// proven rather than a second set written for money.
     func recordPayment(_ id: Order.ID, amount: Double, method: String, paidAt: Date) async {
+        var owed: [KhaytEngine.WebhookDelivery] = []
         await writeToOneOrder(id, named: words.callIt("pay.modal_title")) { order, engine, root in
+            let settings = Self.settings(root)
+            let clients = Self.rows(root, "clients")
             let reaches = (try? await engine.paymentOutbound(
-                order: order, settings: Self.settings(root), clients: Self.rows(root, "clients"))) ?? []
-            if !reaches.isEmpty { throw MoveRefused(sentence: self.words.outboundRefusal(reaches)) }
+                order: order, settings: settings, clients: clients)) ?? []
+            // ONLY what this app genuinely cannot carry — the same question a
+            // move asks. It used to refuse on ANY reach, so a shop with a
+            // webhook switched on could move a job and not record the money
+            // for it.
+            let cannotSend = await Self.channelsThisAppCannotSend(reaches, engine: engine)
+            if !cannotSend.isEmpty {
+                throw MoveRefused(sentence: self.words.outboundRefusal(cannotSend))
+            }
 
             // A payment is not a status change and Khayt writes no log line for
             // one, so neither does this.
-            return OneOrderEdit(order: try await engine.recordPayment(
+            let done = try await engine.recordPayment(
                 order: order, amount: amount, method: method,
-                paidAt: Self.localDay(paidAt), today: Self.localDay()).order)
+                paidAt: Self.localDay(paidAt), today: Self.localDay())
+
+            // ── AND WHAT THE PAYMENT OWES OUTWARD ─────────────────────────
+            //
+            // Built HERE, inside the write, for the reason a move builds its
+            // own here: the settings, the subscriptions and the customer's
+            // name are the ones on disk. Built from the order AS RECORDED, so
+            // a consumer is told the balance after the money rather than
+            // before it. Sending is the caller's job.
+            //
+            // Not sending these is why the refusal existed at all — letting
+            // the payment through without them would trade a loud refusal for
+            // a silent non-send, which is the worse of the two.
+            if let asked = done.webhookEffects, !asked.isEmpty {
+                owed = (try? await engine.webhookDeliveries(
+                    order: done.order, effects: asked, settings: settings,
+                    shopName: Self.plainString(settings["bizEn"])
+                        ?? Self.plainString(settings["bizAr"]) ?? "Khayt",
+                    clientName: Self.emailClientName(for: Self.asObject(done.order) ?? [:],
+                                                     in: clients),
+                    currency: Self.shopCurrencyOf(settings),
+                    at: ISO8601DateFormatter().string(from: Date()),
+                    nowMs: Date().timeIntervalSince1970 * 1000)) ?? []
+            }
+            return OneOrderEdit(order: done.order)
         }
+        // After the write, like a move's: a delivery that went out for a
+        // payment the book then refused to keep would be a lie told outward.
+        if !owed.isEmpty { await fire(owed) }
     }
 
     /// The job being edited.
@@ -7677,10 +7743,20 @@ final class Shop {
     /// published anything this session.
     private var leadTimePublished: JSONValue??
 
-    /// What went wrong last, for the diagnostic pane. Never surfaced as an
-    /// alert: a promise nobody can read is better than a shop interrupted about
-    /// its storefront while it is trying to work.
+    /// What went wrong last. Never surfaced as an ALERT: a promise nobody can
+    /// read is better than a shop interrupted about its storefront while it is
+    /// trying to work. It is shown in Settings → Online, where a shop that
+    /// wonders about its storefront is already looking.
     private(set) var leadTimeProblem: String?
+
+    /// What this last did, and when — the answer to "did it run at all".
+    ///
+    /// The note below has always written this to stderr, which answers the
+    /// question only for somebody holding a terminal. These two carry the same
+    /// sentence to the pane, so a shop can tell a publish that has never run
+    /// from one that ran and was refused.
+    private(set) var leadTimeSaid: String?
+    private(set) var leadTimeAt: Date?
 
     /// Electron's cadence, and for its reasons: once shortly after launch so a
     /// shop that has just opened the app is answering, then every six hours —
@@ -7780,6 +7856,8 @@ final class Shop {
     /// directly and read stderr.
     private func note(_ what: String) {
         FileHandle.standardError.write(Data("khayt: lead time — \(what)\n".utf8))
+        leadTimeSaid = what
+        leadTimeAt = Date()
     }
 
     /// The injected clock, in the shape `lib/lead-time.js` records.
@@ -9203,20 +9281,7 @@ final class Shop {
         // question is not "can I email" but "can I email THROUGH THIS", and
         // `via` is what the shared rule sends along to answer it. A shop on
         // SMTP is still refused, by name, and still has the other app.
-        let canSend: Set<String> = ["telegram", "webhooks", "event_webhook"]
-        // A loop rather than a `filter`, because asking the module whether a
-        // provider can be carried is a call into the engine actor, and an
-        // `await` cannot happen inside a synchronous closure.
-        var cannotSend: [Outbound] = []
-        for reach in reaches {
-            if canSend.contains(reach.channel) { continue }
-            if reach.channel == "email",
-               (try? await engine.emailProviderIsHttp(reach.via ?? "")) == true { continue }
-            // The customer's tracking link. `PortalClient` PUTs it, so a move
-            // on a published job is no longer refused.
-            if reach.channel == "portal" { continue }
-            cannotSend.append(reach)
-        }
+        let cannotSend = await Self.channelsThisAppCannotSend(reaches, engine: engine)
         if !cannotSend.isEmpty {
             throw MoveRefused(sentence: words.outboundRefusal(cannotSend))
         }
