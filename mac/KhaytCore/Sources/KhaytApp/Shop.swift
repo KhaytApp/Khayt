@@ -134,6 +134,18 @@ final class Shop {
     private(set) var taxSummary: String?
     private(set) var settingsValue: JSONValue = .object([:])
 
+    /// Give a shop a mail provider, for a test. The book on disk is not
+    /// touched — `pretendMode`'s sibling, and there for the same reason.
+    ///
+    /// The email settings pane is four different screens depending on this one
+    /// field, and `SnapshotTests` has to photograph all four. Building a book
+    /// on disk per picture would be photographing `StoreWriter`.
+    func pretendEmailConfig(_ config: [String: JSONValue]) {
+        var held: [String: JSONValue] = settingsDict
+        held["emailConfig"] = .object(config)
+        settingsValue = .object(held)
+    }
+
     /// Put a shop into a mode, for a test. The book on disk is not touched.
     func pretendMode(_ mode: String?) {
         var held: [String: JSONValue] = settingsDict

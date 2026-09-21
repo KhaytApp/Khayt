@@ -112,14 +112,17 @@ struct EmailSettings: View {
                     SecureField(stored.apiKey ? "••••••••" : "", text: $draft.apiKey)
                         .frame(width: 240)
                 }
-                if stored.apiKey && draft.apiKey.isEmpty {
-                    Toggle(shop.words.callIt("mac.email_forget_key"), isOn: $draft.clearApiKey)
-                        .font(.caption)
-                }
                 if draft.provider == "mailgun" {
                     row(shop.words.callIt("set.email_domain")) {
                         TextField("mg.yourshop.com", text: $draft.domain).frame(width: 240)
                     }
+                }
+                // AFTER the fields, not between them. Drawn straight under the
+                // key it belongs to, it sat between "API key" and "Domain" and
+                // read as though it were about the domain.
+                if stored.apiKey && draft.apiKey.isEmpty {
+                    Toggle(shop.words.callIt("mac.email_forget_key"), isOn: $draft.clearApiKey)
+                        .font(.caption)
                 }
             }
 
@@ -137,11 +140,11 @@ struct EmailSettings: View {
                     SecureField(stored.password ? "••••••••" : "", text: $draft.password)
                         .frame(width: 240)
                 }
+                Toggle(shop.words.callIt("set.smtp_secure"), isOn: $draft.secure)
                 if stored.password && draft.password.isEmpty {
                     Toggle(shop.words.callIt("mac.email_forget_pass"), isOn: $draft.clearPassword)
                         .font(.caption)
                 }
-                Toggle(shop.words.callIt("set.smtp_secure"), isOn: $draft.secure)
                 // WHICH PORT MEANS WHICH, said here rather than left to be
                 // discovered by a send that fails. 465 is encrypted from the
                 // first byte; 587 starts in the clear and upgrades, and this
@@ -151,10 +154,15 @@ struct EmailSettings: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if sends {
-                // WHAT GETS EMAILED. Without a trigger switched on, everything
-                // above is configured and nothing is ever sent — which reads
-                // as email being broken rather than as nothing being asked for.
+            // WHAT GETS EMAILED. Without a trigger switched on, everything
+            // above is configured and nothing is ever sent — which reads as
+            // email being broken rather than as nothing being asked for.
+            //
+            // `!triggers.isEmpty` as well as `sends`: the list is fetched from
+            // the shared rule when the pane appears, and drawing the heading
+            // before it arrives gives a shop "Send email when" with nothing
+            // underneath — which is what the first render of this pane showed.
+            if sends && !triggers.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(shop.words.callIt("set.email_triggers"))
                         .font(.callout.weight(.medium))
@@ -166,7 +174,7 @@ struct EmailSettings: View {
                                 else { draft.triggers.remove(trigger.key) }
                             }))
                     }
-                    if sends && draft.triggers.isEmpty {
+                    if draft.triggers.isEmpty {
                         Text(shop.words.callIt("mac.email_no_triggers"))
                             .font(.caption).foregroundStyle(Khayt.note)
                             .fixedSize(horizontal: false, vertical: true)
@@ -219,15 +227,6 @@ struct EmailSettings: View {
         let key = "mac.email_when_" + trigger.key
         let said = shop.words.callIt(key)
         return said == key ? trigger.label : said
-    }
-
-    @ViewBuilder
-    private func row(_ label: String, @ViewBuilder _ control: () -> some View) -> some View {
-        HStack {
-            Text(label)
-            Spacer()
-            control()
-        }
     }
 
     private func reload() async {

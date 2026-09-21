@@ -195,6 +195,95 @@ import KhaytCore
     /// host a WKWebView, so the invoice's paper comes out blank here and is
     /// photographed from the app instead. Between the two there is a picture of
     /// the whole of each sheet.
+    /// The settings panes, which have never been photographed at all.
+    ///
+    /// The snapshot RUNNER cannot reach them: opening the settings window hangs
+    /// it, and `captureSheet` says so in as many words — "which is why those
+    /// six panes stayed unphotographed". So a whole class of screen in this app
+    /// has only ever been judged by reading its source.
+    ///
+    /// That is how the email pane shipped its first draft with a hand-rolled
+    /// `HStack { Text; Spacer; control }` where every other row in the window
+    /// uses `LabeledContent`. It reads the same and does not look the same:
+    /// one puts the label in the platform's own aligned column and the other
+    /// aligns with nothing. Found by reading two files side by side, which is
+    /// not a method — this is.
+    ///
+    /// THREE PICTURES, because the pane is a different screen per provider: a
+    /// key for SendGrid, a key and a domain for Mailgun, six fields for a
+    /// relay. A branch the pictures do not cover is a branch nobody has
+    /// looked at.
+    ///
+    /// ── WHAT THESE PICTURES CANNOT SHOW ───────────────────────────────────
+    ///
+    /// Two things, and knowing which is the difference between reading them
+    /// and being misled by them:
+    ///
+    /// - Every text field comes back as `ImageRenderer`'s yellow refusal.
+    ///   `TextField` and `SecureField` are AppKit-backed and it will not draw
+    ///   them, which is the same limit that keeps the whole settings WINDOW
+    ///   out of the snapshot runner. Layout, labels, order and wording are
+    ///   real; the boxes are placeholders.
+    /// - The trigger checkboxes are absent, because the list is fetched from
+    ///   the shared rule in `.task` and `ImageRenderer` runs no tasks. That is
+    ///   also why the group hides itself until the list arrives — the first
+    ///   render of this pane showed "Send email when" with nothing under it,
+    ///   which is exactly what a shop would have seen for the same reason.
+    ///
+    /// They are still worth having. This pane's first draft hand-rolled an
+    /// `HStack { Text; Spacer; control }` where every other row in the window
+    /// uses `LabeledContent`, put "Forget the stored API key" between the key
+    /// and the domain so it read as belonging to the domain, and gave two
+    /// adjacent toggles different type sizes. None of that is visible in
+    /// source and all of it is visible here.
+    @Test("the email settings render, in each provider's shape")
+    func emailSettings() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+
+        // Rendered inside the `Form` they live in, because a `Section` outside
+        // one draws as a bare `VStack` — a picture of a control group that
+        // does not exist anywhere in the app.
+        //
+        // The config goes into the SHOP rather than into the view: the pane
+        // reads `shop.settingsDict`, so a local copy would have rendered the
+        // same empty screen four times over and looked like four pictures.
+        func shoot(_ name: String, _ height: CGFloat, _ config: [String: JSONValue]) throws {
+            shop.pretendEmailConfig(config)
+            try render(VStack(alignment: .leading) { EmailSettings(shop: shop) }
+                        .padding(20)
+                        .frame(width: 560),
+                       name, size: CGSize(width: 560, height: height))
+        }
+
+        // `none` is NOT photographed: it draws one picker and the blank-page
+        // guard below rightly refuses a picture that is almost all paper. Its
+        // shape is covered by `EmailSettingsTests.draftReadsNothing`.
+        try shoot("31-email-sendgrid", 620, [
+            "provider": .string("sendgrid"),
+            "fromEmail": .string("orders@acme3d.test"),
+            "fromName": .string("Acme 3D"),
+            "apiKey": .string("__enc__x"),
+            "triggers": .array([.string("completed")]),
+        ])
+        try shoot("32-email-mailgun", 660, [
+            "provider": .string("mailgun"),
+            "fromEmail": .string("orders@acme3d.test"),
+            "domain": .string("mg.acme3d.test"),
+            "apiKey": .string("__enc__x"),
+        ])
+        try shoot("33-email-smtp", 860, [
+            "provider": .string("custom"),
+            "fromEmail": .string("orders@acme3d.test"),
+            "fromName": .string("Acme 3D"),
+            "smtpHost": .string("smtp.acme3d.test"),
+            "smtpPort": .number(587),
+            "smtpUser": .string("orders@acme3d.test"),
+            "smtpPassword": .string("__enc__x"),
+            "triggers": .array([.string("completed"), .string("quote")]),
+        ])
+    }
+
     @Test("the sheets render, with their words")
     func sheets() async throws {
         let shop = Shop()
