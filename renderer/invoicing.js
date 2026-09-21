@@ -1458,6 +1458,11 @@ function renderInvoice(order, money) {
     shopField, safeBizLogo, safeCssColor, BRAND_MARK_SVG,
     orderCurrency: (typeof orderCurrency === 'function') ? orderCurrency : null,
     clientCurrency, payStatus, hijriDate, toArabicNumerals,
+    // Named rather than reached for. The document used to call this window's
+    // `getClientTier` as a free variable, which is why the Mac app could not
+    // build an invoice for a customer at all once loyalty was on.
+    clientTier: (order.clientId && typeof getClientTier === 'function')
+      ? getClientTier(order.clientId) : null,
   }));
   area.innerHTML = out.html;
   if (out.arabicNumerals) {

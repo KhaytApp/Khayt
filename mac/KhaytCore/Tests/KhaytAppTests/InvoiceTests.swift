@@ -291,3 +291,68 @@ struct InvoiceTests {
         return try? JSONDecoder().decode(Order.self, from: data)
     }
 }
+
+// ── THE PATH THE BUTTON ACTUALLY TAKES ─────────────────────────────────────
+//
+// Every test above builds `Ingredients` by hand and hands it to
+// `Invoice.document`. Not one of them went through `Invoice.html(for:shop:)`,
+// which is what the Invoice button calls — so the document rule was covered
+// and the route to it was not.
+//
+// What that hid: `lib/invoice-document.js` called `getClientTier` as a FREE
+// VARIABLE. In Electron it resolved to the renderer's global. In
+// JavaScriptCore it threw `ReferenceError: Can't find variable:
+// getClientTier`, so this app could not build an invoice at all for any job
+// with a customer once loyalty was switched on — the sheet read "This job's
+// invoice could not be built", which is what a screenshot run of the sample
+// shop showed. Every other ingredient in that file is named in its context;
+// this was the only one that was not.
+@MainActor
+struct InvoiceFromTheShopTests {
+
+    @Test("a job in the shop's own book builds an invoice")
+    func fromTheBook() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let job = try #require(shop.orders.first, "the sample book has no jobs")
+        let doc = await Invoice.html(for: job, shop: shop)
+        #expect(doc != nil, "the Invoice button says it could not be built")
+    }
+
+    /// The sample shop has loyalty ON, which is what made the crash reachable.
+    /// If that ever changes, this test stops proving anything and says so
+    /// rather than passing quietly.
+    @Test("the sample shop still exercises the loyalty branch")
+    func loyaltyIsOn() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(Shop.plainBool(shop.settingsDict["loyaltyEnabled"]) == true,
+                "loyalty is off in the sample book — the branch that crashed is unreached again")
+        let job = try #require(shop.orders.first { !($0.clientId ?? "").isEmpty },
+                               "no sample job has a customer")
+        #expect(await Invoice.html(for: job, shop: shop) != nil)
+    }
+
+    /// And the tier is really carried through, not merely not-crashing: a
+    /// document that silently stopped printing the badge would pass everything
+    /// above.
+    @Test("the customer's tier reaches the paper")
+    func tierIsPrinted() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let tiers: [JSONValue] = [.object(["name": .string("Gold"), "minOrders": .number(1)])]
+        var settings = shop.settingsDict
+        settings["loyaltyEnabled"] = .bool(true)
+        settings["loyaltyTiers"] = .array(tiers)
+        let job = try #require(shop.orders.first { !($0.clientId ?? "").isEmpty })
+        let doc = try #require(try await engine.invoiceHtml(
+            order: shop.orderRow(job.id) ?? .object([:]), settings: settings,
+            clients: shop.clientRows, currencies: Invoice.currencyTable(shop),
+            language: "en",
+            money: ["qrSvg": .string(""), "qrProblem": .null, "payQrSvg": .string(""),
+                    "total": .string("1"), "vatAmount": .string("0"), "subtotal": .string("1")],
+            sellerFields: shop.shopDocumentFields, orders: shop.orderRows))
+        #expect(doc.html.contains("Gold"), "the tier badge never reached the document")
+    }
+}
