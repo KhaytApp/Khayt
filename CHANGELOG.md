@@ -25,6 +25,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   now checked against the real catalogue, in both languages, so a button can
   no longer be labelled with the name of the thing it was supposed to say.
 
+
+- **(Mac) The calculator can be told what the shop actually charges.** It
+  costed every part at Khayt's opening figures — 90 an hour of labour, a
+  quarter hour of prep, half an hour after — and there was nowhere on this Mac
+  to say otherwise. A shop could write its own seven figures down as a printer
+  preset, see them listed, and be quoted at 90 an hour for ever: the rule has
+  always taken a preset and this app never passed one, so the numbers were
+  saved and then ignored by the one screen they are for. Reported by a shop
+  asking where labour is adjusted. The calculator picks a preset beside the
+  machine now, shows the seven figures it is costing at, and lets any of them
+  be typed over for the quote in hand — with the shop's own rates one click
+  away again, and a way to save what was typed as a preset without leaving the
+  screen. A machine still carries the two figures a printer knows about
+  itself, and still wins on those.
+
 - **(Maintainers) The design system knows how Khayt moves.** The React mirror
   that Claude Design builds with carried every colour, type step and the card
   geometry out of the Mac app's own source — and no motion at all, while

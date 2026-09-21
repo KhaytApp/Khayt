@@ -8245,6 +8245,19 @@ public actor KhaytEngine {
         try runtime.call2("KhaytPrintRates.DEFAULTS", [], as: [String: Double].self)
     }
 
+    /// The seven figures RESOLVED for one machine and one saved preset.
+    ///
+    /// The same `ratesFor` the costing itself calls, so a screen that shows a
+    /// shop what it is being charged at shows the figures that are actually
+    /// used — defaults, then the preset over all seven, then the machine over
+    /// the two a printer knows about itself. A screen that recomputed that
+    /// order in Swift would be a second opinion, and the first thing to drift.
+    public func printRates(machine: JSONValue? = nil,
+                           preset: JSONValue? = nil) throws -> [String: Double] {
+        try runtime.call2("KhaytPrintRates.ratesFor({ machine: ARG0, preset: ARG1 })",
+                          [machine ?? .null, preset ?? .null], as: [String: Double].self)
+    }
+
     public func costPart(_ part: JSONValue, inventory: [JSONValue],
                          settings: [String: JSONValue],
                          machine: JSONValue? = nil, preset: JSONValue? = nil) throws -> CostedPart {

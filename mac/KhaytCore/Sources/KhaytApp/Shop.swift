@@ -2944,12 +2944,40 @@ final class Shop {
     }
 
     func costedPart(spoolId: String?, grams: Double, hours: Double, qty: Int,
-                    machineId: String? = nil, extra: [String: JSONValue] = [:]) async -> KhaytEngine.CostedPart? {
+                    machineId: String? = nil, presetId: String? = nil,
+                    extra: [String: JSONValue] = [:]) async -> KhaytEngine.CostedPart? {
         guard let engine else { return nil }
         return try? await engine.costPart(partFor(spoolId: spoolId, grams: grams,
                                                   hours: hours, qty: qty, extra: extra),
                                           inventory: inventoryRows, settings: settingsDict,
-                                          machine: machineRow(machineId))
+                                          machine: machineRow(machineId),
+                                          preset: presetRow(presetId))
+    }
+
+    /// A saved preset as the book holds it.
+    ///
+    /// `costPart` has always taken one and this app never passed it, so the
+    /// shop's own labour rate, electricity and failure allowance were saved,
+    /// listed, and then ignored by the one screen they are for — a part was
+    /// costed at Khayt's opening figures whatever the shop had written down.
+    private func presetRow(_ id: String?) -> JSONValue? {
+        guard let id, !id.isEmpty else { return nil }
+        return presetRows.first {
+            if case .object(let p) = $0 { return p["id"] == .string(id) }
+            return false
+        }
+    }
+
+    /// What a part WOULD be costed at, before anything is typed over it.
+    ///
+    /// Asked of the rule rather than worked out here: the order (defaults,
+    /// then the preset, then the machine's two) belongs to
+    /// `lib/print-rates.js`, and a screen that restated it would drift from
+    /// the costing it is supposed to be showing.
+    func resolvedRates(presetId: String?, machineId: String?) async -> [String: Double] {
+        guard let engine else { return [:] }
+        return (try? await engine.printRates(machine: machineRow(machineId),
+                                             preset: presetRow(presetId))) ?? [:]
     }
 
     /// A machine as the book holds it, for the two rates a printer knows about
