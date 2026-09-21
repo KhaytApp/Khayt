@@ -31,6 +31,11 @@ struct Kanban: View {
     /// draw. A namespace here and a matched geometry on each card gives the
     /// card a path between the two.
     @Namespace private var board
+    @FocusState private var focused: Bool
+    /// In a mirrored window the next column is to the LEFT. The library grid
+    /// makes the same correction, for the same reason: a right arrow that
+    /// walks backwards is worse than no arrow keys at all.
+    @Environment(\.layoutDirection) private var layout
 
     /// Seven columns, and all seven are here — which they were not. A job in QC
     /// or on hold had no column and therefore no card: it did not move to the
@@ -48,6 +53,43 @@ struct Kanban: View {
                     }
                 }
                 .padding(Metric.screen)
+            }
+            // ── THE BOARD ANSWERS THE KEYBOARD ────────────────────────────
+            //
+            // It had none. The library was the only screen in this app with
+            // arrow keys, and a board is the screen people use with one hand
+            // while the other is holding a part.
+            //
+            // ARROWS NAVIGATE, ⌘ARROWS MOVE: the Job menu's ⌘→ sends the job
+            // one step along, a bare → only changes which card is selected.
+            // Two verbs, and the modifier is the difference.
+            .focusable()
+            .focused($focused)
+            // No ring round the whole board, for the reason the library gives:
+            // a blue rectangle enclosing the content reads as an error state,
+            // and the selection itself shows where the keyboard is.
+            .focusEffectDisabled()
+            .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
+                // ⌘ belongs to the menu's Move Along / Move Back. Passing it
+                // through here would move the job AND the selection.
+                guard !press.modifiers.contains(.command) else { return .ignored }
+                let mirrored = layout == .rightToLeft
+                let moved: Bool
+                switch press.key {
+                case .leftArrow:  moved = shop.moveBoardSelection(dx: mirrored ? 1 : -1, dy: 0)
+                case .rightArrow: moved = shop.moveBoardSelection(dx: mirrored ? -1 : 1, dy: 0)
+                case .upArrow:    moved = shop.moveBoardSelection(dx: 0, dy: -1)
+                default:          moved = shop.moveBoardSelection(dx: 0, dy: 1)
+                }
+                // Unhandled at the edges, so the system beep still says "there
+                // is nothing that way".
+                return moved ? .handled : .ignored
+            }
+            // Return opens the job, as it does in the library.
+            .onKeyPress(.return) {
+                guard shop.selection != nil else { return .ignored }
+                shop.shelf = .jobs(nil)
+                return .handled
             }
             // Said out loud rather than filtered away. A job whose status has no
             // column is not on this board, and the board saying so is the
