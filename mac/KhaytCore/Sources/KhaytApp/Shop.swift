@@ -3663,15 +3663,21 @@ final class Shop {
     /// provider can be carried is a call into the engine actor, and an `await`
     /// cannot happen inside a synchronous closure.
     static func channelsThisAppCannotSend(_ reaches: [Outbound],
+                                          settings: [String: JSONValue],
                                           engine: KhaytEngine) async -> [Outbound] {
         let canSend: Set<String> = ["telegram", "webhooks", "event_webhook"]
         var out: [Outbound] = []
         for reach in reaches {
             if canSend.contains(reach.channel) { continue }
-            // Email only where the provider is one this app can POST to. A
-            // shop on its own SMTP server is still refused, by name.
+            // Email only where the provider is one this app has a door for.
+            // `settings` is needed as well as the provider name because SMTP is
+            // a door with a lock on it: `custom` with no relay typed in is a
+            // shop that started configuring and stopped, and offering to send
+            // through it would open a connection to the empty string.
             if reach.channel == "email",
-               (try? await engine.emailProviderIsHttp(reach.via ?? "")) == true { continue }
+               await canEmailThrough(reach.via ?? "", settings: settings, engine: engine) {
+                continue
+            }
             // The customer's tracking link. `PortalClient` PUTs it.
             if reach.channel == "portal" { continue }
             out.append(reach)
@@ -3695,7 +3701,8 @@ final class Shop {
             // move asks. It used to refuse on ANY reach, so a shop with a
             // webhook switched on could move a job and not record the money
             // for it.
-            let cannotSend = await Self.channelsThisAppCannotSend(reaches, engine: engine)
+            let cannotSend = await Self.channelsThisAppCannotSend(
+                reaches, settings: settings, engine: engine)
             if !cannotSend.isEmpty {
                 throw MoveRefused(sentence: self.words.outboundRefusal(cannotSend))
             }
@@ -9149,7 +9156,16 @@ final class Shop {
             var config: [String: JSONValue] = [:]
             if case .object(let c)? = settingsDict["emailConfig"] { config = c }
             let key = try await Secrets.open(Self.plainString(config["apiKey"]) ?? "", for: source)
-            try await EmailClient.send(mail, apiKey: key, config: config)
+            // THERE ARE TWO SEALED SECRETS UNDER `emailConfig`, and this opened
+            // one. `settings.emailConfig.smtpPassword` is registered in
+            // `store-secret-paths.js` alongside `apiKey`, so a shop on its own
+            // relay held ciphertext where its password should be — which a
+            // server answers with `535 authentication failed`, indistinguishable
+            // from a password the shop typed wrong.
+            let smtpPassword = try await Secrets.open(
+                Self.plainString(config["smtpPassword"]) ?? "", for: source)
+            try await EmailClient.send(mail, apiKey: key, config: config,
+                                       smtpPassword: smtpPassword, engine: engine)
             moveNotices.append(words.callIt("mac.email_sent"))
         } catch let failure as EmailClient.Failure {
             moveProblem = words.callIt("mac.email_failed") + " "
@@ -9324,12 +9340,12 @@ final class Shop {
         // with no way to notice.
         //
         // EMAIL IS CONDITIONAL, and the condition is the provider rather than
-        // the channel. SendGrid and Mailgun are one HTTPS POST each and this
-        // app makes them; `custom` is SMTP, which it does not speak. So the
-        // question is not "can I email" but "can I email THROUGH THIS", and
-        // `via` is what the shared rule sends along to answer it. A shop on
-        // SMTP is still refused, by name, and still has the other app.
-        let cannotSend = await Self.channelsThisAppCannotSend(reaches, engine: engine)
+        // the channel. So the question is not "can I email" but "can I email
+        // THROUGH THIS", and `via` is what the shared rule sends along to
+        // answer it. A provider added to the other app and not to this one is
+        // still refused by name, which is the point of asking at all.
+        let cannotSend = await Self.channelsThisAppCannotSend(
+            reaches, settings: settings, engine: engine)
         if !cannotSend.isEmpty {
             throw MoveRefused(sentence: words.outboundRefusal(cannotSend))
         }
@@ -10999,25 +11015,70 @@ final class Shop {
             settings: settingsValue)) ?? body
     }
 
-    /// Whether this shop can send a campaign from here at all.
-    ///
-    /// THE QUESTION IS THE PROVIDER, NOT THE CHANNEL. SendGrid and Mailgun are
-    /// one HTTPS POST each and this app makes them; `custom` is SMTP, which it
-    /// does not speak — the same line `moveJob` draws, drawn once more here
-    /// rather than guessed at.
     /// The provider the shop configured, or empty.
     var emailProvider: String {
         guard case .object(let config)? = settingsDict["emailConfig"] else { return "" }
         return Self.plainString(config["provider"]) ?? ""
     }
 
-    /// Asked of the shared rule, not answered here: which providers are one
-    /// HTTPS POST is `lib/order-email.js`'s list, and a second copy of it in
-    /// Swift is how the two apps come to disagree about whether a customer
-    /// could have been told.
+    /// Can this app send a campaign at all?
+    ///
+    /// ── THIS USED TO ASK A NARROWER QUESTION ──────────────────────────────
+    ///
+    /// It asked whether the provider was one HTTPS POST, because those were the
+    /// only two doors this app had. A shop on its own SMTP relay was told to go
+    /// and send the campaign from somewhere else — which is not an answer, it is
+    /// a shop with a mailing list it cannot use.
+    ///
+    /// `SmtpClient` is the third door now, so the question is the one that was
+    /// always meant: is a provider configured, and does this app speak it?
+    /// `custom` is added to the shared rule's answer rather than replacing it,
+    /// so a provider added to the other app still correctly reads as one this
+    /// one cannot send through.
     func canSendCampaign() async -> Bool {
+        await canEmailThrough(emailProvider)
+    }
+
+    /// Can this app carry mail through that provider?
+    ///
+    /// Asked in two places — a job moving, and a campaign going out — and they
+    /// must agree: a shop told its move cannot be made because the customer
+    /// could not be emailed, and then offered a campaign button that emails
+    /// that same customer, is being told two different things about one relay.
+    ///
+    /// The HTTPS providers are the shared rule's list, asked rather than
+    /// repeated. `custom` is this app's own door and is not in that list, so it
+    /// is added here — and only with a host, because a provider set to `custom`
+    /// with nothing typed into it is a shop that started configuring and
+    /// stopped.
+    func canEmailThrough(_ provider: String) async -> Bool {
         guard let engine else { return false }
-        return (try? await engine.emailProviderIsHttp(emailProvider)) ?? false
+        return await Shop.canEmailThrough(provider, settings: settingsDict, engine: engine)
+    }
+
+    /// The same question asked from inside the write chain.
+    ///
+    /// STATIC because `applyMove` is: it runs inside `updateStoreOnDisk` with
+    /// the settings that are on disk, and the instance's `settingsDict` is the
+    /// in-memory copy, which lags every write still in flight. One
+    /// implementation, two ways in — a second copy of this rule is how a move
+    /// and a campaign come to disagree about one relay.
+    static func canEmailThrough(_ provider: String, settings: [String: JSONValue],
+                                engine: KhaytEngine) async -> Bool {
+        if provider == "custom" {
+            guard case .object(let config)? = settings["emailConfig"] else { return false }
+            return !(plainString(config["smtpHost"]) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return (try? await engine.emailProviderIsHttp(provider)) ?? false
+    }
+
+    /// The relay the shop typed, or empty. Not the password — that is sealed,
+    /// and is opened at the point of use in `post`.
+    var smtpHost: String {
+        guard case .object(let config)? = settingsDict["emailConfig"] else { return "" }
+        return (Self.plainString(config["smtpHost"]) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Write to everybody the segment reaches.
@@ -11048,7 +11109,7 @@ final class Shop {
         guard !body.trimmingCharacters(in: .whitespaces).isEmpty else {
             return words.callIt("camp.need_body")
         }
-        guard await canSendCampaign() else { return words.callIt("mac.campaign_needs_http") }
+        guard await canSendCampaign() else { return words.callIt("mac.campaign_needs_email") }
 
         let typed = subject.trimmingCharacters(in: .whitespacesAndNewlines)
         var sent = 0

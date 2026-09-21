@@ -167,7 +167,7 @@ struct CampaignTests {
         #expect(sheet.distance(from: sheet.startIndex, to: button.lowerBound) > 0)
     }
 
-    @Test("an empty list, an empty message, and an SMTP shop all refuse")
+    @Test("an empty list, an empty message, and a shop with no provider all refuse")
     func refusals() async throws {
         let shop = Shop()
         await shop.load(.sample)
@@ -182,11 +182,78 @@ struct CampaignTests {
             stats: .init(completedCount: 0, totalSpend: 0, lastOrderDate: ""))
         #expect(await shop.sendCampaign("   ", to: [recipient])
                 == shop.words.callIt("camp.need_body"))
-        // The sample book configures no HTTP provider, so a real send refuses
-        // by name rather than failing forty times.
+        // The sample book configures no mail provider at all, so a real send
+        // refuses once rather than failing forty times.
         #expect(await shop.canSendCampaign() == false)
         #expect(await shop.sendCampaign("Hello", to: [recipient])
-                == shop.words.callIt("mac.campaign_needs_http"))
+                == shop.words.callIt("mac.campaign_needs_email"))
+    }
+
+    /// The gap this app carried until SMTP was built.
+    ///
+    /// A shop on its own relay was refused and told to send the campaign from
+    /// the other app — so this asserts the opposite of what used to hold. It
+    /// goes through the STATIC rule because that is the one both doors share:
+    /// `settingsDict` is read-only on a loaded `Shop`, and more to the point a
+    /// move asks this question from inside the write chain, with the settings
+    /// that are on disk rather than the ones in memory.
+    @Test("a shop on its own SMTP relay can send from this app, at both doors")
+    func smtpShopCanSend() async throws {
+        let engine = try KhaytEngine()
+
+        func settings(_ config: [String: JSONValue]) -> [String: JSONValue] {
+            ["emailConfig": .object(config)]
+        }
+
+        let relay = settings([
+            "provider": .string("custom"),
+            "smtpHost": .string("smtp.example.com"),
+            "smtpUser": .string("orders@example.com"),
+            "fromEmail": .string("orders@example.com"),
+        ])
+        #expect(await Shop.canEmailThrough("custom", settings: relay, engine: engine),
+                "a shop on its own SMTP relay is still being refused")
+
+        // A provider set to `custom` with nothing typed into it is a shop that
+        // started configuring and stopped; offering it a send would open a
+        // connection to the empty string.
+        #expect(await Shop.canEmailThrough(
+            "custom", settings: settings(["provider": .string("custom")]), engine: engine) == false)
+        #expect(await Shop.canEmailThrough(
+            "custom", settings: settings(["provider": .string("custom"),
+                                          "smtpHost": .string("   ")]), engine: engine) == false,
+                "whitespace is not a hostname")
+
+        // The HTTPS providers still answer from the shared rule rather than
+        // from a second list written here.
+        #expect(await Shop.canEmailThrough("sendgrid", settings: relay, engine: engine))
+        #expect(await Shop.canEmailThrough("mailgun", settings: relay, engine: engine))
+
+        // And a provider neither app has heard of is still refused by name —
+        // which is the whole point of asking the rule instead of assuming.
+        #expect(await Shop.canEmailThrough("postmark", settings: relay, engine: engine) == false)
+        #expect(await Shop.canEmailThrough("", settings: relay, engine: engine) == false)
+        // `mailto` opens a compose window in the other app and sends nothing
+        // by itself; it must not read as a channel this app can carry.
+        #expect(await Shop.canEmailThrough("mailto", settings: relay, engine: engine) == false)
+    }
+
+    /// The port, however a book happens to hold it.
+    @Test("an SMTP port survives a book that holds it as a string, or not at all")
+    func portIsRead() {
+        #expect(EmailClient.smtpPort(.number(465)) == 465)
+        #expect(EmailClient.smtpPort(.string("465")) == 465)
+        // The field left empty, and the shapes an edited book can hold. 587 is
+        // what `main.js` falls back to, so this app must not pick anything else.
+        #expect(EmailClient.smtpPort(nil) == 587)
+        #expect(EmailClient.smtpPort(.number(0)) == 587)
+        #expect(EmailClient.smtpPort(.string("")) == 587)
+        #expect(EmailClient.smtpPort(.string("not a port")) == 587)
+        #expect(EmailClient.smtpPort(.number(-1)) == 587)
+        // 70000 does not fit in the UInt16 a port is, and truncating it would
+        // silently connect somewhere else entirely.
+        #expect(EmailClient.smtpPort(.number(70000)) == 587)
+        #expect(EmailClient.smtpPort(.number(65535)) == 65535)
     }
 
     @Test("the subject is a template too, and an empty one is the shop's name")

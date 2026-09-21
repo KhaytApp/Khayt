@@ -48,6 +48,11 @@
     ? global.KhaytAiPrivacy
     : (function () { try { return require('./ai-privacy.js'); } catch (e) { return null; } })();
 
+  /** The provider and trigger vocabularies, so this file holds neither. */
+  const mailRules = () => (typeof global.KhaytOrderEmail !== 'undefined')
+    ? global.KhaytOrderEmail
+    : (function () { try { return require('./order-email.js'); } catch (e) { return null; } })();
+
   /** An address only if a key may travel to it; otherwise keep what was stored. */
   function safeBaseUrl(raw, stored) {
     const v = String(raw == null ? '' : raw).trim();
@@ -352,6 +357,57 @@
         // what a masked field means.
         apiKey: has(a, 'apiKey') && String(a.apiKey || '') ? a.apiKey : (held.apiKey || ''),
         features,
+      };
+    }
+    // ── EMAIL, WHEN A FORM CARRIES IT ─────────────────────────────────────
+    //
+    // `out.emailConfig` a hundred lines up keeps whatever is stored, because
+    // for years the only screen that wrote it was `renderer/settings.js`,
+    // which writes `settings.emailConfig` straight into the book and saves the
+    // whole thing. The Mac has no such path — everything it saves goes through
+    // this function — so without this branch its email settings screen would
+    // appear to save and change nothing.
+    //
+    // Shaped like the `ai` branch above and for the same reasons: an absent
+    // field keeps what is stored (that is what a masked secret field means),
+    // and the secrets are OPAQUE — sealed by the host before they arrive, and
+    // never inspected or re-encoded here.
+    if (has(f, 'emailConfig')) {
+      const e = f.emailConfig || {};
+      const mail = mailRules();
+      const held = s.emailConfig || {};
+      const keep = (k, fallback) => (has(e, k) ? e[k] : (held[k] === undefined ? fallback : held[k]));
+      const text = (k) => String(keep(k, '') == null ? '' : keep(k, '')).trim();
+      // A provider this app has never heard of would sit in the book looking
+      // configured and send nothing, so an unknown one leaves the stored value
+      // alone rather than being written.
+      const known = mail && Array.isArray(mail.PROVIDERS) ? mail.PROVIDERS : [];
+      const asked = has(e, 'provider') ? String(e.provider || '') : '';
+      const provider = asked && (!known.length || known.indexOf(asked) !== -1)
+        ? asked : (held.provider || 'none');
+      // A port is a port. 0 is the field left empty, and anything outside the
+      // range is a typo; both become the default rather than being stored for
+      // a connection to fail on later.
+      const port = Math.trunc(num(keep('smtpPort', 587), 587));
+      out.emailConfig = {
+        ...held,
+        provider,
+        apiKey: has(e, 'apiKey') && String(e.apiKey || '') ? e.apiKey : (held.apiKey || ''),
+        domain: text('domain'),
+        smtpHost: text('smtpHost').toLowerCase(),
+        smtpPort: port >= 1 && port <= 65535 ? port : 587,
+        smtpUser: text('smtpUser'),
+        smtpPassword: has(e, 'smtpPassword') && String(e.smtpPassword || '')
+          ? e.smtpPassword : (held.smtpPassword || ''),
+        smtpSecure: !!keep('smtpSecure', false),
+        fromEmail: text('fromEmail'),
+        fromName: text('fromName'),
+        // KNOWN triggers only. A status nobody has a switch for is a trigger
+        // nobody asked for, and it would sit in the book looking switched on.
+        triggers: (Array.isArray(keep('triggers', [])) ? keep('triggers', []) : [])
+          .map((t) => String(t || ''))
+          .filter((t, i, all) => all.indexOf(t) === i)
+          .filter((t) => (mail && mail.isTrigger ? mail.isTrigger(t) : true)),
       };
     }
     if (has(f, 'printRisk')) {

@@ -438,16 +438,21 @@ final class Words {
                                "ar": "يتطلب هذا النقل أمراً لا يعرفه هذا التطبيق، فلم يتغير شيء."],
         "mac.move_reaches":  ["en": "Finishing this here would skip",
                               "ar": "إنهاء العمل هنا سيتخطى"],
-        "mac.move_in_khayt": ["en": "Do it in Khayt so it is sent.",
-                              "ar": "نفّذه في خيط ليُرسل."],
+        // WHAT TO FIX, NOT WHERE TO GO. This used to read "Do it in Khayt so
+        // it is sent" — which sent a shop to another app rather than telling
+        // it that a mail provider it configured is one this app has no door
+        // for. Every provider the other app sends through, this one now sends
+        // through too, so reaching here means the setting is the problem.
+        "mac.move_in_khayt": ["en": "Set up how these are sent in Settings, then move it.",
+                              "ar": "اضبط طريقة الإرسال في الإعدادات ثم انقله."],
         "mac.reach_webhooks":      ["en": "a webhook",        "ar": "إشعار ويب"],
         "mac.reach_event_webhook": ["en": "an order webhook", "ar": "إشعار ويب للطلب"],
         "mac.reach_telegram":      ["en": "a Telegram message", "ar": "رسالة تيليجرام"],
-        // Only a shop on SMTP is refused for email now: SendGrid and Mailgun
-        // are sent from here. Naming the provider is the difference between a
-        // shop that knows what to change and one that thinks email is missing.
-        "mac.reach_email":         ["en": "an email through your own mail server (SMTP)",
-                                    "ar": "بريداً عبر خادم بريدك (SMTP)"],
+        // SMTP used to be named here, because a shop on its own relay was the
+        // one case this app could not carry. `SmtpClient` carries it now, so
+        // what is left is a provider this app has never heard of — which the
+        // word "email" describes and a provider name would not.
+        "mac.reach_email":         ["en": "an email", "ar": "بريداً إلكترونياً"],
         "mac.reach_portal":        ["en": "the customer's tracking link", "ar": "رابط متابعة العميل"],
         "mac.and":           ["en": "and",            "ar": "و"],
         // The menu bar's own titles, said before any book is open
@@ -1744,11 +1749,17 @@ final class Words {
         "mac.spool_history_total": ["en": "Used altogether", "ar": "المستخدم إجمالاً"],
         "mac.campaign_confirm_hint": ["en": "One message each, a third of a second apart. It cannot be taken back.",
                                       "ar": "رسالة لكل عميل، بفاصل ثلث ثانية. لا يمكن التراجع عن ذلك."],
-        // Refused BY NAME, the way a move through an SMTP provider is: the
-        // question is not "can this app email" but "can it email through
-        // this", and a shop on SMTP still has the other app.
-        "mac.campaign_needs_http": ["en": "Campaigns go through SendGrid or Mailgun. A shop on its own SMTP server still sends these from the Windows and Linux app.",
-                                    "ar": "تُرسل الحملات عبر SendGrid أو Mailgun. أما المتجر الذي يستخدم خادم SMTP خاصاً به فيرسلها من تطبيق ويندوز ولينكس."],
+        // ── WHAT THIS USED TO SAY ─────────────────────────────────────────
+        //
+        // "Campaigns go through SendGrid or Mailgun. A shop on its own SMTP
+        // server still sends these from the Windows and Linux app." Which was
+        // accurate and was still the wrong thing to print: a shop reading it
+        // has a mailing list, this app, and an instruction to go and install
+        // another one. SMTP is a door here now, so the only shops that reach
+        // this line are the ones that have not set email up at all — and
+        // Settings is where they do that, in this app.
+        "mac.campaign_needs_email": ["en": "Set up an email provider in Settings before sending a campaign.",
+                                     "ar": "اضبط مزوّد البريد في الإعدادات قبل إرسال حملة."],
         "mac.whatsapp": ["en": "WhatsApp", "ar": "واتساب"],
         "mac.export_accounting_where": [
             "en": "Two files are written here: one of invoices and one of expenses.",

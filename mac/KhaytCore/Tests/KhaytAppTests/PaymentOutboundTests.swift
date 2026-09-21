@@ -18,7 +18,8 @@ import KhaytCore
 @MainActor
 struct PaymentOutboundTests {
 
-    static func settings(webhooks: Bool = false, emailProvider: String? = nil) -> [String: JSONValue] {
+    static func settings(webhooks: Bool = false, emailProvider: String? = nil,
+                         smtpHost: String = "") -> [String: JSONValue] {
         var out: [String: JSONValue] = ["currency": .string("SAR")]
         if webhooks {
             out["webhooks"] = .object(["enabled": .bool(true),
@@ -26,10 +27,12 @@ struct PaymentOutboundTests {
                                        "events": .object(["payment_received": .string("https://example.test/hook")])])
         }
         if let emailProvider {
-            out["emailConfig"] = .object([
+            var cfg: [String: JSONValue] = [
                 "provider": .string(emailProvider),
                 "triggers": .array([.string("payment_received")]),
-            ])
+            ]
+            if !smtpHost.isEmpty { cfg["smtpHost"] = .string(smtpHost) }
+            out["emailConfig"] = .object(cfg)
         }
         return out
     }
@@ -49,23 +52,40 @@ struct PaymentOutboundTests {
             order: Self.order, settings: Self.settings(webhooks: true), clients: Self.clients)
         #expect(reaches.contains { $0.channel == "webhooks" }, "the fixture reaches nobody — it proves nothing")
 
-        let cannot = await Shop.channelsThisAppCannotSend(reaches, engine: engine)
+        let cannot = await Shop.channelsThisAppCannotSend(
+            reaches, settings: Self.settings(webhooks: true), engine: engine)
         #expect(cannot.isEmpty,
                 Comment(rawValue: "refused on channels it can send: "
                         + cannot.map(\.channel).joined(separator: ", ")))
     }
 
-    /// The one that must still refuse, and by name.
-    @Test("a shop on its own SMTP is still refused, and told which channel")
-    func smtpStillRefuses() async throws {
+    /// SMTP used to be the one thing this app could not carry. It carries it
+    /// now — but only once there is a relay to carry it to.
+    @Test("a shop on its own SMTP relay is carried, and a half-set-up one is not")
+    func smtpIsCarriedOnceConfigured() async throws {
         let engine = try KhaytEngine()
-        let reaches = try await engine.paymentOutbound(
-            order: Self.order, settings: Self.settings(emailProvider: "custom"), clients: Self.clients)
-        #expect(reaches.contains { $0.channel == "email" }, "the fixture reaches no email")
 
-        let cannot = await Shop.channelsThisAppCannotSend(reaches, engine: engine)
-        #expect(cannot.map(\.channel) == ["email"],
-                "SMTP email is the one thing this app cannot carry, and it must say so")
+        // `custom` with nothing typed into it: a shop that started configuring
+        // and stopped. There is no relay to open a connection to, so this must
+        // still refuse — by name, so the shop knows which channel to fix.
+        let half = Self.settings(emailProvider: "custom")
+        let reaches = try await engine.paymentOutbound(
+            order: Self.order, settings: half, clients: Self.clients)
+        #expect(reaches.contains { $0.channel == "email" }, "the fixture reaches no email")
+        let refused = await Shop.channelsThisAppCannotSend(reaches, settings: half, engine: engine)
+        #expect(refused.map(\.channel) == ["email"],
+                "a provider with no relay behind it must be refused by name")
+
+        // And with a relay, `SmtpClient` carries it — so recording the money
+        // is no longer refused for a shop on its own mail server.
+        let whole = Self.settings(emailProvider: "custom", smtpHost: "smtp.shop.test")
+        let carried = try await engine.paymentOutbound(
+            order: Self.order, settings: whole, clients: Self.clients)
+        #expect(carried.contains { $0.channel == "email" }, "the fixture reaches no email")
+        let stillRefused = await Shop.channelsThisAppCannotSend(
+            carried, settings: whole, engine: engine)
+        #expect(stillRefused.isEmpty,
+                "a shop on its own SMTP relay is still being refused its own money")
     }
 
     /// An HTTP provider is one this app POSTs to, so it is not a refusal.
@@ -74,7 +94,8 @@ struct PaymentOutboundTests {
         let engine = try KhaytEngine()
         let reaches = try await engine.paymentOutbound(
             order: Self.order, settings: Self.settings(emailProvider: "sendgrid"), clients: Self.clients)
-        let cannot = await Shop.channelsThisAppCannotSend(reaches, engine: engine)
+        let cannot = await Shop.channelsThisAppCannotSend(
+            reaches, settings: Self.settings(emailProvider: "sendgrid"), engine: engine)
         #expect(cannot.isEmpty, "SendGrid is HTTP; refusing it is refusing a thing that works")
     }
 

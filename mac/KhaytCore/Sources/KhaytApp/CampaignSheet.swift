@@ -194,7 +194,7 @@ struct CampaignSheet: View {
                     // SAID, NOT HIDDEN. A shop on SMTP has a Send button that
                     // would always fail; it is told why, by name, rather than
                     // shown a control that does nothing.
-                    Text(shop.words.callIt("mac.campaign_needs_http"))
+                    Text(shop.words.callIt("mac.campaign_needs_email"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

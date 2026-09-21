@@ -189,6 +189,11 @@ let package = Package(
         .testTarget(name: "KhaytPreviewTests",
                     dependencies: ["KhaytPreview", "KhaytCore"]),
         .testTarget(name: "KhaytCoreTests", dependencies: ["KhaytCore"]),
-        .testTarget(name: "KhaytAppTests", dependencies: ["KhaytApp", "KhaytCore"]),
+        // `Resources/fake-smtp.py` is run as a program by `SmtpWireTests`, which
+        // finds it by `#filePath`, not as a bundled resource. Excluded rather
+        // than declared, so SwiftPM stops calling it an unhandled file and the
+        // shipping app does not carry a copy of a test server.
+        .testTarget(name: "KhaytAppTests", dependencies: ["KhaytApp", "KhaytCore"],
+                    exclude: ["Resources/fake-smtp.py"]),
     ]
 )
