@@ -345,12 +345,26 @@ struct AiQuoteTests {
         // that outlives its limitation is worse than none: it tells a shop a
         // working feature does nothing.
         //
-        // So it is per feature now, and this pins both directions.
+        // So it is per feature now.
         #expect(Shop.aiRunsHere("quote"), "quote works here and is still captioned as elsewhere")
-        for elsewhere in ["price", "reply", "assistant"] {
-            #expect(!Shop.aiRunsHere(elsewhere),
-                    Comment(rawValue: "\(elsewhere) claims to run here — does it?"))
-        }
+
+        // ── AND THEN THIS GUARD OUTLIVED ITS OWN LIMITATION ───────────────
+        //
+        // It used to loop over a hard-written ["price", "reply", "assistant"]
+        // and require each to be captioned elsewhere. That list was true the
+        // day it was written and false by the time all three had been built
+        // here — so the test that exists to stop a caveat going stale went
+        // stale in exactly the same way, and held the caption wrong for three
+        // features while staying green.
+        //
+        // Its own failure message asked the right question — "price claims to
+        // run here — does it?" — and the answer was yes, for all three.
+        //
+        // A second hard-written list would only rot again, so the direction
+        // this half was guarding is now `AiRunsHereTests`, which checks each
+        // claim against the CHAIN it needs: a screen that asks, a `Shop`
+        // method, and an `AiClient` entry point. What stays here is the part
+        // that cannot rot — the ids have to be real features.
         // And every id in the list is a real feature, so a typo cannot quietly
         // drop the note from something that still does not work.
         let engine = try KhaytEngine()

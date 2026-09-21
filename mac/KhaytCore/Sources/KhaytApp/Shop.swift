@@ -2572,7 +2572,22 @@ final class Shop {
     /// is the only thing telling a shop the switch does nothing on this Mac,
     /// and leaving it on a working feature is as wrong as dropping it from a
     /// missing one.
-    static let aiFeaturesOnThisMac: Set<String> = ["quote"]
+    ///
+    /// ALL FOUR, as of 2026-09-21. This said `["quote"]` long after the other
+    /// three had been built, so Settings told a shop that price advice, the
+    /// drafted reply and the assistant "run in the Windows and Linux app for
+    /// now" while this Mac was performing all three. Each has a complete chain
+    /// — a view, a `Shop` method, `AiClient`, an engine bridge and the shared
+    /// rule:
+    ///
+    ///   quote      NewJobSheet.draftPartFromDescription -> AiClient.draftQuote
+    ///   price      NewJobSheet.recommendMargin          -> AiClient.recommendMargin
+    ///   reply      DraftMessageSheet.draftMessage       -> AiClient.draftReply
+    ///   assistant  AskTheBook.ask                       -> AiClient.ask
+    ///
+    /// The comment above already said leaving the note on a working feature is
+    /// as wrong as dropping it from a missing one. It was, for three of them.
+    static let aiFeaturesOnThisMac: Set<String> = ["quote", "price", "reply", "assistant"]
 
     static func aiRunsHere(_ id: String) -> Bool { aiFeaturesOnThisMac.contains(id) }
 
