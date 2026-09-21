@@ -135,6 +135,81 @@ struct TelegramSettingsTests {
                 "the Telegram settings screen exists and nothing opens it")
     }
 
+    // MARK: - The warning the switch turns on
+
+    /// The shared rule answers for a configured shop, and says nothing for
+    /// every shape of shop that has not asked.
+    @Test("the low-stock warning is built by the shared rule, not here")
+    func theWarningComesFromTheRule() async throws {
+        let engine = try KhaytEngine()
+        let spools: [JSONValue] = [
+            .object(["id": .string("s1"), "material": .string("PLA Black"),
+                     "weight": .number(40), "originalWeight": .number(1000)]),
+            .object(["id": .string("s2"), "material": .string("PETG"),
+                     "weight": .number(900), "originalWeight": .number(1000)]),
+        ]
+        let on: [String: JSONValue] = ["telegram": .object([
+            "botToken": .string("__enc__t"), "chatId": .string("-100"),
+            "notifyOnLowStock": .bool(true),
+        ])]
+
+        let warning = try await engine.lowStockWarning(spools, settings: on)
+        let said = try #require(warning, "a shop with a nearly-empty spool was told nothing")
+        #expect(said.message.contains("PLA Black"), "the empty spool is not named: \(said.message)")
+        #expect(!said.message.contains("PETG"), "a full spool was reported as low")
+        // The token comes back as it sits in the book — opening it is the
+        // app's job, and a rule that decrypted anything would need a Keychain.
+        #expect(said.botToken == "__enc__t")
+        #expect(said.chatId == "-100")
+
+        // And silence in every shape of "not asked".
+        for quiet in [["botToken": JSONValue.string(""), "chatId": .string("-1"),
+                       "notifyOnLowStock": .bool(true)],
+                      ["botToken": .string("t"), "chatId": .string(""),
+                       "notifyOnLowStock": .bool(true)],
+                      ["botToken": .string("t"), "chatId": .string("-1"),
+                       "notifyOnLowStock": .bool(false)]] {
+            let none = try await engine.lowStockWarning(
+                spools, settings: ["telegram": .object(quiet)])
+            #expect(none == nil, "a shop that did not ask was told anyway")
+        }
+        // Nothing low, everything configured.
+        let full: [JSONValue] = [.object(["id": .string("s2"), "material": .string("PETG"),
+                                          "weight": .number(900),
+                                          "originalWeight": .number(1000)])]
+        #expect(try await engine.lowStockWarning(full, settings: on) == nil,
+                "a shop with full spools was warned")
+    }
+
+    /// A correct rule nothing calls is the failure this repository keeps
+    /// producing, and the reason this file is not finished without it.
+    ///
+    /// Read as source because the call sits inside `load`, which needs a book
+    /// on disk, an engine and a Keychain to run — and because what is being
+    /// asserted is that the call EXISTS, which no amount of running proves if
+    /// the run never reaches it.
+    @Test("something actually sends the warning")
+    func theWarningIsWired() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/Shop.swift")
+        let shop = try String(contentsOf: url, encoding: .utf8)
+        #expect(!shop.isEmpty, "Shop.swift was not read — this would pass vacuously")
+
+        #expect(shop.contains("func warnAboutLowStock("), "the sender is gone")
+        #expect(shop.contains("await warnAboutLowStock("),
+                "`warnAboutLowStock` exists and nothing calls it — the switch is dead again")
+        #expect(shop.contains("engine.lowStockWarning("),
+                "the sender does not ask the shared rule")
+        #expect(shop.contains("Telegram.send(botToken:"),
+                "the sender never reaches Telegram")
+        // Once per launch. Without the flag this fires on every load, and this
+        // app re-reads the book on every save.
+        #expect(shop.contains("guard !lowStockWarned"),
+                "the warning is not held to once a launch")
+    }
+
     private static func token(_ root: [String: JSONValue]) -> String? {
         guard case .object(let settings)? = root["settings"],
               case .object(let tg)? = settings["telegram"],
