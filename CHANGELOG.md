@@ -64,6 +64,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   if the card or the sidebar row changes shape the mirror still has to be
   updated by hand, and a green run here does not say otherwise.
 
+- **(Mac) Settings said three AI features run in the other app. This Mac does
+  all four.** Price advice, the drafted reply and the assistant were each built
+  here — a screen that asks, a method that answers, and the shared rule behind
+  it — and the list that decides whether to print "Runs in the Windows and
+  Linux app for now" was never updated past the first one. So a shop reading
+  its own settings was told to go and use the other app for three things this
+  one was already doing. The note is gone from all three, and a test now holds
+  that list to the chain each feature actually has: a feature claimed here must
+  be reachable from a screen, and one that is reachable must not be disclaimed.
+
 - **(Mac) A button said `common.ok`.** The banner that appears when Khayt has
   drafted purchase orders by itself asked for a word neither this app's own
   table nor the shared catalogue has, and a word that resolves nowhere is
