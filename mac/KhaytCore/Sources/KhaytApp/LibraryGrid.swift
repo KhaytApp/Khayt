@@ -17,6 +17,9 @@ struct LibraryGrid: View {
     /// and a grid whose right arrow walks backwards is worse than one with no
     /// arrow keys at all.
     @Environment(\.layoutDirection) private var layout
+    /// The scroll that follows the keyboard used a hand-written 0.12s — the
+    /// number `Motion.hover` holds — so it kept moving under Reduce Motion.
+    @Environment(\.accessibilityReduceMotion) private var reduced
 
     private static let cellWidth: CGFloat = 176
     private static let spacing: CGFloat = 16
@@ -91,7 +94,7 @@ struct LibraryGrid: View {
                 }
                 .onChange(of: shop.focusedFile) { _, id in
                     guard let id else { return }
-                    withAnimation(.easeOut(duration: 0.12)) { scroller.scrollTo(id, anchor: .center) }
+                    withAnimation(Motion.of(Motion.hover, unless: reduced)) { scroller.scrollTo(id, anchor: .center) }
                 }
             }
             // DRAGGING A MODEL ONTO THE LIBRARY IMPORTS IT.

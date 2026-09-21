@@ -27,6 +27,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   very one. It scrolls now, and the table is drawn the height of what is in it
   — a shop with two quarters was being shown room for eight, then a gap.
 
+- **(Mac) The board draws the thing it exists for.** A job changing column is
+  the one moment a board is for, and it was the one moment it did not draw: the
+  card vanished from one column and appeared in another between two frames. It
+  travels now. The cards answer the pointer as well — the screen a shop stands
+  in front of had nothing on it that lifted or turned the cursor, while the
+  machine tiles on the dashboard have done both for months. And the figures
+  arrive rather than appear: the counts, the revenue, the percentage beside a
+  running print and the goal bar all move to their new reading instead of
+  snapping to it, on the timings the app already had written down. Nothing
+  loops, nothing bounces, and every one of them is still under the setting that
+  switches motion off — two of them were not, because they had been written
+  with the number typed out instead of the name, and a test refuses that now.
+
 - **(Maintainers) A design token that went stale is now a failing test.** The
   extractor reads the Mac app's colours, card geometry, type scale and motion
   out of the Swift and stops dead if one is renamed — but it cannot notice that

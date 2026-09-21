@@ -295,6 +295,8 @@ struct BigFigure: View {
     var tint: Color?
     var size: CGFloat = 34
 
+    @Environment(\.accessibilityReduceMotion) private var reduced
+
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 5) {
             Text(value)
@@ -305,6 +307,13 @@ struct BigFigure: View {
                 // shout back.
                 .font(.system(size: size, weight: .semibold, design: .rounded))
                 .monospacedDigit()
+                // A figure ARRIVING at a new value rather than being replaced
+                // by one. Here rather than at each call site, for the reason
+                // `LayerProgress` owns its own animation: one place, and every
+                // screen that shows a big number inherits it. The digits are
+                // already monospaced, which is what `numericText` needs to
+                // roll without jitter.
+                .contentTransition(.numericText())
                 .foregroundStyle(tint ?? .primary)
             if let unit {
                 Text(unit)
@@ -314,6 +323,10 @@ struct BigFigure: View {
         }
         .lineLimit(1)
         .minimumScaleFactor(0.55)
+        // `contentTransition` above is the SHAPE of the change; this is what
+        // makes it happen. Without an animation keyed to the value, the
+        // transition is declared and never runs.
+        .animation(Motion.of(Motion.figure, unless: reduced), value: value)
     }
 }
 
@@ -515,6 +528,7 @@ struct StatStrip: View {
                 Text(stat.value)
                     .font(.system(size: 21, weight: .semibold, design: .rounded))
                     .monospacedDigit()
+                    .contentTransition(.numericText())
                     .foregroundStyle(stat.tint == .secondary
                                      ? AnyShapeStyle(.primary) : AnyShapeStyle(stat.tint))
                     .lineLimit(1).minimumScaleFactor(0.6)
@@ -523,10 +537,14 @@ struct StatStrip: View {
                     HStack(spacing: 5) {
                         Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
                         Text(working).font(.caption2).monospacedDigit()
+                            .contentTransition(.numericText())
                             .foregroundStyle(.tertiary).lineLimit(1)
                     }
                 }
             }
+            // Both figures in the cell move together, on the one token for a
+            // figure arriving at a new reading.
+            .animation(Motion.of(Motion.figure, unless: reduceMotion), value: stat.value)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 13).padding(.vertical, 11)
         }

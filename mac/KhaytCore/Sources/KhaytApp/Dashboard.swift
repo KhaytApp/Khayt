@@ -520,6 +520,11 @@ struct ToChase: View {
 /// second opinion about what counts.
 private struct Goal: View {
     let shop: Shop
+    /// Swept on arrival, moved on a new reading, still on a redraw — the shape
+    /// `WearGauge` established. Copied rather than reinvented: a second answer
+    /// for "a gauge reaching its reading" is how a motion system drifts.
+    @State private var shown: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduced
 
     var body: some View {
         let goal = Shop.plainNumber(shop.settingsDict["monthlyGoal"]) ?? 0
@@ -535,11 +540,22 @@ private struct Goal: View {
                         Spacer()
                         Text("\(Int((done / goal * 100).rounded()))%")
                             .monospacedDigit()
+                            .contentTransition(.numericText())
                             .foregroundStyle(done >= goal ? AnyShapeStyle(Khayt.done)
                                                           : AnyShapeStyle(.secondary))
                     }
-                    ProgressView(value: min(1, done / goal))
+                    ProgressView(value: shown)
                         .tint(done >= goal ? Khayt.done : Khayt.brand)
+                        .onAppear {
+                            let now = min(1, done / goal)
+                            guard !reduced else { shown = now; return }
+                            withAnimation(Motion.gauge) { shown = now }
+                        }
+                        .onChange(of: done) { _, fresh in
+                            withAnimation(Motion.of(Motion.gauge, unless: reduced)) {
+                                shown = min(1, fresh / goal)
+                            }
+                        }
                 }
                 .card(padding: 12)
             }
@@ -836,6 +852,10 @@ private struct RunningNow: View {
                             .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                     }
                     Text("\(status.progress)%")
+                        // The tile on the floor strip already rolls this
+                        // figure; this one snapped. Two screens showing the
+                        // same reading, disagreeing about whether it moved.
+                        .contentTransition(.numericText())
                         .font(.callout.weight(.semibold)).monospacedDigit()
                         .foregroundStyle(Khayt.hot)
                         .frame(width: 46, alignment: .trailing)
