@@ -23,6 +23,15 @@ import KhaytCore
 struct Kanban: View {
     @Bindable var shop: Shop
 
+    /// ── THE ONE MOMENT THE BOARD EXISTS FOR ──────────────────────────────
+    ///
+    /// A move completed, `shop.board` was rebuilt, and the card disappeared
+    /// from one column and appeared in another between two frames. The thing
+    /// this screen is for — work moving along — was the one thing it did not
+    /// draw. A namespace here and a matched geometry on each card gives the
+    /// card a path between the two.
+    @Namespace private var board
+
     /// Seven columns, and all seven are here — which they were not. A job in QC
     /// or on hold had no column and therefore no card: it did not move to the
     /// end of the board, it vanished from it, and a board that silently omits
@@ -34,7 +43,8 @@ struct Kanban: View {
             ScrollView([.horizontal, .vertical]) {
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(columns) { stage in
-                        Column(stage: stage, jobs: shop.board[stage] ?? [], shop: shop)
+                        Column(stage: stage, jobs: shop.board[stage] ?? [], shop: shop,
+                               board: board)
                     }
                 }
                 .padding(Metric.screen)
@@ -153,6 +163,7 @@ private struct Column: View {
     let stage: Stage
     let jobs: [Order]
     let shop: Shop
+    let board: Namespace.ID
     @State private var isTarget = false
     @Environment(\.accessibilityReduceMotion) private var reduced
 
@@ -194,6 +205,15 @@ private struct Column: View {
             } else {
                 ForEach(jobs) { job in
                     JobCard(job: job, shop: shop)
+                        // The card's path from the column it left to the one
+                        // it landed in. Keyed by job id, so the SAME card
+                        // travels rather than one fading out while another
+                        // fades in somewhere else.
+                        .matchedGeometryEffect(id: job.id, in: board)
+                        // For a card entering or leaving the BOARD — a new job,
+                        // or one moving to a column scrolled out of view. Without
+                        // it the matched geometry has nowhere to fly from.
+                        .transition(.opacity)
                         // A card could only be DRAGGED. Moving a job two
                         // columns along meant picking it up and carrying it
                         // past the ones in between, and moving it back meant
@@ -204,6 +224,14 @@ private struct Column: View {
                 }
             }
         }
+        // `Motion.figure` (0.45), not `progress` (0.9): a card arriving in a
+        // new column is a value arriving at a new reading, and nearly a second
+        // of card flight across seven columns is a shop waiting for the app.
+        //
+        // Keyed on the IDS rather than the array: `Order` moving within a
+        // column (a reorder) is not news, and re-running this on every redraw
+        // is the "animates on redraw" fault the doctrine forbids.
+        .animation(Motion.of(Motion.figure, unless: reduced), value: jobs.map(\.id))
         // Narrow enough that seven columns are a short scroll rather than a
         // long one, wide enough for a two-line job name.
         .frame(width: 196, alignment: .leading)
@@ -265,7 +293,13 @@ private struct Column: View {
             Task { await shop.moveJob(job.id, to: stage) }
             return true
         } isTargeted: { isTarget = $0 }
-        .animation(.easeOut(duration: 0.12), value: isTarget)
+        // BOTH through the token. This line was a hand-written `.easeOut(
+        // duration: 0.12)` — the same number `Motion.hover` holds, sitting
+        // directly above a line that asks for it properly. It did not go to
+        // zero under Reduce Motion, and the one below it did: two answers to
+        // one question, two lines apart, which is how a motion system stops
+        // being one.
+        .animation(Motion.of(Motion.hover, unless: reduced), value: isTarget)
         .animation(Motion.of(Motion.hover, unless: reduced), value: refusal == nil)
     }
 }
@@ -281,6 +315,12 @@ private extension Stage {
 private struct JobCard: View {
     let job: Order
     let shop: Shop
+    /// The board is the screen a shop stands in front of, and nothing on it
+    /// answered the pointer. `Dashboard`'s machine tile has the same job and
+    /// says why it does it: "A tile that looks pressable has to be." This card
+    /// opens the job, so it lifts — and `liftsOnHover` brings the pointing
+    /// hand with it, which is the half a shop actually reads.
+    @State private var hovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -341,6 +381,8 @@ private struct JobCard: View {
         .card(rail: job.isOverdue() ? Khayt.late : (job.priority ? Khayt.attention : nil),
               padding: 9)
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .liftsOnHover(hovering)
+        .onHover { hovering = $0 }
         .onTapGesture {
             // The board is for seeing; the table is for reading one job. A tap
             // takes you there rather than opening a panel the board has no room

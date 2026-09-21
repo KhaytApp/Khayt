@@ -1216,6 +1216,11 @@ struct SpoolCard: View {
     let spool: Spool
     let shop: Shop
     let low: Bool
+    /// The shelf answered the pointer nowhere. A spool card opens its editor,
+    /// so it lifts and takes the pointing hand — the same answer the board's
+    /// job cards and the dashboard's machine tiles give.
+    @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduced
     /// How long this one has got, or nil when nothing has been printed from it
     /// in the window — an unknown future, which the card says nothing about
     /// rather than guessing at.
@@ -1264,6 +1269,13 @@ struct SpoolCard: View {
                 // knew was the only unit anything could be recorded in.
                 Text(spool.weight.map { Quantity.say($0, unit, shop.words) } ?? "—")
                     .font(.callout).monospacedDigit()
+                    // A JOB FINISHING TAKES GRAMS OFF THIS SPOOL, and that is
+                    // the most physical thing that happens in the whole app —
+                    // the shelf is the screen that says what the shop has. It
+                    // snapped from one figure to the next with nothing in
+                    // between, which is exactly what `Motion.swift` says a
+                    // figure arriving is for.
+                    .contentTransition(.numericText())
                     .foregroundStyle(low ? Khayt.attention : .primary)
                 if low {
                     // The word, not only a colour: a shop reading this at a
@@ -1351,6 +1363,9 @@ struct SpoolCard: View {
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
             .strokeBorder(low ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(Khayt.hairline),
                           lineWidth: low ? 1.5 : 1))
+        .liftsOnHover(hovering)
+        .onHover { hovering = $0 }
+        .animation(Motion.of(Motion.figure, unless: reduced), value: spool.weight)
         .help(spool.material)
     }
 

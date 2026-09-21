@@ -347,6 +347,30 @@ private struct JobMenu: View {
             // reached by name, which is also how they are read on the board.
             .disabled(!canMove || Stage.of(job!) == stage)
         }
+        Divider()
+        // ── ALONG AND BACK, WITHOUT NAMING THE STAGE ─────────────────────
+        //
+        // The stages above are reached by name, which is right when a shop
+        // knows where a job should go. Most of the time it does not need to:
+        // the job is simply further on than it was. That is one gesture, and
+        // until now the only ways to make it were dragging the card across the
+        // board or reading the list and picking the right word.
+        //
+        // ⌘→ / ⌘← rather than a letter: the arrows say direction, and the
+        // board reads left to right. In a mirrored window the shortcut still
+        // says "along" — `Stage.progression` is the order of WORK, not of
+        // pixels, so it does not flip with the layout.
+        //
+        // Both go through `questionFor` and `moveJob` exactly as the stage
+        // buttons above do. Nothing about what a move means is decided here.
+        Button(Words.upfront("mac.move_along")) { step(by: 1) }
+            .keyboardShortcut(.rightArrow, modifiers: .command)
+            .disabled(stepTarget(1) == nil)
+        Button(Words.upfront("mac.move_back")) { step(by: -1) }
+            .keyboardShortcut(.leftArrow, modifiers: .command)
+            .disabled(stepTarget(-1) == nil)
+
+        Divider()
         // Delivered sits with the stages because that is what it answers —
         // where the job is — even though it is not one. Everything below the
         // divider is something you DO to a job rather than somewhere you put it.
@@ -443,6 +467,34 @@ private struct JobMenu: View {
         .keyboardShortcut("p")
         .disabled(job == nil)
     }
+
+    /// Where "along" or "back" would put the selected job, or nil when there
+    /// is nowhere to go — the ends of the progression, a job on hold, or no
+    /// selection at all. Drives both the action and whether it is offered.
+    private func stepTarget(_ delta: Int) -> Stage? {
+        guard canMove, let job, let here = Stage.of(job) else { return nil }
+        guard let there = here.stepped(by: delta) else { return nil }
+        // The same refusal the board shows before a card is dropped. Asked
+        // here so the item is greyed rather than offered and then refused.
+        guard shop.dragRefusal(there) == nil else { return nil }
+        return there
+    }
+
+    /// One step, through the path a drop takes.
+    ///
+    /// SHIPPED IS NOT A STATUS — it is a date stamped on a job that stays
+    /// `completed` — so it is performed the only way it can be, exactly as the
+    /// board's drop handler does it, and before anything asks the gate.
+    private func step(by delta: Int) {
+        guard let id = shop.selection, let there = stepTarget(delta) else { return }
+        if there == .shipped {
+            Task { await shop.markShipped(id) }
+            return
+        }
+        if let ask = shop.questionFor(id, moving: there) { ask(); return }
+        Task { await shop.moveJob(id, to: there) }
+    }
+
 }
 
 private struct ModelMenu: View {

@@ -1546,6 +1546,9 @@ final class Words {
         "mac.calc_rates_default": ["en": "Khayt's defaults", "ar": "الإعدادات الافتراضية"],
         "mac.calc_rates_edited":  ["en": "edited", "ar": "مُعدَّل"],
         "mac.calc_rates_reset":   ["en": "Reset", "ar": "إعادة"],
+        // One step along the way work goes, without naming the stage.
+        "mac.move_along":    ["en": "Move Along",   "ar": "تقديم"],
+        "mac.move_back":     ["en": "Move Back",    "ar": "إرجاع"],
         // The other shelf. Every other `cons.` word is in the shared
         // catalogue already, with its Arabic; these two are this sheet's own.
         "cons.unit_ph":      ["en": "each / ml / roll", "ar": "حبة / مل / لفة"],

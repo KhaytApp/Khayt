@@ -386,6 +386,27 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
     /// flight, and a job with a courier still is.
     static let boardColumns: [Stage] = [.quote, .pending, .on_hold, .printing, .post, .qc, .completed, .shipped]
 
+    /// The way work actually goes, for "move it along" and "move it back".
+    ///
+    /// `boardColumns` WITHOUT `on_hold`, and that is the whole point of having
+    /// a second list: hold sits between pending and printing on the board
+    /// because that is where a held job is easiest to find, but it is a
+    /// detour, not a step. A shop pressing "move along" on a pending job means
+    /// "start printing it", and stepping it into hold instead would be the app
+    /// misreading a plain instruction.
+    ///
+    /// A job that IS on hold has no "along" here on purpose — where it goes
+    /// back to is a decision, and the same menu lists every stage by name.
+    static let progression: [Stage] = boardColumns.filter { $0 != .on_hold }
+
+    /// The next stage along, or nil at either end — and nil for a job on hold.
+    func stepped(by delta: Int) -> Stage? {
+        guard let at = Self.progression.firstIndex(of: self) else { return nil }
+        let next = at + delta
+        guard next >= 0, next < Self.progression.count else { return nil }
+        return Self.progression[next]
+    }
+
     /// The stage a job is in, or nil for a status this app has no column for.
     ///
     /// DELIVERED IS NOT A STATUS. A handed-over job stays `completed` and
