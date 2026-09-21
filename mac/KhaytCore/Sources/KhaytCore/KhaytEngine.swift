@@ -1573,11 +1573,21 @@ public actor KhaytEngine {
     /// name. That is not an omission: it means "copy the bytes that were
     /// already there", and it is what keeps a 400 MB mesh out of this process
     /// entirely. The caller must copy it from the file it read.
+    ///
+    /// The mesh has one part the rule does still decide about: the `<build>`
+    /// block that says where each object sits on the bed. The caller sends that
+    /// block alone (`build` on the member it passes in) and gets a rewritten one
+    /// back the same way, so a conversion can re-tile the plates for a different
+    /// bed size without the mesh ever being here.
     public struct ConvertedMember: Decodable, Sendable {
         public let name: String
         /// The new contents, when this member was rewritten. Nil means the
         /// original bytes, unchanged.
         public let text: String?
+        /// A rewritten `<build>…</build>` block, for the one member that is too
+        /// big to come back whole. The caller splices it into the original
+        /// bytes where it found it; everything either side is untouched.
+        public let buildBlock: String?
     }
 
     public struct Conversion: Decodable, Sendable {
@@ -1601,7 +1611,9 @@ public actor KhaytEngine {
                 // one that was left alone. A config is XML or JSON; the members
                 // this rewrites are never binary.
                 members: planned.members.map((m) => (
-                  m.data == null ? { name: m.name } : { name: m.name, text: String(m.data) }
+                  m.data != null ? { name: m.name, text: String(m.data) }
+                  : m.buildBlock != null ? { name: m.name, buildBlock: String(m.buildBlock) }
+                  : { name: m.name }
                 )),
               };
             })(ARG0, ARG1)
