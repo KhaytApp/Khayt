@@ -6,6 +6,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) The SMTP wire tests failed on a busy machine and blamed the
+  network.** The client waits two minutes in these tests, because a build box
+  running two and a half thousand tests beside a Python SMTP server is not a
+  shop's Mac. The fake server was still on thirty seconds, so under load it
+  was the SERVER that gave up: its TLS handshake timed out while the client
+  was waiting happily, and the failure arrived as "server closed session with
+  no notification" — a network fault, apparently, in code that was working.
+  Measured in the same window: a pure-JavaScript parity test that takes ten
+  milliseconds on a desk took 58 seconds.
+
+  Both ends carry the same figure now, from one constant on each side, and a
+  test fails if the two ever drift apart — raising one alone only moves which
+  end gives up first.
+
 - **(Mac) The Online settings pane sent the shop to the other app for three
   things this app has served since alpha.18.** "The customer intake form, quote
   approval and the calendar feed run in that app for now" was true when it was
