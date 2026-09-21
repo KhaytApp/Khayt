@@ -5308,8 +5308,16 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytLanPages.queuePage(ARG0, { now: ARG1 })",
                           [store, .string(now)], as: String.self)
     }
-    public func lanNotFoundBody() throws -> String {
-        try runtime.call2("JSON.stringify(globalThis.KhaytLanPages.notFound())", [], as: String.self)
+    /// The 404 body, listing what THIS host routes.
+    ///
+    /// The endpoints are passed in rather than taken from the rule's own list:
+    /// that list is the Node server's, and this app serves a subset of it. A
+    /// 404 here that recited it advertised eleven routes that answer 404 on
+    /// this host — five owner-data APIs and six integration webhooks — to a
+    /// caller who has shown no PIN.
+    public func lanNotFoundBody(endpoints: [String]) throws -> String {
+        try runtime.call2("JSON.stringify(globalThis.KhaytLanPages.notFound(ARG0))",
+                          [.array(endpoints.map { .string($0) })], as: String.self)
     }
     /// The four headers every response carries, JSON included.
     public func lanSecurityHeaders() throws -> [String: String] {

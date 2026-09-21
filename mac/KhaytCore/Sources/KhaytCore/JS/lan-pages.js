@@ -144,9 +144,36 @@ setTimeout(()=>location.reload(),30000);
 </body></html>`;
   }
 
-  /** The 404 body: what IS here, for whoever typed the wrong thing. */
-  function notFound() {
-    return { error: 'Not found', endpoints: ['/api/status','/api/orders','/api/queue','/api/machines','/api/inventory','/api/waiting-list','/api/clients','/api/webhook/printer/:machineId','/calendar.ics','/intake','/api/intake','/api/intake/estimate','/api/webhook/salla','/api/webhook/zid','/api/webhook/smsa','/api/webhook/aramex','/api/webhook/spl'] };
+  /**
+   * Every route the Node LAN server answers — what its 404 offers whoever
+   * typed the wrong thing.
+   *
+   * This is NOT "the LAN API". The native Mac app serves a subset of it out of
+   * `LanServer.swift`, and handing a caller this list from THERE advertises
+   * eleven routes that answer 404 on that host — including five owner-data
+   * APIs and six integration webhooks, to a caller who has shown no PIN. A
+   * phone told `/api/clients` exists tries it and is refused; a stranger on the
+   * shop's Wi‑Fi who mistypes a path learns which storefront and which courier
+   * the shop is wired to. Neither is a thing a 404 should say.
+   */
+  const NODE_ENDPOINTS = ['/api/status','/api/orders','/api/queue','/api/machines','/api/inventory','/api/waiting-list','/api/clients','/api/webhook/printer/:machineId','/calendar.ics','/intake','/api/intake','/api/intake/estimate','/api/webhook/salla','/api/webhook/zid','/api/webhook/smsa','/api/webhook/aramex','/api/webhook/spl'];
+
+  /**
+   * The 404 body: what IS here, for whoever typed the wrong thing.
+   *
+   * `endpoints` is the HOST's list, because only the host knows what it routes.
+   * Called with nothing it answers for the Node server, which is the caller
+   * that has always been right about this.
+   */
+  function notFound(endpoints) {
+    // Filtered BEFORE the fallback is decided, not after: a list of empty
+    // strings is a non-empty array that filters down to nothing, and answering
+    // with an empty list reads as "there is nothing here" on a server that is
+    // running and serving. Found by the test below rather than by reading.
+    const given = Array.isArray(endpoints)
+      ? endpoints.filter((e) => typeof e === 'string' && e)
+      : [];
+    return { error: 'Not found', endpoints: given.length ? given : NODE_ENDPOINTS };
   }
 
   /** The four headers every response carries, JSON included — see lan-server.js. */
@@ -157,7 +184,8 @@ setTimeout(()=>location.reload(),30000);
     'Content-Security-Policy': "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'",
   };
 
-  const api = { statusJson, queueJson, manifest, serviceWorker, queuePage, notFound, SECURITY_HEADERS };
+  const api = { statusJson, queueJson, manifest, serviceWorker, queuePage, notFound,
+    NODE_ENDPOINTS, SECURITY_HEADERS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytLanPages = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

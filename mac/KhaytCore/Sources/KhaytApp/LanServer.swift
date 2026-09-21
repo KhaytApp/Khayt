@@ -453,6 +453,26 @@ final class LanServer {
         }
     }
 
+    /// What this server answers, for the 404 to offer whoever typed the wrong
+    /// thing — and ONLY what this server answers.
+    ///
+    /// It used to recite `lan-pages`' list, which is the Node server's: sixteen
+    /// endpoints, eleven of which 404 here. That is wrong twice over. A phone
+    /// told `/api/clients` is available tries it and is refused, and a stranger
+    /// on the shop's Wi‑Fi who mistypes a path is handed the shop's whole
+    /// integration surface — which storefront, which courier — without ever
+    /// showing a PIN.
+    ///
+    /// `LanEndpointsTests` asks this server for every line of it and fails if
+    /// one is not routed, so the list cannot drift from the table below.
+    nonisolated static let endpoints = [
+        "/", "/intake", "/manifest.json", "/sw.js",
+        "/api/status", "/api/queue", "/api/store", "/api/store/deltas",
+        "/api/intake", "/api/intake/estimate", "/api/survey",
+        "/order/:id", "/order/:id/quote", "/order/:id/approve",
+        "/calendar.ics",
+    ]
+
     // MARK: - The routes
 
     func respond(to request: Request) async -> Response {
@@ -614,7 +634,8 @@ final class LanServer {
                             body: png)
 
         default:
-            let body = (try? await engine.lanNotFoundBody()) ?? #"{"error":"Not found"}"#
+            let body = (try? await engine.lanNotFoundBody(endpoints: Self.endpoints))
+                ?? #"{"error":"Not found"}"#
             return .json(404, body)
         }
     }

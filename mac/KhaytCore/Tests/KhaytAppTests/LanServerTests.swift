@@ -507,7 +507,10 @@ struct LanServerTests {
         defer { bench.stop() }
         let missing = try await bench.get("/nothing/here")
         #expect(missing.status == 404)
-        #expect(missing.text == (try await bench.engine.lanNotFoundBody()))
+        // The body is this server's own endpoint list, not the Node server's —
+        // see `LanEndpointsTests` for why that distinction is a security one.
+        #expect(missing.text == (try await bench.engine
+            .lanNotFoundBody(endpoints: LanServer.endpoints)))
         #expect(missing.headers["content-type"] == "application/json")
         let v1 = try await bench.get("/v1/status?format=json")
         let api = try await bench.get("/api/status?format=json")
