@@ -25,7 +25,12 @@ import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const APP = path.join(ROOT, 'mac/KhaytCore/Sources/KhaytApp');
-const OUT = path.join(ROOT, 'design-system/src/tokens/khayt.css');
+/* `--out <path>` so a guard can regenerate into a temp file and compare,
+ * without writing over the committed stylesheet it is checking. */
+const outArg = process.argv.indexOf('--out');
+const OUT = outArg > -1 && process.argv[outArg + 1]
+  ? path.resolve(process.argv[outArg + 1])
+  : path.join(ROOT, 'design-system/src/tokens/khayt.css');
 
 const read = (f) => fs.readFileSync(path.join(APP, f), 'utf8');
 
