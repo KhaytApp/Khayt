@@ -24,7 +24,13 @@ struct MoveBanners: View {
             Banner(text: shop.words.callIt("reorder.auto_drafted",
                                            ["n": .number(Double(shop.autoDrafted))]),
                    symbol: "doc.badge.plus", tint: Role.text2) {
-                Button(shop.words.callIt("common.ok")) { shop.autoDrafted = 0 }
+                // `common.close`, not `common.ok`: there is no `common.ok`
+                // in either this app's table or the shared catalogue, so this
+                // button read the words "common.ok" — `callIt` ends
+                // `return key`, and a key that resolves nowhere renders as
+                // itself. Close is the word the catalogue already has, in
+                // both languages, for dismissing something.
+                Button(shop.words.callIt("common.close")) { shop.autoDrafted = 0 }
             }
         }
         // MONEY THE BOOK IS UNDERSTATING. Not a move's answer like the rest of
