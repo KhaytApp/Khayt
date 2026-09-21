@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import KhaytCore
 @testable import KhaytApp
 
 /// What this Mac says it can do with AI, against what it actually does.
@@ -92,6 +93,39 @@ struct AiRunsHereTests {
                     Comment(rawValue: "`\(id)` is wired end to end on this Mac, but "
                             + "`aiFeaturesOnThisMac` leaves it out — Settings will tell the shop "
                             + "it runs in the Windows and Linux app"))
+        }
+    }
+
+    /// The third direction, which neither of the two above covers.
+    ///
+    /// Both tests reason about the four features THIS FILE knows. A fifth one
+    /// added to `lib/ai-privacy.js` is in neither `chain` nor
+    /// `aiFeaturesOnThisMac`, so both pass — and Settings quietly draws a line
+    /// telling the shop to go and use the other app for it.
+    ///
+    /// That line is the thing being forbidden here. A feature the shared rule
+    /// offers and this app does not perform is a GAP TO CLOSE, not a note to
+    /// print, so it fails the build instead: whoever adds the fifth feature is
+    /// told here rather than a shop being told in Settings.
+    @Test("every AI feature the shared rule offers is one this Mac performs")
+    func nothingIsLeftToTheOtherApp() async throws {
+        let engine = try KhaytEngine()
+        let offered = try await engine.aiFeatures(settings: [:])
+            .map { $0.id }.sorted()
+        #expect(offered.count >= 4, "the shared rule offered \(offered) — the scan is wrong")
+        for id in offered {
+            #expect(Shop.aiRunsHere(id),
+                    Comment(rawValue: "`\(id)` is offered by `lib/ai-privacy.js` and this Mac "
+                            + "does not perform it. Build it here and add it to "
+                            + "`aiFeaturesOnThisMac` and to `chain` — do not leave the shop a "
+                            + "note pointing at another app."))
+        }
+        // And nothing is claimed that the shared rule has never heard of, which
+        // would be a consent switch for a feature nobody can grant.
+        for id in Shop.aiFeaturesOnThisMac.sorted() {
+            #expect(offered.contains(id),
+                    Comment(rawValue: "`\(id)` is claimed here and the shared rule does not "
+                            + "offer it"))
         }
     }
 }

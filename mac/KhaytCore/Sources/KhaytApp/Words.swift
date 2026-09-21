@@ -1936,9 +1936,16 @@ final class Words {
         // which is exactly how a caveat becomes a lie: it outlives the
         // limitation it described. Attached to the features themselves now, so
         // it disappears feature by feature as each one lands.
-        "mac.ai_elsewhere":  ["en": "Runs in the Windows and Linux app for now — switching it on "
-                              + "here records your answer for the whole shop.",
-                              "ar": "يعمل في تطبيق ويندوز ولينكس حاليًا — تشغيله هنا يسجّل إجابتك "
+        //
+        // AND IT NAMES NO OTHER APP. It used to read "Runs in the Windows and
+        // Linux app for now", which is a shop being sent somewhere else for a
+        // feature this one should simply have. Every feature the shared rule
+        // offers is performed here — `AiRunsHereTests.nothingIsLeftToTheOtherApp`
+        // fails the build if a fifth is ever added and not built — so this line
+        // is unreachable today and says the honest thing if it ever is not.
+        "mac.ai_elsewhere":  ["en": "Not available here yet — switching it on "
+                              + "records your answer for the whole shop.",
+                              "ar": "غير متاح هنا بعد — تشغيله يسجّل إجابتك "
                               + "للمتجر كله."],
         // ── DRAFTING A QUOTE FROM A DESCRIPTION ───────────────────────────
         "mac.describe_the_job": ["en": "Describe the job — \"20 cable clips, black PETG\"",

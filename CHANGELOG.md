@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) "Runs in the Windows and Linux app" cannot be printed by
+  accident.** One line was left in the Mac's assistant settings pointing a shop
+  at the other app, and it was unreachable — every AI feature the shared rule
+  offers is performed here. Unreachable is not the same as impossible: a fifth
+  feature added to the shared list would have been in neither the Mac's list
+  nor the test's, so both existing guards would have passed and Settings would
+  have quietly drawn that line. It is a failing build now, which says to build
+  the feature here rather than leave the shop a note. The line itself no longer
+  names another app.
+
+
 - **(Mac) A shop on its own mail server can send from the Mac now, and any
   shop can set email up here at all.** Khayt sends a customer's update through
   SendGrid, Mailgun, or a shop's own SMTP server, and the Mac could do the
