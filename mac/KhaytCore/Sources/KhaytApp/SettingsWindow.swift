@@ -111,7 +111,14 @@ struct SaveBar: View {
 }
 
 /// A labelled row inside a grouped Form.
-private func row<Content: View>(_ label: String, @ViewBuilder _ content: () -> Content) -> some View {
+///
+/// NOT file-private any more: `EmailSettings` is a pane of this window that
+/// lives in its own file, and its first draft hand-rolled an
+/// `HStack { Text; Spacer; control }` instead. That reads the same in source
+/// and does not look the same on screen — `LabeledContent` puts the label in
+/// the platform's own column, aligned with every other row in the window, and
+/// an HStack aligns with nothing.
+func row<Content: View>(_ label: String, @ViewBuilder _ content: () -> Content) -> some View {
     LabeledContent(label) { content() }
 }
 

@@ -72,7 +72,7 @@ enum WebhookClient {
         if (try? await engine.isBlockedHost(host)) ?? true { throw Failure.blocked(host) }
 
         // Layer two: every address it resolves to.
-        for address in resolve(host) {
+        for address in await addresses(of: host) {
             if (try? await engine.isBlockedHost(address)) ?? true {
                 throw Failure.blocked("\(host) → \(address)")
             }
@@ -126,6 +126,31 @@ enum WebhookClient {
             // nil = do not follow; the 3xx is handed back as the response.
             completionHandler(nil)
         }
+    }
+
+    /// Every address a name resolves to, off the thread that asked.
+    ///
+    /// ── `resolve` BLOCKS, AND THIS TYPE IS `@MainActor` ───────────────────
+    ///
+    /// `getaddrinfo` waits for a resolver, and for a name that does not resolve
+    /// it waits until DNS gives up — seconds, on a bad network. Called straight
+    /// from an `async` method of a main-actor type it blocks the main thread,
+    /// so a shop finishing a job with a webhook pointed at a slow name would
+    /// watch the window stop.
+    ///
+    /// It is worse than it looks, because a blocked thread of Swift's
+    /// cooperative pool is a thread no OTHER async work can use either — so the
+    /// damage is not confined to the send that is waiting.
+    ///
+    /// HOW IT WAS FOUND IS NOT WHY IT IS FIXED. It turned up while chasing a CI
+    /// failure that had a different cause entirely (two swapped constants in
+    /// `LanStallTests`), and the first version of this comment claimed the
+    /// blocking call was responsible. It was not. It is fixed because a
+    /// main-actor type must not wait on DNS, which is true on its own.
+    ///
+    /// `Task.detached` runs it on a thread that is allowed to block.
+    static func addresses(of host: String) async -> [String] {
+        await Task.detached(priority: .userInitiated) { resolve(host) }.value
     }
 
     /// Every address a host resolves to, as text the shared rule can read.

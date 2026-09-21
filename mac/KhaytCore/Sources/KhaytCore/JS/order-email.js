@@ -35,13 +35,47 @@
    *
    * This matters to a host, not to a shop: `sendgrid` and `mailgun` are one
    * POST each and anything that can make an HTTPS request can make them.
-   * `custom` is SMTP — a socket, a dialogue, STARTTLS — which Electron's main
-   * process implements and the Mac app does not. A host that cannot carry a
-   * provider must refuse the move rather than make it and skip the email, so
-   * it has to be able to ask WHICH provider before the move happens. That is
-   * what `via` on an `outboundFor` entry is for.
+   * `custom` is SMTP — a socket, a dialogue, STARTTLS — which is a protocol
+   * rather than a request. A host that cannot carry a provider must refuse the
+   * move rather than make it and skip the email, so it has to be able to ask
+   * WHICH provider before the move happens. That is what `via` on an
+   * `outboundFor` entry is for.
+   *
+   * BOTH APPS CARRY ALL THREE NOW. This list said what the Mac could not do
+   * until it grew an SMTP client of its own (`SmtpClient.swift`), and it is
+   * still the right question for a host to ask — a third host, or a provider
+   * added tomorrow, would be in exactly the position the Mac was in. What it
+   * no longer means is "the other app can and this one cannot".
    */
   const HTTP_PROVIDERS = ['sendgrid', 'mailgun'];
+
+  /** Every provider either app can be configured with. */
+  const PROVIDERS = ['none', 'sendgrid', 'mailgun', 'custom', 'mailto'];
+
+  /**
+   * The moves a shop can ask to have emailed.
+   *
+   * ONE LIST, because there were two: `renderer/settings.js` drew the
+   * checkboxes from a literal of its own while `wouldSend` above matched
+   * whatever was stored against the status. A key in one and not the other is
+   * a trigger a shop can switch on and never fire, or one that fires with no
+   * way to switch it off — and neither shows up as an error anywhere.
+   *
+   * The labels are English here and are TRANSLATED by whoever draws them; the
+   * keys are the status values `wouldSend` matches.
+   */
+  const TRIGGERS = [
+    { key: 'printing',         label: 'Printing started' },
+    { key: 'post',             label: 'In post-processing' },
+    { key: 'completed',        label: 'Ready for pickup' },
+    { key: 'quote',            label: 'Quote created' },
+    { key: 'payment_received', label: 'Payment received' },
+  ];
+
+  /** Is this a move a shop may ask to have emailed? */
+  function isTrigger(key) {
+    return TRIGGERS.some((t) => t.key === String(key || ''));
+  }
 
   /** Escape for HTML text. Same five characters as `renderer/util.js`. */
   function esc(s) {
@@ -137,7 +171,7 @@
     return { to: decision.to, subject, html, provider: decision.provider };
   }
 
-  const api = { HTTP_PROVIDERS, wouldSend, isHttpProvider, messageFor };
+  const api = { HTTP_PROVIDERS, PROVIDERS, TRIGGERS, isTrigger, wouldSend, isHttpProvider, messageFor };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderEmail = api;

@@ -438,16 +438,21 @@ final class Words {
                                "ar": "يتطلب هذا النقل أمراً لا يعرفه هذا التطبيق، فلم يتغير شيء."],
         "mac.move_reaches":  ["en": "Finishing this here would skip",
                               "ar": "إنهاء العمل هنا سيتخطى"],
-        "mac.move_in_khayt": ["en": "Do it in Khayt so it is sent.",
-                              "ar": "نفّذه في خيط ليُرسل."],
+        // WHAT TO FIX, NOT WHERE TO GO. This used to read "Do it in Khayt so
+        // it is sent" — which sent a shop to another app rather than telling
+        // it that a mail provider it configured is one this app has no door
+        // for. Every provider the other app sends through, this one now sends
+        // through too, so reaching here means the setting is the problem.
+        "mac.move_in_khayt": ["en": "Set up how these are sent in Settings, then move it.",
+                              "ar": "اضبط طريقة الإرسال في الإعدادات ثم انقله."],
         "mac.reach_webhooks":      ["en": "a webhook",        "ar": "إشعار ويب"],
         "mac.reach_event_webhook": ["en": "an order webhook", "ar": "إشعار ويب للطلب"],
         "mac.reach_telegram":      ["en": "a Telegram message", "ar": "رسالة تيليجرام"],
-        // Only a shop on SMTP is refused for email now: SendGrid and Mailgun
-        // are sent from here. Naming the provider is the difference between a
-        // shop that knows what to change and one that thinks email is missing.
-        "mac.reach_email":         ["en": "an email through your own mail server (SMTP)",
-                                    "ar": "بريداً عبر خادم بريدك (SMTP)"],
+        // SMTP used to be named here, because a shop on its own relay was the
+        // one case this app could not carry. `SmtpClient` carries it now, so
+        // what is left is a provider this app has never heard of — which the
+        // word "email" describes and a provider name would not.
+        "mac.reach_email":         ["en": "an email", "ar": "بريداً إلكترونياً"],
         "mac.reach_portal":        ["en": "the customer's tracking link", "ar": "رابط متابعة العميل"],
         "mac.and":           ["en": "and",            "ar": "و"],
         // The menu bar's own titles, said before any book is open
@@ -1484,6 +1489,43 @@ final class Words {
                               "ar": "حذف المفتاح المحفوظ"],
         "mac.ai_key_unsealed": ["en": "That key could not be encrypted, so it was not saved. The book syncs and is backed up, and a key in the clear would go with it.",
                                 "ar": "لم يتمكّن خيط من تشفير المفتاح، فلم يُحفظ. الدفتر يُزامن ويُنسخ احتياطيًا، والمفتاح غير المشفّر سينتقل معه."],
+        // ── SETTING EMAIL UP, WHICH THIS APP COULD NOT DO ─────────────────
+        //
+        // The shared catalogue already names every field — `set.email_provider`,
+        // `set.smtp_host`, `set.smtp_pass` and the rest — because the other
+        // app's screen has had them for years. What is here is only what that
+        // screen never had to say: the two secrets this app seals itself, and
+        // the sentences a shop needs when a send goes wrong.
+        "mac.email_forget_key": ["en": "Forget the stored API key",
+                                 "ar": "حذف مفتاح الواجهة المحفوظ"],
+        "mac.email_forget_pass": ["en": "Forget the stored password",
+                                  "ar": "حذف كلمة المرور المحفوظة"],
+        "mac.email_unsealed": ["en": "That could not be encrypted, so nothing was saved. The book syncs and is backed up, and a password in the clear would go with it.",
+                               "ar": "تعذّر التشفير، فلم يُحفظ شيء. الدفتر يُزامن ويُنسخ احتياطيًا، وكلمة المرور غير المشفّرة ستنتقل معه."],
+        // 465 and 587 are not two ways of saying the same thing, and a shop
+        // that picks the wrong one gets a failure that names neither.
+        "mac.smtp_ports": ["en": "Port 465 is encrypted from the start. Port 587 starts in the clear and asks the server to encrypt — and Khayt will not send your password if the server refuses.",
+                           "ar": "المنفذ 465 مشفّر من البداية. المنفذ 587 يبدأ دون تشفير ثم يطلب من الخادم تشفير الاتصال — ولن يرسل خيط كلمة مرورك إن رفض الخادم."],
+        "mac.email_no_triggers": ["en": "Nothing is set to send yet, so no customer will be emailed.",
+                                  "ar": "لم يُحدَّد أي حدث للإرسال، فلن يصل أي عميل بريد."],
+        "mac.email_mailto_hint": ["en": "This opens a message in your mail app for you to send yourself. Khayt cannot send it for you, so campaigns and automatic updates stay off.",
+                                  "ar": "يفتح هذا رسالة في تطبيق البريد لديك لترسلها بنفسك. لا يستطيع خيط إرسالها نيابةً عنك، لذا تبقى الحملات والتحديثات التلقائية معطّلة."],
+        "mac.email_no_shop_address": ["en": "This shop has no email address in Settings, so there is nowhere to send a test.",
+                                      "ar": "لا يوجد بريد للمحل في الإعدادات، فلا مكان لإرسال رسالة تجريبية إليه."],
+        "mac.email_test_subject": ["en": "Khayt — test email", "ar": "خيط — رسالة تجريبية"],
+        "mac.email_test_body": ["en": "This is a test from Khayt. Email is working.",
+                                "ar": "هذه رسالة تجريبية من خيط. البريد يعمل."],
+        "mac.email_test_failed": ["en": "The test did not send:",
+                                  "ar": "لم تُرسل الرسالة التجريبية:"],
+        // The moves a shop can have emailed. The keys come from
+        // `lib/order-email.js`; these are that list said in the shop's own
+        // language, and a trigger added there without a word here still draws
+        // readably — see `EmailSettings.label`.
+        "mac.email_when_printing": ["en": "Printing starts", "ar": "عند بدء الطباعة"],
+        "mac.email_when_post": ["en": "It goes to finishing", "ar": "عند الانتقال إلى التشطيب"],
+        "mac.email_when_completed": ["en": "It is ready to collect", "ar": "عند الجاهزية للاستلام"],
+        "mac.email_when_quote": ["en": "A quote is made", "ar": "عند إنشاء عرض سعر"],
+        "mac.email_when_payment_received": ["en": "A payment arrives", "ar": "عند استلام دفعة"],
         "risk.looking": ["en": "Reading the mesh…", "ar": "جارٍ قراءة المجسّم…"],
         "risk.clear": ["en": "Nothing to flag on this one.", "ar": "لا ملاحظات على هذا الملف."],
         "risk.not_looked": ["en": "Khayt has not looked at this mesh yet. Reading it takes a few seconds on a large model.",
@@ -1744,11 +1786,17 @@ final class Words {
         "mac.spool_history_total": ["en": "Used altogether", "ar": "المستخدم إجمالاً"],
         "mac.campaign_confirm_hint": ["en": "One message each, a third of a second apart. It cannot be taken back.",
                                       "ar": "رسالة لكل عميل، بفاصل ثلث ثانية. لا يمكن التراجع عن ذلك."],
-        // Refused BY NAME, the way a move through an SMTP provider is: the
-        // question is not "can this app email" but "can it email through
-        // this", and a shop on SMTP still has the other app.
-        "mac.campaign_needs_http": ["en": "Campaigns go through SendGrid or Mailgun. A shop on its own SMTP server still sends these from the Windows and Linux app.",
-                                    "ar": "تُرسل الحملات عبر SendGrid أو Mailgun. أما المتجر الذي يستخدم خادم SMTP خاصاً به فيرسلها من تطبيق ويندوز ولينكس."],
+        // ── WHAT THIS USED TO SAY ─────────────────────────────────────────
+        //
+        // "Campaigns go through SendGrid or Mailgun. A shop on its own SMTP
+        // server still sends these from the Windows and Linux app." Which was
+        // accurate and was still the wrong thing to print: a shop reading it
+        // has a mailing list, this app, and an instruction to go and install
+        // another one. SMTP is a door here now, so the only shops that reach
+        // this line are the ones that have not set email up at all — and
+        // Settings is where they do that, in this app.
+        "mac.campaign_needs_email": ["en": "Set up an email provider in Settings before sending a campaign.",
+                                     "ar": "اضبط مزوّد البريد في الإعدادات قبل إرسال حملة."],
         "mac.whatsapp": ["en": "WhatsApp", "ar": "واتساب"],
         "mac.export_accounting_where": [
             "en": "Two files are written here: one of invoices and one of expenses.",
@@ -1888,9 +1936,16 @@ final class Words {
         // which is exactly how a caveat becomes a lie: it outlives the
         // limitation it described. Attached to the features themselves now, so
         // it disappears feature by feature as each one lands.
-        "mac.ai_elsewhere":  ["en": "Runs in the Windows and Linux app for now — switching it on "
-                              + "here records your answer for the whole shop.",
-                              "ar": "يعمل في تطبيق ويندوز ولينكس حاليًا — تشغيله هنا يسجّل إجابتك "
+        //
+        // AND IT NAMES NO OTHER APP. It used to read "Runs in the Windows and
+        // Linux app for now", which is a shop being sent somewhere else for a
+        // feature this one should simply have. Every feature the shared rule
+        // offers is performed here — `AiRunsHereTests.nothingIsLeftToTheOtherApp`
+        // fails the build if a fifth is ever added and not built — so this line
+        // is unreachable today and says the honest thing if it ever is not.
+        "mac.ai_elsewhere":  ["en": "Not available here yet — switching it on "
+                              + "records your answer for the whole shop.",
+                              "ar": "غير متاح هنا بعد — تشغيله يسجّل إجابتك "
                               + "للمتجر كله."],
         // ── DRAFTING A QUOTE FROM A DESCRIPTION ───────────────────────────
         "mac.describe_the_job": ["en": "Describe the job — \"20 cable clips, black PETG\"",

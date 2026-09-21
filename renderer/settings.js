@@ -37,13 +37,10 @@ function renderEmailNotificationSettings() {
   const el = $('#emailNotificationsSection');
   if (!el) return;
   const cfg = settings.emailConfig || {};
-  const triggers = [
-    { key: 'printing',         label: 'Printing started' },
-    { key: 'post',             label: 'In post-processing' },
-    { key: 'completed',        label: 'Ready for pickup' },
-    { key: 'quote',            label: 'Quote created' },
-    { key: 'payment_received', label: 'Payment received' },
-  ];
+  // The shared list, not a copy of it: the Mac's email settings draw the same
+  // checkboxes, and a key in one app's literal and not the other's is a
+  // trigger a shop can switch on that never fires.
+  const triggers = KhaytOrderEmail.TRIGGERS;
   el.innerHTML = `
     <div style="margin-bottom:12px;">
       <label style="margin-top:0;">${escapeHtml(t('set.email_provider'))}</label>

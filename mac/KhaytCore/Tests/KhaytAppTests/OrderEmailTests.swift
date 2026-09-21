@@ -108,22 +108,47 @@ struct OrderEmailTests {
 
     // MARK: - What this app can and cannot carry
 
-    @Test("SMTP is refused by name, and the move does not happen")
-    func smtpRefused() async throws {
+    /// SMTP used to be refused here, by name, and the shop was told to finish
+    /// the job in the other app. `SmtpClient` carries it now.
+    @Test("a shop on its own SMTP server can finish the job here")
+    func smtpIsCarried() async throws {
         var root = Self.book([
             "provider": .string("custom"),
             "triggers": .array([.string("completed")]),
             "smtpHost": .string("mail.example.com"),
         ])
-        await #expect(throws: (any Error).self) {
-            _ = try await Self.move(&root, .completed)
+        let out = try await Self.move(&root, .completed)
+        let mail = try #require(out.email, "the move should have carried an email")
+        #expect(mail.provider == "custom")
+        #expect(mail.to == "buyer@example.com")
+        #expect(!out.undo.isEmpty, "the move itself must have happened")
+        // NOTHING WAS SENT HERE. `applyMove` addresses the message; `Shop.post`
+        // opens the socket, afterwards and outside the write. A test that
+        // reached a mail server would be a test that needs one.
+    }
+
+    /// The refusal still exists — it is just about a different thing now.
+    @Test("a provider this app has no door for is still refused, and nothing moves")
+    func unknownProviderRefused() async throws {
+        // `custom` with nothing typed into it: a shop that started configuring
+        // and stopped. There is no relay to open a connection to, so carrying
+        // the move would mean finishing the job and telling nobody.
+        for config in [["provider": JSONValue.string("custom"),
+                        "triggers": .array([.string("completed")])],
+                       ["provider": .string("postmark"),
+                        "triggers": .array([.string("completed")]),
+                        "apiKey": .string("k")]] {
+            var root = Self.book(config)
+            await #expect(throws: (any Error).self) {
+                _ = try await Self.move(&root, .completed)
+            }
+            // And the job is still where it was: a refused move writes nothing.
+            let orders = Shop.rows(root, "printLog")
+            guard case .object(let job)? = orders.first else {
+                Issue.record("the job is gone"); return
+            }
+            #expect(Shop.plainString(job["status"]) == "printing")
         }
-        // And the job is still where it was: a refused move writes nothing.
-        let orders = Shop.rows(root, "printLog")
-        guard case .object(let job)? = orders.first else {
-            Issue.record("the job is gone"); return
-        }
-        #expect(Shop.plainString(job["status"]) == "printing")
     }
 
     @Test("the providers this app carries are the module's, not a Swift list")

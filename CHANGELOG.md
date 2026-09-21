@@ -6,6 +6,47 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) "Runs in the Windows and Linux app" cannot be printed by
+  accident.** One line was left in the Mac's assistant settings pointing a shop
+  at the other app, and it was unreachable — every AI feature the shared rule
+  offers is performed here. Unreachable is not the same as impossible: a fifth
+  feature added to the shared list would have been in neither the Mac's list
+  nor the test's, so both existing guards would have passed and Settings would
+  have quietly drawn that line. It is a failing build now, which says to build
+  the feature here rather than leave the shop a note. The line itself no longer
+  names another app.
+
+- **(Mac) A shop on its own mail server can send from the Mac now, and any
+  shop can set email up here at all.** Khayt sends a customer's update through
+  SendGrid, Mailgun, or a shop's own SMTP server, and the Mac could do the
+  first two. The third was refused by name and the shop was told to go and do
+  it in the Windows and Linux app — which is not an answer when the Mac is the
+  app you are using. It speaks SMTP itself now, on port 465 or on 587 with the
+  upgrade to an encrypted connection that most mail servers ask for, and it
+  will not send your password to a server that refuses to encrypt.
+
+  Underneath that was a larger gap nobody had named: there was no email
+  settings screen on the Mac at all. Every way this app sends mail reads
+  settings that only the other app could write, so a Mac shop could use an
+  account somebody else had set up and could set up none of its own. Settings →
+  Integrations now has the provider, the from address, the keys or the server
+  details, which moves get emailed, and a Send test email button that tells you
+  what a mail server said rather than that "it failed".
+
+- **(Everyone) A stored key or password could be replaced but never forgotten,
+  and two ways to be told a customer was not emailed.** "Forget the stored key"
+  on the assistant settings could be switched on and saved and left the key
+  exactly where it was — a shop that meant to revoke a key would believe it
+  had. Asking for a stored secret to be forgotten now forgets it, on the
+  assistant and on the new email settings both. Separately, the check for
+  whether a mail server offered to encrypt matched the word "STARTTLS"
+  anywhere in the server's reply, so a server whose greeting merely contained
+  it could talk either app into sending a password over an unencrypted
+  connection; it has to be offered properly now. And the list of moves a shop
+  can have emailed lived in two places that could disagree, which is a switch
+  that never fires or one that cannot be turned off.
+
+
 - **(Mac) The board can be worked from the keyboard.** It could not be at all:
   the library was the only screen in the app with arrow keys, and the board is
   the one a shop stands at with a part in one hand. The arrows walk the

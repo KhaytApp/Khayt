@@ -575,11 +575,72 @@ test('an address a key must not travel to is refused, and the stored one kept', 
 
 test('the sealed key is opaque and never re-encoded', () => {
   // The host seals it before it arrives here. This must not inspect, trim or
-  // re-wrap it, and an absent field means "keep what is stored" — which is what
+  // re-wrap it, and an ABSENT field means "keep what is stored" — which is what
   // a masked field on screen means.
   assert.equal(apply(heldAi(), { ai: { enabled: true } }).ai.apiKey, '__enc__sealed');
-  assert.equal(apply(heldAi(), { ai: { apiKey: '' } }).ai.apiKey, '__enc__sealed');
   assert.equal(apply(heldAi(), { ai: { apiKey: '__enc__new' } }).ai.apiKey, '__enc__new');
+});
+
+test('an empty key clears it, because absent and empty are different asks', () => {
+  // This test used to assert the opposite, and the opposite is what shipped:
+  // `apiKey: ''` kept the stored key. Which made the Mac's "Forget the stored
+  // key" switch a control that could be turned on, saved, and change nothing —
+  // so a shop that meant to revoke a key believed it had.
+  //
+  // Absent is "nobody typed in the masked field". Empty is "forget it". Only a
+  // screen that means the second sends it: `readSettingsForm` does not carry
+  // `ai` or `emailConfig` at all, so no ordinary save can reach this by
+  // accident.
+  assert.equal(apply(heldAi(), { ai: { apiKey: '' } }).ai.apiKey, '');
+  // And clearing the key leaves everything else about the assistant alone.
+  const out = apply(heldAi(), { ai: { apiKey: '' } });
+  assert.equal(out.ai.provider, heldAi().ai.provider);
+});
+
+test('email settings save, which they did not before', () => {
+  // `out.emailConfig` kept whatever was stored and ignored the form, because
+  // the only screen that ever wrote one saved the whole book directly. The Mac
+  // has no such path — everything it saves goes through this function — so its
+  // email settings screen appeared to save and changed nothing.
+  const held = { emailConfig: { provider: 'sendgrid', apiKey: '__enc__k' } };
+  const out = apply(held, {
+    emailConfig: {
+      provider: 'custom',
+      smtpHost: '  SMTP.Shop.TEST  ',
+      smtpPort: '465',
+      smtpUser: 'orders@shop.test',
+      smtpSecure: true,
+      triggers: ['completed', 'completed', 'not-a-status'],
+    },
+  });
+  assert.equal(out.emailConfig.provider, 'custom');
+  // Trimmed and lowered: a hostname is not case-sensitive and a pasted one
+  // arrives with whitespace on it.
+  assert.equal(out.emailConfig.smtpHost, 'smtp.shop.test');
+  assert.equal(out.emailConfig.smtpPort, 465);
+  assert.equal(out.emailConfig.smtpSecure, true);
+  // Known triggers only, and each one once. A status nobody has a switch for
+  // is a trigger nobody asked for, and it would sit in the book looking on.
+  assert.deepEqual(out.emailConfig.triggers, ['completed']);
+  // The key nobody mentioned is still there.
+  assert.equal(out.emailConfig.apiKey, '__enc__k');
+});
+
+test('an email provider neither app knows is not written', () => {
+  const held = { emailConfig: { provider: 'sendgrid', apiKey: '__enc__k' } };
+  assert.equal(apply(held, { emailConfig: { provider: 'postmark' } }).emailConfig.provider,
+    'sendgrid');
+  // A port outside the range is a typo, not a port.
+  const bad = (v) => apply(held, { emailConfig: { smtpPort: v } }).emailConfig.smtpPort;
+  assert.equal(bad(0), 587);
+  assert.equal(bad(70000), 587);
+  assert.equal(bad('not a port'), 587);
+  assert.equal(bad(465), 465);
+});
+
+test('an email form that is absent leaves the stored settings alone', () => {
+  const held = { emailConfig: { provider: 'mailgun', domain: 'mg.test', apiKey: '__enc__k' } };
+  assert.deepEqual(apply(held, {}).emailConfig, held.emailConfig);
 });
 
 test('a field the form does not know about survives', () => {

@@ -1829,6 +1829,32 @@ public actor KhaytEngine {
         try runtime.call2("KhaytAiProviders.providers()", [], as: [AiProvider].self)
     }
 
+    // MARK: - Email
+
+    /// One move a shop can ask to have emailed.
+    public struct EmailTrigger: Decodable, Sendable, Identifiable, Equatable {
+        /// The status value `wouldSend` matches — `completed`, `quote`, …
+        public let key: String
+        /// English, from the module. A host that can translate should.
+        public let label: String
+        public var id: String { key }
+    }
+
+    /// The moves a shop can ask to have emailed.
+    ///
+    /// Asked rather than listed in Swift: this was a literal in
+    /// `renderer/settings.js` and a lookup in `order-email.js`, and a key in
+    /// one and not the other is a trigger a shop can switch on that never
+    /// fires. Two apps drawing the same checkboxes must draw the same ones.
+    public func emailTriggers() throws -> [EmailTrigger] {
+        try runtime.call2("KhaytOrderEmail.TRIGGERS", [], as: [EmailTrigger].self)
+    }
+
+    /// Every provider a shop may be configured with, `none` included.
+    public func emailProviders() throws -> [String] {
+        try runtime.call2("KhaytOrderEmail.PROVIDERS", [], as: [String].self)
+    }
+
     /// The provider a shop has chosen, falling back the way the rule does.
     public func aiProviderOf(settings: [String: JSONValue]) throws -> AiProvider {
         try runtime.call2("""

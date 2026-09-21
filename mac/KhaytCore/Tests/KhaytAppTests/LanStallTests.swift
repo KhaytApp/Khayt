@@ -66,11 +66,33 @@ struct LanStallTests {
     /// Each bench now carries its own.
     private static let short: TimeInterval = 1
 
+    /// How long the probe waits for the server to hang up.
+    ///
+    /// ── WHY THIS IS SIXTY AND NOT EIGHT ───────────────────────────────────
+    ///
+    /// What these tests prove is that an idle connection is LET GO rather than
+    /// held for ever. "For ever" is the claim; the exact second is not.
+    ///
+    /// At eight, they were a timing race against the CI runner and lost it
+    /// repeatedly — three times in one afternoon on one PR, each read as a
+    /// flake and re-run at a cost of forty minutes apiece. The measurement
+    /// that settled it: in the same window, `SmtpParityTests` — a pure
+    /// JavaScript parity suite that takes ten milliseconds on a desk — took
+    /// **66 seconds**. Every suite in the bundle starts at once and the runner
+    /// is starved for about a minute, so the server's one-second timeout task
+    /// simply had not been scheduled by the time the probe gave up. The server
+    /// was right and the probe was impatient.
+    ///
+    /// Sixty keeps the property exactly — a server that never closes still
+    /// fails — and costs nothing on a run where the close happens in a second,
+    /// because the probe returns as soon as it does.
+    nonisolated static let patience: TimeInterval = 60
+
     @Test("a connection that sends nothing is let go, not held for ever")
     func silentConnection() async throws {
         let bench = try await LanServerTests.Bench(readTimeout: Self.short)
         let port = bench.port
-        let verdict = await Task.detached { Self.stall(port: port, send: nil, waitFor: 8) }.value
+        let verdict = await Task.detached { Self.stall(port: port, send: nil, waitFor: Self.patience) }.value
         #expect(verdict == "closed",
                 Comment(rawValue: "a silent client was \(verdict) — it holds a connection and a task"))
     }
@@ -80,7 +102,7 @@ struct LanStallTests {
         let bench = try await LanServerTests.Bench(readTimeout: Self.short)
         let port = bench.port
         let head = "POST /api/intake HTTP/1.1\r\nHost: x\r\nContent-Length: 1000\r\n\r\n"
-        let verdict = await Task.detached { Self.stall(port: port, send: head, waitFor: 8) }.value
+        let verdict = await Task.detached { Self.stall(port: port, send: head, waitFor: Self.patience) }.value
         #expect(verdict == "closed", Comment(rawValue: "a stalled body was \(verdict)"))
     }
 
@@ -89,7 +111,7 @@ struct LanStallTests {
         let bench = try await LanServerTests.Bench(readTimeout: Self.short)
         let port = bench.port
         let head = "GET /api/status HTTP/1.1\r\nHost: x\r\n"
-        let verdict = await Task.detached { Self.stall(port: port, send: head, waitFor: 8) }.value
+        let verdict = await Task.detached { Self.stall(port: port, send: head, waitFor: Self.patience) }.value
         #expect(verdict == "closed", Comment(rawValue: "a partial head was \(verdict)"))
     }
 

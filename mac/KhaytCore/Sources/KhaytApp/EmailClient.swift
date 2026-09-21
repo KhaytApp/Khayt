@@ -7,21 +7,27 @@ import KhaytCore
 /// here is the door each provider opens: SendGrid and Mailgun are one HTTPS
 /// POST apiece, with different shapes and different ways of saying no.
 ///
-/// ── WHY THERE IS NO SMTP HERE ─────────────────────────────────────────────
+/// ── AND THE THIRD, WHICH IS A PROTOCOL ────────────────────────────────────
 ///
-/// The other app's third provider, `custom`, is SMTP: a socket, EHLO, STARTTLS,
-/// AUTH, a dialogue with a server the shop names. That is not a missing `if` —
-/// it is a protocol, and writing a second implementation of it is how two apps
-/// come to disagree about whether a customer was told. So a shop on SMTP still
-/// has its move REFUSED here, by name, and `NeedsTheOtherAppTests` carries the
-/// gap with that sentence attached.
+/// `custom` is the shop's own SMTP relay: a socket, a greeting, STARTTLS, AUTH,
+/// a dialogue. This file refused it by name for as long as it existed, and the
+/// comment here used to explain why — writing a second implementation of a
+/// protocol is how two apps come to disagree about whether a customer was told.
 ///
-/// ── AND WHY THE HOSTS ARE NOT GUARDED LIKE A WEBHOOK'S ────────────────────
+/// That was a reason to SHARE the parts that can disagree, not a reason to
+/// leave a shop unable to send. The rules with an opinion in them now live in
+/// `lib/smtp-format.js`, which both apps read; `SmtpClient` is the socket, and
+/// sockets have no opinions. See that file for the STARTTLS upgrade, which is
+/// the only genuinely hard part.
 ///
-/// `WebhookClient` resolves the host and refuses private addresses because the
-/// URL is typed by the shop. These two are not: they are constants in this
-/// file, and the only thing a shop supplies is a key. There is nothing for an
-/// SSRF guard to guard.
+/// ── WHICH HOSTS ARE GUARDED, AND WHICH NEED NOT BE ────────────────────────
+///
+/// SendGrid's and Mailgun's are constants in this file; the only thing a shop
+/// supplies is a key, so there is nothing for an SSRF guard to guard. The SMTP
+/// relay is the opposite — a hostname typed into a settings field — and it gets
+/// the same two layers `WebhookClient` applies: the name, and every address it
+/// resolves to. That guard lives in `SmtpClient.send`, next to the connection
+/// it protects.
 @MainActor
 enum EmailClient {
 
@@ -59,9 +65,32 @@ enum EmailClient {
     /// `hub:send-email` does.
     static func send(_ mail: OrderEmail, apiKey: String,
                      config: [String: JSONValue],
+                     smtpPassword: String = "",
+                     engine: KhaytEngine? = nil,
                      session: URLSession = .shared) async throws {
         let from = str(config["fromEmail"]) ?? "noreply@khaytapp.com"
         let fromName = str(config["fromName"]) ?? "Khayt"
+
+        // SMTP FIRST, because it is the one provider with no API key: a relay
+        // is a host, a user and a password. Checking the key before the switch
+        // would refuse every SMTP shop for the wrong reason.
+        if mail.provider == "custom" {
+            guard let engine else { throw Failure.unsupported(mail.provider) }
+            let user = str(config["smtpUser"]) ?? ""
+            try await SmtpClient.send(mail, relay: SmtpClient.Relay(
+                host: str(config["smtpHost"]) ?? "",
+                port: smtpPort(config["smtpPort"]),
+                user: user,
+                password: smtpPassword,
+                secure: bool(config["smtpSecure"]),
+                // A relay almost always insists the envelope sender be the
+                // account that authenticated, so the user is the fallback
+                // rather than Khayt's address — which is what `main.js` does.
+                from: str(config["fromEmail"]) ?? (user.isEmpty ? from : user),
+                fromName: fromName), engine: engine)
+            return
+        }
+
         guard !apiKey.isEmpty else { throw Failure.missingKey(mail.provider) }
 
         switch mail.provider {
@@ -102,10 +131,29 @@ enum EmailClient {
                 session: session)
 
         default:
-            // `custom` (SMTP), `mailto`, or something added to the other app
-            // and not to this one. Refused by name rather than dropped.
+            // `mailto`, or something added to the other app and not to this
+            // one. Refused by name rather than dropped.
             throw Failure.unsupported(mail.provider)
         }
+    }
+
+    /// The port, however the book happens to hold it.
+    ///
+    /// `renderer/settings.js` writes it from a `type="number"` input, which
+    /// gives a number — but a book that has been through an export, an import
+    /// or a hand edit can hold the string, and `main.js` reads `smtpPort || 587`
+    /// either way. A `0` is the field left empty, not a port.
+    static func smtpPort(_ value: JSONValue?) -> UInt16 {
+        var raw = 0
+        if case .number(let n)? = value { raw = Int(n) }
+        if case .string(let s)? = value, let n = Int(s) { raw = n }
+        guard (1...65535).contains(raw) else { return 587 }
+        return UInt16(raw)
+    }
+
+    private static func bool(_ value: JSONValue?) -> Bool {
+        if case .bool(let b)? = value { return b }
+        return false
     }
 
     // MARK: - Private
