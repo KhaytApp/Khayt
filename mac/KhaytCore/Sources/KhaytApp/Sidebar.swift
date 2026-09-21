@@ -167,6 +167,7 @@ struct Sidebar: View {
         /// The colour of the count, where the count is news. Only the
         /// dashboard's is: it is how many things want a person today.
         var tint: Color?
+        @Environment(\.accessibilityReduceMotion) private var reduced
 
         var body: some View {
             HStack {
@@ -207,10 +208,19 @@ struct Sidebar: View {
                         Text("\(count)")
                             .font(.caption)
                             .monospacedDigit()
+                            .contentTransition(.numericText())
                             .foregroundStyle(selected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                     }
                 }
             }
+            // THE COUNT CHANGES AT THE MOMENT THE CARD MOVES.
+            //
+            // Moving a job along changes a stage count here in the same frame
+            // the card lands in its new column. The card travels and the
+            // number beside it jumped — two halves of one reading disagreeing,
+            // which is the fault the running-print percentage had between the
+            // dashboard and the floor strip.
+            .animation(Motion.of(Motion.figure, unless: reduced), value: count)
         }
     }
 }

@@ -27,6 +27,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   very one. It scrolls now, and the table is drawn the height of what is in it
   — a shop with two quarters was being shown room for eight, then a gap.
 
+- **(Mac) The count beside a job moves with it, the shelf answers the pointer,
+  and a job can be sent along without naming where.** Moving a job changes a
+  count in the sidebar at the same instant the card lands in its new column —
+  the card travelled and the number jumped, which is one reading told two ways.
+  They move together now. The shelf had nothing that responded at all: a spool
+  card lifts under the pointer like the board's cards and the machine tiles do,
+  and the weight rolls down when a finished job takes grams off it, which is
+  the most physical thing that happens in the whole app and used to happen with
+  no motion at all. And ⌘→ / ⌘← send the selected job one step along the way
+  work goes, or back — the board's order of COLUMNS puts hold between pending
+  and printing, so stepping by column would read "get on with it" as "stop";
+  this follows the order of work instead and offers nothing at all on a held
+  job, because where that resumes to is a decision rather than a step.
+
 - **(Mac) The board draws the thing it exists for.** A job changing column is
   the one moment a board is for, and it was the one moment it did not draw: the
   card vanished from one column and appeared in another between two frames. It
