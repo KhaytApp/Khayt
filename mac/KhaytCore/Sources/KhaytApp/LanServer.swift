@@ -22,10 +22,9 @@ import KhaytCore
 /// the store and its deltas, the three files that make the queue installable
 /// on a phone's home screen, the customer intake form and its estimate, the
 /// quote page and its approval, the order's own tracking page and survey, and
-/// `/calendar.ics`. It arrived one slice at a time and the list above is the
-/// end of that; what has NOT been lifted is the webhooks, and Node's short
-/// `/status/<id>` alias for a tracking page this app serves at
-/// `/order/<id>/status`.
+/// `/calendar.ics`, and the other app's `/status/<id>` address for that same
+/// tracking page. It arrived one slice at a time and the list above is the end
+/// of that; what has NOT been lifted is the webhooks.
 ///
 /// That list is not decoration: `OnlinePaneTruthTests` reads this route table
 /// and fails the build if the Online settings pane sends a shop to the other
@@ -469,7 +468,7 @@ final class LanServer {
         "/", "/intake", "/manifest.json", "/sw.js",
         "/api/status", "/api/queue", "/api/store", "/api/store/deltas",
         "/api/intake", "/api/intake/estimate", "/api/survey",
-        "/order/:id", "/order/:id/quote", "/order/:id/approve",
+        "/order/:id", "/order/:id/quote", "/order/:id/approve", "/status/:id",
         "/calendar.ics",
     ]
 
@@ -602,6 +601,10 @@ final class LanServer {
 
         case (_, true) where Self.trackingPath(path) != nil:
             return await trackingPage(request, id: Self.trackingPath(path)!, store: store)
+
+        // The other app's address for the same page, behind the same token.
+        case (_, true) where Self.statusPath(path) != nil:
+            return await trackingPage(request, id: Self.statusPath(path)!, store: store)
 
         case ("/api/survey", false) where request.method == "POST":
             return await surveySubmit(request)
@@ -875,6 +878,27 @@ final class LanServer {
         if raw.hasSuffix("/status") { raw = String(raw.dropLast("/status".count)) }
         guard !raw.isEmpty, !raw.contains("/") else { return nil }
         return raw.filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-") }
+    }
+
+    /// `/status/<id>` and `/status/<id>.html` — the address the OTHER app gives
+    /// a customer for the same page.
+    ///
+    /// The Node server writes a status page to disk per order and serves it
+    /// from there; this app draws the live one at `/order/<id>/status`. Same
+    /// page to the customer, same tracking token in front of it, different
+    /// address — so a link a shop had already sent out, or copied from the
+    /// other app, answered 404 here.
+    ///
+    /// The `.html` suffix is stripped because Node strips it, and a customer
+    /// who has the link has whichever form was generated.
+    nonisolated static func statusPath(_ path: String) -> String? {
+        guard path.hasPrefix("/status/") else { return nil }
+        var raw = String(path.dropFirst("/status/".count))
+        if raw.hasSuffix("/") { raw.removeLast() }
+        if raw.lowercased().hasSuffix(".html") { raw = String(raw.dropLast(5)) }
+        guard !raw.isEmpty, !raw.contains("/") else { return nil }
+        let id = raw.filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-") }
+        return id.isEmpty ? nil : id
     }
 
     /// `GET /order/:id`: a quote is sent to its quote page; anything else is

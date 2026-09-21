@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A tracking link a shop had already sent a customer answered "invalid
+  link" on this app.** The Windows and Linux app gives a customer an address
+  beginning `/status/`; this app draws the same page at `/order/…/status` and
+  knew nothing about the other form, so a link already out in the world — or
+  copied across from that app — was refused. It reaches the page now, behind
+  the same tracking token, with or without the `.html` the other app puts on
+  the end.
+
 - **(Mac) A shop with loyalty switched on could not produce an invoice for a
   customer at all.** The Invoice button opened its sheet and said "This job's
   invoice could not be built", for every job with a customer's name on it.
