@@ -262,6 +262,12 @@ import KhaytCore
         // `none` is NOT photographed: it draws one picker and the blank-page
         // guard below rightly refuses a picture that is almost all paper. Its
         // shape is covered by `EmailSettingsTests.draftReadsNothing`.
+        // `mailto` draws one sentence and nothing else, and until this it was a
+        // branch no picture reached — the same hole that let an invoice bug
+        // sit behind `settings.loyaltyEnabled` for weeks because no fixture
+        // ever switched loyalty on. A branch the pictures do not cover is a
+        // branch nobody has read.
+        try shoot("30-email-mailto", 190, ["provider": .string("mailto")])
         try shoot("31-email-sendgrid", 620, [
             "provider": .string("sendgrid"),
             "fromEmail": .string("orders@acme3d.test"),
