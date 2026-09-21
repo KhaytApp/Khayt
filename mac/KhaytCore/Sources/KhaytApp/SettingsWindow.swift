@@ -219,6 +219,14 @@ struct BusinessPane: View {
                     row(shop.taxProfile?.registration ?? shop.words.callIt("set.vat")) { TextField("", text: $draft.vat) }
                     row(shop.words.callIt("set.cr")) { TextField("", text: $draft.cr) }
                 }
+
+                // What the shop pays every month. Here, beside the tax
+                // registration, because this is the pane about the business
+                // itself rather than about a screen — and because Reports
+                // sends a shop to "Settings" for it without saying which pane.
+                // It saves itself: it is a LIST, and a list reverted by the
+                // bar below along with the shop's name is a surprise.
+                FixedCostsSettings(shop: shop)
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,

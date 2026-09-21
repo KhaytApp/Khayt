@@ -190,6 +190,13 @@ final class Shop {
         }
     }
 
+    /// Give a shop some monthly costs, for a test.
+    func pretendFixedCosts(_ rows: [JSONValue]) {
+        var held: [String: JSONValue] = settingsDict
+        held["fixedCosts"] = .array(rows)
+        settingsValue = .object(held)
+    }
+
     /// Give a shop a Telegram bot, for a test. `pretendEmailConfig`'s sibling.
     func pretendTelegram(_ config: [String: JSONValue]) {
         var held: [String: JSONValue] = settingsDict

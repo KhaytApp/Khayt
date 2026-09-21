@@ -1526,6 +1526,20 @@ final class Words {
         "mac.email_when_completed": ["en": "It is ready to collect", "ar": "عند الجاهزية للاستلام"],
         "mac.email_when_quote": ["en": "A quote is made", "ar": "عند إنشاء عرض سعر"],
         "mac.email_when_payment_received": ["en": "A payment arrives", "ar": "عند استلام دفعة"],
+        // ── WHAT THE SHOP PAYS EVERY MONTH ────────────────────────────────
+        //
+        // `an.be_none` on the break-even screen has told shops to add these
+        // "in Settings" since it shipped, and this app's Settings had nowhere
+        // to do it — a sentence written for the other app's pane. These are
+        // the words for the pane that sentence was always pointing at.
+        "mac.fixed_section": ["en": "Monthly costs", "ar": "التكاليف الشهرية"],
+        "mac.fixed_none": ["en": "Nothing yet. Add rent, subscriptions, wages — anything paid every month whether you print or not. Reports uses these to work out what you have to bill to break even.",
+                           "ar": "لا شيء بعد. أضف الإيجار والاشتراكات والرواتب — كل ما يُدفع شهريًا سواء طبعت أم لا. تستخدمها التقارير لحساب ما يجب تحصيله لتغطية التكاليف."],
+        "mac.fixed_name_ph": ["en": "Rent, electricity, a subscription…",
+                              "ar": "إيجار، كهرباء، اشتراك…"],
+        "mac.fixed_add": ["en": "Add a cost", "ar": "إضافة تكلفة"],
+        "mac.fixed_remove": ["en": "Remove this cost", "ar": "حذف هذه التكلفة"],
+        "mac.fixed_total": ["en": "Every month:", "ar": "شهريًا:"],
         // ── SETTING TELEGRAM UP, WHICH THIS APP COULD NOT DO ──────────────
         //
         // The shared catalogue has `tg.chat_id_hint`, `tg.test_sent` and
