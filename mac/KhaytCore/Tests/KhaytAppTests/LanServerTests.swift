@@ -187,7 +187,17 @@ struct LanServerTests {
     final class NoRedirect: NSObject, URLSessionTaskDelegate, Sendable {
         static let session: URLSession = {
             let config = URLSessionConfiguration.ephemeral
-            config.timeoutIntervalForRequest = 10
+            // SIXTY, not ten. These requests go to a server in this same
+            // process, so the only thing this timeout can measure is whether
+            // the scheduler got round to it — and every suite in the bundle
+            // starts at once. Measured in one such window: `SmtpParityTests`,
+            // ten milliseconds of pure JavaScript on a desk, took 66 seconds.
+            // Ten seconds produced `NSURLErrorDomain -1001` on a server that
+            // was working perfectly, which reads as a broken LAN API.
+            //
+            // See `LanStallTests.patience` for the same correction and the
+            // same reasoning.
+            config.timeoutIntervalForRequest = 60
             config.httpShouldSetCookies = false
             config.httpCookieAcceptPolicy = .never
             return URLSession(configuration: config, delegate: NoRedirect(), delegateQueue: nil)
