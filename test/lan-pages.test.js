@@ -166,3 +166,35 @@ test('the four security headers are the server\'s own', () => {
     ['Content-Security-Policy', 'Referrer-Policy', 'X-Content-Type-Options', 'X-Frame-Options']);
   assert.equal(P.SECURITY_HEADERS['X-Frame-Options'], 'DENY');
 });
+
+// ── THE 404 SPEAKS FOR ITS OWN HOST ────────────────────────────────────────
+//
+// The endpoint list is the NODE server's. The native Mac app serves a subset,
+// and reciting this list from there advertised eleven routes that answer 404
+// on that host — five owner-data APIs and six integration webhooks, to a
+// caller who has shown no PIN. The 404 runs before any gate, so mistyping a
+// path told a stranger on the shop's Wi-Fi which storefront and which courier
+// the shop is wired to.
+
+test('notFound answers for the host that asked', () => {
+  const mine = ['/api/status', '/intake'];
+  assert.deepEqual(P.notFound(mine).endpoints, mine);
+  // Called with nothing it is the Node server's own list, which is the caller
+  // that has always been right about this.
+  assert.deepEqual(P.notFound().endpoints, P.NODE_ENDPOINTS);
+  assert.ok(P.NODE_ENDPOINTS.includes('/api/clients'));
+});
+
+test('an empty or nonsense list is the Node list, never an empty 404', () => {
+  // A 404 that lists nothing is worse than one that lists too much: it reads
+  // as "there is nothing here" on a server that is running and serving.
+  for (const bad of [[], null, undefined, 'clients', [''], [null, 0]]) {
+    assert.deepEqual(P.notFound(bad).endpoints, P.NODE_ENDPOINTS,
+                     `notFound(${JSON.stringify(bad)}) should fall back`);
+  }
+});
+
+test('the error line is unchanged, whoever is asking', () => {
+  assert.equal(P.notFound(['/a']).error, 'Not found');
+  assert.equal(P.notFound().error, 'Not found');
+});

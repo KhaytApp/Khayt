@@ -6,6 +6,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A mistyped address told a stranger on the shop's Wi‑Fi which
+  storefront and which courier the shop uses.** Ask this app's LAN server for
+  a path it does not have and it answered with a list of endpoints — the list
+  belonging to the Windows and Linux server, sixteen of them, eleven of which
+  answer 404 here. Five were owner-data APIs and six were integration webhooks:
+  Salla, Zid, SMSA, Aramex, SPL. The 404 runs before any PIN is checked, so
+  anyone who could reach the shop's Wi‑Fi and mistype a path was handed the
+  shop's whole integration surface without ever being asked who they were.
+
+  The 404 lists what this server actually routes now, and nothing else. The
+  rule that builds it takes the list from the host that called it, because only
+  the host knows what it serves. A test asks the running server for every line
+  it advertises and fails if one answers 404, so the list cannot drift from the
+  route table; another fails if the other server's routes reappear in it.
+
 - **(Maintainers) The SMTP wire tests failed on a busy machine and blamed the
   network.** The client waits two minutes in these tests, because a build box
   running two and a half thousand tests beside a Python SMTP server is not a
