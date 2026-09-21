@@ -6,6 +6,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The Riyal mark is Khayt's own now, drawn rather than borrowed.** The
+  face every money figure is set in has no Riyal sign in it, so the mark beside
+  the digits was being taken from a different face — a different cut and a
+  different weight, on the one character that belongs to the figure. At
+  masthead size it read as a hash rather than a currency mark, which the design
+  notes had already written down and answered with a font that was never cut.
+
+  It is drawn now, from the same outline the invoice has printed since ZATCA
+  made the glyph something that has to be certain. One mark, on the paper and
+  on the screen, at the colour and the size of the digits it belongs to,
+  because it is drawn rather than looked up — and a test holds the two copies
+  of that outline together so they cannot drift into being two marks again.
+
 - **(Everyone) The app icon is the letter khāʾ now — and until today it was not
   one.** The mark is خ, the first letter of خيط, and خ is ح with a dot above
   it. The shipped icon had no dot, so what every Dock, every Home screen and

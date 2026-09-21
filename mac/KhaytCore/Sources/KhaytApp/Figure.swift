@@ -87,8 +87,23 @@ struct Figure: View {
                 // of the mark's leaf rather than a third leaf of its own — a
                 // bare `Text(" ")` in a view is also a string literal, and the
                 // guard that keeps English out of views is right to say so.
-                Text(Self.markLeaf)
-                    .font(Self.markFont(size))
+                // DRAWN, not set. The figure face has no U+20C1, so this leaf
+                // used to be the LABEL face beside the tabular one — a
+                // different cut carrying the one character that belongs to the
+                // digits. `RiyalMark` is the outline the invoice already
+                // prints, so the mark is now the same mark on paper and on
+                // screen, at the digits' own colour and size.
+                if Self.drawnMark(code) {
+                    // The binding space is the glyph's own padding rather than
+                    // a leaf of its own: a non-breaking space set in the FIGURE
+                    // face is wider than the gap this mark wants, and a third
+                    // leaf is a third thing the layout can squeeze.
+                    RiyalGlyph(size: size)
+                        .padding(.trailing, size * 0.15)
+                } else {
+                    Text(Self.markLeaf)
+                        .font(Self.markFont(size))
+                }
                 Text(renderedText)
                     .font(TypeScale.figure(size, weight: weight))
                     .monospacedDigit()
@@ -197,6 +212,13 @@ struct Figure: View {
     /// old ones say the same thing, which they did not while this read "SAR"
     /// beside a table drawing the mark. If no face on the Mac has the glyph the
     /// leaf falls back to the ISO code, which is unambiguous rather than a box.
+    /// Whether this currency's mark is one this app draws itself.
+    ///
+    /// Only the riyal, and only because it is the one mark the figure face
+    /// cannot set. Every other currency keeps its code, which is what stops
+    /// the one symbol this shop uses becoming an assumption about the rest.
+    static func drawnMark(_ code: String) -> Bool { code.uppercased() == "SAR" }
+
     static var markLeaf: String {
         isolated(hasMarkFont ? mark : "SAR") + "\u{00A0}"
     }
