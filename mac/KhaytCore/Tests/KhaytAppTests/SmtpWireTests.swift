@@ -144,13 +144,28 @@ struct SmtpWireTests {
 
     // MARK: - The tests
 
+    /// How long either end waits, in these tests only.
+    ///
+    /// The product waits 20s for a mail server, which is right for a shop and
+    /// wrong for a test box running 2,500 tests beside a Python SMTP server on
+    /// the same cores. BOTH ends have to carry this number: raising only the
+    /// client's just moves which end gives up first, and the failure then
+    /// blames the network for a server that ran out of patience — which is
+    /// exactly how this suite failed on CI, with the client reporting "server
+    /// closed session with no notification" over a Python
+    /// `TimeoutError: the handshake operation timed out`.
+    ///
+    /// `fake-smtp.py` carries the same figure, and `patienceIsAgreed` below
+    /// fails if the two ever drift apart.
+    static let patience: TimeInterval = 120
+
     @Test("STARTTLS: the framer upgrades the socket and the whole message arrives")
     func startTlsSend() async throws {
         SmtpClient.Trust.acceptAnyCertificate = true
         // The product waits 20s for a mail server, which is right for a shop
         // and wrong for a test box running 2,500 others beside a Python SMTP
         // server on the same cores.
-        SmtpClient.patience = 120
+        SmtpClient.patience = Self.patience
         defer {
             SmtpClient.Trust.acceptAnyCertificate = false
             SmtpClient.patience = SmtpClient.timeout
@@ -226,7 +241,7 @@ struct SmtpWireTests {
         // The product waits 20s for a mail server, which is right for a shop
         // and wrong for a test box running 2,500 others beside a Python SMTP
         // server on the same cores.
-        SmtpClient.patience = 120
+        SmtpClient.patience = Self.patience
         defer {
             SmtpClient.Trust.acceptAnyCertificate = false
             SmtpClient.patience = SmtpClient.timeout
@@ -257,7 +272,7 @@ struct SmtpWireTests {
         // The product waits 20s for a mail server, which is right for a shop
         // and wrong for a test box running 2,500 others beside a Python SMTP
         // server on the same cores.
-        SmtpClient.patience = 120
+        SmtpClient.patience = Self.patience
         defer {
             SmtpClient.Trust.acceptAnyCertificate = false
             SmtpClient.patience = SmtpClient.timeout
@@ -292,7 +307,7 @@ struct SmtpWireTests {
         // The product waits 20s for a mail server, which is right for a shop
         // and wrong for a test box running 2,500 others beside a Python SMTP
         // server on the same cores.
-        SmtpClient.patience = 120
+        SmtpClient.patience = Self.patience
         defer {
             SmtpClient.Trust.acceptAnyCertificate = false
             SmtpClient.patience = SmtpClient.timeout
@@ -351,5 +366,29 @@ struct SmtpWireTests {
         #expect(offenders.isEmpty, "these would ship in a release build: \(offenders)")
         #expect(text.contains("acceptAnyCertificate"), "the switch is gone — retire this test")
         #expect(text.contains("patience"), "the patience knob is gone — retire that half")
+    }
+
+    /// The two ends of this test agree about how long to wait.
+    ///
+    /// They are in different languages and different files, so nothing but
+    /// this connects them. Raising one alone is the bug that produced the
+    /// failure this constant exists for.
+    @Test("the fake server is as patient as the client")
+    func patienceIsAgreed() throws {
+        // Read from source, the same way `Fake` starts it: the script is
+        // EXCLUDED from the bundle in Package.swift because it is run as a
+        // program, so there is nothing to find in `Bundle.module`.
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appending(path: "Resources/fake-smtp.py")
+        let source = try String(contentsOf: url, encoding: .utf8)
+        let line = try #require(source.split(separator: "\n")
+            .first { $0.contains("PATIENCE = ") }, "fake-smtp.py no longer declares PATIENCE")
+        let value = try #require(Double(line.split(separator: "=")[1]
+            .trimmingCharacters(in: .whitespaces)), "PATIENCE is not a number: \(line)")
+        #expect(value >= Self.patience,
+                Comment(rawValue: "the fake server waits \(value)s and the client waits "
+                        + "\(Self.patience)s — the server will give up first and the failure "
+                        + "will read as a network fault"))
     }
 }
