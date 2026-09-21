@@ -81,7 +81,7 @@ struct AskFirst: View {
     @FocusState private var focused: Bool
 
     enum Kind {
-        case hold, qcPass
+        case hold
 
         var title: String { self == .hold ? "ord.hold_btn" : "ord.qc_pass" }
         var prompt: String { self == .hold ? "ord.hold_reason" : "ord.qc_notes" }
@@ -117,7 +117,6 @@ struct AskFirst: View {
         Task {
             switch kind {
             case .hold: await shop.moveJob(id, to: .on_hold, holdReason: said)
-            case .qcPass: await shop.moveJob(id, to: .completed, qcNotes: said)
             }
         }
     }

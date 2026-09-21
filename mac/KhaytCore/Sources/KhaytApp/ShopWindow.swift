@@ -545,7 +545,6 @@ struct WindowSheets: ViewModifier {
             // animation the collapse is one layout pass, on a settled pane, on a
             // turn of its own.
             .sheet(item: $shop.pendingHold) { AskFirst(shop: shop, subject: $0, kind: .hold) }
-            .sheet(item: $shop.pendingQC) { AskFirst(shop: shop, subject: $0, kind: .qcPass) }
             .sheet(item: $shop.pendingCompletion) { CompletionSheet(shop: shop, subject: $0) }
             .sheet(item: $shop.pendingPayment) { PaymentSheet(shop: shop, subject: $0) }
             .sheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }

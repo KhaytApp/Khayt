@@ -237,5 +237,37 @@ struct MenuCoverageTests {
         let dead = presented.filter { !everything.contains("\($0) = true") }
         #expect(dead.isEmpty,
                 Comment(rawValue: "presented but never opened: \(dead.joined(separator: ", "))"))
+
+        // ── AND THE ITEM-PRESENTED ONES ───────────────────────────────────
+        //
+        // The first version of this test excluded `sheet(item:)` on the
+        // grounds that "presenting one means assigning the item itself, so it
+        // cannot be dead this way". That was wrong, and `pendingQC` was the
+        // proof: declared, bound to a sheet, reset to nil in `clearQuestion`,
+        // and never once assigned a value. The reasoning was sound about the
+        // MECHANISM and silent about whether anybody used it.
+        let itemPattern = #/\.(?:sheet|alert|confirmationDialog|popover|inspector)\(item: \$shop\.([a-zA-Z]+)\)/#
+        let byItem = app.matches(of: itemPattern).map { String($0.1) }
+        #expect(byItem.count > 10, "only \(byItem.count) item-presented surfaces — the parse is wrong")
+
+        // Assigned SOMETHING other than nil. `X = nil` is how these are
+        // dismissed, so it is not evidence that anything can open them.
+        //
+        // Plain scanning: a Regex built from an interpolated string got its
+        // escapes mangled and reported nineteen live surfaces as dead, which
+        // is the same "guard that checks nothing" shape this file exists for.
+        func everOpened(_ name: String) -> Bool {
+            var from = everything.startIndex
+            while let hit = everything.range(of: name + " = ", range: from ..< everything.endIndex) {
+                from = hit.upperBound
+                let rest = everything[hit.upperBound...]
+                if !rest.hasPrefix("nil") { return true }
+            }
+            return false
+        }
+        let neverOpened = byItem.filter { !everOpened($0) }
+        #expect(neverOpened.isEmpty,
+                Comment(rawValue: "bound to a sheet and never given a value: "
+                        + neverOpened.joined(separator: ", ")))
     }
 }
