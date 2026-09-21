@@ -857,6 +857,55 @@ struct LanServerTests {
         #expect(alias.status == 200)
     }
 
+    /// THE OTHER APP'S ADDRESS FOR THE SAME PAGE.
+    ///
+    /// The Node server writes a status page per order and serves it from
+    /// `/status/<id>`; this app draws the live one at `/order/<id>/status`.
+    /// Same page, same token in front of it, different address — so a link a
+    /// shop had already sent a customer, or copied out of the other app,
+    /// answered 404 here and told them to use the link their shop sent.
+    @Test("a link written by the other app reaches the same page here")
+    func statusLinkFromTheOtherApp() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.put(Self.trackedJob)
+        let token = "0123456789abcdef0123456789abcdef"
+
+        let page = try await bench.get("/status/T-5?token=\(token)")
+        #expect(page.status == 200)
+        let expected = try await bench.engine.lanTrackingPage(
+            order: .object(Self.trackedJob), store: .object(bench.book.value))
+        #expect(page.text == expected, "it is not the same page this app already serves")
+
+        // Node strips `.html`, because that is the file it wrote — whichever
+        // form the customer has, it is the same order.
+        #expect(try await bench.get("/status/T-5.html?token=\(token)").status == 200)
+        #expect(try await bench.get("/status/T-5/?token=\(token)").status == 200)
+
+        // AND THE GATE IS THE SAME GATE. A second address for a page is a
+        // second way in if it is not.
+        let noToken = try await bench.get("/status/T-5")
+        #expect(noToken.status == 403)
+        #expect(noToken.text == (try await bench.engine.lanOrderNotice("invalid_tracking_link")))
+        #expect(try await bench.get("/status/T-5?token=wrong").status == 403)
+        #expect(try await bench.get("/status/NOPE?token=\(token)").status == 404)
+    }
+
+    @Test("the status address takes an id and nothing else")
+    func statusPathParsing() {
+        #expect(LanServer.statusPath("/status/T-5") == "T-5")
+        #expect(LanServer.statusPath("/status/T-5.html") == "T-5")
+        #expect(LanServer.statusPath("/status/T-5/") == "T-5")
+        // Not a way to reach anything else: no traversal, no nesting, and an
+        // id that is only punctuation is not an id.
+        #expect(LanServer.statusPath("/status/../../etc/passwd") == nil)
+        #expect(LanServer.statusPath("/status/a/b") == nil)
+        #expect(LanServer.statusPath("/status/") == nil)
+        #expect(LanServer.statusPath("/status") == nil)
+        #expect(LanServer.statusPath("/statuses/T-5") == nil)
+        #expect(LanServer.statusPath("/status/...") == nil)
+    }
+
     @Test("a quote's order page sends the customer to the quote page")
     func trackingRedirectsQuotes() async throws {
         let bench = try await Bench()

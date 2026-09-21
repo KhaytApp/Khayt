@@ -50,6 +50,7 @@ struct LanEndpointsTests {
             let recognised = LanServer.trackingPath(concrete) != nil
                 || LanServer.quotePath(concrete) != nil
                 || LanServer.approvePath(concrete) != nil
+                || LanServer.statusPath(concrete) != nil
             #expect(recognised,
                     Comment(rawValue: "the 404 offers \(endpoint), which no route parses"))
         }
