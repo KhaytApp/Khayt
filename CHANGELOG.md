@@ -6,6 +6,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) A sheet that could never open, and the guard that said it
+  could not exist.** The confirmation for passing a job out of inspection was
+  declared, bound to the window and cleared with the others, and nothing ever
+  gave it a value — the question was folded into the completion sheet long ago
+  and the old surface was left behind. No shop ever saw it and nothing was
+  lost: the notes it would have taken are recorded by the sheet that replaced
+  it. The leftovers are gone, and the guard that finds this class now covers
+  the sheets it had deliberately skipped — it had been reasoned that those
+  cannot go dead, which was true about the mechanism and silent about whether
+  anybody used them.
+
 - **(Maintainers) A design token that went stale is now a failing test.** The
   extractor reads the Mac app's colours, card geometry, type scale and motion
   out of the Swift and stops dead if one is renamed — but it cannot notice that

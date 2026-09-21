@@ -1342,7 +1342,6 @@ final class Shop {
     /// the record off the order. A completion that skipped it is not counted as
     /// failed — it is not counted at all, so the shop's pass rate would be
     /// quietly computed over a shrinking subset of its work.
-    var pendingQC: PendingHold?
 
     /// A job being finished, what it was quoted at, and what — if anything —
     /// the printer said it actually took.
@@ -8685,7 +8684,6 @@ final class Shop {
 
     func clearQuestion() {
         pendingHold = nil
-        pendingQC = nil
         pendingCompletion = nil
         pendingPayment = nil
         pendingEdit = nil
