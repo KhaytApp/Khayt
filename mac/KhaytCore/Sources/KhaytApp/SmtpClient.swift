@@ -42,6 +42,30 @@ enum SmtpClient {
     /// providers' ten because this is several round trips, not one.
     static let timeout: TimeInterval = 20
 
+    /// How long to wait for the connection to become usable.
+    ///
+    /// `timeout` in a shipping build, and nothing else: the `#if DEBUG` branch
+    /// exists because the end-to-end tests run alongside two and a half
+    /// thousand others on a shared CI runner, with a Python SMTP server on the
+    /// other end of the socket competing for the same cores. Twenty seconds is
+    /// the right answer for a shop waiting on a mail server and the wrong one
+    /// for a test box under that much load — and a test that fails for want of
+    /// CPU teaches nothing about whether STARTTLS works.
+    ///
+    /// Guarded the way `Trust` is, by `trustSwitchCannotShip`: a release build
+    /// has no path to it.
+    static var connectTimeout: TimeInterval {
+        #if DEBUG
+        return patience
+        #else
+        return timeout
+        #endif
+    }
+
+    #if DEBUG
+    nonisolated(unsafe) static var patience: TimeInterval = timeout
+    #endif
+
     enum Failure: Error, LocalizedError {
         case incomplete
         case blocked(String)
@@ -251,7 +275,7 @@ enum SmtpClient {
                         }
                     }
                     connection.start(queue: wire.queue)
-                    wire.queue.asyncAfter(deadline: .now() + timeout) {
+                    wire.queue.asyncAfter(deadline: .now() + connectTimeout) {
                         // The CONNECTION is cancelled, not a task: a parked
                         // `receive` does not notice task cancellation, and the
                         // state handler above turns the cancel into a failure.

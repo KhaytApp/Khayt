@@ -66,19 +66,47 @@ struct SmtpWireTests {
 
             // `READY <port>` on the first line, or the environment has no
             // usable python3 / openssl and there is nothing to test against.
-            var line = Data()
-            let deadline = Date().addingTimeInterval(30)
-            while Date() < deadline, !line.contains(0x0A) {
-                line.append(out.fileHandleForReading.availableData)
-                if line.isEmpty { break }
+            //
+            // READ ON ANOTHER THREAD, because `availableData` blocks: a loop
+            // that checks a deadline between blocking reads has no deadline at
+            // all, and on a loaded runner the generated certificate can take a
+            // while. This waits a bounded time and says what it actually saw.
+            let box = Line()
+            let handle = out.fileHandleForReading
+            Thread.detachNewThread {
+                var seen = Data()
+                while !seen.contains(0x0A) {
+                    let chunk = handle.availableData
+                    if chunk.isEmpty { break }
+                    seen.append(chunk)
+                }
+                box.set(String(decoding: seen, as: UTF8.self))
             }
-            let text = String(decoding: line, as: UTF8.self)
+            let deadline = Date().addingTimeInterval(60)
+            while box.text == nil, Date() < deadline { usleep(20_000) }
+
+            guard let text = box.text else {
+                process.terminate()
+                Issue.record("the fake SMTP server never printed READY — it is still starting")
+                return nil
+            }
             guard let number = text.split(separator: " ").last
                 .flatMap({ UInt16($0.trimmingCharacters(in: .whitespacesAndNewlines)) }) else {
                 process.terminate()
+                let said = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                Issue.record(Comment(rawValue: "the fake SMTP server said \"\(said)\" instead of "
+                                     + "READY — python3 or openssl is missing here"))
                 return nil
             }
             port = number
+        }
+
+        /// One line, written by a reader thread and read by the test.
+        final class Line: @unchecked Sendable {
+            private let lock = NSLock()
+            private var value: String?
+            func set(_ s: String) { lock.lock(); value = s; lock.unlock() }
+            var text: String? { lock.lock(); defer { lock.unlock() }; return value }
         }
 
         func finish() throws -> Transcript {
@@ -119,7 +147,14 @@ struct SmtpWireTests {
     @Test("STARTTLS: the framer upgrades the socket and the whole message arrives")
     func startTlsSend() async throws {
         SmtpClient.Trust.acceptAnyCertificate = true
-        defer { SmtpClient.Trust.acceptAnyCertificate = false }
+        // The product waits 20s for a mail server, which is right for a shop
+        // and wrong for a test box running 2,500 others beside a Python SMTP
+        // server on the same cores.
+        SmtpClient.patience = 120
+        defer {
+            SmtpClient.Trust.acceptAnyCertificate = false
+            SmtpClient.patience = SmtpClient.timeout
+        }
 
         guard let fake = try Fake(mode: "starttls") else {
             // No python3 or no openssl. Skipping is honest; pretending to pass
@@ -127,7 +162,20 @@ struct SmtpWireTests {
             Issue.record("could not start the fake SMTP server — this machine cannot run this test")
             return
         }
-        try await SmtpClient.converse(Self.mail, relay: Self.relay(port: fake.port, secure: false))
+        do {
+            try await SmtpClient.converse(Self.mail, relay: Self.relay(port: fake.port, secure: false))
+        } catch {
+            // WHAT THE SERVER HEARD, which is the whole diagnosis. Nothing at
+            // all means this never got a connection — a starved runner, not a
+            // broken upgrade. An EHLO and a STARTTLS and then silence means the
+            // handshake itself failed, which would be a real fault.
+            let heard = try? fake.finish()
+            let transcript = "\(heard?.said ?? []) upgraded=\(heard?.upgraded ?? false) "
+                + "serverError=\(heard?.error ?? "none")"
+            Issue.record(Comment(rawValue: "the send failed: \(error). "
+                                 + "The server heard: \(transcript)"))
+            return
+        }
         let heard = try fake.finish()
 
         #expect(heard.error == nil, "the server gave up: \(heard.error ?? "")")
@@ -175,7 +223,14 @@ struct SmtpWireTests {
     @Test("implicit TLS on 465 needs no prelude and sends the same message")
     func implicitTlsSend() async throws {
         SmtpClient.Trust.acceptAnyCertificate = true
-        defer { SmtpClient.Trust.acceptAnyCertificate = false }
+        // The product waits 20s for a mail server, which is right for a shop
+        // and wrong for a test box running 2,500 others beside a Python SMTP
+        // server on the same cores.
+        SmtpClient.patience = 120
+        defer {
+            SmtpClient.Trust.acceptAnyCertificate = false
+            SmtpClient.patience = SmtpClient.timeout
+        }
 
         guard let fake = try Fake(mode: "implicit") else {
             Issue.record("could not start the fake SMTP server"); return
@@ -199,7 +254,14 @@ struct SmtpWireTests {
     @Test("a server that will not encrypt gets no password")
     func refusesToLeakThePassword() async throws {
         SmtpClient.Trust.acceptAnyCertificate = true
-        defer { SmtpClient.Trust.acceptAnyCertificate = false }
+        // The product waits 20s for a mail server, which is right for a shop
+        // and wrong for a test box running 2,500 others beside a Python SMTP
+        // server on the same cores.
+        SmtpClient.patience = 120
+        defer {
+            SmtpClient.Trust.acceptAnyCertificate = false
+            SmtpClient.patience = SmtpClient.timeout
+        }
 
         guard let fake = try Fake(mode: "nostarttls") else {
             Issue.record("could not start the fake SMTP server"); return
@@ -227,7 +289,14 @@ struct SmtpWireTests {
     @Test("the reason a shop is given names the missing encryption, not a socket error")
     func theRefusalSaysWhy() async throws {
         SmtpClient.Trust.acceptAnyCertificate = true
-        defer { SmtpClient.Trust.acceptAnyCertificate = false }
+        // The product waits 20s for a mail server, which is right for a shop
+        // and wrong for a test box running 2,500 others beside a Python SMTP
+        // server on the same cores.
+        SmtpClient.patience = 120
+        defer {
+            SmtpClient.Trust.acceptAnyCertificate = false
+            SmtpClient.patience = SmtpClient.timeout
+        }
 
         guard let fake = try Fake(mode: "nostarttls") else {
             Issue.record("could not start the fake SMTP server"); return
@@ -252,7 +321,7 @@ struct SmtpWireTests {
     /// Read as source rather than tested behaviourally, because the thing being
     /// asserted is that a release compile has no such symbol — which a test
     /// running in a debug build cannot observe any other way.
-    @Test("the trust switch is inside #if DEBUG and cannot ship")
+    @Test("the test-only switches are inside #if DEBUG and cannot ship")
     func trustSwitchCannotShip() throws {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -271,6 +340,9 @@ struct SmtpWireTests {
             if bare.hasPrefix("#endif") { debugDepth = max(0, debugDepth - 1); continue }
             let dangerous = bare.contains("acceptAnyCertificate")
                 || bare.contains("sec_protocol_options_set_verify_block")
+                // The patience knob too: a release build must wait the twenty
+                // seconds a shop should wait, not whatever a test last set.
+                || bare.contains("patience")
             // The doc comment explains the switch and is not the switch.
             if dangerous, debugDepth == 0, !bare.hasPrefix("///"), !bare.hasPrefix("//") {
                 offenders.append(bare)
@@ -278,5 +350,6 @@ struct SmtpWireTests {
         }
         #expect(offenders.isEmpty, "these would ship in a release build: \(offenders)")
         #expect(text.contains("acceptAnyCertificate"), "the switch is gone — retire this test")
+        #expect(text.contains("patience"), "the patience knob is gone — retire that half")
     }
 }

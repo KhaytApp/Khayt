@@ -16,7 +16,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the feature here rather than leave the shop a note. The line itself no longer
   names another app.
 
-
 - **(Mac) A shop on its own mail server can send from the Mac now, and any
   shop can set email up here at all.** Khayt sends a customer's update through
   SendGrid, Mailgun, or a shop's own SMTP server, and the Mac could do the
@@ -25,6 +24,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   app you are using. It speaks SMTP itself now, on port 465 or on 587 with the
   upgrade to an encrypted connection that most mail servers ask for, and it
   will not send your password to a server that refuses to encrypt.
+
+  Underneath that was a larger gap nobody had named: there was no email
+  settings screen on the Mac at all. Every way this app sends mail reads
+  settings that only the other app could write, so a Mac shop could use an
+  account somebody else had set up and could set up none of its own. Settings →
+  Integrations now has the provider, the from address, the keys or the server
+  details, which moves get emailed, and a Send test email button that tells you
+  what a mail server said rather than that "it failed".
 
 - **(Everyone) A stored key or password could be replaced but never forgotten,
   and two ways to be told a customer was not emailed.** "Forget the stored key"
