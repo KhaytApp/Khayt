@@ -6,6 +6,30 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A shop with loyalty switched on could not produce an invoice for a
+  customer at all.** The Invoice button opened its sheet and said "This job's
+  invoice could not be built", for every job with a customer's name on it.
+  Nothing else in the app was affected and nothing was written wrongly — the
+  document simply could not be made, so a shop that needed to send an invoice
+  had to go and start the Windows and Linux app.
+
+  The invoice rule asked the window it used to live in for the customer's
+  loyalty tier. Every other thing it needs — the money, the shop's fields, the
+  way it spells a date — is named and handed to it, which is what lets two
+  apps print the same document; the tier was the one ingredient left reaching
+  for a global. In the other app that global is there. In this one it is not,
+  and the whole document failed on that line.
+
+  It is handed over now like everything else. The tier is worked out from the
+  shared loyalty rule against what the customer has actually spent, so the
+  badge on the invoice is the same badge in both apps rather than one app's
+  idea of it.
+
+  No invoice test had ever switched loyalty on, which is why a document with
+  ten regression fixtures behind it could fail on the first real job in the
+  sample book. There are tests on both sides now, and the one in plain Node
+  would have caught this the day it was written.
+
 - **(Maintainers) Two tests read the sample book at a date that stopped
   moving with it.** The sample shop is re-dated to today every time it is
   opened, so it never shows a queue entirely in the past — and two tests asked

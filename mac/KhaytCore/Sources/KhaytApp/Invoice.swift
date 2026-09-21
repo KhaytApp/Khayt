@@ -36,6 +36,7 @@ enum Invoice {
             row: shop.orderRow(job.id) ?? .object([:]),
             settings: shop.settingsDict,
             clients: shop.clientRows,
+            orders: shop.orderRows,
             currencies: currencyTable(shop),
             language: shop.words.language,
             sellerName: shop.shopName,
@@ -58,6 +59,10 @@ enum Invoice {
         var row: JSONValue
         var settings: [String: JSONValue]
         var clients: [JSONValue]
+        /// The whole print log, for the one ingredient that cannot be worked
+        /// out from this order alone: what the customer has spent, and so
+        /// which loyalty tier they are in.
+        var orders: [JSONValue] = []
         var currencies: [String: JSONValue]
         var language: String
         var sellerName: String
@@ -121,7 +126,7 @@ enum Invoice {
         return try? await engine.invoiceHtml(
             order: paper.row, settings: paper.settings, clients: paper.clients,
             currencies: paper.currencies, language: paper.language,
-            money: money, sellerFields: paper.sellerFields)
+            money: money, sellerFields: paper.sellerFields, orders: paper.orders)
     }
 
     /// The currency table the document formats against.

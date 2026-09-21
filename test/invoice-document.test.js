@@ -272,3 +272,65 @@ test('an agreed part is billed at its agreed figure and the others share what is
   // The fixture's parts carry no baseCost, so the pool is split equally — as it always was.
   assert.deepEqual(before.slice(0, 2), ['575.00', '575.00']);
 });
+
+// ── THE RULE MUST NOT REACH FOR A GLOBAL ───────────────────────────────────
+//
+// Every ingredient this document needs is named in its context — except one.
+// `getClientTier` was called as a free variable, so it found the renderer's
+// global in Electron and threw `ReferenceError` everywhere else. The native
+// Mac app could not build an invoice AT ALL for a job with a customer once
+// loyalty was switched on; the sheet read "This job's invoice could not be
+// built".
+//
+// Nothing caught it because no invoice test has ever enabled loyalty, and the
+// branch is behind `order.clientId && settings.loyaltyEnabled`. These call the
+// rule directly, in plain Node, where no renderer global exists — which is the
+// cheapest place this could ever have been found.
+
+const DOC = require('../lib/invoice-document.js');
+const { CURRENCIES: CURR } = require('../lib/currencies.js');
+// The document reads its sibling rules off the global the way both apps load
+// them — the Mac bundles every module and the renderer loads every script, so
+// requiring them here is what "no renderer in sight" actually means: the
+// shared rules, and nothing of the window.
+require('../lib/invoice-language.js');
+
+function bareContext(extra = {}) {
+  return Object.assign({
+    qrSvg: '', qrProblem: null, payQrSvg: '', total: '100.00',
+    vatAmount: '0.00', subtotal: '100.00', vatRate: 0,
+    settings: { loyaltyEnabled: true, currency: 'SAR' },
+    CURRENCIES: CURR,
+    clients: [{ id: 'c1', name: 'Najd Architects' }],
+    i18n: { current: 'en' },
+  }, extra);
+}
+
+const TIER_ORDER = { id: 'ORD-1', clientId: 'c1', project: 'Turbine bracket', price: 100, date: '2026-01-01T00:00:00.000Z' };
+
+test('the document builds with loyalty on and no renderer in sight', () => {
+  // Before the fix this threw ReferenceError: getClientTier is not defined.
+  const out = DOC.invoiceHtml(TIER_ORDER, bareContext());
+  assert.ok(out && typeof out.html === 'string' && out.html.length > 0);
+});
+
+test('a tier that is handed over is printed, and one that is not is not', () => {
+  const withTier = DOC.invoiceHtml(TIER_ORDER, bareContext({ clientTier: { name: 'Gold' } }));
+  assert.match(withTier.html, /Gold/, 'the tier badge is missing');
+
+  const without = DOC.invoiceHtml(TIER_ORDER, bareContext());
+  assert.doesNotMatch(without.html, /Gold/);
+});
+
+test('a tier record with no name prints nothing rather than an empty badge', () => {
+  // The host looks this up; a half-filled record is its problem to have, and
+  // an empty orange chip on a customer's invoice is the wrong way to say so.
+  const out = DOC.invoiceHtml(TIER_ORDER, bareContext({ clientTier: { minOrders: 3 } }));
+  assert.doesNotMatch(out.html, /background:#D88A3D/);
+});
+
+test('loyalty off means no badge, whatever the host passes', () => {
+  const out = DOC.invoiceHtml(TIER_ORDER, bareContext({
+    settings: { loyaltyEnabled: false }, clientTier: { name: 'Gold' } }));
+  assert.doesNotMatch(out.html, /Gold/);
+});

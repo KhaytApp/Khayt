@@ -5788,13 +5788,21 @@ public actor KhaytEngine {
     /// a label is called — and a function cannot cross a JSON bridge. So they
     /// are built in JavaScript, from the locale catalogue this runtime already
     /// has loaded, and only the DATA comes from Swift. See `INVOICE_SCRIPT`.
+    ///
+    /// `orders` is the whole print log, and it is here for one reason: the
+    /// customer's loyalty tier is worked out from what they have actually
+    /// spent, so `lib/loyalty.js` needs the book to answer it. The document
+    /// itself is handed the ANSWER — the tier record — exactly as it is handed
+    /// the tax split rather than the tax rule.
     public func invoiceHtml(order: JSONValue, settings: [String: JSONValue],
                             clients: [JSONValue], currencies: [String: JSONValue],
                             language: String, money: [String: JSONValue],
-                            sellerFields: [String: JSONValue]) throws -> InvoiceDocument {
+                            sellerFields: [String: JSONValue],
+                            orders: [JSONValue] = []) throws -> InvoiceDocument {
         try runtime.call2(INVOICE_SCRIPT,
                           [order, .object(settings), .array(clients), .object(currencies),
-                           .string(language), .object(money), .object(sellerFields)],
+                           .string(language), .object(money), .object(sellerFields),
+                           .array(orders)],
                           as: InvoiceDocument.self)
     }
 
@@ -9457,6 +9465,20 @@ private let INVOICE_SCRIPT = """
 (function () {
   var order = ARG0, settings = ARG1, clients = ARG2, currencies = ARG3;
   var language = ARG4, money = ARG5, sellerFields = ARG6 || {};
+  var orders = ARG7 || [];
+
+  // The customer's loyalty tier, from the shared rule rather than from a
+  // renderer global. The document takes the record; working it out needs the
+  // print log, which is why this script is handed one.
+  var clientTier = null;
+  try {
+    if (order && order.clientId && settings && settings.loyaltyEnabled
+        && globalThis.KhaytLoyalty && globalThis.KhaytLoyalty.tierFor) {
+      clientTier = globalThis.KhaytLoyalty.tierFor({
+        orders: orders, clientId: order.clientId, settings: settings, clients: clients,
+      });
+    }
+  } catch (e) { clientTier = null; }
 
   var ARABIC_DIGITS = '\u{0660}\u{0661}\u{0662}\u{0663}\u{0664}\u{0665}\u{0666}\u{0667}\u{0668}\u{0669}';
   var locales = globalThis.KhaytLocales || {};
@@ -9478,6 +9500,7 @@ private let INVOICE_SCRIPT = """
   }
 
   var ctx = {
+    clientTier: clientTier,
     settings: settings, clients: clients, CURRENCIES: currencies,
     i18n: { current: language, tIn: function (l, k, v) { return say(l, k, v); } },
     t: function (k, v) { return say(language, k, v); },
