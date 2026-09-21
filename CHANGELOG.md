@@ -6,6 +6,31 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Everyone) A Saudi shop running Khayt in English was offered Shopify and
+  Stripe.** Settings → Integrations opened on the market matching the
+  INTERFACE LANGUAGE, and where a shop sells is a different question from what
+  it reads. A Riyadh shop with the app in English was shown the United States
+  directory — Shopify, WooCommerce, Etsy, Stripe, PayPal — instead of Salla,
+  Zid, Mada, STC Pay and Tabby, while its own book said its country was Saudi
+  Arabia, its currency SAR, and its invoices carried a ZATCA QR.
+
+  The directory opens on where the shop sells now: its country if it has given
+  one, otherwise what it charges in — a book priced in riyals with a ZATCA QR
+  on its invoices is not ambiguous, and plenty of shops never fill the country
+  field in at all. The interface language remains the last resort. The euro is
+  deliberately not read, because Spain, France and Germany all use it.
+
+  **Most shops will see this change**, and that is the intent rather than a
+  side effect: Khayt's own default currency is the riyal, so a shop that has
+  never touched either field now opens on Salla, Zid, Mada, STC Pay and Tabby
+  instead of Shopify, WooCommerce, Etsy, Stripe and PayPal. For an app that
+  builds in ZATCA invoices, the riyal and Hijri dates, that is the right way
+  round. A shop selling elsewhere sets its country once, or picks another
+  market from the selector that has always been there. The picker is untouched:
+  a shop selling into two markets exists, which is what it is for. Both apps
+  read the same rule, so they cannot open on different markets for the same
+  shop.
+
 - **(Mac) What the shop pays every month can be entered here, so break-even
   and the P&L stop pretending it has no overhead.** Reports has always told a
   shop with nothing entered to "add rent, subscriptions and anything else that

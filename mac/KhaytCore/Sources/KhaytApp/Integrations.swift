@@ -67,8 +67,22 @@ struct IntegrationsPane: View {
     @State private var showing: KhaytEngine.IntegrationMarket?
     @State private var copied: String?
 
-    /// The market being looked at: the shop's own language until it picks one.
-    private var viewing: String { market ?? shop.words.language }
+    /// The market being looked at: where the shop SELLS until it picks one.
+    ///
+    /// It used to be the interface language, and those are different
+    /// questions. A Riyadh shop running this app in English opened on the
+    /// United States market — Shopify and Stripe instead of Salla, Zid, Mada,
+    /// STC Pay and Tabby — while its own book said `country: "SA"`, its
+    /// currency was SAR and its invoices carried a ZATCA QR.
+    ///
+    /// `home` is the shared rule's answer, resolved once the book is read; the
+    /// language remains the fallback for a shop that has not said where it is.
+    /// Either way the picker is still there, because a shop selling into two
+    /// markets exists.
+    private var viewing: String { market ?? home ?? shop.words.language }
+
+    /// Where the shop sells, as the shared rule reads its book.
+    @State private var home: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -141,7 +155,16 @@ struct IntegrationsPane: View {
                     save: { Task { await shop.saveSettings(draft.form()); reset() } },
                     revert: { draft = original })
         }
-        .task(id: shop.settingsValue) { reset() }
+        .task(id: shop.settingsValue) {
+            reset()
+            // Asked of the book, every time the book changes: a shop that sets
+            // its country in Settings → Business should find this directory
+            // showing its own market afterwards, without relaunching.
+            home = try? await shop.engine?.integrationMarketFor(
+                country: Shop.plainString(shop.settingsDict["country"]) ?? "",
+                currency: Shop.plainString(shop.settingsDict["currency"]) ?? "",
+                language: shop.words.language)
+        }
         .task(id: shop.words.language) {
             markets = (try? await shop.engine?.integrationMarkets(in: shop.words.language)) ?? []
         }

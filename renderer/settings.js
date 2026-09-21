@@ -181,7 +181,14 @@ function renderIntegrationsSettings() {
   if (!el || typeof KhaytIntegrations === 'undefined') return;
   if (!settings.paymentProviders) settings.paymentProviders = {};
   const lang = (typeof i18n !== 'undefined' && i18n.current) || 'en';
-  const viewLoc = el.dataset.market || lang;
+  // WHERE THE SHOP SELLS, then what it reads. Those are different questions,
+  // and this used to ask only the second: a Riyadh shop running Khayt in
+  // English opened on the United States market — Shopify and Stripe rather
+  // than Salla, Zid and Mada — while its own settings said `country: 'SA'`.
+  // The rule is shared, so this window and the Mac open on the same market.
+  const viewLoc = el.dataset.market
+    || KhaytIntegrations.marketFor({
+      country: settings.country, currency: settings.currency, language: lang });
   const m = KhaytIntegrations.forLocale(viewLoc);
   const country = (l) => (m.country[l] || m.country.en);
   const markets = Object.keys(KhaytIntegrations.MARKETS);
