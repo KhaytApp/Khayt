@@ -64,7 +64,7 @@ struct LanStallTests {
     /// when it finally bites.
     ///
     /// Each bench now carries its own.
-    private static let short: TimeInterval = 300
+    private static let short: TimeInterval = 1
 
     /// How long the probe waits for the server to hang up.
     ///
@@ -86,7 +86,7 @@ struct LanStallTests {
     /// Sixty keeps the property exactly — a server that never closes still
     /// fails — and costs nothing on a run where the close happens in a second,
     /// because the probe returns as soon as it does.
-    nonisolated static let patience: TimeInterval = 3
+    nonisolated static let patience: TimeInterval = 60
 
     @Test("a connection that sends nothing is let go, not held for ever")
     func silentConnection() async throws {

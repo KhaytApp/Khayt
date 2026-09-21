@@ -118,7 +118,7 @@ enum SmtpClient {
         // host is typed by the shop, and `127.0.0.1` or a cloud metadata
         // address would make this app into a probe of its own network.
         if (try? await engine.isBlockedHost(host)) ?? true { throw Failure.blocked(host) }
-        for address in WebhookClient.resolve(host) {
+        for address in await WebhookClient.addresses(of: host) {
             if (try? await engine.isBlockedHost(address)) ?? true {
                 throw Failure.blocked("\(host) → \(address)")
             }

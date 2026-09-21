@@ -91,6 +91,51 @@ struct SmtpHostGuardTests {
         }
     }
 
+    /// The blocking call has ONE caller, and it is the one that steps off the
+    /// thread first.
+    ///
+    /// `WebhookClient.resolve` is `getaddrinfo`, which waits — for a name that
+    /// does not resolve, until DNS gives up. Both types that use it are
+    /// `@MainActor`, so calling it directly blocks the interface; and because a
+    /// blocked thread of Swift's cooperative pool is one no other async work
+    /// can use, it also stops unrelated tasks elsewhere in the app.
+    ///
+    /// `SmtpClient.send` called it directly, on a path reached from
+    /// `@MainActor EmailClient` — so a shop finishing a job with a relay whose
+    /// name resolved slowly would have watched the window stop.
+    ///
+    /// Read as source because the fault is "who calls what", which no runtime
+    /// assertion can see.
+    @Test("nothing calls the blocking resolver except the wrapper that offloads it")
+    func resolveIsNotCalledOnAnActor() throws {
+        let dir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir,
+                     includingPropertiesForKeys: nil)) ?? []
+        #expect(!files.isEmpty, "no sources were read — this would pass vacuously")
+
+        var offenders: [String] = []
+        var wrapperFound = false
+        for url in files where url.pathExtension == "swift" {
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            for line in text.components(separatedBy: .newlines) {
+                let bare = line.trimmingCharacters(in: .whitespaces)
+                if bare.hasPrefix("//") || bare.hasPrefix("///") { continue }
+                // The wrapper itself, which is the one place allowed to.
+                if bare.contains("{ resolve(host) }") { wrapperFound = true; continue }
+                // The declaration is not a call.
+                if bare.contains("static func resolve(") { continue }
+                if bare.contains("resolve(host)") || bare.contains("WebhookClient.resolve(") {
+                    offenders.append("\(url.lastPathComponent): \(bare)")
+                }
+            }
+        }
+        #expect(wrapperFound, "the offloading wrapper is gone — retire this test or restore it")
+        #expect(offenders.isEmpty,
+                Comment(rawValue: "these block a main-actor thread on DNS: \(offenders)"))
+    }
+
     /// Anti-vacuity: if the guard refused everything, every test above would
     /// pass while the feature was broken.
     @Test("an ordinary relay name is not refused by the guard")

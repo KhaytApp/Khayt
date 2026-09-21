@@ -341,7 +341,10 @@ struct WebhookWiringTests {
     func bothLayers() throws {
         let client = try Self.code("WebhookClient.swift")
         #expect(client.contains("engine.isBlockedHost(host)"), "the name is never checked")
-        #expect(client.contains("for address in resolve(host)"),
+        // `addresses(of:)` is `resolve(host)` moved off the main thread — the
+        // blocking `getaddrinfo` must not run on a `@MainActor` type. The
+        // guard is unchanged; only which thread it waits on is.
+        #expect(client.contains("for address in await addresses(of: host)"),
                 "the resolved addresses are never checked — a public name pointing inward passes")
         // And no Swift copy of the ranges.
         #expect(!client.contains("169.254") && !client.contains("192.168"),
