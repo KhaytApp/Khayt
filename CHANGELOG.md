@@ -6,6 +6,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A button said `common.ok`.** The banner that appears when Khayt has
+  drafted purchase orders by itself asked for a word neither this app's own
+  table nor the shared catalogue has, and a word that resolves nowhere is
+  rendered as its own name — so the button that dismisses it read
+  `common.ok`, in Arabic as well. It says Close now, which is a word both
+  catalogues already have. Every one of the 1,375 words this app asks for is
+  now checked against the real catalogue, in both languages, so a button can
+  no longer be labelled with the name of the thing it was supposed to say.
+
 - **(Maintainers) The first consumable is proven to land, on the book this
   shop actually has.** The tests covered the shared rules and the screen's own
   restatement of "low", and never the write itself on an EMPTY shelf — which
