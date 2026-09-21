@@ -2387,13 +2387,26 @@ final class Words {
         // two apps call the same switch the same thing.
         "mac.nav_online":    ["en": "Online", "ar": "الشبكة"],
         "mac.online_title":  ["en": "The phone's live queue", "ar": "قائمة الانتظار على الهاتف"],
+        // WHAT THIS PANE CLAIMS IS HELD TO WHAT THE SERVER ROUTES.
+        //
+        // This sentence sent the shop to the other app for the intake form,
+        // quote approval and the calendar feed — all three of which this app
+        // has served since alpha.18, out of `LanServer.swift`. A shop reading
+        // it would have gone and started a second app to be handed something
+        // this one was already serving on the same Wi‑Fi.
+        //
+        // `OnlinePaneTruthTests` now reads the route table and fails the build
+        // if the closing sentence sends a shop elsewhere for anything this app
+        // answers — the same correction, and the same shape of guard, as the
+        // assistant pane's "runs in the Windows and Linux app".
         "mac.online_desc":   ["en": "This Mac serves the live queue to phones on the shop's Wi‑Fi, "
-                                    + "and the same status API the Windows and Linux app serves. "
-                                    + "The customer intake form, quote approval and the calendar feed "
-                                    + "run in that app for now.",
+                                    + "the customer intake form, quote approval, the tracking page "
+                                    + "and the calendar feed, and the same status API the Windows "
+                                    + "and Linux app serves. Webhooks run in that app for now.",
                               "ar": "يقدّم هذا الماك قائمة الانتظار المباشرة للهواتف على شبكة Wi‑Fi الخاصة بالمحل، "
-                                    + "ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس. "
-                                    + "أما نموذج طلبات العملاء واعتماد عروض الأسعار وتقويم المواعيد فتعمل في ذلك التطبيق حالياً."],
+                                    + "ونموذج طلبات العملاء واعتماد عروض الأسعار وصفحة تتبّع الطلب "
+                                    + "وتقويم المواعيد، ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس. "
+                                    + "أما الويب هوك فيعمل في ذلك التطبيق حالياً."],
         "mac.lan_open":      ["en": "Open on a phone on the same Wi‑Fi:",
                               "ar": "افتحه على هاتف متصل بنفس شبكة Wi‑Fi:"],
         "mac.lan_pin_missing": ["en": "Set an owner PIN — the queue shows customers' names.",

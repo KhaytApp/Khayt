@@ -18,10 +18,19 @@ import KhaytCore
 /// and it serves the SAME BYTES the Node server serves, from the same
 /// modules, which `LanServerTests` holds it to.
 ///
-/// This first slice is the floor: the live queue page, the status and queue
-/// APIs, and the three files that make the queue installable on a phone's
-/// home screen. The intake form, quote approval, the calendar feed and the
-/// webhooks are the other app's still; they follow, one slice each.
+/// What is served here now: the live queue page, the status and queue APIs,
+/// the store and its deltas, the three files that make the queue installable
+/// on a phone's home screen, the customer intake form and its estimate, the
+/// quote page and its approval, the order's own tracking page and survey, and
+/// `/calendar.ics`. It arrived one slice at a time and the list above is the
+/// end of that; what has NOT been lifted is the webhooks, and Node's short
+/// `/status/<id>` alias for a tracking page this app serves at
+/// `/order/<id>/status`.
+///
+/// That list is not decoration: `OnlinePaneTruthTests` reads this route table
+/// and fails the build if the Online settings pane sends a shop to the other
+/// app for something answered here. The pane said exactly that about three of
+/// them for three releases after they landed.
 ///
 /// ── THE GATE ──────────────────────────────────────────────────────────────
 ///

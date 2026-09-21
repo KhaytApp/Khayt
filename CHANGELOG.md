@@ -6,6 +6,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The Online settings pane sent the shop to the other app for three
+  things this app has served since alpha.18.** "The customer intake form, quote
+  approval and the calendar feed run in that app for now" was true when it was
+  written and stopped being true three releases ago, so a shop reading it would
+  have gone and started the Windows and Linux app to be handed something this
+  Mac was already serving on the same Wi‑Fi. The pane lists what it really
+  serves now — the live queue, the intake form and its estimate, quote
+  approval, the tracking page, the survey and the calendar feed — and says
+  plainly that webhooks are the one piece still running in the other app.
+
+  Nothing caught it because the words were right on the day they were written.
+  They are held to the route table now: a test reads `LanServer.swift` and
+  fails the build if the pane defers anything this app answers, in Arabic as
+  well as English, and fails the other way too if the pane stops saying where
+  webhooks run — a pane that promises everything is the worse error of the two.
+
 - **(Mac) The library showed a tick and a failure at the same time.** The
   banner under the search field answers one question — what happened when you
   last asked for something — but each gesture cleared only its own line, so a
