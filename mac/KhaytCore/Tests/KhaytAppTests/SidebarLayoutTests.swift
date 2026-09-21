@@ -233,6 +233,12 @@ struct LastWordsTests {
         #expect(written.contains(reason), "the note does not say why")
         #expect(written.contains("KhaytDeliberateException"), "the note does not say what")
         #expect(written.contains("Khayt"), "the note carries no backtrace")
+        // And what the shared rules had already refused on the way here. A
+        // fresh abort has none, and "(none)" is the honest answer — but the
+        // section has to be there, or a real crash's note will not carry it
+        // either.
+        #expect(written.contains("rules that failed before this"),
+                "the note no longer says what the rules refused")
     }
 
     @Test("no note is not a crash")

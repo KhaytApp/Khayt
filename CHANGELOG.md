@@ -6,6 +6,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) A fault inside the shared rules left no trace at all.** This
+  app asks those rules 263 questions and almost every one is asked in a way
+  that swallows a failure — which is right, because a fault in one rule should
+  not take a window down. The cost showed up this week: a rule reached for
+  something that exists only in the other app, the Invoice button said "could
+  not be built", and there was nothing written down anywhere to say why. It was
+  found by photographing the app.
+
+  Every engine call in both products goes through one place, so that is where
+  the fault is now recorded on its way past — the last sixteen, in memory, and
+  the crash note carries them. Nothing a shop sees changes. What is kept is the
+  error and the SHAPE of the call that failed, never its arguments: a script
+  carries its data inline, and a crash note is a file a shop is asked to send
+  on. `KHAYT_ENGINE_LOG=1` writes them as they happen.
+
 - **(Mac) A tracking link a shop had already sent a customer answered "invalid
   link" on this app.** The Windows and Linux app gives a customer an address
   beginning `/status/`; this app draws the same page at `/order/…/status` and

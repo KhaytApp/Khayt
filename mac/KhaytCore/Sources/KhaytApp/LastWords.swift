@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 
 /// Saying why the app died.
 ///
@@ -78,6 +79,9 @@ enum LastWords {
 
             where:
             \(stack.prefix(40).joined(separator: "\n"))
+
+            rules that failed before this (newest last):
+            \(engineFaults())
             """
         for url in LastWords.targets {
             // Best effort by design: a handler that throws while reporting a
@@ -85,6 +89,23 @@ enum LastWords {
             try? note.write(to: url, atomically: true, encoding: .utf8)
         }
         FileHandle.standardError.write(Data((note + "\n").utf8))
+    }
+
+    /// What the shared rules had already refused, on the way to here.
+    ///
+    /// A JavaScript fault does not crash this app — 263 engine calls are asked
+    /// with `try?` on purpose — but it is very often the thing that led here,
+    /// and until now it was written down nowhere at all. The SHAPE of each
+    /// call only: a script carries its arguments inline, so the text that
+    /// failed can hold a customer's name or a shop's password, and a crash
+    /// note is a file a shop is asked to send on.
+    nonisolated static func engineFaults() -> String {
+        let faults = EngineFaults.recent()
+        guard !faults.isEmpty else { return "(none)" }
+        let clock = ISO8601DateFormatter()
+        return faults
+            .map { "\(clock.string(from: $0.at))  \($0.call)  —  \($0.problem)" }
+            .joined(separator: "\n")
     }
 
     /// Die on purpose, the way AppKit does, when asked to.
