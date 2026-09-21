@@ -47,6 +47,27 @@
   --khayt-weight-label: 700;
   --khayt-track-display: -0.02em;
   --khayt-track-label: 0.10em;
+
+  /* Motion, from Motion.swift. Each duration is argued for in that file —
+     read it before reaching for one. `hover` is "quicker than a person can
+     notice"; `progress` is slow BECAUSE it stands for hours of work, and a
+     snappy one would misrepresent it. */
+  --khayt-motion-figure: 450ms;
+  --khayt-ease-figure: ease-out;
+  --khayt-motion-gauge: 650ms;
+  --khayt-ease-gauge: ease-out;
+  --khayt-motion-progress: 900ms;
+  --khayt-ease-progress: ease-in-out;
+  --khayt-motion-hover: 120ms;
+  --khayt-ease-hover: ease-out;
+
+  /* The two named behaviours. `alive` is the slow breath reserved for the
+     one thing happening right now — the amber dot on a running print, and
+     NOTHING else. `lift` is the whole vocabulary for "this is yours to
+     press". Neither is decoration: see the head of Motion.swift. */
+  --khayt-motion-alive: 1400ms;
+  --khayt-alive-dim: 0.45;
+  --khayt-lift: 1.01;
 }
 
 /* Dark. Only the colours change — the geometry and the type scale are one
@@ -63,6 +84,25 @@
   --khayt-surface: #201c17;
   --khayt-ground: #16130f;
   --khayt-hairline: #3a342c;
+}
+
+/* REDUCE MOTION TAKES EVERYTHING TO ZERO, and that is not a nicety.
+   Motion.swift: "this app is for a workshop, motion sensitivity is common,
+   and a pulsing dot on a screen somebody has to look at all day is the exact
+   thing the setting exists for." `Motion.of` returns no animation at all and
+   the breath STOPS rather than slowing, so the tokens do the same. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --khayt-motion-figure: 0ms;
+    --khayt-motion-gauge: 0ms;
+    --khayt-motion-progress: 0ms;
+    --khayt-motion-hover: 0ms;
+    --khayt-motion-alive: 0ms;
+    /* Full opacity, not a dimmed resting state: a dot left at 45% on a
+       machine that has finished reads as a fault. */
+    --khayt-alive-dim: 1;
+    --khayt-lift: 1;
+  }
 }
 
 @media (prefers-color-scheme: dark) {

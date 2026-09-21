@@ -39,6 +39,23 @@ export function EmptyLane() {
   );
 }
 
+/**
+ * Running right now. The amber dot breathes — the only thing in this system
+ * that moves on its own, and it is reserved for exactly this. A board with
+ * nothing printing is a board that is completely still.
+ */
+export function Live() {
+  return (
+    <Theme>
+      <div style={{ padding: 16, display: 'grid', gap: 8, width: 260,
+                    background: 'var(--khayt-ground)' }}>
+        <JobCard live project="Falcon hood" client="Acme Robotics" material="PLA+ Black" />
+        <JobCard project="Bracket set" client="Acme Robotics" material="PETG Grey" />
+      </div>
+    </Theme>
+  );
+}
+
 export function Dark() {
   return (
     <Theme mode="dark">

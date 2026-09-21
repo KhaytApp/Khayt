@@ -56,6 +56,17 @@ export interface JobCardProps {
   thumbnail?: ReactNode;
   /** Chips, a stage pill, anything the card carries along the bottom. */
   footer?: ReactNode;
+  /**
+   * This job is printing RIGHT NOW.
+   *
+   * Draws the one moving thing in Khayt's whole vocabulary: a slow breath on
+   * an amber dot. `Motion.swift` reserves it — "used on the amber dot beside a
+   * running print and nowhere else" — because `Palette` reserves that colour
+   * for the same thing, "so a floor with nothing running is a floor that is
+   * completely still". Do not reach for this to draw attention to anything
+   * else; there is deliberately no general-purpose pulse in this system.
+   */
+  live?: boolean;
 }
 
 /**
@@ -66,13 +77,14 @@ export interface JobCardProps {
  * flag sits on the first baseline beside the title rather than floating at the
  * middle of a title that wrapped.
  */
-export function JobCard({ project, client, material, priority, thumbnail, footer }: JobCardProps) {
+export function JobCard({ project, client, material, priority, thumbnail, footer, live }: JobCardProps) {
   return (
     <article className="khayt-job">
       <div className="khayt-job__top">
         {thumbnail ? <div className="khayt-job__thumb">{thumbnail}</div> : null}
         <div className="khayt-job__text">
           <h4 className="khayt-job__title">
+            {live ? <span className="khayt-alive" aria-label="Printing now" /> : null}
             {priority ? <span className="khayt-job__flag" aria-label="Priority">⚑</span> : null}
             {project}
           </h4>

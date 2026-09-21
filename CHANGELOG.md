@@ -6,6 +6,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Maintainers) A design token that went stale is now a failing test.** The
+  extractor reads the Mac app's colours, card geometry, type scale and motion
+  out of the Swift and stops dead if one is renamed — but it cannot notice that
+  nobody ran it. Change a colour, commit, and the generated stylesheet the
+  design tool builds from still holds the old one, with every design made from
+  then on quietly off-brand. It is regenerated into a temp file and compared on
+  every run now, and the failure says which command to run. Only the VALUES:
+  if the card or the sidebar row changes shape the mirror still has to be
+  updated by hand, and a green run here does not say otherwise.
+
 - **(Mac) A button said `common.ok`.** The banner that appears when Khayt has
   drafted purchase orders by itself asked for a word neither this app's own
   table nor the shared catalogue has, and a word that resolves nowhere is
@@ -14,6 +24,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   catalogues already have. Every one of the 1,375 words this app asks for is
   now checked against the real catalogue, in both languages, so a button can
   no longer be labelled with the name of the thing it was supposed to say.
+
+- **(Maintainers) The design system knows how Khayt moves.** The React mirror
+  that Claude Design builds with carried every colour, type step and the card
+  geometry out of the Mac app's own source — and no motion at all, while
+  `Motion.swift` holds a deliberate vocabulary and argues it out: `hover` is
+  "quicker than a person can notice", `progress` is slow *because* it stands
+  for hours of work. A design tool asked for something livelier had nothing of
+  Khayt's to reach for and would have invented its own. The extractor now reads
+  `Motion.swift` as a fourth source — four durations with their curves, the
+  breath and the lift — and fails loudly on a rename exactly as it does for a
+  colour. Two opt-in props come with it: a card that *opens* something lifts,
+  and a job printing right now gets the one breathing dot this system has.
+  Reduce Motion takes every duration to zero and stops the breath, which is
+  `Motion.swift`'s own position and now travels with the tokens.
 
 - **(Maintainers) The first consumable is proven to land, on the book this
   shop actually has.** The tests covered the shared rules and the screen's own

@@ -25,7 +25,12 @@ import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const APP = path.join(ROOT, 'mac/KhaytCore/Sources/KhaytApp');
-const OUT = path.join(ROOT, 'design-system/src/tokens/khayt.css');
+/* `--out <path>` so a guard can regenerate into a temp file and compare,
+ * without writing over the committed stylesheet it is checking. */
+const outArg = process.argv.indexOf('--out');
+const OUT = outArg > -1 && process.argv[outArg + 1]
+  ? path.resolve(process.argv[outArg + 1])
+  : path.join(ROOT, 'design-system/src/tokens/khayt.css');
 
 const read = (f) => fs.readFileSync(path.join(APP, f), 'utf8');
 
@@ -113,6 +118,58 @@ if (!trackDisplay || !trackLabel || !family) {
   process.exit(1);
 }
 
+/**
+ * How the app MOVES, from Motion.swift.
+ *
+ * Read for the same reason the colours are: `Motion.swift` argues its four
+ * durations out in its own comments ("quicker than a person can notice",
+ * "stands for hours of work"), and a stylesheet that guesses at them is a
+ * second opinion that drifts. A design built in the wrong timing is off-brand
+ * in a way nobody can point at.
+ *
+ * The two named behaviours come with it, because they are the vocabulary:
+ * `Alive` is the slow breath reserved for the one thing happening right now,
+ * and `Lift` is the whole of "this is yours to press".
+ */
+const motionRaw = read('Motion.swift');
+const motionBody = motionRaw
+  .split('\n')
+  .filter((l) => !l.trim().startsWith('///') && !l.trim().startsWith('//'))
+  .join('\n');
+
+/** SwiftUI curve names to their CSS equivalents. */
+const CURVE = { easeOut: 'ease-out', easeInOut: 'ease-in-out', easeIn: 'ease-in', linear: 'linear' };
+
+const motion = {};
+for (const m of motionBody.matchAll(
+  /static let (\w+)\s*=\s*Animation\.(easeOut|easeInOut|easeIn|linear)\(duration:\s*([\d.]+)\)/g)) {
+  motion[m[1]] = { curve: CURVE[m[2]], seconds: m[3] };
+}
+
+/* NAMED, not inferred — the same rule the colours follow. A duration that is
+ * renamed should stop this script dead rather than quietly ship a motion set
+ * with one timing missing, which is the kind of gap nobody sees in a diff. */
+const MOTION_NEEDED = ['figure', 'gauge', 'progress', 'hover'];
+const motionMissing = MOTION_NEEDED.filter((k) => !motion[k]);
+if (motionMissing.length) {
+  console.error(`✗ not found in Motion.swift: ${motionMissing.join(', ')}`);
+  console.error('  A duration that moved is motion that would silently go stale.');
+  process.exit(1);
+}
+
+// The breath, and how far it dims. Both live inside `Alive`, not on `Motion`.
+const aliveSeconds = motionBody.match(/\.easeInOut\(duration:\s*([\d.]+)\)\.repeatForever/)?.[1];
+const aliveDim = motionBody.match(/\.opacity\(active && breathed && !reduced \? ([\d.]+)/)?.[1];
+// The lift, as a PERCENT in the Swift (`1 + amount / 100`).
+const liftPercent = motionBody.match(/by amount: CGFloat = ([\d.]+)/)?.[1];
+if (!aliveSeconds || !aliveDim || !liftPercent) {
+  console.error('✗ Alive or Lift moved in Motion.swift:',
+                JSON.stringify({ aliveSeconds, aliveDim, liftPercent }));
+  process.exit(1);
+}
+
+const ms = (seconds) => `${Math.round(parseFloat(seconds) * 1000)}ms`;
+
 /** SwiftUI weight names to CSS numbers. */
 const WEIGHT = { regular: 400, medium: 500, semibold: 600, bold: 700, heavy: 800 };
 const w = (name) => WEIGHT[name] ?? 400;
@@ -161,6 +218,23 @@ lines.push(`  --khayt-weight-body: ${w(steps.body.weight)};`);
 lines.push('  --khayt-weight-label: 700;');
 lines.push(`  --khayt-track-display: ${trackDisplay}em;`);
 lines.push(`  --khayt-track-label: ${trackLabel}em;`);
+lines.push('');
+lines.push('  /* Motion, from Motion.swift. Each duration is argued for in that file —');
+lines.push('     read it before reaching for one. `hover` is "quicker than a person can');
+lines.push('     notice"; `progress` is slow BECAUSE it stands for hours of work, and a');
+lines.push('     snappy one would misrepresent it. */');
+for (const k of MOTION_NEEDED) {
+  lines.push(`  --khayt-motion-${k}: ${ms(motion[k].seconds)};`);
+  lines.push(`  --khayt-ease-${k}: ${motion[k].curve};`);
+}
+lines.push('');
+lines.push('  /* The two named behaviours. `alive` is the slow breath reserved for the');
+lines.push('     one thing happening right now — the amber dot on a running print, and');
+lines.push('     NOTHING else. `lift` is the whole vocabulary for "this is yours to');
+lines.push('     press". Neither is decoration: see the head of Motion.swift. */');
+lines.push(`  --khayt-motion-alive: ${ms(aliveSeconds)};`);
+lines.push(`  --khayt-alive-dim: ${aliveDim};`);
+lines.push(`  --khayt-lift: ${1 + parseFloat(liftPercent) / 100};`);
 lines.push('}');
 lines.push('');
 lines.push('/* Dark. Only the colours change — the geometry and the type scale are one');
@@ -169,6 +243,24 @@ lines.push('[data-theme="dark"] {');
 for (const k of NEEDED) {
   lines.push(`  --khayt-${kebab(k)}: ${palette[k].dark};`);
 }
+lines.push('}');
+lines.push('');
+lines.push('/* REDUCE MOTION TAKES EVERYTHING TO ZERO, and that is not a nicety.');
+lines.push('   Motion.swift: "this app is for a workshop, motion sensitivity is common,');
+lines.push('   and a pulsing dot on a screen somebody has to look at all day is the exact');
+lines.push('   thing the setting exists for." `Motion.of` returns no animation at all and');
+lines.push('   the breath STOPS rather than slowing, so the tokens do the same. */');
+lines.push('@media (prefers-reduced-motion: reduce) {');
+lines.push('  :root {');
+for (const k of MOTION_NEEDED) {
+  lines.push(`    --khayt-motion-${k}: 0ms;`);
+}
+lines.push('    --khayt-motion-alive: 0ms;');
+lines.push('    /* Full opacity, not a dimmed resting state: a dot left at 45% on a');
+lines.push('       machine that has finished reads as a fault. */');
+lines.push('    --khayt-alive-dim: 1;');
+lines.push('    --khayt-lift: 1;');
+lines.push('  }');
 lines.push('}');
 lines.push('');
 lines.push('@media (prefers-color-scheme: dark) {');
@@ -184,5 +276,6 @@ function kebab(s) { return s.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase(); 
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, lines.join('\n'));
-console.log(`✓ ${NEEDED.length} colours, ${Object.keys(steps).length + 1} type steps, 5 card values`);
+console.log(`✓ ${NEEDED.length} colours, ${Object.keys(steps).length + 1} type steps, 5 card values, `
+            + `${MOTION_NEEDED.length} durations + alive/lift`);
 console.log(`  → ${path.relative(ROOT, OUT)}`);

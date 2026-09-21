@@ -39,6 +39,28 @@ export function Railed() {
   );
 }
 
+/**
+ * A card that OPENS something. Opt-in, and the reason it is opt-in is the
+ * whole point: most cards do not lift, so the ones that do read as pressable.
+ * It takes a focus ring from the keyboard as well as the pointer.
+ */
+export function Pressable() {
+  return (
+    <Theme>
+      <div style={{ padding: 16, display: 'grid', gap: 10, width: 280 }}>
+        <Card pressable>
+          <CapsLabel>Opens the job</CapsLabel>
+          <p style={{ margin: '4px 0 0' }}>Falcon hood &times; 4</p>
+        </Card>
+        <Card>
+          <CapsLabel tone="note">Opens nothing</CapsLabel>
+          <p style={{ margin: '4px 0 0' }}>This one must not lift.</p>
+        </Card>
+      </div>
+    </Theme>
+  );
+}
+
 /** Dark, which is one token swap and no geometry change. */
 export function Dark() {
   return (

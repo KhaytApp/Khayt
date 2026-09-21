@@ -219,3 +219,79 @@
   font-weight: var(--khayt-weight-title);
 }
 .khayt-empty__body { margin: 4px 0 0; font-size: var(--khayt-size-row); color: var(--khayt-note); }
+
+/* ── HOW THIS MOVES ───────────────────────────────────────────────────────
+ *
+ * Every duration and curve below is a token generated out of Motion.swift —
+ * never a number typed here. That file argues each one out: `hover` is
+ * "quicker than a person can notice, or the app feels heavy rather than
+ * alive"; `figure` is "long enough to be seen as a change, short enough that
+ * a shop is not waiting for it".
+ *
+ * The rule that matters more than the numbers: **motion has to mean
+ * something.** Nothing here loops for decoration, nothing bounces, and
+ * nothing draws the eye to a thing that is not news. A dashboard where
+ * something is always moving is a dashboard where movement stops meaning
+ * anything.
+ *
+ * Under Reduce Motion every duration is already 0ms and the breath is
+ * already still — the tokens do that, so nothing below needs its own query.
+ */
+
+/* A card that OPENS something. Opt-in: see `pressable` in CardProps. */
+.khayt-card--pressable {
+  cursor: pointer;
+  transition: transform var(--khayt-motion-hover) var(--khayt-ease-hover),
+              border-color var(--khayt-motion-hover) var(--khayt-ease-hover);
+}
+.khayt-card--pressable:hover {
+  transform: scale(var(--khayt-lift));
+  border-color: color-mix(in srgb, var(--khayt-brand) 45%, var(--khayt-hairline));
+}
+/* The keyboard gets the same affordance the pointer does. `:focus-visible`
+   rather than `:focus`, so a mouse press does not leave a ring behind. */
+.khayt-card--pressable:focus-visible {
+  outline: 2px solid var(--khayt-brand);
+  outline-offset: 2px;
+}
+
+/* A navigation row answering the pointer. Not a lift — a row is not a tile,
+   and scaling text is how a sidebar starts to feel loose. */
+.khayt-navrow {
+  transition: background-color var(--khayt-motion-hover) var(--khayt-ease-hover),
+              color var(--khayt-motion-hover) var(--khayt-ease-hover);
+}
+.khayt-navrow:hover:not([data-selected]) {
+  background: color-mix(in srgb, var(--khayt-note) 8%, transparent);
+}
+
+/* A figure arriving at a new value. The timing is `figure`, which is the
+   Mac app's answer for exactly this: a number that was 61 and then was 62,
+   with no moment in between, has to be READ to be understood. */
+.khayt-figure,
+.khayt-stat__value {
+  transition: color var(--khayt-motion-figure) var(--khayt-ease-figure);
+}
+
+/* THE ONE MOVING THING. A slow breath on an amber dot, beside a print that
+   is running right now — and nowhere else in this system. There is no
+   general-purpose pulse here on purpose. */
+.khayt-alive {
+  display: inline-block;
+  inline-size: 7px;
+  block-size: 7px;
+  margin-inline-end: 5px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: var(--khayt-hot);
+  animation: khayt-breath var(--khayt-motion-alive) ease-in-out infinite alternate;
+}
+@keyframes khayt-breath {
+  from { opacity: 1; }
+  to   { opacity: var(--khayt-alive-dim); }
+}
+/* Stops where it is rather than mid-fade: a dot left dimmed on a machine
+   that has finished reads as a fault. Mirrors `Alive`'s own onChange. */
+@media (prefers-reduced-motion: reduce) {
+  .khayt-alive { animation: none; opacity: 1; }
+}

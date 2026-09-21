@@ -87,6 +87,41 @@ so the colour is never the only signal.
 **Figures are semibold, not bold.** At 34px bold is shouting, and everything
 else on the screen then has to shout back.
 
+## How this moves
+
+Khayt has a motion vocabulary and it is small on purpose. Use these tokens —
+never a duration you picked yourself:
+
+| Token | Value | For |
+|---|---|---|
+| `--khayt-motion-hover` / `--khayt-ease-hover` | 120ms ease-out | something answering the pointer |
+| `--khayt-motion-figure` / `--khayt-ease-figure` | 450ms ease-out | a figure arriving at a new value |
+| `--khayt-motion-gauge` / `--khayt-ease-gauge` | 650ms ease-out | a bar or gauge growing to its reading |
+| `--khayt-motion-progress` / `--khayt-ease-progress` | 900ms ease-in-out | a print advancing |
+| `--khayt-lift` | 1.01 | the scale a pressable card takes under the pointer |
+
+**Motion has to mean something.** Every one of those is tied to a real change
+in the shop. Nothing loops for decoration, nothing bounces, and nothing draws
+the eye to a thing that is not news — a screen where something is always
+moving is a screen where movement stops meaning anything. If you want a
+design to feel alive, make the *real* changes visible; do not add movement
+that stands for nothing.
+
+**`<Card pressable>` is the whole of "this is yours to press."** It lifts by
+`--khayt-lift`, warms its border, takes a focus ring and a pointer cursor. A
+card that opens nothing must not have it.
+
+**`<JobCard live>` is the only thing that moves on its own** — a slow breath
+on an amber dot, for a print running right now. That is the entire set; there
+is deliberately no general-purpose pulse, badge shimmer or skeleton animation
+in this system. Do not build one.
+
+**Reduce Motion is already handled.** Every duration token is 0ms and the
+breath is still under `prefers-reduced-motion`, because this is a workshop app
+and a pulsing dot on a screen somebody watches all day is exactly what that
+setting exists for. Use the tokens and you inherit that; hard-code `300ms` and
+you break it.
+
 ## A screen, put together
 
 ```jsx

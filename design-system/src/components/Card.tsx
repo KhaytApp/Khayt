@@ -21,6 +21,16 @@ export interface CardProps {
    * short one would otherwise leave the rest of that height as a gap.
    */
   fills?: boolean;
+  /**
+   * This card OPENS something, so it answers the pointer.
+   *
+   * Opt-in, exactly as in the Mac app: `Motion.swift` gives `liftsOnHover` as
+   * "the whole vocabulary for 'this is yours to press', used on every card and
+   * tile that opens something" — which means a card that opens nothing must
+   * not lift. A board where everything moves under the pointer teaches a shop
+   * that movement means nothing.
+   */
+  pressable?: boolean;
   children?: ReactNode;
   className?: string;
   style?: CSSProperties;
@@ -35,16 +45,18 @@ export interface CardProps {
  * same source: radius 10, a 1px hairline border, 12pt padding, and a 3pt rail
  * inset 5pt from the leading edge when one is asked for.
  */
-export function Card({ rail, padding, fills, children, className, style }: CardProps) {
+export function Card({ rail, padding, fills, pressable, children, className, style }: CardProps) {
   return (
     <div
-      className={['khayt-card', fills ? 'khayt-card--fills' : '', className].filter(Boolean).join(' ')}
+      className={['khayt-card', fills ? 'khayt-card--fills' : '',
+                  pressable ? 'khayt-card--pressable' : '', className].filter(Boolean).join(' ')}
       style={{
         ...(padding !== undefined ? { ['--khayt-card-padding' as string]: `${padding}px` } : null),
         ...(rail ? { ['--khayt-card-rail' as string]: `var(${TONE_VAR[rail]})` } : null),
         ...style,
       }}
       data-rail={rail ? '' : undefined}
+      tabIndex={pressable ? 0 : undefined}
     >
       {children}
     </div>
