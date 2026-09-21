@@ -33,6 +33,45 @@ enum Converter {
     /// megabytes.
     static let inlineLimit = 4 << 20
 
+    /// The root model — the member that is the mesh, and the one member whose
+    /// LAYOUT the rule still has to see.
+    ///
+    /// A 3MF's `<build>` block lists where each object sits on the bed. It is a
+    /// line per object at the end of a file that is otherwise triangles, and
+    /// re-placing those items is how a conversion keeps the plates centred when
+    /// the target bed is a different size. Passing this member by name alone
+    /// meant the rule had nothing to read and the conversion failed outright —
+    /// so the block crosses on its own, and comes back on its own.
+    static func isRootModel(_ name: String) -> Bool {
+        name.lowercased().hasSuffix("3d/3dmodel.model")
+    }
+
+    /// Where `<build>…</build>` sits in a root model's bytes.
+    ///
+    /// Bytes rather than text on purpose: the block is spliced back in at
+    /// exactly the range it was taken from, so four hundred megabytes of mesh
+    /// are never decoded into a String to have one line changed. Nil when the
+    /// file has no build block (`<build/>`, or a CAD export that has none),
+    /// which is a file with no layout to re-tile rather than a failure.
+    static func buildBlockRange(in data: Data) -> Range<Data.Index>? {
+        var from = data.startIndex
+        while let open = data.range(of: Data("<build".utf8), in: from..<data.endIndex) {
+            // `<buildinfo` is not `<build`. The element name ends at a space or
+            // at the closing angle bracket, and nothing else counts.
+            let after = open.upperBound
+            if after < data.endIndex,
+               data[after] == UInt8(ascii: ">") || data[after] == UInt8(ascii: " ")
+                || data[after] == UInt8(ascii: "\n") || data[after] == UInt8(ascii: "\r")
+                || data[after] == UInt8(ascii: "\t") {
+                guard let close = data.range(of: Data("</build>".utf8), in: after..<data.endIndex)
+                else { return nil }
+                return open.lowerBound..<close.upperBound
+            }
+            from = after
+        }
+        return nil
+    }
+
     enum Failure: Error, CustomStringConvertible, Equatable {
         case notOurs
         case unreadable(String)
@@ -87,6 +126,17 @@ enum Converter {
             if entry.size <= inlineLimit, let data = try? Zip.data(of: entry, in: source),
                let text = String(data: data, encoding: .utf8) {
                 member["data"] = .string(text)
+            } else if isRootModel(entry.name),
+                      let data = try? Zip.data(of: entry, in: source, limit: .max),
+                      let range = buildBlockRange(in: data),
+                      let block = String(data: Data(data[range]), encoding: .utf8) {
+                // The mesh still does not cross. Its layout does, on its own —
+                // kilobytes of it, out of a member that may be hundreds of
+                // megabytes. Read again at the splice rather than held here,
+                // because holding it would put the whole mesh alongside the
+                // engine for the length of the call, which is the cost this
+                // design exists to avoid.
+                member["build"] = .string(block)
             }
             described.append(.object(member))
         }
@@ -104,6 +154,16 @@ enum Converter {
         for member in members {
             if let text = member.text {
                 out.append(.init(member.name, Data(text.utf8)))
+            } else if let block = member.buildBlock {
+                // A re-tiled layout, put back exactly where it came from. The
+                // triangles either side of it are the bytes that were there.
+                guard let entry = byName[member.name],
+                      var data = try? Zip.data(of: entry, in: source, limit: .max),
+                      let range = buildBlockRange(in: data) else {
+                    throw Failure.unreadable("\(member.name)'s plate layout would not go back in")
+                }
+                data.replaceSubrange(range, with: Data(block.utf8))
+                out.append(.init(member.name, data))
             } else if let entry = byName[member.name] {
                 guard let data = try? Zip.data(of: entry, in: source, limit: .max) else {
                     throw Failure.unreadable("\(member.name) would not come back out")

@@ -7034,10 +7034,30 @@ final class Shop {
     /// cleanly between imports rather than halfway through one.
     var importCancelled = false
 
-    /// Ask for a file and add it.
-    func addModelToLibrary() async {
+    /// Clear the answer to the LAST thing the shop asked for.
+    ///
+    /// The library's banner area answers one question — what happened when you
+    /// last asked for something — and four gestures write there: a move, an
+    /// import, a conversion, opening a slicer. Each used to clear only its own
+    /// line, so they piled up: a conversion that failed appeared UNDERNEATH a
+    /// green "1 moved in · 0 failed" from an import minutes earlier, which
+    /// together say something that never happened. Reported from the running
+    /// app, with a TypeError sitting below a tick.
+    ///
+    /// A gesture is what supersedes a gesture, so every one of them starts
+    /// here. `LibraryOutcomeTests` holds all four to it.
+    func clearLastOutcome() {
+        moveProblem = nil
         importNote = nil
         importProblem = nil
+        convertNote = nil
+        convertProblem = nil
+        slicerProblem = nil
+    }
+
+    /// Ask for a file and add it.
+    func addModelToLibrary() async {
+        clearLastOutcome()
         guard source.build != nil else {
             importProblem = words.callIt("mac.move_sample"); return
         }
@@ -7114,8 +7134,7 @@ final class Shop {
     /// `known` grows as it goes, so two copies of the same model inside one
     /// selection do not both get in.
     func addModelsToLibrary(_ chosen: [URL]) async {
-        importNote = nil
-        importProblem = nil
+        clearLastOutcome()
         importCancelled = false
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             importProblem = LibraryImport.Failure.notOurs.description; return
@@ -7233,8 +7252,7 @@ final class Shop {
     /// where to put it has already spent the time before the shop can change
     /// its mind, and a shop that cancels should have cost nothing.
     func convertModel(_ file: LibraryFile, targetId: String?) async {
-        convertNote = nil
-        convertProblem = nil
+        clearLastOutcome()
         guard let source = modelFile(for: file) else {
             convertProblem = words.callIt("mac.not_found"); return
         }
@@ -7632,7 +7650,7 @@ final class Shop {
 
     /// Open a model in a named slicer.
     func openInSlicer(_ url: URL, slicer: KhaytEngine.Slicer) async {
-        slicerProblem = nil
+        clearLastOutcome()
         guard let engine else { return }
         let allowed = (try? await engine.mayLaunchAsSlicer(path: slicer.path)) ?? false
         let refusal = FileActions.openInSlicer(url, slicerPath: slicer.path) { _ in allowed }
@@ -11374,8 +11392,7 @@ final class Shop {
     }
 
     func deleteLibraryFile(_ file: LibraryFile) async {
-        importProblem = nil
-        importNote = nil
+        clearLastOutcome()
         pendingLibraryDelete = nil
         guard let build = source.build else {
             importProblem = words.callIt("mac.move_sample"); return

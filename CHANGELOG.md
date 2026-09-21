@@ -6,6 +6,36 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The library showed a tick and a failure at the same time.** The
+  banner under the search field answers one question — what happened when you
+  last asked for something — but each gesture cleared only its own line, so a
+  conversion that failed appeared underneath a green "1 moved in · 0 already
+  there · 0 failed" from an import minutes earlier. Two answers, minutes apart,
+  read as one event. A move, an import, a conversion and opening a slicer now
+  each clear what the last one said.
+
+- **(Mac) Converting a model for another printer failed outright, and said
+  "undefined is not an object".** Any 3MF from the same slicer family as the
+  printer it was being converted for — a Bambu or Orca file, which is most of
+  them — stopped there, as long as the file named the bed it was laid out on
+  and that bed was a different size from the target's. Nothing was written and
+  nothing was said except the engine's own error text.
+
+  What it was doing when it stopped is a real part of the job: a file with
+  several plates lays them out in one grid built from the bed it came from, so
+  a smaller or larger target bed leaves every plate drifting further off-centre
+  than the last. This app re-places them. It is the ONE thing a conversion asks
+  about the model itself — every other decision reads a settings file — and the
+  model is the member this app deliberately never hands to the engine, because
+  it can be four hundred megabytes of triangles. The rule reached for it
+  anyway, found nothing, and threw before it had even asked whether the file
+  had a second plate to re-tile: single-plate files failed the same way.
+
+  The plate layout crosses on its own now — a few lines out of the file, never
+  the mesh — and goes back exactly where it came from, so the triangles either
+  side of it are the bytes that were already there. A file this app genuinely
+  cannot read the layout of converts anyway and says the plates were left where
+  the source slicer put them, which is a sentence a shop can act on.
 - **(Maintainers) "Runs in the Windows and Linux app" cannot be printed by
   accident.** One line was left in the Mac's assistant settings pointing a shop
   at the other app, and it was unreachable — every AI feature the shared rule

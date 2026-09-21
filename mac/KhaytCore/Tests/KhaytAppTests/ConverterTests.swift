@@ -221,6 +221,105 @@ struct ConverterTests {
         }
     }
 
+    // ── THE PLATES, AND THE ONE PART OF THE MESH THAT IS A DECISION ───────
+    //
+    // A multi-plate file lays its objects out in one world grid built from the
+    // SOURCE bed. Converted for a bed of another size, that grid no longer
+    // matches and the plates drift — so the rule re-places each item, which
+    // means reading the `<build>` block inside the root model.
+    //
+    // That member is the mesh, and the mesh is passed by name. The rule read
+    // its bytes anyway and the conversion died with "undefined is not an
+    // object" — for every same-family retarget to a different bed, whether or
+    // not the file had a second plate. Nothing here caught it because this
+    // file's fixture declares no `printable_area`, so the source bed was
+    // unknown and the re-tile was never reached.
+
+    /// Two plates, a declared bed, and a mesh big enough to be passed by name.
+    static func multiPlate(at url: URL, meshPadding: Int) throws {
+        let settings = """
+            {"printer_model":"X1C","nozzle_diameter":["0.4"],\
+            "printable_area":["0x0","256x0","256x256","0x256"],\
+            "filament_colour":["#FF0000"],"filament_type":["PLA"]}
+            """
+        let plates = """
+            <?xml version="1.0"?><config>
+            <plate><metadata key="plater_id" value="1"/><model_instance>\
+            <metadata key="object_id" value="2"/></model_instance></plate>
+            <plate><metadata key="plater_id" value="2"/><model_instance>\
+            <metadata key="object_id" value="4"/></model_instance></plate>
+            </config>
+            """
+        // The padding stands in for triangles: it is what makes this member too
+        // big to inline, which is the whole point of the test.
+        let mesh = "<?xml version=\"1.0\"?><model unit=\"millimeter\"><resources>"
+            + "<object id=\"2\"/><object id=\"4\"/>"
+            + String(repeating: " ", count: meshPadding)
+            + "</resources><build>"
+            + "<item objectid=\"2\" transform=\"1 0 0 0 1 0 0 0 1 128 128 0\"/>"
+            + "<item objectid=\"4\" transform=\"1 0 0 0 1 0 0 0 1 435 128 0\"/>"
+            + "</build></model>"
+        try ZipWrite.archive([
+            .init("[Content_Types].xml", Data("<Types/>".utf8)),
+            .init("3D/3dmodel.model", Data(mesh.utf8)),
+            .init("Metadata/project_settings.config", Data(settings.utf8)),
+            .init("Metadata/model_settings.config", Data(plates.utf8)),
+        ]).write(to: url)
+    }
+
+    @Test("a multi-plate file converts for a different bed, mesh and all")
+    func plateLayoutIsRetiled() async throws {
+        let dir = Self.temp()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let source = dir.appending(path: "plates.3mf")
+        let out = dir.appending(path: "out.3mf")
+        try Self.multiPlate(at: source, meshPadding: Converter.inlineLimit + 1024)
+
+        // It ran at all. Before, this threw the engine's TypeError.
+        _ = try await Converter.convert(source, into: out,
+                                        options: ["targetId": .string("snapmaker-u1")],
+                                        engine: try Self.engine())
+
+        let entry = try #require(try Zip.entries(of: out).first { $0.name == "3D/3dmodel.model" })
+        let after = try Zip.data(of: entry, in: out, limit: .max)
+        let text = String(decoding: after, as: UTF8.self)
+
+        // The layout moved: 128 was the source bed's centre and is not the
+        // target's. A file copied through unchanged passes nothing here.
+        #expect(!text.contains("transform=\"1 0 0 0 1 0 0 0 1 128 128 0\""),
+                "the plates were left on the source bed's grid")
+        #expect(text.contains("<item objectid=\"2\""), "an item went missing from the build")
+        #expect(text.contains("<item objectid=\"4\""), "an item went missing from the build")
+
+        // AND THE MESH SURVIVED. The block is spliced back into the original
+        // bytes, so everything either side of it must be what it was — this is
+        // the guarantee the whole design is arranged around, and a splice at
+        // the wrong offset would quietly cut the model in half.
+        let before = try Zip.data(
+            of: try #require(try Zip.entries(of: source).first { $0.name == "3D/3dmodel.model" }),
+            in: source, limit: .max)
+        let head = try #require(Converter.buildBlockRange(in: before))
+        let tail = try #require(Converter.buildBlockRange(in: after))
+        #expect(before[..<head.lowerBound] == after[..<tail.lowerBound],
+                "the bytes before the layout changed")
+        #expect(Data(before[head.upperBound...]) == Data(after[tail.upperBound...]),
+                "the bytes after the layout changed")
+    }
+
+    @Test("the build block is found by its own name, not by a prefix")
+    func buildBlockIsNotAPrefixMatch() {
+        // `<buildinfo` is not `<build`, and a range taken from it would splice
+        // a rewritten layout over the wrong bytes.
+        let decoy = Data("<buildinfo who=\"orca\"/><build><item/></build>".utf8)
+        let range = try? #require(Converter.buildBlockRange(in: decoy))
+        let found = String(decoding: decoy[range!], as: UTF8.self)
+        #expect(found == "<build><item/></build>", "found \(found)")
+
+        // A file with no build block at all is a file with no layout, not a
+        // failure: nil, and the conversion goes on without re-tiling.
+        #expect(Converter.buildBlockRange(in: Data("<model><build/></model>".utf8)) == nil)
+    }
+
     @Test("something that is not a 3MF is refused, not written")
     func refusesRubbish() async throws {
         let dir = Self.temp()
