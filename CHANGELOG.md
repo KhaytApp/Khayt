@@ -15,6 +15,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   now checked against the real catalogue, in both languages, so a button can
   no longer be labelled with the name of the thing it was supposed to say.
 
+- **(Maintainers) The design system knows how Khayt moves.** The React mirror
+  that Claude Design builds with carried every colour, type step and the card
+  geometry out of the Mac app's own source — and no motion at all, while
+  `Motion.swift` holds a deliberate vocabulary and argues it out: `hover` is
+  "quicker than a person can notice", `progress` is slow *because* it stands
+  for hours of work. A design tool asked for something livelier had nothing of
+  Khayt's to reach for and would have invented its own. The extractor now reads
+  `Motion.swift` as a fourth source — four durations with their curves, the
+  breath and the lift — and fails loudly on a rename exactly as it does for a
+  colour. Two opt-in props come with it: a card that *opens* something lifts,
+  and a job printing right now gets the one breathing dot this system has.
+  Reduce Motion takes every duration to zero and stops the breath, which is
+  `Motion.swift`'s own position and now travels with the tokens.
+
 - **(Maintainers) The first consumable is proven to land, on the book this
   shop actually has.** The tests covered the shared rules and the screen's own
   restatement of "low", and never the write itself on an EMPTY shelf — which

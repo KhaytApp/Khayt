@@ -22,8 +22,9 @@ out of the Swift.
 
 ## The tokens are generated. Do not hand-edit them.
 
-`.design-sync/extract-tokens.mjs` reads `Palette.swift`, `Surface.swift` and
-`TypeScale.swift` and writes `design-system/src/tokens/khayt.css`. It runs as
+`.design-sync/extract-tokens.mjs` reads `Palette.swift`, `Surface.swift`,
+`TypeScale.swift` and `Motion.swift` (see "Motion is extracted too" below) and
+writes `design-system/src/tokens/khayt.css`. It runs as
 part of `npm run build` in that package.
 
 **It fails loudly rather than defaulting**, and that is deliberate: a colour
@@ -39,7 +40,7 @@ traps it already hit, both now guarded:
   `padding: CGFloat =` search found a different view's 10 instead of the card's
   12. It now matches the `func card(rail:` signature by name.
 
-After any change to those three Swift files, re-run the package build and check
+After any change to those four Swift files, re-run the package build and check
 the generated CSS before trusting a sync.
 
 ## Build and sync
@@ -74,6 +75,41 @@ cd .. && node .ds-sync/resync.mjs --config .design-sync/config.json \
 - **Eight components need `cardMode: "column"`.** Their stories are wider than
   a grid cell and the product card crops them. Already in `cfg.overrides`.
 
+## Motion is extracted too, as of 2026-09-21
+
+`Motion.swift` is now the **fourth** Swift file the extractor reads, and it is
+the one that makes the design tool useful for anything interactive. Before
+this, the mirror shipped eleven static components and zero motion — so a
+design agent asked for something "livelier" invented its own timings, which
+is precisely what `Motion.swift` argues against.
+
+What is read: the four `static let` durations on `Motion` (`figure`, `gauge`,
+`progress`, `hover`) with their curves, plus the two named behaviours —
+`Alive`'s breath duration and dim, and `Lift`'s percentage. They become
+`--khayt-motion-*`, `--khayt-ease-*`, `--khayt-alive-dim` and `--khayt-lift`.
+
+**Reduce Motion goes to ZERO, not slower**, and the breath stops rather than
+resting dimmed. That is `Motion.swift`'s own position — a workshop app, a dot
+somebody looks at all day — and the tokens carry it so no component has to
+remember.
+
+Two components gained a prop, both opt-in and both deliberately narrow:
+
+* `Card pressable` — the lift. A card that opens nothing must not have it.
+* `JobCard live` — the breathing amber dot. **The only self-starting motion in
+  the system.** There is no general-purpose pulse, and there should not be.
+
+## Known render warns
+
+* **Hover and press states cannot be captured.** `Card`'s `Pressable` cell
+  shows two cards side by side — one that opens something, one that does not
+  — because the lift only exists under a pointer. The cell is graded on the
+  API and the rule it demonstrates, not on visible movement. Same for the
+  focus ring.
+* `JobCard`'s `Live` cell catches the breath at one frame of its cycle, so the
+  dot's opacity in the still is arbitrary. The dot being PRESENT on the
+  running job and ABSENT on the other is what that cell proves.
+
 ## Re-sync risks
 
 - **The extractor is the single point of drift.** It matches Swift by regex. A
@@ -96,3 +132,16 @@ cd .. && node .ds-sync/resync.mjs --config .design-sync/config.json \
 - **The project this syncs to was adopted, not created.** It held a
   componentless shell from an earlier failed run, which this run overwrote.
   `projectId` is pinned in `config.json`.
+- **Motion.swift is now a fourth point of drift, with the same hand-written
+  list problem as the palette.** `MOTION_NEEDED` names four durations; a
+  duration ADDED to `Motion.swift` is silently absent from the tokens. Check
+  that list when the motion vocabulary grows.
+- **`Alive` and `Lift` are matched against implementation detail, not a
+  signature.** The dim comes from the literal
+  `.opacity(active && breathed && !reduced ? 0.45 : 1)` and the lift from
+  `by amount: CGFloat = 1`. Both stop the build with a named error if they
+  move — which is the intent — but they are tighter patterns than the
+  duration regex and will need re-pointing if those modifiers are refactored.
+- **The CSS curves are approximations.** SwiftUI's `.easeOut`/`.easeInOut` are
+  mapped to CSS `ease-out`/`ease-in-out`. Close, not identical; if a motion
+  ever has to match the Mac frame-for-frame, measure rather than assume.
