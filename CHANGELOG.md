@@ -6,6 +6,34 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Everyone) The app icon is the letter khāʾ now — and until today it was not
+  one.** The mark is خ, the first letter of خيط, and خ is ح with a dot above
+  it. The shipped icon had no dot, so what every Dock, every Home screen and
+  every browser tab has been showing is ح: a different letter. The dot is not
+  decoration on this letter, it is the letter.
+
+  The nozzle has gone with it. It was grey on navy — the lowest-contrast thing
+  in the icon — and it took the top third of the tile, so at the size an icon
+  is actually looked at it was a smudge above a letter rather than a printer
+  above a thread.
+
+  What replaced it is the same letterform the mark has always had, with the dot
+  restored and the stroke redrawn — no gradient down it, no highlight inside
+  it, nothing that turns to noise when small. The stroke's width follows the
+  room the letter leaves itself: it thins where the letter doubles back on
+  itself and is full everywhere else, which is what the brush was doing and
+  what keeps the counter there open. Drawn at one width throughout, this letter
+  fills that counter in and reads as a blot rather than a letter — measured,
+  the tightest the letterform comes to itself is 0.080 of the canvas against a
+  stroke 0.105 wide.
+
+  There are two masters now. The large one carries that taper; the small one,
+  which takes over at 64 points and under, is a single heavier width with a
+  larger dot, because below 64 the counter cannot be seen at all and weight is
+  the only thing that survives. All 72 assets are regenerated from them, and
+  `assets/logo/khayt-mark.svg` is emitted from the same centreline, so the
+  vector mark and the PNGs cannot drift apart.
+
 - **(Mac) A mistyped address told a stranger on the shop's Wi‑Fi which
   storefront and which courier the shop uses.** Ask this app's LAN server for
   a path it does not have and it answered with a list of endpoints — the list
