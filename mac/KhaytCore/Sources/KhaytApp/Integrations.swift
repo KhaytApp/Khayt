@@ -120,6 +120,11 @@ struct IntegrationsPane: View {
                 // draft that a revert could write back.
                 EmailSettings(shop: shop)
 
+                // And where the shop's own alerts go. Same defect as the email
+                // settings above: this app has always SENT Telegram and never
+                // been able to be set up for it.
+                TelegramSettings(shop: shop)
+
                 // The shop's own messages, on the page where the rest of
                 // reaching a customer lives. They are a COLLECTION rather than
                 // a setting, so they save on their own rather than through the

@@ -250,15 +250,24 @@ import KhaytCore
         // same empty screen four times over and looked like four pictures.
         func shoot(_ name: String, _ height: CGFloat, _ config: [String: JSONValue]) throws {
             shop.pretendEmailConfig(config)
+            // On the ground the app draws — see `fixedCosts` below for what a
+            // transparent page does to the ink check.
             try render(VStack(alignment: .leading) { EmailSettings(shop: shop) }
                         .padding(20)
-                        .frame(width: 560),
+                        .frame(width: 560, height: height)
+                        .background(Khayt.ground),
                        name, size: CGSize(width: 560, height: height))
         }
 
         // `none` is NOT photographed: it draws one picker and the blank-page
         // guard below rightly refuses a picture that is almost all paper. Its
         // shape is covered by `EmailSettingsTests.draftReadsNothing`.
+        // `mailto` draws one sentence and nothing else, and until this it was a
+        // branch no picture reached — the same hole that let an invoice bug
+        // sit behind `settings.loyaltyEnabled` for weeks because no fixture
+        // ever switched loyalty on. A branch the pictures do not cover is a
+        // branch nobody has read.
+        try shoot("30-email-mailto", 190, ["provider": .string("mailto")])
         try shoot("31-email-sendgrid", 620, [
             "provider": .string("sendgrid"),
             "fromEmail": .string("orders@acme3d.test"),
@@ -281,6 +290,76 @@ import KhaytCore
             "smtpUser": .string("orders@acme3d.test"),
             "smtpPassword": .string("__enc__x"),
             "triggers": .array([.string("completed"), .string("quote")]),
+        ])
+    }
+
+    /// The Telegram pane, for the reason the email one is here: a settings
+    /// pane the runner cannot reach is a pane nobody has looked at.
+    ///
+    /// TWO PICTURES, because the pane is two screens — the switches stay
+    /// hidden until there is a token and a chat to send to, since a switch
+    /// that cannot fire is a switch that misleads.
+    @Test("the Telegram settings render, before and after a bot is set up")
+    func telegramSettings() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+
+        func shoot(_ name: String, _ height: CGFloat, _ config: [String: JSONValue]) throws {
+            shop.pretendTelegram(config)
+            // On the ground the app draws — see `fixedCosts` below.
+            try render(VStack(alignment: .leading) { TelegramSettings(shop: shop) }
+                        .padding(20)
+                        .frame(width: 560, height: height)
+                        .background(Khayt.ground),
+                       name, size: CGSize(width: 560, height: height))
+        }
+
+        try shoot("34-telegram-empty", 320, [:])
+        try shoot("35-telegram-set", 700, [
+            "botToken": .string("__enc__x"),
+            "chatId": .string("-1001234567890"),
+            "notifyOnComplete": .bool(true),
+            "notifyOnLowStock": .bool(true),
+        ])
+    }
+
+    /// The monthly costs, empty and filled.
+    ///
+    /// The empty one is the picture that matters: it is what a shop sees after
+    /// following break-even's instruction to come here, so it has to explain
+    /// itself rather than show a bare Add button.
+    @Test("the monthly costs render, empty and filled")
+    func fixedCosts() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+
+        func shoot(_ name: String, _ height: CGFloat, _ rows: [JSONValue]) throws {
+            shop.pretendFixedCosts(rows)
+            // ON THE GROUND THE APP DRAWS, not on nothing. Without it the page
+            // is transparent everywhere it is not written on, the ink check
+            // samples only the opaque pixels — the text — and decides the
+            // text IS the background, so a perfectly good render reports
+            // "0 of 744 sampled pixels are anything other than the
+            // background". The panes beside this one pass only because their
+            // controls are coloured.
+            try render(VStack(alignment: .leading) { FixedCostsSettings(shop: shop) }
+                        .padding(20)
+                        .frame(width: 560, height: height)
+                        .background(Khayt.ground),
+                       name, size: CGSize(width: 560, height: height))
+        }
+
+        // Sized to the CONTENT, not rounded up: the ink check samples a
+        // band down the middle, so a frame taller than what is drawn is
+        // "blank down the middle" and it is right to say so.
+        try shoot("36-fixed-empty", 150, [])
+        try shoot("37-fixed-filled", 290, [
+            .object(["id": .string("a"), "name": .string("Workshop rent"),
+                     "amount": .number(3000)]),
+            .object(["id": .string("b"), "name": .string("Electricity"),
+                     "amount": .number(450)]),
+            .object(["id": .string("c"), "name": .string("Slicer subscription"),
+                     "amount": .number(60)]),
         ])
     }
 

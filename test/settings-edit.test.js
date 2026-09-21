@@ -597,6 +597,44 @@ test('an empty key clears it, because absent and empty are different asks', () =
   assert.equal(out.ai.provider, heldAi().ai.provider);
 });
 
+test('telegram settings save, which they did not before', () => {
+  // `out.telegram` kept whatever was stored and ignored the form, because the
+  // only screen that ever wrote one saved the whole book directly. The Mac has
+  // no such path, so its Telegram screen would have appeared to save nothing.
+  const held = { telegram: { botToken: '__enc__t', chatId: '-100', notifyOnComplete: true } };
+  const out = apply(held, { telegram: { chatId: '  -200  ', notifyOnHold: true } });
+  assert.equal(out.telegram.chatId, '-200');
+  assert.equal(out.telegram.notifyOnHold, true);
+  // Untouched fields keep what is stored, including the sealed token.
+  assert.equal(out.telegram.notifyOnComplete, true);
+  assert.equal(out.telegram.botToken, '__enc__t');
+});
+
+test('the three printer alerts default ON, and an explicit off sticks', () => {
+  // `lib/printer-alerts.js` reads an absent key as ON (`!== false`). Writing
+  // `false` for a key nobody set would switch off alerts nobody switched off;
+  // ignoring an explicit `false` would switch them back on.
+  const fresh = apply({}, { telegram: { chatId: '-1' } }).telegram;
+  assert.equal(fresh.notifyPrinterError, true);
+  assert.equal(fresh.notifyPrinterOffline, true);
+  assert.equal(fresh.notifyPrinterStall, false);
+
+  const off = apply({ telegram: { notifyPrinterError: false } },
+    { telegram: { chatId: '-1' } }).telegram;
+  assert.equal(off.notifyPrinterError, false, 'an alert the shop switched off came back on');
+});
+
+test('an empty bot token clears it; an absent one keeps it', () => {
+  const held = { telegram: { botToken: '__enc__t', chatId: '-1' } };
+  assert.equal(apply(held, { telegram: { chatId: '-2' } }).telegram.botToken, '__enc__t');
+  assert.equal(apply(held, { telegram: { botToken: '' } }).telegram.botToken, '');
+});
+
+test('a form with no telegram leaves the stored settings alone', () => {
+  const held = { telegram: { botToken: '__enc__t', chatId: '-1', notifyOnComplete: true } };
+  assert.deepEqual(apply(held, {}).telegram, held.telegram);
+});
+
 test('email settings save, which they did not before', () => {
   // `out.emailConfig` kept whatever was stored and ignored the form, because
   // the only screen that ever wrote one saved the whole book directly. The Mac

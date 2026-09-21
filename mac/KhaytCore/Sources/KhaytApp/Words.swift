@@ -1526,6 +1526,53 @@ final class Words {
         "mac.email_when_completed": ["en": "It is ready to collect", "ar": "عند الجاهزية للاستلام"],
         "mac.email_when_quote": ["en": "A quote is made", "ar": "عند إنشاء عرض سعر"],
         "mac.email_when_payment_received": ["en": "A payment arrives", "ar": "عند استلام دفعة"],
+        // ── WHAT THE SHOP PAYS EVERY MONTH ────────────────────────────────
+        //
+        // `an.be_none` on the break-even screen has told shops to add these
+        // "in Settings" since it shipped, and this app's Settings had nowhere
+        // to do it — a sentence written for the other app's pane. These are
+        // the words for the pane that sentence was always pointing at.
+        "mac.fixed_section": ["en": "Monthly costs", "ar": "التكاليف الشهرية"],
+        "mac.fixed_none": ["en": "Nothing yet. Add rent, subscriptions, wages — anything paid every month whether you print or not. Reports uses these to work out what you have to bill to break even.",
+                           "ar": "لا شيء بعد. أضف الإيجار والاشتراكات والرواتب — كل ما يُدفع شهريًا سواء طبعت أم لا. تستخدمها التقارير لحساب ما يجب تحصيله لتغطية التكاليف."],
+        "mac.fixed_name_ph": ["en": "Rent, electricity, a subscription…",
+                              "ar": "إيجار، كهرباء، اشتراك…"],
+        "mac.fixed_add": ["en": "Add a cost", "ar": "إضافة تكلفة"],
+        "mac.fixed_remove": ["en": "Remove this cost", "ar": "حذف هذه التكلفة"],
+        "mac.fixed_total": ["en": "Every month:", "ar": "شهريًا:"],
+        // ── SETTING TELEGRAM UP, WHICH THIS APP COULD NOT DO ──────────────
+        //
+        // The shared catalogue has `tg.chat_id_hint`, `tg.test_sent` and
+        // `tg.error` because the other app's screen needed them. It does NOT
+        // have the field labels — it hard-codes "Telegram Notifications",
+        // "Bot Token" and "Chat ID" as English literals, and spells two of its
+        // own checkboxes "Notify on order on_hold", which is a raw status
+        // value shown to a shop. Said properly here, and in both languages.
+        "mac.tg_section": ["en": "Telegram alerts", "ar": "تنبيهات تيليجرام"],
+        "mac.tg_token": ["en": "Bot token", "ar": "رمز البوت"],
+        "mac.tg_chat": ["en": "Chat ID", "ar": "معرّف المحادثة"],
+        "mac.tg_forget": ["en": "Forget the stored bot token",
+                          "ar": "حذف رمز البوت المحفوظ"],
+        "mac.tg_unsealed": ["en": "That token could not be encrypted, so nothing was saved. The book syncs and is backed up, and a token in the clear would go with it.",
+                            "ar": "تعذّر تشفير الرمز، فلم يُحفظ شيء. الدفتر يُزامن ويُنسخ احتياطيًا، والرمز غير المشفّر سينتقل معه."],
+        "mac.tg_when": ["en": "Send a message when", "ar": "أرسل رسالة عند"],
+        "mac.tg_on_complete": ["en": "A job is finished", "ar": "اكتمال عمل"],
+        "mac.tg_on_hold": ["en": "A job is put on hold", "ar": "تعليق عمل"],
+        "mac.tg_on_low_stock": ["en": "Filament is running low", "ar": "انخفاض مخزون الخيط"],
+        // THE LAST THREE ARE NOT THE SHARED `fleet.notify_*`, and the picture
+        // is why. Those read "Notify on printer error", which is right on the
+        // fleet screen and wrong under this heading: "Send a message when
+        // Notify on printer error". Every switch in this list has to complete
+        // the sentence above it, so all six are events.
+        "mac.tg_printer_error": ["en": "A printer reports an error",
+                                 "ar": "إبلاغ طابعة عن خطأ"],
+        "mac.tg_printer_offline": ["en": "A printer stops answering",
+                                   "ar": "توقّف طابعة عن الاستجابة"],
+        "mac.tg_printer_stall": ["en": "A print stops moving",
+                                 "ar": "توقّف طباعة عن التقدّم"],
+        "mac.tg_test": ["en": "Send a test message", "ar": "إرسال رسالة تجريبية"],
+        "mac.tg_test_body": ["en": "Test from Khayt. Telegram alerts are working.",
+                             "ar": "رسالة تجريبية من خيط. تنبيهات تيليجرام تعمل."],
         "risk.looking": ["en": "Reading the mesh…", "ar": "جارٍ قراءة المجسّم…"],
         "risk.clear": ["en": "Nothing to flag on this one.", "ar": "لا ملاحظات على هذا الملف."],
         "risk.not_looked": ["en": "Khayt has not looked at this mesh yet. Reading it takes a few seconds on a large model.",
