@@ -246,8 +246,14 @@ public final class JSRuntime {
     public func evaluate(_ script: String) throws -> JSValue {
         lastException = nil
         let value = context.evaluateScript(script)
-        if let problem = lastException { throw KhaytJSError.evaluationFailed(problem) }
-        guard let value else { throw KhaytJSError.unexpectedResult("no value") }
+        if let problem = lastException {
+            EngineFaults.record(problem, script: script)
+            throw KhaytJSError.evaluationFailed(problem)
+        }
+        guard let value else {
+            EngineFaults.record("no value", script: script)
+            throw KhaytJSError.unexpectedResult("no value")
+        }
         return value
     }
 
