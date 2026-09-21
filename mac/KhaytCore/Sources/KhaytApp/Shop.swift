@@ -230,6 +230,54 @@ final class Shop {
     /// Computed once per read rather than filtered per column: four passes over
     /// the book to draw four columns is three too many, and the board is the
     /// screen most likely to be left open all day.
+    /// Walk the selection around the board with the arrow keys.
+    ///
+    /// The board had no keyboard at all — the library was the only screen in
+    /// the app that did, and a board is a screen people use with one hand
+    /// while holding a part in the other.
+    ///
+    /// ARROWS NAVIGATE, ⌘ARROWS MOVE. The Job menu's ⌘→ sends the job one step
+    /// along the way work goes; a bare arrow only changes which card is
+    /// selected. Two different verbs, and the modifier is the difference.
+    ///
+    /// `dx` walks the COLUMNS and `dy` the cards within one. A column change
+    /// keeps the row where it can and lands on the last card where it cannot,
+    /// so walking right across a short column does not silently jump to the
+    /// top. Returns false at the edges, so the system beep still means "there
+    /// is nothing that way" rather than the app swallowing the key.
+    @discardableResult
+    func moveBoardSelection(dx: Int, dy: Int) -> Bool {
+        let columns = Stage.boardColumns
+        let filled = columns.map { board[$0] ?? [] }
+        guard filled.contains(where: { !$0.isEmpty }) else { return false }
+
+        // Nothing selected yet: the first press picks an end rather than
+        // doing nothing, which is how the library behaves.
+        guard let id = selection,
+              let here = filled.firstIndex(where: { $0.contains { $0.id == id } }),
+              let row = filled[here].firstIndex(where: { $0.id == id })
+        else {
+            selection = filled.first { !$0.isEmpty }?.first?.id
+            return selection != nil
+        }
+
+        if dy != 0 {
+            let next = row + dy
+            guard next >= 0, next < filled[here].count else { return false }
+            selection = filled[here][next].id
+            return true
+        }
+
+        // Skip empty columns rather than stopping at them: a board with seven
+        // columns and three in use would otherwise need three presses to cross
+        // an empty one, and the shop cannot see why it stopped.
+        var column = here + dx
+        while column >= 0, column < filled.count, filled[column].isEmpty { column += dx }
+        guard column >= 0, column < filled.count else { return false }
+        selection = filled[column][min(row, filled[column].count - 1)].id
+        return true
+    }
+
     var board: [Stage: [Order]] {
         var out: [Stage: [Order]] = [:]
         // The search box is one box for the whole window. A board that ignored

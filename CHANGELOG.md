@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The board can be worked from the keyboard.** It could not be at all:
+  the library was the only screen in the app with arrow keys, and the board is
+  the one a shop stands at with a part in one hand. The arrows walk the
+  selection between cards and across columns — skipping empty ones, so crossing
+  a board with seven columns and three in use is one press rather than four —
+  and Return opens the selected job. ⌘→ and ⌘← still move the job itself, so
+  the two are never confused: an arrow changes what is selected, an arrow with
+  ⌘ changes where the work is. In a mirrored window the arrows follow the
+  screen, and at the ends nothing is swallowed, so the beep still means there
+  is nothing that way.
+
+
 - **(Mac) A shop with a webhook switched on could move a job and could not
   record the money for it.** Recording a payment asked where that would reach
   outside the shop, and refused if the answer was anybody at all — including
