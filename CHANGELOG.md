@@ -6,6 +6,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The library showed a tick and a failure at the same time.** The
+  banner under the search field answers one question — what happened when you
+  last asked for something — but each gesture cleared only its own line, so a
+  conversion that failed appeared underneath a green "1 moved in · 0 already
+  there · 0 failed" from an import minutes earlier. Two answers, minutes apart,
+  read as one event. A move, an import, a conversion and opening a slicer now
+  each clear what the last one said.
+
 - **(Mac) Converting a model for another printer failed outright, and said
   "undefined is not an object".** Any 3MF from the same slicer family as the
   printer it was being converted for — a Bambu or Orca file, which is most of
