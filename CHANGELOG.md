@@ -17,6 +17,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   cannot go dead, which was true about the mechanism and silent about whether
   anybody used them.
 
+- **(Mac) The Profit & Loss page showed a slice of itself.** The page a shop
+  opens Reports on had five things stacked down it — the quarter drawn out, the
+  table, and three charts — in a column that could not scroll. The column is
+  far taller than any window, so what was drawn was an arbitrary band across
+  the middle of it: no tabs along the top, an empty space where the figures
+  should be, and "Cash flow" clipped off at the bottom edge. Every other page
+  in Reports could already scroll, including the panel down the right of this
+  very one. It scrolls now, and the table is drawn the height of what is in it
+  — a shop with two quarters was being shown room for eight, then a gap.
+
 - **(Maintainers) A design token that went stale is now a failing test.** The
   extractor reads the Mac app's colours, card geometry, type scale and motion
   out of the Swift and stops dead if one is renamed — but it cannot notice that

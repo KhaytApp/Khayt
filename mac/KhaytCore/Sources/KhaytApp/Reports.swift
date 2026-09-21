@@ -121,9 +121,35 @@ struct Reports: View {
                     // table stays underneath — a chart is not a replacement
                     // for the figures, and the lightest bar on it is only
                     // legible BECAUSE the figures are there.
+                    // ── AND IT HAS TO SCROLL ──────────────────────────
+                    //
+                    // Five sections — a waterfall, the table and three charts
+                    // — stacked in a column with nothing to scroll. The stack
+                    // is far taller than any window, so the page rendered as
+                    // an arbitrary slice of itself: no tabs at the top, an
+                    // empty column, and "Cash flow" clipped at the bottom
+                    // edge. This is the DEFAULT report page, so it was the
+                    // first thing the screen showed.
+                    //
+                    // Every other page here already scrolls — `Best` does,
+                    // and so does the `Totals` panel on the right of this very
+                    // split. This one was the exception.
+                    ScrollView {
                     VStack(spacing: 0) {
                         if let latest = rows.first { QuarterDrawn(shop: shop, row: latest) }
+                        // A DEFINITE HEIGHT, because `Table` is greedy: given
+                        // an unbounded column it takes everything and leaves
+                        // the charts below it nowhere to be.
+                        //
+                        // Sized to what it HOLDS rather than to a constant. A
+                        // flat 340 left a shop with two quarters staring at a
+                        // hand's depth of empty table between its figures and
+                        // the cash-flow chart — which reads as a screen that
+                        // failed to draw, not as a table with room to grow.
+                        // Capped so a shop with three years of quarters gets a
+                        // table that scrolls rather than a page that does.
                         table
+                            .frame(height: Self.tableHeight(rows.count))
                         // Under the table rather than beside it: the quarters
                         // are what the shop earned, and this is the follow-up
                         // question — did any of it arrive.
@@ -138,6 +164,7 @@ struct Reports: View {
                         // above reads in — revenue, then what it cost.
                         ExpenseCategoriesCard(shop: shop, report: spending)
                             .padding(Metric.screen)
+                    }
                     }
                     Totals(shop: shop, rows: rows, floor: floor)
                         .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
@@ -184,6 +211,22 @@ struct Reports: View {
         // answering it from one quarter's prints would throw away most of the
         // little evidence the measured-only filter leaves.
         .task(id: shop.orderRows.count) { await recomputeAccuracy() }
+    }
+
+    /// Header, then a row each, within reason.
+    ///
+    /// 44pt per row, not the 28 an ordinary one-line row takes: the Expenses
+    /// column carries TWO lines — the figure and the overhead charged to the
+    /// period underneath it — because the shop is owed the number it can
+    /// check. Measured off a capture after the first guess clipped the second
+    /// quarter's overhead line behind the cash-flow heading.
+    ///
+    /// Floor of two rows so a shop with one quarter still gets a table that
+    /// looks like one; ceiling of ten so three years of quarters scroll inside
+    /// the table rather than making the page itself enormous.
+    static func tableHeight(_ count: Int) -> CGFloat {
+        let rows = CGFloat(max(2, min(count, 10)))
+        return 46 + rows * 44
     }
 
     private var table: some View {
