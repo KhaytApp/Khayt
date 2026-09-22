@@ -143,6 +143,47 @@ test('a decimal spelling of a PRIVATE address is judged as that address', () => 
   assert.equal(isAllowedPrinterHost('167772161'), true, 'a LAN printer may legitimately be 10.0.0.1');
 });
 
+/*
+ * 100.64.0.0/10 — RFC 6598 carrier-grade NAT, and the whole of Tailscale.
+ *
+ * A PRIVATE NETWORK THAT IS NOT RFC 1918, and this list did not have it. A
+ * shop that runs Tailscale to reach its printers from home has its machines,
+ * its NAS and everything else on that tailnet addressed in 100.64–100.127,
+ * and a webhook or cloud address pointed at any of it was sent. 10/8,
+ * 172.16/12 and 192.168/16 were all blocked; this was the one private range
+ * that was not.
+ *
+ * `100.100.100.100` is Tailscale's own MagicDNS resolver — the single most
+ * likely thing on a tailnet to answer an HTTP request.
+ */
+test('the carrier-grade NAT range is private, and is blocked', () => {
+  for (const h of ['100.64.0.0', '100.64.0.1', '100.100.100.100', '100.127.255.255']) {
+    assert.equal(isBlockedHost(h), true, `${h} is inside 100.64.0.0/10 and was sent`);
+  }
+  // AND THE PRINTER GUARD IS A SEPARATE ANSWER, deliberately left as it was.
+  //
+  // `isAllowedPrinterHost` is an ALLOW list — RFC1918, link-local, .local —
+  // and 100.64/10 is not on it, so a shop that reaches its printers over
+  // Tailscale cannot add one. That is a gap, but it is a gap about what Khayt
+  // supports, not about what it may send, and widening an allow list is not a
+  // change to make inside a fix that narrows a block list. Pinned here so the
+  // behaviour is stated rather than assumed either way.
+  assert.equal(isAllowedPrinterHost('100.64.0.1'), false,
+    'if this is changed, it is a decision about supporting tailnet printers');
+});
+
+/*
+ * The range is a /10, so the second octet runs 64–127. The rest of 100/8 is
+ * ordinary public address space: 100.0.0.0/10, 100.128.0.0/9 and so on are
+ * routable, and blocking all of 100/8 would quietly break a shop whose cloud
+ * or webhook host happens to live there.
+ */
+test('the rest of 100/8 is public and stays reachable', () => {
+  for (const h of ['100.0.0.1', '100.5.5.5', '100.63.255.255', '100.128.0.0', '100.255.255.255']) {
+    assert.equal(isBlockedHost(h), false, `${h} is public space and was refused`);
+  }
+});
+
 test('real printers and real hostnames are unaffected', () => {
   for (const h of ['10.0.0.5', '192.168.1.50', '172.16.0.1', '169.254.1.5', 'octopi.local', 'printer-1']) {
     assert.equal(isAllowedPrinterHost(h), true, h);
