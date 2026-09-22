@@ -198,7 +198,7 @@ struct TriageContent: View {
             // Date, then two counts — three `Text`s, never one sentence built
             // with `+`. §5 applies to prose as much as to figures.
             HStack(spacing: Space.xs) {
-                Text(Date().formatted(date: .complete, time: .shortened))
+                Text(shop.words.say(Date(), Date.FormatStyle(date: .complete, time: .shortened)))
                 Text("·")
                 Text(shop.words.counting(shop.openJobCount, "mac.n_open"))
             }

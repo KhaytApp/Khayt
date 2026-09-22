@@ -244,11 +244,6 @@ private struct Provenance: View {
         }
     }
 
-    /// The time of day, in the shop's own locale.
-    static func clock(_ when: Date) -> String {
-        when.formatted(date: .omitted, time: .shortened)
-    }
-
     let shop: Shop
 
     private var footerLabel: String {

@@ -402,7 +402,7 @@ private struct JobCard: View {
                 if let due = Order.day(job.dueDate) {
                     // Said in words as well as colour — this is the line that
                     // decides whether someone gets a phone call today.
-                    Label(due.formatted(.dateTime.day().month(.abbreviated)),
+                    Label(shop.words.say(due, .dateTime.day().month(.abbreviated)),
                           systemImage: job.isOverdue() ? "exclamationmark.triangle" : "calendar")
                         .font(.caption2)
                         .monospacedDigit()

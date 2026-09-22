@@ -375,13 +375,13 @@ private struct DueDate: View {
     var body: some View {
         if let due = Order.day(job.dueDate) {
             let late = job.isOverdue()
-            Text(due, format: .dateTime.day().month(.abbreviated))
+            Text(words.say(due, .dateTime.day().month(.abbreviated)))
                 .monospacedDigit()
                 .foregroundStyle(late ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.secondary))
                 .help(late
                       ? words.callIt("mac.overdue_unpaid")
                       : words.callIt("mac.due_on",
-                                     ["date": .string(due.formatted(date: .abbreviated, time: .omitted))]))
+                                     ["date": .string(words.say(due, Date.FormatStyle(date: .abbreviated, time: .omitted)))]))
         } else {
             Text("—").foregroundStyle(.quaternary)
         }

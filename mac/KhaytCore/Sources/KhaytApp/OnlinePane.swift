@@ -271,7 +271,7 @@ struct OnlinePane: View {
                                 .fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: 0)
                             if let at = shop.leadTimeAt {
-                                Text(at.formatted(date: .omitted, time: .shortened))
+                                Text(shop.words.say(at, Date.FormatStyle(date: .omitted, time: .shortened)))
                                     .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
                             }
                         }
