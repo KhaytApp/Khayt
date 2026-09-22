@@ -1674,3 +1674,44 @@ book, bounded by the 50MB cap.
 per-process: two processes on one `khayt-store.json` race exactly the way two
 shop-floor tablets did before #898. Either the Mac app replaces Electron on that
 machine, or the second one opens read-only behind a lock.
+
+## Asking an assistant about the library
+
+`khayt-mcp` is a Model Context Protocol server over the shop's model library.
+Claude Desktop, Cursor and Codex launch a command and speak JSON-RPC down a
+pipe, so it is a small executable beside the Quick Look extensions rather than
+anything in the app — **Khayt does not have to be running**.
+
+```bash
+swift build --package-path mac/KhaytCore --product khayt-mcp
+```
+
+Then point the host at the binary. For Claude Desktop, in
+`~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{ "mcpServers": { "khayt": { "command": "/full/path/to/khayt-mcp" } } }
+```
+
+Three tools: `search_models`, `get_model`, `library_summary`.
+
+**What it can see is the point.** The library, and nothing else — not a
+customer, not a price, not an invoice, not a payment, not the shop's contact
+details. Khayt keeps all of that in the same file, so a server that reads the
+file could just as easily answer "what is Nouf's phone number". What it can
+answer is decided in `Library` by never lifting anything else out of the book,
+and the protocol layer takes no path and no query language, so there is nothing
+to point somewhere new. It opens the book **read-only** and never writes it, so
+it does not care whether Khayt is running and holding the lock.
+
+Drive it by hand to check it:
+
+```bash
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"library_summary"}}' \
+  | ./khayt-mcp
+```
+
+Diagnostics go to **stderr**, never stdout: stdout IS the protocol, and a stray
+`print` lands mid-stream and the host drops the connection with a parse error
+that names nothing.
