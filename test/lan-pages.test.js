@@ -198,3 +198,50 @@ test('the error line is unchanged, whoever is asking', () => {
   assert.equal(P.notFound(['/a']).error, 'Not found');
   assert.equal(P.notFound().error, 'Not found');
 });
+
+// ── THE SHOP'S OWN NAME, ON THE PAGES A CUSTOMER SEES ──────────────────────
+//
+// Both of these read `settings.shopName`, which NOTHING anywhere writes. The
+// name a shop actually types lives in `bizEn`/`bizAr`. So the queue page and
+// the phone's home-screen icon said "Khayt" for every shop that ever installed
+// them — while the quote page, two files away, said the shop's real name,
+// because it had the fallback these did not.
+
+require('../lib/content-languages.js');
+
+const NAMED = { settings: { bizEn: 'Athar Tuwaiq', bizAr: 'اثر طويق', lang: 'en' }, printLog: [] };
+
+test('the phone installs the shop, not the app', () => {
+  assert.equal(P.manifest(NAMED).short_name, 'Athar Tuwaiq');
+  assert.equal(P.manifest(NAMED).name, 'Athar Tuwaiq Queue');
+});
+
+test('the queue page is headed by the shop', () => {
+  assert.match(P.queuePage(NAMED, { now: '' }), /Athar Tuwaiq/);
+});
+
+test('an Arabic shop is named in Arabic', () => {
+  const ar = { settings: { ...NAMED.settings, lang: 'ar' }, printLog: [] };
+  assert.equal(P.manifest(ar).short_name, 'اثر طويق');
+});
+
+test('a shop that set shopName explicitly keeps it', () => {
+  // It is first for a reason: a shop that has said what these pages should be
+  // called has said it, whatever its invoices are headed.
+  const explicit = { settings: { shopName: 'The Print Room', bizEn: 'Something Ltd' }, printLog: [] };
+  assert.equal(P.manifest(explicit).short_name, 'The Print Room');
+});
+
+test('a shop with no name at all is still installable', () => {
+  // The fallback is unchanged — what changed is how rarely it is reached.
+  assert.equal(P.manifest({ settings: {}, printLog: [] }).short_name, 'Khayt');
+  assert.equal(P.shopNameOf(undefined), 'Khayt');
+  assert.equal(P.shopNameOf({ bizEn: '' }), 'Khayt');
+});
+
+test('the name is escaped on the page, not just interpolated', () => {
+  const nasty = { settings: { bizEn: 'Ali <script>alert(1)</script>' }, printLog: [] };
+  const html = P.queuePage(nasty, { now: '' });
+  assert.ok(!html.includes('<script>alert(1)</script>'), 'the shop name reached the page unescaped');
+  assert.match(html, /&lt;script&gt;/);
+});

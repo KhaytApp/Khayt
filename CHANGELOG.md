@@ -6,6 +6,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Everyone) The queue a shop puts on its phones was called "Khayt", never
+  the shop.** Add the live queue to a phone's home screen and the icon was
+  labelled Khayt; open the page and it was headed Khayt. Both read a setting
+  called `shopName` that nothing in either app has ever written — the name a
+  shop actually types is kept under its business details, in both languages.
+  The quote page, in the next file along, had always fallen back to it
+  properly; these two had not.
+
+  They read the shop's real name now, in the language the page is in, and a
+  shop that has set an explicit name for these pages still gets that first.
+  A shop with no name at all still says Khayt — what changed is how rarely
+  anyone reaches that.
+
 - **(Mac) Settings looked like a list of facts rather than a form, and the two
   languages were the wrong way round.** Every text field in the settings window
   drew without a border, so a filled one read as a value and an EMPTY one was
