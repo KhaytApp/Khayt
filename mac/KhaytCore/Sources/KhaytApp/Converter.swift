@@ -62,10 +62,42 @@ enum Converter {
     /// by name and by size rather than the whole feature being refused as a
     /// category, which is what this app did before.
     ///
-    /// A `var` for one reason: a test that proves the refusal would otherwise
-    /// have to write a 256 MB file to disk on every run. It lowers this and
-    /// puts it back. Nothing in the app ever assigns to it.
-    nonisolated(unsafe) static var paintInlineLimit = 256 << 20
+    /// A `var` for two reasons: it is derived from the machine at launch, and
+    /// a test that proves the refusal would otherwise have to write a quarter
+    /// of a gigabyte to disk on every run. Nothing in the app assigns to it
+    /// after `defaultMeshBudget()`.
+    nonisolated(unsafe) static var paintInlineLimit = defaultMeshBudget()
+
+    /// How much model XML this Mac will hold at once, from how much memory it
+    /// has.
+    ///
+    /// ── WHY IT IS NOT A FIXED NUMBER ──────────────────────────────────────
+    ///
+    /// A machine with 32 GB should not be held to what one with 8 GB can do,
+    /// and a fixed limit picks the smaller machine for everybody. This asks
+    /// the machine.
+    ///
+    /// Two measured figures decide it. A bound mesh peaks at about five and a
+    /// half times its own size — 64 MB costs 266 MB, 256 MB costs 1.0 GB,
+    /// 512 MB costs 2.6 GB, 1 GB costs 5.6 GB — so `peakPerByte` is six,
+    /// rounded up rather than fitted. And a conversion may have a sixth of the
+    /// machine, which is generous for something that takes a fraction of a
+    /// second and is over.
+    ///
+    ///     32 GB → about 950 MB of model
+    ///     16 GB → about 475 MB
+    ///      8 GB → about 240 MB, which is roughly where a fixed limit sat
+    ///
+    /// The floor exists so an unusual machine still does something rather than
+    /// refusing every colour plan; the ceiling because past two gigabytes the
+    /// time to read the file off disk, not this, is what a shop waits for.
+    nonisolated static func defaultMeshBudget() -> Int {
+        let memoryShare = 6      // a sixth of the machine
+        let peakPerByte = 6      // measured at ~5.5, rounded up
+        let ram = Int(ProcessInfo.processInfo.physicalMemory)
+        let budget = ram / memoryShare / peakPerByte
+        return max(64 << 20, min(budget, 2 << 30))
+    }
 
     /// The same figure in megabytes, for the sentence a shop reads. Derived
     /// rather than written twice, so the message cannot outlive the limit.
@@ -160,6 +192,8 @@ enum Converter {
         var described: [JSONValue] = []
         /// Model XML, bound by name rather than carried in the script.
         var meshes: [String: String] = [:]
+        /// How much of it, running, because they are all bound together.
+        var bound = 0
         for entry in entries {
             var member: [String: JSONValue] = [
                 "name": .string(entry.name),
@@ -169,8 +203,13 @@ enum Converter {
             // A colour plan reads and rewrites EVERY `.model` member, not only
             // the root: a 3MF may carry one per object.
             if paintPlan, isModel {
-                guard entry.size <= paintInlineLimit else {
-                    throw Failure.meshTooBig(entry.name, bytes: entry.size)
+                // THE TOTAL, not this one member. Every mesh in the file is
+                // bound at the same time, so a model in twelve painted parts
+                // costs the sum of them — checking each on its own would let a
+                // file through at twelve times the budget.
+                bound += entry.size
+                guard bound <= paintInlineLimit else {
+                    throw Failure.meshTooBig(entry.name, bytes: bound)
                 }
                 guard let data = try? Zip.data(of: entry, in: source, limit: .max),
                       let text = String(data: data, encoding: .utf8) else {

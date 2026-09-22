@@ -453,3 +453,70 @@ struct ConverterTests {
         #expect(!FileManager.default.fileExists(atPath: out.path), "it wrote a file anyway")
     }
 }
+
+/// The colour-plan budget, which comes from the machine rather than a constant.
+///
+/// A Mac with 32 GB should not be held to what one with 8 GB can do, and a
+/// fixed limit picks the smaller machine for everybody.
+@Suite(.serialized)
+@MainActor
+struct MeshBudgetTests {
+
+    @Test("the budget follows the machine's memory")
+    func followsTheMachine() {
+        let budget = Converter.defaultMeshBudget()
+        let ram = Int(ProcessInfo.processInfo.physicalMemory)
+        // A sixth of the machine, and a bound mesh peaks at about six times
+        // its own size — so roughly a thirty-sixth, between the two bounds.
+        #expect(budget <= ram / 30, "the budget is a larger share of memory than intended")
+        #expect(budget >= 64 << 20, "below the floor")
+        #expect(budget <= 2 << 30, "above the ceiling")
+    }
+
+    /// A machine's worth of headroom is not the same as a file's worth. This
+    /// is the number a shop actually gets on the Mac the tests run on.
+    @Test("this machine can plan a colour for a real model")
+    func thisMachineIsUseful() {
+        let budget = Converter.defaultMeshBudget()
+        let ram = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824
+        // 8 GB is the smallest Mac this app supports, and it must still reach
+        // a model of a few hundred megabytes.
+        if ram >= 8 { #expect(budget >= 200 << 20,
+                              Comment(rawValue: "only \(budget >> 20) MB on a \(Int(ram)) GB machine")) }
+    }
+
+    /// THE ONE THAT WAS WRONG FIRST. Every mesh in a file is bound at the same
+    /// time, so the budget is the TOTAL. Checking each member on its own let a
+    /// model in twelve painted parts through at twelve times the budget.
+    @Test("the budget counts every part of a model, not the largest one")
+    func countsTheWholeFile() async throws {
+        let dir = ConverterTests.temp()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let source = dir.appending(path: "parts.3mf")
+        let real = Converter.paintInlineLimit
+        Converter.paintInlineLimit = 300 << 10          // 300 KB of model
+        defer { Converter.paintInlineLimit = real }
+
+        // Four parts of 100 KB: each fits, the file does not.
+        let colours = "[\"#FF0000\",\"#00FF00\",\"#0000FF\",\"#FFFF00\",\"#00FFFF\"]"
+        let settings = "{\"printer_model\":\"X1C\",\"filament_colour\":\(colours)}"
+        var members: [ZipWrite.Member] = [
+            .init("[Content_Types].xml", Data("<Types/>".utf8)),
+            .init("Metadata/project_settings.config", Data(settings.utf8)),
+        ]
+        let padding = String(repeating: " ", count: 100 << 10)
+        for i in 1...4 {
+            let xml = "<?xml version=\"1.0\"?><model><resources><object id=\"\(i)\"><mesh/></object>"
+                + padding + "</resources><build/></model>"
+            members.append(.init("3D/part\(i).model", Data(xml.utf8)))
+        }
+        try ZipWrite.archive(members).write(to: source)
+
+        await #expect(throws: Converter.Failure.self, "four parts over the budget were accepted") {
+            _ = try await Converter.convert(
+                source, into: dir.appending(path: "out.3mf"),
+                options: ["targetId": .string("snapmaker-u1"), "fullSpectrum": .bool(true)],
+                engine: try ConverterTests.engine())
+        }
+    }
+}
