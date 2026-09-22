@@ -7250,7 +7250,9 @@ final class Shop {
                 scratches.append(out.scratch)
                 // Grouped by the archive's own name, the way a folder of models
                 // is grouped by the folder — see `ImportGrouping`.
-                files += out.models.map { LibraryImport.Incoming(url: $0, group: out.group) }
+                files += out.models.map {
+                    LibraryImport.Incoming(url: $0, group: out.group, documents: out.documents)
+                }
             } catch let refusal as ArchiveImport.Failure {
                 refusals.append(refusal.description)
             } catch {
@@ -10674,7 +10676,17 @@ final class Shop {
         /// yet". Zero inside a folder, where nothing can be unfiled, which is
         /// how that chip disappears when it would teach the wrong thing.
         var unfiled = 0
-        var isEmpty: Bool { categories.isEmpty && tags.isEmpty && unfiled == 0 }
+        /// Models this shop has never actually made.
+        ///
+        /// The other library tools in this category carry a printed FLAG a
+        /// person ticks. Khayt has the real answer — `timesPrinted` is written
+        /// by the jobs — so this is a fact rather than a reminder, and the
+        /// question it answers is the one a shop with a big library asks:
+        /// what have I collected and never printed.
+        var neverPrinted = 0
+        var isEmpty: Bool {
+            categories.isEmpty && tags.isEmpty && unfiled == 0 && neverPrinted == 0
+        }
     }
 
     private(set) var libraryFacets = LibraryFacets()
@@ -10685,7 +10697,7 @@ final class Shop {
     /// round trip.
     private var libraryRows: [JSONValue] = []
 
-    enum LibraryAxis { case unfiled, category, tag }
+    enum LibraryAxis { case unfiled, category, tag, neverPrinted }
 
     /// What one axis counts: the shelf, the search, and the other two chips.
     private func libraryPool(skipping axis: LibraryAxis) -> [JSONValue] {
@@ -10695,6 +10707,9 @@ final class Shop {
         }
         if axis != .unfiled, libraryUnfiledOnly {
             rows = rows.filter { Self.rowGroup($0) == nil }
+        }
+        if axis != .neverPrinted, libraryNeverPrintedOnly {
+            rows = rows.filter { Self.rowPrintCount($0) == 0 }
         }
         if axis != .category, let category = libraryCategory {
             rows = rows.filter { category.matches(Self.rowText($0, "category")) }
@@ -10709,6 +10724,15 @@ final class Shop {
                 || Self.rowText(row, "material").lowercased().contains(q)
                 || Self.rowTags(row).contains { $0.lowercased().contains(q) }
         }
+    }
+
+    /// How many times a record says it has been printed.
+    ///
+    /// `timesPrinted` is the field; absent means none, which is the same
+    /// answer a record written before the field existed gives.
+    private static func rowPrintCount(_ row: JSONValue) -> Int {
+        guard case .object(let o) = row, case .number(let n)? = o["timesPrinted"] else { return 0 }
+        return Int(n)
     }
 
     /// The group a record is in, by the rule the grid files it under —
@@ -10755,7 +10779,9 @@ final class Shop {
         let tags = (try? await engine.tagCounts(libraryPool(skipping: .tag))) ?? []
         guard mine == libraryRecount else { return }
         let unfiled = libraryPool(skipping: .unfiled).count { Self.rowGroup($0) == nil }
-        libraryFacets = LibraryFacets(categories: categories, tags: tags, unfiled: unfiled)
+        let never = libraryPool(skipping: .neverPrinted).count { Self.rowPrintCount($0) == 0 }
+        libraryFacets = LibraryFacets(categories: categories, tags: tags,
+                                      unfiled: unfiled, neverPrinted: never)
     }
 
     private var libraryRecountTask: Task<Void, Never>?
@@ -10786,15 +10812,19 @@ final class Shop {
     var libraryTag: String? { didSet { recountLibrarySoon() } }
     /// Models in no project at all — the answer to "what have I not filed yet".
     var libraryUnfiledOnly = false { didSet { recountLibrarySoon() } }
+    /// Models the shop has never made. See `LibraryFacets.neverPrinted`.
+    var libraryNeverPrintedOnly = false { didSet { recountLibrarySoon() } }
 
     var libraryFilterOn: Bool {
         libraryCategory != nil || libraryTag != nil || libraryUnfiledOnly
+            || libraryNeverPrintedOnly
     }
 
     func clearLibraryFilter() {
         libraryCategory = nil
         libraryTag = nil
         libraryUnfiledOnly = false
+        libraryNeverPrintedOnly = false
     }
 
     var shownFiles: [LibraryFile] {
@@ -10811,6 +10841,7 @@ final class Shop {
         // Kings" is the question a library of hundreds is actually asked — the
         // same reasoning renderer/printfiles.js gives for its own chips.
         if libraryUnfiledOnly { rows = rows.filter { ($0.groupName ?? "").isEmpty } }
+        if libraryNeverPrintedOnly { rows = rows.filter { $0.printCount == 0 } }
         if let category = libraryCategory { rows = rows.filter { category.matches($0.category) } }
         if let tag = libraryTag {
             rows = rows.filter { ($0.tags ?? []).contains { $0.lowercased() == tag.lowercased() } }
@@ -10952,6 +10983,7 @@ final class Shop {
         libraryCategory = nil
         libraryTag = nil
         libraryUnfiledOnly = false
+        libraryNeverPrintedOnly = false
         if file.isArchived { libraryShowArchived = true }
         // Into its own project if it has one: that is where the model lives,
         // and opening the library at the top with one tile selected somewhere
@@ -11604,6 +11636,26 @@ final class Shop {
     }
 
     func fileIsPresent(_ file: LibraryFile) -> Bool { directory(for: file) != nil }
+
+    /// The guides sitting beside a model — assembly instructions, a colour
+    /// guide, whatever came out of the pack with it.
+    ///
+    /// READ OFF THE DISK rather than out of the book, which is the whole
+    /// reason this needed no new field in the store. A model's folder holds
+    /// everything about that model; the PDFs in it are its papers by being
+    /// there, and a shop that drops one in by hand gets the same answer as one
+    /// that imported a pack. Nothing to migrate, nothing to keep in step, and
+    /// nothing for the Electron app to learn.
+    func guides(for file: LibraryFile) -> [URL] {
+        guard let dir = directory(for: file),
+              let found = try? FileManager.default.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+        else { return [] }
+        return found
+            .filter { ArchiveImport.documentKinds.contains($0.pathExtension.lowercased()) }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent)
+                      == .orderedAscending }
+    }
 
     /// The model file itself, if it is on this Mac.
     ///

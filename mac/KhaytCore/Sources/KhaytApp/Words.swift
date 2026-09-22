@@ -914,6 +914,15 @@ final class Words {
         // true and does not fit; this is the same fact at tile size, and the
         // Machines screen carries the sentence.
         "mac.no_protocol": ["en": "no link", "ar": "بلا ربط"],
+        // Khayt counts REAL prints, so this chip is a fact rather than a
+        // status somebody ticks. Its own key rather than a borrowed one:
+        // `plib.*` comes from Khayt's nine-language file and this app
+        // cannot add to it with two.
+        "mac.never_printed": ["en": "Never printed", "ar": "لم تُطبع"],
+        // Assembly instructions and colour guides, which used to be thrown
+        // away on import. "Guides" rather than "documents": it is what the
+        // creator calls them and what a shop is looking for.
+        "mac.guides": ["en": "Guides", "ar": "أدلة"],
         "mac.filter_needs_me": ["en": "Needs me", "ar": "يحتاجني"],
         "mac.filter_running": ["en": "Running", "ar": "قيد التشغيل"],
         "mac.filter_unpaid": ["en": "Unpaid", "ar": "غير مدفوع"],

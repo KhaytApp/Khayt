@@ -64,6 +64,7 @@ struct LibraryInspector: View {
                     LayerRule()
                     PhotoSection(shop: shop, file: file)
                     provenance(file)
+                    guides(file)
                     actions(file)
             if let notes = file.testedNotes, !notes.isEmpty {
                         LayerRule()
@@ -247,6 +248,44 @@ struct LibraryInspector: View {
 
     /// Where it came from, and what may be done with it.
     ///
+    /// The papers that came with it.
+    ///
+    /// ── THEY USED TO BE EXTRACTED AND DELETED ─────────────────────────────
+    ///
+    /// A creator pack's assembly instructions and its colour guide are the two
+    /// pieces of paper a shop actually needs beside the print, and
+    /// `ArchiveImport` kept only files whose extension names a model — so every
+    /// PDF in every pack was unzipped into a scratch folder, ignored, and
+    /// thrown out with it. Silently, on every import.
+    ///
+    /// Absent when there are none, like `provenance` above and for the same
+    /// reason: a heading reading "no guides" on four hundred models teaches
+    /// people to stop reading headings.
+    @ViewBuilder
+    private func guides(_ file: LibraryFile) -> some View {
+        let papers = shop.guides(for: file)
+        if !papers.isEmpty {
+            DetailSection(shop.words.callIt("mac.guides")) {
+                ForEach(papers, id: \.self) { paper in
+                    Button {
+                        NSWorkspace.shared.open(paper)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc.richtext")
+                                .foregroundStyle(.secondary)
+                            Text(paper.deletingPathExtension().lastPathComponent)
+                                .lineLimit(1).truncationMode(.middle)
+                            Spacer(minLength: 0)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(paper.lastPathComponent)
+                }
+            }
+        }
+    }
+
     /// Absent entirely for a model nobody has recorded a licence for. That is
     /// deliberate: a library that has just been imported has recorded none, and
     /// a panel that said "not recorded" on four hundred models would teach
