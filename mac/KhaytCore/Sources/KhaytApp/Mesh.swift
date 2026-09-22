@@ -1118,3 +1118,160 @@ enum Mesh {
         }
     }
 }
+
+// MARK: - Where a model came from
+
+extension Mesh {
+
+    /// What a 3MF says about itself: who made it, and under what licence.
+    ///
+    /// ── THE RULE EXISTED AND HAD NO DATA ──────────────────────────────────
+    ///
+    /// `ModelLicence` answers the one question a print shop's library has that
+    /// a hobbyist's does not — may a print of this be SOLD — and `Khayt`
+    /// recorded a licence only when somebody opened a menu and chose one. So
+    /// on a real book the provenance panel was blank on every model and
+    /// `sellable` was nil everywhere, which the rule is careful to say is not
+    /// the same as "no".
+    ///
+    /// Measured on this shop's own vault, ninety 3MF files: EVERY ONE carries
+    /// `<metadata>`, and twenty-one carry a designer or a licence that somebody
+    /// typed at the other end. Three of those are **BY-NC-SA** — the exact
+    /// licence `lib/model-licence.js` was written about, sitting unmarked in a
+    /// library the shop sells prints from.
+    ///
+    /// So the answer was never a browser extension. It is in the file.
+    ///
+    /// ── AND IT IS NOT `structuralTags`, WHICH WAS THE FIRST TRY ──────────
+    ///
+    /// That one looked right — it streams the root part with the geometry
+    /// taken out — and it keeps only the TAGS, dropping every character
+    /// between them. `<metadata name="Designer">enr</metadata>` comes back as
+    /// `<metadata name="Designer"></metadata>`: the name survives and the
+    /// answer does not. The first test written against a fixture said so
+    /// before any of this reached a shop.
+    ///
+    /// So this reads the HEAD of the part instead, and stops at the first
+    /// `<resources` or `<object`. The spec puts model metadata before the
+    /// resources, which is what makes a bounded read correct rather than
+    /// merely cheap — and it is cheap too: a part file runs to hundreds of
+    /// megabytes and none of it after that point can say anything here. It
+    /// is not a second reader of the geometry, which is what the warning two
+    /// hundred lines up is about.
+    public struct Provenance: Sendable, Equatable {
+        /// The name the designer gave it, which is often better than the
+        /// filename a download produced.
+        public var title = ""
+        /// Who made it. Goes in `source`, which is documented as "a URL, a
+        /// designer, or my own design".
+        public var designer = ""
+        /// VERBATIM, as the file spells it — `BY-NC-SA`, `Standard Digital
+        /// File License`. Translating it is `licenceId`'s business, and it
+        /// refuses far more often than it agrees.
+        public var licence = ""
+        /// What wrote the file. `BambuStudio-…`, `BedReady-HueForge`.
+        public var application = ""
+
+        public var isEmpty: Bool {
+            title.isEmpty && designer.isEmpty && licence.isEmpty
+        }
+    }
+
+    /// The `<metadata>` block of a 3MF, or nil for a file that is not one.
+    public static func provenance(of url: URL) -> Provenance? {
+        guard url.pathExtension.lowercased() == "3mf",
+              let entries = try? Zip.entries(of: url),
+              let root = entries.first(where: { equalPath($0.name, "3D/3dmodel.model") }),
+              let xml = try? declaredHead(of: root, in: url) else { return nil }
+
+        var out = Provenance()
+        // `<metadata name="Designer">enr</metadata>` — the value is the TEXT
+        // between the tags, not an attribute, so `tags(in:)` alone cannot see
+        // it. Scanned as pairs instead, and bounded by the first `<object`:
+        // everything this reads is declared before the resources by the spec,
+        // and a model part can be hundreds of megabytes.
+        var name: String?
+        var text = ""
+        var reading = false
+        var i = xml.startIndex
+        while i < xml.endIndex {
+            let ch = xml[i]
+            if ch == "<" {
+                if reading, let key = name { out.take(key, of: unescape(text)) }
+                reading = false
+                name = nil
+                var tag = "<"
+                var j = xml.index(after: i)
+                while j < xml.endIndex, xml[j] != ">" { tag.append(xml[j]); j = xml.index(after: j) }
+                if tag.hasPrefix("<object") || tag.hasPrefix("<resources") { break }
+                if tag.hasPrefix("<metadata"), let key = value(of: "name", in: tag) {
+                    name = key
+                    text = ""
+                    reading = true
+                }
+                i = j < xml.endIndex ? xml.index(after: j) : j
+                continue
+            }
+            if reading { text.append(ch) }
+            i = xml.index(after: i)
+        }
+        return out.isEmpty ? nil : out
+    }
+
+    /// The part up to its resources: everything a 3MF declares about itself.
+    ///
+    /// Capped as well as bounded. A malformed part with no `<resources` at all
+    /// would otherwise stream the whole file into a string to find out there
+    /// was nothing in it — and this runs over every file a shop drags in.
+    private static let headLimit = 512 * 1024
+
+    private static func declaredHead(of entry: Zip.Entry, in url: URL) throws -> String {
+        var kept = [UInt8]()
+        var done = false
+        func consume(_ bytes: UnsafeRawBufferPointer) -> Bool {
+            guard !done else { return false }
+            kept.append(contentsOf: bytes.bindMemory(to: UInt8.self))
+            // The marker can straddle two chunks, so this looks at everything
+            // kept so far rather than at the chunk.
+            let text = String(decoding: kept, as: UTF8.self)
+            if let stop = text.range(of: "<resources") ?? text.range(of: "<object") {
+                kept = Array(text[text.startIndex..<stop.lowerBound].utf8)
+                done = true
+                return false
+            }
+            if kept.count >= headLimit { done = true; return false }
+            return true
+        }
+        try Zip.stream(entry, in: url, onChunk: consume)
+        return String(decoding: kept, as: UTF8.self)
+    }
+
+    /// The five entities XML guarantees. A designer called `Tom & Jerry` comes
+    /// out of the file as `Tom &amp; Jerry`, and writing that into the book
+    /// would put the escape on the screen.
+    private static func unescape(_ s: String) -> String {
+        var out = s
+        for (from, to) in [("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""),
+                           ("&apos;", "'"), ("&#39;", "'"), ("&amp;", "&")] {
+            out = out.replacingOccurrences(of: from, with: to)
+        }
+        return out.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+extension Mesh.Provenance {
+    /// The four keys worth keeping, and only when they say something. A
+    /// `Copyright` of `[]` — which is what sixty-eight of this shop's files
+    /// carry — is an exporter's empty array, not a claim about anything.
+    mutating func take(_ key: String, of said: String) {
+        guard !said.isEmpty, said != "[]" else { return }
+        switch key {
+        case "Title":       if title.isEmpty { title = said }
+        case "Designer":    if designer.isEmpty { designer = said }
+        case "License", "LicenseTerms":
+                            if licence.isEmpty { licence = said }
+        case "Application": if application.isEmpty { application = said }
+        default: break
+        }
+    }
+}

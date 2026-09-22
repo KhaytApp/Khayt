@@ -6,6 +6,35 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Every model has been saying who made it and Khayt never asked.** A
+  3MF carries the designer's name and the licence the model was published
+  under, written by the slicer that exported it. Khayt recorded a licence only
+  when somebody opened a menu and chose one — so on a real shop's book the
+  provenance panel was blank on every model, and the rule that answers whether
+  a print may be SOLD had no data to answer from.
+
+  Measured on this shop's own ninety files: twenty-one name a designer, and
+  **three are licensed NonCommercial** — the exact licence that makes selling
+  a print of it a breach rather than a favour, sitting unmarked in a library
+  the shop sells from. They are read now, on import and once over the models
+  already on disk, and only ever into a field nobody has filled in: a licence
+  a person CHOSE outranks one a slicer copied.
+
+  A licence Khayt cannot translate stays blank rather than being guessed at.
+  Fifteen of those files say "Standard Digital File License" and three say
+  "MakerWorld Exclusive License", which are a platform's terms and not Creative
+  Commons. Deciding either way would be Khayt inventing a legal opinion — and
+  it is wrong in both directions, because it would either tell a shop it may
+  sell something it may not, or tell it that it may not sell its own work.
+
+- **(Mac) A model's card led with how many megabytes it was.** Which is the
+  least useful thing Khayt knows about a model — nobody has ever chosen what to
+  print by file size — while "printed 12×", the most useful, came second, and
+  the designer's name was nowhere at all. The card now says who made it and how
+  often the shop has made it, and carries the file's format in the corner,
+  because a STEP a customer sent and a 3MF ready for the bed were the same
+  card. The size is still in the inspector.
+
 - **(Mac) The ledger called a cancelled job "waiting", and a finished one
   too.** Its state chip handled four statuses and sent everything else to
   *Queued* — "في الانتظار", waiting. On the sample shop that was six of the

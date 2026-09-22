@@ -365,6 +365,22 @@ private struct Cell: View {
                 // filaments and three swaps is the difference between a print
                 // that runs unattended and one someone has to stand over.
                 .overlay(alignment: .bottomLeading) { Palette(file: file, words: words) }
+                // WHAT KIND OF FILE THIS IS. Khayt indexes twenty-two
+                // extensions and the tile never said which one it was looking
+                // at — a `.step` a customer sent and a `.3mf` ready for the
+                // bed are the same card. Top-leading, because the favourite
+                // star has the other corner and the palette has the floor.
+                .overlay(alignment: .topLeading) {
+                    if let ext = file.sourceFile?.ext, !ext.isEmpty {
+                        Text(ext.uppercased())
+                            .font(.system(size: 8, weight: .semibold))
+                            .tracking(0.4)
+                            .padding(.horizontal, 4).padding(.vertical, 1)
+                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 3))
+                            .foregroundStyle(.secondary)
+                            .padding(5)
+                    }
+                }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(file.title)
@@ -387,9 +403,24 @@ private struct Cell: View {
         .contentShape(RoundedRectangle(cornerRadius: 8))
     }
 
+    /// ── WHAT A TILE'S SECOND LINE IS FOR ─────────────────────────────────
+    ///
+    /// It led with the file's SIZE IN MEGABYTES, which is the least useful
+    /// fact this app holds about a model. Nobody has ever chosen what to print
+    /// by how many megabytes it is. Behind it sat "printed 12×", which is the
+    /// most useful — how often this shop has actually made the thing.
+    ///
+    /// And the creator was nowhere. Every library tool in this category puts
+    /// "By <designer>" under the name; Khayt had the field and never drew it,
+    /// which matters more here than it does for them, because a shop that
+    /// SELLS a print of somebody's model may owe them attribution — see
+    /// `ModelLicence.needsAttribution`.
+    ///
+    /// So: who made it and how often it has been printed. The size stays in
+    /// the inspector, where a shop that wants it is already looking.
     private var subtitle: String {
         var bits: [String] = []
-        if let size = file.size { bits.append(Format.bytes(size)) }
+        if let who = file.source, !who.isEmpty { bits.append(who) }
         // Khayt's own words for this, not ours: the catalogue has said
         // "printed {n}×" in nine languages since long before this app, and a
         // shop running in Arabic was reading an English sentence on every card
@@ -397,6 +428,10 @@ private struct Cell: View {
         if file.printCount > 0 {
             bits.append(words.callIt("cat.printed_n", ["n": .number(Double(file.printCount))]))
         }
+        // A model that is neither printed nor attributed still says something
+        // rather than nothing — and for those the size IS the only fact there
+        // is, which is how it came to be first in the first place.
+        if bits.isEmpty, let size = file.size { bits.append(Format.bytes(size)) }
         return bits.joined(separator: " · ")
     }
 }

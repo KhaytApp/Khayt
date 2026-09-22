@@ -744,6 +744,7 @@ final class Shop {
             await readSlicers()
             remeasureIfDue()
             createRecurringIfDue()
+            readProvenanceIfDue()
             // Beside the standing orders, which is the same kind of thing: a
             // write the shop asked to have made for it. After the book has
             // loaded, because it reads what is already on order to decide.
@@ -969,6 +970,8 @@ final class Shop {
     /// the pass reads every due 3MF and marks it, so the next launch finds
     /// nothing due — and a book whose write was refused is simply due again.
     private var remeasuredBooks: Set<String> = []
+    /// The same once-per-book-per-launch guard, for the provenance read.
+    private var provenanceReadBooks: Set<String> = []
     /// The pass in flight, so a quit — or a test — can wait for it.
     private(set) var remeasuring: Task<Void, Never>?
 
@@ -992,6 +995,33 @@ final class Shop {
             }.value
             guard !report.measured.isEmpty, let self else { return }
             await self.recordRemeasure(report, build: build, engine: engine)
+        }
+    }
+
+    /// Ask the model files who made them, once per book per launch.
+    ///
+    /// Wired the way `remeasureIfDue` is, and for the same reason: a rule with
+    /// no caller is this repo's recurring bug, and a menu item a shop has to
+    /// find is barely a caller. Background and best-effort — nothing on any
+    /// screen waits for it, and a book where every model has already been
+    /// asked does no work at all, because `readProvenanceFromFiles` looks only
+    /// at records with BOTH fields still blank.
+    ///
+    /// The cost on a book where the files say nothing is one bounded header
+    /// read per model — the part before `<resources`, not the geometry — which
+    /// is why this can run again on the next launch rather than needing a
+    /// marker written into the book.
+    func readProvenanceIfDue() {
+        guard case .store(let build) = source,
+              !provenanceReadBooks.contains(build.rawValue) else { return }
+        provenanceReadBooks.insert(build.rawValue)
+        Task { [weak self] in
+            guard let self else { return }
+            let filled = await self.readProvenanceFromFiles()
+            if filled > 0 {
+                FileHandle.standardError.write(Data(
+                    "provenance: \(filled) model(s) now name their designer\n".utf8))
+            }
         }
     }
 
@@ -10473,6 +10503,54 @@ final class Shop {
         editFiles(fileSelection, named: named) { record in
             record["licence"] = .string(id)
         }
+    }
+
+    /// Read provenance out of the model files a shop ALREADY has.
+    ///
+    /// ── A FIX ONLY ON NEW IMPORTS STRANDS THE WHOLE LIBRARY ───────────────
+    ///
+    /// Reading the designer and the licence at import time fixes every model
+    /// added from now on and nothing a shop has. This book holds ninety 3MFs;
+    /// twenty-one of them name a designer in the file and three are
+    /// non-commercial, and not one of those records was written by an import
+    /// that knew to look. So the same read runs over what is on disk.
+    ///
+    /// ── IT ONLY EVER FILLS A BLANK ────────────────────────────────────────
+    ///
+    /// Never overwrites. A shop that typed "my own design" over a file whose
+    /// metadata still names the creator it was remixed from has said something
+    /// this must not undo — and a licence a person CHOSE outranks one a slicer
+    /// copied. So a record with either field already set is left entirely
+    /// alone, which also makes running this twice free.
+    ///
+    /// Returns how many records gained something, so the shop is told rather
+    /// than left to go and look.
+    @discardableResult
+    func readProvenanceFromFiles() async -> Int {
+        let candidates = files.filter {
+            ($0.source ?? "").isEmpty && ($0.licence ?? "").isEmpty
+        }
+        guard !candidates.isEmpty else { return 0 }
+
+        // Read first, write once. `editFiles` goes through the store's write
+        // chain, and opening ninety zips inside it would hold the book for as
+        // long as that takes.
+        var found: [LibraryFile.ID: (source: String, licence: String)] = [:]
+        for file in candidates {
+            guard let url = modelFile(for: file),
+                  let said = Mesh.provenance(of: url) else { continue }
+            let licence = ModelLicence.fromFile(said.licence)?.id ?? ""
+            guard !said.designer.isEmpty || !licence.isEmpty else { continue }
+            found[file.id] = (said.designer, licence)
+        }
+        guard !found.isEmpty else { return 0 }
+
+        editFiles(Set(found.keys), named: words.callIt("mac.source_set")) { record in
+            guard case .string(let id)? = record["id"], let said = found[id] else { return }
+            if !said.source.isEmpty { record["source"] = .string(said.source) }
+            if !said.licence.isEmpty { record["licence"] = .string(said.licence) }
+        }
+        return found.count
     }
 
     /// Record where a model came from — a model-site URL, or the shop's own
