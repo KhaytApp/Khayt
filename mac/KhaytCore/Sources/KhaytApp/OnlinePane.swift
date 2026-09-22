@@ -300,7 +300,8 @@ struct OnlinePane: View {
             Divider()
             Text(shop.words.callIt("mac.iq_new_preset")).font(.caption.weight(.semibold))
             HStack(spacing: 8) {
-                TextField(shop.words.callIt("calc.machine.preset_name_ph"), text: $newPresetName)
+                TextField("", text: $newPresetName,
+                          prompt: Text(shop.words.callIt("calc.machine.preset_name_ph")))
                     .textFieldStyle(.roundedBorder)
                 Button(shop.words.callIt("calc.machine.save_preset")) {
                     Task {

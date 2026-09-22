@@ -76,7 +76,8 @@ struct TelegramSettings: View {
                     .frame(width: 240)
             }
             row(shop.words.callIt("mac.tg_chat")) {
-                TextField("-1001234567890", text: $draft.chatId).frame(width: 240)
+                TextField("", text: $draft.chatId, prompt: Text(verbatim: "-1001234567890"))
+                    .frame(width: 240)
             }
             Text(shop.words.callIt("tg.chat_id_hint"))
                 .font(.caption).foregroundStyle(.secondary)

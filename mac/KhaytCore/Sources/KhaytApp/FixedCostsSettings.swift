@@ -46,10 +46,15 @@ struct FixedCostsSettings: View {
 
             ForEach($lines) { $line in
                 HStack {
-                    TextField(shop.words.callIt("mac.fixed_name_ph"), text: $line.name)
+                    // The hint goes INSIDE the field. A title argument is
+                    // drawn as a label beside it once the field has a bezel,
+                    // so every row in this list repeated the same sentence.
+                    TextField("", text: $line.name,
+                              prompt: Text(shop.words.callIt("mac.fixed_name_ph")))
                         .frame(maxWidth: .infinity)
-                    TextField("0", value: $line.amount,
-                              format: .number.precision(.fractionLength(0)))
+                    TextField("", value: $line.amount,
+                              format: .number.precision(.fractionLength(0)),
+                              prompt: Text(verbatim: "0"))
                         .frame(width: 90)
                         .multilineTextAlignment(.trailing)
                     Button {

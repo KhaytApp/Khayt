@@ -117,8 +117,8 @@ struct IntegrationsPane: View {
                             // is on — an address for a service nobody uses is a
                             // field that can only be wrong.
                             if draft.providers[system.id]?.enabled == true {
-                                TextField(shop.words.callIt("integ.pay_link_ph"),
-                                          text: payLink(system.id))
+                                TextField("", text: payLink(system.id),
+                                          prompt: Text(shop.words.callIt("integ.pay_link_ph")))
                                     .textFieldStyle(.roundedBorder)
                                     .font(.callout)
                             }

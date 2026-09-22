@@ -120,12 +120,31 @@ struct SaveBar: View {
 /// an HStack aligns with nothing.
 func row<Content: View>(_ label: String, @ViewBuilder _ content: () -> Content) -> some View {
     LabeledContent(label) { content() }
+        // ── A FIELD HAS TO LOOK LIKE A FIELD ──────────────────────────────
+        //
+        // A `TextField` inside `LabeledContent` draws with no bezel. A filled
+        // one then reads as a VALUE — "Business name · English    Tuwaiq
+        // Additive" looks like a row of a table — and an EMPTY one is
+        // invisible: the Payments pane showed "Bank name" and "Account
+        // holder" with nothing after them at all, so the whole screen read as
+        // a list of facts about the shop rather than a form. Reported as
+        // exactly that: the settings look like you cannot edit them.
+        //
+        // Set here rather than on each of the thirty-five fields, so a pane
+        // added later cannot forget it. `textFieldStyle` applies only to text
+        // fields; the pickers, toggles and buttons that also go through `row`
+        // ignore it.
+        .textFieldStyle(.roundedBorder)
 }
 
 // MARK: - Business
 
 struct BusinessPane: View {
     let shop: Shop
+
+    /// Which way this WINDOW reads, which is half of where a field's text
+    /// starts — see `ContentField.textAlignment(appIsRTL:)`.
+    private var appIsRTL: Bool { shop.words.language == "ar" }
 
     struct Draft: Equatable {
         /// The shop's own text, keyed by store field (`bizEn`, `addr_fr`…).
@@ -158,8 +177,22 @@ struct BusinessPane: View {
                 Section(shop.words.callIt("set.biz_identity")) {
                     ForEach(shop.contentFields(["biz", "tagline", "addr"]), id: \.key) { field in
                         row(field.label) {
+                            // ── EACH SCRIPT STARTS AT ITS OWN EDGE ────
+                            //
+                            // `LabeledContent` aligns its content TRAILING,
+                            // and the layout direction below decides which
+                            // side trailing IS. Together they put every value
+                            // on the wrong edge: the English name hugged the
+                            // right of its field and the Arabic name hugged
+                            // the left, each reading as the other script's
+                            // direction. Reported as exactly that.
+                            //
+                            // `.leading` is the reading edge of whichever
+                            // direction the field is in, so English starts at
+                            // the left and Arabic at the right — where a
+                            // person typing either one expects the caret.
                             TextField("", text: binding(field.key))
-                                .environment(\.layoutDirection, field.language == "ar" ? .rightToLeft : .leftToRight)
+                                .multilineTextAlignment(field.textAlignment(appIsRTL: appIsRTL))
                         }
                     }
                 }
@@ -246,6 +279,10 @@ struct BusinessPane: View {
 
 struct InvoicePane: View {
     let shop: Shop
+
+    /// Which way this WINDOW reads, which is half of where a field's text
+    /// starts — see `ContentField.textAlignment(appIsRTL:)`.
+    private var appIsRTL: Bool { shop.words.language == "ar" }
 
     struct Draft: Equatable {
         var currency = "SAR"
@@ -378,15 +415,29 @@ struct InvoicePane: View {
                     }
                     ForEach(shop.contentFields(["footer"]), id: \.key) { field in
                         row(field.label) {
+                            // ── EACH SCRIPT STARTS AT ITS OWN EDGE ────
+                            //
+                            // `LabeledContent` aligns its content TRAILING,
+                            // and the layout direction below decides which
+                            // side trailing IS. Together they put every value
+                            // on the wrong edge: the English name hugged the
+                            // right of its field and the Arabic name hugged
+                            // the left, each reading as the other script's
+                            // direction. Reported as exactly that.
+                            //
+                            // `.leading` is the reading edge of whichever
+                            // direction the field is in, so English starts at
+                            // the left and Arabic at the right — where a
+                            // person typing either one expects the caret.
                             TextField("", text: binding(field.key))
-                                .environment(\.layoutDirection, field.language == "ar" ? .rightToLeft : .leftToRight)
+                                .multilineTextAlignment(field.textAlignment(appIsRTL: appIsRTL))
                         }
                     }
                     ForEach(shop.contentFields(["invTerms"]), id: \.key) { field in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(field.label).foregroundStyle(.secondary)
                             TextEditor(text: binding(field.key)).frame(height: 60).font(.body)
-                                .environment(\.layoutDirection, field.language == "ar" ? .rightToLeft : .leftToRight)
+                                .multilineTextAlignment(field.textAlignment(appIsRTL: appIsRTL))
                         }
                     }
                 }
@@ -502,7 +553,8 @@ struct PaymentsPane: View {
                     row(shop.words.callIt("set.bank_name")) { TextField("", text: $draft.bankName) }
                     row(shop.words.callIt("set.account_holder")) { TextField("", text: $draft.accountHolder) }
                     row(shop.words.callIt("set.iban")) {
-                        TextField(shop.words.callIt("set.iban_ph"), text: $draft.iban).font(.body.monospaced())
+                        TextField("", text: $draft.iban, prompt: Text(shop.words.callIt("set.iban_ph")))
+                            .font(.body.monospaced())
                     }
                 }
                 Section(shop.words.callIt("set.accepted")) {
@@ -1115,7 +1167,7 @@ struct AssistantPane: View {
                     }
                     if chosen?.needsBaseUrl == true || !draft.baseUrl.isEmpty {
                         row(shop.words.callIt("set.ai_base_url")) {
-                            TextField("http://localhost:11434", text: $draft.baseUrl)
+                            TextField("", text: $draft.baseUrl, prompt: Text(verbatim: "http://localhost:11434"))
                                 .frame(width: 240)
                                 .onChange(of: draft.baseUrl) { _, v in Task { await checkAddress(v) } }
                         }
@@ -1243,6 +1295,26 @@ extension Shop {
         let base: String
         let language: String
         let label: String
+
+        /// Which edge this field's TEXT starts at.
+        ///
+        /// ── WHY IT IS NOT SIMPLY `.leading` ───────────────────────────────
+        ///
+        /// `.leading` and `.trailing` resolve against the layout direction of
+        /// the WINDOW, not of the field, and overriding `layoutDirection` on a
+        /// `TextField` does not move its text on macOS — measured, by
+        /// photographing it. So a field holding Arabic inside an English
+        /// window has to ask for the opposite edge to the one the window calls
+        /// leading, and vice versa.
+        ///
+        /// Written as a disagreement between two directions rather than as two
+        /// cases, because the four combinations are what it has to get right:
+        /// an Arabic name in an English window starts at the right, an English
+        /// name in an Arabic window starts at the left, and a field in its own
+        /// window's direction starts where everything else on the screen does.
+        func textAlignment(appIsRTL: Bool) -> TextAlignment {
+            (language == "ar") == appIsRTL ? .leading : .trailing
+        }
     }
 
     /// One field per language the shop writes in, for each base — `bizEn`,
