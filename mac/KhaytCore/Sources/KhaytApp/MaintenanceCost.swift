@@ -72,6 +72,7 @@ struct MaintenanceCostCard: View {
                                 Capsule()
                                     .fill(Khayt.attention.opacity(0.8))
                                     .frame(width: max(3, geo.size.width * CGFloat(row.total / peak)))
+                                    .growsToItsReading(row.total / peak, from: .leading)
                                     .frame(maxHeight: .infinity, alignment: .center)
                             }
                             .frame(height: 14)

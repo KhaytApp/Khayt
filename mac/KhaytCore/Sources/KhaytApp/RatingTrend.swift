@@ -134,6 +134,7 @@ struct RatingTrendCard: View {
                                 .fill(RatingTrendCard.tint(average) == .primary
                                       ? Khayt.brand : RatingTrendCard.tint(average))
                                 .frame(height: max(0.04, average / RatingTrendCard.top) * Self.tall)
+                                .growsToItsReading(average / RatingTrendCard.top)
                         } else {
                             Rectangle().fill(Khayt.hairline).frame(height: 1)
                         }

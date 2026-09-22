@@ -105,6 +105,7 @@ struct QuoteFunnelCard: View {
                                 Capsule().fill(Khayt.recessed)
                                 Capsule().fill(Khayt.brand.opacity(0.75))
                                     .frame(width: (Double(step.count) / top) * geometry.size.width)
+                                    .growsToItsReading(Double(step.count) / top, from: .leading)
                             }
                         }
                         .frame(height: 12)

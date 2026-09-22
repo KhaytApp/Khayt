@@ -69,6 +69,9 @@ struct ClientValueTable: View {
                             Capsule()
                                 .fill(Khayt.brand.opacity(0.55))
                                 .frame(width: max(4, (row.value / widest) * 90), height: 3)
+                                // Out of the edge the figures are aligned to,
+                                // which is the trailing one in both scripts.
+                                .growsToItsReading(row.value / widest, from: .trailing)
                         }
                         Text("\(row.jobs)")
                             .font(.caption).monospacedDigit()

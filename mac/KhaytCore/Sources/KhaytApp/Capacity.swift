@@ -119,6 +119,7 @@ struct CapacityCard: View {
                         Capsule()
                             .fill(over ? Khayt.late : Khayt.brand)
                             .frame(width: max(0, min(1, fraction)) * geometry.size.width)
+                            .growsToItsReading(fraction, from: .leading)
                         if over {
                             // The overflow, striped against the end of the bar
                             // so being 300% booked does not look like being
@@ -127,6 +128,7 @@ struct CapacityCard: View {
                             Capsule()
                                 .fill(Khayt.late.opacity(0.35))
                                 .frame(width: min(1, fraction - 1) * geometry.size.width)
+                                .growsToItsReading(fraction, from: .leading)
                                 .offset(x: 0)
                         }
                     }

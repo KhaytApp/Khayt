@@ -106,6 +106,7 @@ struct DowntimeCard: View {
                     Capsule()
                         .fill(Khayt.late.opacity(0.7))
                         .frame(width: max(3, geo.size.width * CGFloat(row.total / max(peak, 0.0001))))
+                        .growsToItsReading(row.total / max(peak, 0.0001), from: .leading)
                         .frame(maxHeight: .infinity, alignment: .center)
                 }
                 .frame(width: 62, height: 12)

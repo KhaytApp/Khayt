@@ -81,6 +81,7 @@ struct ExpenseCategoriesCard: View {
                             .fill(Khayt.attention.opacity(0.8))
                             .frame(width: max(3, geo.size.width
                                                * CGFloat(share(of: peak))))
+                            .growsToItsReading(share(of: peak), from: .leading)
                     }
                     .frame(maxHeight: .infinity, alignment: .center)
                 }

@@ -75,6 +75,10 @@ struct CustomerMixCard: View {
                 HStack(spacing: 2) {
                     Capsule().fill(Khayt.brand)
                         .frame(width: max(0, min(1, fresh)) * (geometry.size.width - 2))
+                        // The split settles into place: the returning half
+                        // holds the whole width and the new half takes its
+                        // share out of it, which is the arithmetic the bar is.
+                        .growsToItsReading(fresh, from: .leading)
                     Capsule().fill(Khayt.done)
                 }
             }
