@@ -2035,6 +2035,25 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) Every margin on the ledger read "+56%", and a job sold below cost
+  looked like all the others.** The margin column was set in the style meant
+  for a RISE OR A FALL, so fifteen rows down the screen each carried a plus
+  sign — a sign on every row is a sign that says nothing, and nobody describes
+  a job as having made "plus fifty-six percent". A margin is how much of the
+  price was kept.
+
+  The row that column exists to find is the one where the shop charged less
+  than the job cost it, and it was drawn in the same secondary grey as every
+  other. It is in the warning colour now — the same call this app had already
+  made for the same figure on the product report, and not on the screen where
+  a shop actually reads its jobs.
+
+  It could not have been noticed: all forty-two jobs in the sample shop turned
+  a profit, so that branch had never been drawn. One of them lost money now —
+  the job already carrying the shop's worst rating, which failed twice before
+  it printed — and a test holds it there, and holds it to being the exception
+  it is in a real shop.
+
 - **(Mac) The front door said "+9%" about a print that was nine percent done,
   and told a shop "no link" about four different things.** The machine strip on
   Triage — the screen Khayt opens on, and the liveliest thing in the product —
