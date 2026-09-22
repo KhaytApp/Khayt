@@ -74,6 +74,7 @@ let package = Package(
     products: [
         .library(name: "KhaytCore", targets: ["KhaytCore"]),
         .executable(name: "Khayt", targets: ["KhaytApp"]),
+        .executable(name: "khayt-mcp", targets: ["KhaytMcp"]),
         // The Quick Look thumbnail extension. Its own product because it is its
         // own binary inside its own bundle — see `make-app.sh`, which assembles
         // the .appex the way it already assembles the .app.
@@ -188,6 +189,20 @@ let package = Package(
                           ]),
         .testTarget(name: "KhaytPreviewTests",
                     dependencies: ["KhaytPreview", "KhaytCore"]),
+        // ── THE LIBRARY, ANSWERABLE BY AN ASSISTANT ──────────────────────
+        //
+        // A Model Context Protocol server: Claude Desktop, Cursor and Codex
+        // launch a command and speak JSON-RPC down a pipe, so this cannot be a
+        // window and a shop should not have to leave Khayt open to ask about
+        // its models. Same shape as the two extensions above — a small program
+        // on `KhaytCore` — and it depends on KhaytCore only for
+        // `ModelLicence`, because "may I sell a print of this" is the one
+        // question about a library that has a rule behind it.
+        //
+        // It reads the book and never writes it, and it lifts ONLY the
+        // library out — see `Library` for what that deliberately cannot see.
+        .executableTarget(name: "KhaytMcp", dependencies: ["KhaytCore"]),
+        .testTarget(name: "KhaytMcpTests", dependencies: ["KhaytMcp", "KhaytCore"]),
         .testTarget(name: "KhaytCoreTests", dependencies: ["KhaytCore"]),
         // `Resources/fake-smtp.py` is run as a program by `SmtpWireTests`, which
         // finds it by `#filePath`, not as a bundled resource. Excluded rather

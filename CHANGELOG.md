@@ -4,6 +4,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+### Added
+
+- **(Mac) An assistant can ask about the model library.** `khayt-mcp` is a
+  Model Context Protocol server, so Claude Desktop, Cursor or Codex can search
+  the shop's models — "what have I never printed", "which of these may I not
+  sell", "who made the dragon". It is a small command the assistant launches,
+  not a window, so **Khayt does not have to be running**, and it opens the book
+  read-only.
+
+  What it can see is the point: the library, and nothing else. Not a customer,
+  not a price, not an invoice, not a payment, not the shop's own contact
+  details. Khayt keeps all of that in the same file, so a server that read the
+  file could as easily answer "what is this customer's phone number" — what it
+  can answer is decided in one place by never lifting anything else out of the
+  book, and there is no path or query language for an assistant to point
+  somewhere new.
+
+  A model nobody has recorded a licence for is in NEITHER answer when asked
+  what may be sold. Unknown is not a no, and a shop asking what it may sell
+  must not be handed models on the strength of silence.
+
 ### Changed
 
 - **(Mac) A creator pack's assembly instructions were unzipped, ignored and
