@@ -1,5 +1,12 @@
 # Dependencies
-node_modules/
+# NO TRAILING SLASH, and that is the point: `node_modules/` matches a
+# DIRECTORY only. A symlink of that name — which is how you give a linked
+# worktree the dependencies without a second install — is not a directory to
+# git, so it slipped past this and `git add -A` committed it. A symlink
+# carrying an absolute path off one machine is not a thing to hand anybody
+# else, and CI caught it as "node_modules is a dependency" from a repo-corpus
+# check that had to exist for a different reason entirely.
+node_modules
 
 # Electron build output
 build/
