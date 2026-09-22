@@ -101,3 +101,58 @@ private struct Lift: ViewModifier {
             .animation(Motion.of(Motion.hover, unless: reduced), value: hovering)
     }
 }
+
+/// A bar that ARRIVES at its reading instead of being drawn at it.
+///
+/// `Motion.gauge` has said "a bar or a gauge growing to its reading" since the
+/// day this file was written, and two views used it: the capacity ring and one
+/// drawing. Every bar chart in the app — cash flow, cost trends, waste, the
+/// machine band — was drawn at its final height, on the screen that holds the
+/// most bars in the product. A shop opening Reports saw a finished picture
+/// appear all at once and had no way to tell the chart had just been worked
+/// out from its book rather than been sitting there.
+///
+/// This is not decoration by the argument at the top of this file, because
+/// there is a real change behind both halves of it:
+///
+/// - **It grows on first draw** because the reading is not known when the card
+///   appears. Every one of these charts is `nil` until the engine answers, so
+///   the bar genuinely goes from having no value to having one.
+/// - **It moves when the reading moves**, which is what happens when the shop
+///   changes the window on the screen — a different question, and the bars
+///   travelling to their new heights says the chart answered it rather than
+///   was replaced.
+///
+/// And it is still the first thing to switch off: under Reduce Motion the bar
+/// is simply drawn where it belongs.
+private struct Grows: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    let reading: Double
+    let anchor: UnitPoint
+    /// Starts false so the FIRST frame is at the baseline. `onAppear` then
+    /// moves it, which is what makes the growth happen at all — animating a
+    /// height that was correct from the start animates nothing.
+    @State private var grown = false
+
+    func body(content: Content) -> some View {
+        content
+            // The height itself, for a reading that changes under a chart that
+            // is already on screen.
+            .animation(Motion.of(Motion.gauge, unless: reduced), value: reading)
+            // And the first arrival, from the baseline the bar stands on.
+            .scaleEffect(x: 1, y: grown ? 1 : 0, anchor: anchor)
+            .animation(Motion.of(Motion.gauge, unless: reduced), value: grown)
+            .onAppear { grown = true }
+    }
+}
+
+extension View {
+    /// Grow to this reading, from the baseline the bar stands on.
+    ///
+    /// `anchor` is where the bar is anchored, not where it is going: a column
+    /// above the line grows from `.bottom`, and cash flow's spending columns
+    /// hang from `.top`.
+    func growsToItsReading(_ reading: Double, from anchor: UnitPoint = .bottom) -> some View {
+        modifier(Grows(reading: reading, anchor: anchor))
+    }
+}

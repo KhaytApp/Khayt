@@ -704,6 +704,39 @@ final class Activator: NSObject, NSApplicationDelegate {
             shop.shelf = .jobs(nil)
             await settle()
             capture(named: "01b-jobs-sample", into: dir)
+
+            // ── AND THE SAME TABLE WITH THE PRINTERS ANSWERING ────────────
+            //
+            // The stage cell draws a live print differently — the layer stack
+            // and the percentage instead of the word — and that branch is
+            // reachable only when a job in the book is printing on a machine
+            // this app can hear. Neither book can produce it here: the sample's
+            // printers are somebody else's addresses, and the real one's jobs
+            // are finished. So the branch would ship having been drawn for
+            // nobody, which is exactly what `07c-machines-band` exists to stop.
+            //
+            // The sample seeds five printing jobs across three machines, and
+            // THREE OF THEM ARE ON ONE PRINTER — so this picture also carries
+            // the case `Shop.livePrint` is deliberately narrow about: all three
+            // show that machine's progress, because the book says all three are
+            // printing and the fix for that is in the book.
+            for machine in shop.machines {
+                shop.printers.setReadingForTesting(machine.id, PrinterWatch.Reading(
+                    status: KhaytEngine.PrinterStatus(
+                        state: "printing", progress: [7, 48, 93][abs(machine.id.hashValue) % 3],
+                        progressSource: "layers", filename: "falcon-hood-v4.gcode",
+                        timeRemaining: 2.6 * 3600, tempNozzle: 245, tempBed: 60,
+                        type: "moonraker"),
+                    problem: nil, at: Date()))
+            }
+            await settle()
+            // Past the growth: the stack animates to its reading, and a picture
+            // taken during it is a picture of a bar on its way somewhere.
+            try? await Task.sleep(for: .milliseconds(1200))
+            capture(named: "01c-jobs-live", into: dir)
+            shop.printers.clearReadingsForTesting()
+            await settle()
+
             shop.selection = (shop.shown.first { !$0.isSettled } ?? shop.shown.first)?.id
             await settle()
             capture(named: "02b-job-selected-sample", into: dir)
@@ -1032,15 +1065,35 @@ final class Activator: NSObject, NSApplicationDelegate {
             // the two screens rather than losing the eleven behind them. The
             // skip prints to stderr, so a short run cannot pass for a
             // complete one.
-            if skipped("spending") {
-                FileHandle.standardError.write(Data("skipping spending\n".utf8))
+            // ── TWO SCREENS, TWO SKIPS ────────────────────────────────────
+            //
+            // `spending` used to cover both, and only one of them is the
+            // problem: the EXPENSES screen is what puts AppKit into a runaway
+            // constraint pass. Waste simply stood behind it in the queue, so
+            // the one skip every run of this harness is told to pass — see the
+            // README — has also been throwing away the waste screen since the
+            // day the skip was written. Its trend card had never been
+            // photographed from the running app at all.
+            //
+            // `spending` still means both, because that is what every note and
+            // every habit in this repo says to pass.
+            if skipped("spending") || skipped("expenses") {
+                FileHandle.standardError.write(Data("skipping expenses\n".utf8))
             } else {
                 shop.shelf = .expenses
                 await settle()
                 capture(named: "18-expenses", into: dir)
+            }
+            if skipped("spending") || skipped("waste") {
+                FileHandle.standardError.write(Data("skipping waste\n".utf8))
+            } else {
                 shop.shelf = .waste
                 await settle()
+                // The trend card is a chart that grows to its reading, so a
+                // picture taken on the settle is a picture of it arriving.
+                try? await Task.sleep(for: .milliseconds(900))
                 capture(named: "19-waste", into: dir)
+                capturePanes(named: "19-waste", into: dir)
             }
             shop.shelf = .reports
             await settle()
@@ -1049,6 +1102,12 @@ final class Activator: NSObject, NSApplicationDelegate {
             // "no data yet" placeholder, which is what a broken one looks like.
             try? await Task.sleep(for: .seconds(1))
             capture(named: "20-reports", into: dir)
+            // AND THE WHOLE COLUMN. This window is 760 points tall and the
+            // report column is far longer — the cost-trends chart lives below
+            // the fold, so the only picture this harness has ever taken of it
+            // is the one that cuts it off. Same reason the settings panes get
+            // this treatment.
+            capturePanes(named: "20-reports", into: dir)
             // The other half of the screen: what the shop is still owed.
             shop.reportPage = .owing
             await settle()
