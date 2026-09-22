@@ -9,6 +9,12 @@ import KhaytCore
 /// is tested here is the two ends this app supplies — that it reads a container,
 /// hands the rule only what a rule needs, and writes back a file whose geometry
 /// is the geometry it was given.
+/// SERIALIZED because `refusesAMeshTooBig` lowers `Converter.paintInlineLimit`
+/// and puts it back. That is one shared static for the whole process, so a
+/// neighbour converting a real file beside it would see the lowered limit and
+/// fail for a reason that has nothing to do with it — which is what
+/// `SharedStateIsSerializedTests` exists to prevent, and it caught this.
+@Suite(.serialized)
 @MainActor
 struct ConverterTests {
 
@@ -125,6 +131,32 @@ struct ConverterTests {
         ]).write(to: url)
     }
 
+    /// A Bambu-family 3MF whose triangles carry paint codes, which is what a
+    /// colour plan is for.
+    static func paintedMF(at url: URL) throws {
+        let settings = """
+            {"printer_model":"X1C","nozzle_diameter":["0.4"],\
+            "filament_colour":["#FF0000","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF"],\
+            "filament_type":["PLA","PLA","PLA","PLA","PLA","PLA"]}
+            """
+        var triangles = ""
+        for i in 0..<60 {
+            triangles += "<triangle v1=\"\(i)\" v2=\"\(i + 1)\" v3=\"\(i + 2)\" "
+                + "paint_color=\"\(String(i % 6 + 1, radix: 16))\"/>"
+        }
+        var vertices = ""
+        for i in 0..<64 { vertices += "<vertex x=\"\(i)\" y=\"\(i * 2)\" z=\"0\"/>" }
+        let mesh = "<?xml version=\"1.0\"?><model unit=\"millimeter\"><resources>"
+            + "<object id=\"1\" type=\"model\"><mesh><vertices>\(vertices)</vertices>"
+            + "<triangles>\(triangles)</triangles></mesh></object></resources>"
+            + "<build><item objectid=\"1\" transform=\"1 0 0 0 1 0 0 0 1 128 128 0\"/></build></model>"
+        try ZipWrite.archive([
+            .init("[Content_Types].xml", Data("<Types/>".utf8)),
+            .init("3D/3dmodel.model", Data(mesh.utf8)),
+            .init("Metadata/project_settings.config", Data(settings.utf8)),
+        ]).write(to: url)
+    }
+
     static func engine() throws -> KhaytEngine { try KhaytEngine() }
 
     @Test("a 3MF converts, and comes back a readable 3MF")
@@ -201,24 +233,109 @@ struct ConverterTests {
         #expect(!text.contains("Original Prusa MK4"), "the source printer survived the retarget")
     }
 
-    /// Said plainly rather than half-done. Full Spectrum and band-swap rewrite
-    /// the paint codec inside the mesh, which means the mesh would have to
-    /// cross into the engine — the one thing this design exists to avoid.
-    @Test("a colour plan that needs the mesh is refused before anything is read")
-    func refusesPaintPlans() async throws {
+    /// A colour plan rewrites the paint codec inside the mesh, so for those
+    /// two options the `.model` members come in with their bytes. This used to
+    /// be refused outright and the shop sent to the other app.
+    @Test("a colour plan runs here now, on a mesh small enough to bring in")
+    func runsPaintPlans() async throws {
         let dir = Self.temp()
         defer { try? FileManager.default.removeItem(at: dir) }
         let source = dir.appending(path: "in.3mf")
         try Self.threeMF(at: source)
 
         for option in ["fullSpectrum", "bandSwap"] {
-            await #expect(throws: Converter.Failure.needsTheMesh) {
-                _ = try await Converter.convert(
-                    source, into: dir.appending(path: "out.3mf"),
-                    options: ["targetId": .string("snapmaker-u1"), option: .bool(true)],
-                    engine: try Self.engine())
-            }
+            let out = dir.appending(path: "out-\(option).3mf")
+            _ = try await Converter.convert(
+                source, into: out,
+                options: ["targetId": .string("snapmaker-u1"), option: .bool(true)],
+                engine: try Self.engine())
+            #expect(FileManager.default.fileExists(atPath: out.path),
+                    "\(option) produced no file")
         }
+    }
+
+    /// AND IT IS STILL REFUSED WHEN IT HAS TO BE — by size, with the size said.
+    ///
+    /// "Too large" on its own is a wall. A shop told which member and how big
+    /// it is can see that a plain retarget of the same file still works, which
+    /// is true and is the next thing it would want.
+    @Test("a mesh past the colour-plan limit is refused by name and by size")
+    func refusesAMeshTooBig() async throws {
+        let dir = Self.temp()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let source = dir.appending(path: "huge.3mf")
+        // Lowered rather than met: proving the gate does not require writing a
+        // quarter of a gigabyte to disk on every run.
+        let real = Converter.paintInlineLimit
+        Converter.paintInlineLimit = 64 << 10
+        defer { Converter.paintInlineLimit = real }
+        try Self.threeMF(at: source, meshPadding: 128 << 10)
+
+        await #expect(throws: Converter.Failure.self) {
+            _ = try await Converter.convert(
+                source, into: dir.appending(path: "out.3mf"),
+                options: ["targetId": .string("snapmaker-u1"), "fullSpectrum": .bool(true)],
+                engine: try Self.engine())
+        }
+        // The same file, without a colour plan, still converts — which is what
+        // the refusal tells the shop to do.
+        let plain = dir.appending(path: "plain.3mf")
+        _ = try await Converter.convert(source, into: plain,
+                                        options: ["targetId": .string("snapmaker-u1")],
+                                        engine: try Self.engine())
+        #expect(FileManager.default.fileExists(atPath: plain.path),
+                "the advice in the refusal does not work")
+    }
+
+    /// A COLOUR PLAN REWRITES THE PAINT AND NOTHING ELSE.
+    ///
+    /// This is the guarantee that replaces "the mesh never crosses". It has
+    /// to: a colour plan exists to change `paint_color`, so the old promise —
+    /// the model comes out byte-identical — cannot hold for these two
+    /// options. What must still hold is that EVERYTHING ELSE in the mesh is
+    /// untouched: the same vertices, the same triangles, in the same order.
+    ///
+    /// Proven by taking the paint attributes out of both sides and requiring
+    /// what is left to match exactly. A conversion that dropped a triangle,
+    /// reordered the vertices or rewrote a coordinate fails here even though
+    /// the file would still open.
+    @Test("a colour plan changes the paint and leaves the geometry alone")
+    func paintOnlyTouchesPaint() async throws {
+        let dir = Self.temp()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let source = dir.appending(path: "painted.3mf")
+        let out = dir.appending(path: "out.3mf")
+        try Self.paintedMF(at: source)
+
+        _ = try await Converter.convert(
+            source, into: out,
+            options: ["targetId": .string("snapmaker-u1"), "fullSpectrum": .bool(true)],
+            engine: try Self.engine())
+
+        func modelText(_ url: URL) throws -> String {
+            let entry = try #require(try Zip.entries(of: url).first { $0.name == "3D/3dmodel.model" })
+            return String(decoding: try Zip.data(of: entry, in: url, limit: .max), as: UTF8.self)
+        }
+        let before = try modelText(source), after = try modelText(out)
+
+        // The paint really moved — otherwise everything below passes on a copy.
+        #expect(before != after, "the colour plan changed nothing at all")
+
+        let strip = { (t: String) in
+            t.replacingOccurrences(of: #"\s*paint_color="[0-9A-Fa-f]+""#,
+                                   with: "", options: .regularExpression)
+        }
+        #expect(strip(before) == strip(after),
+                "the colour plan changed something other than the paint")
+    }
+
+    /// The message says the megabytes, and says the same number the limit is.
+    @Test("the refusal quotes the real limit")
+    func refusalQuotesTheLimit() {
+        let said = Converter.Failure.meshTooBig("3D/3dmodel.model", bytes: 64 << 20).description
+        #expect(said.contains("3D/3dmodel.model"), "it does not say which member")
+        #expect(said.contains("64 MB"), "it does not say how big: \(said)")
+        #expect(said.contains("\(Converter.paintLimitMB) MB"), "it does not say the limit: \(said)")
     }
 
     // ── THE PLATES, AND THE ONE PART OF THE MESH THAT IS A DECISION ───────
@@ -334,5 +451,72 @@ struct ConverterTests {
                                             engine: try Self.engine())
         }
         #expect(!FileManager.default.fileExists(atPath: out.path), "it wrote a file anyway")
+    }
+}
+
+/// The colour-plan budget, which comes from the machine rather than a constant.
+///
+/// A Mac with 32 GB should not be held to what one with 8 GB can do, and a
+/// fixed limit picks the smaller machine for everybody.
+@Suite(.serialized)
+@MainActor
+struct MeshBudgetTests {
+
+    @Test("the budget follows the machine's memory")
+    func followsTheMachine() {
+        let budget = Converter.defaultMeshBudget()
+        let ram = Int(ProcessInfo.processInfo.physicalMemory)
+        // A sixth of the machine, and a bound mesh peaks at about six times
+        // its own size — so roughly a thirty-sixth, between the two bounds.
+        #expect(budget <= ram / 30, "the budget is a larger share of memory than intended")
+        #expect(budget >= 64 << 20, "below the floor")
+        #expect(budget <= 2 << 30, "above the ceiling")
+    }
+
+    /// A machine's worth of headroom is not the same as a file's worth. This
+    /// is the number a shop actually gets on the Mac the tests run on.
+    @Test("this machine can plan a colour for a real model")
+    func thisMachineIsUseful() {
+        let budget = Converter.defaultMeshBudget()
+        let ram = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824
+        // 8 GB is the smallest Mac this app supports, and it must still reach
+        // a model of a few hundred megabytes.
+        if ram >= 8 { #expect(budget >= 200 << 20,
+                              Comment(rawValue: "only \(budget >> 20) MB on a \(Int(ram)) GB machine")) }
+    }
+
+    /// THE ONE THAT WAS WRONG FIRST. Every mesh in a file is bound at the same
+    /// time, so the budget is the TOTAL. Checking each member on its own let a
+    /// model in twelve painted parts through at twelve times the budget.
+    @Test("the budget counts every part of a model, not the largest one")
+    func countsTheWholeFile() async throws {
+        let dir = ConverterTests.temp()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let source = dir.appending(path: "parts.3mf")
+        let real = Converter.paintInlineLimit
+        Converter.paintInlineLimit = 300 << 10          // 300 KB of model
+        defer { Converter.paintInlineLimit = real }
+
+        // Four parts of 100 KB: each fits, the file does not.
+        let colours = "[\"#FF0000\",\"#00FF00\",\"#0000FF\",\"#FFFF00\",\"#00FFFF\"]"
+        let settings = "{\"printer_model\":\"X1C\",\"filament_colour\":\(colours)}"
+        var members: [ZipWrite.Member] = [
+            .init("[Content_Types].xml", Data("<Types/>".utf8)),
+            .init("Metadata/project_settings.config", Data(settings.utf8)),
+        ]
+        let padding = String(repeating: " ", count: 100 << 10)
+        for i in 1...4 {
+            let xml = "<?xml version=\"1.0\"?><model><resources><object id=\"\(i)\"><mesh/></object>"
+                + padding + "</resources><build/></model>"
+            members.append(.init("3D/part\(i).model", Data(xml.utf8)))
+        }
+        try ZipWrite.archive(members).write(to: source)
+
+        await #expect(throws: Converter.Failure.self, "four parts over the budget were accepted") {
+            _ = try await Converter.convert(
+                source, into: dir.appending(path: "out.3mf"),
+                options: ["targetId": .string("snapmaker-u1"), "fullSpectrum": .bool(true)],
+                engine: try ConverterTests.engine())
+        }
     }
 }

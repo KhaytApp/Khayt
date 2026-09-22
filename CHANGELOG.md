@@ -6,6 +6,28 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Full Spectrum and band-swap run here now.** A model painted in more
+  colours than the printer has heads could not be converted on this app at all:
+  both options were refused up front and the shop was told to go and use the
+  Windows and Linux app. They were refused because a colour plan rewrites the
+  paint codes inside the model itself, and this app deliberately never brings a
+  model into the engine — it can be hundreds of megabytes.
+
+  It brings one in for this, and only for this, and how much it will bring in
+  comes from the MACHINE rather than from a number somebody picked: a Mac with
+  32 GB allows about 910 MB of model, one with 16 GB about 455 MB, one with
+  8 GB about 228 MB. A fixed limit would have held every machine to what the
+  smallest one can do.
+
+  On this shop's own library that reaches all eleven of its multi-colour files,
+  including a 32-colour model and one whose parts come to 600 MB. A model past
+  what the machine can hold is refused by name and by size, with the plain
+  retarget that still works named as the alternative.
+
+  What a colour plan may change is the paint and nothing else: the vertices and
+  triangles that come out are the ones that went in, in the same order, which
+  is asserted rather than assumed.
+
 - **(Everyone) The queue a shop puts on its phones was called "Khayt", never
   the shop.** Add the live queue to a phone's home screen and the icon was
   labelled Khayt; open the page and it was headed Khayt. Both read a setting
