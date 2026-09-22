@@ -839,6 +839,12 @@ final class PrinterWatch {
     /// Put a reading in place, for a test that has no printer to ask.
     func setReadingForTesting(_ id: Machine.ID, _ reading: Reading) { readings[id] = reading }
 
+    /// And take them away again. The snapshot runner puts readings in place to
+    /// photograph a screen that needs them, then photographs a dozen more —
+    /// and a planted "printing" left behind claims a machine is running for
+    /// the rest of the run.
+    func clearReadingsForTesting() { readings.removeAll() }
+
     // MARK: - What the machine itself remembers
 
     /// How many of its own jobs to ask a printer for.

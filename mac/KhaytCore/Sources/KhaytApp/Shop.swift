@@ -10306,6 +10306,41 @@ final class Shop {
         }
     }
 
+    /// The print this job IS, right now, or nothing.
+    ///
+    /// ── THE LIVEST FACT IN THE SHOP WAS NOT ON THE SHOP'S OWN SCREEN ──────
+    ///
+    /// This app polls every linked printer and knows, to the percent, how far
+    /// through each running print is. It drew that on the Dashboard and on the
+    /// floor — and the Jobs table, the screen a shop actually lives in, said
+    /// "Printing" as flat text for three hours. A shop watching its own work
+    /// had to leave the list of that work to find out how it was going.
+    ///
+    /// ── WHY IT IS THIS NARROW ─────────────────────────────────────────────
+    ///
+    /// Three conditions, and each one is a way of being wrong:
+    ///
+    /// - **The job says it is printing.** A job the shop has already moved to
+    ///   Post-processing is not the print on the bed even if its machine is
+    ///   busy — the machine has moved on to the next one.
+    /// - **The job names a machine.** Without it there is nothing to ask, and
+    ///   guessing from "the only machine running" would put one printer's
+    ///   progress on another printer's job the moment a second one starts.
+    /// - **The machine says PRINTING.** An idle printer answers happily with
+    ///   `progress: 0`, and a job left marked printing against an idle machine
+    ///   would be drawn as 0% underway rather than as needing a look. Same
+    ///   refusal `machineBand` makes, for the same reason.
+    ///
+    /// Two jobs against one machine both match, which is right: the book says
+    /// both are printing and this reports what the machine says. The fix for
+    /// that is in the book, not in a tie-break invented here.
+    func livePrint(for job: Order) -> KhaytEngine.PrinterStatus? {
+        guard Stage.of(job) == .printing, let machineId = job.machineId,
+              let status = printers.readings[machineId]?.status,
+              PrinterWatch.isPrinting(status.state) else { return nil }
+        return status
+    }
+
     /// The categories and the tags the shop already uses, most-used first.
     ///
     /// Offered before typing, and that order is the point: the menu exists so a

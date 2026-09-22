@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytCore
 
 /// The book. A real `Table`, which means AppKit's column resizing, column
 /// reordering, click-to-sort, type-select, and rows that stay put under the
@@ -111,29 +112,7 @@ struct OrdersTable: View {
             .customizationID("client")
 
             TableColumn(shop.words.callIt("mac.stage"), value: \.status) { job in
-                if let s = Stage.of(job) {
-                    // Colour only where the stage means something the palette
-                    // has a word for — see `Stage.tint`. On a book whose jobs
-                    // are all delivered this column is still one colour, and
-                    // that is the honest answer rather than a decorated one.
-                    // A DOT AND THE WORD, not an icon and the word.
-                    //
-                    // The same borrowed symbol repeated down forty-two rows
-                    // carries one bit the word beside it already carries, and
-                    // costs the height that made this table 55pt a row. A dot
-                    // in the stage's own colour scans as well and takes 6pt.
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(s.tint ?? Color.secondary)
-                            .frame(width: 6, height: 6)
-                        Text(shop.words.callIt(s.key))
-                            .foregroundStyle(s.tint.map(AnyShapeStyle.init)
-                                             ?? AnyShapeStyle(.secondary))
-                            .lineLimit(1)
-                    }
-                } else {
-                    Text(job.status).foregroundStyle(.tertiary)
-                }
+                StageCell(shop: shop, job: job)
             }
             .width(min: 100, ideal: 130)
 
@@ -195,6 +174,93 @@ struct OrdersTable: View {
         }
         .background(Khayt.ground)
         .screenToolbar { NewJobButton(shop: shop) }
+    }
+}
+
+/// Where a job is — and, when it is on a bed right now, how far through.
+///
+/// ── A DOT AND THE WORD, not an icon and the word ──────────────────────────
+///
+/// The same borrowed symbol repeated down forty-two rows carries one bit the
+/// word beside it already carries, and costs the height that made this table
+/// 55pt a row. A dot in the stage's own colour scans as well and takes 6pt.
+/// Colour only where the stage means something the palette has a word for —
+/// see `Stage.tint`. On a book whose jobs are all delivered this column is
+/// still one colour, and that is the honest answer rather than a decorated one.
+///
+/// ── AND THE PRINTING ROW SHOWS THE PRINT ──────────────────────────────────
+///
+/// A job printing on a linked machine said "Printing" and nothing else, for
+/// however many hours the print took, on the screen a shop spends its day on.
+/// The percentage was known the whole time — `Shop.livePrint` is where it was
+/// already coming from for the Dashboard.
+///
+/// So a live row drops the word and draws the print instead: the layer stack
+/// this app uses for a print everywhere else, and the figure. The word is no
+/// loss — a growing stack of amber layers says "printing" more plainly than
+/// the word did, and the word is still in the row's tooltip with the file and
+/// the time left. It also FITS: the bar and the figure come to about 76pt
+/// where "Printing" and its dot came to 70, so a shop that narrowed this
+/// column years ago does not find it truncated today.
+///
+/// Every other row is exactly what it was.
+private struct StageCell: View {
+    let shop: Shop
+    let job: Order
+    @Environment(\.accessibilityReduceMotion) private var reduced
+
+    var body: some View {
+        let stage = Stage.of(job)
+        if let stage, let live = shop.livePrint(for: job) {
+            HStack(spacing: 6) {
+                // The one movement reserved for work in progress, on the one
+                // row that is work in progress.
+                Circle().fill(Khayt.hot).frame(width: 6, height: 6).alive()
+                LayerProgress(progress: Double(live.progress) / 100, height: 14)
+                    .frame(width: 32)
+                Text("\(live.progress)%")
+                    .monospacedDigit()
+                    // A print gains a percent every few minutes and the figure
+                    // used to be a different number with no moment in between.
+                    .contentTransition(.numericText())
+                    .foregroundStyle(Khayt.hot)
+                    .lineLimit(1)
+            }
+            .help(tooltip(stage: stage, live: live))
+            // The bar and the dot are pictures; this is what the row says.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(shop.words.callIt(stage.key) + " · \(live.progress)%")
+        } else if let stage {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(stage.tint ?? Color.secondary)
+                    .frame(width: 6, height: 6)
+                Text(shop.words.callIt(stage.key))
+                    .foregroundStyle(stage.tint.map(AnyShapeStyle.init)
+                                     ?? AnyShapeStyle(.secondary))
+                    .lineLimit(1)
+            }
+            // MOVING A JOB ALONG IS THE COMMONEST THING A SHOP DOES HERE, and
+            // the row simply WAS a different stage afterwards — the same
+            // complaint `Motion` opens with, about figures, applied to the
+            // thing this table is for. The colour travels, so an eye that was
+            // on the menu knows which row answered. Only this row: the value
+            // is the stage of one job, so a reload that changes nothing
+            // animates nothing.
+            .animation(Motion.of(Motion.figure, unless: reduced), value: stage)
+        } else {
+            Text(job.status).foregroundStyle(.tertiary)
+        }
+    }
+
+    /// The word the bar replaced, and the two facts a shop asks next.
+    private func tooltip(stage: Stage, live: KhaytEngine.PrinterStatus) -> String {
+        var said = shop.words.callIt(stage.key) + " · \(live.progress)%"
+        if let left = live.timeRemaining, left > 0 {
+            said += " · " + PrinterWatch.spell(left)
+        }
+        if !live.filename.isEmpty { said += " · " + live.filename }
+        return said
     }
 }
 
@@ -332,6 +398,7 @@ private struct DueDate: View {
 private struct Owed: View {
     let job: Order
     let words: Words
+    @Environment(\.accessibilityReduceMotion) private var reduced
 
     private var paidFraction: Double {
         guard job.price > 0 else { return 0 }
@@ -361,6 +428,9 @@ private struct Owed: View {
             VStack(alignment: .trailing, spacing: 3) {
                 Text(Money.figure(job.owed))
                     .monospacedDigit()
+                    // Recording a payment changes this number and the meter
+                    // below it, and both used to simply BE different.
+                    .contentTransition(.numericText())
                 Capsule()
                     .fill(.quaternary)
                     // ── NOT THE FULL WIDTH OF THE CELL ──────────────────
@@ -383,6 +453,13 @@ private struct Owed: View {
                                 .frame(width: geo.size.width * paidFraction)
                         }
                     }
+                    // ── AND IT GROWS TO ITS READING ─────────────────────
+                    //
+                    // `Motion.gauge` is defined as "a bar or a gauge growing
+                    // to its reading", and this is a gauge: a deposit landing
+                    // is the change a shop most wants to see happen. It used
+                    // to be drawn at its new length with nothing in between.
+                    .animation(Motion.of(Motion.gauge, unless: reduced), value: paidFraction)
                     // And clear of the separator, which it was sitting on.
                     .padding(.bottom, 2)
                     .help(paidFraction > 0

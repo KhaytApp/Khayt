@@ -6,6 +6,41 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The screens a shop reads most did not say what they were drawing,
+  and the one thing actually happening was not on them.** Three findings, and
+  none of them is about decoration:
+
+  The Jobs table said "Printing" as flat text, for as many hours as the print
+  took. Khayt polls every linked printer and knows to the percent how far
+  through each running print is — it draws that on the Dashboard and on the
+  floor, and not on the screen a shop lives in. A job printing on a machine
+  Khayt can hear now shows the print itself: the layer stack, the percentage,
+  and the time left and the file in its tooltip. Only when the book says the
+  job is printing AND names a machine AND that machine says it is printing —
+  an idle printer answers happily with 0%, and a job drawn as 0% underway is a
+  confident picture of something that is not happening.
+
+  The bar charts could be compared and not read. Cash flow, cost trends and
+  the waste trend each drew six or twelve columns with no axis, no readout and
+  no statement of which months they covered — the cash-flow chart has taken a
+  `currency` since it was written and never printed one. Pointing at a column
+  now puts that month's figures where the window's were and names the month,
+  and every card says which months it is about. The waste card's key, which is
+  the entire point of it, was showing the window's totals: a stripe that kept
+  coming back could not be measured against itself.
+
+  And nothing on any of them moved. Khayt's own note on motion has said since
+  it was written that `Motion.gauge` is for "a bar or a gauge growing to its
+  reading", and two views used it — so the screen holding the most bars in the
+  product was the one where everything was drawn at its final height. The bars
+  arrive at their readings now, and travel when the shop changes the window.
+  A job's stage and the amount owed on it do the same, because moving a job
+  along and taking a deposit are the two commonest things done in this table
+  and the row simply WAS different afterwards.
+
+  Nothing loops, nothing bounces, and every one of these is off under Reduce
+  Motion.
+
 - **(Mac) Full Spectrum and band-swap run here now.** A model painted in more
   colours than the printer has heads could not be converted on this app at all:
   both options were refused up front and the shop was told to go and use the

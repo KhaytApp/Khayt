@@ -9,9 +9,21 @@ import KhaytCore
 /// under the columns, so a reader can tell the stripe that keeps coming back.
 /// A month with nothing thrown away is a zero, drawn as a baseline, because
 /// zero waste is a real and good answer.
+///
+/// ── A STRIPE THAT KEEPS COMING BACK IS A MONTH-BY-MONTH QUESTION ──────────
+///
+/// The key is the whole point of this card and it carried the WINDOW's totals,
+/// so "bed adhesion, 340g" was six months added together. A reader who saw one
+/// stripe growing down the chart could not find out by how much without
+/// counting pixels. The key is a readout now: pointing at a column puts that
+/// month's grams beside every type, so the comparison the card is for can
+/// actually be made.
 struct WasteTrendCard: View {
     let shop: Shop
     let trend: KhaytEngine.WasteTrend?
+
+    /// `YYYY-MM`, while a pointer is on it.
+    @State private var pointingAt: String?
 
     /// Three tints and grey for the rest. The palette's own attention colours
     /// for the three: waste is the one chart where every stripe is bad news.
@@ -24,6 +36,7 @@ struct WasteTrendCard: View {
     var body: some View {
         let words = shop.words
         VStack(alignment: .leading, spacing: 10) {
+            let month = pointingAt.flatMap { key in trend?.months.first { $0.key == key } }
             HStack(alignment: .firstTextBaseline) {
                 Text(words.callIt("an.waste_trend"))
                     .font(.system(size: 10, weight: .semibold))
@@ -31,12 +44,23 @@ struct WasteTrendCard: View {
                     .foregroundStyle(Khayt.brand)
                 Spacer()
                 if let trend, trend.total > 0 {
-                    Text(Money.grams(trend.total) + " " + words.callIt("mac.grams"))
+                    Text(Money.grams(month?.total ?? trend.total) + " " + words.callIt("mac.grams"))
                         .font(.callout.weight(.medium)).monospacedDigit()
+                        .contentTransition(.numericText())
                 }
             }
             if let trend, trend.total > 0 {
-                Columns(trend: trend).frame(height: 84)
+                Columns(trend: trend, language: words.language, pointingAt: $pointingAt)
+                    .frame(height: 84)
+                // WHAT THE FIGURES BELOW ARE ABOUT. The card never said which
+                // months it covered, so the total in the corner was six months
+                // of a span the reader had to work out from the axis.
+                Text(MonthLabel.span(trend.months.map(\.key), pointingAt: pointingAt,
+                                     language: words.language))
+                    .font(.caption)
+                    .foregroundStyle(pointingAt == nil ? AnyShapeStyle(.secondary)
+                                                       : AnyShapeStyle(.primary))
+                    .lineLimit(1).minimumScaleFactor(0.75)
                 // The key, one type per line in stacking order, with its grams.
                 // A line each rather than a row of chips: this pane is 240 to
                 // 360 points wide and "Bed Adhesion" beside "Operator Error"
@@ -46,11 +70,18 @@ struct WasteTrendCard: View {
                         HStack(spacing: 6) {
                             RoundedRectangle(cornerRadius: 2).fill(Self.tint(i, of: trend.types))
                                 .frame(width: 9, height: 9)
-                            Text(words.callIt("waste.ft." + type)).font(.caption).foregroundStyle(.secondary)
+                            Text(words.callIt("waste.ft." + type)).font(.caption)
+                                .foregroundStyle(.secondary)
                                 .lineLimit(1)
                             Spacer(minLength: 8)
-                            Text(Money.grams(trend.byType[type] ?? 0) + " " + words.callIt("mac.grams"))
+                            // A type that cost this month nothing says so, and
+                            // "0 g" is the true answer rather than an absence:
+                            // a stripe missing from one column is exactly the
+                            // fact a reader is hunting for.
+                            Text(Money.grams((month?.byType ?? trend.byType)[type] ?? 0)
+                                 + " " + words.callIt("mac.grams"))
                                 .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                                .contentTransition(.numericText())
                         }
                     }
                 }
@@ -63,11 +94,15 @@ struct WasteTrendCard: View {
 
     private struct Columns: View {
         let trend: KhaytEngine.WasteTrend
+        let language: String
+        @Binding var pointingAt: String?
+        @Environment(\.accessibilityReduceMotion) private var reduced
 
         var body: some View {
             let peak = max(trend.months.map(\.total).max() ?? 0, 1)
             HStack(alignment: .bottom, spacing: 0) {
                 ForEach(trend.months) { month in
+                    let here = pointingAt == month.key
                     VStack(spacing: 0) {
                         Spacer(minLength: 0)
                         if month.total > 0 {
@@ -86,17 +121,37 @@ struct WasteTrendCard: View {
                                 }
                             }
                             .clipShape(RoundedRectangle(cornerRadius: 2))
+                            // The stack, not each stripe: the column is one
+                            // month's waste and it grows as one thing, so the
+                            // stripes keep their proportions the whole way up.
+                            .growsToItsReading(month.total / peak)
                         } else {
                             Rectangle().fill(Khayt.hairline).frame(height: 1)
                         }
                         Text(MonthLabel.short(month.key))
-                            .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+                            .font(.caption2).monospacedDigit()
+                            .foregroundStyle(here ? AnyShapeStyle(.primary)
+                                                  : AnyShapeStyle(.secondary))
                             .padding(.top, 4)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 6)
+                    .background(here ? Khayt.recessed : .clear,
+                                in: RoundedRectangle(cornerRadius: 4))
+                    .animation(Motion.of(Motion.hover, unless: reduced), value: here)
+                    // A month that threw nothing away draws a one-point
+                    // hairline, and it is one of the months most worth asking
+                    // about — so the whole column answers the pointer.
+                    .contentShape(Rectangle())
+                    .onHover { inside in
+                        if inside { pointingAt = month.key }
+                        else if pointingAt == month.key { pointingAt = nil }
+                    }
+                    .help(MonthLabel.long(month.key, language: language)
+                          + " · " + Money.grams(month.total) + " g")
                 }
             }
+            .onHover { inside in if !inside { pointingAt = nil } }
         }
     }
 }

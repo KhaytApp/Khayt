@@ -532,13 +532,21 @@ Judging a design by reading its source is guessing.
 
 ```bash
 pkill -f "\.build/debug/Khayt"                                 # orphans, see below
-KHAYT_SNAPSHOT_SKIP=spending KHAYT_SNAPSHOT_DIR=/tmp/shots swift run Khayt
+KHAYT_SNAPSHOT_SKIP=expenses KHAYT_SNAPSHOT_DIR=/tmp/shots swift run Khayt
 ```
 
 **The skip is not optional if you want everything.**
 
 The expenses screen puts AppKit into a runaway constraint pass — documented at
-its own call site — and takes the rest of the run with it. The settings window
+its own call site — and takes the rest of the run with it.
+
+**Skip `expenses`, not `spending`.** `spending` means both the expenses screen
+and the waste screen, and only the first of them is the problem — waste merely
+stood behind it in the queue. So the skip every note in this repo told you to
+pass had also been throwing the waste screen away since the day it was
+written, and the trend card on it had never been photographed from the running
+app at all. `spending` still works, because that is what the habit is; prefer
+`expenses`, and get `19-waste` back. The settings window
 is photographed *after* it, so all six panes were lost to it for the whole life
 of this harness. That is how the Preferences pane came to head two different
 sections "App Preferences" without anyone seeing.
@@ -551,8 +559,9 @@ Two things made it hard to find, and both are fixed:
   later reported `STUCK at 09-board`, naming a screen it had already
   photographed successfully. Every writer checks in now.
 * **A skipped run looks like a complete one.** The skip prints to stderr and
-  nothing else does, so **count the PNGs**: 88 with the skip, against 50 for a
-  run the expenses screen kills.
+  nothing else does, so **count the PNGs**: 109 with `expenses` skipped (106
+  with `spending`, which loses the waste screen and its two panes), against 50
+  for a run the expenses screen kills.
 
 **Orphans are a separate failure.** An interrupted run leaves Khayt alive
 holding its `NSStatusItem`; the next run then looks for the settings window
