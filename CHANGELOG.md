@@ -2683,6 +2683,524 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [4.0.0-alpha.35] - 2026-09-22
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The release where the shelf became a thing the shop can count, and the
+storefront stopped selling from it behind Khayt's back.
+
+A shop that prints a batch and sells from stock can now say how many of each
+thing it has, sell one off the shelf across the counter, and see how many have
+gone. That count is what a storefront publishes — and until now nothing had
+ever taken one off it. A shop that printed twelve, listed twelve and sold four
+went on advertising twelve. An order arriving from Shopify, Salla, Zid,
+WooCommerce, Etsy or Medusa is read against the shelf now: anything already
+printed is recorded as a sale rather than queued for a printer with nothing to
+make, and the count comes down with it.
+
+Beside that, a run of things the screen had been saying that were not true. The
+front door reported "+9%" about a print that was nine percent *done*. Every
+margin on the ledger read the same "+56%", so the one column that exists to
+show a job sold below cost could not. A job finished in April was counted down
+as a hundred and forty-four days late. A shop running Khayt in Arabic saw its
+own phone number with the digits reversed, its dates in English, and its
+invoices in Western numerals with the setting switched on — that last one had
+never worked at all.
+
+Most of those were found by photographing a screen, measuring it, or rendering
+it and reading the result back — not by reading the source. The state marks
+turned out to be set in seven different typefaces, which is invisible until all
+fourteen are drawn side by side, and nothing in the app had ever drawn them
+that way.
+
+And four ways this app had been misreading Khayt Cloud. A shop busy enough to
+fill its change history was refused, read that refusal as "somebody else saved
+first", and retried the same change on a timer — forever, while its cloud copy
+quietly stopped updating. A view-only sign-in was told its token had been
+reset, over and over, about an account working exactly as intended. The
+service's own explanations — over the plan's size, a stored file it cannot
+find — reached the screen as raw JSON. And every save downloaded the entire
+book again to work out which few records had moved; it asks for what it has
+not seen now.
+
+### Added
+
+- **An order from your online store now comes off the shelf.** Khayt could
+  tell a storefront where to send its orders and could not show you one that
+  had arrived. The Integrations screen has always handed out the address to
+  paste into Shopify, Salla, Zid, WooCommerce, Etsy or Medusa, and every order
+  those sent has been sitting in a queue nothing on the Mac ever asked for.
+
+  The Mac reads that queue now, from the catalogue — which is where the shelf
+  is, because the question an online order raises is *do I already have this
+  made?* Each order is checked against the shelf first, line by line, and the
+  button says what will happen: **Record the sale** for an order that is
+  already printed, **Add to the queue** for one that is not.
+
+  An order that takes pieces off the shelf takes them off the count as well.
+  That count is what your storefront publishes and sells against, and until
+  now one screen in the whole app had ever written it — a person typing a
+  number. Nothing took one off. So a shop that printed twelve, listed twelve
+  and sold four went on publishing twelve, and the next publish put the four
+  that were gone back on sale.
+
+  The same is true of the Salla and Zid webhooks the desktop's own LAN server
+  takes: those orders now take what they use off the shelf too, and an order
+  the shelf can answer in full is recorded as finished rather than queued for
+  a printer that has nothing to make.
+
+  **It does not guess.** A line is matched on the whole product name, in
+  either language, and a near miss is reported as *Not in your catalogue*
+  rather than quietly taken off the nearest shelf — a deduction is invisible
+  once it is made, because the number it leaves behind looks exactly like a
+  number somebody counted.
+
+- **(Mac) A piece can be sold off the shelf, and the shop can see how many
+  went.** Every order this app has ever written is work the shop made for
+  somebody. A piece printed in a batch weeks ago, for nobody in particular, had
+  no way to become money — so a shelf sale never reached revenue, VAT or the
+  profit and loss at all.
+
+  Selling one writes it as done today at the catalogue price, takes a piece off
+  the count, and prints nothing: the filament left the shelf when the batch was
+  made and is not deducted twice. Its cost lands on the sale, which keeps each
+  sale's margin honest — and its print hours land with it, which is not a
+  detail. Revenue arriving with no hours behind it would inflate what the shop
+  believes an hour of its own printing earns, and nothing on any screen would
+  have said so.
+
+  The counting sheet says how many have gone across the counter, and says whose
+  sales those are: anything bought through the shop's online store is counted
+  there, because the feed runs one way.
+
+- **(Mac) A shop can say how many of a thing it has already printed.** Every
+  figure in the catalogue was about MAKING one — price, margin, weight,
+  material — and none of them about HAVING one. A shop that prints a batch to
+  sell off a shelf had nowhere to record it, so its online store could only
+  ever offer to print a piece to order.
+
+  "On the shelf" is a column in the catalogue and a count taken from its own
+  sheet. Three different answers, and two of them look alike and mean opposite
+  things: a dash is a product made to order, a number is one kept boxed, and a
+  ZERO is one kept boxed whose batch has sold out — which says print more,
+  where a dash says this was never a stocked line.
+
+  Khayt says how many were counted; the shop's online store says how many are
+  left, because it is the thing watching orders. That is why a count carries
+  the date it was taken, and why re-counting to the same number still moves
+  that date: a shop that sells three, prints three and counts again publishes
+  the same figure, and anything comparing numbers alone would read that as
+  nothing having happened and go on under-selling the shelf.
+
+  The same two fields the desktop app has written since 3.7 — one book, one
+  contract, so a count taken on either is the one the other shows.
+
+- **(Mac) An assistant can ask about the model library.** `khayt-mcp` is a
+  Model Context Protocol server, so Claude Desktop, Cursor or Codex can search
+  the shop's models — "what have I never printed", "which of these may I not
+  sell", "who made the dragon". It is a small command the assistant launches,
+  not a window, so **Khayt does not have to be running**, and it opens the book
+  read-only.
+
+  What it can see is the point: the library, and nothing else. Not a customer,
+  not a price, not an invoice, not a payment, not the shop's own contact
+  details. Khayt keeps all of that in the same file, so a server that read the
+  file could as easily answer "what is this customer's phone number" — what it
+  can answer is decided in one place by never lifting anything else out of the
+  book, and there is no path or query language for an assistant to point
+  somewhere new.
+
+  A model nobody has recorded a licence for is in NEITHER answer when asked
+  what may be sold. Unknown is not a no, and a shop asking what it may sell
+  must not be handed models on the strength of silence.
+
+### Changed
+
+- **(Mac) Every save downloaded the whole book again.** Khayt checks the cloud
+  before it sends, and that check asked for everything each time — the whole
+  book plus every change since it was last compacted — to work out which few
+  records had moved. On a shop that saves often it was the largest thing the
+  app did, over and over.
+
+  It asks for what it has not already seen now. Anything it cannot be sure
+  about — a first check after opening, a different shop, or a cloud that has
+  been reset or restored — falls back to asking for everything, which is
+  exactly what it used to do every time.
+
+- **(Mac) A creator pack's assembly instructions were unzipped, ignored and
+  deleted.** Importing an archive kept only files whose extension names a
+  model, then removed the folder it had extracted everything into — so the
+  colour guide and the assembly instructions, which are the two pieces of paper
+  a shop actually needs beside the print, were thrown away on every pack
+  import. Silently: the archive still had them and the library still had its
+  models, so the only way to find out was to go looking for a guide afterwards
+  and find nothing.
+
+  PDFs are kept now, and put in the model's own folder — so a shop that hands
+  one model to somebody hands its instructions with it. The inspector lists
+  them and opens them. Nothing else is kept: a pack also carries licence text,
+  gallery renders and a slicer's leavings, and hoarding those would fill a
+  vault with things nobody opens.
+
+- **(Mac) The library could not answer "what have I never actually made".**
+  A chip beside Unfiled, counting the models with no print behind them. It is a
+  FACT here rather than a reminder — Khayt counts real prints from the jobs,
+  where the other tools in this category carry a status somebody ticks, which
+  answers "did I mean to print this" instead of "did I".
+
+- **(Mac) Every model has been saying who made it and Khayt never asked.** A
+  3MF carries the designer's name and the licence the model was published
+  under, written by the slicer that exported it. Khayt recorded a licence only
+  when somebody opened a menu and chose one — so on a real shop's book the
+  provenance panel was blank on every model, and the rule that answers whether
+  a print may be SOLD had no data to answer from.
+
+  Measured on this shop's own ninety files: twenty-one name a designer, and
+  **three are licensed NonCommercial** — the exact licence that makes selling
+  a print of it a breach rather than a favour, sitting unmarked in a library
+  the shop sells from. They are read now, on import and once over the models
+  already on disk, and only ever into a field nobody has filled in: a licence
+  a person CHOSE outranks one a slicer copied.
+
+  A licence Khayt cannot translate stays blank rather than being guessed at.
+  Fifteen of those files say "Standard Digital File License" and three say
+  "MakerWorld Exclusive License", which are a platform's terms and not Creative
+  Commons. Deciding either way would be Khayt inventing a legal opinion — and
+  it is wrong in both directions, because it would either tell a shop it may
+  sell something it may not, or tell it that it may not sell its own work.
+
+- **(Mac) A model's card led with how many megabytes it was.** Which is the
+  least useful thing Khayt knows about a model — nobody has ever chosen what to
+  print by file size — while "printed 12×", the most useful, came second, and
+  the designer's name was nowhere at all. The card now says who made it and how
+  often the shop has made it, and carries the file's format in the corner,
+  because a STEP a customer sent and a 3MF ready for the bed were the same
+  card. The size is still in the inspector.
+
+- **(Mac) The ledger called a cancelled job "waiting", and a finished one
+  too.** Its state chip handled four statuses and sent everything else to
+  *Queued* — "في الانتظار", waiting. On the sample shop that was six of the
+  twenty-four unsettled rows: four jobs the shop had finished and two it had
+  cancelled, all drawn as work waiting to be made, on the screen whose whole
+  job is to say where the work stands. Every status the book can hold is named
+  now, and the fall-through that caused it is gone.
+
+  Cancelled has its own mark for the first time. Making room for it meant
+  merging the nozzle kind: it was using two unrelated marks where the rule is
+  one silhouette in two weights — the way the machine and stock kinds have
+  always worked — and so was the order kind. Both are proper pairs now.
+
+  Which turned up something nobody had measured: of the fifteen marks this app
+  draws states with, only seven were in the system typeface. The other eight
+  came from seven different fonts — three of them from **Menlo**, a typewriter
+  face — so a row of chips was set in up to eight cuts at once. A mark is
+  chosen by asking the font now, and a test holds a kind's two marks to coming
+  from one of them.
+
+  A finished job also stops fading. Fading was for a job with nothing left to
+  do, and that used to be the same thing as finished; it is not, because an
+  invoice can still be unpaid. And the chip column was too narrow for half its
+  own vocabulary — eight of sixteen English words wrapped onto a second line
+  and made their row taller — which had stayed invisible because the sample's
+  jobs only ever reached the short ones.
+
+- **(Mac) Every bar in the app is drawn at its final length.** Sixteen of them,
+  across fifteen files — the break-even meter, the capacity meter, the quote
+  funnel, waste by month, cost per gram, cycle time, downtime, expenses by
+  category, ratings, spend per customer, profit per product, scrap per machine,
+  maintenance cost, new against returning customers, and where the work came
+  from. Khayt's own note on motion has said since it was written that
+  `Motion.gauge` is for "a bar or a gauge growing to its reading", and when it
+  was counted, two views used it. Nobody decided the rest; it is what happens
+  when each card is written on its own and the rule lives in a comment.
+
+  They arrive at their readings now, and travel when the shop changes the
+  window it is asking about. The one exception is deliberate and written down:
+  the paid-so-far meter on each row of the jobs table answers a payment landing
+  and does NOT introduce itself, because forty-two meters unrolling every time
+  that screen opens is the always-moving dashboard the note argues against.
+
+  A gauge grows out of the edge it stands on, and in Arabic that is the other
+  edge — measured rather than assumed, by rendering a half-scaled bar in both
+  directions and reading the pixels back. A test now finds the bars the same
+  way the sweep found them, so the next card either grows its bar or says in
+  one line why it is not a gauge.
+
+- **(Mac) The screens a shop reads most did not say what they were drawing,
+  and the one thing actually happening was not on them.** Three findings, and
+  none of them is about decoration:
+
+  The Jobs table said "Printing" as flat text, for as many hours as the print
+  took. Khayt polls every linked printer and knows to the percent how far
+  through each running print is — it draws that on the Dashboard and on the
+  floor, and not on the screen a shop lives in. A job printing on a machine
+  Khayt can hear now shows the print itself: the layer stack, the percentage,
+  and the time left and the file in its tooltip. Only when the book says the
+  job is printing AND names a machine AND that machine says it is printing —
+  an idle printer answers happily with 0%, and a job drawn as 0% underway is a
+  confident picture of something that is not happening.
+
+  The bar charts could be compared and not read. Cash flow, cost trends and
+  the waste trend each drew six or twelve columns with no axis, no readout and
+  no statement of which months they covered — the cash-flow chart has taken a
+  `currency` since it was written and never printed one. Pointing at a column
+  now puts that month's figures where the window's were and names the month,
+  and every card says which months it is about. The waste card's key, which is
+  the entire point of it, was showing the window's totals: a stripe that kept
+  coming back could not be measured against itself.
+
+  And nothing on any of them moved. Khayt's own note on motion has said since
+  it was written that `Motion.gauge` is for "a bar or a gauge growing to its
+  reading", and two views used it — so the screen holding the most bars in the
+  product was the one where everything was drawn at its final height. The bars
+  arrive at their readings now, and travel when the shop changes the window.
+  A job's stage and the amount owed on it do the same, because moving a job
+  along and taking a deposit are the two commonest things done in this table
+  and the row simply WAS different afterwards.
+
+  Nothing loops, nothing bounces, and every one of these is off under Reduce
+  Motion.
+
+- **(Mac) Full Spectrum and band-swap run here now.** A model painted in more
+  colours than the printer has heads could not be converted on this app at all:
+  both options were refused up front and the shop was told to go and use the
+  Windows and Linux app. They were refused because a colour plan rewrites the
+  paint codes inside the model itself, and this app deliberately never brings a
+  model into the engine — it can be hundreds of megabytes.
+
+  It brings one in for this, and only for this, and how much it will bring in
+  comes from the MACHINE rather than from a number somebody picked: a Mac with
+  32 GB allows about 910 MB of model, one with 16 GB about 455 MB, one with
+  8 GB about 228 MB. A fixed limit would have held every machine to what the
+  smallest one can do.
+
+  On this shop's own library that reaches all eleven of its multi-colour files,
+  including a 32-colour model and one whose parts come to 600 MB. A model past
+  what the machine can hold is refused by name and by size, with the plain
+  retarget that still works named as the alternative.
+
+  What a colour plan may change is the paint and nothing else: the vertices and
+  triangles that come out are the ones that went in, in the same order, which
+  is asserted rather than assumed.
+
+- **(Everyone) The queue a shop puts on its phones was called "Khayt", never
+  the shop.** Add the live queue to a phone's home screen and the icon was
+  labelled Khayt; open the page and it was headed Khayt. Both read a setting
+  called `shopName` that nothing in either app has ever written — the name a
+  shop actually types is kept under its business details, in both languages.
+  The quote page, in the next file along, had always fallen back to it
+  properly; these two had not.
+
+  They read the shop's real name now, in the language the page is in, and a
+  shop that has set an explicit name for these pages still gets that first.
+  A shop with no name at all still says Khayt — what changed is how rarely
+  anyone reaches that.
+
+- **(Mac) Settings looked like a list of facts rather than a form, and the two
+  languages were the wrong way round.** Every text field in the settings window
+  drew without a border, so a filled one read as a value and an EMPTY one was
+  invisible — the Payments pane showed "Bank name" and "Account holder" with
+  nothing after them at all, and nothing to suggest you could type there. They
+  are fields now, all thirty-five, and the hints that belong inside them sit
+  inside them rather than beside them.
+
+  The shop's bilingual details were also inverted: the English name started at
+  the right of its box and the Arabic name at the left, each reading as the
+  other script's direction. Each one starts at the edge its own script reads
+  from now, in an Arabic window as well as an English one.
+
+### Fixed
+
+- **(Mac) A busy shop's cloud copy could quietly stop updating.** Khayt Cloud
+  keeps a shop's changes as a chain, and a chain has a bound — a thousand
+  changes, or four times the size of the book under it. When it is reached the
+  service refuses the next change and asks for the whole book instead, which
+  is what empties it.
+
+  That refusal looks exactly like the one that means "somebody else saved
+  first", and this app read it as that one: it fetched, tried the same change,
+  was refused again, and went on doing that on a timer. Nothing failed
+  visibly. The Mac said the cloud had "changed while this was on screen" and
+  the shop's cloud copy simply stopped moving. It sends the whole book now, as
+  the service is asking it to.
+
+- **(Mac) A view-only sign-in was told its token had been reset.** An account
+  that can read a shop but not change it is refused on every save, correctly —
+  and Khayt reported that as a broken token and kept retrying, on a timer,
+  about a sign-in working exactly as intended. It now says what is true, once,
+  before it sends anything: this sign-in can read this shop but not change it.
+
+- **(Mac) The cloud's own explanations reached the screen.** A book over the
+  plan's size limit, or a store whose file the service cannot find, answer
+  with a sentence written for a person. Khayt showed the first 200 characters
+  of the raw reply instead.
+
+- **(Mac) A book whose key was stretched differently could not be unlocked.**
+  The keyset records how its key was made and the other apps read that back;
+  this one had the usual settings built in and ignored the record. Every book
+  in existence uses the usual settings, which is the right time to fix it.
+
+- **(Mac) An invoice set to Arabic numerals printed Western ones.** A shop
+  that asked for `٥٧٥` on its invoices got `575`, on every invoice, and
+  nothing failed anywhere — the setting was saved, the option stayed ticked,
+  and the paper was simply wrong.
+
+  The digits are rewritten by a small script. The window an invoice is drawn
+  in has scripts switched off on purpose, so that an escaping slip in some
+  future field is a visible `<script>` on the paper rather than code running —
+  and a script written into the document is inert under that rule. It never
+  ran once.
+
+  The rewrite is done by the app now rather than by the page, which needs no
+  script in the document at all: the guard stays exactly as strong and the
+  feature works. Saving to PDF waits for it, so a fast hand cannot save the
+  old digits.
+
+- **(Mac) An Arabic window showed a different phone number from the one the
+  shop typed.** `+966 50 000 0000` was drawn as `0000 000 50 966+` — the `+`
+  at the far end and the digit groups reversed. Nothing was wrong with the
+  value: it is stored, exported and printed on the invoice correctly. The one
+  place it was wrong is the screen it is typed into, in the language most of
+  this shop's customers read.
+
+  A `+` is a neutral character, so in a right-to-left paragraph it takes the
+  paragraph's side; digits are weak, so they reorder around it. The email
+  survived only because every character of `hello@tuwaiq.example` happens to
+  read left to right — one Arabic character in a domain and it breaks the same
+  way.
+
+  The phone, email, tax number, commercial registration and IBAN are fixed
+  left-to-right now, and stay that way when a value is loaded from the book.
+  The labels beside them stay in the shop's language, on the shop's side.
+
+- **(Mac) Dates read in the Mac's language, not the shop's.** A shop running
+  Khayt in Arabic — which is most of the reason this app is bilingual — saw its
+  front door dated "Tuesday, 22 September 2026 at 2:45 PM" under an Arabic
+  heading, and the money masthead said "SEPTEMBER · صافي". Twenty-two places
+  did it: due dates on the board and in the ledger, the job inspector, expenses,
+  waste, the shelf, backups, the last-saved clock.
+
+  `Date.formatted` takes the system locale when it is not given one, and the
+  system locale belongs to the Mac. It survives every test — the strings are
+  correct, they are simply in somebody else's language — and the one Mac this
+  was built on keeps its system in English. It was found by photographing the
+  app in Arabic.
+
+  Two of those places carried a comment saying they already did this: "where
+  the locale is known, and where Arabic gets Arabic month names rather than a
+  transliteration", and "the time of day, in the shop's own locale". Both
+  described the intent and not the code.
+
+  The book's own dates are untouched and must stay that way — a stored date
+  that writes itself in Arabic-Indic digits is one nothing can read back — so
+  the split between what a person reads and what the book holds is now held by
+  a test from both sides.
+
+- **(Mac) The state marks came from seven different typefaces.** Of the
+  fifteen glyphs this app draws a job's or a machine's state with, seven were
+  in the system face and the other eight fell back to seven other fonts —
+  three of them to **Menlo**, a typewriter face, and one to a dingbat font. So
+  a row of chips was set in up to eight cuts at once, at eight weights. Nobody
+  chose that: a character map says a glyph exists and says nothing about which
+  face will draw it, so the fallback chain was choosing, per character.
+
+  Every mark now names its own face: the system one wherever it has the mark,
+  and one family for the rest. Not one face for all of them — the system face
+  carries about twenty usable marks against fourteen meanings, and forcing it
+  would mean a star standing for a quote.
+
+  Naming the face exposed the next problem, which only a picture of all
+  fourteen chips together could show: the second family draws these marks a
+  fifth smaller at the same size, so the hexagons read as dots beside the
+  triangles. They are scaled to match now, by a ratio measured off the faces
+  themselves rather than written down.
+
+  "Not delivered" is gone — it was the widest chip in the set and **nothing in
+  the app drew it**, on any branch.
+
+- **(Mac) The ledger counted down on work that was over.** A job the shop
+  finished in April read "−144d" in its due column: a hundred and forty-four
+  days late, about something that is done. A cancelled job did the same, and it
+  is not late and never will be. A promise date is a deadline until the thing
+  is made and a fact afterwards, so a finished or cancelled row says when it
+  was due and stops counting. Work still in flight counts down as before.
+
+- **(Mac) Settings fields drew their text against the far edge of the pane.**
+  "Phone" sat on the left of the window and `+966 50 000 0000` on the right,
+  a whole column apart, and the caret landed nowhere near the label it belongs
+  to. Every ordinary field in the window did it — forty-three of them.
+
+  It is the other half of a fix made earlier: the two bilingual name fields
+  were given an explicit alignment because they need a special one, and the
+  rule behind them was never set, so the form had two behaviours and no
+  explanation. Every field starts at the reading edge now — the left in an
+  English window, the right in an Arabic one — and the bilingual pair still
+  choose their own, because an Arabic name in an English window reads from the
+  other side.
+
+- **(Mac) Every margin on the ledger read "+56%", and a job sold below cost
+  looked like all the others.** The margin column was set in the style meant
+  for a RISE OR A FALL, so fifteen rows down the screen each carried a plus
+  sign — a sign on every row is a sign that says nothing, and nobody describes
+  a job as having made "plus fifty-six percent". A margin is how much of the
+  price was kept.
+
+  The row that column exists to find is the one where the shop charged less
+  than the job cost it, and it was drawn in the same secondary grey as every
+  other. It is in the warning colour now — the same call this app had already
+  made for the same figure on the product report, and not on the screen where
+  a shop actually reads its jobs.
+
+  It could not have been noticed: all forty-two jobs in the sample shop turned
+  a profit, so that branch had never been drawn. One of them lost money now —
+  the job already carrying the shop's worst rating, which failed twice before
+  it printed — and a test holds it there, and holds it to being the exception
+  it is in a real shop.
+
+- **(Mac) The front door said "+9%" about a print that was nine percent done,
+  and told a shop "no link" about four different things.** The machine strip on
+  Triage — the screen Khayt opens on, and the liveliest thing in the product —
+  had never been photographed with a print on it. Neither book can produce one:
+  the sample shop's printers are somebody else's addresses and the real book's
+  jobs are finished, so the running tile was drawn by nobody and reviewed by
+  nobody. It set the percentage in the style meant for a RISE OR A FALL in a
+  figure, so every running machine reported its progress as a change that had
+  not happened. There is a picture of it now, taken with the printers answering,
+  and it cannot happen a second time unseen.
+
+  The same tile answered "why is this machine not printing" with one test, and
+  said "no link" whenever it failed: about a laser cutter Khayt has no protocol
+  for and never will, about a printer nobody has typed an address into yet, and
+  about a perfectly well configured machine that simply had not answered its
+  first poll of the morning. One is permanent, one is thirty seconds' work, and
+  one is not a problem at all. They are four sentences now, decided in one place
+  that both machine strips in the app ask — the Dashboard's own tile had been
+  through this argument already and had the case for "asked, and silent"
+  missing too.
+
+  And the running tile now looks like the thing it is: the warm colour this app
+  reserves for work being made, the slow breath it reserves for the same, and
+  the time left where the sliced file's name used to be. It opens the machine
+  when pressed, like every other tile that draws a printer.
+
+### Security
+
+- **Khayt would send a webhook, a cloud request or mail to a Tailscale
+  address.** Every outbound address a shop types is checked against the
+  private ranges first, so a URL pointing at the machine Khayt is running on
+  or at something else on the office network is refused rather than fetched.
+  `10.x`, `172.16–31.x`, `192.168.x`, loopback and the cloud metadata address
+  were all blocked. `100.64.0.0/10` was not — and that range is carrier-grade
+  NAT, which in practice means the whole of Tailscale.
+
+  A shop that runs Tailscale to reach its printers from home has its machines,
+  its NAS and everything else on that tailnet addressed there, and
+  `100.100.100.100` is Tailscale's own resolver. It is now refused like every
+  other private range. The rest of `100.x` is ordinary public space and is
+  untouched.
+
 ## [4.0.0-alpha.34] - 2026-09-22
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
