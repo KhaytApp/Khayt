@@ -2062,6 +2062,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) Settings fields drew their text against the far edge of the pane.**
+  "Phone" sat on the left of the window and `+966 50 000 0000` on the right,
+  a whole column apart, and the caret landed nowhere near the label it belongs
+  to. Every ordinary field in the window did it — forty-three of them.
+
+  It is the other half of a fix made earlier: the two bilingual name fields
+  were given an explicit alignment because they need a special one, and the
+  rule behind them was never set, so the form had two behaviours and no
+  explanation. Every field starts at the reading edge now — the left in an
+  English window, the right in an Arabic one — and the bilingual pair still
+  choose their own, because an Arabic name in an English window reads from the
+  other side.
+
 - **(Mac) Every margin on the ledger read "+56%", and a job sold below cost
   looked like all the others.** The margin column was set in the style meant
   for a RISE OR A FALL, so fifteen rows down the screen each carried a plus
