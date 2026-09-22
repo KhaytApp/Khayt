@@ -2305,6 +2305,105 @@ final class Shop {
         takingAJob = true
     }
 
+    // MARK: - Selling a piece off the shelf
+
+    /// Sell something already printed, boxed and counted.
+    ///
+    /// ── THIS IS A SALE, NOT A JOB ─────────────────────────────────────────
+    ///
+    /// Every order this app has ever written is work the shop made for
+    /// somebody. A piece off the shelf was made weeks ago for nobody in
+    /// particular, and handing it across the counter is the moment it becomes
+    /// money — so the order is created ALREADY DONE: completed, dated today,
+    /// with no machine and nothing to queue.
+    ///
+    /// ── AND EVERYTHING LANDS ON THE SALE, WHICH IS ONE DECISION ───────────
+    ///
+    /// Its price, its cost AND its print hours. Cost moving with the sale is
+    /// the shop's own choice — it keeps each sale's margin honest and matches
+    /// how the catalogue already prices a piece — and the hours have to follow
+    /// for the figures to stay true: `lib/cost-trends.js` divides revenue by
+    /// hours, so revenue arriving with no hours behind it would inflate what
+    /// the shop believes an hour of printing earns. The piece really did take
+    /// those hours; they are being recorded when it sold rather than when it
+    /// was made.
+    ///
+    /// The filament is NOT deducted again. It left the shelf when the batch
+    /// was printed, and `materialDeducted` stays false on a record that never
+    /// consumed anything.
+    func sellFromShelf(_ product: Product, count: Int = 1) async {
+        guard case .store(let build) = source, let engine, count > 0 else { return }
+        let onShelf = stockCount(of: product.id)
+        guard let onShelf, onShelf >= count else {
+            writeProblem = words.callIt("mac.not_enough_on_shelf"); return
+        }
+
+        // COSTED, not just measured — the same call the new-job sheet makes,
+        // so a shelf sale carries exactly the cost the catalogue prices with.
+        let parts = await jobParts(from: product)
+        var input = newJobInput(parts: parts,
+                                project: product.anyName(),
+                                clientId: nil,
+                                margin: product.margin ?? defaultMargin,
+                                discountPct: 0, shippingCost: 0, deposit: 0,
+                                rush: false, asQuote: false, fromProduct: product,
+                                rule: Self.priceRule(of: product))
+        input["fromStock"] = JSONValue.bool(true)
+
+        writeProblem = nil
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+            let orders = Self.rows(root, "printLog")
+            let out = try await engine.newOrder(
+                input, orders: orders, settings: Self.settings(root), now: Date(),
+                tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)))
+            guard case .object(var record) = out.order else { return }
+
+            // ALREADY DONE. Nothing about this waits on a machine, so it never
+            // sits in the queue: a shelf sale that appears under Pending is a
+            // job somebody will go looking for a printer to start.
+            let now = StoreWriter.iso(Date())
+            record["status"] = .string("completed")
+            record["completedAt"] = .string(now)
+            record["statusHistory"] = .array([
+                .object(["status": .string("completed"), "at": .string(now)]),
+            ])
+            record["queuePos"] = .null
+            record["machineId"] = .null
+            record["dueDate"] = .null
+            root["printLog"] = .array([.object(record)] + orders)
+
+            // AND THE SHELF IS SMALLER, which the storefront has to be told:
+            // it watches its OWN orders and cannot see a piece handed over a
+            // counter. Re-dated for the same reason every count is — see
+            // `recordStockCount`.
+            // The invoice counter the order consumed travels with it, for the
+            // reason `createJob` gives: one swap, both records.
+            var settings = out.settings
+            Self.putStockCount(onShelf - count, for: product.id, into: &settings, at: Date())
+            root["settings"] = .object(settings)
+            }
+        } catch let refusal as MoveRefused {
+            writeProblem = refusal.sentence
+        } catch {
+            writeProblem = String(describing: error)
+        }
+    }
+
+    /// How many of a product this shop has sold off its shelf.
+    ///
+    /// Khayt's own sales only. A piece bought through the online store is the
+    /// storefront's to count — the feed runs one way — so this is what the
+    /// shop sold across the counter, and it says so rather than implying it is
+    /// the whole picture.
+    func soldFromShelf(_ productId: String) -> Int {
+        orders.filter { $0.fromStock && $0.productId == productId }.count
+    }
+
     /// The tiers a product offers, as the sheet shows them.
     ///
     /// A NAMED MARGIN, not a price. "Wholesale 20%" replaces the margin on the

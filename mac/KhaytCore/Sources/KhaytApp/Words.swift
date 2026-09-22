@@ -932,6 +932,29 @@ final class Words {
         "mac.not_stocked":   ["en": "Not stocked",   "ar": "غير مخزّن"],
         "mac.counted_on":    ["en": "Counted {date}", "ar": "جُرد {date}"],
         "mac.stock_counted": ["en": "Count the shelf", "ar": "جرد الرف"],
+        "mac.sell_from_shelf": ["en": "Sell one from the shelf", "ar": "بيع قطعة من الرف"],
+        "mac.sell_one":        ["en": "Sell one",       "ar": "بِع قطعة"],
+        "mac.sold_here_n": ["en": "Sold here: {n}", "ar": "بيع هنا: {n}"],
+        "mac.sold_here_hint": [
+            "en": "Pieces sold across the counter and recorded here. Anything "
+                + "bought through your online store is counted there.",
+            "ar": "القطع التي بيعت عند الطاولة وسُجلت هنا. ما يُشترى عبر متجرك "
+                + "الإلكتروني يُحسب هناك.",
+        ],
+        "mac.sold_from_shelf": ["en": "Sold from the shelf", "ar": "بيع من الرف"],
+        "mac.sell_from_shelf_q": ["en": "Sell one {name} from the shelf?",
+                                  "ar": "بيع قطعة {name} من الرف؟"],
+        "mac.not_enough_on_shelf": ["en": "There are not that many on the shelf.",
+                                    "ar": "لا يوجد هذا العدد على الرف."],
+        "mac.sell_from_shelf_hint": [
+            "en": "Records it as sold today at the catalogue price, with its cost "
+                + "and its print hours, and takes one off the count. Nothing is "
+                + "printed and no filament is deducted — that happened when the "
+                + "batch was made.",
+            "ar": "يسجّلها مبيعة اليوم بسعر الكتالوج، مع تكلفتها وساعات طباعتها، "
+                + "وينقص واحدة من الجرد. لا تُطبع أي قطعة ولا يُخصم خيط — حدث ذلك "
+                + "عند طباعة الدفعة.",
+        ],
         "mac.shelf_hint": [
             "en": "How many are printed, boxed and ready to post. A shop's "
                 + "online store uses this to offer a piece today instead of "

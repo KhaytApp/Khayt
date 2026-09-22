@@ -113,6 +113,7 @@ struct Catalogue: View {
         .sheet(item: $counting) { row in
             CountTheShelf(shop: shop, row: row)
         }
+        .modifier(SellFromShelf(shop: shop, selling: $selling))
         .confirmationDialog(
             shop.words.callIt("mac.delete_product_q", ["name": .string(deleting?.name ?? "")]),
             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
@@ -142,6 +143,13 @@ struct Catalogue: View {
             .disabled(!shop.canMoveJobs)
         Button(shop.words.callIt("mac.count_the_shelf") + "\u{2026}") { counting = row }
             .disabled(!shop.canMoveJobs)
+        // Only where there is something to sell. A shop with nothing counted
+        // is making this to order, and an action that refuses is worse than
+        // one that is not offered.
+        if (shop.stockCount(of: row.id) ?? 0) > 0 {
+            Button(shop.words.callIt("mac.sell_from_shelf")) { selling = row }
+                .disabled(!shop.canMoveJobs)
+        }
         Divider()
         // Asked for, and answered, on the row the shop pressed — never on a
         // selection that might have moved under them.
@@ -159,6 +167,10 @@ struct Catalogue: View {
     /// SAYS so, and putting it in the product's Save would re-assert every
     /// count whenever somebody opened a product to change its price.
     @State private var counting: KhaytEngine.CatalogueRow?
+    /// The product being sold off the shelf. Confirmed rather than done on the
+    /// press: it writes an order and takes a piece off the count, and neither
+    /// is something to discover having happened.
+    @State private var selling: KhaytEngine.CatalogueRow?
 
 
     /// Take a job from one, rather than typing out what the shop already makes.
@@ -293,6 +305,12 @@ struct Catalogue: View {
                     counting = shop.catalogueRows.first { $0.id == id }
                 }
                 .disabled(!shop.canMoveJobs)
+                if (shop.stockCount(of: id) ?? 0) > 0 {
+                    Button(shop.words.callIt("mac.sell_from_shelf")) {
+                        selling = shop.catalogueRows.first { $0.id == id }
+                    }
+                    .disabled(!shop.canMoveJobs)
+                }
                 Divider()
                 Button(shop.words.callIt("mac.delete_product") + "\u{2026}", role: .destructive) {
                     deleting = shop.catalogueRows.first { $0.id == id }
@@ -474,6 +492,27 @@ struct CountTheShelf: View {
                 ]))
                 .font(.caption).foregroundStyle(.tertiary)
             }
+
+            // ── WHAT THIS SHOP HAS SOLD OFF ITS OWN SHELF ────────────────
+            //
+            // Here because this is where somebody is standing when they ask
+            // it: counting the shelf is exactly the moment "and how many went
+            // out?" comes up.
+            //
+            // AND IT SAYS WHOSE SALES THEY ARE. Khayt sees what it recorded —
+            // pieces handed over a counter. A piece bought through the shop's
+            // online store is the storefront's to count, because the feed runs
+            // one way, and a figure that quietly left those out would be read
+            // as the whole picture.
+            let sold = shop.soldFromShelf(row.id)
+            if sold > 0 {
+                Divider()
+                Text(shop.words.callIt("mac.sold_here_n", ["n": .number(Double(sold))]))
+                    .font(.caption).foregroundStyle(.secondary)
+                Text(shop.words.callIt("mac.sold_here_hint"))
+                    .font(.caption2).foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         } footer: {
             HStack {
                 // Clearing it is a different statement from counting zero: one
@@ -498,6 +537,46 @@ struct CountTheShelf: View {
         .onAppear {
             typed = shop.stockCount(of: row.id).map(String.init) ?? ""
             focused = true
+        }
+    }
+}
+
+/// Confirming a sale off the shelf.
+///
+/// ── ITS OWN MODIFIER, AND THAT IS THE COMPILER TALKING ────────────────────
+///
+/// Added inline, this tipped the catalogue's body past what the type-checker
+/// will solve — "unable to type-check this expression in reasonable time",
+/// which names no line in the thing that caused it. A screen this big grows by
+/// extraction rather than by another clause.
+struct SellFromShelf: ViewModifier {
+    @Bindable var shop: Shop
+    @Binding var selling: KhaytEngine.CatalogueRow?
+
+    func body(content: Content) -> some View {
+        content.confirmationDialog(
+            shop.words.callIt("mac.sell_from_shelf_q", ["name": .string(selling?.name ?? "")]),
+            isPresented: Binding(get: { selling != nil }, set: { if !$0 { selling = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.sell_one")) { sell() }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) { selling = nil }
+        } message: {
+            // WHAT IT WILL DO, in full: it is a sale, so it writes money into
+            // the book and takes a piece off the shelf at the same time, and
+            // it prints nothing.
+            Text(shop.words.callIt("mac.sell_from_shelf_hint"))
+        }
+    }
+
+    private func sell() {
+        guard let row = selling else { return }
+        selling = nil
+        // Read the FULL record, the way the product editor does: a catalogue
+        // row is a summary and the sale needs the parts it was priced from.
+        Task {
+            guard let product = await shop.productForEditing(row.id) else { return }
+            await shop.sellFromShelf(product)
         }
     }
 }

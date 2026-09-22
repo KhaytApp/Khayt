@@ -146,6 +146,8 @@
    *   `priceRound`   `{ step, mode }` — round the total, as a product's price is
    *   `priceOverride` a typed total, used as is
    *   `asQuote`      a quote rather than an order
+   *   `fromStock`    this piece came off the shelf; it was printed in a batch
+   *                  weeks ago and is being SOLD now, not made now
    *
    * A part carrying `agreedPrice` (set by `lib/price-agreements.js` from the
    * customer's record) is priced at that figure per unit and NOT marked up;
@@ -260,6 +262,18 @@
         ? P.resolveExtraLines(extraLines, quote.extrasBase)
            .map((r, n) => Object.assign({}, extraLines[n], { label: r.label, amount: r.amount }))
         : undefined,
+      // ── SOLD OFF THE SHELF, NOT MADE TO ORDER ────────────────────────
+      //
+      // A marker, never a calculation. The piece was printed in a batch weeks
+      // ago and is being sold today, so its price, its cost AND its print
+      // hours all land on the sale — which is the only combination that keeps
+      // the existing figures true. Cost without hours would inflate revenue
+      // per print-hour in `cost-trends.js`, which divides one by the other;
+      // hours without cost would show a machine earning nothing.
+      //
+      // `undefined` rather than `false` for an ordinary job, so not one record
+      // in any existing book changes shape.
+      fromStock: i.fromStock === true ? true : undefined,
       status: asQuote ? 'quote' : 'pending',
       statusHistory: [{ status: asQuote ? 'quote' : 'pending', at: now.toISOString() }],
       queuePos: orders.filter(o => o && o.status === 'pending').length + 1,
