@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// What a thing's state looks like — §4 of the design spec.
 ///
@@ -31,7 +32,10 @@ enum ShopState: String, CaseIterable, Hashable {
     //
     // Not attention, and not from attention.js. These say where the work
     // stands and must never compete for the eye with the list above.
-    case running, queued, finishing, done, quoted, offline, failedToSend
+    // `cancelled` is here and not above: a job the shop stopped is not
+    // asking for anything. It is where the work went to stop being work, and
+    // it must be as quiet on the eye as `done` is.
+    case running, queued, finishing, done, cancelled, quoted, offline, failedToSend
 
     /// ── SILHOUETTE SEPARATES KINDS; FILL SEPARATES SEVERITY ─────────────
     ///
@@ -47,20 +51,49 @@ enum ShopState: String, CaseIterable, Hashable {
     /// A new kind brings a new silhouette, never a new fill of an existing
     /// one. If the silhouettes run out, the set is too big and a kind should
     /// merge.
+    ///
+    /// ── AND THE NOZZLE KIND HAD RUN OUT ─────────────────────────────────
+    ///
+    /// It was `⊘` and `◔`: two unrelated silhouettes for ONE kind, which is
+    /// the rule above read backwards. The order kind was the same — `▲` and
+    /// `◷` share nothing. Both are fill pairs now, the way the machine and
+    /// stock kinds always were, and freeing `⊘` is what let `cancelled` have
+    /// a mark at all.
+    ///
+    /// ── WHICH FACE EACH OF THESE IS ACTUALLY DRAWN IN ───────────────────
+    ///
+    /// MEASURED, and it is worse than anybody had looked: of the fifteen
+    /// glyphs this set used, only seven were in the system face. The other
+    /// eight fell back to SEVEN different typefaces — `◔` and `◷` and `✉` to
+    /// **Menlo**, `⊘` to AppleSymbols, `◌` to SF Arabic, `◑` to Hiragino,
+    /// `◇` to the CJK fallback, `✕` to Zapf Dingbats. A row of chips was set
+    /// in up to eight cuts at once, which is the same defect `RiyalMark`
+    /// exists for: a mark borrowed from another face reads as borrowed.
+    ///
+    /// So a glyph here is CHOSEN BY ASKING THE FONT, never by looking at a
+    /// character map. `StateGlyphTests` holds the two rules that came out of
+    /// it: every mark must draw something, and the two marks of one kind must
+    /// come from ONE face — or the pair reads as two different weights, which
+    /// is exactly what `⊘` beside `◔` was doing.
+    ///
+    /// `⊗` for a cancelled job is in the system face, and it is not a new
+    /// invention either: `Stage.cancelled` has drawn `xmark.circle` since it
+    /// was written.
     var glyph: String {
         switch self {
         case .orderLate:      "▲"
-        case .orderToday:     "◷"
+        case .orderToday:     "△"
         case .machineStopped: "■"
         case .machineCheck:   "□"
-        case .nozzleBlocked:  "⊘"
-        case .nozzleWorn:     "◔"
+        case .nozzleBlocked:  "⬢"
+        case .nozzleWorn:     "⬡"
         case .stockOut:       "▼"
         case .stockLow:       "▽"
         case .running:        "●"
         case .queued:         "◌"
         case .finishing:      "◑"
         case .done:           "✓"
+        case .cancelled:      "⊗"
         case .quoted:         "◇"
         case .offline:        "✕"
         case .failedToSend:   "✉"
@@ -83,6 +116,9 @@ enum ShopState: String, CaseIterable, Hashable {
         case .queued:         "mac.state_queued"
         case .finishing:      "mac.state_finishing"
         case .done:           "mac.state_done"
+        // The word the whole app already uses for this, rather than a
+        // second spelling of it invented for one chip.
+        case .cancelled:      "mac.cancelled"
         case .quoted:         "mac.state_quoted"
         case .offline:        "mac.state_offline"
         case .failedToSend:   "mac.state_failed_send"
@@ -95,7 +131,7 @@ enum ShopState: String, CaseIterable, Hashable {
         case .orderToday, .machineCheck, .nozzleWorn, .stockLow, .finishing: Role.warn
         case .running:                     Role.ok
         case .queued, .done, .failedToSend: Role.text2
-        case .quoted, .offline:            Role.text3
+        case .quoted, .offline, .cancelled: Role.text3
         }
     }
 
@@ -134,7 +170,8 @@ enum ShopState: String, CaseIterable, Hashable {
     /// never competes for the eye.
     var isAttention: Bool {
         switch self {
-        case .running, .queued, .finishing, .done, .quoted, .offline, .failedToSend: false
+        case .running, .queued, .finishing, .done, .cancelled,
+             .quoted, .offline, .failedToSend: false
         default: true
         }
     }
@@ -153,12 +190,32 @@ struct StateChip: View {
     /// ink turns white, because a paper-tinted chip on navy is a hole.
     var onNavy = false
 
+    /// How wide a column of these needs to be.
+    ///
+    /// ── MEASURED, AND THE OLD NUMBER FITTED HALF THE VOCABULARY ──────────
+    ///
+    /// The ledger pinned its chip column at 78 points. EIGHT of the sixteen
+    /// English words are wider than that — "DUE TODAY" is 95, "FINISHING" 91,
+    /// "PRINTING" 87 — so those chips wrapped onto a second line and made
+    /// their row taller than every other. It went unseen because the sample
+    /// book's unsettled jobs only ever reached the short words; adding
+    /// "CANCELLED", which is the widest at 100, is what put one on screen.
+    ///
+    /// `StateChipFitsTests` measures every word in both languages against
+    /// this, so the next one that does not fit fails a test instead of
+    /// reflowing a row.
+    static let column: CGFloat = 104
+
     var body: some View {
         HStack(spacing: Space.xs) {
             Text(state.glyph)
             Text(words.callIt(state.wordKey).uppercased())
                 .tracking(0.9)
         }
+        // A chip is one line. Wrapping one silently changes the height of the
+        // row it is in, which is how this was invisible for as long as it was.
+        .lineLimit(1)
+        .fixedSize(horizontal: false, vertical: true)
         .font(TypeScale.label(10))
         .foregroundStyle(onNavy ? Role.onNavy : state.tint)
         .padding(.horizontal, 7)
@@ -173,5 +230,16 @@ struct StateChip: View {
         // the same sentence a sighted reader gets — not a second vocabulary
         // invented for it.
         .accessibilityElement(children: .combine)
+    }
+
+    /// What this chip needs, drawn. Here rather than in the test so there is
+    /// ONE description of how a chip is set: a test carrying its own replica
+    /// of the font, the tracking and the padding measures the replica.
+    static func width(of state: ShopState, saying word: String) -> CGFloat {
+        let face = NSFont.systemFont(ofSize: 10, weight: .heavy)
+        let mark = NSAttributedString(string: state.glyph, attributes: [.font: face])
+        let text = NSAttributedString(string: word.uppercased(),
+                                      attributes: [.font: face, .kern: 0.9])
+        return mark.size().width + text.size().width + Space.xs + 14
     }
 }

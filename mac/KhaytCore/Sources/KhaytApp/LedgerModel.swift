@@ -43,6 +43,12 @@ extension Shop {
         let reference: String
         /// One sentence saying why the cost is not known, or nil when it is.
         let costUnknownWhy: String?
+        /// Whether there is anything left to do about the money.
+        ///
+        /// Here rather than derived from `state`, because they stopped being
+        /// the same question: a job can be DONE and unpaid, and that row is
+        /// one a shop still has to act on.
+        let settled: Bool
     }
 
     var ledgerRows: [LedgerLine] {
@@ -104,17 +110,42 @@ extension Shop {
             vat: nil,
             marginMoney: costKnown ? order.price - order.costBasis : nil,
             reference: "#" + order.id,
-            costUnknownWhy: costKnown ? nil : words.callIt("mac.cost_never_recorded"))
+            costUnknownWhy: costKnown ? nil : words.callIt("mac.cost_never_recorded"),
+            settled: order.isSettled)
     }
 
+    /// Where the work stands — which is what this screen says it answers.
+    ///
+    /// ── A QUARTER OF THE ROWS SAID THE WRONG THING ────────────────────────
+    ///
+    /// The switch handled four statuses and sent everything else to `.queued`,
+    /// whose word is "Queued" in English and "في الانتظار" — *waiting* — in
+    /// Arabic. On the sample shop that was six of the twenty-four unsettled
+    /// rows: four jobs the shop had FINISHED and two it had CANCELLED, all
+    /// drawn as work waiting to be made, on the screen whose stated job is
+    /// "where does the work stand".
+    ///
+    /// Every status the book can hold is named here now, and the `default` is
+    /// gone — a fall-through is what made a cancelled job read as queued, and
+    /// leaving one in means the next status added does it again.
     private func state(of order: Order) -> ShopState {
+        let status = order.status.lowercased()
+        // CANCELLED FIRST, before the money. A cancelled job can carry an
+        // unpaid balance for ever — nothing will ever settle it — so testing
+        // settlement first would leave it reading as live work indefinitely.
+        if status == "cancelled" { return .cancelled }
         if order.isSettled { return .done }
         if isLate(order) { return .orderLate }
-        switch order.status.lowercased() {
-        case "printing":        return .running
-        case "quote", "quoted": return .quoted
-        case "post", "qc":      return .finishing
-        default:                return .queued
+        switch status {
+        case "printing":                          return .running
+        case "quote", "quoted":                   return .quoted
+        case "post", "qc":                        return .finishing
+        // THE WORK IS DONE; the money is what is not. That is the `charged`
+        // column's business and the `unpaid` filter's, and it is why the row
+        // stops dimming on this state — see `LedgerRow`.
+        case "completed", "shipped", "delivered": return .done
+        case "pending", "on_hold":                return .queued
+        default:                                  return .queued
         }
     }
 
