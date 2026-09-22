@@ -180,13 +180,13 @@ extension Shop {
     private func dueWords(_ order: Order, at state: ShopState) -> String {
         guard let due = Order.day(order.dueDate ?? "") else { return "—" }
         if state == .done || state == .cancelled {
-            return due.formatted(.dateTime.day().month(.abbreviated))
+            return words.say(due, .dateTime.day().month(.abbreviated))
         }
         let start = Calendar.current.startOfDay(for: Date())
         let days = Calendar.current.dateComponents([.day], from: start, to: due).day ?? 0
         if days < 0 { return "−" + String(-days) + "d" }
-        if days == 0 { return due.formatted(date: .omitted, time: .shortened) }
-        return due.formatted(.dateTime.weekday(.abbreviated).day())
+        if days == 0 { return words.say(due, Date.FormatStyle(date: .omitted, time: .shortened)) }
+        return words.say(due, .dateTime.weekday(.abbreviated).day())
     }
 
     /// A spool, as a shop says it: "PLA Basic · Black".

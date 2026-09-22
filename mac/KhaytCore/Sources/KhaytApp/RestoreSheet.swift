@@ -20,7 +20,7 @@ struct RestoreSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(subject.filename).font(.body).monospaced()
                 HStack(spacing: 8) {
-                    Text(subject.written.formatted(date: .abbreviated, time: .shortened))
+                    Text(shop.words.say(subject.written, Date.FormatStyle(date: .abbreviated, time: .shortened)))
                     Text(size).monospacedDigit()
                     if subject.isInsurance {
                         Text(shop.words.callIt("mac.restore_insurance"))

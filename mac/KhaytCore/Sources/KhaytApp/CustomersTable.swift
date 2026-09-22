@@ -87,7 +87,7 @@ struct CustomersTable: View {
 
             TableColumn(shop.words.callIt("mac.last_job"), value: \.lastJobSort) { person in
                 if let day = person.lastJob {
-                    Text(day, format: .dateTime.day().month(.abbreviated).year())
+                    Text(shop.words.say(day, .dateTime.day().month(.abbreviated).year()))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 } else {

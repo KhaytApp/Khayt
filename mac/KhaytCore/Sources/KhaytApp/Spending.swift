@@ -28,7 +28,7 @@ struct Expenses: View {
     private var table: some View {
         Table(rows, sortOrder: $order, columnCustomization: $columns) {
             TableColumn(shop.words.callIt("exp.date"), value: \.date) { e in
-                Text(e.day?.formatted(date: .abbreviated, time: .omitted) ?? e.date)
+                Text(e.day.map { shop.words.say($0, Date.FormatStyle(date: .abbreviated, time: .omitted)) } ?? e.date)
                     .monospacedDigit().foregroundStyle(.secondary)
             }
             .width(min: 90, ideal: 110)
@@ -184,7 +184,7 @@ struct Waste: View {
     private var table: some View {
         Table(rows, selection: $selection, sortOrder: $order, columnCustomization: $columns) {
             TableColumn(shop.words.callIt("waste.date"), value: \.date) { w in
-                Text(w.day?.formatted(date: .abbreviated, time: .omitted) ?? w.date)
+                Text(w.day.map { shop.words.say($0, Date.FormatStyle(date: .abbreviated, time: .omitted)) } ?? w.date)
                     .monospacedDigit().foregroundStyle(.secondary)
             }
             .width(min: 90, ideal: 110)

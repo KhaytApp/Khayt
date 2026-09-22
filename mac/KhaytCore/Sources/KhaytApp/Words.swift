@@ -2635,3 +2635,39 @@ final class Words {
         "lan.iq_min", "lan.iq_waste", "lan.iq_limit", "lan.iq_note", "slicer.none",
     ]
 }
+
+extension Words {
+
+    /// A date as THIS SHOP reads it, not as this Mac does.
+    ///
+    /// ── WHAT WENT WRONG ───────────────────────────────────────────────────
+    ///
+    /// `Date.formatted` takes the system locale when it is not given one, and
+    /// the system locale is the Mac's, not the book's. So a shop running Khayt
+    /// in Arabic — which is most of the reason this app is bilingual — read
+    /// its front door as "Tuesday, 22 September 2026 at 2:45 PM" under an
+    /// Arabic heading, and the money masthead said "SEPTEMBER · صافي".
+    /// Twenty-two places did it.
+    ///
+    /// It survives every test: the strings are correct, they are simply in
+    /// somebody else's language, and the one Mac this was built on keeps its
+    /// system in English.
+    ///
+    /// ── AND WHY THIS IS NOT APPLIED TO EVERY DATE ─────────────────────────
+    ///
+    /// Only the ones a PERSON READS. The book's own dates — `2026-09-22`, the
+    /// ISO stamps, the backup filenames — are data, and `Order.swift` already
+    /// pins those to `en_US_POSIX` on purpose: a stored date that formats
+    /// itself in Arabic-Indic digits is a stored date nothing can read back.
+    /// Sweeping those too would corrupt the book, so the split is deliberate
+    /// and `DatesReadInTheShopsLanguageTests` holds both halves of it.
+    var locale: Locale { Locale(identifier: language) }
+
+    /// The one way a displayed date is written. Takes any `Date.FormatStyle`,
+    /// so `.dateTime.day().month(.abbreviated)` and
+    /// `Date.FormatStyle(date: .abbreviated, time: .shortened)` both go
+    /// through it — which is what lets a test find the ones that do not.
+    func say(_ date: Date, _ style: Date.FormatStyle) -> String {
+        date.formatted(style.locale(locale))
+    }
+}

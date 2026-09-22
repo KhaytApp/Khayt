@@ -423,8 +423,8 @@ struct RunningOut: View {
             // not.
             if let due = job.dueDate, !due.isEmpty, let eta = shop.readyDate(of: job.id) {
                 Text(shop.words.callIt("mac.due_expected",
-                                       ["due": .string(Self.day(due)),
-                                        "eta": .string(Self.day(eta))]))
+                                       ["due": .string(Self.day(due, shop.words)),
+                                        "eta": .string(Self.day(eta, shop.words))]))
                     .font(.caption).monospacedDigit()
                     .foregroundStyle(Khayt.attention)
             }
@@ -441,9 +441,12 @@ struct RunningOut: View {
 
     /// `2026-09-12` as the shop reads it. The stored form is unambiguous and
     /// nobody wants to read it.
-    static func day(_ iso: String) -> String {
+    /// TAKES THE SHOP'S WORDS, because a `static` has no shop to ask and the
+    /// system locale is the Mac's rather than the book's — which is how an
+    /// Arabic front door came to read its dates in English.
+    static func day(_ iso: String, _ words: Words) -> String {
         guard let d = DateFormatter.shopDay.date(from: iso) else { return iso }
-        return d.formatted(.dateTime.day().month(.abbreviated))
+        return words.say(d, .dateTime.day().month(.abbreviated))
     }
 }
 
@@ -916,7 +919,7 @@ private struct WentWrong: View {
                                 }
                             }
                             Spacer(minLength: 12)
-                            Text(notice.at.formatted(date: .omitted, time: .shortened))
+                            Text(shop.words.say(notice.at, Date.FormatStyle(date: .omitted, time: .shortened)))
                                 .font(.caption).monospacedDigit().foregroundStyle(.tertiary)
                         }
                         .padding(.vertical, 5)
@@ -1176,12 +1179,12 @@ private struct Takings: View {
         let text: String = {
             if let hovered, let month = outlook.history.first(where: { $0.key == hovered }) {
                 return shop.words.callIt("mac.takings_month",
-                                         ["month": .string(Self.monthName(month.key)),
+                                         ["month": .string(Self.monthName(month.key, shop.words)),
                                           "amount": .string(Money.short(month.revenue, shop.currency))])
             }
             if let last, let best, best.key == last.key, best.revenue > 0 {
                 return shop.words.callIt("mac.takings_best",
-                                         ["month": .string(Self.monthName(last.key))])
+                                         ["month": .string(Self.monthName(last.key, shop.words))])
             }
             if let pct = outlook.trendPct, outlook.method == "trend" {
                 let key = pct >= 0 ? "mac.takings_up" : "mac.takings_down"
@@ -1227,7 +1230,7 @@ private struct Takings: View {
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
                         .fill(Khayt.brand.opacity(strength))
                         .frame(height: height)
-                    Text(Self.monthName(month.key))
+                    Text(Self.monthName(month.key, shop.words))
                         .font(.caption2)
                         .foregroundStyle(lit ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                 }
@@ -1236,7 +1239,7 @@ private struct Takings: View {
                 .onHover { inside in hovered = inside ? month.key : (hovered == month.key ? nil : hovered) }
                 .accessibilityElement()
                 .accessibilityLabel(shop.words.callIt("mac.takings_month",
-                                                      ["month": .string(Self.monthName(month.key)),
+                                                      ["month": .string(Self.monthName(month.key, shop.words)),
                                                        "amount": .string(Money.short(month.revenue, shop.currency))]))
             }
             Spacer(minLength: 0)
@@ -1250,12 +1253,17 @@ private struct Takings: View {
     /// thing to show somebody. `key` is `year * 12 + month`, so the name is
     /// formatted here — where the locale is known, and where Arabic gets Arabic
     /// month names rather than a transliteration.
-    static func monthName(_ key: Int) -> String {
+    /// AND IT TAKES THE SHOP'S WORDS NOW. The comment above has claimed since
+    /// it was written that "Arabic gets Arabic month names rather than a
+    /// transliteration" — and `Date.formatted` with no locale takes the Mac's,
+    /// so it never did. The sentence was true about the intent and false about
+    /// the code, which is the hardest kind of comment to disbelieve.
+    static func monthName(_ key: Int, _ words: Words) -> String {
         var components = DateComponents()
         components.year = key / 12
         components.month = key % 12 + 1
         components.day = 1
         guard let date = Calendar.current.date(from: components) else { return "" }
-        return date.formatted(.dateTime.month(.abbreviated))
+        return words.say(date, .dateTime.month(.abbreviated))
     }
 }

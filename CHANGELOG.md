@@ -2133,6 +2133,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) Dates read in the Mac's language, not the shop's.** A shop running
+  Khayt in Arabic — which is most of the reason this app is bilingual — saw its
+  front door dated "Tuesday, 22 September 2026 at 2:45 PM" under an Arabic
+  heading, and the money masthead said "SEPTEMBER · صافي". Twenty-two places
+  did it: due dates on the board and in the ledger, the job inspector, expenses,
+  waste, the shelf, backups, the last-saved clock.
+
+  `Date.formatted` takes the system locale when it is not given one, and the
+  system locale belongs to the Mac. It survives every test — the strings are
+  correct, they are simply in somebody else's language — and the one Mac this
+  was built on keeps its system in English. It was found by photographing the
+  app in Arabic.
+
+  Two of those places carried a comment saying they already did this: "where
+  the locale is known, and where Arabic gets Arabic month names rather than a
+  transliteration", and "the time of day, in the shop's own locale". Both
+  described the intent and not the code.
+
+  The book's own dates are untouched and must stay that way — a stored date
+  that writes itself in Arabic-Indic digits is one nothing can read back — so
+  the split between what a person reads and what the book holds is now held by
+  a test from both sides.
+
 - **(Mac) The state marks came from seven different typefaces.** Of the
   fifteen glyphs this app draws a job's or a machine's state with, seven were
   in the system face and the other eight fell back to seven other fonts —

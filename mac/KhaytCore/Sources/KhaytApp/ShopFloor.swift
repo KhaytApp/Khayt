@@ -397,7 +397,7 @@ private struct Card: View {
                     }
                     if let installed = nozzle.installedAt, let day = Order.day(installed) {
                         DetailLine(shop.words.callIt("mac.installed"),
-                                   day.formatted(date: .abbreviated, time: .omitted), dim: true)
+                                   shop.words.say(day, Date.FormatStyle(date: .abbreviated, time: .omitted)), dim: true)
                     }
                     if let material = nozzle.material {
                         DetailLine(shop.words.callIt("plib.material"), material, dim: true)

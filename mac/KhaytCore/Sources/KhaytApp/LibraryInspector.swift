@@ -172,7 +172,7 @@ struct LibraryInspector: View {
             DetailLine(shop.words.callIt("mac.printed"), file.printCount == 0 ? shop.words.callIt("mac.never") : "\(file.printCount)×",
                        dim: file.printCount == 0)
             if let last = file.lastPrinted, let day = Order.day(last) {
-                DetailLine(shop.words.callIt("mac.last_run"), day.formatted(date: .abbreviated, time: .omitted))
+                DetailLine(shop.words.callIt("mac.last_run"), shop.words.say(day, Date.FormatStyle(date: .abbreviated, time: .omitted)))
             }
             // Where the bytes are is worth stating plainly. "On this Mac" and
             // "in the records but not here" look identical in a grid, and only

@@ -10326,7 +10326,7 @@ final class Shop {
             return words.callIt("mac.never")
         }
         return words.callIt("mac.saved_at",
-                            ["t": .string(day.formatted(date: .omitted, time: .shortened))])
+                            ["t": .string(words.say(day, Date.FormatStyle(date: .omitted, time: .shortened)))])
     }
 
     /// Is anything actually printing? One dot in the sidebar, and a dot is

@@ -235,7 +235,7 @@ private struct Detail: View {
                 }
             }
             if let due = Order.day(job.dueDate) {
-                DetailLine(shop.words.callIt("doc.due"), due.formatted(date: .abbreviated, time: .omitted),
+                DetailLine(shop.words.callIt("doc.due"), shop.words.say(due, Date.FormatStyle(date: .abbreviated, time: .omitted)),
                      warn: job.isOverdue())
             }
         }
@@ -326,8 +326,8 @@ struct ZatcaLine: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             if let at = state.at {
-                Text(Date(timeIntervalSince1970: at / 1000)
-                    .formatted(date: .abbreviated, time: .shortened))
+                Text(shop.words.say(Date(timeIntervalSince1970: at / 1000),
+                                    Date.FormatStyle(date: .abbreviated, time: .shortened)))
                     .font(.caption2).foregroundStyle(.tertiary)
             }
         }
