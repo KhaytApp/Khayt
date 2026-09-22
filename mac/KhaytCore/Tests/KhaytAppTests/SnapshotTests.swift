@@ -1491,3 +1491,74 @@ import KhaytCore
     }
 
 }
+
+/// The queue a storefront fills, and what the shelf makes of it.
+///
+/// ── WHY THIS ONE IS PLANTED ───────────────────────────────────────────────
+///
+/// The orders live in the cloud, so on a sample book this screen is always
+/// empty — and an empty state is not what needs looking at. Four readings go
+/// in, because those four are every branch the card can draw: an order the
+/// shelf answers in full, one it answers in part, one naming nothing this shop
+/// sells, and one of each mixed. A picture of one of them says nothing about
+/// the other three. (See `Sample data must span its cases`.)
+///
+/// Built out of the sample book's own catalogue and its own shelf counts, and
+/// read through the real shared rule — so the figures on screen are figures
+/// this book could really produce, rather than a fixture's.
+@Suite @MainActor struct OnlineOrdersSnapshot {
+
+    func shop() async -> Shop {
+        let shop = Shop()
+        await shop.load(.sample)
+        return shop
+    }
+
+    @Test("the incoming-orders sheet, with every reading it can show")
+    func theSheet() async throws {
+        let shop = await self.shop()
+        let engine = try #require(shop.engine)
+        let stocked = shop.shownProducts.compactMap { row in
+            shop.stockCount(of: row.id).map { (row.name, $0) }
+        }
+        let full = try #require(stocked.first { $0.1 >= 2 },
+                                "the sample book stocks nothing, so this draws an empty sheet")
+        let part = stocked.first { $0.0 != full.0 && $0.1 >= 1 }
+
+        var baskets: [(String, String, String, String)] = [
+            ("Salla order — SL-2291", "• \(full.0) × 2", "salla", "Nora Al-Otaibi"),
+            ("Shopify order — #1042", "• A lamp nobody here makes × 1", "shopify", "Reem S."),
+        ]
+        if let part {
+            baskets.insert(("Zid order — ZD-88", "• \(part.0) × \(part.1 + 3)", "zid", "Faisal H."),
+                           at: 1)
+            baskets.append(("Medusa order — #204",
+                            "• \(full.0) × 1\n• A keyring nobody here makes × 4",
+                            "medusa", "Turki A."))
+        }
+
+        let stock = Shop.stockCounts(shop.settingsDict)
+        var orders: [Shop.OnlineOrder] = []
+        for (index, basket) in baskets.enumerated() {
+            let payload = JSONValue.object([
+                "title": .string(basket.0), "description": .string(basket.1),
+                "source": .string(basket.2), "name": .string(basket.3),
+            ])
+            orders.append(Shop.OnlineOrder(
+                item: CloudIntake.Item(id: "planted-\(index)", payload: payload,
+                                       createdAt: Date()),
+                reading: try await engine.shelfSaleReading(
+                    payload: payload, products: shop.productRows, stock: stock)))
+        }
+        #expect(orders.contains { $0.allFromShelf }, "no card draws the finished-sale branch")
+        #expect(orders.contains { $0.unmatched > 0 }, "no card draws the unmatched branch")
+        #expect(orders.contains { $0.fromShelf > 0 && $0.toPrint > 0 },
+                "no card draws the part-shelf-part-print branch")
+        shop.onlineOrders = orders
+
+        let renderer = SnapshotTests()
+        try renderer.render(OnlineOrdersSheet(shop: shop),
+                            "29b-online-orders",
+                            size: CGSize(width: SheetMetrics.outerWidth(520), height: 760))
+    }
+}

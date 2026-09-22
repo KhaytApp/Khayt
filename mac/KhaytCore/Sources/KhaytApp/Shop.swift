@@ -6719,6 +6719,17 @@ final class Shop {
     /// Whether the last comparison found a settings change this app cannot send.
     var cloudSettingsStay = false
 
+    // MARK: - Orders a storefront has already sent
+
+    /// What is waiting in the cloud's intake queue, each read against the
+    /// shelf. See `OnlineOrders.swift` — empty until the screen asks, and
+    /// empty for a shop with no cloud, which is not an error.
+    var onlineOrders: [OnlineOrder] = []
+    /// True while the queue is being read or one of its orders written.
+    var onlineBusy = false
+    /// Why the last look or the last write did not work.
+    var onlineProblem: String?
+
     /// The shop's data key, held for as long as this app runs.
     ///
     /// ── IT USED TO GO WHEN THE SHEET DID, AND THAT IS WHY NOTHING SYNCED ──

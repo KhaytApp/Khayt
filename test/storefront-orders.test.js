@@ -133,7 +133,10 @@ test('both storefront handlers check before they create, and record the id', () 
     // on prose is a test people learn to edit rather than read.
     const body = lan.slice(at, at + 3000);
     const check = body.indexOf(`alreadyRecorded(storeData.printLog, '${source}'`);
-    const create = body.indexOf('log.unshift(newOrder)');
+    // `log.unshift(recorded)`, not `newOrder`: what goes in the book is the
+    // order AFTER the shelf has been read against it — `fromStock`, the
+    // status and the note all come from there. See the next assertion.
+    const create = body.indexOf('log.unshift(recorded)');
     assert.ok(check > 0, `the ${source} handler does not check for a duplicate`);
     assert.ok(create > 0, `the ${source} handler no longer creates an order here`);
     assert.ok(check < create, `the ${source} handler creates the order before checking for it`);
@@ -150,7 +153,36 @@ test('both storefront handlers check before they create, and record the id', () 
       `the ${source} handler does not record the id, so the NEXT delivery cannot be recognised`);
     assert.match(body, /notes:\s+storefrontOrders\.noteFor\(/,
       `the ${source} handler writes its own note string instead of the shared one`);
+
+    // ── AND THE SHELF IS READ INSIDE THE SAME WRITE ───────────────────
+    //
+    // An online order for something already printed is a sale: it comes off
+    // `settings.storefront.stockQty`, which is the count the storefront
+    // publishes and sells against. Doing that outside `updateStoreOnDisk`
+    // would be a read-modify-write racing the duplicate check beside it —
+    // two deliveries arriving together would each read the same figure and
+    // each write their own.
+    const shelf = body.indexOf(`takeOnlineOrderOffTheShelf('${source}'`);
+    assert.ok(shelf > 0,
+      `the ${source} handler does not read the shelf, so an order for a piece `
+      + 'already made still goes to a machine and the published count stays wrong');
+    assert.ok(check < shelf && shelf < create,
+      `the ${source} handler reads the shelf outside the checked write`);
   }
+});
+
+/*
+ * What the desktop is TOLD is what was written, not what was drafted.
+ *
+ * `lan-order-updated` carried `newOrder` — the record built before the write
+ * chain ran — so the queue was told 'pending' about an order the book had just
+ * recorded as completed off the shelf.
+ */
+test('the window is sent the order that was written', () => {
+  assert.ok(!/lan-order-updated', newOrder\)/.test(lan),
+    'a storefront handler tells the window about its draft rather than its record');
+  assert.equal((lan.match(/lan-order-updated', recorded\)/g) || []).length, 2,
+    'both storefront handlers should send the record they wrote');
 });
 
 test('a duplicate answers 200, so the provider stops retrying', () => {

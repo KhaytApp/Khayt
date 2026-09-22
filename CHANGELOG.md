@@ -22,6 +22,36 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **An order from your online store now comes off the shelf.** Khayt could
+  tell a storefront where to send its orders and could not show you one that
+  had arrived. The Integrations screen has always handed out the address to
+  paste into Shopify, Salla, Zid, WooCommerce, Etsy or Medusa, and every order
+  those sent has been sitting in a queue nothing on the Mac ever asked for.
+
+  The Mac reads that queue now, from the catalogue — which is where the shelf
+  is, because the question an online order raises is *do I already have this
+  made?* Each order is checked against the shelf first, line by line, and the
+  button says what will happen: **Record the sale** for an order that is
+  already printed, **Add to the queue** for one that is not.
+
+  An order that takes pieces off the shelf takes them off the count as well.
+  That count is what your storefront publishes and sells against, and until
+  now one screen in the whole app had ever written it — a person typing a
+  number. Nothing took one off. So a shop that printed twelve, listed twelve
+  and sold four went on publishing twelve, and the next publish put the four
+  that were gone back on sale.
+
+  The same is true of the Salla and Zid webhooks the desktop's own LAN server
+  takes: those orders now take what they use off the shelf too, and an order
+  the shelf can answer in full is recorded as finished rather than queued for
+  a printer that has nothing to make.
+
+  **It does not guess.** A line is matched on the whole product name, in
+  either language, and a near miss is reported as *Not in your catalogue*
+  rather than quietly taken off the nearest shelf — a deduction is invisible
+  once it is made, because the number it leaves behind looks exactly like a
+  number somebody counted.
+
 - **(Mac) A piece can be sold off the shelf, and the shop can see how many
   went.** Every order this app has ever written is work the shop made for
   somebody. A piece printed in a batch weeks ago, for nobody in particular, had
