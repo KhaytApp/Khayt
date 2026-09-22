@@ -100,7 +100,7 @@ struct EmailSettings: View {
 
             if sends {
                 row(shop.words.callIt("set.email_from")) {
-                    TextField("orders@yourshop.com", text: $draft.fromEmail).frame(width: 240)
+                    TextField("", text: $draft.fromEmail, prompt: Text(verbatim: "orders@yourshop.com")).frame(width: 240)
                 }
                 row(shop.words.callIt("set.email_from_name")) {
                     TextField(shop.shopName, text: $draft.fromName).frame(width: 240)
@@ -114,7 +114,7 @@ struct EmailSettings: View {
                 }
                 if draft.provider == "mailgun" {
                     row(shop.words.callIt("set.email_domain")) {
-                        TextField("mg.yourshop.com", text: $draft.domain).frame(width: 240)
+                        TextField("", text: $draft.domain, prompt: Text(verbatim: "mg.yourshop.com")).frame(width: 240)
                     }
                 }
                 // AFTER the fields, not between them. Drawn straight under the
@@ -128,13 +128,13 @@ struct EmailSettings: View {
 
             if usesSmtp {
                 row(shop.words.callIt("set.smtp_host")) {
-                    TextField("smtp.yourshop.com", text: $draft.host).frame(width: 240)
+                    TextField("", text: $draft.host, prompt: Text(verbatim: "smtp.yourshop.com")).frame(width: 240)
                 }
                 row(shop.words.callIt("set.smtp_port")) {
-                    TextField("587", text: $draft.port).frame(width: 90)
+                    TextField("", text: $draft.port, prompt: Text(verbatim: "587")).frame(width: 90)
                 }
                 row(shop.words.callIt("set.smtp_user")) {
-                    TextField("orders@yourshop.com", text: $draft.user).frame(width: 240)
+                    TextField("", text: $draft.user, prompt: Text(verbatim: "orders@yourshop.com")).frame(width: 240)
                 }
                 row(shop.words.callIt("set.smtp_pass")) {
                     SecureField(stored.password ? "••••••••" : "", text: $draft.password)

@@ -6,6 +6,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Settings looked like a list of facts rather than a form, and the two
+  languages were the wrong way round.** Every text field in the settings window
+  drew without a border, so a filled one read as a value and an EMPTY one was
+  invisible — the Payments pane showed "Bank name" and "Account holder" with
+  nothing after them at all, and nothing to suggest you could type there. They
+  are fields now, all thirty-five, and the hints that belong inside them sit
+  inside them rather than beside them.
+
+  The shop's bilingual details were also inverted: the English name started at
+  the right of its box and the Arabic name at the left, each reading as the
+  other script's direction. Each one starts at the edge its own script reads
+  from now, in an Arabic window as well as an English one.
+
 - **(Everyone) A Saudi shop running Khayt in English was offered Shopify and
   Stripe.** Settings → Integrations opened on the market matching the
   INTERFACE LANGUAGE, and where a shop sells is a different question from what
