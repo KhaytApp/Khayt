@@ -152,6 +152,20 @@ extension View {
     /// `anchor` is where the bar is anchored, not where it is going: a column
     /// above the line grows from `.bottom`, and cash flow's spending columns
     /// hang from `.top`.
+    ///
+    /// ── `.leading` AND `.trailing` ARE ALREADY ARABIC-AWARE ───────────────
+    ///
+    /// Measured, not assumed, because the obvious mistake here is a bar that
+    /// grows out of the wrong end of itself in one of the two scripts this app
+    /// ships in — which looks like a rendering fault rather than a bug. A red
+    /// bar scaled to half its width on `anchor: .leading` was rendered in both
+    /// layout directions and the pixels read back: LTR keeps the left half,
+    /// RTL keeps the right. So `scaleEffect` follows `layoutDirection` on its
+    /// own and nothing here has to flip anything.
+    ///
+    /// Which means the anchor is chosen by where the bar's CONTAINER puts it —
+    /// a capsule in a `.trailing`-aligned stack grows from `.trailing` — and
+    /// that choice is then correct in Arabic for free.
     func growsToItsReading(_ reading: Double, from anchor: UnitPoint = .bottom) -> some View {
         modifier(Grows(reading: reading, anchor: anchor))
     }

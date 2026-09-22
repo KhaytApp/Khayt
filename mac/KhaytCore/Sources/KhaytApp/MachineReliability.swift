@@ -92,6 +92,7 @@ struct MachineReliabilityCard: View {
                     Capsule()
                         .fill((tint ?? Khayt.brand).opacity(0.55))
                         .frame(width: max(2, min(1, (row.scrapRate ?? 0) / 0.2) * 70), height: 3)
+                        .growsToItsReading((row.scrapRate ?? 0) / 0.2, from: .trailing)
                 }
             }
             .padding(.vertical, 6)

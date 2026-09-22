@@ -129,6 +129,7 @@ struct BreakEvenCard: View {
                     Capsule()
                         .fill(over ? Khayt.brand : Khayt.late)
                         .frame(width: max(0, min(1, fraction)) * geometry.size.width)
+                        .growsToItsReading(fraction, from: .leading)
                 }
             }
         }

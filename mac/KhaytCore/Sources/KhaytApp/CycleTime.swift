@@ -96,6 +96,7 @@ struct CycleTimeCard: View {
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(Khayt.brand)
                                 .frame(height: max(0.05, min(1, avg / peak)) * 40)
+                                .growsToItsReading(avg / peak)
                         } else {
                             Rectangle().fill(Khayt.hairline).frame(height: 1)
                         }

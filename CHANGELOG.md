@@ -6,6 +6,28 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Every bar in the app is drawn at its final length.** Sixteen of them,
+  across fifteen files — the break-even meter, the capacity meter, the quote
+  funnel, waste by month, cost per gram, cycle time, downtime, expenses by
+  category, ratings, spend per customer, profit per product, scrap per machine,
+  maintenance cost, new against returning customers, and where the work came
+  from. Khayt's own note on motion has said since it was written that
+  `Motion.gauge` is for "a bar or a gauge growing to its reading", and when it
+  was counted, two views used it. Nobody decided the rest; it is what happens
+  when each card is written on its own and the rule lives in a comment.
+
+  They arrive at their readings now, and travel when the shop changes the
+  window it is asking about. The one exception is deliberate and written down:
+  the paid-so-far meter on each row of the jobs table answers a payment landing
+  and does NOT introduce itself, because forty-two meters unrolling every time
+  that screen opens is the always-moving dashboard the note argues against.
+
+  A gauge grows out of the edge it stands on, and in Arabic that is the other
+  edge — measured rather than assumed, by rendering a half-scaled bar in both
+  directions and reading the pixels back. A test now finds the bars the same
+  way the sweep found them, so the next card either grows its bar or says in
+  one line why it is not a gauge.
+
 - **(Mac) The screens a shop reads most did not say what they were drawing,
   and the one thing actually happening was not on them.** Three findings, and
   none of them is about decoration:

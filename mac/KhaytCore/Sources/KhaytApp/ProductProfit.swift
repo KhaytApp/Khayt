@@ -72,6 +72,7 @@ struct ProductProfitTable: View {
                             Capsule()
                                 .fill((row.profit < 0 ? Khayt.late : Khayt.brand).opacity(0.55))
                                 .frame(width: max(4, (abs(row.profit) / widest) * 90), height: 3)
+                                .growsToItsReading(abs(row.profit) / widest, from: .trailing)
                         }
                     }
                     .padding(.vertical, 6)

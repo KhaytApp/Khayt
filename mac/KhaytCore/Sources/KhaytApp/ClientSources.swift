@@ -78,6 +78,8 @@ struct ClientSourcesCard: View {
                             .fill(Khayt.brand.opacity(0.85))
                             .frame(width: max(3, geo.size.width
                                                * CGFloat(row.count) / CGFloat(peak)))
+                            .growsToItsReading(Double(row.count) / Double(max(peak, 1)),
+                                               from: .leading)
                     }
                     .frame(maxHeight: .infinity, alignment: .center)
                 }
