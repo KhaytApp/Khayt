@@ -4,34 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-### Fixed
-
-- **(Mac) The front door said "+9%" about a print that was nine percent done,
-  and told a shop "no link" about four different things.** The machine strip on
-  Triage — the screen Khayt opens on, and the liveliest thing in the product —
-  had never been photographed with a print on it. Neither book can produce one:
-  the sample shop's printers are somebody else's addresses and the real book's
-  jobs are finished, so the running tile was drawn by nobody and reviewed by
-  nobody. It set the percentage in the style meant for a RISE OR A FALL in a
-  figure, so every running machine reported its progress as a change that had
-  not happened. There is a picture of it now, taken with the printers answering,
-  and it cannot happen a second time unseen.
-
-  The same tile answered "why is this machine not printing" with one test, and
-  said "no link" whenever it failed: about a laser cutter Khayt has no protocol
-  for and never will, about a printer nobody has typed an address into yet, and
-  about a perfectly well configured machine that simply had not answered its
-  first poll of the morning. One is permanent, one is thirty seconds' work, and
-  one is not a problem at all. They are four sentences now, decided in one place
-  that both machine strips in the app ask — the Dashboard's own tile had been
-  through this argument already and had the case for "asked, and silent"
-  missing too.
-
-  And the running tile now looks like the thing it is: the warm colour this app
-  reserves for work being made, the slow breath it reserves for the same, and
-  the time left where the sliced file's name used to be. It opens the machine
-  when pressed, like every other tile that draws a printer.
-
 ### Changed
 
 - **(Mac) Every bar in the app is drawn at its final length.** Sixteen of them,
