@@ -2211,6 +2211,214 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [4.0.0-alpha.34] - 2026-09-22
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The release where several things that had been wrong for a long time turned out
+to be visible all along. The app icon was the wrong Arabic letter — khāʾ without
+its dot is ḥāʾ, so every Dock and every Home screen has been showing the wrong
+letter since the mark was drawn. A shop with loyalty switched on could not
+produce an invoice at all. Converting a model for another printer failed
+outright on roughly one file in six of a real library.
+
+Beside them, three things this app could not do and now can: enter what the shop
+pays every month, so the break-even target and the Profit & Loss stop assuming
+the business has no overhead; set up Telegram alerts, including a warning when
+filament runs low; and find the integrations for the market the shop is actually
+in rather than the language it happens to read.
+
+### Changed
+
+- **(Everyone) The app icon is the letter khāʾ now — and until today it was not
+  one.** The mark is خ, the first letter of خيط, and خ is ح with a dot above
+  it. The shipped icon had no dot, so what every Dock, every Home screen and
+  every browser tab has been showing is ح: a different letter. The dot is not
+  decoration on this letter, it is the letter.
+
+  The nozzle has gone with it. It was grey on navy — the lowest-contrast thing
+  in the icon — and it took the top third of the tile, so at the size an icon
+  is actually looked at it was a smudge above a letter rather than a printer
+  above a thread.
+
+  What replaced it is the same letterform the mark has always had, with the dot
+  restored and the stroke redrawn — no gradient down it, no highlight inside
+  it, nothing that turns to noise when small. The stroke's width follows the
+  room the letter leaves itself: it thins where the letter doubles back on
+  itself and is full everywhere else, which is what the brush was doing and
+  what keeps the counter there open. Drawn at one width throughout, this letter
+  fills that counter in and reads as a blot rather than a letter — measured,
+  the tightest the letterform comes to itself is 0.080 of the canvas against a
+  stroke 0.105 wide.
+
+  There are two masters now. The large one carries that taper; the small one,
+  which takes over at 64 points and under, is a single heavier width with a
+  larger dot, because below 64 the counter cannot be seen at all and weight is
+  the only thing that survives. All 72 assets are regenerated from them, and
+  `assets/logo/khayt-mark.svg` is emitted from the same centreline, so the
+  vector mark and the PNGs cannot drift apart.
+
+- **(Mac) A shop with loyalty switched on could not produce an invoice for a
+  customer at all.** The Invoice button opened its sheet and said "This job's
+  invoice could not be built", for every job with a customer's name on it.
+  Nothing else in the app was affected and nothing was written wrongly — the
+  document simply could not be made, so a shop that needed to send an invoice
+  had to go and start the Windows and Linux app.
+
+  The invoice rule asked the window it used to live in for the customer's
+  loyalty tier. Every other thing it needs — the money, the shop's fields, the
+  way it spells a date — is named and handed to it, which is what lets two
+  apps print the same document; the tier was the one ingredient left reaching
+  for a global. In the other app that global is there. In this one it is not,
+  and the whole document failed on that line.
+
+  It is handed over now like everything else. The tier is worked out from the
+  shared loyalty rule against what the customer has actually spent, so the
+  badge on the invoice is the same badge in both apps rather than one app's
+  idea of it.
+
+  No invoice test had ever switched loyalty on, which is why a document with
+  ten regression fixtures behind it could fail on the first real job in the
+  sample book. There are tests on both sides now, and the one in plain Node
+  would have caught this the day it was written.
+
+- **(Mac) Converting a model for another printer failed outright, and said
+  "undefined is not an object".** Any 3MF from the same slicer family as the
+  printer it was being converted for — a Bambu or Orca file, which is most of
+  them — stopped there, as long as the file named the bed it was laid out on
+  and that bed was a different size from the target's. Nothing was written and
+  nothing was said except the engine's own error text.
+
+  What it was doing when it stopped is a real part of the job: a file with
+  several plates lays them out in one grid built from the bed it came from, so
+  a smaller or larger target bed leaves every plate drifting further off-centre
+  than the last. This app re-places them. It is the ONE thing a conversion asks
+  about the model itself — every other decision reads a settings file — and the
+  model is the member this app deliberately never hands to the engine, because
+  it can be four hundred megabytes of triangles. The rule reached for it
+  anyway, found nothing, and threw before it had even asked whether the file
+  had a second plate to re-tile: single-plate files failed the same way.
+
+  The plate layout crosses on its own now — a few lines out of the file, never
+  the mesh — and goes back exactly where it came from, so the triangles either
+  side of it are the bytes that were already there. A file this app genuinely
+  cannot read the layout of converts anyway and says the plates were left where
+  the source slicer put them, which is a sentence a shop can act on.
+
+- **(Mac) The library showed a tick and a failure at the same time.** The
+  banner under the search field answers one question — what happened when you
+  last asked for something — but each gesture cleared only its own line, so a
+  conversion that failed appeared underneath a green "1 moved in · 0 already
+  there · 0 failed" from an import minutes earlier. Two answers, minutes apart,
+  read as one event. A move, an import, a conversion and opening a slicer now
+  each clear what the last one said.
+
+- **(Mac) A mistyped address told a stranger on the shop's Wi‑Fi which
+  storefront and which courier the shop uses.** Ask this app's LAN server for
+  a path it does not have and it answered with a list of endpoints — the list
+  belonging to the Windows and Linux server, sixteen of them, eleven of which
+  answer 404 here. Five were owner-data APIs and six were integration webhooks:
+  Salla, Zid, SMSA, Aramex, SPL. The 404 runs before any PIN is checked, so
+  anyone who could reach the shop's Wi‑Fi and mistype a path was handed the
+  shop's whole integration surface without ever being asked who they were.
+
+  The 404 lists what this server actually routes now, and nothing else. The
+  rule that builds it takes the list from the host that called it, because only
+  the host knows what it serves. A test asks the running server for every line
+  it advertises and fails if one answers 404, so the list cannot drift from the
+  route table; another fails if the other server's routes reappear in it.
+
+- **(Mac) A tracking link a shop had already sent a customer answered "invalid
+  link" on this app.** The Windows and Linux app gives a customer an address
+  beginning `/status/`; this app draws the same page at `/order/…/status` and
+  knew nothing about the other form, so a link already out in the world — or
+  copied across from that app — was refused. It reaches the page now, behind
+  the same tracking token, with or without the `.html` the other app puts on
+  the end.
+
+- **(Everyone) A Saudi shop running Khayt in English was offered Shopify and
+  Stripe.** Settings → Integrations opened on the market matching the
+  INTERFACE LANGUAGE, and where a shop sells is a different question from what
+  it reads. A Riyadh shop with the app in English was shown the United States
+  directory — Shopify, WooCommerce, Etsy, Stripe, PayPal — instead of Salla,
+  Zid, Mada, STC Pay and Tabby, while its own book said its country was Saudi
+  Arabia, its currency SAR, and its invoices carried a ZATCA QR.
+
+  The directory opens on where the shop sells now: its country if it has given
+  one, otherwise what it charges in — a book priced in riyals with a ZATCA QR
+  on its invoices is not ambiguous, and plenty of shops never fill the country
+  field in at all. The interface language remains the last resort. The euro is
+  deliberately not read, because Spain, France and Germany all use it.
+
+  **Most shops will see this change**, and that is the intent rather than a
+  side effect: Khayt's own default currency is the riyal, so a shop that has
+  never touched either field now opens on Salla, Zid, Mada, STC Pay and Tabby
+  instead of Shopify, WooCommerce, Etsy, Stripe and PayPal. For an app that
+  builds in ZATCA invoices, the riyal and Hijri dates, that is the right way
+  round. A shop selling elsewhere sets its country once, or picks another
+  market from the selector that has always been there. The picker is untouched:
+  a shop selling into two markets exists, which is what it is for. Both apps
+  read the same rule, so they cannot open on different markets for the same
+  shop.
+
+- **(Mac) What the shop pays every month can be entered here, so break-even
+  and the P&L stop pretending it has no overhead.** Reports has always told a
+  shop with nothing entered to "add rent, subscriptions and anything else that
+  is paid every month in Settings" — and this app's Settings had nowhere to do
+  it, so following the instruction arrived at a pane that did not exist. It is
+  in Settings → Business now, under Monthly costs.
+
+  It was not only a missing target. The Profit & Loss puts a quarter's share of
+  these into its figures, so a shop that has only ever used this app has been
+  shown a P&L computed as though the business had no costs at all — a wrong
+  number rather than a missing one.
+
+- **(Mac) Telegram alerts can be set up here, and low filament is one of
+  them.** Khayt has sent the shop's Telegram messages from this app for as long
+  as it has had them — a job finished, a job put on hold, a printer that stopped
+  answering — and there was nowhere on this Mac to say which bot, which chat, or
+  which of those you actually wanted. Settings → Integrations has all of it now,
+  with a Send a test message button that repeats what Telegram said rather than
+  "it failed". The bot token is encrypted with the rest of the book's secrets
+  and can be forgotten when you ask.
+
+  One of those switches would have done nothing here: the low-filament warning
+  was twelve lines inside the other app, so this one could offer the switch and
+  had nothing to send. It sends it now, once per launch, and it uses the SAME
+  rule that decides which spools get the low badge on the shelf — the old copy
+  read a threshold straight out of settings, so a spool could be badged low and
+  never warned about, or warned about and not badged.
+
+- **(Mac) The Online settings pane sent the shop to the other app for three
+  things this app has served since alpha.18.** "The customer intake form, quote
+  approval and the calendar feed run in that app for now" was true when it was
+  written and stopped being true three releases ago, so a shop reading it would
+  have gone and started the Windows and Linux app to be handed something this
+  Mac was already serving on the same Wi‑Fi. The pane lists what it really
+  serves now — the live queue, the intake form and its estimate, quote
+  approval, the tracking page, the survey and the calendar feed — and says
+  plainly that webhooks are the one piece still running in the other app.
+
+  Nothing caught it because the words were right on the day they were written.
+  They are held to the route table now: a test reads `LanServer.swift` and
+  fails the build if the pane defers anything this app answers, in Arabic as
+  well as English, and fails the other way too if the pane stops saying where
+  webhooks run — a pane that promises everything is the worse error of the two.
+
+- **(Mac) The Riyal mark is Khayt's own now, drawn rather than borrowed.** The
+  face every money figure is set in has no Riyal sign in it, so the mark beside
+  the digits was being taken from a different face — a different cut and a
+  different weight, on the one character that belongs to the figure. At
+  masthead size it read as a hash rather than a currency mark, which the design
+  notes had already written down and answered with a font that was never cut.
+
+  It is drawn now, from the same outline the invoice has printed since ZATCA
+  made the glyph something that has to be certain. One mark, on the paper and
+  on the screen, at the colour and the size of the digits it belongs to,
+  because it is drawn rather than looked up — and a test holds the two copies
+  of that outline together so they cannot drift into being two marks again.
+
 ## [4.0.0-alpha.33] - 2026-09-21
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
