@@ -67,6 +67,16 @@ async function testStorefrontImportLinkReachesTheClipboard(window) {
     settings.mode = 'professional';
     KhaytShell.applyMode();
     settings.cloud = cloud;
+    /* PIN THE MARKET, because this test is about the clipboard.
+     *
+     * The directory opens on where the shop sells — its country, then its
+     * currency, then the interface language. This shop states neither, and
+     * Khayt's default currency is SAR, so it would open on the Gulf market and
+     * the first copy button would be Salla. That is correct behaviour and has
+     * its own tests; what it must not do is decide which URL a clipboard test
+     * is asserting on. So the shop says where it is, and this stays a test of
+     * the copy button. */
+    settings.country = 'US';
     KhaytShell.openSettingsSection('online');
     renderIntegrationsSettings();
   }, CLOUD);
@@ -74,7 +84,7 @@ async function testStorefrontImportLinkReachesTheClipboard(window) {
   const btn = window.locator('#integrationsSection .integCopy').first();
   await btn.waitFor({ state: 'visible', timeout: 15_000 });
   const url = await btn.getAttribute('data-url');
-  check('the Shopify import link is the first copy button',
+  check('the Shopify import link is the first copy button (a US shop)',
     url, `${CLOUD.url}/v1/shops/${CLOUD.shopId}/import/shopify`);
 
   await poison();

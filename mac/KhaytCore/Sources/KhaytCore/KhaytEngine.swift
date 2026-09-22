@@ -8728,6 +8728,25 @@ public actor KhaytEngine {
                          [JSONValue.string(locale)], as: IntegrationMarket.self)
     }
 
+    /// Which market this shop is in — from where it SELLS, then from what it
+    /// reads.
+    ///
+    /// The two are not the same question, and the directory used to ask only
+    /// the second: a Riyadh shop running Khayt in English opened on the United
+    /// States market and was offered Shopify and Stripe rather than Salla,
+    /// Zid and Mada. Its book had said `country: "SA"` all along.
+    ///
+    /// The rule is `lib/integrations-registry.js`'s, so both apps open the
+    /// directory on the same market for the same shop.
+    public func integrationMarketFor(country: String, currency: String,
+                                     language: String) throws -> String {
+        let js = "KhaytIntegrations.marketFor("
+            + "{ country: ARG0, currency: ARG1, language: ARG2 })"
+        return try runtime.call2(js,
+                                 [.string(country), .string(currency), .string(language)],
+                                 as: String.self)
+    }
+
     /// Every market, in the registry's own order, with the name each is shown
     /// under in a given language.
     public struct MarketChoice: Decodable, Sendable, Identifiable {
