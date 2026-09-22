@@ -194,6 +194,40 @@ struct SampleShopTests {
                 "a book where losses are ordinary shows nothing about the ordinary case")
     }
 
+    /// ── A SHELF WITH SOMETHING ON IT, AND SOMETHING SOLD OUT ─────────────
+    ///
+    /// The catalogue's shelf column draws three different things and the
+    /// difference between two of them is the whole point: a DASH for a product
+    /// the shop makes to order, a NUMBER for one it keeps boxed, and a ZERO
+    /// for one it keeps boxed and has sold out. Zero and a dash look alike and
+    /// mean opposite things — one says print more, the other says this was
+    /// never a stocked line — so a sample reaching only two of the three
+    /// leaves the third drawn by nobody.
+    @Test("the sample shelf reaches stocked, sold out, and made to order")
+    func theShelfSpansItsCases() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let ids = shop.catalogueRows.map(\.id)
+        #expect(ids.count > 10, "the sample catalogue shrank past being a fixture")
+
+        let counted = ids.compactMap { shop.stockCount(of: $0) }
+        #expect(counted.contains { $0 > 0 }, "nothing in the sample is on the shelf")
+        #expect(counted.contains(0), """
+            nothing in the sample is stocked-but-sold-out, so the one case that \
+            looks like "made to order" and means the opposite is never drawn
+            """)
+        #expect(counted.count < ids.count, """
+            every product is stocked, so the made-to-order case — which is most \
+            of a real catalogue — is never drawn
+            """)
+        // And every count carries its date, or a storefront cannot tell a
+        // fresh count from one it has already applied.
+        for id in ids where shop.stockCount(of: id) != nil {
+            #expect(shop.stockCountedAt(of: id) != nil,
+                    Comment(rawValue: "\(id) has a count with no date"))
+        }
+    }
+
     /// The tax on a purchase is a real field now, and a book that carries none
     /// of it shows nothing of the work. It must also carry a purchase with NO
     /// tax — an import — because "absent is zero" is the rule that keeps every

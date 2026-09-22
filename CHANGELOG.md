@@ -6,6 +6,30 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A shop can say how many of a thing it has already printed.** Every
+  figure in the catalogue was about MAKING one — price, margin, weight,
+  material — and none of them about HAVING one. A shop that prints a batch to
+  sell off a shelf had nowhere to record it, so its online store could only
+  ever offer to print a piece to order.
+
+  "On the shelf" is a column in the catalogue and a count taken from its own
+  sheet. Three different answers, and two of them look alike and mean opposite
+  things: a dash is a product made to order, a number is one kept boxed, and a
+  ZERO is one kept boxed whose batch has sold out — which says print more,
+  where a dash says this was never a stocked line.
+
+  Khayt says how many were counted; the shop's online store says how many are
+  left, because it is the thing watching orders. That is why a count carries
+  the date it was taken, and why re-counting to the same number still moves
+  that date: a shop that sells three, prints three and counts again publishes
+  the same figure, and anything comparing numbers alone would read that as
+  nothing having happened and go on under-selling the shelf.
+
+  The same two fields the desktop app has written since 3.7 — one book, one
+  contract, so a count taken on either is the one the other shows.
+
+### Added
+
 - **(Mac) An assistant can ask about the model library.** `khayt-mcp` is a
   Model Context Protocol server, so Claude Desktop, Cursor or Codex can search
   the shop's models — "what have I never printed", "which of these may I not

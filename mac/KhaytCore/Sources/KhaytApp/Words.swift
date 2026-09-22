@@ -919,6 +919,26 @@ final class Words {
         // `plib.*` comes from Khayt's nine-language file and this app
         // cannot add to it with two.
         "mac.never_printed": ["en": "Never printed", "ar": "لم تُطبع"],
+        // ── WHAT IS ALREADY PRINTED AND BOXED ─────────────────────────────
+        //
+        // The shop counts; a storefront decides what is left, because it is
+        // the thing watching orders. "On the shelf" rather than "in stock":
+        // this app already says "stock" about filament and consumables, and
+        // a second meaning for the same word on a screen beside them is how
+        // somebody orders a spool instead of printing a batch.
+        "mac.on_the_shelf":  ["en": "On the shelf",  "ar": "على الرف"],
+        "mac.count_the_shelf": ["en": "Count the shelf", "ar": "جرد الرف"],
+        "mac.record_count":  ["en": "Record count",  "ar": "سجّل الجرد"],
+        "mac.not_stocked":   ["en": "Not stocked",   "ar": "غير مخزّن"],
+        "mac.counted_on":    ["en": "Counted {date}", "ar": "جُرد {date}"],
+        "mac.stock_counted": ["en": "Count the shelf", "ar": "جرد الرف"],
+        "mac.shelf_hint": [
+            "en": "How many are printed, boxed and ready to post. A shop's "
+                + "online store uses this to offer a piece today instead of "
+                + "printing it to order.",
+            "ar": "كم قطعة مطبوعة ومعبأة وجاهزة للشحن. يستخدم متجرك هذا الرقم "
+                + "ليعرض القطعة اليوم بدل طباعتها عند الطلب.",
+        ],
         // Assembly instructions and colour guides, which used to be thrown
         // away on import. "Guides" rather than "documents": it is what the
         // creator calls them and what a shop is looking for.

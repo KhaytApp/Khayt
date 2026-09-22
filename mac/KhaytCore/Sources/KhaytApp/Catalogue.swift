@@ -110,6 +110,9 @@ struct Catalogue: View {
         }
         .background(Khayt.ground)
         .overlay { emptyState }
+        .sheet(item: $counting) { row in
+            CountTheShelf(shop: shop, row: row)
+        }
         .confirmationDialog(
             shop.words.callIt("mac.delete_product_q", ["name": .string(deleting?.name ?? "")]),
             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
@@ -137,6 +140,8 @@ struct Catalogue: View {
             .disabled(!shop.canMoveJobs)
         Button(shop.words.callIt("mac.job_from_product") + "\u{2026}") { take(row.id) }
             .disabled(!shop.canMoveJobs)
+        Button(shop.words.callIt("mac.count_the_shelf") + "\u{2026}") { counting = row }
+            .disabled(!shop.canMoveJobs)
         Divider()
         // Asked for, and answered, on the row the shop pressed — never on a
         // selection that might have moved under them.
@@ -148,6 +153,12 @@ struct Catalogue: View {
 
     /// The product the shop has asked to delete, held until they say yes.
     @State private var deleting: KhaytEngine.CatalogueRow?
+    /// The product whose shelf is being counted. Its own sheet rather than a
+    /// field on the product editor, and that is the rule rather than a layout
+    /// choice — see `Shop.recordStockCount`: a count is dated when the shop
+    /// SAYS so, and putting it in the product's Save would re-assert every
+    /// count whenever somebody opened a product to change its price.
+    @State private var counting: KhaytEngine.CatalogueRow?
 
 
     /// Take a job from one, rather than typing out what the shop already makes.
@@ -231,6 +242,37 @@ struct Catalogue: View {
             .width(min: 72, ideal: 90)
             .alignment(.trailing)
 
+            // ── WHAT IS ALREADY PRINTED AND BOXED ────────────────────────
+            //
+            // A shop that prints a batch to sell from a shelf has nowhere in
+            // this app to say so: every figure in the catalogue is about
+            // making one, and none of them is about having one.
+            //
+            // A DASH rather than a zero for a product nobody has counted,
+            // which is the distinction the rest of this app keeps everywhere
+            // else: zero on the shelf is a shop that counted and found none,
+            // and a dash is a shop that does not stock this at all. They are
+            // different sentences and only one of them means "print more".
+            TableColumn(shop.words.callIt("mac.on_the_shelf")) { row in
+                if let count = shop.stockCount(of: row.id) {
+                    Text("\(count)")
+                        .moneyStyle()
+                        .foregroundStyle(count == 0 ? AnyShapeStyle(Khayt.attention)
+                                                    : AnyShapeStyle(.primary))
+                        .help(shop.stockCountedAt(of: row.id)
+                              .flatMap(Order.day)
+                              .map { shop.words.callIt("mac.counted_on", [
+                                  "date": .string(shop.words.say(
+                                      $0, Date.FormatStyle(date: .abbreviated, time: .omitted))),
+                              ]) } ?? "")
+                } else {
+                    Text("—").foregroundStyle(.quaternary)
+                }
+            }
+            .width(min: 72, ideal: 92)
+            .alignment(.trailing)
+            .customizationID("shelf")
+
             TableColumn(shop.words.callIt("plib.material"), value: \.material) { row in
                 Text(row.material.isEmpty ? "—" : row.material).lineLimit(1)
                     .foregroundStyle(.secondary)
@@ -247,6 +289,10 @@ struct Catalogue: View {
                     .disabled(!shop.canMoveJobs)
                 Button(shop.words.callIt("mac.job_from_product") + "\u{2026}") { take(id) }
                     .disabled(!shop.canMoveJobs)
+                Button(shop.words.callIt("mac.count_the_shelf") + "\u{2026}") {
+                    counting = shop.catalogueRows.first { $0.id == id }
+                }
+                .disabled(!shop.canMoveJobs)
                 Divider()
                 Button(shop.words.callIt("mac.delete_product") + "\u{2026}", role: .destructive) {
                     deleting = shop.catalogueRows.first { $0.id == id }
@@ -372,5 +418,86 @@ private struct ProductCell: View {
         let encoded = String(uri[uri.index(after: comma)...])
         guard let data = Data(base64Encoded: encoded, options: .ignoreUnknownCharacters) else { return nil }
         return NSImage(data: data)
+    }
+}
+
+/// How many of this are printed, boxed and ready to post.
+///
+/// ── ITS OWN SHEET, AND THAT IS THE RULE ───────────────────────────────────
+///
+/// A count is dated when the shop says it counted — see
+/// `Shop.recordStockCount` for why dating it on CHANGE reproduces the exact
+/// bug the timestamp exists to fix. So it cannot live in the product editor,
+/// whose Save writes every field: opening a product to fix a typo in its name
+/// would re-assert a count nobody had checked.
+struct CountTheShelf: View {
+    @Bindable var shop: Shop
+    let row: KhaytEngine.CatalogueRow
+    @Environment(\.dismiss) private var dismiss
+    @State private var typed = ""
+    @FocusState private var focused: Bool
+
+    private var count: Int? {
+        let tidy = typed.trimmingCharacters(in: .whitespaces)
+        return tidy.isEmpty ? nil : Int(tidy)
+    }
+
+    var body: some View {
+        // `SheetFrame`, like every other sheet in this app: a sheet cannot be
+        // moved, so one taller than the screen hides its own buttons.
+        SheetFrame(width: 420) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(shop.words.callIt("mac.count_the_shelf")).font(.headline)
+                Text(row.name).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+            }
+
+            LabeledContent(shop.words.callIt("mac.on_the_shelf")) {
+                TextField("", text: $typed)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 90)
+                    .focused($focused)
+                    .multilineTextAlignment(.leading)
+            }
+
+            // WHAT THE NUMBER IS FOR, because it is not obvious that this
+            // reaches a customer. A count published here is what a storefront
+            // uses to say a piece can be posted today rather than printed to
+            // order.
+            Text(shop.words.callIt("mac.shelf_hint"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let at = shop.stockCountedAt(of: row.id).flatMap(Order.day) {
+                Text(shop.words.callIt("mac.counted_on", [
+                    "date": .string(shop.words.say(
+                        at, Date.FormatStyle(date: .abbreviated, time: .omitted))),
+                ]))
+                .font(.caption).foregroundStyle(.tertiary)
+            }
+        } footer: {
+            HStack {
+                // Clearing it is a different statement from counting zero: one
+                // says the shop does not stock this, the other says it counted
+                // and the shelf is empty. Both are reachable, and neither is
+                // the accident of leaving a box blank.
+                if shop.stockCount(of: row.id) != nil {
+                    Button(shop.words.callIt("mac.not_stocked"), role: .destructive) {
+                        Task { await shop.recordStockCount(nil, for: row.id); dismiss() }
+                    }
+                }
+                Spacer()
+                Button(shop.words.callIt("common.cancel")) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button(shop.words.callIt("mac.record_count")) {
+                    Task { await shop.recordStockCount(count, for: row.id); dismiss() }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(count == nil)
+            }
+        }
+        .onAppear {
+            typed = shop.stockCount(of: row.id).map(String.init) ?? ""
+            focused = true
+        }
     }
 }

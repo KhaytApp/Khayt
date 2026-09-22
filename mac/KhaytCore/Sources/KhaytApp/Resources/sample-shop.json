@@ -2312,6 +2312,18 @@
   }
  ],
  "settings": {
+   "storefront" : {
+     "stockQty" : {
+       "PRD-0522F9" : 12,
+       "PRD-EF6642" : 4,
+       "PRD-51069B" : 0
+     },
+     "stockCountedAt" : {
+       "PRD-0522F9" : "2026-09-18T09:00:00Z",
+       "PRD-EF6642" : "2026-09-20T14:30:00Z",
+       "PRD-51069B" : "2026-09-21T08:15:00Z"
+     }
+   },
   "bizEn": "Tuwaiq Additive",
   "bizAr": "تويق أدتف",
   "taglineEn": "Precision 3D printing in Riyadh",
