@@ -70,3 +70,67 @@ struct ContentFieldAlignmentTests {
                 "a field is steering its text with layoutDirection again")
     }
 }
+
+/// Every ORDINARY settings field starts where you type, not at the far edge.
+///
+/// ── HALF-FIXED IS WORSE THAN NOT FIXED ────────────────────────────────────
+///
+/// `LabeledContent` puts its content against the trailing edge, so "Phone" was
+/// drawn as `+966 50 000 0000` hard against the right of the pane, a full
+/// column away from its own label. The bilingual name fields were given an
+/// explicit alignment when they needed a special one — an Arabic name in an
+/// English window reads from the other edge — and the forty-three ordinary
+/// fields were left alone. Fixing the exceptions and missing the rule leaves a
+/// form with two behaviours and no explanation, which is how it was reported.
+///
+/// ── AND IT HAS TO BE INSIDE THE CLOSURE ───────────────────────────────────
+///
+/// The obvious placement does nothing: `.multilineTextAlignment(.leading)` on
+/// the `LabeledContent` itself is overridden by the labelled style, which sets
+/// its own alignment on the content it wraps — closer to the field, so it
+/// wins. Photographed both ways before believing either. This pins the
+/// placement, because the version that reads more naturally is the broken one.
+@MainActor
+struct SettingsFieldAlignmentTests {
+
+    static func source() throws -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try String(contentsOf: root.appending(path: "Sources/KhaytApp/SettingsWindow.swift"),
+                          encoding: .utf8)
+    }
+
+    @Test("every field through `row` starts at the reading edge")
+    func rowAlignsItsContent() throws {
+        let text = try Self.source()
+        #expect(text.contains("LabeledContent(label) { content().multilineTextAlignment(.leading) }"),
+                """
+                `row` no longer aligns its content, so every ordinary settings \
+                field draws its text against the far edge of the pane — or the \
+                alignment moved outside the closure, where the labelled style \
+                overrides it and it silently does nothing
+                """)
+    }
+
+    /// `.leading`, never `.left`. The reading edge of whichever direction the
+    /// window is in, so an Arabic window keeps its fields on the right.
+    @Test("the alignment is the reading edge, not a side")
+    func itIsNotHardcodedLeft() throws {
+        let text = try Self.source()
+        #expect(!text.contains("multilineTextAlignment(.left)"),
+                "a hard left pins every field to the wrong edge in an Arabic window")
+    }
+
+    /// And the two fields that need the OTHER edge still ask for it. They set
+    /// theirs on the field itself, closer to the leaf than `row`'s.
+    @Test("a bilingual field still chooses its own edge")
+    func theExceptionSurvivesTheRule() throws {
+        let text = try Self.source()
+        #expect(text.contains(".multilineTextAlignment(field.textAlignment(appIsRTL: appIsRTL))"),
+                """
+                the bilingual name fields lost their own alignment, so an \
+                Arabic name in an English window reads from the wrong edge again
+                """)
+    }
+}

@@ -119,7 +119,13 @@ struct SaveBar: View {
 /// the platform's own column, aligned with every other row in the window, and
 /// an HStack aligns with nothing.
 func row<Content: View>(_ label: String, @ViewBuilder _ content: () -> Content) -> some View {
-    LabeledContent(label) { content() }
+    // INSIDE the closure, and that is the whole trick. Applied to the
+    // `LabeledContent` from the outside it does nothing at all: the labelled
+    // style sets its own alignment on the content it wraps, which is closer to
+    // the field than anything put around the whole row, and the closer one
+    // wins. Photographed both ways — the outside version left "+966 50 000
+    // 0000" exactly where it was.
+    LabeledContent(label) { content().multilineTextAlignment(.leading) }
         // ── A FIELD HAS TO LOOK LIKE A FIELD ──────────────────────────────
         //
         // A `TextField` inside `LabeledContent` draws with no bezel. A filled
@@ -135,6 +141,26 @@ func row<Content: View>(_ label: String, @ViewBuilder _ content: () -> Content) 
         // fields; the pickers, toggles and buttons that also go through `row`
         // ignore it.
         .textFieldStyle(.roundedBorder)
+        // ── AND IT HAS TO START WHERE YOU TYPE ────────────────────────────
+        //
+        // `LabeledContent` puts its content against the TRAILING edge, so
+        // every one of these fields drew its text hard against the right of
+        // the box in an English window: "Phone" ... "+966 55 123 4567" with
+        // the caret at the far side of the pane from the label it belongs to.
+        //
+        // This was half-fixed once already, which is worse than not at all.
+        // The two bilingual name fields got an explicit alignment — they
+        // needed a special one, because an Arabic name in an English window
+        // reads from the other edge — and the forty-three ORDINARY fields
+        // were left as they were. Fixing the exceptions and missing the rule
+        // is how a form ends up with two behaviours and no explanation.
+        //
+        // `.leading` rather than `.left`: it is the reading edge of whichever
+        // direction the window is in, so an Arabic window keeps its fields on
+        // the right, where they belong. Set here for the same reason the
+        // bezel is — a pane added next month cannot forget it — and the
+        // bilingual fields still override it, because they set theirs on the
+        // field itself, closer to the leaf still.
 }
 
 // MARK: - Business
