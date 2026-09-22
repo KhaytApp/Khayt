@@ -30,6 +30,7 @@ struct Catalogue: View {
     /// margin and weight side by side, which is what pricing work needs.
     @SceneStorage("catalogue.layout") private var layout: Layout = .table
     @State private var selection: KhaytEngine.CatalogueRow.ID?
+    @State private var showingOnline = false
     @State private var order: [KeyPathComparator<KhaytEngine.CatalogueRow>] =
         [.init(\.final, order: .reverse)]
 
@@ -37,6 +38,7 @@ struct Catalogue: View {
 
     var body: some View {
         content
+            .sheet(isPresented: $showingOnline) { OnlineOrdersSheet(shop: shop) }
             .screenToolbar {
                 ToolbarItem {
                     Picker("", selection: $layout) {
@@ -47,6 +49,25 @@ struct Catalogue: View {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
+                }
+                // ── WHAT THE STOREFRONT HAS SENT ────────────────────────
+                //
+                // Here rather than on Integrations, where the address to paste
+                // into a storefront lives, because the question an incoming
+                // order raises is *do I already have this made?* — and that is
+                // the row above. Shown only to a shop that has a cloud; one
+                // without a storefront should not be offered a queue it does
+                // not have.
+                if shop.cloudConnected {
+                    ToolbarItem {
+                        Button {
+                            showingOnline = true
+                        } label: {
+                            Label(shop.words.callIt("mac.online_orders"),
+                                  systemImage: "tray.and.arrow.down")
+                        }
+                        .help(shop.words.callIt("mac.online_orders"))
+                    }
                 }
                 ToolbarItem {
                     Button {

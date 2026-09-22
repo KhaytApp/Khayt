@@ -936,10 +936,42 @@ final class Words {
         "mac.sell_one":        ["en": "Sell one",       "ar": "بِع قطعة"],
         "mac.sold_here_n": ["en": "Sold here: {n}", "ar": "بيع هنا: {n}"],
         "mac.sold_here_hint": [
-            "en": "Pieces sold across the counter and recorded here. Anything "
-                + "bought through your online store is counted there.",
-            "ar": "القطع التي بيعت عند الطاولة وسُجلت هنا. ما يُشترى عبر متجرك "
-                + "الإلكتروني يُحسب هناك.",
+            "en": "Pieces sold across the counter, and online orders you have "
+                + "brought in. An online order nobody has brought in yet is "
+                + "not counted.",
+            "ar": "القطع التي بيعت عند الطاولة، والطلبات الإلكترونية التي "
+                + "أدخلتها. الطلب الإلكتروني الذي لم يُدخل بعد لا يُحسب.",
+        ],
+        "mac.online_orders": ["en": "Online orders", "ar": "الطلبات الإلكترونية"],
+        "mac.online_orders_hint": [
+            "en": "Orders your storefront has sent to Khayt. Each one is "
+                + "checked against the shelf first — anything already printed "
+                + "is a sale, not a job.",
+            "ar": "الطلبات التي أرسلها متجرك إلى خيط. يُقارن كل طلب بالرف "
+                + "أولًا — فما هو مطبوع مسبقًا بيعٌ لا عملٌ جديد.",
+        ],
+        "mac.online_none": [
+            "en": "Nothing new from your storefront.",
+            "ar": "لا جديد من متجرك.",
+        ],
+        "mac.online_refresh": ["en": "Look again", "ar": "تحديث"],
+        "mac.online_off_shelf": [
+            "en": "{n} off the shelf", "ar": "{n} من الرف",
+        ],
+        "mac.online_to_print": ["en": "To print", "ar": "للطباعة"],
+        "mac.online_part": [
+            "en": "{shelf} off the shelf, {print} to print",
+            "ar": "{shelf} من الرف، {print} للطباعة",
+        ],
+        "mac.online_unmatched": [
+            "en": "Not in your catalogue", "ar": "ليس في كتالوجك",
+        ],
+        "mac.online_record_sale": ["en": "Record the sale", "ar": "سجّل البيع"],
+        "mac.online_add_to_queue": ["en": "Add to the queue", "ar": "أضف للطابور"],
+        "mac.online_kept_in_queue": [
+            "en": "The order was recorded, but it could not be taken out of "
+                + "the cloud queue — it will be offered again.",
+            "ar": "سُجّل الطلب، لكن تعذّر حذفه من طابور السحابة — سيُعرض مرة أخرى.",
         ],
         "mac.sold_from_shelf": ["en": "Sold from the shelf", "ar": "بيع من الرف"],
         "mac.sell_from_shelf_q": ["en": "Sell one {name} from the shelf?",

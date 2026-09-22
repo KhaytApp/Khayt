@@ -21,6 +21,13 @@ public actor KhaytEngine {
     /// The modules this engine exposes, in dependency order.
     static let modules = [
         "tax",
+        // What an online order takes off the shelf. The storefront sells
+        // against `settings.storefront.stockQty` and one screen in the whole
+        // app has ever written that number — a person typing it — so a shop
+        // that sold four of twelve went on publishing twelve. The arithmetic
+        // is shared because the desktop, the LAN server and this app all have
+        // to reach the same figure about a count a customer can see.
+        "shelf-sale",
         // The warning a shop gets when filament runs out. It was twelve lines
         // inside the renderer, so this app drew the switch that turns it on
         // and had nothing to send.
@@ -8822,6 +8829,28 @@ public actor KhaytEngine {
     public func medusaSubscriber(importURL: String) throws -> String {
         try runtime.call("KhaytMedusa", "subscriberSource",
                          [JSONValue.string(importURL)], as: String.self)
+    }
+
+    /// What an online order can take off the shelf, and what is left to print.
+    ///
+    /// `payload` is an intake row exactly as khayt-cloud filed it — the whole
+    /// object, not fields picked out of it here. The basket khayt-cloud files
+    /// is a flattened string (`• Falcon hood × 6`), and reading it back is
+    /// `lib/shelf-sale.js`'s job precisely so there is ONE reader of that
+    /// format rather than one per host.
+    ///
+    /// `stock` is `settings.storefront.stockQty`.
+    public func shelfSaleReading(payload: JSONValue, products: [JSONValue],
+                                 stock: JSONValue) throws -> JSONValue {
+        try runtime.call("KhaytShelfSale", "read",
+                         [payload, .object(["products": .array(products), "stock": stock])],
+                         as: JSONValue.self)
+    }
+
+    /// The same reading, as the ordered list of things to do about it.
+    public func shelfSaleEffects(_ reading: JSONValue, at: Date) throws -> [JSONValue] {
+        try runtime.call("KhaytShelfSale", "effects",
+                         [reading, .string(StoreWriter.iso(at))], as: [JSONValue].self)
     }
 
     public func medusaSubscriberPath() throws -> String {
