@@ -35,6 +35,15 @@ enum ArchiveImport {
     /// as often as it arrives as a zip.
     static let kinds: Set<String> = ["zip", "rar", "7z", "tgz", "gz"]
 
+    /// What comes out of a pack that is worth keeping and is not a model.
+    ///
+    /// A short list on purpose. A PDF is the assembly instructions or the
+    /// colour guide; the rest of what a creator pack holds — licence text,
+    /// gallery images the thumbnailer has already taken its own copy of, a
+    /// slicer's config leavings — is not something a shop opens beside a
+    /// print, and keeping it would be hoarding rather than filing.
+    static let documentKinds: Set<String> = ["pdf"]
+
     /// Formats opened by libarchive rather than by the zip reader.
     static let byLibarchive: Set<String> = ["rar", "7z", "tgz", "gz"]
 
@@ -88,6 +97,20 @@ enum ArchiveImport {
     struct Expanded {
         /// The models, in a scratch directory the caller is expected to consume.
         let models: [URL]
+        /// ── THE GUIDES, WHICH USED TO BE THROWN AWAY ──────────────────────
+        ///
+        /// This walked the extracted archive keeping only files whose
+        /// extension is in `LibraryImport.kinds`, and then deleted the
+        /// scratch. So a creator pack's assembly instructions and its colour
+        /// guide — the two pieces of paper a shop actually needs beside the
+        /// print — were extracted, ignored and deleted, silently, on every
+        /// import. Nothing said so and nothing was left to find.
+        ///
+        /// Documents only. Not "everything that is not a model": an archive
+        /// also holds licence text, thumbnails and a slicer's own leavings,
+        /// and hoarding those would fill a shop's vault with rubbish it
+        /// cannot read.
+        let documents: [URL]
         /// The scratch directory itself, so the caller can clear it up.
         let scratch: URL
         /// What the archive was called, without its extension — the natural
@@ -132,16 +155,22 @@ enum ArchiveImport {
             throw Failure.refused(name, reason: verdict.reason ?? "refused")
         }
 
-        // Only the models. `Zip.entries` reports directories too, and a zip from
-        // a model site is mostly licence text and render previews.
-        let wanted = entries.filter { e in
+        // The models, and the documents that belong beside them. `Zip.entries`
+        // reports directories too, and a zip from a model site is mostly
+        // licence text and render previews.
+        func usable(_ e: Zip.Entry) -> Bool {
             !e.name.hasSuffix("/")
-                && LibraryImport.kinds.contains((e.name as NSString).pathExtension.lowercased())
                 // A __MACOSX/._foo.stl resource fork is not a model; it is four
                 // hundred bytes of Finder metadata wearing a model's name.
                 && !e.name.hasPrefix("__MACOSX/")
                 && !(e.name as NSString).lastPathComponent.hasPrefix("._")
         }
+        // NOT named `ext`: the archive's own extension is already in scope
+        // under that name, and shadowing it here compiles as a call to a String.
+        func suffix(_ e: Zip.Entry) -> String { (e.name as NSString).pathExtension.lowercased() }
+        let wanted = entries.filter { usable($0) && LibraryImport.kinds.contains(suffix($0)) }
+        // THE GUIDES, which this used to extract and delete — see `Expanded`.
+        let papers = entries.filter { usable($0) && Self.documentKinds.contains(suffix($0)) }
         guard !wanted.isEmpty else { throw Failure.noModels(name) }
 
         let scratch = FileManager.default.temporaryDirectory
@@ -149,7 +178,8 @@ enum ArchiveImport {
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
 
         var out: [URL] = []
-        for entry in wanted {
+        var papersOut: [URL] = []
+        for entry in wanted + papers {
             // FLATTENED ON PURPOSE, to the member's own last component.
             //
             // The scan has already refused a traversal, so this is belt and
@@ -163,14 +193,18 @@ enum ArchiveImport {
             let dest = uniqueName(in: scratch, leaf: leaf)
             guard let data = try? Zip.data(of: entry, in: url, limit: .max) else { continue }
             do { try data.write(to: dest) } catch { continue }
-            out.append(dest)
+            if Self.documentKinds.contains(dest.pathExtension.lowercased()) {
+                papersOut.append(dest)
+            } else {
+                out.append(dest)
+            }
         }
         guard !out.isEmpty else {
             try? FileManager.default.removeItem(at: scratch)
             throw Failure.noModels(name)
         }
 
-        return Expanded(models: out, scratch: scratch,
+        return Expanded(models: out, documents: papersOut, scratch: scratch,
                         group: url.deletingPathExtension().lastPathComponent)
     }
 
@@ -268,12 +302,16 @@ enum ArchiveImport {
         // The models, wherever they ended up. The group is the archive's own
         // name, as it is for a zip.
         var models: [URL] = []
+        var documents: [URL] = []
         let walker = FileManager.default.enumerator(at: scratch,
                                                     includingPropertiesForKeys: nil,
                                                     options: [.skipsHiddenFiles])
         while let next = walker?.nextObject() as? URL {
-            if LibraryImport.kinds.contains(next.pathExtension.lowercased()) {
+            let ext = next.pathExtension.lowercased()
+            if LibraryImport.kinds.contains(ext) {
                 models.append(next)
+            } else if Self.documentKinds.contains(ext) {
+                documents.append(next)
             }
         }
         guard !models.isEmpty else {
@@ -281,6 +319,8 @@ enum ArchiveImport {
             throw Failure.noModels(name)
         }
         return Expanded(models: models.sorted {
+            $0.path.localizedStandardCompare($1.path) == .orderedAscending
+        }, documents: documents.sorted {
             $0.path.localizedStandardCompare($1.path) == .orderedAscending
         }, scratch: scratch,
            // The archive's own name, decorations stripped — and its bare name

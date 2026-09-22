@@ -45,6 +45,22 @@ struct LibraryFilterBar: View {
                 shop.libraryUnfiledOnly.toggle()
             })
         }
+        // WHAT THIS SHOP HAS COLLECTED AND NEVER MADE. Beside Unfiled because
+        // it is the same kind of question — a property of the model rather than
+        // a name somebody gave it — and because both are the ones worth asking
+        // of a library that has just grown by a hundred files.
+        //
+        // Khayt counts real prints, so this chip is a FACT. The other tools in
+        // this category carry a status somebody ticks, which answers "did I
+        // mean to print this" rather than "did I".
+        if facets.neverPrinted > 0 || shop.libraryNeverPrintedOnly {
+            out.append(FilterChipModel(id: "never-printed",
+                                       label: shop.words.callIt("mac.never_printed"),
+                                       count: facets.neverPrinted,
+                                       on: shop.libraryNeverPrintedOnly) {
+                shop.libraryNeverPrintedOnly.toggle()
+            })
+        }
         for row in Self.withActive(facets.categories, shop.libraryCategory) {
             out.append(FilterChipModel(id: "category:" + row.name, label: row.name,
                                        count: row.count,

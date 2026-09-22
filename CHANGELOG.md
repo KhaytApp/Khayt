@@ -6,6 +6,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) A creator pack's assembly instructions were unzipped, ignored and
+  deleted.** Importing an archive kept only files whose extension names a
+  model, then removed the folder it had extracted everything into — so the
+  colour guide and the assembly instructions, which are the two pieces of paper
+  a shop actually needs beside the print, were thrown away on every pack
+  import. Silently: the archive still had them and the library still had its
+  models, so the only way to find out was to go looking for a guide afterwards
+  and find nothing.
+
+  PDFs are kept now, and put in the model's own folder — so a shop that hands
+  one model to somebody hands its instructions with it. The inspector lists
+  them and opens them. Nothing else is kept: a pack also carries licence text,
+  gallery renders and a slicer's leavings, and hoarding those would fill a
+  vault with things nobody opens.
+
+- **(Mac) The library could not answer "what have I never actually made".**
+  A chip beside Unfiled, counting the models with no print behind them. It is a
+  FACT here rather than a reminder — Khayt counts real prints from the jobs,
+  where the other tools in this category carry a status somebody ticks, which
+  answers "did I mean to print this" instead of "did I".
+
 - **(Mac) Every model has been saying who made it and Khayt never asked.** A
   3MF carries the designer's name and the licence the model was published
   under, written by the slicer that exported it. Khayt recorded a licence only

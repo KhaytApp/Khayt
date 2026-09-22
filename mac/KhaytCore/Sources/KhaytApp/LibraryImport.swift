@@ -190,6 +190,7 @@ enum LibraryImport {
                     engine: KhaytEngine,
                     keepOriginal: Bool = false,
                     group: String? = nil,
+                    documents: [URL] = [],
                     analyseRisk: Bool = false,
                     owns: @escaping () -> Bool,
                     whoHasIt: @escaping () -> String?) async throws -> Added {
@@ -242,6 +243,17 @@ enum LibraryImport {
         guard (try? contentHash(of: destination)) == hash else {
             try? FileManager.default.removeItem(at: dir)
             throw Failure.failed("\(originalName) did not arrive intact")
+        }
+
+        // THE GUIDES, beside the model. Best-effort and after the model is in
+        // place: an import must not fail because a PDF would not copy, and a
+        // model with no instructions is a model, while no model at all is
+        // nothing.
+        for paper in documents {
+            let into = destination.deletingLastPathComponent()
+                .appending(path: paper.lastPathComponent)
+            guard !FileManager.default.fileExists(atPath: into.path) else { continue }
+            try? FileManager.default.copyItem(at: paper, to: into)
         }
 
         let size = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size]
@@ -393,6 +405,22 @@ enum LibraryImport {
         let url: URL
         /// Nil for ungrouped — see `ImportGrouping`.
         let group: String?
+        /// The guides that came out of the same pack — assembly instructions,
+        /// a colour guide. Copied into the model's own folder.
+        ///
+        /// ── WHY A COPY PER MODEL AND NOT ONE SHARED ONE ───────────────────
+        ///
+        /// The vault is one folder per model, deliberately: a model's folder
+        /// holds everything about it, so a shop can move, export or hand one
+        /// model to somebody and nothing is left behind. A guide stored once
+        /// under the pack would break that, and there is no pack folder on
+        /// disk to store it in — there are only model folders.
+        ///
+        /// So a pack of forty models carrying a two-megabyte guide costs
+        /// eighty megabytes rather than two. That is the trade, stated rather
+        /// than discovered: the alternative is a guide reachable from one
+        /// arbitrary model of the forty, which is the same as not having it.
+        var documents: [URL] = []
 
         /// Files with no grouping — what `--import` of a bare list means, and
         /// what most tests want. Spelled out at the call site so a caller that
@@ -422,7 +450,8 @@ enum LibraryImport {
                 let added = try await add(file.url, storeURL: storeURL, libraryRoot: libraryRoot,
                                           knownHashes: known, nameOfExisting: nameOfExisting,
                                           engine: engine, keepOriginal: keepOriginal,
-                                          group: file.group, analyseRisk: analyseRisk,
+                                          group: file.group, documents: file.documents,
+                                          analyseRisk: analyseRisk,
                                           owns: owns, whoHasIt: whoHasIt)
                 report.moved += 1
                 if let hash = added.contentHash { known.insert(hash) }
