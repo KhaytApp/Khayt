@@ -22,6 +22,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+
+- **(iOS) The order history said where the rest of it is.** The phone carries the
+  newest two hundred finished jobs and every unfinished one; the list simply
+  stopped at the end of them. A shop scrolling to the bottom of its own history
+  had nothing to tell it that the other two thousand were on the Mac — which
+  reads as a shop that has done two hundred jobs in its life.
+
+  It now says "Showing the newest 200 of 3,140", from the scope the phone
+  already records at every pull. A shop small enough that the phone holds
+  everything is told nothing, because a note about missing history under a
+  complete list is its own untruth — and so is a phone that cannot say what it
+  is missing, which says nothing rather than guessing.
+
+  The Arabic is mine and has had no native read.
 - **An order from your online store now comes off the shelf.** Khayt could
   tell a storefront where to send its orders and could not show you one that
   had arrived. The Integrations screen has always handed out the address to

@@ -155,6 +155,18 @@ actor BookReader {
         return Array(rows.prefix(max(0, limit)))
     }
 
+    /// How much of the order history this phone holds, when it holds only part.
+    ///
+    /// `nil` when it has all of it — and also when it has no idea, because a
+    /// phone that cannot say what it is missing must not claim to be complete.
+    /// The screen shows nothing in either case; the difference only matters if
+    /// something ever starts totalling history, which is what `holdsAll` is for.
+    nonisolated func orderHistoryWindow() -> HeldWindow? {
+        guard let held = book.scope()?.collections["printLog"],
+              !held.whole, let available = held.available else { return nil }
+        return HeldWindow(sent: held.sent, available: available)
+    }
+
     func inventory() throws -> [InventorySpool] { try decode("inventory") }
     /// The shop's clients, each under the name the shop actually calls them.
     ///

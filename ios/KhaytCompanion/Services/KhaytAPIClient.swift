@@ -24,6 +24,9 @@ final class KhaytAPIClient: ObservableObject {
     /// things, but neither has anything waiting.
     @Published private(set) var pendingCount = 0
 
+    /// What this phone holds of the order history, when it holds only part.
+    @Published private(set) var historyWindow: HeldWindow?
+
     /// The book, and the reader that turns it into what the screens decode.
     ///
     /// Optional because a build without its App Group container has neither, and
@@ -72,6 +75,7 @@ final class KhaytAPIClient: ObservableObject {
         guard let value = try? await read(reader) else { return nil }
         servingFromBook = true
         servingCachedSince = nil
+        historyWindow = reader.orderHistoryWindow()
         refreshBookIfConnected()
         return value
     }

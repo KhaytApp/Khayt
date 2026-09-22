@@ -124,6 +124,14 @@ struct QueueOrder: Codable, Identifiable, Sendable {
     }
 }
 
+/// How much of a collection this phone is carrying, when it carries only part.
+///
+/// A list that simply stops is a shop concluding it has done two hundred jobs.
+struct HeldWindow: Equatable, Sendable {
+    let sent: Int
+    let available: Int
+}
+
 struct MachineInfo: Codable, Identifiable, Sendable {
     let id: String
     let name: String?
