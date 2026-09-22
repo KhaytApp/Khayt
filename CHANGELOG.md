@@ -4,6 +4,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+### Security
+
+- **Khayt would send a webhook, a cloud request or mail to a Tailscale
+  address.** Every outbound address a shop types is checked against the
+  private ranges first, so a URL pointing at the machine Khayt is running on
+  or at something else on the office network is refused rather than fetched.
+  `10.x`, `172.16–31.x`, `192.168.x`, loopback and the cloud metadata address
+  were all blocked. `100.64.0.0/10` was not — and that range is carrier-grade
+  NAT, which in practice means the whole of Tailscale.
+
+  A shop that runs Tailscale to reach its printers from home has its machines,
+  its NAS and everything else on that tailnet addressed there, and
+  `100.100.100.100` is Tailscale's own resolver. It is now refused like every
+  other private range. The rest of `100.x` is ordinary public space and is
+  untouched.
+
 ### Added
 
 - **(Mac) A piece can be sold off the shelf, and the shop can see how many
