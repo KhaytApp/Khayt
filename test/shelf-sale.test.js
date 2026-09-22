@@ -141,3 +141,62 @@ test('an empty order asks for nothing rather than for everything', () => {
   assert.equal(r.allFromShelf, false, 'an order with no lines is not "all on the shelf"');
   assert.deepEqual(S.effects(r, 'now'), []);
 });
+
+/*
+ * ── A BASKET HAS AN END ───────────────────────────────────────────────────
+ *
+ * This runs over an order that arrives from OUTSIDE — khayt-cloud's import
+ * route takes a storefront's delivery and files it, and the Mac then reads it
+ * on its main actor. The cloud caps a description at 4000 characters, but
+ * `lib/lan-server.js` reads a platform's own payload through `itemLines`,
+ * where nothing caps anything.
+ *
+ * Unbounded, a long basket against a real catalogue was quadratic: every line
+ * normalised every product name again, each an NFKC pass and four regexes.
+ * Forty thousand lines against sixty products measured 455ms; against a
+ * five-hundred-product catalogue it is seconds, with the window frozen.
+ *
+ * Two bounds fix it — this cap, and indexing the catalogue once.
+ */
+test('a basket is bounded, however long the delivery claims to be', () => {
+  const huge = Array.from({ length: 40000 }, () => '• Flexi Dragon × 1').join('\n');
+  const t = Date.now();
+  const r = S.read({ description: huge }, book);
+  const ms = Date.now() - t;
+  assert.equal(r.lines.length, S.MAX_LINES);
+  assert.ok(ms < 1000, `reading a 40,000-line basket took ${ms}ms`);
+});
+
+test('a platform sending its own basket is bounded the same way', () => {
+  const items = Array.from({ length: 40000 }, () => ({ name: 'Flexi Dragon', quantity: 1 }));
+  assert.equal(S.itemLines(items).length, S.MAX_LINES);
+});
+
+/*
+ * The catalogue is indexed ONCE per reading rather than re-normalised per
+ * line. Two products can share a name — a shop duplicates a row and renames
+ * one later — and the index must resolve that the same way every time rather
+ * than by whichever came first in the array on the day.
+ */
+test('two products sharing a name resolve to the same one every time', () => {
+  const twins = [
+    { id: 'PRD-X', nameEn: 'Falcon hood' },
+    { id: 'PRD-Y', nameEn: 'Falcon hood' },
+  ];
+  const match = S.matcher(twins);
+  assert.equal(match('Falcon hood'), 'PRD-X');
+  assert.equal(match('falcon  HOOD'), 'PRD-X');
+  assert.equal(S.matchLine('Falcon hood', twins), 'PRD-X');
+});
+
+test('a product with no id is not indexed, and neither is a blank name', () => {
+  const messy = [
+    { nameEn: 'No id here' },
+    { id: 'PRD-Z', nameEn: '', nameAr: '' },
+    { id: 'PRD-W', nameEn: 'Real one' },
+  ];
+  const match = S.matcher(messy);
+  assert.equal(match('No id here'), null);
+  assert.equal(match(''), null);
+  assert.equal(match('Real one'), 'PRD-W');
+});

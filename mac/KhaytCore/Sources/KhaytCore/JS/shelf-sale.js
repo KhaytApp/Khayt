@@ -37,6 +37,9 @@
  * Pure: an order and a book in, an ordered effects list out. No clock, no disk.
  */
 (function (global) {
+  /** No real order has more lines than this. See `lines`. */
+  const MAX_LINES = 1000;
+
   const str = (v) => String(v == null ? '' : v);
   const int = (v) => {
     const n = Math.floor(Number(v));
@@ -85,6 +88,12 @@
     const p = payload || {};
     const out = [];
     for (const raw of str(p.description).split('\n')) {
+      // A BASKET HAS AN END. khayt-cloud caps a description at 4000
+      // characters, but `lib/lan-server.js` reads a platform's own payload
+      // where nothing does, and this runs on the Mac's main actor over an
+      // order that arrives from outside. No real basket is a thousand lines;
+      // one that claims to be is not a basket.
+      if (out.length >= MAX_LINES) break;
       const m = /^\s*[•\-*]\s*(.+?)(?:\s*[×x*]\s*(\d+))?\s*$/.exec(raw);
       if (!m) continue;
       const name = str(m[1]).trim();
@@ -110,13 +119,33 @@
    * still has boxes of would otherwise be told its own order is unrecognisable.
    */
   function matchLine(name, products) {
-    const want = key(name);
-    if (!want) return null;
+    return matcher(products)(name);
+  }
+
+  /**
+   * The catalogue, indexed once.
+   *
+   * `matchLine` normalised every product name again for every line, so a
+   * basket of N lines against a catalogue of M products did N×M of them —
+   * each an NFKC normalise and four regex passes. A shop with five hundred
+   * products and a long basket spent seconds on it, on the Mac's main actor,
+   * over an order that arrives from outside.
+   *
+   * Two things bound it now: this index, built once per reading, and the line
+   * cap in `lines`.
+   */
+  function matcher(products) {
+    const index = new Map();
     for (const p of Array.isArray(products) ? products : []) {
       if (!p || !p.id) continue;
-      if (key(p.nameEn) === want || key(p.nameAr) === want) return str(p.id);
+      for (const name of [p.nameEn, p.nameAr]) {
+        const k = key(name);
+        // FIRST WINS, so two products sharing a name resolve the same way
+        // every time rather than by array order on the day.
+        if (k && !index.has(k)) index.set(k, str(p.id));
+      }
     }
-    return null;
+    return (name) => index.get(key(name)) || null;
   }
 
   /**
@@ -148,8 +177,9 @@
     const products = (book && book.products) || [];
     const stock = (book && book.stock) || {};
     const left = {};
+    const match = matcher(products);
     const rows = (Array.isArray(basket) ? basket : []).map((line) => {
-      const productId = matchLine(line.name, products);
+      const productId = match(line.name);
       if (!productId) {
         return { name: line.name, qty: line.qty, productId: null,
                  onShelf: 0, fromShelf: 0, toPrint: line.qty };
@@ -216,6 +246,7 @@
   function itemLines(items) {
     const out = [];
     for (const it of Array.isArray(items) ? items : []) {
+      if (out.length >= MAX_LINES) break;
       if (!it) continue;
       const name = str(it.name || it.title || it.product_title || it.label).trim();
       if (!name) continue;
@@ -225,7 +256,7 @@
     return out;
   }
 
-  const api = { key, lines, itemLines, matchLine, read, readLines, effects };
+  const api = { key, lines, itemLines, matchLine, matcher, read, readLines, effects, MAX_LINES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytShelfSale = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
