@@ -966,7 +966,6 @@ final class Words {
         "mac.state_worn": ["en": "Worn", "ar": "مهترئة"],
         "mac.state_out": ["en": "Out", "ar": "نفد"],
         "mac.state_low": ["en": "Low", "ar": "منخفض"],
-        "mac.state_failed_send": ["en": "Not delivered", "ar": "لم تصل"],
         // §4: gift cards get no chip — the balance column says it instead, and
         // a spent card says `closed` where a figure would be.
         "mac.gc_closed": ["en": "closed", "ar": "مغلقة"],

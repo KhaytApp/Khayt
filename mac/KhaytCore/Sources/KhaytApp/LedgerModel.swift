@@ -97,12 +97,13 @@ extension Shop {
 
     private func line(for order: Order) -> LedgerLine {
         let costKnown = order.costBasis > 0
+        let where_ = state(of: order)
         return LedgerLine(
             id: order.id,
-            state: state(of: order),
+            state: where_,
             title: order.project,
             who: order.client.isEmpty ? words.callIt("mac.no_customer") : order.client,
-            due: dueWords(order),
+            due: dueWords(order, at: where_),
             charged: order.price,
             margin: costKnown && order.price > 0
                 ? (order.price - order.costBasis) / order.price : nil,
@@ -164,8 +165,23 @@ extension Shop {
     }
 
     /// "−2d", "17:00", "Wed 16" — the shortest true reading.
-    private func dueWords(_ order: Order) -> String {
+    ///
+    /// ── A COUNTDOWN IS ONLY TRUE OF WORK STILL IN FLIGHT ──────────────────
+    ///
+    /// It counted for every row, so a job the shop FINISHED in April read
+    /// "−144d" — a hundred and forty-four days late, about something that is
+    /// done. The same for a job the shop cancelled, which is not late and
+    /// never will be. On a book whose unsettled rows are a quarter finished
+    /// work, that is a column of warnings about the past.
+    ///
+    /// A promise date is only a deadline until the thing is made. Afterwards
+    /// it is a fact, and the fact a shop wants is WHEN — so a finished or
+    /// cancelled row shows the date it was due and stops counting.
+    private func dueWords(_ order: Order, at state: ShopState) -> String {
         guard let due = Order.day(order.dueDate ?? "") else { return "—" }
+        if state == .done || state == .cancelled {
+            return due.formatted(.dateTime.day().month(.abbreviated))
+        }
         let start = Calendar.current.startOfDay(for: Date())
         let days = Calendar.current.dateComponents([.day], from: start, to: due).day ?? 0
         if days < 0 { return "−" + String(-days) + "d" }

@@ -135,4 +135,33 @@ import KhaytCore
             §9: anything that does not fit at 1100×620 is over-designed.
             """))
     }
+
+    /// ── THE WHOLE VOCABULARY, IN ONE PICTURE ─────────────────────────────
+    ///
+    /// Fourteen states drawn together, which nothing had ever shown. Every
+    /// chip in this app appears beside jobs and machines, never beside the
+    /// other thirteen — so a set drawn in seven different typefaces at seven
+    /// weights looked fine everywhere and was wrong as a set, and only a
+    /// picture like this one says so.
+    ///
+    /// `StateGlyphTests` holds the faces by measurement; this is what the
+    /// measurement looks like.
+    @Test("the state vocabulary, as one set")
+    func everyState() async {
+        let shop = await sample()
+        let marks = VStack(alignment: .leading, spacing: 6) {
+            ForEach(ShopState.allCases, id: \.self) { state in
+                HStack(spacing: 10) {
+                    StateChip(state: state, words: shop.words)
+                        .frame(width: StateChip.column, alignment: .leading)
+                    Text(state.rawValue)
+                        .font(TypeScale.body(10)).foregroundStyle(Role.text3)
+                }
+            }
+        }
+        .padding(20)
+        .frame(width: 320, alignment: .leading)
+        .background(Khayt.ground)
+        write(marks, "ui-10-states")
+    }
 }

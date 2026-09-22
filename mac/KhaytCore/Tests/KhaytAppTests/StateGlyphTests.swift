@@ -32,8 +32,10 @@ struct StateGlyphTests {
     /// Asking at 17pt would answer a question nobody is looking at.
     static let sizes: [CGFloat] = [10, 12]
 
-    static func face(drawing glyph: String, at size: CGFloat) -> String? {
-        let font = NSFont.systemFont(ofSize: size, weight: .semibold)
+    static func face(drawing glyph: String, at size: CGFloat,
+                     named: String? = nil) -> String? {
+        let font = named.flatMap { NSFont(name: $0, size: size) }
+            ?? NSFont.systemFont(ofSize: size, weight: .semibold)
         let line = CTLineCreateWithAttributedString(
             NSAttributedString(string: glyph, attributes: [.font: font]))
         guard let runs = CTLineGetGlyphRuns(line) as? [CTRun], let run = runs.first,
@@ -125,6 +127,51 @@ struct StateGlyphTests {
         #expect(ShopState.of(kind: "stock", severity: "high") == .stockLow)
     }
 
+    /// ── THE WHOLE SET COMES FROM TWO FACES, AND BOTH ARE CHOSEN ─────────
+    ///
+    /// The defect this suite was written for was SEVEN typefaces in one row of
+    /// chips, arrived at by a fallback chain choosing per character. `face`
+    /// names the cut for every mark, so the answer is a decision rather than
+    /// whatever macOS reached for — and this holds it to two: the system face
+    /// wherever it has the mark, and one named family for the rest.
+    ///
+    /// Not one face, and that is deliberate: the system face carries about
+    /// twenty usable geometric marks against fourteen meanings, so forcing it
+    /// buys a star standing for a quote. A mark that has to be learnt is worse
+    /// than one drawn a quarter-point light.
+    @Test("every mark comes from the system face or from one named family")
+    func twoFacesAndNoMore() {
+        var fallbacks: Set<String> = []
+        for state in ShopState.allCases {
+            for size in Self.sizes {
+                let drawn = Self.face(drawing: state.glyph, at: size, named: state.face)
+                if let want = state.face {
+                    #expect(drawn?.isEmpty == false, Comment(rawValue: "\(state) drew nothing"))
+                    fallbacks.insert(want)
+                } else {
+                    // No face named means the system face must actually have
+                    // it — otherwise this is the old bug wearing a comment.
+                    #expect(drawn?.hasPrefix(".SFNS") == true, Comment(rawValue: """
+                        \(state) claims the system face and is drawn by \(drawn ?? "nothing")                         at \(size)pt — name its face or choose a mark the system has
+                        """))
+                }
+            }
+        }
+        #expect(fallbacks.count <= 1, Comment(rawValue: """
+            the set is drawn in \(fallbacks.count + 1) faces — \(fallbacks.sorted())             beside the system one. Seven was the defect; two is the rule.
+            """))
+    }
+
+    /// A named face has to be installed, or the mark silently falls back again
+    /// and the naming has bought nothing.
+    @Test("a named face is one this Mac actually has")
+    func namedFacesExist() {
+        for name in Set(ShopState.allCases.compactMap(\.face)) {
+            #expect(NSFont(name: name, size: 10) != nil,
+                    Comment(rawValue: "\(name) is not installed, so its marks fall back"))
+        }
+    }
+
     /// A cancelled job is not asking for anything, so its mark must not be one
     /// of the ones that does. The attention list and the lifecycle list are
     /// kept apart on purpose — "lifecycle never competes for the eye".
@@ -135,5 +182,50 @@ struct StateGlyphTests {
                 "a cancelled row carries a coloured ground, so it shouts like a fault")
         #expect(ShopState.cancelled.tint == Role.text3,
                 "a cancelled job is over; it must be as quiet as a quote")
+    }
+}
+
+/// A promise date stops being a deadline once the thing is made.
+///
+/// The ledger counted down on every row, so a job the shop FINISHED in April
+/// read "−144d" — a hundred and forty-four days late, about something that is
+/// done — and a cancelled job did the same, which is not late and never will
+/// be. On this book a quarter of the unsettled rows are finished work, so it
+/// was a column of warnings about the past.
+@MainActor
+struct LedgerDueWordsTests {
+
+    static func rows() async -> [Shop.LedgerLine] {
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.ledgerFilter = .all
+        return shop.ledgerRows
+    }
+
+    @Test("a finished or cancelled row says WHEN, and does not count down")
+    func historyIsADate() async {
+        let rows = await Self.rows()
+        let over = rows.filter { $0.state == .done || $0.state == .cancelled }
+        #expect(!over.isEmpty, "the sample book no longer reaches this at all")
+        for row in over {
+            #expect(!row.due.hasPrefix("−"), """
+                \(row.title) is \(row.state) and its due column reads "\(row.due)" — \
+                a countdown about work that is over
+                """)
+        }
+    }
+
+    /// And work still in flight keeps its countdown, which is the whole point
+    /// of the column: a job due in two days and one that was due a week ago
+    /// are the two things a shop is looking for.
+    @Test("work still in flight still counts")
+    func liveWorkStillCounts() async {
+        let rows = await Self.rows()
+        let live = rows.filter { $0.state != .done && $0.state != .cancelled }
+        #expect(!live.isEmpty)
+        #expect(live.contains { $0.due.hasPrefix("−") }, """
+            nothing in flight is counting down any more — the fix reached rows \
+            it should not have
+            """)
     }
 }
