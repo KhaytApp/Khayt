@@ -1601,10 +1601,39 @@ public actor KhaytEngine {
         public let report: JSONValue?
     }
 
+    /// `meshes` is the one thing that does NOT cross as JSON.
+    ///
+    /// A colour plan needs the model's own XML, and a model runs to hundreds
+    /// of megabytes. `call2` substitutes its arguments into the script's
+    /// source, so passing one that way means escaping it, building a source
+    /// string around it and parsing the lot: measured, about twenty-six times
+    /// the mesh in memory, and a 32 MB model peaked at 840 MB.
+    ///
+    /// Bound as globals instead, a 256 MB model costs 0.04s and 883 MB — the
+    /// same memory as 32 MB the other way. So each mesh is bound under a name,
+    /// the member carries the NAME rather than the bytes, and the script swaps
+    /// one for the other before the rule sees it. `lib/mf-convert.js` is
+    /// unchanged and still receives plain `data`.
     public func convertMembers(_ members: [JSONValue],
-                               options: [String: JSONValue]) throws -> Conversion {
+                               options: [String: JSONValue],
+                               meshes: [String: String] = [:]) throws -> Conversion {
+        try runtime.withBoundStrings(meshes) {
+            try convertMembersBound(members, options: options)
+        }
+    }
+
+    private func convertMembersBound(_ members: [JSONValue],
+                                     options: [String: JSONValue]) throws -> Conversion {
         try runtime.call2("""
             (function (members, opts) {
+              // A member carrying `meshVar` names a global this app bound the
+              // model's XML to, rather than carrying the XML itself.
+              members = members.map(function (m) {
+                if (!m || !m.meshVar) return m;
+                var text = globalThis[m.meshVar];
+                if (typeof text !== 'string') return m;
+                return { name: m.name, size: m.size, data: text };
+              });
               const planned = KhaytMfConvert.convertMembers(members, opts);
               if (!planned.ok) return { ok: false, error: planned.error };
               return {

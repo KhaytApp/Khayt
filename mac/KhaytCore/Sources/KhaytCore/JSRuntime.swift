@@ -283,6 +283,38 @@ public final class JSRuntime {
     /// positional arguments — `dashboardFacts({orders, machines, settings})` —
     /// and for the one that needs another MODULE passed in. Same JSON crossing
     /// as `call`, so a shape change is still a decoding error here.
+    /// Hand JavaScript a large STRING without putting it in the script.
+    ///
+    /// ── WHY THIS EXISTS ───────────────────────────────────────────────────
+    ///
+    /// `call2` substitutes each argument's JSON into the expression and
+    /// evaluates the result, which is right for the kilobytes almost every
+    /// call passes. For a MESH it is not: a colour plan needs the model's own
+    /// XML, and putting 128 MB of it into a script means escaping it, building
+    /// a source string around it and asking JavaScriptCore to parse the whole
+    /// thing. Measured, that costs about twenty-six times the mesh in memory —
+    /// a 32 MB model peaked at 840 MB.
+    ///
+    /// Bound as a global instead, the string crosses once. The script names it
+    /// rather than containing it.
+    ///
+    /// The name is cleared afterwards whatever happens, so a mesh cannot
+    /// outlive the call that needed it — this context is long-lived and one
+    /// forgotten binding is the whole file still resident.
+    public func withBoundStrings<T>(_ values: [String: String],
+                                    _ body: () throws -> T) rethrows -> T {
+        for (name, value) in values {
+            context.setObject(value, forKeyedSubscript: name as NSString)
+        }
+        defer {
+            for name in values.keys {
+                context.setObject(JSValue(undefinedIn: context),
+                                  forKeyedSubscript: name as NSString)
+            }
+        }
+        return try body()
+    }
+
     public func call2<T: Decodable>(_ expression: String, _ args: [JSONValue] = [],
                                     as type: T.Type) throws -> T {
         let encoder = JSONEncoder()

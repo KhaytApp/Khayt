@@ -33,6 +33,44 @@ enum Converter {
     /// megabytes.
     static let inlineLimit = 4 << 20
 
+    /// How much mesh may cross for a COLOUR PLAN, which is the one job that
+    /// needs it.
+    ///
+    /// ── WHY THERE IS A SECOND, LARGER LIMIT ───────────────────────────────
+    ///
+    /// Full Spectrum and band-swap rewrite the paint codec inside the mesh:
+    /// every `paint_color` attribute is remapped onto the target's physical
+    /// heads. That cannot be done from the outside, so for those two options
+    /// the `.model` members have to be in the engine — and this app used to
+    /// refuse both outright and send the shop to the other app.
+    ///
+    /// MEASURED, twice, because the first measurement chose the wrong number.
+    ///
+    /// Passing a mesh as an ordinary argument costs about twenty-six times its
+    /// size in memory: `call2` substitutes arguments into the script's own
+    /// source, so the XML is escaped, concatenated and re-parsed. A 32 MB
+    /// model peaked at 840 MB that way. BOUND as a global instead it crosses
+    /// once — 256 MB costs 0.04s and 883 MB, the same memory as 32 MB the
+    /// other way — which is why `convertMembers` takes `meshes` separately.
+    ///
+    /// And the limit is sized against the files that NEED a colour plan, not
+    /// against the library. That distinction is the whole of it: 32 MB covers
+    /// 93% of this shop's 3MFs but only 4 of the 11 with more than four
+    /// colours, because a model painted in sixteen colours is a detailed one.
+    /// Measured across those eleven — 2.3, 3.9, 7.3, 8.7, 42, 95, 96, 146,
+    /// 185, 230 and 602 MB — 256 MB reaches ten of them. The last is refused
+    /// by name and by size rather than the whole feature being refused as a
+    /// category, which is what this app did before.
+    ///
+    /// A `var` for one reason: a test that proves the refusal would otherwise
+    /// have to write a 256 MB file to disk on every run. It lowers this and
+    /// puts it back. Nothing in the app ever assigns to it.
+    nonisolated(unsafe) static var paintInlineLimit = 256 << 20
+
+    /// The same figure in megabytes, for the sentence a shop reads. Derived
+    /// rather than written twice, so the message cannot outlive the limit.
+    nonisolated static var paintLimitMB: Int { paintInlineLimit / 1_048_576 }
+
     /// The root model — the member that is the mesh, and the one member whose
     /// LAYOUT the rule still has to see.
     ///
@@ -76,20 +114,23 @@ enum Converter {
         case notOurs
         case unreadable(String)
         case refused(String)
-        case needsTheMesh
+        /// A colour plan was asked for on a mesh too large to bring in.
+        case meshTooBig(String, bytes: Int)
 
         var description: String {
             switch self {
             case .notOurs: return "Another app has this book open."
             case .unreadable(let why): return "Could not read the 3MF: \(why)"
             case .refused(let why): return why
-            case .needsTheMesh:
-                // Said plainly rather than half-done. Full Spectrum and
-                // band-swap rewrite the paint codec inside the mesh itself,
-                // which means the whole mesh would have to cross into the
-                // engine — the one thing this design exists to avoid.
-                return "That colour option rewrites the model itself, which this app cannot do yet. "
-                     + "Convert it in Khayt, or choose a plain retarget."
+            case .meshTooBig(let name, let bytes):
+                // The SIZE and the NAME, because "too large" on its own is a
+                // wall. A shop told which member and how big it is can see
+                // that a plain retarget of the same file will still work.
+                let mb = String(format: "%.0f", Double(bytes) / 1_048_576)
+                let cap = Converter.paintLimitMB
+                return "A colour plan has to rewrite the model itself, and \(name) is \(mb) MB — "
+                     + "more than the \(cap) MB this app will bring in at once. "
+                     + "Convert it in Khayt, or retarget it here without a colour plan."
             }
         }
     }
@@ -103,12 +144,11 @@ enum Converter {
     /// Convert `source` for a target printer and write the result to `into`.
     static func convert(_ source: URL, into destination: URL,
                         options: [String: JSONValue], engine: KhaytEngine) async throws -> Result {
-        // Paint plans need the mesh in the engine, and the mesh does not go
-        // there. Refused UP FRONT rather than after a long read that produces
-        // a file quietly missing its colours.
-        if truthy(options["fullSpectrum"]) || truthy(options["bandSwap"]) {
-            throw Failure.needsTheMesh
-        }
+        // A colour plan rewrites the mesh, so for those two options the
+        // `.model` members come in with their bytes. Everything else still
+        // crosses by name, which is what keeps the rest of a 400 MB file out
+        // of this process.
+        let paintPlan = truthy(options["fullSpectrum"]) || truthy(options["bandSwap"])
 
         let entries: [Zip.Entry]
         do { entries = try Zip.entries(of: source) }
@@ -118,11 +158,32 @@ enum Converter {
         // What the engine is told about each member: everything small enough to
         // decide about, and nothing else.
         var described: [JSONValue] = []
+        /// Model XML, bound by name rather than carried in the script.
+        var meshes: [String: String] = [:]
         for entry in entries {
             var member: [String: JSONValue] = [
                 "name": .string(entry.name),
                 "size": .number(Double(entry.size)),
             ]
+            let isModel = entry.name.lowercased().hasSuffix(".model")
+            // A colour plan reads and rewrites EVERY `.model` member, not only
+            // the root: a 3MF may carry one per object.
+            if paintPlan, isModel {
+                guard entry.size <= paintInlineLimit else {
+                    throw Failure.meshTooBig(entry.name, bytes: entry.size)
+                }
+                guard let data = try? Zip.data(of: entry, in: source, limit: .max),
+                      let text = String(data: data, encoding: .utf8) else {
+                    throw Failure.unreadable("\(entry.name) would not come out as text")
+                }
+                // BOUND, not passed. See `KhaytEngine.convertMembers(_:options:meshes:)`:
+                // a model in a script's source costs twenty-six times its size.
+                let variable = "__khaytMesh\(meshes.count)"
+                meshes[variable] = text
+                member["meshVar"] = .string(variable)
+                described.append(.object(member))
+                continue
+            }
             if entry.size <= inlineLimit, let data = try? Zip.data(of: entry, in: source),
                let text = String(data: data, encoding: .utf8) {
                 member["data"] = .string(text)
@@ -141,7 +202,7 @@ enum Converter {
             described.append(.object(member))
         }
 
-        let planned = try await engine.convertMembers(described, options: options)
+        let planned = try await engine.convertMembers(described, options: options, meshes: meshes)
         guard planned.ok, let members = planned.members else {
             throw Failure.refused(planned.error ?? "the converter refused it")
         }
