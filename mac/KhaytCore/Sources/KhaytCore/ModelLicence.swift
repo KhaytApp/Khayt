@@ -127,3 +127,55 @@ public enum ModelLicence {
         }
     }
 }
+
+extension ModelLicence {
+
+    /// The licence a MODEL FILE claims, translated — or nothing.
+    ///
+    /// ── IT REFUSES FAR MORE OFTEN THAN IT AGREES, ON PURPOSE ──────────────
+    ///
+    /// `find` matches this module's own ids and nothing else, which is right
+    /// for a value a person chose from a menu and useless for one a slicer
+    /// wrote. A 3MF says `BY-NC-SA`, not `cc-by-nc-sa`.
+    ///
+    /// Measured on a real shop's ninety files, the licence strings that
+    /// actually turn up are: `BY-NC-SA`, `Standard Digital File License` and
+    /// `MakerWorld Exclusive License`. Only the first is a licence this module
+    /// can reason about. The other two are a platform's own terms — they are
+    /// not Creative Commons, they are not "commercial", and deciding either
+    /// way would be this app inventing a legal opinion.
+    ///
+    /// So they come back nil, and nil means NOBODY HAS SAID — which the rest
+    /// of this module is careful to keep distinct from "no". The alternative
+    /// is worse in both directions: guessing permissive tells a shop it may
+    /// sell something it may not, and guessing restrictive tells a shop it may
+    /// not sell its own work.
+    public static func fromFile(_ said: String?) -> Licence? {
+        let raw = (said ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !raw.isEmpty else { return nil }
+        // The id itself, first: a file that already spells it this module's
+        // way needs no table.
+        if let exact = byId(raw) { return exact }
+        // `CC BY-NC-SA 4.0`, `cc-by-nc-sa`, `BY-NC-SA` — one shape.
+        var tidy = raw.replacingOccurrences(of: "_", with: "-")
+            .replacingOccurrences(of: " ", with: "-")
+        while tidy.contains("--") { tidy = tidy.replacingOccurrences(of: "--", with: "-") }
+        for version in ["-4.0", "-3.0", "-2.0", "-1.0", "-international", "-intl"] {
+            if tidy.hasSuffix(version) { tidy = String(tidy.dropLast(version.count)) }
+        }
+        if tidy.hasPrefix("cc-") { tidy = String(tidy.dropFirst(3)) }
+        if tidy == "cc0" || tidy == "zero" || tidy == "public-domain" { return byId("cc0") }
+        // What is left must be exactly a Creative Commons clause list. Anything
+        // else — a platform's own terms, a sentence, a URL — is not translated.
+        // A stray separator means it is not a clean clause list — `-BY-` is
+        // not `BY`. Swift drops empty pieces when splitting, so without this
+        // the stray one is simply absorbed.
+        guard !tidy.hasPrefix("-"), !tidy.hasSuffix("-") else { return nil }
+        let clauses = tidy.split(separator: "-").map(String.init)
+        let known: Set<String> = ["by", "nc", "sa", "nd"]
+        guard !clauses.isEmpty, clauses.first == "by",
+              clauses.allSatisfy({ known.contains($0) }),
+              Set(clauses).count == clauses.count else { return nil }
+        return byId("cc-" + clauses.joined(separator: "-"))
+    }
+}

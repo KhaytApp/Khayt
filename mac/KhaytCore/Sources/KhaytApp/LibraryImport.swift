@@ -247,6 +247,16 @@ enum LibraryImport {
         let size = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size]
                     as? Int) ?? 0
 
+        // ── WHO MADE IT, WHICH THE FILE HAS BEEN SAYING ALL ALONG ────────
+        //
+        // Read here, while the file is open and warm, and used below only
+        // where the shop has not already written something itself. `ModelLicence`
+        // answers whether a print may be SOLD, and until now it had no data
+        // on any book: a licence was recorded only when somebody opened a
+        // menu and chose one. Twenty-one of this shop's ninety models name a
+        // designer in the file, and three of those are non-commercial.
+        let said = Mesh.provenance(of: destination)
+
         var geometry: Mesh.Measurement?
         switch ext {
         case "3mf": geometry = try? Mesh.measure3MF(destination)
@@ -309,7 +319,7 @@ enum LibraryImport {
                                  hash: hash, key: key,
                                  reader: try? await engine.geometryReader(), colours: colours,
                                  swapCount: swapCount, thumbFile: thumbFile, group: group,
-                                 riskAnalysis: riskAnalysis)
+                                 provenance: said, riskAnalysis: riskAnalysis)
         do {
             try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
                 var rows: [JSONValue] = []
@@ -442,6 +452,7 @@ enum LibraryImport {
                        colours: [JSONValue],
                        swapCount: Int, thumbFile: String?,
                        group: String? = nil,
+                       provenance: Mesh.Provenance? = nil,
                        riskAnalysis: [String: JSONValue]? = nil,
                        now: Double = Date().timeIntervalSince1970 * 1000)
         -> [String: JSONValue] {
@@ -471,6 +482,17 @@ enum LibraryImport {
             "userPhoto": .null,
             "slicerProfileId": .null, "testedNotes": .string(""),
             "tags": .array([]), "material": .string(""),
+            // WHAT THE FILE SAID, and nothing more. The designer goes in
+            // `source`, which is documented as "a URL, a designer, or my own
+            // design"; the licence only when `fromFile` could translate it,
+            // which it refuses to do for a platform's own terms. An empty
+            // string here is the same "nobody has said" every record written
+            // before this carried, so nothing is being claimed on their
+            // behalf.
+            "source": .string(provenance?.designer ?? ""),
+            "licence": .string(provenance.flatMap {
+                ModelLicence.fromFile($0.licence)?.id
+            } ?? ""),
             // BOTH KEYS, and that is not belt and braces. `group` is the name
             // the field has had since 3.7.0-beta.25 and `folder` is what it was
             // called before; nothing was migrated, so a build older than that
