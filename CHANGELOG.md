@@ -2133,6 +2133,35 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) The state marks came from seven different typefaces.** Of the
+  fifteen glyphs this app draws a job's or a machine's state with, seven were
+  in the system face and the other eight fell back to seven other fonts —
+  three of them to **Menlo**, a typewriter face, and one to a dingbat font. So
+  a row of chips was set in up to eight cuts at once, at eight weights. Nobody
+  chose that: a character map says a glyph exists and says nothing about which
+  face will draw it, so the fallback chain was choosing, per character.
+
+  Every mark now names its own face: the system one wherever it has the mark,
+  and one family for the rest. Not one face for all of them — the system face
+  carries about twenty usable marks against fourteen meanings, and forcing it
+  would mean a star standing for a quote.
+
+  Naming the face exposed the next problem, which only a picture of all
+  fourteen chips together could show: the second family draws these marks a
+  fifth smaller at the same size, so the hexagons read as dots beside the
+  triangles. They are scaled to match now, by a ratio measured off the faces
+  themselves rather than written down.
+
+  "Not delivered" is gone — it was the widest chip in the set and **nothing in
+  the app drew it**, on any branch.
+
+- **(Mac) The ledger counted down on work that was over.** A job the shop
+  finished in April read "−144d" in its due column: a hundred and forty-four
+  days late, about something that is done. A cancelled job did the same, and it
+  is not late and never will be. A promise date is a deadline until the thing
+  is made and a fact afterwards, so a finished or cancelled row says when it
+  was due and stops counting. Work still in flight counts down as before.
+
 - **(Mac) Settings fields drew their text against the far edge of the pane.**
   "Phone" sat on the left of the window and `+966 50 000 0000` on the right,
   a whole column apart, and the caret landed nowhere near the label it belongs

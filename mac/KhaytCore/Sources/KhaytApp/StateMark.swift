@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import CoreText
 
 /// What a thing's state looks like — §4 of the design spec.
 ///
@@ -35,7 +36,7 @@ enum ShopState: String, CaseIterable, Hashable {
     // `cancelled` is here and not above: a job the shop stopped is not
     // asking for anything. It is where the work went to stop being work, and
     // it must be as quiet on the eye as `done` is.
-    case running, queued, finishing, done, cancelled, quoted, offline, failedToSend
+    case running, queued, finishing, done, cancelled, quoted, offline
 
     /// ── SILHOUETTE SEPARATES KINDS; FILL SEPARATES SEVERITY ─────────────
     ///
@@ -90,14 +91,97 @@ enum ShopState: String, CaseIterable, Hashable {
         case .stockOut:       "▼"
         case .stockLow:       "▽"
         case .running:        "●"
-        case .queued:         "◌"
+        case .queued:         "○"
         case .finishing:      "◑"
         case .done:           "✓"
         case .cancelled:      "⊗"
         case .quoted:         "◇"
-        case .offline:        "✕"
-        case .failedToSend:   "✉"
+        case .offline:        "⊘"
         }
+    }
+
+    /// ── THE FACE A MARK IS DRAWN IN, CHOSEN RATHER THAN FALLEN INTO ────
+    ///
+    /// MEASURED: of the fifteen marks this set used, SEVEN were in the system
+    /// face and the other eight fell back to SEVEN DIFFERENT TYPEFACES — `◔`,
+    /// `◷` and `✉` to Menlo, a typewriter face; `⊘` to Apple Symbols; `◌` to
+    /// SF Arabic; `◑` to Hiragino; `◇` to the CJK fallback; `✕` to Zapf
+    /// Dingbats, which is a dingbat font. A row of chips was set in up to
+    /// eight cuts at once, at eight different weights and optical sizes.
+    ///
+    /// Nobody chose that. A character map says a glyph EXISTS and says nothing
+    /// about which face will draw it, so the fallback chain was choosing, and
+    /// it chooses per character.
+    ///
+    /// ── TWO FACES, AND WHY NOT ONE ────────────────────────────────────────
+    ///
+    /// The system face carries about twenty usable geometric marks and this
+    /// vocabulary needs fourteen with distinct meanings. Forcing all of them
+    /// into it means assignments that are available rather than apt — a STAR
+    /// standing for a quote — and a mark that has to be learnt is worse than
+    /// one drawn a quarter-point light.
+    ///
+    /// So: the system face wherever it has the mark, and Apple Symbols for the
+    /// rest, named here rather than arrived at. It was the only family
+    /// measured that carries every remaining one. `StateGlyphTests` holds the
+    /// set to those two.
+    var face: String? {
+        switch self {
+        // Drawn by the system face, which is every mark this app could get
+        // from it without inventing a meaning.
+        case .orderLate, .orderToday, .machineStopped, .machineCheck,
+             .stockOut, .stockLow, .running, .queued, .done, .cancelled:
+            return nil
+        // The ones it does not have. One family, so they at least agree with
+        // each other — the pair `⬢`/`⬡` came from here already and `⊘`, freed
+        // when the nozzle kind merged, is a better "not reachable" than the
+        // Zapf Dingbats `✕` it replaces.
+        case .nozzleBlocked, .nozzleWorn, .finishing, .quoted, .offline:
+            return "Apple Symbols"
+        }
+    }
+
+    /// ── AND THE SIZE, BECAUSE NAMING THE FACE EXPOSED THE NEXT PROBLEM ──
+    ///
+    /// Two faces agreeing on WHICH cut does not make them agree on how big.
+    /// Measured at 10pt: the system face draws its marks at a mean height of
+    /// 7.43 points and Apple Symbols draws these at 6.13 — so once every mark
+    /// was in its chosen face, the five from Apple Symbols were visibly small
+    /// and light beside the nine that were not. The hexagons read as dots.
+    ///
+    /// Found by drawing all fourteen chips in ONE picture, which nothing in
+    /// this app had ever done: every chip appears beside jobs and machines and
+    /// never beside the other thirteen, so a set that is wrong AS A SET looks
+    /// fine everywhere. `ShellSnapshots.everyState` is that picture now.
+    ///
+    /// COMPUTED, not a constant. The ratio is read off the faces themselves at
+    /// the size being asked for, so it cannot drift when a face is swapped or
+    /// macOS reships one — and a number like `1.213` written into this file
+    /// would be a measurement nobody could check.
+    func markSize(_ base: CGFloat) -> CGFloat {
+        guard let name = face, let mine = NSFont(name: name, size: base) else { return base }
+        let system = NSFont.systemFont(ofSize: base, weight: .semibold)
+        // The system face's own marks vary — a triangle is shorter than a
+        // circle — so the target is their MEAN rather than any one of them.
+        // Matching a diamond to the tallest would overshoot every time.
+        let want = ["▲", "■", "●", "✓"].map { Self.drawnHeight($0, in: system) }
+        let got = Self.drawnHeight(glyph, in: mine)
+        let mean = want.reduce(0, +) / CGFloat(want.count)
+        guard got > 0, mean > 0 else { return base }
+        return base * mean / got
+    }
+
+    /// How tall a face actually DRAWS a character — the glyph's own bounding
+    /// box, not the point size, which is the em and tells you nothing about
+    /// what lands on screen.
+    static func drawnHeight(_ glyph: String, in font: NSFont) -> CGFloat {
+        var units = Array(glyph.utf16)
+        var ids = [CGGlyph](repeating: 0, count: units.count)
+        guard CTFontGetGlyphsForCharacters(font as CTFont, &units, &ids, units.count) else {
+            return 0
+        }
+        return CTFontGetBoundingRectsForGlyphs(font as CTFont, .horizontal, &ids, nil,
+                                               ids.count).height
     }
 
     /// The word carries the severity: STOPPED and CHECK IT are the same kind
@@ -121,7 +205,6 @@ enum ShopState: String, CaseIterable, Hashable {
         case .cancelled:      "mac.cancelled"
         case .quoted:         "mac.state_quoted"
         case .offline:        "mac.state_offline"
-        case .failedToSend:   "mac.state_failed_send"
         }
     }
 
@@ -130,7 +213,7 @@ enum ShopState: String, CaseIterable, Hashable {
         case .orderLate, .machineStopped, .nozzleBlocked, .stockOut: Role.late
         case .orderToday, .machineCheck, .nozzleWorn, .stockLow, .finishing: Role.warn
         case .running:                     Role.ok
-        case .queued, .done, .failedToSend: Role.text2
+        case .queued, .done:               Role.text2
         case .quoted, .offline, .cancelled: Role.text3
         }
     }
@@ -138,7 +221,6 @@ enum ShopState: String, CaseIterable, Hashable {
     var ground: Color? {
         switch self {
         case .orderLate, .machineStopped, .nozzleBlocked, .stockOut: Role.lateBg
-        case .failedToSend:                                          Role.lateBg
         case .orderToday, .machineCheck, .nozzleWorn, .stockLow:     Role.warnBg
         case .running:                                               Role.okBg
         default:                                                     nil
@@ -171,7 +253,7 @@ enum ShopState: String, CaseIterable, Hashable {
     var isAttention: Bool {
         switch self {
         case .running, .queued, .finishing, .done, .cancelled,
-             .quoted, .offline, .failedToSend: false
+             .quoted, .offline: false
         default: true
         }
     }
@@ -208,7 +290,12 @@ struct StateChip: View {
 
     var body: some View {
         HStack(spacing: Space.xs) {
+            // The mark in ITS face, not whichever one the fallback chain
+            // reaches for — see `ShopState.face`.
             Text(state.glyph)
+                .font(state.face.flatMap {
+                    NSFont(name: $0, size: state.markSize(10)).map(Font.init)
+                })
             Text(words.callIt(state.wordKey).uppercased())
                 .tracking(0.9)
         }

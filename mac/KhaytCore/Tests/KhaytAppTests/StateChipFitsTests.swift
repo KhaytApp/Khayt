@@ -25,17 +25,14 @@ import Testing
 @MainActor
 struct StateChipFitsTests {
 
-    /// The states a JOB can be in — which is what the ledger's column has to
-    /// hold.
+    /// Every state a job can be in — which is now every state there is.
     ///
-    /// `failedToSend` is left out, and finding out why was worth the detour:
-    /// it says "Not delivered", it is the widest chip in the set at 120pt, and
-    /// **nothing in this app draws it**. Not one file outside `ShopState`
-    /// mentions it. It is a MESSAGE's state sitting in a job's vocabulary with
-    /// no caller — so widening every ledger row by twenty points to fit a chip
-    /// that has never appeared would be paying for something that does not
-    /// exist. Whatever screen eventually shows it sizes its own box.
-    static let aJobCanBe = ShopState.allCases.filter { $0 != .failedToSend }
+    /// `failedToSend` used to be excluded here, and finding out why was worth
+    /// the detour: it said "Not delivered", it was the widest chip in the set
+    /// at 120pt, and NOTHING IN THIS APP DREW IT — not one file outside
+    /// `ShopState`, on any branch, including the webhook work in flight. It is
+    /// gone now rather than excused, so the exclusion is gone with it.
+    static let aJobCanBe = ShopState.allCases
 
     @Test("every state's chip fits its column, in both languages")
     func everyChipFits() async throws {
