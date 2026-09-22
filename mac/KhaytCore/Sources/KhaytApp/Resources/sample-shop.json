@@ -146,8 +146,8 @@
      "supportWeight": 0,
      "printTime": 19.9026,
      "qty": 2,
-     "unitCost": 268.68,
-     "baseCost": 268.68,
+     "unitCost": 700,
+     "baseCost": 700,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -156,7 +156,7 @@
    "price": 1120.72,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 537.36,
+   "costBasis": 1400,
    "paymentStatus": "partial",
    "paidAmount": 560.36,
    "paymentMethod": null,

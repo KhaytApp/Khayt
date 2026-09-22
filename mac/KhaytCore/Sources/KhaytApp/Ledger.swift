@@ -108,6 +108,10 @@ struct LedgerRow: View {
 
     private var selected: Bool { shop.ledgerSelection?.id == row.id }
 
+    /// The shop charged less than the job cost it. Nil margin is not this —
+    /// a cost the book was never told is unknown, not a loss.
+    private var soldBelowCost: Bool { (row.margin ?? 0) < 0 }
+
     var body: some View {
         HStack(spacing: 8) {
             StateChip(state: row.state, words: shop.words, onNavy: selected)
@@ -132,8 +136,24 @@ struct LedgerRow: View {
                 .frame(width: 68, alignment: .trailing)
             // A margin nobody can compute is a dash — never a zero, and never
             // a percentage of a cost the book was not told.
-            Figure(value: row.margin, style: .signedPercent, size: 10.5,
-                   tint: selected ? Role.onNavy2 : Role.text2)
+            //
+            // ── A MARGIN IS A LEVEL, AND A LOSS IS NEWS ───────────────────
+            //
+            // It was set in `signedPercent`, so every row on this screen read
+            // "+56%", "+58%", "+65%" — fifteen plus signs down a column, which
+            // is a sign that carries nothing. That style is for a rise or a
+            // fall; a margin is how much of the price was kept, and nobody
+            // says a job made "plus fifty-six percent".
+            //
+            // A NEGATIVE one is the row this column exists to find, and it was
+            // drawn in the same secondary grey as every other. `ProductProfit`
+            // had already made this call for the same figure — "red for a
+            // product that loses money, and nothing for one that does not:
+            // every other row is the ordinary case" — and the ledger, which is
+            // where a shop actually reads its jobs, had not.
+            Figure(value: row.margin, style: .percent, size: 10.5,
+                   tint: soldBelowCost ? Role.late
+                                       : (selected ? Role.onNavy2 : Role.text2))
                 .frame(width: 56, alignment: .trailing)
         }
         .padding(.horizontal, 12)

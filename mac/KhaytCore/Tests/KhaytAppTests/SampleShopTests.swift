@@ -153,6 +153,47 @@ struct SampleShopTests {
         #expect(fill.count >= 4, "the sample spools all sit at the same fill: \(fill.sorted())")
     }
 
+    /// ── ONE JOB THE SHOP LOST MONEY ON ───────────────────────────────────
+    ///
+    /// Forty-two jobs, forty-two positive margins. So the ledger's margin
+    /// column had never been drawn negative — which is the one row that column
+    /// exists to help a shop find, and the only case where its sign carries
+    /// anything. It was drawn in the same secondary grey as every other row
+    /// and nobody could have noticed, because on this book it could not
+    /// happen.
+    ///
+    /// ORD-01002 is the job in this book that went badly already — it is the
+    /// one carrying a rating of 2 — so it is the one that failed twice before
+    /// it printed, and cost more than it was quoted at. It stays a partial
+    /// payment, so it is a BRIGHT row rather than a settled one nobody looks
+    /// at twice.
+    ///
+    /// And the other side of the test matters as much: a book where every
+    /// margin is negative teaches a reviewer nothing either. The loss has to
+    /// be the exception it is in a real shop.
+    @Test("the sample shop has a job it lost money on, and exactly one")
+    func oneJobWentBadly() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let priced = shop.orders.filter { $0.price > 0 && $0.costBasis > 0 }
+        #expect(priced.count > 20, "the sample stopped being able to show a margin at all")
+
+        let lost = priced.filter { $0.costBasis > $0.price }
+        #expect(lost.count == 1, """
+            the ledger draws a loss-making job differently and this book has \
+            \(lost.count) of them — one is the case, several is a different book
+            """)
+        let job = try #require(lost.first)
+        #expect(!job.isSettled, "the loss-making job is settled, so it draws dimmed")
+        // Deep enough to read as a loss rather than as a rounding error.
+        let margin = (job.price - job.costBasis) / job.price
+        #expect(margin < -0.1, "the loss is \(margin), which rounds to nothing on screen")
+
+        // And it is still the exception.
+        #expect(Double(lost.count) / Double(priced.count) < 0.1,
+                "a book where losses are ordinary shows nothing about the ordinary case")
+    }
+
     /// The tax on a purchase is a real field now, and a book that carries none
     /// of it shows nothing of the work. It must also carry a purchase with NO
     /// tax — an import — because "absent is zero" is the rule that keeps every
