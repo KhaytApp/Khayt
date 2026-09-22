@@ -2305,6 +2305,105 @@ final class Shop {
         takingAJob = true
     }
 
+    // MARK: - Selling a piece off the shelf
+
+    /// Sell something already printed, boxed and counted.
+    ///
+    /// ── THIS IS A SALE, NOT A JOB ─────────────────────────────────────────
+    ///
+    /// Every order this app has ever written is work the shop made for
+    /// somebody. A piece off the shelf was made weeks ago for nobody in
+    /// particular, and handing it across the counter is the moment it becomes
+    /// money — so the order is created ALREADY DONE: completed, dated today,
+    /// with no machine and nothing to queue.
+    ///
+    /// ── AND EVERYTHING LANDS ON THE SALE, WHICH IS ONE DECISION ───────────
+    ///
+    /// Its price, its cost AND its print hours. Cost moving with the sale is
+    /// the shop's own choice — it keeps each sale's margin honest and matches
+    /// how the catalogue already prices a piece — and the hours have to follow
+    /// for the figures to stay true: `lib/cost-trends.js` divides revenue by
+    /// hours, so revenue arriving with no hours behind it would inflate what
+    /// the shop believes an hour of printing earns. The piece really did take
+    /// those hours; they are being recorded when it sold rather than when it
+    /// was made.
+    ///
+    /// The filament is NOT deducted again. It left the shelf when the batch
+    /// was printed, and `materialDeducted` stays false on a record that never
+    /// consumed anything.
+    func sellFromShelf(_ product: Product, count: Int = 1) async {
+        guard case .store(let build) = source, let engine, count > 0 else { return }
+        let onShelf = stockCount(of: product.id)
+        guard let onShelf, onShelf >= count else {
+            writeProblem = words.callIt("mac.not_enough_on_shelf"); return
+        }
+
+        // COSTED, not just measured — the same call the new-job sheet makes,
+        // so a shelf sale carries exactly the cost the catalogue prices with.
+        let parts = await jobParts(from: product)
+        var input = newJobInput(parts: parts,
+                                project: product.anyName(),
+                                clientId: nil,
+                                margin: product.margin ?? defaultMargin,
+                                discountPct: 0, shippingCost: 0, deposit: 0,
+                                rush: false, asQuote: false, fromProduct: product,
+                                rule: Self.priceRule(of: product))
+        input["fromStock"] = JSONValue.bool(true)
+
+        writeProblem = nil
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+            let orders = Self.rows(root, "printLog")
+            let out = try await engine.newOrder(
+                input, orders: orders, settings: Self.settings(root), now: Date(),
+                tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)))
+            guard case .object(var record) = out.order else { return }
+
+            // ALREADY DONE. Nothing about this waits on a machine, so it never
+            // sits in the queue: a shelf sale that appears under Pending is a
+            // job somebody will go looking for a printer to start.
+            let now = StoreWriter.iso(Date())
+            record["status"] = .string("completed")
+            record["completedAt"] = .string(now)
+            record["statusHistory"] = .array([
+                .object(["status": .string("completed"), "at": .string(now)]),
+            ])
+            record["queuePos"] = .null
+            record["machineId"] = .null
+            record["dueDate"] = .null
+            root["printLog"] = .array([.object(record)] + orders)
+
+            // AND THE SHELF IS SMALLER, which the storefront has to be told:
+            // it watches its OWN orders and cannot see a piece handed over a
+            // counter. Re-dated for the same reason every count is — see
+            // `recordStockCount`.
+            // The invoice counter the order consumed travels with it, for the
+            // reason `createJob` gives: one swap, both records.
+            var settings = out.settings
+            Self.putStockCount(onShelf - count, for: product.id, into: &settings, at: Date())
+            root["settings"] = .object(settings)
+            }
+        } catch let refusal as MoveRefused {
+            writeProblem = refusal.sentence
+        } catch {
+            writeProblem = String(describing: error)
+        }
+    }
+
+    /// How many of a product this shop has sold off its shelf.
+    ///
+    /// Khayt's own sales only. A piece bought through the online store is the
+    /// storefront's to count — the feed runs one way — so this is what the
+    /// shop sold across the counter, and it says so rather than implying it is
+    /// the whole picture.
+    func soldFromShelf(_ productId: String) -> Int {
+        orders.filter { $0.fromStock && $0.productId == productId }.count
+    }
+
     /// The tiers a product offers, as the sheet shows them.
     ///
     /// A NAMED MARGIN, not a price. "Wholesale 20%" replaces the margin on the
@@ -5149,6 +5248,116 @@ final class Shop {
             root["settings"] = .object(settings)
             Self.stampKit(&root, ids: Set(ids), to: resolved.id)
         }
+    }
+
+    // MARK: - What is already printed and on the shelf
+
+    /// How many of a product the shop has printed, boxed and counted.
+    ///
+    /// ── THE SHOP OWNS THE COUNT; THE STOREFRONT OWNS WHAT IS LEFT ─────────
+    ///
+    /// Khayt says how many were COUNTED. The storefront says how many remain,
+    /// because it is the thing watching orders. Re-applying Khayt's figure on
+    /// every poll would resurrect units somebody had already bought — which is
+    /// why `stockCountedAt` exists beside the number and why the number alone
+    /// is not enough to decide with. A shop that sells three, prints three and
+    /// re-counts publishes the same figure, and a comparison of numbers reads
+    /// that as nothing having happened.
+    ///
+    /// Kept in `settings.storefront`, in the two maps the other app already
+    /// writes — one contract, and deliberately NOT a field on the product
+    /// record. `Product` is re-encoded whole on save, and this app has already
+    /// dropped a product's part costs and re-priced it 50 → 13.74 that way; a
+    /// count that lives outside that record cannot be lost to it.
+    ///
+    /// TWO MAPS RATHER THAN ONE, which is the other app's reasoning kept: a
+    /// build that merges whole records cannot then half-write a count with
+    /// somebody else's timestamp attached to it.
+    func stockCount(of productId: String) -> Int? {
+        Self.stockCount(of: productId, in: settingsValue)
+    }
+
+    /// The read, as a function of the settings alone — so the contract with
+    /// the other app can be exercised without a book on disk.
+    static func stockCount(of productId: String, in settings: JSONValue) -> Int? {
+        guard case .object(let settings) = settings,
+              case .object(let store)? = settings["storefront"],
+              case .object(let counts)? = store["stockQty"],
+              case .number(let n)? = counts[productId] else { return nil }
+        // EMPTY IS NOT ZERO, which is the other app's own words for it: empty
+        // means the shop does not stock this piece and a storefront must leave
+        // its inventory alone entirely; zero means it stocks it and the batch
+        // has sold out, which is a state it reverses next week. Reading one as
+        // the other moves a customer's quoted date by weeks in whichever
+        // direction is wrong.
+        return Int(n)
+    }
+
+    /// When the shop last counted it. A storefront re-applies a figure only
+    /// when this moves, so it is the half that makes the number safe to send.
+    func stockCountedAt(of productId: String) -> String? {
+        Self.stockCountedAt(of: productId, in: settingsValue)
+    }
+
+    static func stockCountedAt(of productId: String, in settings: JSONValue) -> String? {
+        guard case .object(let settings) = settings,
+              case .object(let store)? = settings["storefront"],
+              case .object(let when)? = store["stockCountedAt"],
+              case .string(let at)? = when[productId], !at.isEmpty else { return nil }
+        return at
+    }
+
+    /// Record a count. Dated whenever the shop SAYS so, including when the
+    /// number has not moved.
+    ///
+    /// That is the whole point and it is easy to get backwards: dating it on
+    /// CHANGE reproduces the exact bug the field exists to fix — sell three,
+    /// print three, re-count to the same figure, and the storefront is told
+    /// nothing happened and keeps under-selling the shelf. So this is called
+    /// from the counting sheet and from nowhere else, and never from a product
+    /// save, which would re-assert every count whenever somebody opened a
+    /// product to edit its price.
+    ///
+    /// Nil clears both, for a product that is no longer stocked. Zero is NOT
+    /// nil: zero is a count, and a shop that has counted a shelf and found it
+    /// empty has said something.
+    func recordStockCount(_ count: Int?, for productId: String) async {
+        guard case .store(let build) = source, !productId.isEmpty else { return }
+        await writeKits(build, named: words.callIt("mac.stock_counted")) { root in
+            var settings = Self.settings(root)
+            Self.putStockCount(count, for: productId, into: &settings, at: Date())
+            root["settings"] = .object(settings)
+        }
+    }
+
+    /// The write, as a transform on the settings — testable, and the only
+    /// place the shape of the two maps is decided.
+    ///
+    /// MERGED, not rebuilt. The other app reconstructs both maps from the
+    /// dialog it just showed, which is right there because the dialog holds
+    /// every product; here one product is being counted and the rest must be
+    /// left exactly as they were.
+    static func putStockCount(_ count: Int?, for productId: String,
+                              into settings: inout [String: JSONValue], at now: Date) {
+        var store: [String: JSONValue] = [:]
+        if case .object(let existing)? = settings["storefront"] { store = existing }
+        var counts: [String: JSONValue] = [:]
+        if case .object(let existing)? = store["stockQty"] { counts = existing }
+        var when: [String: JSONValue] = [:]
+        if case .object(let existing)? = store["stockCountedAt"] { when = existing }
+
+        if let count {
+            counts[productId] = .number(Double(max(0, count)))
+            // DATED ON EVERY CALL, because every call is a shop saying it
+            // counted. See the note on `recordStockCount`.
+            when[productId] = .string(StoreWriter.iso(now))
+        } else {
+            counts.removeValue(forKey: productId)
+            when.removeValue(forKey: productId)
+        }
+        store["stockQty"] = .object(counts)
+        store["stockCountedAt"] = .object(when)
+        settings["storefront"] = .object(store)
     }
 
     /// Kit names one or two edits from this one, to ask about before filing.

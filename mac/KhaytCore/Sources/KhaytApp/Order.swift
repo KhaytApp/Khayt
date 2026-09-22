@@ -48,6 +48,15 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     let priorityLevel: String?
     let notes: String
     let machineId: String?
+    /// This piece came off the shelf. It was printed in a batch weeks ago and
+    /// is being SOLD now, not made now — so its price, its cost and its print
+    /// hours all land on the sale, which is the only combination that leaves
+    /// the existing figures true.
+    ///
+    /// Absent on every order written before stock existed, and absent on every
+    /// made-to-order job since, so `false` and "nobody said" are the same
+    /// answer here and there is nothing to migrate.
+    let fromStock: Bool
     /// The customer's row in `clients`, when the job was linked to one. Absent
     /// on a job taken for a walk-in, and on every job in a shop that has never
     /// used the customer screen.
@@ -79,6 +88,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         case id, date, status, project, client, currency, price, paidAmount, costBasis
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
         case machineId, clientId, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
+        case fromStock
         case instalments, instalmentBase
     }
 
@@ -116,6 +126,9 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         priorityLevel = try c.decodeIfPresent(String.self, forKey: .priorityLevel)
         notes = try c.decode(String.self, forKey: .notes)
         machineId = try c.decodeIfPresent(String.self, forKey: .machineId)
+        // Absent means made to order, which is every order written before
+        // the shelf existed and most of them since.
+        fromStock = (try? c.decodeIfPresent(Bool.self, forKey: .fromStock)) as? Bool ?? false
         clientId = try c.decodeIfPresent(String.self, forKey: .clientId)
         productId = try c.decodeIfPresent(String.self, forKey: .productId)
         completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)

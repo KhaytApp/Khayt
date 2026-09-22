@@ -919,6 +919,49 @@ final class Words {
         // `plib.*` comes from Khayt's nine-language file and this app
         // cannot add to it with two.
         "mac.never_printed": ["en": "Never printed", "ar": "لم تُطبع"],
+        // ── WHAT IS ALREADY PRINTED AND BOXED ─────────────────────────────
+        //
+        // The shop counts; a storefront decides what is left, because it is
+        // the thing watching orders. "On the shelf" rather than "in stock":
+        // this app already says "stock" about filament and consumables, and
+        // a second meaning for the same word on a screen beside them is how
+        // somebody orders a spool instead of printing a batch.
+        "mac.on_the_shelf":  ["en": "On the shelf",  "ar": "على الرف"],
+        "mac.count_the_shelf": ["en": "Count the shelf", "ar": "جرد الرف"],
+        "mac.record_count":  ["en": "Record count",  "ar": "سجّل الجرد"],
+        "mac.not_stocked":   ["en": "Not stocked",   "ar": "غير مخزّن"],
+        "mac.counted_on":    ["en": "Counted {date}", "ar": "جُرد {date}"],
+        "mac.stock_counted": ["en": "Count the shelf", "ar": "جرد الرف"],
+        "mac.sell_from_shelf": ["en": "Sell one from the shelf", "ar": "بيع قطعة من الرف"],
+        "mac.sell_one":        ["en": "Sell one",       "ar": "بِع قطعة"],
+        "mac.sold_here_n": ["en": "Sold here: {n}", "ar": "بيع هنا: {n}"],
+        "mac.sold_here_hint": [
+            "en": "Pieces sold across the counter and recorded here. Anything "
+                + "bought through your online store is counted there.",
+            "ar": "القطع التي بيعت عند الطاولة وسُجلت هنا. ما يُشترى عبر متجرك "
+                + "الإلكتروني يُحسب هناك.",
+        ],
+        "mac.sold_from_shelf": ["en": "Sold from the shelf", "ar": "بيع من الرف"],
+        "mac.sell_from_shelf_q": ["en": "Sell one {name} from the shelf?",
+                                  "ar": "بيع قطعة {name} من الرف؟"],
+        "mac.not_enough_on_shelf": ["en": "There are not that many on the shelf.",
+                                    "ar": "لا يوجد هذا العدد على الرف."],
+        "mac.sell_from_shelf_hint": [
+            "en": "Records it as sold today at the catalogue price, with its cost "
+                + "and its print hours, and takes one off the count. Nothing is "
+                + "printed and no filament is deducted — that happened when the "
+                + "batch was made.",
+            "ar": "يسجّلها مبيعة اليوم بسعر الكتالوج، مع تكلفتها وساعات طباعتها، "
+                + "وينقص واحدة من الجرد. لا تُطبع أي قطعة ولا يُخصم خيط — حدث ذلك "
+                + "عند طباعة الدفعة.",
+        ],
+        "mac.shelf_hint": [
+            "en": "How many are printed, boxed and ready to post. A shop's "
+                + "online store uses this to offer a piece today instead of "
+                + "printing it to order.",
+            "ar": "كم قطعة مطبوعة ومعبأة وجاهزة للشحن. يستخدم متجرك هذا الرقم "
+                + "ليعرض القطعة اليوم بدل طباعتها عند الطلب.",
+        ],
         // Assembly instructions and colour guides, which used to be thrown
         // away on import. "Guides" rather than "documents": it is what the
         // creator calls them and what a shop is looking for.

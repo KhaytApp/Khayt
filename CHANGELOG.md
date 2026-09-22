@@ -6,6 +6,46 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A piece can be sold off the shelf, and the shop can see how many
+  went.** Every order this app has ever written is work the shop made for
+  somebody. A piece printed in a batch weeks ago, for nobody in particular, had
+  no way to become money — so a shelf sale never reached revenue, VAT or the
+  profit and loss at all.
+
+  Selling one writes it as done today at the catalogue price, takes a piece off
+  the count, and prints nothing: the filament left the shelf when the batch was
+  made and is not deducted twice. Its cost lands on the sale, which keeps each
+  sale's margin honest — and its print hours land with it, which is not a
+  detail. Revenue arriving with no hours behind it would inflate what the shop
+  believes an hour of its own printing earns, and nothing on any screen would
+  have said so.
+
+  The counting sheet says how many have gone across the counter, and says whose
+  sales those are: anything bought through the shop's online store is counted
+  there, because the feed runs one way.
+
+- **(Mac) A shop can say how many of a thing it has already printed.** Every
+  figure in the catalogue was about MAKING one — price, margin, weight,
+  material — and none of them about HAVING one. A shop that prints a batch to
+  sell off a shelf had nowhere to record it, so its online store could only
+  ever offer to print a piece to order.
+
+  "On the shelf" is a column in the catalogue and a count taken from its own
+  sheet. Three different answers, and two of them look alike and mean opposite
+  things: a dash is a product made to order, a number is one kept boxed, and a
+  ZERO is one kept boxed whose batch has sold out — which says print more,
+  where a dash says this was never a stocked line.
+
+  Khayt says how many were counted; the shop's online store says how many are
+  left, because it is the thing watching orders. That is why a count carries
+  the date it was taken, and why re-counting to the same number still moves
+  that date: a shop that sells three, prints three and counts again publishes
+  the same figure, and anything comparing numbers alone would read that as
+  nothing having happened and go on under-selling the shelf.
+
+  The same two fields the desktop app has written since 3.7 — one book, one
+  contract, so a count taken on either is the one the other shows.
+
 - **(Mac) An assistant can ask about the model library.** `khayt-mcp` is a
   Model Context Protocol server, so Claude Desktop, Cursor or Codex can search
   the shop's models — "what have I never printed", "which of these may I not
