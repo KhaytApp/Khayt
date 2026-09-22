@@ -2173,6 +2173,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) An Arabic window showed a different phone number from the one the
+  shop typed.** `+966 50 000 0000` was drawn as `0000 000 50 966+` — the `+`
+  at the far end and the digit groups reversed. Nothing was wrong with the
+  value: it is stored, exported and printed on the invoice correctly. The one
+  place it was wrong is the screen it is typed into, in the language most of
+  this shop's customers read.
+
+  A `+` is a neutral character, so in a right-to-left paragraph it takes the
+  paragraph's side; digits are weak, so they reorder around it. The email
+  survived only because every character of `hello@tuwaiq.example` happens to
+  read left to right — one Arabic character in a domain and it breaks the same
+  way.
+
+  The phone, email, tax number, commercial registration and IBAN are fixed
+  left-to-right now, and stay that way when a value is loaded from the book.
+  The labels beside them stay in the shop's language, on the shop's side.
+
 - **(Mac) Dates read in the Mac's language, not the shop's.** A shop running
   Khayt in Arabic — which is most of the reason this app is bilingual — saw its
   front door dated "Tuesday, 22 September 2026 at 2:45 PM" under an Arabic

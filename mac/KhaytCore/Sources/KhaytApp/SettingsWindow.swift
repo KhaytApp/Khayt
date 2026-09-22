@@ -118,6 +118,60 @@ struct SaveBar: View {
 /// and does not look the same on screen — `LabeledContent` puts the label in
 /// the platform's own column, aligned with every other row in the window, and
 /// an HStack aligns with nothing.
+/// A field whose value is NOT the shop's language — a phone number, an email
+/// address, a tax number, an IBAN, a host, a path, a key.
+///
+/// ── THE PHONE NUMBER WAS BEING REORDERED ON SCREEN ────────────────────────
+///
+/// In an Arabic window the base direction is right-to-left, and the bidi
+/// algorithm applies it to the whole run. `+966 50 000 0000` came out as
+/// `0000 000 50 966+`: the `+` is a NEUTRAL character so it takes the
+/// paragraph's direction and lands at the far end, and the digit groups are
+/// WEAK so they reorder around it. A shop reading its own telephone number in
+/// its own language was shown a different number.
+///
+/// Nothing was wrong with the value. It is stored correctly, it exports
+/// correctly, and it prints on the invoice correctly — this is the one place
+/// it is displayed inside an Arabic paragraph, and it is the field somebody
+/// types it into.
+///
+/// The email survived only by luck: every character in `hello@tuwaiq.example`
+/// is strong left-to-right, so there was nothing for the algorithm to move.
+/// Change one character to an Arabic one and it breaks the same way.
+///
+/// ── THE APP ALREADY KNEW THIS ─────────────────────────────────────────────
+///
+/// `Figure` isolates every money value the same way, with the same one line
+/// and nearly the same comment: *"the whole value is one run with its own
+/// direction … so a Latin figure inside an Arabic column stays Latin and
+/// keeps its unit attached."* That reasoning was never carried to the form
+/// where the shop types those values in.
+///
+/// ── WHICH FIELDS, AND WHY IT IS A LIST RATHER THAN A DEFAULT ──────────────
+///
+/// Named one at a time on purpose. The opposite — Latin by default, opt out
+/// for prose — puts an Arabic business name, tagline, address or note into a
+/// left-to-right run the first time somebody adds a field and forgets, and
+/// that failure is silent and looks like a font problem. A machine-data field
+/// that is missed here merely keeps the old behaviour.
+func latinRow<Content: View>(_ label: String,
+                             @ViewBuilder _ content: () -> Content) -> some View {
+    row(label) {
+        content()
+            // ORDER MATTERS HERE, and it is the whole fix. `row` applies
+            // `.leading` to whatever it is handed, and SwiftUI resolves that
+            // against the direction in force WHERE THE MODIFIER SITS — so an
+            // alignment set outside this environment resolves to the right in
+            // an Arabic window before the direction below is ever seen. Set
+            // inside it, `.leading` is the left.
+            .multilineTextAlignment(.leading)
+            // The value is one run in its own direction, whatever the window
+            // is doing around it. The LABEL stays in the shop's language and
+            // on the shop's side, because it is a word rather than a value.
+            .environment(\.layoutDirection, .leftToRight)
+    }
+}
+
 func row<Content: View>(_ label: String, @ViewBuilder _ content: () -> Content) -> some View {
     // INSIDE the closure, and that is the whole trick. Applied to the
     // `LabeledContent` from the outside it does nothing at all: the labelled
@@ -223,8 +277,8 @@ struct BusinessPane: View {
                     }
                 }
                 Section(shop.words.callIt("set.biz_contact")) {
-                    row(shop.words.callIt("set.phone")) { TextField("", text: $draft.phone) }
-                    row(shop.words.callIt("set.email")) { TextField("", text: $draft.email) }
+                    latinRow(shop.words.callIt("set.phone")) { LatinField(text: $draft.phone) }
+                    latinRow(shop.words.callIt("set.email")) { LatinField(text: $draft.email) }
                 }
                 // ── THE MARK ON THE SHOP'S DOCUMENTS ──────────────────────
                 //
@@ -275,8 +329,8 @@ struct BusinessPane: View {
                 Section(shop.words.callIt("set.biz_tax")) {
                     // The registration number is called what the shop's tax
                     // rules call it — GSTIN, USt-IdNr., VAT No. — not always "VAT".
-                    row(shop.taxProfile?.registration ?? shop.words.callIt("set.vat")) { TextField("", text: $draft.vat) }
-                    row(shop.words.callIt("set.cr")) { TextField("", text: $draft.cr) }
+                    latinRow(shop.taxProfile?.registration ?? shop.words.callIt("set.vat")) { LatinField(text: $draft.vat) }
+                    latinRow(shop.words.callIt("set.cr")) { LatinField(text: $draft.cr) }
                 }
 
                 // What the shop pays every month. Here, beside the tax
@@ -411,8 +465,8 @@ struct InvoicePane: View {
                     }
                 }
                 Section(shop.words.callIt("set.invoice_section")) {
-                    row(shop.words.callIt("set.invoice_prefix")) { TextField("", text: $draft.invPrefix).frame(width: 120) }
-                    row(shop.words.callIt("set.quote_prefix")) { TextField("", text: $draft.quotePrefix).frame(width: 120) }
+                    latinRow(shop.words.callIt("set.invoice_prefix")) { TextField("", text: $draft.invPrefix).frame(width: 120) }
+                    latinRow(shop.words.callIt("set.quote_prefix")) { TextField("", text: $draft.quotePrefix).frame(width: 120) }
                     row(shop.words.callIt("set.inv_template")) {
                         Picker("", selection: $draft.invTemplate) {
                             Text(shop.words.callIt("set.inv_tmpl_classic")).tag("classic")
@@ -578,9 +632,10 @@ struct PaymentsPane: View {
                 Section(shop.words.callIt("set.bank_section")) {
                     row(shop.words.callIt("set.bank_name")) { TextField("", text: $draft.bankName) }
                     row(shop.words.callIt("set.account_holder")) { TextField("", text: $draft.accountHolder) }
-                    row(shop.words.callIt("set.iban")) {
-                        TextField("", text: $draft.iban, prompt: Text(shop.words.callIt("set.iban_ph")))
-                            .font(.body.monospaced())
+                    latinRow(shop.words.callIt("set.iban")) {
+                        LatinField(text: $draft.iban,
+                                   placeholder: shop.words.callIt("set.iban_ph"),
+                                   monospaced: true)
                     }
                 }
                 Section(shop.words.callIt("set.accepted")) {
