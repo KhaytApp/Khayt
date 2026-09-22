@@ -6,6 +6,33 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) The ledger called a cancelled job "waiting", and a finished one
+  too.** Its state chip handled four statuses and sent everything else to
+  *Queued* — "في الانتظار", waiting. On the sample shop that was six of the
+  twenty-four unsettled rows: four jobs the shop had finished and two it had
+  cancelled, all drawn as work waiting to be made, on the screen whose whole
+  job is to say where the work stands. Every status the book can hold is named
+  now, and the fall-through that caused it is gone.
+
+  Cancelled has its own mark for the first time. Making room for it meant
+  merging the nozzle kind: it was using two unrelated marks where the rule is
+  one silhouette in two weights — the way the machine and stock kinds have
+  always worked — and so was the order kind. Both are proper pairs now.
+
+  Which turned up something nobody had measured: of the fifteen marks this app
+  draws states with, only seven were in the system typeface. The other eight
+  came from seven different fonts — three of them from **Menlo**, a typewriter
+  face — so a row of chips was set in up to eight cuts at once. A mark is
+  chosen by asking the font now, and a test holds a kind's two marks to coming
+  from one of them.
+
+  A finished job also stops fading. Fading was for a job with nothing left to
+  do, and that used to be the same thing as finished; it is not, because an
+  invoice can still be unpaid. And the chip column was too narrow for half its
+  own vocabulary — eight of sixteen English words wrapped onto a second line
+  and made their row taller — which had stayed invisible because the sample's
+  jobs only ever reached the short ones.
+
 - **(Mac) Every bar in the app is drawn at its final length.** Sixteen of them,
   across fifteen files — the break-even meter, the capacity meter, the quote
   funnel, waste by month, cost per gram, cycle time, downtime, expenses by

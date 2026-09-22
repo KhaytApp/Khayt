@@ -115,7 +115,7 @@ struct LedgerRow: View {
     var body: some View {
         HStack(spacing: 8) {
             StateChip(state: row.state, words: shop.words, onNavy: selected)
-                .frame(width: 78, alignment: .leading)
+                .frame(width: StateChip.column, alignment: .leading)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.title)
                     .font(TypeScale.row(11.5, weight: .semibold))
@@ -158,7 +158,15 @@ struct LedgerRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .opacity(row.state.rowOpacity)
+        // ── DRAWN BACK WHEN THERE IS NOTHING LEFT TO DO ──────────────────
+        //
+        // Not on the STATE any more. `rowOpacity` fades a `done` row because
+        // a finished job is "plainly over" — but `done` used to mean SETTLED,
+        // and now it means the work is finished, which a job can be while its
+        // invoice is still unpaid. Fading that row hides the one thing left to
+        // do about it. A cancelled row fades for the same reason a settled one
+        // does: there is nothing to act on.
+        .opacity(row.settled || row.state == .cancelled ? 0.55 : 1)
         .background(ground)
         .overlay(alignment: .leading) {
             // §6: an attention row carries a 3px leading border as well as a
