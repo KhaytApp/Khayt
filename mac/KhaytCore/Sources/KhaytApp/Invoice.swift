@@ -194,7 +194,62 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     }
 
     func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
-        drawn = true
+        // ── THE DIGITS, AND ONLY THEN `drawn` ─────────────────────────────
+        //
+        // `drawn` is what the Save button waits on, so flipping it before the
+        // rewrite has run would let a fast hand save a PDF with the digits
+        // still in 0–9. The pass is awaited first.
+        guard document.arabicNumerals else { drawn = true; return }
+        Task { @MainActor in
+            _ = try? await view.evaluateJavaScript(Self.digitPass(document.selector))
+            drawn = true
+        }
+    }
+
+    /// Rewrite the document's digits to Arabic-Indic, AS THE APP rather than
+    /// as the page.
+    ///
+    /// ── WHY THIS IS NOT A `<script>` IN THE DOCUMENT ANY MORE ─────────────
+    ///
+    /// It was one, and it never ran. `DocumentWeb` switches page scripts off —
+    /// deliberately, so that an escaping slip in some future field is a visible
+    /// `<script>` on the paper rather than code running — and a `<script>`
+    /// written into the page is inert under that setting. So a shop that asked
+    /// for Arabic digits on its invoices got 0–9, on every invoice, with
+    /// nothing failing anywhere. The test that covered it asserted the script
+    /// was in the STRING, which it was.
+    ///
+    /// `evaluateJavaScript` is the host asking WebKit to run something, which
+    /// is a different permission from the page carrying its own script: it
+    /// works with `allowsContentJavaScript` off, and the document still cannot
+    /// bring any script of its own. So the guard stays exactly as strong and
+    /// the feature works.
+    ///
+    /// The selector is the module's — `.v, .amount` and so on — and it is
+    /// placed in a JSON string rather than pasted between quotes, so a
+    /// selector carrying a quote cannot end the literal.
+    static func digitPass(_ selector: String) -> String {
+        let quoted = (try? String(data: JSONEncoder().encode(selector), encoding: .utf8))
+            ?? "\"\""
+        return """
+        (function () {
+          var A = '\u{0660}\u{0661}\u{0662}\u{0663}\u{0664}\u{0665}\u{0666}\u{0667}\u{0668}\u{0669}';
+          // TEXT NODES, not `textContent`. Assigning `el.textContent` replaces
+          // everything inside the element with one flat string — so it did not
+          // only change the digits, it deleted the markup. `.biz-meta` holds
+          // the address in its own paragraphs and the contact line in another,
+          // and they came out as one run; `.amount` holds a span for the
+          // currency and lost its styling; and the `<bdi>` that keeps a phone
+          // number the right way round went with them, putting the number back
+          // to front for exactly the shops that had asked for Arabic digits.
+          document.querySelectorAll(\(quoted)).forEach(function (el) {
+            var walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            for (var n = walk.nextNode(); n; n = walk.nextNode()) {
+              n.nodeValue = n.nodeValue.replace(/[0-9]/g, function (d) { return A[+d]; });
+            }
+          });
+        })();
+        """
     }
 
     /// Nothing but the document itself is allowed to load.
@@ -311,30 +366,10 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     /// the wrapper is kept rather than dropped. Whichever media WebKit renders
     /// in, the rules that apply are the shop's own.
     static func page(_ doc: InvoiceDocument) -> String {
-        let numerals = doc.arabicNumerals ? """
-        <script>
-        // The one thing a stylesheet cannot do: rewrite the digits of elements
-        // after they are laid out. The module said which elements.
-        //
-        // TEXT NODES, not `textContent`. Assigning `el.textContent` replaces
-        // everything inside the element with one flat string — so it did not
-        // only change the digits, it deleted the markup. `.biz-meta` holds the
-        // address in its own paragraphs and the contact line in another, and
-        // they came out as one run; `.amount` holds a span for the currency
-        // and lost its styling; and the `<bdi>` that keeps a phone number the
-        // right way round went with them, putting the number back to front for
-        // exactly the shops that had asked for Arabic digits.
-        (function () {
-          var A = '\u{0660}\u{0661}\u{0662}\u{0663}\u{0664}\u{0665}\u{0666}\u{0667}\u{0668}\u{0669}';
-          document.querySelectorAll('\(doc.selector)').forEach(function (el) {
-            var walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-            for (var n = walk.nextNode(); n; n = walk.nextNode()) {
-              n.nodeValue = n.nodeValue.replace(/[0-9]/g, function (d) { return A[+d]; });
-            }
-          });
-        })();
-        </script>
-        """ : ""
+        // NOTHING IS ADDED TO THE PAGE. See `digitPass` — the rewrite is run
+        // by the app after the document is laid out, because page scripts are
+        // switched off in `DocumentWeb` and a `<script>` written in here was
+        // inert.
 
         return """
         <!doctype html><html><head><meta charset="utf-8">
@@ -365,7 +400,7 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
           }
         }
         </style>
-        </head><body><div id="invoice-print-area">\(doc.html)</div>\(numerals)</body></html>
+        </head><body><div id="invoice-print-area">\(doc.html)</div></body></html>
         """
     }
 }

@@ -2189,6 +2189,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) An invoice set to Arabic numerals printed Western ones.** A shop
+  that asked for `٥٧٥` on its invoices got `575`, on every invoice, and
+  nothing failed anywhere — the setting was saved, the option stayed ticked,
+  and the paper was simply wrong.
+
+  The digits are rewritten by a small script. The window an invoice is drawn
+  in has scripts switched off on purpose, so that an escaping slip in some
+  future field is a visible `<script>` on the paper rather than code running —
+  and a script written into the document is inert under that rule. It never
+  ran once.
+
+  The rewrite is done by the app now rather than by the page, which needs no
+  script in the document at all: the guard stays exactly as strong and the
+  feature works. Saving to PDF waits for it, so a fast hand cannot save the
+  old digits.
+
 - **(Mac) An Arabic window showed a different phone number from the one the
   shop typed.** `+966 50 000 0000` was drawn as `0000 000 50 966+` — the `+`
   at the far end and the digit groups reversed. Nothing was wrong with the

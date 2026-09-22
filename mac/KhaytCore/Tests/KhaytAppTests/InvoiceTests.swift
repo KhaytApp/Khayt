@@ -230,14 +230,100 @@ struct InvoiceTests {
         #expect(!page.contains("<script>"), "no digit pass for a shop reading 0-9")
     }
 
-    @Test("a shop reading Arabic digits gets the pass that rewrites them")
-    func digitPass() throws {
+    /// ── THE TEST THAT USED TO PASS WHILE THE FEATURE DID NOTHING ────────
+    ///
+    /// This asserted that the page STRING contained a `<script>`, that the
+    /// script named the right selector, and that it carried an Arabic zero.
+    /// All three were true and the digits on the paper were `0–9` anyway:
+    /// `DocumentWeb` switches page scripts off, so the `<script>` was inert.
+    /// Every shop that asked for Arabic digits on its invoices got Western
+    /// ones, on every invoice, and nothing failed anywhere.
+    ///
+    /// So it renders the document now and reads the digits back off it.
+    /// Checking that a script was WRITTEN is not checking that it RAN.
+    @Test("a shop reading Arabic digits sees them on the paper")
+    func digitPass() async throws {
         let doc = InvoiceDocument(html: "<span class=\"v\">575.00</span>",
                                   arabicNumerals: true, selector: ".v, .amount")
-        let page = InvoicePaper.page(doc)
-        #expect(page.contains("<script>"))
-        #expect(page.contains(".v, .amount"), "over the elements the module named")
-        #expect(page.contains("\u{0660}"), "and with the digits to write")
+        // No script goes into the document: the guard that keeps one out is
+        // the whole reason the old one never ran.
+        #expect(!InvoicePaper.page(doc).contains("<script"),
+                "a document carries no script of its own")
+
+        let paper = InvoicePaper(document: doc)
+        for _ in 0..<100 where !paper.drawn {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        #expect(paper.drawn, "the document never finished laying out")
+
+        let text = (try await paper.webView
+            .evaluateJavaScript("document.body.innerText") as? String) ?? ""
+        #expect(text.contains("\u{0665}\u{0667}\u{0665}"), """
+            the paper reads "\(text.trimmingCharacters(in: .whitespacesAndNewlines))" \
+            — 575.00 in a shop that asked for Arabic digits should be ٥٧٥
+            """)
+        // ── ON THE SCALARS, NOT ON `contains` ─────────────────────────────
+        //
+        // `text.contains("575")` answers TRUE for a string whose scalars are
+        // `U+0665 U+0667 U+0665 U+002E U+0660 U+0660` — no ASCII digit in it
+        // anywhere. Measured here, in this test process.
+        //
+        // THE CAUSE IS NOT THE LOCALE, which was the obvious guess and is
+        // wrong: `Locale.current` is `en_SA` both here and in a plain script
+        // that runs the identical expression and answers FALSE. Something
+        // else this process loads changes how Foundation's collation-aware
+        // search compares those digits, and this test is not the place to
+        // find out what.
+        //
+        // What it IS the place for is asking the question in a way that has
+        // one answer: is there an ASCII digit left on this paper. Scalars
+        // compare by value, and a 5 is a 5.
+        #expect(!text.unicodeScalars.contains(where: { ("0"..."9").contains($0) }), """
+            an ASCII digit is still on the paper: \
+            \(text.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " "))
+            """)
+    }
+
+    /// And a shop reading 0–9 is left alone — the pass must not run at all.
+    @Test("a shop reading Western digits keeps them")
+    func noDigitPass() async throws {
+        let doc = InvoiceDocument(html: "<span class=\"v\">575.00</span>",
+                                  arabicNumerals: false, selector: ".v, .amount")
+        let paper = InvoicePaper(document: doc)
+        for _ in 0..<100 where !paper.drawn {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let text = (try await paper.webView
+            .evaluateJavaScript("document.body.innerText") as? String) ?? ""
+        #expect(text.contains("575"))
+    }
+
+    /// A selector carrying a quote must not be able to end the string literal
+    /// it is placed in. It is the module's own value, not a customer's — but
+    /// a value pasted between quotes is a habit, and this is the one place in
+    /// the app that builds JavaScript from a string at all.
+    @Test("the selector cannot end the literal it sits in")
+    func selectorIsQuoted() {
+        let selector = "a\"b'); alert(1); ('"
+        let nasty = InvoicePaper.digitPass(selector)
+        let call = nasty.split(separator: "\n").first { $0.contains("querySelectorAll") } ?? ""
+
+        // THE REAL INVARIANT, rather than "the nasty text is absent" — it is
+        // present, as DATA, and that is correct. What matters is that the
+        // argument is still ONE JSON string and that it decodes back to
+        // exactly what went in: if the quote had ended the literal, everything
+        // after it would be code and this would not round-trip.
+        let open = call.firstIndex(of: "\"")
+        let close = call.lastIndex(of: "\"")
+        guard let open, let close, open < close else {
+            Issue.record("the call is not a quoted string at all: \(call)"); return
+        }
+        let literal = String(call[open...close])
+        let decoded = try? JSONDecoder().decode(String.self, from: Data(literal.utf8))
+        #expect(decoded == selector, """
+            the selector did not survive being placed in the script — \
+            \(decoded.map { "\"\($0)\"" } ?? "it is not one string") from \(literal)
+            """)
     }
 
     // MARK: - on paper
