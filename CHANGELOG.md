@@ -46,8 +46,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   The same two fields the desktop app has written since 3.7 — one book, one
   contract, so a count taken on either is the one the other shows.
 
-### Added
-
 - **(Mac) An assistant can ask about the model library.** `khayt-mcp` is a
   Model Context Protocol server, so Claude Desktop, Cursor or Codex can search
   the shop's models — "what have I never printed", "which of these may I not
