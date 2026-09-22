@@ -481,14 +481,22 @@ struct SendToCloudWiringTests {
 
     /// A viewer is told before a request is made, not after a 403 that would
     /// be retried on a timer.
-    @Test("the role is read before anything is pushed")
+    @Test("the role is read before anything reaches the network")
     func roleGateComesFirst() throws {
         let body = try Self.sendToCloud()
-        guard let gate = body.range(of: "cloudRoleCanWrite"),
-              let pull = body.range(of: "CloudReader.pull(") else {
-            Issue.record("sendToCloud no longer checks the role before pulling"); return
+        guard let gate = body.range(of: "cloudRoleCanWrite") else {
+            Issue.record("sendToCloud no longer checks the role at all"); return
         }
-        #expect(gate.lowerBound < pull.lowerBound,
+        // Whatever it fetches WITH — this was `CloudReader.pull` and is
+        // `pullCloudStore` now that the pull asks `?since=`. The property is
+        // the order, not the name, so both are looked for and the guard does
+        // not quietly stop checking when the call is renamed again.
+        let fetches = ["pullCloudStore(", "CloudReader.pull("]
+            .compactMap { body.range(of: $0)?.lowerBound }
+        guard let first = fetches.min() else {
+            Issue.record("sendToCloud no longer pulls before it pushes — that is the 409 guard"); return
+        }
+        #expect(gate.lowerBound < first,
                 "a viewer's Mac still asks the service before telling the shop")
     }
 }
