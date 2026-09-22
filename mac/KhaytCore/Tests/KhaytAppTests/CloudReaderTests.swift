@@ -320,3 +320,159 @@ struct TombstoneKeyTests {
         #expect(out.agrees)
     }
 }
+
+/// Asking only for what this app has not seen.
+///
+/// ── WHY THIS IS TWO CHANGES THAT ARE ONE CHANGE ───────────────────────────
+///
+/// khayt-cloud's own comment calls `?since=` "a requirement, not an
+/// optimisation": without it a device that is already current re-downloads the
+/// base AND the whole chain, and `sendToCloud` pulls before every push — so a
+/// shop paid for its entire book on every save.
+///
+/// But the server sends the base ONLY to a caller that is behind it. A warm
+/// pull answers with deltas and no base, and there is nothing to fold them
+/// onto unless the device kept the store it had at that revision. Send
+/// `?since=` without keeping it and every warm pull is `Failure.noBase`.
+@MainActor
+struct WarmPullTests {
+
+    static let connection = CloudReader.Connection(
+        url: "https://cloud.khayt.example", shopId: "shop_a", storedToken: "")
+    static let dek = Data((0..<32).map { UInt8($0) })
+
+    static func sealed(_ object: [String: JSONValue]) throws -> SyncCrypto.Blob {
+        try SyncCrypto.seal(object, dek: dek)
+    }
+
+    /// A reply with a base (cold) or without one (warm).
+    static func reply(rev: Int, base: [String: JSONValue]?,
+                      deltas: [(Int, [String: JSONValue])] = []) throws -> Data {
+        var body: [String: JSONValue] = ["rev": .number(Double(rev))]
+        if let base { body["ciphertext"] = try blob(sealed(base)) }
+        body["deltas"] = .array(try deltas.map { rev, payload in
+            .object(["rev": .number(Double(rev)), "ciphertext": try blob(sealed(payload))])
+        })
+        return try JSONEncoder().encode(JSONValue.object(body))
+    }
+
+    static func blob(_ b: SyncCrypto.Blob) throws -> JSONValue {
+        try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(b))
+    }
+
+    static func answer(_ data: Data, status: Int = 200) -> (URLRequest) async throws -> (Data, URLResponse) {
+        { request in
+            (data, HTTPURLResponse(url: request.url!, statusCode: status,
+                                   httpVersion: nil, headerFields: nil)!)
+        }
+    }
+
+    /// The first pull of a run asks for everything and remembers the answer;
+    /// the next one asks for what came after it.
+    @Test("a cold pull is cold, and the one after it is warm")
+    func coldThenWarm() async throws {
+        let shop = Shop()
+        let engine = try KhaytEngine()
+        var asked: [String] = []
+
+        let cold = try Self.reply(rev: 7, base: ["orders": .array([.string("a")])])
+        _ = try await shop.pullCloudStore(Self.connection, token: "t", dek: Self.dek,
+                                          engine: engine) { request in
+            asked.append(request.url?.query ?? "")
+            return try await Self.answer(cold)(request)
+        }
+        #expect(asked == [""], "the first pull asked for a slice with nothing to fold it onto")
+        #expect(shop.cloudSeen?.rev == 7)
+
+        // Warm: the server sends no base, only what came after rev 7.
+        let warm = try Self.reply(rev: 9, base: nil,
+                                  deltas: [(8, ["records": .array([])]), (9, ["records": .array([])])])
+        let out = try await shop.pullCloudStore(Self.connection, token: "t", dek: Self.dek,
+                                                engine: engine) { request in
+            asked.append(request.url?.query ?? "")
+            return try await Self.answer(warm)(request)
+        }
+        #expect(asked.last == "since=7", "the second pull re-downloaded the whole book")
+        #expect(out.reply.rev == 9)
+        #expect(shop.cloudSeen?.rev == 9)
+    }
+
+    /// THE ONE THAT WOULD HAVE BEEN SILENT. A cloud that has gone BACKWARDS —
+    /// reset, or restored from a backup — answers with a head below what this
+    /// app remembers. Folding its shorter chain onto a store from the future
+    /// would report this device's own records as the cloud's, and the next
+    /// push would send them.
+    @Test("a cloud that went backwards is pulled cold, not folded onto memory")
+    func cloudWentBackwards() async throws {
+        let shop = Shop()
+        let engine = try KhaytEngine()
+        _ = try await shop.pullCloudStore(
+            Self.connection, token: "t", dek: Self.dek, engine: engine,
+            fetch: Self.answer(try Self.reply(rev: 40, base: ["orders": .array([.string("old")])])))
+        #expect(shop.cloudSeen?.rev == 40)
+
+        var asked: [String] = []
+        let reset = try Self.reply(rev: 2, base: ["orders": .array([.string("new")])])
+        let out = try await shop.pullCloudStore(Self.connection, token: "t", dek: Self.dek,
+                                                engine: engine) { request in
+            asked.append(request.url?.query ?? "")
+            return try await Self.answer(reset)(request)
+        }
+        // It asks warm first — it cannot know — and then pulls cold rather
+        // than folding the answer onto a memory that is ahead of it.
+        #expect(asked.count == 2, "it did not re-pull after seeing the cloud was behind")
+        #expect(asked.last == "", "the recovery pull asked for a slice again")
+        #expect(out.reply.rev == 2)
+        #expect(shop.cloudSeen?.rev == 2)
+    }
+
+    /// A book that switches clouds must not fold a new shop's chain onto an
+    /// old shop's store.
+    @Test("a memory of another shop is not used")
+    func anotherShop() async throws {
+        let shop = Shop()
+        let engine = try KhaytEngine()
+        _ = try await shop.pullCloudStore(
+            Self.connection, token: "t", dek: Self.dek, engine: engine,
+            fetch: Self.answer(try Self.reply(rev: 5, base: ["orders": .array([])])))
+
+        let other = CloudReader.Connection(url: Self.connection.url,
+                                           shopId: "shop_b", storedToken: "")
+        var asked: [String] = []
+        _ = try await shop.pullCloudStore(other, token: "t", dek: Self.dek,
+                                          engine: engine) { request in
+            asked.append(request.url?.query ?? "")
+            return try await Self.answer(try Self.reply(rev: 1, base: ["orders": .array([])]))(request)
+        }
+        #expect(asked == [""], "it asked shop_b for changes since shop_a's revision")
+    }
+
+    /// Locking the cloud drops the key. What the cloud held is a DECRYPTED
+    /// copy of the shop's book, so it goes with it.
+    @Test("locking the cloud forgets what it held")
+    func lockingForgets() async throws {
+        let shop = Shop()
+        let engine = try KhaytEngine()
+        _ = try await shop.pullCloudStore(
+            Self.connection, token: "t", dek: Self.dek, engine: engine,
+            fetch: Self.answer(try Self.reply(rev: 3, base: ["orders": .array([])])))
+        #expect(shop.cloudSeen != nil)
+        shop.forgetCloudKey()
+        #expect(shop.cloudSeen == nil, "the shop's records stayed in memory after locking")
+    }
+
+    /// No base and nothing known is still an error. Folding a chain onto an
+    /// empty store would hand back a book missing everything that predates it
+    /// and call it the cloud's.
+    @Test("a reply with no base and no memory is refused")
+    func noBaseNoMemory() async throws {
+        let shop = Shop()
+        let engine = try KhaytEngine()
+        await #expect(throws: CloudReader.Failure.self) {
+            _ = try await shop.pullCloudStore(
+                Self.connection, token: "t", dek: Self.dek, engine: engine,
+                fetch: Self.answer(try Self.reply(rev: 9, base: nil,
+                                                  deltas: [(9, ["records": .array([])])])))
+        }
+    }
+}

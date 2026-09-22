@@ -113,6 +113,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Mac) Every save downloaded the whole book again.** Khayt checks the cloud
+  before it sends, and that check asked for everything each time — the whole
+  book plus every change since it was last compacted — to work out which few
+  records had moved. On a shop that saves often it was the largest thing the
+  app did, over and over.
+
+  It asks for what it has not already seen now. Anything it cannot be sure
+  about — a first check after opening, a different shop, or a cloud that has
+  been reset or restored — falls back to asking for everything, which is
+  exactly what it used to do every time.
+
 - **(Mac) A creator pack's assembly instructions were unzipped, ignored and
   deleted.** Importing an archive kept only files whose extension names a
   model, then removed the folder it had extracted everything into — so the
@@ -2218,6 +2229,35 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   stop asking for a job number when what they filter is filament and products.
 
 ### Fixed
+
+- **(Mac) A busy shop's cloud copy could quietly stop updating.** Khayt Cloud
+  keeps a shop's changes as a chain, and a chain has a bound — a thousand
+  changes, or four times the size of the book under it. When it is reached the
+  service refuses the next change and asks for the whole book instead, which
+  is what empties it.
+
+  That refusal looks exactly like the one that means "somebody else saved
+  first", and this app read it as that one: it fetched, tried the same change,
+  was refused again, and went on doing that on a timer. Nothing failed
+  visibly. The Mac said the cloud had "changed while this was on screen" and
+  the shop's cloud copy simply stopped moving. It sends the whole book now, as
+  the service is asking it to.
+
+- **(Mac) A view-only sign-in was told its token had been reset.** An account
+  that can read a shop but not change it is refused on every save, correctly —
+  and Khayt reported that as a broken token and kept retrying, on a timer,
+  about a sign-in working exactly as intended. It now says what is true, once,
+  before it sends anything: this sign-in can read this shop but not change it.
+
+- **(Mac) The cloud's own explanations reached the screen.** A book over the
+  plan's size limit, or a store whose file the service cannot find, answer
+  with a sentence written for a person. Khayt showed the first 200 characters
+  of the raw reply instead.
+
+- **(Mac) A book whose key was stretched differently could not be unlocked.**
+  The keyset records how its key was made and the other apps read that back;
+  this one had the usual settings built in and ignored the record. Every book
+  in existence uses the usual settings, which is the right time to fix it.
 
 - **(Mac) An invoice set to Arabic numerals printed Western ones.** A shop
   that asked for `٥٧٥` on its invoices got `575`, on every invoice, and

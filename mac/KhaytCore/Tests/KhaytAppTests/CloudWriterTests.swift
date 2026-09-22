@@ -312,3 +312,222 @@ struct CloudWriterTests {
         #expect(after.differing.first?.collection == "orders")
     }
 }
+
+/// What the service's refusals actually mean.
+///
+/// ── THE 409 THAT IS NOT A RACE ────────────────────────────────────────────
+///
+/// khayt-cloud answers `409 { rev }` for two different things, and the number
+/// does not tell them apart:
+///
+///   * somebody else appended — `rev` is the head this device has not seen;
+///   * the chain is FULL — and `rev` is this device's OWN `baseRev`.
+///
+/// Read as a race, the second one produces a pull, the same 409, and a retry
+/// on a backoff capped at five minutes, **forever**, while the shop's cloud
+/// copy quietly stops updating. khayt-cloud #67 added `compact: true` to the
+/// second so a client can tell, and pins on its own side that the race 409
+/// carries no such field.
+@MainActor
+struct CloudRefusalsTests {
+
+    static let connection = CloudWriterTests.connection
+    static let dek = CloudWriterTests.dek
+    static let payload = CloudWriterTests.payload
+
+    static func send(_ status: Int, _ json: String) async -> Error? {
+        do {
+            _ = try await CloudWriter.send(connection, token: "t", payload: payload,
+                                           dek: dek, baseRev: 12,
+                                           fetch: CloudWriterTests.answer(status, json))
+            return nil
+        } catch { return error }
+    }
+
+    @Test("a full chain is its own answer, and the way out is the whole book")
+    func chainFull() async {
+        let failure = await Self.send(409, #"{"rev":12,"compact":true}"#) as? CloudWriter.Failure
+        #expect(failure == .chainFull(12), """
+            a chain-full 409 came back as \(failure.map(String.init(describing:)) ?? "nothing") — \
+            read as a race it retries forever and the shop's cloud copy stops moving
+            """)
+    }
+
+    @Test("a real race still reads as one")
+    func stillARace() async {
+        #expect(await Self.send(409, #"{"rev":41}"#) as? CloudWriter.Failure == .moved(41))
+    }
+
+    /// `409 { rev: 0 }` is the server saying there is no base blob at all:
+    /// "the first push of a shop's life is necessarily the whole store". It
+    /// carries no `compact`, and retrying a delta against nothing cannot work.
+    @Test("nothing to append to is also the whole book")
+    func noBaseYet() async {
+        #expect(await Self.send(409, #"{"rev":0}"#) as? CloudWriter.Failure == .chainFull(0))
+    }
+
+    /// A viewer's account. The token is fine and always will be — saying it
+    /// "may have been reset" sends a shop to fix something that is not broken,
+    /// and this ran on a timer, so it said it again and again.
+    @Test("a 403 is a role, not a reset token")
+    func readOnly() async {
+        let failure = await Self.send(403, #"{"error":"This account can view this shop but not change it"}"#)
+        #expect(failure as? CloudWriter.Failure == .readOnly)
+        #expect(!(failure as? CloudWriter.Failure).map(\.description).map { $0.contains("reset") }!)
+    }
+
+    @Test("a 401 is still the token")
+    func unauthorised() async {
+        #expect(await Self.send(401, "{}") as? CloudWriter.Failure == .unauthorised)
+    }
+
+    /// 413 and 412 answer with a sentence written for a person. Showing 200
+    /// bytes of the JSON around it showed the shop the envelope, not the letter.
+    @Test("what the service said is what the shop is shown")
+    func theServerSentence() async {
+        let failure = await Self.send(413, #"{"error":"Store exceeds your plan’s size limit"}"#)
+        #expect(failure as? CloudWriter.Failure
+                == .http(413, "Store exceeds your plan’s size limit"))
+        // And an answer that is not that shape still says something.
+        let odd = await Self.send(502, "<html>bad gateway</html>")
+        #expect((odd as? CloudWriter.Failure)?.description.contains("bad gateway") == true)
+    }
+}
+
+/// That `sendToCloud` ACTS on those answers.
+///
+/// `CloudRefusalsTests` proves the refusals are read correctly; a failure case
+/// that is understood and then ignored is the bug this app keeps finding in
+/// itself. `sendToCloud` reaches for `URLSession` directly, so there is no seam
+/// to drive it through — the wiring is asserted where it is written, the same
+/// way `CloudSignInTests` pins the order of sign-in.
+@MainActor
+struct SendToCloudWiringTests {
+
+    static func shopSource() throws -> String {
+        try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+    }
+
+    static func sendToCloud() throws -> Substring {
+        let source = try shopSource()
+        guard let fn = source.range(of: "func sendToCloud(") else {
+            throw Failure.gone("sendToCloud is gone")
+        }
+        return source[fn.lowerBound...].prefix(7000)
+    }
+
+    enum Failure: Error { case gone(String) }
+
+    /// A full chain must go down the whole-book path. Without this the shop
+    /// retries the same delta forever and its cloud copy stops updating —
+    /// silently, because every individual step is behaving as designed.
+    @Test("a full chain sends the whole book instead of retrying the delta")
+    func chainFullFallsBack() throws {
+        let body = try Self.sendToCloud()
+        guard let caught = body.range(of: "catch CloudWriter.Failure.chainFull") else {
+            Issue.record("""
+                sendToCloud does not catch chainFull — a 409 with compact:true \
+                is read as a race and retried forever
+                """)
+            return
+        }
+        let after = body[caught.upperBound...]
+        #expect(after.contains("sendWholeBookAfterMerging"), """
+            chainFull is caught and does not reach the whole-book path, which \
+            is the only thing that empties the chain
+            """)
+        // And the closed-chain case it sits beside is still wired.
+        #expect(body.contains("catch CloudWriter.Failure.notAccepted"))
+    }
+
+    /// The merge is what makes a whole-store push legal, so it is not optional
+    /// and not reorderable. `CloudWriter.sendWholeStore`'s own comment says it
+    /// is "deliberately NOT reachable on its own" and names the one caller —
+    /// this pins that there is still exactly one, and that it is that one.
+    ///
+    /// Two escapes now reach the whole-book path: a closed chain (404/405) and
+    /// a full one (409 compact). Both go through the same function, which is
+    /// the entire reason adding the second was safe.
+    @Test("the whole book is only ever sent from the function that merges first")
+    func onlyFromTheMergingPath() throws {
+        let source = try Self.shopSource()
+        let calls = source.ranges(of: "CloudWriter.sendWholeStore(")
+        #expect(calls.count == 1, """
+            sendWholeStore is called \(calls.count) times in Shop.swift — a whole \
+            store from a device that has not merged is that device's records and \
+            nobody else's, and the server takes it
+            """)
+        guard let call = calls.first,
+              let fn = source.range(of: "func sendWholeBookAfterMerging(") else {
+            Issue.record("sendWholeBookAfterMerging is gone"); return
+        }
+        #expect(call.lowerBound > fn.lowerBound
+                && call.lowerBound < source.index(fn.lowerBound, offsetBy: 4000,
+                                                  limitedBy: source.endIndex)!, """
+            the one call to sendWholeStore is not inside sendWholeBookAfterMerging
+            """)
+        // And that function merges before it sends.
+        let body = source[fn.lowerBound...].prefix(4000)
+        guard let merge = body.range(of: "mergeFromCloud("),
+              let send = body.range(of: "CloudWriter.sendWholeStore(") else {
+            Issue.record("it no longer merges and sends"); return
+        }
+        #expect(merge.lowerBound < send.lowerBound,
+                "the whole book goes up before the cloud has been merged into it")
+    }
+
+    /// A viewer is told before a request is made, not after a 403 that would
+    /// be retried on a timer.
+    @Test("the role is read before anything reaches the network")
+    func roleGateComesFirst() throws {
+        let body = try Self.sendToCloud()
+        guard let gate = body.range(of: "cloudRoleCanWrite") else {
+            Issue.record("sendToCloud no longer checks the role at all"); return
+        }
+        // Whatever it fetches WITH — this was `CloudReader.pull` and is
+        // `pullCloudStore` now that the pull asks `?since=`. The property is
+        // the order, not the name, so both are looked for and the guard does
+        // not quietly stop checking when the call is renamed again.
+        let fetches = ["pullCloudStore(", "CloudReader.pull("]
+            .compactMap { body.range(of: $0)?.lowerBound }
+        guard let first = fetches.min() else {
+            Issue.record("sendToCloud no longer pulls before it pushes — that is the 409 guard"); return
+        }
+        #expect(gate.lowerBound < first,
+                "a viewer's Mac still asks the service before telling the shop")
+    }
+}
+
+/// What the saved role means.
+@MainActor
+struct CloudRoleTests {
+
+    static func settings(_ role: String?) -> [String: JSONValue] {
+        var cloud: [String: JSONValue] = ["shopId": .string("shop_1"), "verified": .bool(true)]
+        if let role { cloud["role"] = .string(role) }
+        return ["cloud": .object(cloud)]
+    }
+
+    @Test("only a viewer is stopped — the service stops nobody else")
+    func onlyViewer() {
+        #expect(!Shop.cloudRoleCanWrite(Self.settings("viewer")))
+        #expect(!Shop.cloudRoleCanWrite(Self.settings("Viewer")), "the role is not case-sensitive")
+        for allowed in ["owner", "admin", "staff", "manager"] {
+            #expect(Shop.cloudRoleCanWrite(Self.settings(allowed)), "\(allowed) may write")
+        }
+    }
+
+    /// UNKNOWN IS ALLOWED here, against this codebase's usual rule, and on
+    /// purpose: a book that predates the field or arrived by restore has no
+    /// role, and refusing those would stop syncing for every existing install
+    /// to guard a case the service already refuses properly.
+    @Test("a book with no role recorded still syncs")
+    func unknownIsAllowed() {
+        #expect(Shop.cloudRoleCanWrite(Self.settings(nil)))
+        #expect(Shop.cloudRoleCanWrite([:]))
+        #expect(Shop.cloudRoleCanWrite(Self.settings("")))
+    }
+}

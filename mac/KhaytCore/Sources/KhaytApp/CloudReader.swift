@@ -124,17 +124,39 @@ enum CloudReader {
     /// `fetch` is a seam so the whole path can be exercised without a network
     /// or a shop's real credentials — every test in `CloudReaderTests` uses it,
     /// and none of them has ever spoken to the service.
-    static func pull(_ connection: Connection, token: String,
+    ///
+    /// ── `since` IS NOT AN OPTIMISATION ───────────────────────────────────
+    ///
+    /// khayt-cloud's own words. Without it a device that is already current
+    /// re-downloads the base AND the entire chain on every pull — and
+    /// `sendToCloud` pulls before every push, so a shop paid for its whole
+    /// book on every save. A device holding rev N asks for N+1 onward.
+    ///
+    /// WHAT COMES BACK IS DIFFERENT, and that is the part to get right: the
+    /// base is included ONLY when the caller is behind it. A warm pull
+    /// answers with deltas and no base, so there is nothing to fold them onto
+    /// unless the caller kept the store it had at `since` — see `store(_:…)`
+    /// and `Shop.cloudSeen`. Passing `since` without keeping that store turns
+    /// every warm pull into `Failure.noBase`.
+    static func pull(_ connection: Connection, token: String, since: Int? = nil,
                      fetch: (URLRequest) async throws -> (Data, URLResponse)) async throws -> Reply {
-        let request = try self.request(connection, token: token, method: "GET", tail: "/store")
+        let tail = since.map { "/store?since=\($0)" } ?? "/store"
+        let request = try self.request(connection, token: token, method: "GET", tail: tail)
         let (data, response) = try await fetch(request)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         switch code {
         case 200: break
+        // Nothing has ever been pushed for this shop. A VIEWER still reads, so
+        // a 403 here is a genuine credential problem rather than a role — the
+        // roles only ever stop a write.
         case 204: throw Failure.noStoreYet
         case 401, 403: throw Failure.unauthorised
         default:
-            throw Failure.http(code, String(decoding: data.prefix(200), as: UTF8.self))
+            // The service answers with a sentence written for a person. A
+            // store whose blob has gone missing from object storage now says
+            // so in a 500 — it used to answer 204, which read as "nothing has
+            // been sent yet" and is a very different thing to tell a shop.
+            throw Failure.http(code, CloudWriter.said(data))
         }
 
         guard let body = try? JSONDecoder().decode(Body.self, from: data) else {
@@ -158,9 +180,25 @@ enum CloudReader {
 
     /// Decrypt the base and fold the chain onto it — the same order `pull()`
     /// uses in cloud-backend.js.
-    static func store(_ reply: Reply, dek: Data, engine: KhaytEngine) async throws -> Folded {
-        guard let baseBlob = reply.base else { throw Failure.noBase }
-        let base = try SyncCrypto.store(baseBlob, dek: dek)
+    /// `onto` is the store this device already holds for the revision it asked
+    /// from — the ONLY thing a warm `?since=` pull can be folded onto, because
+    /// the server sends no base to a caller that is not behind one. Nil is a
+    /// cold pull, where the base always comes down and this is unused.
+    ///
+    /// It is not a fallback for a missing base on a COLD pull: no base and
+    /// nothing known is still `noBase`, because folding a chain onto an empty
+    /// store would hand back a book missing everything that predates it and
+    /// call it the cloud's.
+    static func store(_ reply: Reply, dek: Data, engine: KhaytEngine,
+                      onto known: [String: JSONValue]? = nil) async throws -> Folded {
+        var base: [String: JSONValue]
+        if let baseBlob = reply.base {
+            base = try SyncCrypto.store(baseBlob, dek: dek)
+        } else if let known {
+            base = known
+        } else {
+            throw Failure.noBase
+        }
         guard !reply.deltas.isEmpty else {
             return Folded(store: base, chain: 0, applied: 0, removed: 0)
         }

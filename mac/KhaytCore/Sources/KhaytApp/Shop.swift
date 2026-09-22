@@ -6682,6 +6682,105 @@ final class Shop {
         return (url, shopId)
     }
 
+    // MARK: - What the cloud held, last time this app looked
+
+    /// The cloud's own store as this app last saw it, and the revision it was.
+    ///
+    /// ── WHY THIS HAS TO EXIST FOR `?since=` TO ────────────────────────────
+    ///
+    /// khayt-cloud sends the base blob ONLY to a caller that is behind it. A
+    /// device that is already current asks `?since=N` and gets the deltas
+    /// after N and nothing else — which is the entire saving, and which leaves
+    /// nothing to fold those deltas onto unless the device kept the store it
+    /// had at N. So the two changes are one change.
+    ///
+    /// IN MEMORY, NOT ON DISK, deliberately. A relaunch pulls cold exactly as
+    /// this app always has, which is the behaviour every failure falls back to
+    /// — and nothing here has to be reconciled with a book on disk that is the
+    /// SHOP's copy, not the cloud's. The two are different stores and confusing
+    /// them is how a sync writes somebody else's records over yours.
+    struct CloudSeen {
+        /// The shop it belongs to. A book that switches clouds must not fold a
+        /// new shop's chain onto an old shop's store.
+        let shopId: String
+        let rev: Int
+        let store: [String: JSONValue]
+    }
+
+    private(set) var cloudSeen: CloudSeen?
+
+    /// Pull the cloud's store, asking only for what this app has not seen.
+    ///
+    /// Falls back to a cold pull — no `since`, base included — whenever the
+    /// cache cannot be trusted, and that list is the whole safety argument:
+    ///
+    ///   * no cache at all (first pull of the run, or after a whole-book push);
+    ///   * a cache belonging to a different shop;
+    ///   * a reply whose head is BEHIND the cache, which means the cloud went
+    ///     backwards — a reset, or a restore from a backup. Folding a shorter
+    ///     chain onto a store from the future would report this device's own
+    ///     records as the cloud's, and then push them.
+    ///
+    /// A cold pull is what this app did on every save until now, so every one
+    /// of those is a return to the old cost, never to a wrong answer.
+    func pullCloudStore(_ connection: CloudReader.Connection, token: String,
+                        dek: Data, engine: KhaytEngine,
+                        fetch: (URLRequest) async throws -> (Data, URLResponse))
+    async throws -> (reply: CloudReader.Reply, folded: CloudReader.Folded) {
+        let warm = cloudSeen.flatMap { $0.shopId == connection.shopId ? $0 : nil }
+        if let warm {
+            let reply = try await CloudReader.pull(connection, token: token,
+                                                   since: warm.rev, fetch: fetch)
+            if reply.rev >= warm.rev {
+                let folded = try await CloudReader.store(reply, dek: dek, engine: engine,
+                                                         onto: warm.store)
+                cloudSeen = CloudSeen(shopId: connection.shopId, rev: reply.rev,
+                                      store: folded.store)
+                return (reply, folded)
+            }
+            // The cloud is behind what this app remembers. Distrust the memory.
+            cloudSeen = nil
+        }
+        let reply = try await CloudReader.pull(connection, token: token, fetch: fetch)
+        let folded = try await CloudReader.store(reply, dek: dek, engine: engine)
+        cloudSeen = CloudSeen(shopId: connection.shopId, rev: reply.rev, store: folded.store)
+        return (reply, folded)
+    }
+
+    /// Remember what the cloud holds now that this device has changed it.
+    ///
+    /// After a delta push the cloud's store is the one just pulled with this
+    /// payload folded on — which `sendToCloud` computes anyway, to say what is
+    /// true now rather than what was true before the send.
+    func rememberCloud(shopId: String, rev: Int, store: [String: JSONValue]) {
+        cloudSeen = CloudSeen(shopId: shopId, rev: rev, store: store)
+    }
+
+    /// Forget it. Used after a whole-book push, where what the service ended up
+    /// holding is worth one cold pull rather than an argument.
+    func forgetCloud() { cloudSeen = nil }
+
+    /// What this sign-in may do to the shop, as the cloud recorded it.
+    ///
+    /// `settings.cloud.role` is written by `CloudSignIn`. The service refuses
+    /// a WRITE from `viewer` and allows every other role — `owner` for the
+    /// shop's own token, and a member account's role otherwise — so the rule
+    /// is stated the way the server states it: only a viewer is stopped.
+    ///
+    /// UNKNOWN IS ALLOWED, deliberately, and it is the opposite of the usual
+    /// rule here. A book that predates this field, or one that arrived by
+    /// restore, has no role at all — and refusing to sync it would break
+    /// syncing for every existing install to guard against a case the server
+    /// already refuses properly. The server is the authority; this only saves
+    /// a viewer from being told its token is broken.
+    var cloudRoleCanWrite: Bool { Self.cloudRoleCanWrite(settingsDict) }
+
+    static func cloudRoleCanWrite(_ settings: [String: JSONValue]) -> Bool {
+        guard case .object(let cloud)? = settings["cloud"],
+              case .string(let role)? = cloud["role"] else { return true }
+        return role.lowercased() != "viewer"
+    }
+
     /// The same, as a function of the settings alone — `settingsValue` is only
     /// the model's to set, and a rule about a shop's data should be testable
     /// without building one.
@@ -6756,6 +6855,10 @@ final class Shop {
     func forgetCloudKey() {
         cloudDek = nil
         cloudSent = nil
+        // And what the cloud held, which is a decrypted copy of the shop's
+        // book: locking the cloud and keeping its contents in memory would
+        // be the opposite of what the menu item says.
+        forgetCloud()
         cancelPendingSync()
         syncStatus = Self.cloudConnected(settingsDict) ? .locked : .off
     }
@@ -6841,7 +6944,12 @@ final class Shop {
                 throw CloudReader.Failure.malformed("the keyset has no passphrase-wrapped key")
             }
             // Before the write, so a wrong passphrase changes nothing.
-            let dek = try SyncCrypto.unwrapDek(secret: passphrase, wrapped: wrapped)
+            // The keyset says how its key was stretched — `lib/sync-crypto.js`
+            // writes `kdf` when it creates one and reads it back to unlock.
+            // Built-in defaults would refuse a keyset made with anything else,
+            // with a decryption error that says nothing about why.
+            let dek = try SyncCrypto.unwrapDek(secret: passphrase, wrapped: wrapped,
+                                               kdf: SyncCrypto.Kdf.from(keyset["kdf"]))
             let sealed = try await Secrets.seal(session.token, for: build)
 
             try await StoreWriter.update(
@@ -6970,7 +7078,12 @@ final class Shop {
             else {
                 throw CloudReader.Failure.malformed("the keyset has no passphrase-wrapped key")
             }
-            let dek = try SyncCrypto.unwrapDek(secret: passphrase, wrapped: wrapped)
+            // The keyset says how its key was stretched — `lib/sync-crypto.js`
+            // writes `kdf` when it creates one and reads it back to unlock.
+            // Built-in defaults would refuse a keyset made with anything else,
+            // with a decryption error that says nothing about why.
+            let dek = try SyncCrypto.unwrapDek(secret: passphrase, wrapped: wrapped,
+                                               kdf: SyncCrypto.Kdf.from(keyset["kdf"]))
             cloudDek = dek
             // Unlocked. From here on this app pushes on its own, and the first
             // push carries whatever was changed while it was locked.
@@ -7026,12 +7139,22 @@ final class Shop {
             let connection = try CloudReader.connection(settingsDict)
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
+            // ── A VIEWER IS TOLD ONCE, BEFORE ANYTHING IS SENT ────────────
+            //
+            // The service answers 403 to every write from a viewer's account,
+            // and this app said "the token may have been reset" and retried —
+            // forever, on a backoff, about a sign-in that is working exactly
+            // as intended. Sign-in already saves the role; reading it here
+            // means the shop is told the truth without a request at all.
+            guard cloudRoleCanWrite else { throw CloudWriter.Failure.readOnly }
 
             let session = URLSession(configuration: .ephemeral)
-            let reply = try await CloudReader.pull(connection, token: token) { request in
+            // ASKS ONLY FOR WHAT IT HAS NOT SEEN. This runs before every push,
+            // and every push used to re-download the base and the whole chain.
+            let (reply, folded) = try await pullCloudStore(
+                connection, token: token, dek: dek, engine: engine) { request in
                 try await session.data(for: request)
             }
-            let folded = try await CloudReader.store(reply, dek: dek, engine: engine)
             // From disk, for the same reason the comparison reads from disk:
             // the screens hold two collections out of thirty-three, and a
             // payload built from those would claim the other thirty-one are
@@ -7082,11 +7205,38 @@ final class Shop {
                 cloudSent = try await sendWholeBookAfterMerging(
                     connection: connection, token: token, dek: dek, engine: engine,
                     build: build, server: folded.store, baseRev: reply.rev, session: session)
+            } catch CloudWriter.Failure.chainFull(let head) {
+                // ── THE CHAIN IS FULL, WHICH IS NOT A RACE ────────────────
+                //
+                // Over 1,000 deltas, or four times the base, or the plan's
+                // size. The `rev` in that 409 is this device's OWN baseRev —
+                // nobody moved — so read as a race it produced a pull, the
+                // same 409, and a retry on a five-minute backoff FOREVER,
+                // while the shop's cloud copy quietly stopped updating.
+                //
+                // A whole `PUT /store` is the only thing that compacts the
+                // chain, and it is the same path a closed chain already takes:
+                // merge the cloud into this book first, then push, guarded by
+                // the rev the merge was folded from.
+                _ = head
+                cloudSent = try await sendWholeBookAfterMerging(
+                    connection: connection, token: token, dek: dek, engine: engine,
+                    build: build, server: folded.store, baseRev: reply.rev, session: session)
             }
             // Say what is true NOW, not what was true before the send: fold the
             // payload onto the store that was just pulled, which is exactly
             // what every other device will do when it next pulls the chain.
             let after = try await engine.foldDeltas(base: folded.store, deltas: [outbox.wire])
+            // And that IS what the cloud holds now, at the revision it just
+            // gave back — so the next pull can ask for nothing but what
+            // arrives after it. A whole-book push is not worth reasoning
+            // about: it replaced the base and compacted the chain, so the
+            // memory is dropped and the next pull is cold.
+            if let sent = cloudSent, sent.wholeStore {
+                forgetCloud()
+            } else if let sent = cloudSent {
+                rememberCloud(shopId: connection.shopId, rev: sent.rev, store: after.store)
+            }
             cloudCheck = CloudCompare.compare(here: mine, there: after.store,
                                               collections: collections,
                                               cloudRev: cloudSent?.rev ?? reply.rev,
@@ -7155,10 +7305,10 @@ final class Shop {
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
 
             let session = URLSession(configuration: .ephemeral)
-            let reply = try await CloudReader.pull(connection, token: token) { request in
+            let (reply, folded) = try await pullCloudStore(
+                connection, token: token, dek: dek, engine: engine) { request in
                 try await session.data(for: request)
             }
-            let folded = try await CloudReader.store(reply, dek: dek, engine: engine)
 
             // Before anything is written. A shop that does not like what came
             // down has this morning's book to go back to.
