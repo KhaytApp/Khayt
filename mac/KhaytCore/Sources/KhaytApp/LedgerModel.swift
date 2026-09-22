@@ -149,17 +149,118 @@ extension Shop {
         return spool.material + " · " + colour
     }
 
-    /// What a machine tile says. The three readings §4 distinguishes: running
-    /// with a figure, idle, and a machine Khayt has no protocol for.
-    func tileReading(for machine: Machine) -> (percent: Double?, state: ShopState, line: String) {
-        let reading = printers.readings[machine.id]?.status
-        if let reading, PrinterWatch.isPrinting(reading.state) {
-            return (Double(reading.progress) / 100, .running,
-                    reading.filename.isEmpty ? words.callIt("mac.printing") : reading.filename)
+    /// WHY a machine is not printing — and they are four different facts.
+    ///
+    /// ── THE DEFECT THIS EXISTS FOR ────────────────────────────────────────
+    ///
+    /// `tileReading` had one test — "is there a reading" — and said **"no
+    /// link"** for everything that failed it. So the front door told a shop
+    /// the same sentence about a laser cutter Khayt has no protocol for, a
+    /// Snapmaker somebody has not typed an address into yet, and a perfectly
+    /// well configured printer that simply had not answered its first poll of
+    /// the morning. One of those is permanent, one takes thirty seconds to
+    /// fix, and one is not a problem at all.
+    ///
+    /// `Dashboard.Tile` had already been through this — its own comment says
+    /// all five tiles once read "Khayt cannot ask this machine" including
+    /// three printers Khayt speaks four protocols for, and that "those are
+    /// different facts and only one of them is fixable". That reasoning was
+    /// never applied to the strip that actually ships on Triage, which is the
+    /// default front door. Two views answering one question, and the one
+    /// people look at had the wrong answer.
+    ///
+    /// So it is one rule now, here, and both tiles ask it.
+    enum Quiet {
+        /// A KIND with no protocol in this repo — a laser, a UV flatbed.
+        /// Nothing to do about it, and saying "not connected" would send
+        /// somebody looking for a setting that cannot exist.
+        case noProtocol
+        /// A printer Khayt speaks to, with no address typed in yet. The one
+        /// that is worth a shop's thirty seconds.
+        case notSetUp
+        /// Set up, asked, and silent. Different from never having been asked.
+        case notAnswering
+        /// Answering, and not printing. Not a problem; the ordinary state of
+        /// a machine between jobs.
+        case idle
+
+        var wordKey: String {
+            switch self {
+            case .noProtocol:   "mac.no_protocol"
+            case .notSetUp:     "mac.not_connected"
+            case .notAnswering: "mac.attn_state_offline"
+            case .idle:         "mac.idle"
+            }
         }
-        if reading == nil {
-            return (nil, .offline, words.callIt("mac.no_protocol"))
+
+        /// THE GLYPH NAMES THE KIND, THE WORD CARRIES THE SEVERITY —
+        /// `StateMark`'s own rule, and it settles this cleanly.
+        ///
+        /// Three of these four are the same KIND: a quiet machine with
+        /// nothing wrong. Not set up, nothing to set up, and simply between
+        /// jobs all draw `queued`, and the sentence underneath is what tells
+        /// them apart. Only one is a different kind — set up, asked, and
+        /// silent is a machine to go and look at — and only that one gets a
+        /// different mark.
+        ///
+        /// The first version gave `noProtocol` the `quoted` diamond, which is
+        /// the mark for a job that is only a quote. That file says in as many
+        /// words that no glyph appears in two tables, and borrowing one is how
+        /// a set stops meaning anything.
+        var state: ShopState {
+            switch self {
+            case .notAnswering:              .machineCheck
+            case .noProtocol, .notSetUp, .idle: .queued
+            }
         }
-        return (nil, .queued, words.callIt("mac.idle"))
     }
+
+    func quiet(_ machine: Machine) -> Quiet {
+        // AN ANSWER BEATS EVERY GUESS. If the machine has told this app what
+        // it is doing, nothing read off the settings can contradict it — and
+        // this test was third at first, so a machine that had answered was
+        // still reported as not set up because its record was thin.
+        if printers.readings[machine.id]?.status != nil { return .idle }
+        // Is this KIND askable at all? `lib/machine-kinds.js` answers it, and
+        // it is a fact about the kind rather than about the setup.
+        guard kind(of: machine)?.polled ?? true else { return .noProtocol }
+        guard PrinterWatch.notWatched(machine) == nil else { return .notSetUp }
+        return .notAnswering
+    }
+
+    /// What a machine tile says: a print in progress, or why there is not one.
+    func tileReading(for machine: Machine) -> TileReading {
+        if let status = printers.readings[machine.id]?.status,
+           PrinterWatch.isPrinting(status.state) {
+            return TileReading(percent: Double(status.progress) / 100, state: .running,
+                               line: status.timeRemaining.map(PrinterWatch.spell)
+                                     ?? words.callIt("mac.printing"),
+                               filename: status.filename)
+        }
+        let why = quiet(machine)
+        return TileReading(percent: nil, state: why.state, line: words.callIt(why.wordKey),
+                           filename: "")
+    }
+}
+
+/// What one machine tile draws.
+///
+/// A struct rather than a tuple because the running case carries three things
+/// now — how far, how long, and what — and a four-field tuple read at two call
+/// sites is how the wrong element gets picked.
+struct TileReading {
+    /// 0…1 while a print is running, and nil otherwise. NOT a change: it was
+    /// drawn with `Figure.signedPercent` and every running machine on the
+    /// front door said "+48%", as though a print nearly half done were a rise
+    /// of 48 percent in something. Nobody saw it because no picture of a
+    /// running tile had ever been taken — neither book this app is
+    /// photographed against can reach a printer.
+    let percent: Double?
+    let state: ShopState
+    /// The sentence under the name: the time left while printing, and why it
+    /// is not printing otherwise.
+    let line: String
+    /// Only while running, and only for the tooltip — the name of a sliced
+    /// file is a long ugly string and the tile is two hundred points wide.
+    let filename: String
 }

@@ -689,6 +689,44 @@ final class Activator: NSObject, NSApplicationDelegate {
             FileHandle.standardError.write(Data("menus: \(menuTree())\n".utf8))
             capture(named: "00b-dashboard-sample", into: dir)
 
+            // ── AND THE FRONT DOOR WITH THE MACHINES RUNNING ──────────────
+            //
+            // The single liveliest thing in this product is the machine strip
+            // on Triage with a print on it, and NO PICTURE OF IT HAS EVER
+            // EXISTED. Neither book can produce one: the sample's printers are
+            // somebody else's addresses and this Mac never knocks on them, and
+            // the real book's jobs are finished. So the running tile — the one
+            // a shop looks at most, on the screen it leaves open all day — was
+            // drawn by nobody and reviewed by nobody, and shipped saying
+            // "+48%" as though a print in progress were a rise in a figure.
+            //
+            // Readings are put in place rather than polled, the same
+            // concession `07c-machines-band` already makes for the same
+            // reason. `mac.no_protocol` needs the opposite of this picture,
+            // which `00b` above is.
+            // ONLY THE MACHINES THAT COULD ACTUALLY ANSWER. A laser and a UV
+            // flatbed have no protocol in this repo at all, so planting a
+            // reading on them would photograph a state that cannot happen —
+            // and leaving them alone is better than neutral: the picture then
+            // carries the running tiles AND the quiet ones side by side, which
+            // is what a real floor looks like and what the four sentences of
+            // `Shop.Quiet` have to be legible against.
+            for (i, machine) in shop.machines.enumerated()
+            where shop.kind(of: machine)?.polled ?? true {
+                shop.printers.setReadingForTesting(machine.id, PrinterWatch.Reading(
+                    status: KhaytEngine.PrinterStatus(
+                        state: i == 2 ? "idle" : "printing",
+                        progress: [9, 48, 0, 77, 96][i % 5], progressSource: "layers",
+                        filename: "falcon-hood-v4.gcode", timeRemaining: 2.6 * 3600,
+                        tempNozzle: 245, tempBed: 60, type: "moonraker"),
+                    problem: nil, at: Date()))
+            }
+            await settle()
+            try? await Task.sleep(for: .milliseconds(900))
+            capture(named: "00d-dashboard-running", into: dir)
+            shop.printers.clearReadingsForTesting()
+            await settle()
+
             // ── AND THE JOBS TABLE, WHILE THE SAMPLE IS OPEN ──────────────
             //
             // The reason three lines above applies to the screen a shop LIVES

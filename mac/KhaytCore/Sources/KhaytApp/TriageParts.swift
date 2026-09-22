@@ -27,37 +27,87 @@ struct OnTheMachines: View {
     }
 }
 
+/// One machine, on the front door.
+///
+/// ── THE TILE NOBODY HAD EVER SEEN RUNNING ─────────────────────────────────
+///
+/// This is the liveliest thing in the product — the strip a shop glances at
+/// all day to see what its printers are doing — and there was no picture of it
+/// with a print on it. Neither book can produce one: the sample's printers are
+/// somebody else's addresses, and the real book's jobs are finished. So the
+/// running branch was drawn by nobody and reviewed by nobody, and it showed a
+/// print nine percent through as **"+9%"**, because it was set in
+/// `Figure.signedPercent`, which exists for a rise or a fall in a figure. A
+/// print in progress is a level, not a change. `00d-dashboard-running` is the
+/// photograph that found it, and it exists now so this cannot happen twice.
+///
+/// It also said nothing about being alive. The palette reserves the warm
+/// colour for "being made right now" and `Motion` reserves the slow breath for
+/// the same thing; a running machine got neither, and a filename where the
+/// time left should be.
 struct MachineTile: View {
     let machine: Machine
     @Bindable var shop: Shop
+    @State private var hovering = false
 
-    private var reading: (percent: Double?, state: ShopState, line: String) {
-        shop.tileReading(for: machine)
-    }
+    private var reading: TileReading { shop.tileReading(for: machine) }
 
     var body: some View {
+        let now = reading
         VStack(alignment: .leading, spacing: 3) {
-            if let percent = reading.percent {
-                Figure(value: percent, style: .signedPercent, size: 15, weight: .bold,
-                       tint: Role.text)
+            if let percent = now.percent {
+                HStack(spacing: 5) {
+                    // The one movement reserved for work in progress, on the
+                    // one tile that is work in progress.
+                    Circle().fill(Khayt.hot).frame(width: 5, height: 5).alive()
+                    Figure(value: percent, style: .percent, size: 15, weight: .bold,
+                           tint: Khayt.hot)
+                }
             } else {
-                Text(reading.state.glyph)
+                Text(now.state.glyph)
                     .font(TypeScale.label(12))
-                    .foregroundStyle(reading.state.tint)
+                    .foregroundStyle(now.state.tint)
             }
             Text(machine.name)
                 .font(TypeScale.row(10.5, weight: .semibold))
                 .foregroundStyle(Role.text)
                 .lineLimit(1)
-            Text(reading.line)
+            Text(now.line)
                 .font(TypeScale.body(9.5))
                 .foregroundStyle(Role.text2)
                 .lineLimit(1)
+            // ── AND NO BAR HERE, WHICH WAS TRIED AND PHOTOGRAPHED ──────
+            //
+            // `LayerProgress` went in first, because it is how a print is
+            // drawn everywhere else in this app. It reads as a smear at this
+            // size: the shape lays TEN rows, so in the eight points a
+            // 54-point tile can spare, each row is under a point thick and the
+            // whole thing is a scratch. Nine percent and ninety-six looked
+            // alike.
+            //
+            // The dot says it is running, the figure says how far and the line
+            // says how long. A third drawing of the same fact, done badly, is
+            // ink for nothing — and `Drawings.swift` makes the same argument
+            // about counting what a screen draws before adding to it. The
+            // drawn print belongs where there is room for it: the Dashboard's
+            // own tile at 34 points, and the jobs table at 32 by 14.
         }
         .padding(6)
         .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
         .background(ground, in: RoundedRectangle(cornerRadius: Radius.control,
                                                  style: .continuous))
+        // ── A TILE THAT LOOKS PRESSABLE HAS TO BE ─────────────────────────
+        //
+        // The other machine strip in this app — `Dashboard.Tile` — lifts under
+        // the pointer and opens the machine, with a comment saying why: "a
+        // drawing of a printer that does nothing when clicked teaches people
+        // that the drawings are decoration". This one, the one on the default
+        // front door, did nothing at all.
+        .contentShape(Rectangle())
+        .liftsOnHover(hovering)
+        .onHover { hovering = $0 }
+        .onTapGesture { shop.shelf = .machines }
+        .help(now.filename.isEmpty ? machine.name : machine.name + " · " + now.filename)
     }
 
     private var ground: Color {

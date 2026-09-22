@@ -49,7 +49,16 @@ struct Figure: View {
         /// A quantity with a Latin unit: `180 g`, `540 h`.
         case unit(String)
         /// A signed percentage, where the sign is part of the meaning.
+        ///
+        /// A RISE OR A FALL, and only that. A level set this way reads as a
+        /// change that did not happen: the front door drew every running
+        /// printer's progress with it and said "+48%" about a print not quite
+        /// half done. If a figure would still be true with no sign in front of
+        /// it, it wants `.percent`.
         case signedPercent
+        /// A percentage that is a LEVEL — how far through, how much of a
+        /// whole. No sign, because there is no direction in it.
+        case percent
     }
 
     /// What the number is worth as a claim.
@@ -154,6 +163,8 @@ struct Figure: View {
         case .signedPercent:
             let n = Self.percent.string(from: NSNumber(value: value)) ?? "—"
             return value > 0 ? "+" + n : n
+        case .percent:
+            return Self.percent.string(from: NSNumber(value: value)) ?? "—" 
         }
     }
 
