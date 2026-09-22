@@ -30,12 +30,16 @@ enum LeadTimePublisher {
 
     enum Failure: Error, CustomStringConvertible, Equatable {
         case unauthorised
+        /// A 403: this sign-in may read the shop and not change it.
+        case readOnly
         case http(Int, String)
 
         var description: String {
             switch self {
             case .unauthorised:
                 return "Khayt Cloud did not accept this shop's token for the delivery promise."
+            case .readOnly:
+                return "This sign-in can read this shop but not publish its delivery promise."
             case .http(let code, let body):
                 return "Khayt Cloud answered \(code) to the delivery promise"
                      + (body.isEmpty ? "" : ": \(body)")
@@ -66,9 +70,13 @@ enum LeadTimePublisher {
         let (data, response) = try await fetch(request)
         switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
         case 200: return
-        case 401, 403: throw Failure.unauthorised
+        case 401: throw Failure.unauthorised
+        // A viewer's account, not a reset token. Saying the wrong one sends a
+        // shop to fix something that is not broken — and this ran on a timer,
+        // so it said it over and over.
+        case 403: throw Failure.readOnly
         case let code:
-            throw Failure.http(code, String(decoding: data.prefix(200), as: UTF8.self))
+            throw Failure.http(code, CloudWriter.said(data))
         }
     }
 

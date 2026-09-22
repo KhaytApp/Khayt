@@ -89,13 +89,67 @@ public enum SyncCrypto {
     /// book carries. A key-wrapped entry (an organisation's) has no salt and is
     /// refused by name rather than by deriving a KEK from nothing, which is a
     /// GCM error that tells a shop the wrong thing.
-    public static func unwrapDek(secret: String, wrapped: Blob,
-                                 n: Int = 32768, r: Int = 8, p: Int = 1) throws -> Data {
+    public static func unwrapDek(secret: String, wrapped: Blob, kdf: Kdf = Kdf(),
+                                 n: Int? = nil, r: Int? = nil, p: Int? = nil) throws -> Data {
         guard let salt64 = wrapped.salt, let salt = Data(base64Encoded: salt64) else {
             throw Failure.malformed("this entry is key-wrapped and needs the organisation's key, not a passphrase")
         }
-        let kek = try Scrypt.key(password: Data(secret.utf8), salt: salt, n: n, r: r, p: p, length: 32)
+        let kek = try Scrypt.key(password: Data(secret.utf8), salt: salt,
+                                 n: n ?? kdf.n, r: r ?? kdf.r, p: p ?? kdf.p,
+                                 length: kdf.keyLength)
         return try open(wrapped, key: kek)
+    }
+
+    /// ── THE KEYSET SAYS HOW ITS KEY WAS STRETCHED ────────────────────────
+    ///
+    /// `createKeyset` in `lib/sync-crypto.js` takes `opts.kdf` and writes what
+    /// it used into `keyset.kdf`. `unlockWithPassphrase` reads it back, and so
+    /// does the web client. This app had the defaults built in and ignored the
+    /// field — so a keyset made with anything else would have been refused on
+    /// this Mac with a decryption error, which says nothing about why.
+    ///
+    /// Every keyset in existence uses the defaults today. That is exactly when
+    /// to fix it: the cost is a struct, and the alternative is discovering it
+    /// on the day somebody turns the cost up and every Mac in the shop stops
+    /// unlocking.
+    ///
+    /// Only scrypt exists. An algorithm this app does not know is refused BY
+    /// NAME rather than quietly stretched with scrypt anyway, which would hand
+    /// back a wrong key and report it as a wrong passphrase.
+    public struct Kdf: Sendable, Equatable {
+        public let algorithm: String
+        public let n: Int
+        public let r: Int
+        public let p: Int
+        public let keyLength: Int
+
+        public init(algorithm: String = "scrypt", n: Int = 32768, r: Int = 8,
+                    p: Int = 1, keyLength: Int = 32) {
+            self.algorithm = algorithm
+            self.n = n
+            self.r = r
+            self.p = p
+            self.keyLength = keyLength
+        }
+
+        /// Read it off `settings.cloud.keyset.kdf`. A missing field is the
+        /// default, which is what every keyset written so far carries.
+        public static func from(_ value: JSONValue?) throws -> Kdf {
+            guard case .object(let fields)? = value else { return Kdf() }
+            let int = { (key: String, fallback: Int) -> Int in
+                if case .number(let v)? = fields[key] { return Int(v) }
+                return fallback
+            }
+            var algorithm = "scrypt"
+            if case .string(let a)? = fields["algo"], !a.isEmpty { algorithm = a }
+            guard algorithm == "scrypt" else {
+                throw Failure.malformed("this book's key uses \(algorithm), which this app cannot read")
+            }
+            let fallback = Kdf()
+            return Kdf(algorithm: algorithm,
+                       n: int("N", fallback.n), r: int("r", fallback.r),
+                       p: int("p", fallback.p), keyLength: int("keyLen", fallback.keyLength))
+        }
     }
 
     // MARK: - The store

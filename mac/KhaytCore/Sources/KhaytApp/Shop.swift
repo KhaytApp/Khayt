@@ -6682,6 +6682,27 @@ final class Shop {
         return (url, shopId)
     }
 
+    /// What this sign-in may do to the shop, as the cloud recorded it.
+    ///
+    /// `settings.cloud.role` is written by `CloudSignIn`. The service refuses
+    /// a WRITE from `viewer` and allows every other role — `owner` for the
+    /// shop's own token, and a member account's role otherwise — so the rule
+    /// is stated the way the server states it: only a viewer is stopped.
+    ///
+    /// UNKNOWN IS ALLOWED, deliberately, and it is the opposite of the usual
+    /// rule here. A book that predates this field, or one that arrived by
+    /// restore, has no role at all — and refusing to sync it would break
+    /// syncing for every existing install to guard against a case the server
+    /// already refuses properly. The server is the authority; this only saves
+    /// a viewer from being told its token is broken.
+    var cloudRoleCanWrite: Bool { Self.cloudRoleCanWrite(settingsDict) }
+
+    static func cloudRoleCanWrite(_ settings: [String: JSONValue]) -> Bool {
+        guard case .object(let cloud)? = settings["cloud"],
+              case .string(let role)? = cloud["role"] else { return true }
+        return role.lowercased() != "viewer"
+    }
+
     /// The same, as a function of the settings alone — `settingsValue` is only
     /// the model's to set, and a rule about a shop's data should be testable
     /// without building one.
@@ -6841,7 +6862,12 @@ final class Shop {
                 throw CloudReader.Failure.malformed("the keyset has no passphrase-wrapped key")
             }
             // Before the write, so a wrong passphrase changes nothing.
-            let dek = try SyncCrypto.unwrapDek(secret: passphrase, wrapped: wrapped)
+            // The keyset says how its key was stretched — `lib/sync-crypto.js`
+            // writes `kdf` when it creates one and reads it back to unlock.
+            // Built-in defaults would refuse a keyset made with anything else,
+            // with a decryption error that says nothing about why.
+            let dek = try SyncCrypto.unwrapDek(secret: passphrase, wrapped: wrapped,
+                                               kdf: SyncCrypto.Kdf.from(keyset["kdf"]))
             let sealed = try await Secrets.seal(session.token, for: build)
 
             try await StoreWriter.update(
@@ -6970,7 +6996,12 @@ final class Shop {
             else {
                 throw CloudReader.Failure.malformed("the keyset has no passphrase-wrapped key")
             }
-            let dek = try SyncCrypto.unwrapDek(secret: passphrase, wrapped: wrapped)
+            // The keyset says how its key was stretched — `lib/sync-crypto.js`
+            // writes `kdf` when it creates one and reads it back to unlock.
+            // Built-in defaults would refuse a keyset made with anything else,
+            // with a decryption error that says nothing about why.
+            let dek = try SyncCrypto.unwrapDek(secret: passphrase, wrapped: wrapped,
+                                               kdf: SyncCrypto.Kdf.from(keyset["kdf"]))
             cloudDek = dek
             // Unlocked. From here on this app pushes on its own, and the first
             // push carries whatever was changed while it was locked.
@@ -7026,6 +7057,14 @@ final class Shop {
             let connection = try CloudReader.connection(settingsDict)
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
+            // ── A VIEWER IS TOLD ONCE, BEFORE ANYTHING IS SENT ────────────
+            //
+            // The service answers 403 to every write from a viewer's account,
+            // and this app said "the token may have been reset" and retried —
+            // forever, on a backoff, about a sign-in that is working exactly
+            // as intended. Sign-in already saves the role; reading it here
+            // means the shop is told the truth without a request at all.
+            guard cloudRoleCanWrite else { throw CloudWriter.Failure.readOnly }
 
             let session = URLSession(configuration: .ephemeral)
             let reply = try await CloudReader.pull(connection, token: token) { request in
@@ -7079,6 +7118,23 @@ final class Shop {
                 // has, so the merge below is not a courtesy — it is the thing
                 // that makes the push legal. Anything arriving in between comes
                 // back as a 409 from `baseRev`.
+                cloudSent = try await sendWholeBookAfterMerging(
+                    connection: connection, token: token, dek: dek, engine: engine,
+                    build: build, server: folded.store, baseRev: reply.rev, session: session)
+            } catch CloudWriter.Failure.chainFull(let head) {
+                // ── THE CHAIN IS FULL, WHICH IS NOT A RACE ────────────────
+                //
+                // Over 1,000 deltas, or four times the base, or the plan's
+                // size. The `rev` in that 409 is this device's OWN baseRev —
+                // nobody moved — so read as a race it produced a pull, the
+                // same 409, and a retry on a five-minute backoff FOREVER,
+                // while the shop's cloud copy quietly stopped updating.
+                //
+                // A whole `PUT /store` is the only thing that compacts the
+                // chain, and it is the same path a closed chain already takes:
+                // merge the cloud into this book first, then push, guarded by
+                // the rev the merge was folded from.
+                _ = head
                 cloudSent = try await sendWholeBookAfterMerging(
                     connection: connection, token: token, dek: dek, engine: engine,
                     build: build, server: folded.store, baseRev: reply.rev, session: session)

@@ -131,10 +131,17 @@ enum CloudReader {
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         switch code {
         case 200: break
+        // Nothing has ever been pushed for this shop. A VIEWER still reads, so
+        // a 403 here is a genuine credential problem rather than a role — the
+        // roles only ever stop a write.
         case 204: throw Failure.noStoreYet
         case 401, 403: throw Failure.unauthorised
         default:
-            throw Failure.http(code, String(decoding: data.prefix(200), as: UTF8.self))
+            // The service answers with a sentence written for a person. A
+            // store whose blob has gone missing from object storage now says
+            // so in a 500 — it used to answer 204, which read as "nothing has
+            // been sent yet" and is a very different thing to tell a shop.
+            throw Failure.http(code, CloudWriter.said(data))
         }
 
         guard let body = try? JSONDecoder().decode(Body.self, from: data) else {
