@@ -266,8 +266,14 @@ private struct FloorStrip: View {
                 if !printing, let x = machine.bed?.x, let y = machine.bed?.y {
                     BedPlan(x: x, y: y, widest: shop.widestBed, deepest: shop.deepestBed,
                             box: CGSize(width: 74, height: 38))
-                    Text(shop.words.callIt(!askable ? "mac.cannot_ask"
-                                           : !connected ? "mac.not_connected" : "mac.idle"))
+                    // Three sentences here and two in the other branch, from
+                    // two different expressions — which is how "set up, asked,
+                    // silent" came to be missing from both. `Shop.quiet` says
+                    // it once. `mac.cannot_ask` is the long form of the same
+                    // fact `Quiet.noProtocol` names, and this tile has the
+                    // room for it.
+                    Text(shop.words.callIt(shop.quiet(machine) == .noProtocol
+                                           ? "mac.cannot_ask" : shop.quiet(machine).wordKey))
                         .font(.caption2).foregroundStyle(.tertiary)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 } else {
@@ -299,7 +305,13 @@ private struct FloorStrip: View {
                             .font(.caption2).foregroundStyle(.secondary)
                             .lineLimit(1).truncationMode(.middle)
                     } else {
-                        Text(shop.words.callIt(connected ? "mac.idle" : "mac.not_connected"))
+                        // ONE RULE, ASKED. This tile used to choose between
+                        // two sentences from its own `connected`, which made
+                        // it the second view in the app deciding why a machine
+                        // is quiet — and the two disagreed. `Shop.quiet` is
+                        // that decision, in one place, with the case both
+                        // tiles were missing: set up, asked, and silent.
+                        Text(shop.words.callIt(shop.quiet(machine).wordKey))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
