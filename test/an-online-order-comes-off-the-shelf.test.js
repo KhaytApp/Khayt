@@ -22,7 +22,7 @@ const crypto = require('node:crypto');
 const ROOT = path.join(__dirname, '..');
 const { registerLanServer } = require(path.join(ROOT, 'lib/lan-server.js'));
 
-const PORT = 3991;
+const PORT = 3998;   // 3991-3997 are taken by the other LAN suites
 const BASE = `http://127.0.0.1:${PORT}`;
 const SECRET = 'salla-secret';
 const handlers = new Map();
