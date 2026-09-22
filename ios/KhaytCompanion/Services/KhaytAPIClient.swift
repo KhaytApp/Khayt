@@ -17,6 +17,13 @@ final class KhaytAPIClient: ObservableObject {
     /// shop has paired with a Mac that can hand the book over.
     @Published private(set) var servingFromBook = false
 
+    /// Edits made on this phone that the Mac has not taken yet.
+    ///
+    /// Zero is the normal state, including when there is no book at all — a
+    /// phone with nothing to send and a phone that cannot send are different
+    /// things, but neither has anything waiting.
+    @Published private(set) var pendingCount = 0
+
     /// The book, and the reader that turns it into what the screens decode.
     ///
     /// Optional because a build without its App Group container has neither, and
@@ -198,6 +205,66 @@ final class KhaytAPIClient: ObservableObject {
         let store: [String: JSONValue]
     }
 
+    /// Send what this phone has changed, and say how much arrived.
+    ///
+    /// `POST /api/store/deltas` — the outbox computed by the shop's own push
+    /// rule, folded on the Mac by the shop's own pull rule. Returns nil when
+    /// there is nothing to send or no book to send from.
+    ///
+    /// ── THE BASELINE MOVES ONLY ON SUCCESS ───────────────────────────────
+    ///
+    /// After the Mac has taken the changes, this phone and that Mac agree, so
+    /// the baseline becomes the book. Doing it before the reply, or after a
+    /// failure, would tell the next outbox that edits already went which never
+    /// did — and they would never be sent again. A write that is silently
+    /// dropped is worse than one that visibly fails.
+    @discardableResult
+    func sendPendingChanges() async throws -> Int? {
+        guard let book, let reader else { return nil }
+        guard let outbox = try await reader.pendingChanges(), !outbox.isEmpty else { return nil }
+
+        let body = try JSONEncoder().encode(JSONValue.object(outbox.wire))
+        let (data, response) = try await request(path: "/api/store/deltas", method: "POST",
+                                                 body: body, requiresPin: true)
+        guard let http = response as? HTTPURLResponse else {
+            throw KhaytAPIError.transport(URLError(.badServerResponse))
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw try decodeAPIError(data, status: http.statusCode)
+        }
+        // The Mac has it. Only now do the two agree.
+        try book.markSynced()
+        pendingCount = 0
+        return outbox.count
+    }
+
+    /// How many edits are waiting to reach the Mac, for a screen that says so.
+    func refreshPendingCount() async {
+        guard let reader else { return }
+        let outbox = try? await reader.pendingChanges()
+        pendingCount = outbox?.count ?? 0
+    }
+
+    /// Do a write locally when this phone keeps a book, and send it on.
+    ///
+    /// The send is attempted but never required: the whole point is that the
+    /// edit is safe on the phone before the network is involved. A failure here
+    /// leaves it in the outbox, counted, and the next successful send carries
+    /// it.
+    private func writeLocally(_ change: (BookWriter) throws -> Void) async throws -> Bool {
+        guard let book, book.exists else { return false }
+        do {
+            try change(BookWriter(book: book))
+        } catch is BookWriter.Refusal {
+            // The book cannot represent this one. Fall through to the desktop,
+            // which either does it properly or fails honestly.
+            return false
+        }
+        await refreshPendingCount()
+        _ = try? await sendPendingChanges()
+        return true
+    }
+
     /// How many records a book holds, counting only what is actually a list of
     /// them. `settings` is one object, not a collection, and counting its keys
     /// would inflate the number the screen shows.
@@ -234,6 +301,7 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     func updateSpoolRemaining(id: String, grams: Int) async throws {
+        if try await writeLocally({ try $0.setSpoolRemaining(spoolId: id, grams: grams) }) { return }
         let encodedId = try encodeOrderIdForPath(id)
         let body = try JSONEncoder().encode(["remaining": max(0, grams)])
         let (data, response) = try await request(
@@ -280,6 +348,7 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     func updateWaitingStatus(id: String, status: String) async throws {
+        if try await writeLocally({ try $0.setWaitingStatus(id: id, to: status) }) { return }
         let encodedId = try encodeOrderIdForPath(id)
         let body = try JSONEncoder().encode(["status": status])
         let (data, response) = try await request(
@@ -289,6 +358,7 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     func updateOrderStatus(orderId: String, status: String) async throws {
+        if try await writeLocally({ try $0.setOrderStatus(orderId: orderId, to: status) }) { return }
         let encodedId = try encodeOrderIdForPath(orderId)
         let body = try JSONEncoder().encode(["status": status])
         _ = try await request(
@@ -300,6 +370,12 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     func assignMachine(orderId: String, machineId: String?) async throws {
+        if let reader, let book, book.exists {
+            let machines = (try? await reader.machines()) ?? []
+            if try await writeLocally({
+                try $0.assignMachine(orderId: orderId, machineId: machineId, machines: machines)
+            }) { return }
+        }
         let encodedId = try encodeOrderIdForPath(orderId)
         // [String: String?] encodes a nil value as JSON null (unassign).
         let body = try JSONEncoder().encode(["machineId": machineId])

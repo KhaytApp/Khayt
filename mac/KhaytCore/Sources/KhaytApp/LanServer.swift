@@ -1418,6 +1418,13 @@ extension Shop {
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             return try await self.recordSurvey(token: token, rating: rating, comment: comment, nowIso: nowIso)
         }
+        // A paired phone's changes, folded into the book. Switched on here and
+        // nowhere else: the capability is nil by default precisely so that
+        // taking a phone's edits is something this app decides to do.
+        host.fold = { [weak self] payload in
+            guard let self else { throw CocoaError(.fileWriteUnknown) }
+            return try await self.foldFromPhone(payload)
+        }
         let server = LanServer(host: host)
         do {
             _ = try await server.start(port: config.port, bind: config.bindLan ? .lan : .loopback)
@@ -1432,6 +1439,37 @@ extension Shop {
     /// A customer's request, into the book's waiting list — the entry the
     /// shared rule built, appended inside the write, then the window reloads
     /// from the file so the request is on the Waiting screen at once.
+    /// Fold a phone's outbox into the book, inside the write.
+    ///
+    /// The same shape as `recordIntake` beside it, and for the same reasons:
+    /// the book is read inside the write, ownership is checked before the read
+    /// and again before the swap, and the app reloads from disk afterwards so
+    /// its screens show what was actually written rather than what it believes
+    /// it wrote.
+    ///
+    /// The fold itself is `KhaytSync.applyDeltas`, which is what protects the
+    /// book: a record this Mac already holds at an equal or newer revision is
+    /// skipped, so a phone carrying a stale copy cannot undo work done at the
+    /// desk. Nothing here re-decides that — it would be a second opinion about
+    /// a rule the shop already has.
+    func foldFromPhone(_ payload: [String: JSONValue]) async throws -> KhaytEngine.Folded {
+        guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
+        guard let engine else { throw CocoaError(.fileWriteUnknown) }
+        var result: KhaytEngine.Folded?
+        try await StoreWriter.update(
+            storeURL: build.storeURL,
+            owns: { StoreLock.weOwnIt(build) },
+            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+        ) { root in
+            let folded = try await engine.foldDeltas(base: root, deltas: [payload])
+            root = folded.store
+            result = folded
+        }
+        await load(source)
+        guard let result else { throw CocoaError(.fileWriteUnknown) }
+        return result
+    }
+
     func recordIntake(_ entry: JSONValue) async throws {
         guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
         try await StoreWriter.update(
