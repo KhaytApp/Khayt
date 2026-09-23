@@ -499,6 +499,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <string>_moonraker._tcp</string>
     <string>_snapmaker._tcp</string>
     <string>_bambulab._tcp</string>
+    <!-- THIS APP'S OWN SERVICE, which the list above forgot. LanServer
+         advertises _khayt._tcp whenever it listens on the shop's network, and
+         mDNSResponder refuses a type the app did not declare — "App
+         Info.plist(NSBonjourServices) does not allow '_khayt._tcp'" — and
+         that refusal took the whole listener down with it (DNS Error:
+         NoAuth). alpha.37 on the shop's own Mac: LAN switched on, nothing
+         listening, no error anywhere. LanBonjourDeclaredTests holds this. -->
+    <string>_khayt._tcp</string>
   </array>
 $SPARKLE_KEYS
   <!-- A job being dragged across the board. Declared so the drag is this app's
