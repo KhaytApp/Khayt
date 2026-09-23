@@ -2314,6 +2314,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   it, so they read like warnings. Every notice has a Close button now, and they
   go on their own 15 seconds after the last one arrived. Problems still stay
   until they are dealt with.
+- **(Mac) The cloud asked for the passphrase at every launch.** The unlocked
+  key lived only in memory, so each time the app opened a shop had to sign in
+  to the cloud again before anything synced. It is kept in this Mac's login
+  Keychain now, never in the book and never sent anywhere, and the next launch
+  unlocks by itself. The passphrase itself is still never stored. Locking the
+  cloud from the menu bar removes the kept key. If the shop's key changes on
+  another device, this Mac asks once rather than keep sending with the old one.
 
 - **(Mac) Preferences could not be opened.** Settings had nine tabs in a window
   too narrow for them, so the last ones went behind a » button at the end of
