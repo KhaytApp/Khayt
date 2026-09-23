@@ -149,6 +149,47 @@ final class BookContractTests: XCTestCase {
                         "the names do not match the shop's machines")
     }
 
+    /// A shipped order, as the Ship dialog writes it — Electron's always, the
+    /// Mac's too from its shipping work (fields confirmed by the Mac session,
+    /// 2026-09-23). The phone reads orders out of the BOOK, unprojected, so
+    /// every one of these fields reaches the models whether they declare it or
+    /// not.
+    ///
+    /// `trackingNumber` is a NUMBER here on purpose. New books write a string
+    /// or null; old ones hold numbers. A model that declares it `String?`
+    /// throws, and throws for the whole list — `priority` emptied the queue
+    /// screen exactly that way. `/api/orders` projects its fields, so the
+    /// contract capture cannot see this; only the book path can.
+    func testAShippedOrderStillReads() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appending(path: "shipped-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let book = CompanionBook(directory: dir)
+        let shipped = """
+        {"printLog":[
+          {"id":"o-shipped","project":"Cable clips","client":"Acme","status":"completed",
+           "date":"2026-09-20","priority":false,
+           "carrier":"aramex","trackingNumber":44012345678,"shippingService":"express",
+           "labelUrl":"https://example.invalid/label.pdf","shipmentMeta":{"weightKg":0.4},
+           "shippedAt":"2026-09-21T10:00:00.000Z","shippingStatus":"in_transit","courierName":null,
+           "shippingHistory":[{"status":"label_created","at":"2026-09-21T10:00:00.000Z","source":"desk","note":""},
+                              {"status":"in_transit","at":"2026-09-21T12:00:00.000Z","source":"webhook","note":"Picked up"}]},
+          {"id":"o-live","project":"Bracket","status":"printing","priority":false,
+           "trackingNumber":null,"shippingHistory":[]}
+        ]}
+        """
+        let store = try JSONDecoder().decode([String: JSONValue].self, from: Data(shipped.utf8))
+        try book.replace(with: store, scope: nil)
+        let reader = BookReader(book: book)
+
+        let history = try await reader.recentOrders(limit: 40)
+        XCTAssertEqual(history.map(\.id).sorted(), ["o-live", "o-shipped"],
+                       "a shipped order did not decode, and took the list with it")
+        let queue = try await reader.queue()
+        XCTAssertEqual(queue.map(\.id), ["o-live"])
+    }
+
     /// A list that simply stops is a shop concluding it has done 200 jobs.
     func testAWindowedHistorySaysWhereTheRestIs() throws {
         let dir = FileManager.default.temporaryDirectory
