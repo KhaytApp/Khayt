@@ -3017,6 +3017,44 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [4.0.0-alpha.40] - 2026-09-23
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Printer alerts reach the phone, and a phone can sync a shop whose key never
+reached Khayt Cloud. The first release built on the shop's own Mac rather than
+on GitHub. alpha.39 was cut and never built on its own, so its fix ships here
+too: the phone could not find the Mac on the shop's network (see alpha.39).
+
+### Added
+
+- **(Mac) Printer alerts reach the shop's phone — through Telegram, and now
+  ntfy.** The Mac showed a printer fault as a notification on the Mac and told
+  nobody else: its Telegram switches for printer error, offline and stalled were
+  saved and never read. It now sends each alert to Telegram as those switches
+  say, and to **ntfy** — a push to a phone with no account and no bot: pick a
+  topic in Settings → Integrations, install the ntfy app, subscribe. A
+  self-hosted ntfy server and an access token (sealed) work too, each alert
+  type can be switched on or off, and a Test button sends one.
+
+### Fixed
+
+- **(Mac) A spool running out mid-print raised no alert on the Mac.** The Mac
+  asked the alert rule for a fixed set of alert types that left filament
+  runout out, so an empty spool was noticed only by whoever walked past. It is
+  an alert now, on the Mac and to any phone channel set up.
+
+- **(Mac) A shop whose key never reached Khayt Cloud could not sync its other
+  devices.** A book can hold its encryption key without the cloud ever having
+  been given it — the other app made it and never sent it. The Mac signed in
+  with the book's copy and worked; a phone, which can only take the key from
+  the cloud, stopped at "no keyset" and never synced. Signing in on the Mac now
+  puts the book's own key on the cloud when the cloud has none — after the
+  passphrase has proven it, never over a key another device put there, and
+  never a newly made one, which would orphan the shop's recovery key — and then
+  sends the book, so the next device has something to open.
+
 ## [4.0.0-alpha.39] - 2026-09-23
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
