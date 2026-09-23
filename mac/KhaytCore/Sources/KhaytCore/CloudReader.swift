@@ -18,9 +18,9 @@ import KhaytCore
 /// carries one. Confirmed against the server's own handler, not only the
 /// client's.
 @MainActor
-enum CloudReader {
+public enum CloudReader {
 
-    enum Failure: Error, CustomStringConvertible {
+    public enum Failure: Error, CustomStringConvertible {
         case notConnected
         case badAddress(String)
         case unauthorised
@@ -29,7 +29,7 @@ enum CloudReader {
         case malformed(String)
         case noBase
 
-        var description: String {
+        public var description: String {
             switch self {
             case .notConnected:
                 return "This book is not connected to Khayt Cloud."
@@ -52,33 +52,28 @@ enum CloudReader {
     }
 
     /// What one pull came back with.
-    struct Reply {
+    public struct Reply: Sendable {
         /// The head revision — the whole chain's, not the slice's.
-        let rev: Int
-        let base: SyncCrypto.Blob?
-        let deltas: [(rev: Int, blob: SyncCrypto.Blob)]
+        public let rev: Int
+        public let base: SyncCrypto.Blob?
+        public let deltas: [(rev: Int, blob: SyncCrypto.Blob)]
+
+        public init(rev: Int, base: SyncCrypto.Blob?, deltas: [(rev: Int, blob: SyncCrypto.Blob)]) {
+            self.rev = rev; self.base = base; self.deltas = deltas
+        }
     }
 
     /// The shop's own cloud settings, as far as reading needs them.
-    struct Connection {
-        let url: String
-        let shopId: String
+    public struct Connection: Sendable {
+        public let url: String
+        public let shopId: String
         /// Still `__enc__` here. Opened at the moment of the request and never
         /// held — see `Secrets`.
-        let storedToken: String
-    }
+        public let storedToken: String
 
-    static func connection(_ settings: [String: JSONValue]) throws -> Connection {
-        guard Shop.cloudConnected(settings), case .object(let cloud)? = settings["cloud"] else {
-            throw Failure.notConnected
+        public init(url: String, shopId: String, storedToken: String) {
+            self.url = url; self.shopId = shopId; self.storedToken = storedToken
         }
-        guard case .string(let url)? = cloud["url"], !url.isEmpty,
-              case .string(let shop)? = cloud["shopId"], !shop.isEmpty else {
-            throw Failure.notConnected
-        }
-        var token = ""
-        if case .string(let t)? = cloud["token"] { token = t }
-        return Connection(url: url, shopId: shop, storedToken: token)
     }
 
     // MARK: - The request
@@ -97,7 +92,7 @@ enum CloudReader {
     /// The claim is true and that is what earns it — `store(_:dek:engine:)`
     /// folds `base + deltas` through `KhaytSync.applyDeltas`, the same rule the
     /// desktop folds with. It comes off again if that ever stops being so.
-    static func request(_ connection: Connection, token: String,
+    public static func request(_ connection: Connection, token: String,
                         method: String, tail: String) throws -> URLRequest {
         guard let base = URL(string: connection.url), base.scheme == "https" else {
             // Not a preference: the token goes in a header, and http would put
@@ -136,9 +131,9 @@ enum CloudReader {
     /// base is included ONLY when the caller is behind it. A warm pull
     /// answers with deltas and no base, so there is nothing to fold them onto
     /// unless the caller kept the store it had at `since` — see `store(_:…)`
-    /// and `Shop.cloudSeen`. Passing `since` without keeping that store turns
+    /// and the Mac app's `Shop.cloudSeen`. Passing `since` without keeping that store turns
     /// every warm pull into `Failure.noBase`.
-    static func pull(_ connection: Connection, token: String, since: Int? = nil,
+    public static func pull(_ connection: Connection, token: String, since: Int? = nil,
                      fetch: (URLRequest) async throws -> (Data, URLResponse)) async throws -> Reply {
         let tail = since.map { "/store?since=\($0)" } ?? "/store"
         let request = try self.request(connection, token: token, method: "GET", tail: tail)
@@ -189,7 +184,7 @@ enum CloudReader {
     /// nothing known is still `noBase`, because folding a chain onto an empty
     /// store would hand back a book missing everything that predates it and
     /// call it the cloud's.
-    static func store(_ reply: Reply, dek: Data, engine: KhaytEngine,
+    public static func store(_ reply: Reply, dek: Data, engine: KhaytEngine,
                       onto known: [String: JSONValue]? = nil) async throws -> Folded {
         var base: [String: JSONValue]
         if let baseBlob = reply.base {
@@ -214,14 +209,18 @@ enum CloudReader {
     /// thing if thirteen changes were folded onto the base and something else
     /// entirely if none were — and the two are indistinguishable from the
     /// answer alone.
-    struct Folded {
-        let store: [String: JSONValue]
+    public struct Folded: Sendable {
+        public let store: [String: JSONValue]
         /// How many encrypted changes the server sent after the base.
-        let chain: Int
+        public let chain: Int
         /// How many records those changes actually wrote.
-        let applied: Int
+        public let applied: Int
         /// How many they deleted.
-        let removed: Int
+        public let removed: Int
+
+        public init(store: [String: JSONValue], chain: Int, applied: Int, removed: Int) {
+            self.store = store; self.chain = chain; self.applied = applied; self.removed = removed
+        }
     }
 }
 

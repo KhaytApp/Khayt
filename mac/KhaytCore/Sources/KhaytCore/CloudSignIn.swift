@@ -24,22 +24,26 @@ import KhaytCore
 /// owner their shop is recoverable when it is not. That is a flow with its own
 /// failure modes, not a branch of this one. An account that has a keyset — every
 /// shop that has ever synced — signs in here.
-enum CloudSignIn {
+public enum CloudSignIn {
 
     /// Ten seconds, as every other call this app makes.
-    static let timeout: TimeInterval = 10
+    public static let timeout: TimeInterval = 10
 
-    struct Session {
-        let shopId: String
+    public struct Session: Sendable {
+        public let shopId: String
         /// Plaintext, straight off the wire. The caller seals it before it
         /// touches the book and never keeps this copy.
-        let token: String
-        let keyset: JSONValue?
-        let role: String
-        let verified: Bool
+        public let token: String
+        public let keyset: JSONValue?
+        public let role: String
+        public let verified: Bool
+
+        public init(shopId: String, token: String, keyset: JSONValue?, role: String, verified: Bool) {
+            self.shopId = shopId; self.token = token; self.keyset = keyset; self.role = role; self.verified = verified
+        }
     }
 
-    enum Failure: Error, LocalizedError {
+    public enum Failure: Error, LocalizedError {
         case badAddress(String)
         case wrongCredentials
         case noKeyset
@@ -47,7 +51,7 @@ enum CloudSignIn {
         case unreachable(String)
         case refused(Int, String)
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
             case .badAddress(let why): return why
             case .wrongCredentials: return "That email and password were refused"
@@ -67,7 +71,7 @@ enum CloudSignIn {
     /// The address is put through the shared rule first: it is typed by a
     /// person, self-hosting is supported, and an EMAIL AND PASSWORD are the
     /// very first thing sent to it — which is the reason that rule exists.
-    static func logIn(url: String, email: String, password: String,
+    public static func logIn(url: String, email: String, password: String,
                       engine: KhaytEngine,
                       session: URLSession? = nil) async throws -> Session {
         let body: [String: JSONValue]
@@ -112,7 +116,7 @@ enum CloudSignIn {
     /// so "no code came" and "this server cannot send mail" are different
     /// sentences.
     @discardableResult
-    static func requestReset(url: String, email: String, engine: KhaytEngine,
+    public static func requestReset(url: String, email: String, engine: KhaytEngine,
                              session: URLSession? = nil)
     async throws -> (configured: Bool, failed: Bool) {
         let body = try await post(path: "/v1/request-reset",
@@ -132,7 +136,7 @@ enum CloudSignIn {
     /// shop whose passphrase is the thing that was lost. Saying so is the
     /// difference between a shop that reaches for its recovery key and one that
     /// resets a password and wonders why nothing opened.
-    static func resetPassword(url: String, email: String, code: String,
+    public static func resetPassword(url: String, email: String, code: String,
                               newPassword: String, engine: KhaytEngine,
                               session: URLSession? = nil) async throws {
         _ = try await post(path: "/v1/reset-password",

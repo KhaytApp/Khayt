@@ -12,6 +12,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   now takes "nothing here" at its word and sends the whole store, which is
   what the Mac app already did.
 
+- **(Mac + iOS) The cloud client moves into KhaytCore, so the phone can share
+  it.** `CloudSignIn`, `CloudReader` and `CloudWriter` move from the Mac app
+  into KhaytCore, unchanged apart from becoming public API. The one piece that
+  needs the Mac app, `CloudReader.connection(_:)`, which asks the Mac's book
+  whether it is connected, stays behind as an extension. That puts the rules
+  the cloud contract depends on (always `x-delta-capable`, a full chain read as
+  its own 409, append-only sends) in one place for both apps, instead of a
+  second copy on the phone that could drift. Agreed with the Mac session; the
+  Mac's call sites and its cloud tests are unchanged.
+
 - **Cloud sync could stop finishing for a shop near its plan's size.** The
   server refuses a new change once a shop's history of small changes is full,
   and asks for the whole store instead. One of its reasons — the shop is close
