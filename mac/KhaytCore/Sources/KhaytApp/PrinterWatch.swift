@@ -315,10 +315,14 @@ final class PrinterWatch {
     private func raiseAlerts(shop: Shop) async {
         guard let engine = shop.engine else { return }
         let current = statusCache
+        // What to compute: the Mac's own notification, plus anything the
+        // shop's Telegram or ntfy asked for — a stall asked of Telegram is
+        // computed even though the notification here leaves stalls out.
+        let enable = (try? await engine.alertEnable(settings: shop.settingsDict)) ?? KhaytEngine.Alerting.sensible
         guard let found = try? await engine.printerAlerts(
             was: previous, now: current, settings: shop.settingsDict,
             machines: shop.machineRows, state: alertState,
-            enable: KhaytEngine.Alerting.sensible) else {
+            enable: enable) else {
             previous = current
             return
         }
@@ -326,11 +330,15 @@ final class PrinterWatch {
         alertState = found.state
         for alert in found.alerts {
             let name = shop.machines.first { $0.id == alert.machineId }?.name ?? alert.machineId
+            let title = Self.title(alert.type, machine: name, shop: shop)
+            let body = Self.body(alert, machine: name, shop: shop)
             notices.raise(PrinterNotice.Notice(
                 machineId: alert.machineId, machine: name, kind: alert.type,
-                title: Self.title(alert.type, machine: name, shop: shop),
-                body: Self.body(alert, machine: name, shop: shop),
-                at: Date()))
+                title: title, body: body, at: Date()))
+            // AND TO THE SHOP'S PHONE. A notification on this Mac reaches the
+            // person at this Mac; Telegram and ntfy reach the one who is not.
+            // The switches for both were saved here and never read.
+            await shop.sendAlert(type: alert.type, title: title, body: body)
         }
     }
 
@@ -338,6 +346,7 @@ final class PrinterWatch {
         switch kind {
         case "offline": return shop.words.callIt("mac.alert_offline", ["machine": .string(machine)])
         case "stall":   return shop.words.callIt("mac.alert_stalled", ["machine": .string(machine)])
+        case "runout":  return shop.words.callIt("mac.alert_runout", ["machine": .string(machine)])
         default:        return shop.words.callIt("mac.alert_error", ["machine": .string(machine)])
         }
     }

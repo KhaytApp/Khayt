@@ -190,6 +190,47 @@ final class Shop {
         }
     }
 
+    /// Send one printer alert to the shop's Telegram and ntfy, as its switches
+    /// say (`lib/alert-routes.js`). NOT awaited by anyone and NOT shown when it
+    /// fails — like the low-stock warning, nothing is waiting on it — but
+    /// logged, and the last ntfy failure is kept for the settings pane.
+    func sendAlert(type: String, title: String, body: String) async {
+        guard let engine, source.build != nil,
+              let routes = try? await engine.alertRoutes(type: type, settings: settingsDict) else { return }
+        if routes.telegram, case .object(let tg)? = settingsDict["telegram"],
+           case .string(let sealed)? = tg["botToken"], case .string(let chat)? = tg["chatId"] {
+            do {
+                let token = try await Secrets.open(sealed, for: source)
+                try await Telegram.send(botToken: token, chatId: chat, message: title + "\n" + body)
+            } catch {
+                FileHandle.standardError.write(Data("printer alert telegram failed: \(error)\n".utf8))
+            }
+        }
+        if routes.ntfy {
+            do { try await sendNtfy(type: type, title: title, body: body) }
+            catch {
+                ntfyProblem = String(describing: error)
+                FileHandle.standardError.write(Data("printer alert ntfy failed: \(error)\n".utf8))
+            }
+        }
+    }
+
+    /// The last ntfy send that failed, for the settings pane.
+    var ntfyProblem: String?
+
+    /// One ntfy push. The Test button and the alerts both come here.
+    func sendNtfy(type: String, title: String, body: String) async throws {
+        guard let engine,
+              let request = try await engine.ntfyRequest(type: type, title: title, body: body, settings: settingsDict)
+        else { throw Ntfy.Failure.badAddress }
+        var token = ""
+        if case .object(let n)? = settingsDict["ntfy"], case .string(let sealed)? = n["token"], !sealed.isEmpty {
+            token = try await Secrets.open(sealed, for: source)
+        }
+        try await Ntfy.send(request, token: token)
+        ntfyProblem = nil
+    }
+
     /// Give a shop some monthly costs, for a test.
     func pretendFixedCosts(_ rows: [JSONValue]) {
         var held: [String: JSONValue] = settingsDict

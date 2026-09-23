@@ -777,6 +777,10 @@ public actor KhaytEngine {
         // What has just gone wrong with a printer: the thresholds, the
         // cooldowns and the stall clock. Pure, and already wrapped.
         "printer-alerts",
+        // Who is told about a printer alert — Telegram, ntfy, both or neither —
+        // from the shop's own switches, and which alert types to compute so a
+        // channel's choice is honoured. After `printer-alerts`.
+        "alert-routes",
         // Whether an address is a printer on the shop's own network. Not
         // business logic — an SSRF guard — and shared for the same reason the
         // secret list is: a second, more forgiving copy in Swift is how the two
@@ -7534,22 +7538,62 @@ public actor KhaytEngine {
             [.object(was), .object(current), .object(settings), .number(at.timeIntervalSince1970 * 1000),
              state, .array(machines),
              .object(["error": .bool(enable.error), "offline": .bool(enable.offline),
-                      "stall": .bool(enable.stall)])],
+                      "stall": .bool(enable.stall), "runout": .bool(enable.runout)])],
             as: PrinterAlerts.self)
     }
 
     /// Which of the three a caller wants to hear about.
-    public struct Alerting: Sendable {
+    public struct Alerting: Sendable, Decodable, Equatable {
         public var error: Bool
         public var offline: Bool
         public var stall: Bool
-        /// The module's own defaults: a machine that faulted or went quiet is
-        /// worth interrupting somebody for; a print that has not moved might
-        /// just be a long layer.
-        public static let sensible = Alerting(error: true, offline: true, stall: false)
-        public init(error: Bool, offline: Bool, stall: Bool) {
-            self.error = error; self.offline = offline; self.stall = stall
+        /// A spool that ran out mid-print. Missing from this struct until Sep
+        /// 2026, so `printer-alerts` read it as off and a runout on the Mac
+        /// raised nothing at all.
+        public var runout: Bool
+        /// The module's own defaults: a machine that faulted, went quiet or ran
+        /// out of filament is worth interrupting somebody for; a print that has
+        /// not moved might just be a long layer.
+        public static let sensible = Alerting(error: true, offline: true, stall: false, runout: true)
+        public init(error: Bool, offline: Bool, stall: Bool, runout: Bool = true) {
+            self.error = error; self.offline = offline; self.stall = stall; self.runout = runout
         }
+    }
+
+    /// Which alert types to compute: what the Mac notification wants, plus
+    /// whatever Telegram or ntfy asked for — `lib/alert-routes.js`.
+    public func alertEnable(settings: [String: JSONValue]) throws -> Alerting {
+        try runtime.call2("KhaytAlertRoutes.enable(ARG0)", [.object(settings)], as: Alerting.self)
+    }
+
+    public struct AlertRoutes: Decodable, Sendable, Equatable {
+        public let telegram: Bool
+        public let ntfy: Bool
+    }
+
+    /// Which channels one alert goes to, from the shop's switches.
+    public func alertRoutes(type: String, settings: [String: JSONValue]) throws -> AlertRoutes {
+        try runtime.call2("KhaytAlertRoutes.routes(ARG0, ARG1)", [.string(type), .object(settings)],
+                          as: AlertRoutes.self)
+    }
+
+    public struct NtfyRequest: Decodable, Sendable, Equatable {
+        public let url: String
+        public let headers: [String: String]
+        public let body: String
+        public init(url: String, headers: [String: String], body: String) {
+            self.url = url; self.headers = headers; self.body = body
+        }
+    }
+
+    /// The ntfy request for one alert, or nil when ntfy is not set up.
+    public func ntfyRequest(type: String, title: String, body: String,
+                            settings: [String: JSONValue]) throws -> NtfyRequest? {
+        let raw = try runtime.call2("KhaytAlertRoutes.ntfyRequest({ type: ARG0, title: ARG1, body: ARG2 }, ARG3)",
+                                    [.string(type), .string(title), .string(body), .object(settings)],
+                                    as: JSONValue.self)
+        if case .null = raw { return nil }
+        return try JSONDecoder().decode(NtfyRequest.self, from: JSONEncoder().encode(raw))
     }
 
     public struct PrinterAlerts: Decodable, Sendable {

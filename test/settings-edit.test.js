@@ -707,3 +707,12 @@ test('carrier settings merge per carrier, and a secret absent from the form is k
   assert.deepEqual(apply({}, { shipping: { spl: { enabled: true } } }).shipping.spl,
     { enabled: true, accountNumber: '', apiKey: '', webhookSecret: '' });
 });
+
+test('ntfy settings merge over what is stored, and a token absent from the form is kept', () => {
+  const stored = { ntfy: { enabled: true, topic: 'old', token: 'sealed', events: { stall: true } } };
+  const out = apply(stored, { ntfy: { topic: ' athar-printers ', events: { error: false } } });
+  assert.deepEqual(out.ntfy, { enabled: true, server: '', topic: 'athar-printers', token: 'sealed',
+    events: { stall: true, error: false } });
+  assert.equal(apply(stored, { ntfy: { token: '' } }).ntfy.token, '', 'empty is the forget switch');
+  assert.deepEqual(apply(stored, { shopName: 'x' }).ntfy, stored.ntfy, 'a form without it leaves it');
+});
