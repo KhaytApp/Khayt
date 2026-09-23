@@ -429,23 +429,51 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     func addSpool(draft: SpoolDraft) async throws -> InventorySpool {
+        var one = draft
+        one.quantity = 1
+        return try await addSpools(draft: one)[0]
+    }
+
+    /// Book in `draft.quantity` identical rolls — each its own spool.
+    ///
+    /// Into the phone's book it is one write: all of them or none. Against a
+    /// desktop with no book on the phone it is one request per roll, because
+    /// that is all `POST /api/inventory` takes; a failure part-way says how
+    /// many made it rather than leaving the count to be guessed.
+    @discardableResult
+    func addSpools(draft: SpoolDraft) async throws -> [InventorySpool] {
         let material = draft.material.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !material.isEmpty else {
             throw KhaytAPIError.server("Material name is required.")
         }
+        let count = min(SpoolDraft.maxQuantity, max(1, draft.quantity))
 
         // Booked into this phone's own book when it keeps one, and sent on.
         // The native Mac has no `/api/inventory` at all, so for a shop on it
         // this is the only way a roll booked in here reaches the shelf.
         if let book, book.exists, let reader {
-            let record = try await reader.newSpool(from: draft)
-            try BookWriter(book: book).addSpool(record)
+            let records = try await reader.newSpools(from: draft, count: count)
+            try BookWriter(book: book).addSpools(records)
             await refreshPendingCount()
             _ = try? await sendPendingChanges()
-            let data = try JSONEncoder().encode(JSONValue.object(record))
-            return try JSONDecoder().decode(InventorySpool.self, from: data)
+            return try records.map { record in
+                let data = try JSONEncoder().encode(JSONValue.object(record))
+                return try JSONDecoder().decode(InventorySpool.self, from: data)
+            }
         }
 
+        var added: [InventorySpool] = []
+        for _ in 0..<count {
+            do {
+                added.append(try await postSpool(draft: draft, material: material))
+            } catch where !added.isEmpty {
+                throw KhaytAPIError.server("Added \(added.count) of \(count) spools, then: \(error.localizedDescription)")
+            }
+        }
+        return added
+    }
+
+    private func postSpool(draft: SpoolDraft, material: String) async throws -> InventorySpool {
         // `id`, `purchasedAt` and `remaining` are not sent: the server decides
         // the first two (the shop's calendar, not this phone's UTC one) and
         // derives the third, and `pickLanSpoolFields` drops all of them.
@@ -462,6 +490,7 @@ final class KhaytAPIClient: ObservableObject {
 
         let sku = InputLimits.clamp(draft.sku.trimmingCharacters(in: .whitespacesAndNewlines))
         if !sku.isEmpty { payload["sku"] = sku }
+        if let code = ProductBarcode.normalize(draft.barcode) { payload["barcode"] = code }
 
         let lot = InputLimits.clamp(draft.lot.trimmingCharacters(in: .whitespacesAndNewlines))
         if !lot.isEmpty { payload["lot"] = lot }

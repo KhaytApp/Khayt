@@ -8,6 +8,7 @@ struct AddSpoolSheet: View {
 
     enum Step {
         case chooseMethod
+        case barcode
         case scanLabel
         case nfc
         case review
@@ -21,6 +22,8 @@ struct AddSpoolSheet: View {
     @State private var errorMessage: String?
     @State private var showWriteNFC = false
     @State private var nfcWriteStandard: NFCFilamentStandard?
+    @State private var showBarcodeScanner = false
+    @State private var lookingUp = false
 
     var onAdded: () -> Void
 
@@ -30,6 +33,8 @@ struct AddSpoolSheet: View {
                 switch step {
                 case .chooseMethod:
                     chooseMethodView
+                case .barcode:
+                    barcodeView
                 case .scanLabel:
                     scanLabelView
                 case .nfc:
@@ -81,6 +86,11 @@ struct AddSpoolSheet: View {
                 draft = SpoolDraft.from(parsed: FilamentLabelParser.parse(text: value))
                 step = .review
             }
+            .sheet(isPresented: $showBarcodeScanner) {
+                ProductBarcodeScanner { code in
+                    Task { await lookUp(code) }
+                }
+            }
             .onDisappear { nfc.invalidate() }
             .sheet(isPresented: $showWriteNFC) {
                 WriteNFCTagSheet(draft: draft, suggestedStandard: nfcWriteStandard)
@@ -91,6 +101,7 @@ struct AddSpoolSheet: View {
     private var navTitle: String {
         switch step {
         case .chooseMethod: return "Add filament"
+        case .barcode: return "Product barcode"
         case .scanLabel: return "Scan label"
         case .nfc: return "NFC tag"
         case .review: return "Confirm spool"
@@ -106,8 +117,16 @@ struct AddSpoolSheet: View {
             }
             Section {
                 methodRow(
+                    title: "Scan product barcode",
+                    subtitle: "The UPC/EAN on the box, looked up for you",
+                    icon: "barcode"
+                ) {
+                    step = .barcode
+                    showBarcodeScanner = true
+                }
+                methodRow(
                     title: "Scan label",
-                    subtitle: "QR, barcode, or text on the spool",
+                    subtitle: "QR code or text on the spool label",
                     icon: "barcode.viewfinder"
                 ) {
                     step = .scanLabel
@@ -150,6 +169,51 @@ struct AddSpoolSheet: View {
             }
             .padding(.vertical, 4)
         }
+    }
+
+    private var barcodeView: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            if lookingUp {
+                ProgressView()
+                    .controlSize(.large)
+                Text("Looking it up…")
+                    .font(.title3.bold())
+                Text("Your shelf first, then the product database.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                Image(systemName: "barcode")
+                    .font(.system(size: 56))
+                    .foregroundStyle(Color.accentColor)
+                Text("Scan the barcode on the box")
+                    .font(.title3.bold())
+                Text("A filament you have booked in before is filled in from your own shelf, price included.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                Button {
+                    showBarcodeScanner = true
+                } label: {
+                    Label("Open scanner", systemImage: "barcode.viewfinder")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.horizontal)
+            }
+            Spacer()
+        }
+    }
+
+    private func lookUp(_ code: String) async {
+        lookingUp = true
+        defer { lookingUp = false }
+        let shelf = (try? await api.fetchInventory()) ?? []
+        let found = await BarcodeLookup().lookUp(code, shelf: shelf)
+        draft = found.draft
+        step = .review
     }
 
     private var scanLabelView: some View {
@@ -233,7 +297,7 @@ struct AddSpoolSheet: View {
 
     private func goBack() {
         switch step {
-        case .scanLabel, .nfc:
+        case .scanLabel, .nfc, .barcode:
             step = .chooseMethod
         default:
             step = .chooseMethod
@@ -245,7 +309,7 @@ struct AddSpoolSheet: View {
         errorMessage = nil
         defer { isUploading = false }
         do {
-            _ = try await api.addSpool(draft: draft)
+            try await api.addSpools(draft: draft)
             onAdded()
             dismiss()
         } catch {
@@ -290,12 +354,28 @@ struct SpoolReviewForm: View {
                 .keyboardType(.numberPad)
             }
 
+            Section(footer: Text(draft.quantity > 1
+                                 ? "\(draft.quantity) separate spools, each tracked on its own."
+                                 : "Several boxes of the same filament? Add them in one go.")) {
+                Stepper(value: $draft.quantity, in: 1...SpoolDraft.maxQuantity) {
+                    HStack {
+                        Text("How many")
+                        Spacer()
+                        Text("\(draft.quantity)")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             Section(header: Text("Optional"),
                     footer: Text("What the roll cost. Jobs printed from it are priced off this.")) {
                 TextField("Price paid", text: $draft.cost)
                     .keyboardType(.decimalPad)
                 TextField("Brand", text: $draft.brand)
                 TextField("SKU", text: $draft.sku)
+                TextField("Barcode (UPC/EAN)", text: $draft.barcode)
+                    .keyboardType(.numberPad)
                 TextField("Batch / lot no.", text: $draft.lot)
                 TextField("Print temp (°C)", text: $draft.printTemp)
                     .keyboardType(.numberPad)
@@ -308,7 +388,7 @@ struct SpoolReviewForm: View {
                     if isUploading {
                         ProgressView().frame(maxWidth: .infinity)
                     } else {
-                        Text("Add to Khayt inventory")
+                        Text(draft.quantity > 1 ? "Add \(draft.quantity) spools" : "Add to Khayt inventory")
                             .frame(maxWidth: .infinity)
                     }
                 }

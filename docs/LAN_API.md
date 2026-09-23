@@ -450,6 +450,11 @@ Append a spool. **Requires owner PIN.**
 - `addedAt` — ISO timestamp
 - `remaining` — from `weightRemaining` or `weightTotal` or `1000`
 
+`barcode` is the product's UPC/EAN, 8–14 digits; anything else is dropped. The
+companion looks a scanned box up on the shop's own shelf by this field before it
+asks a product database, so the next box of a filament fills the form from the
+last one.
+
 **Response 201:** `{ "ok": true, "spool": { ... } }`
 
 **Desktop side effect:** `lan-spool-added` IPC.
