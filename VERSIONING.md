@@ -86,6 +86,25 @@ Each command updates `package.json` and `package-lock.json`. Edit `CHANGELOG.md`
 
 ## Release checklist
 
+> **Cut and tag on the same day.** Steps 1–5 are one sitting, not a plan for
+> later. `v3.8.0` was cut on 2026-09-18 and tagged on the 21st, and in those
+> three days `main` took 65 commits. The cost was not tidiness:
+>
+> - the notes described a build nobody would receive — six shop-facing changes
+>   were in the tag and not in its notes, including a fix for an "Export all
+>   data (CSV)" that wrote mostly empty columns;
+> - `## [3.8.0]`, `ROADMAP.md`, `VERSIONING.md`, `docs/BETA-RELEASE.md` and
+>   `docs/RELEASE-HOLD.md` all claimed a stable published on a day no tag
+>   existed;
+> - twelve entries sat in `[Unreleased]` belonging to a release already written,
+>   and `scripts/check-changelog.js` rightly refused to let them be filed into a
+>   section a later PR had not written.
+>
+> None of that is visible on the day of the cut. It appears only when the tag is
+> late, which is exactly when nobody is looking for it. If the tag has to wait,
+> expect to redo step 1 against what `main` has become, and re-date the section
+> to the day it actually ships.
+
 1. Move notes from `CHANGELOG.md` `[Unreleased]` into `## [X.Y.Z]`.
 2. Run the appropriate `npm run version:*` command.
 3. Commit: `chore: release vX.Y.Z`
@@ -102,6 +121,26 @@ Each command updates `package.json` and `package-lock.json`. Edit `CHANGELOG.md`
    work from a fork it is usually `upstream`, and pushing the tag to the fork
    builds nothing at all.
 6. CI **Build & Release** builds installers from the tag (`on: push: tags: v*`).
+
+7. Verify the published build — but check FIRST that there is something to
+   verify it with. `npm run verify:release <tag>` downloads the release and
+   launches it, and it is **macOS-only**: it asks for `Khayt-<version>-arm64-mac.zip`.
+   A cut made with `BUILD_MAC` unset publishes no such asset, so the check
+   cannot run at all — `v3.8.0` returns 404 for it. That is the one check CI
+   structurally cannot do (it needs a display and ~150 MB), so a Windows- or
+   Linux-only release ships with no launch check anywhere.
+
+   What is left for those platforms is the manifests, which is what
+   `electron-updater` actually reads. Worth doing by hand:
+
+   ```bash
+   # every file latest.yml / latest-linux.yml names must exist, and its
+   # sha512 and size must match, or an update is refused on the client
+   curl -sL .../v<X.Y.Z>/latest.yml
+   openssl dgst -sha512 -binary <asset> | openssl base64 -A
+   ```
+
+   For `v3.8.0` all three (Setup .exe, AppImage, .deb) matched.
 
 > **The workflow that runs is the one in the commit you tag**, not the one on
 > `main`. Tagging an older commit runs that commit's `.github/workflows/release.yml`
