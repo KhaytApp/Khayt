@@ -100,6 +100,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) See what can start now, with the filament already loaded.** A
+  printer that reports its loaded spools (a Snapmaker U1 does, head by head)
+  gets a **Ready on <printer>** chip in the library, counting the models whose
+  every colour is loaded in a material that fits. Pressing it shows just
+  those, and a model's details say "Ready to start" or "Needs a spool swap" for
+  each such printer. Colours are compared the way they look rather than by hex
+  code, and materials by family, so PLA Silk goes in a PLA slot and PETG does
+  not. The count updates when a spool is swapped.
+
 - **(Mac) Printer alerts reach the shop's phone — through Telegram, and now
   ntfy.** The Mac showed a printer fault as a notification on the Mac and told
   nobody else: its Telegram switches for printer error, offline and stalled were

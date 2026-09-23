@@ -61,6 +61,19 @@ struct LibraryFilterBar: View {
                 shop.libraryNeverPrintedOnly.toggle()
             })
         }
+        // WHAT CAN START NOW, on each machine that says what it has loaded:
+        // every colour the model needs is in a head, in a material that fits.
+        // Beside the other facts, because it is the question asked before every
+        // job — and only for a machine that reports its spools, since a count
+        // made from a guess would send a shop to a printer to find it wrong.
+        for row in facets.ready where row.count > 0 || shop.libraryReadyOn == row.machineId {
+            out.append(FilterChipModel(id: "ready:" + row.machineId,
+                                       label: shop.words.callIt("mac.ready_on", ["name": .string(row.machineName)]),
+                                       count: row.count,
+                                       on: shop.libraryReadyOn == row.machineId) {
+                shop.libraryReadyOn = shop.libraryReadyOn == row.machineId ? nil : row.machineId
+            })
+        }
         for row in Self.withActive(facets.categories, shop.libraryCategory) {
             out.append(FilterChipModel(id: "category:" + row.name, label: row.name,
                                        count: row.count,

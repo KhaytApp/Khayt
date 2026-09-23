@@ -11357,8 +11357,17 @@ final class Shop {
         /// question it answers is the one a shop with a big library asks:
         /// what have I collected and never printed.
         var neverPrinted = 0
+        /// Per machine that says what it has loaded: how many models could
+        /// start on it now, without a spool swap.
+        var ready: [Ready] = []
+        struct Ready: Equatable, Identifiable {
+            let machineId: String
+            let machineName: String
+            let count: Int
+            var id: String { machineId }
+        }
         var isEmpty: Bool {
-            categories.isEmpty && tags.isEmpty && unfiled == 0 && neverPrinted == 0
+            categories.isEmpty && tags.isEmpty && unfiled == 0 && neverPrinted == 0 && ready.isEmpty
         }
     }
 
@@ -11370,7 +11379,7 @@ final class Shop {
     /// round trip.
     private var libraryRows: [JSONValue] = []
 
-    enum LibraryAxis { case unfiled, category, tag, neverPrinted }
+    enum LibraryAxis { case unfiled, category, tag, neverPrinted, ready }
 
     /// What one axis counts: the shelf, the search, and the other two chips.
     private func libraryPool(skipping axis: LibraryAxis) -> [JSONValue] {
@@ -11389,6 +11398,10 @@ final class Shop {
         }
         if axis != .tag, let tag = libraryTag {
             rows = rows.filter { Self.rowTags($0).contains { $0.lowercased() == tag.lowercased() } }
+        }
+        if axis != .ready, let machine = libraryReadyOn {
+            let ready = readyByMachine[machine] ?? []
+            rows = rows.filter { ready.contains(Self.rowText($0, "id")) }
         }
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return rows }
@@ -11453,8 +11466,23 @@ final class Shop {
         guard mine == libraryRecount else { return }
         let unfiled = libraryPool(skipping: .unfiled).count { Self.rowGroup($0) == nil }
         let never = libraryPool(skipping: .neverPrinted).count { Self.rowPrintCount($0) == 0 }
+        // Across the whole book, once per machine that reports what it has
+        // loaded; the chip's count is that set within what the other chips and
+        // the search have left.
+        var byMachine: [String: Set<String>] = [:]
+        var ready: [LibraryFacets.Ready] = []
+        for machine in machines {
+            let loaded = loadedSlots(for: machine.id)
+            guard !loaded.isEmpty else { continue }
+            let ids = Set((try? await engine.readyToPrint(libraryRows, loaded: loaded)) ?? [])
+            byMachine[machine.id] = ids
+            let count = libraryPool(skipping: .ready).count { ids.contains(Self.rowText($0, "id")) }
+            ready.append(.init(machineId: machine.id, machineName: machine.name, count: count))
+        }
+        guard mine == libraryRecount else { return }
+        readyByMachine = byMachine
         libraryFacets = LibraryFacets(categories: categories, tags: tags,
-                                      unfiled: unfiled, neverPrinted: never)
+                                      unfiled: unfiled, neverPrinted: never, ready: ready)
     }
 
     private var libraryRecountTask: Task<Void, Never>?
@@ -11488,9 +11516,27 @@ final class Shop {
     /// Models the shop has never made. See `LibraryFacets.neverPrinted`.
     var libraryNeverPrintedOnly = false { didSet { recountLibrarySoon() } }
 
+    /// Models that can start on this machine now, with what it has loaded.
+    var libraryReadyOn: String? { didSet { recountLibrarySoon() } }
+    /// Which models are ready on which machine, from the last recount.
+    private(set) var readyByMachine: [String: Set<String>] = [:]
+
+    /// What a machine has loaded, as it last reported it.
+    func loadedSlots(for machineId: String) -> [KhaytEngine.LoadedSlot] {
+        printers.readings[machineId]?.status?.loaded ?? []
+    }
+
+    /// Can this model start on that machine now, with what it has loaded?
+    func isReady(_ file: LibraryFile, on machineId: String) -> Bool {
+        readyByMachine[machineId]?.contains(file.id) ?? false
+    }
+
+    /// A machine's loaded spools changed: the ready counts are stale.
+    func loadedChanged() { recountLibrarySoon() }
+
     var libraryFilterOn: Bool {
         libraryCategory != nil || libraryTag != nil || libraryUnfiledOnly
-            || libraryNeverPrintedOnly
+            || libraryNeverPrintedOnly || libraryReadyOn != nil
     }
 
     func clearLibraryFilter() {
@@ -11498,6 +11544,7 @@ final class Shop {
         libraryTag = nil
         libraryUnfiledOnly = false
         libraryNeverPrintedOnly = false
+        libraryReadyOn = nil
     }
 
     var shownFiles: [LibraryFile] {
@@ -11515,6 +11562,10 @@ final class Shop {
         // same reasoning renderer/printfiles.js gives for its own chips.
         if libraryUnfiledOnly { rows = rows.filter { ($0.groupName ?? "").isEmpty } }
         if libraryNeverPrintedOnly { rows = rows.filter { $0.printCount == 0 } }
+        if let machine = libraryReadyOn {
+            let ready = readyByMachine[machine] ?? []
+            rows = rows.filter { ready.contains($0.id) }
+        }
         if let category = libraryCategory { rows = rows.filter { category.matches($0.category) } }
         if let tag = libraryTag {
             rows = rows.filter { ($0.tags ?? []).contains { $0.lowercased() == tag.lowercased() } }

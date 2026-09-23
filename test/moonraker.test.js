@@ -138,7 +138,17 @@ test('the query asks for every object the reading needs, and no more', () => {
   // fields are optional in the parse on purpose, because a starting Klipper
   // omits them.
   assert.deepEqual(M.QUERY.split('&').sort(),
-    ['display_status', 'extruder', 'heater_bed', 'print_stats', 'toolhead', 'virtual_sdcard']);
+    ['display_status', 'extruder', 'heater_bed', 'print_stats', 'print_task_config', 'toolhead', 'virtual_sdcard']);
+});
+
+test('a U1 says what is loaded in each head; any other Klipper says nothing', () => {
+  const U1 = require('./fixtures/u1-print-task-config.json');
+  const withIt = M.readStatus({ result: { status: { print_stats: { state: 'standby' }, print_task_config: U1 } } });
+  assert.deepEqual(withIt.loaded.map((s) => [s.hex, s.material]),
+    [['#FFFFFF', 'PETG'], ['#8C9099', 'PLA'], ['#4DB6AC', 'PLA Silk'], ['#FFFFFF', 'PLA']]);
+  // Moonraker answers an object it does not have with {} — that is "cannot say".
+  const without = M.readStatus({ result: { status: { print_stats: { state: 'standby' }, print_task_config: {} } } });
+  assert.deepEqual(without.loaded, []);
 });
 
 /**

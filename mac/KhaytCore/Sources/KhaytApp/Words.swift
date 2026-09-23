@@ -919,6 +919,9 @@ final class Words {
         // `plib.*` comes from Khayt's nine-language file and this app
         // cannot add to it with two.
         "mac.never_printed": ["en": "Never printed", "ar": "لم تُطبع"],
+        "mac.ready_on":      ["en": "Ready on {name}", "ar": "جاهز على {name}"],
+        "mac.ready_now":     ["en": "Ready to start", "ar": "جاهز للطباعة"],
+        "mac.needs_swap":    ["en": "Needs a spool swap", "ar": "يحتاج تبديل بكرة"],
         // ── WHAT IS ALREADY PRINTED AND BOXED ─────────────────────────────
         //
         // The shop counts; a storefront decides what is left, because it is

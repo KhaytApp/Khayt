@@ -165,6 +165,10 @@ public actor KhaytEngine {
         // spools mix in LINEAR light, and "closest" means perceptual distance
         // rather than the nearest hex triple.
         "color-mix",
+        // What can be printed with the filament already loaded: a model's
+        // colours against a machine's heads, perceptually and by material
+        // family. Needs `color-mix` above it.
+        "loaded-colours",
         // Groups and categories. Pure, and bundled rather than ported because
         // the rule that matters is not the reading — it is that a name matching
         // one already in use IS that name and adopts its spelling. "Saudi Kings"
@@ -7495,6 +7499,9 @@ public actor KhaytEngine {
         /// starts, which is why `printer-poll-cache` freezes it on the edge out
         /// of printing rather than reading it when a shop closes the order.
         public let actuals: Actuals?
+        /// What is loaded, head by head, when the machine reports it (a
+        /// Snapmaker U1 does). Nil or empty means it cannot say.
+        public let loaded: [LoadedSlot]?
 
         /// One reading. Null rather than zero for a side nobody measured: a
         /// zero-length or zero-second reading is a printer that has not run,
@@ -7512,11 +7519,11 @@ public actor KhaytEngine {
         /// and neither can put one on this Mac's wifi.
         public init(state: String, progress: Int, progressSource: String?, filename: String,
                     timeRemaining: Double?, tempNozzle: Double?, tempBed: Double?, type: String,
-                    actuals: Actuals? = nil) {
+                    actuals: Actuals? = nil, loaded: [LoadedSlot]? = nil) {
             self.state = state; self.progress = progress; self.progressSource = progressSource
             self.filename = filename; self.timeRemaining = timeRemaining
             self.tempNozzle = tempNozzle; self.tempBed = tempBed; self.type = type
-            self.actuals = actuals
+            self.actuals = actuals; self.loaded = loaded
         }
     }
 
@@ -7594,6 +7601,51 @@ public actor KhaytEngine {
                                     as: JSONValue.self)
         if case .null = raw { return nil }
         return try JSONDecoder().decode(NtfyRequest.self, from: JSONEncoder().encode(raw))
+    }
+
+    /// One head's filament: `lib/loaded-colours.js`'s slot.
+    public struct LoadedSlot: Codable, Sendable, Hashable {
+        public let slot: Int
+        public let hex: String
+        public let material: String
+        public init(slot: Int, hex: String, material: String) {
+            self.slot = slot; self.hex = hex; self.material = material
+        }
+    }
+
+    /// Whether one model can start with what is loaded, and what it lacks.
+    public struct LoadedFit: Decodable, Sendable, Equatable {
+        public let known: Bool
+        public let fits: Bool
+        public let swaps: Int
+        public let matched: [Matched]
+        public let missing: [Missing]
+        public struct Matched: Decodable, Sendable, Equatable {
+            public let hex: String
+            public let slot: Int
+            public let deltaE: Double
+        }
+        public struct Missing: Decodable, Sendable, Equatable {
+            public let hex: String
+            public let nearest: Int?
+            public let deltaE: Double?
+        }
+    }
+
+    /// The ids of the library rows that can start now on a machine with this
+    /// loaded. Rows are the book's own `printFiles` records.
+    public func readyToPrint(_ rows: [JSONValue], loaded: [LoadedSlot]) throws -> [String] {
+        let slots = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(loaded))
+        return try runtime.call2("""
+        ARG0.filter(function (m) { return m && m.id && KhaytLoadedColours.fit(m, ARG1).fits; })
+             .map(function (m) { return String(m.id); })
+        """, [.array(rows), slots], as: [String].self)
+    }
+
+    /// One model against what is loaded.
+    public func loadedFit(_ row: JSONValue, loaded: [LoadedSlot]) throws -> LoadedFit {
+        let slots = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(loaded))
+        return try runtime.call2("KhaytLoadedColours.fit(ARG0, ARG1)", [row, slots], as: LoadedFit.self)
     }
 
     public struct PrinterAlerts: Decodable, Sendable {
