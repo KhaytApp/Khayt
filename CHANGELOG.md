@@ -4,6 +4,32 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+
+
+- **(iOS) The phone syncs through Khayt Cloud when the Mac is out of reach.**
+  Settings → Khayt Cloud signs the phone in with the shop's email, password and
+  passphrase; it gets a device token of its own and keeps the token and the
+  data key in the Keychain. After an edit the phone tries the Mac first and
+  goes through the cloud when the Mac cannot be reached or will not take it;
+  with a cloud sign-in the book is refreshed from the cloud, which is never
+  behind the phone. It uses the Mac's own cloud client (now in KhaytCore),
+  sends every request with `x-delta-capable`, and only ever APPENDS: a phone
+  holds a slice of the shop, so a whole-store upload from it would delete
+  every record it never carried. A phone can also be set up from Khayt Cloud
+  alone, with the Mac paired later.
+- **(iOS) A refresh from the Mac no longer wipes edits not yet sent.** Edit a
+  job with the Mac away, walk back into range, open any screen: the refresh
+  replaced the book and took the edit and its pending count, silently. Upstream
+  books — from the Mac or the cloud — are now adopted, keeping unsent edits
+  pending, and the refresh sends before it pulls.
+
+- **Cloud sync never recovered for a shop whose cloud store was gone.** If
+  the server no longer had a shop's store — a reset, or the shop moved to a
+  new cloud — the desktop kept sending changes against the version it last
+  saw. The server refused each one, the desktop checked, found nothing there,
+  and tried the same thing again, so the shop's data never went back up. It
+  now takes "nothing here" at its word and sends the whole store, which is
+  what the Mac app already did.
 - **(Mac + iOS) The cloud client moves into KhaytCore, so the phone can share
   it.** `CloudSignIn`, `CloudReader` and `CloudWriter` move from the Mac app
   into KhaytCore, unchanged apart from becoming public API. The one piece that
