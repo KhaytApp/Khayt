@@ -2983,6 +2983,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [4.0.0-alpha.39] - 2026-09-23
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+One fix, released on its own because it stops a phone finding the Mac at all.
+
+### Fixed
+
+- **(Mac) The phone could not find the Mac: switching the Online server on to
+  the shop's network started nothing.** The Mac announces itself so a phone can
+  find it by name, and the app never declared that name to macOS — so macOS
+  refused the announcement, and the refusal took the whole server down with it,
+  seconds after it started. The app went on believing it was running, so the
+  Online pane showed no problem, and nothing was listening. Measured on the
+  shop's own Mac from the system log. The name is declared now; if an
+  announcement is ever refused again the server keeps listening without it (a
+  phone can still connect by address), and anything it cannot recover from is
+  shown on the Online pane instead of being swallowed.
+
 ## [4.0.0-alpha.38] - 2026-09-23
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
