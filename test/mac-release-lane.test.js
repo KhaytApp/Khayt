@@ -139,3 +139,19 @@ test('the lane refuses a bundle that cannot update itself', () => {
   assert.ok(check > 0 && pack > 0 && check < pack,
     'the bundle check must run before the archive is packed');
 });
+
+test('a published Mac build checks for updates by itself', () => {
+  // `SUEnableAutomaticChecks` was <false/> under a comment saying Sparkle would
+  // ask on first launch. Sparkle asks only when the key is ABSENT; NO turns
+  // checking off without asking. Every alpha shipped that way, so no copy of
+  // the app ever looked for an update on its own — a shop asked where the
+  // option was.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const sh = fs.readFileSync(path.join(__dirname, '..', 'mac', 'make-app.sh'), 'utf8');
+  assert.match(sh, /<key>SUEnableAutomaticChecks<\/key><true\/>/);
+  assert.ok(!/<key>SUEnableAutomaticChecks<\/key><false\/>/.test(sh), 'automatic checks are switched off again');
+  const m = /<key>SUScheduledCheckInterval<\/key><integer>(\d+)<\/integer>/.exec(sh);
+  assert.ok(m, 'no check interval: Sparkle would wait a day between checks on an alpha line');
+  assert.ok(+m[1] >= 3600, 'Sparkle refuses an interval under an hour');
+});

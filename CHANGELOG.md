@@ -2435,6 +2435,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) The app never looked for an update on its own.** Every build was
+  published with Sparkle's automatic checks switched OFF, under a note saying
+  it would ask on first launch — but Sparkle only asks when that setting is
+  left out; switched off, it never checks and never asks. So a shop stayed on
+  whatever alpha it installed until it chose Check for Updates… by hand. It
+  now checks when Khayt opens and every hour after, and a shop that would
+  rather not can turn it off — or turn on installing updates automatically
+  when Khayt quits — in Settings → App Preferences → On this Mac.
+
 - **(Mac) There was nowhere visible to type the owner PIN.** The PIN field on
   Settings → Online drew with no border and, until a PIN was saved, no
   placeholder — a blank strip beside "Owner LAN PIN", on the one field the
