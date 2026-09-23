@@ -2972,6 +2972,70 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [4.0.0-alpha.38] - 2026-09-23
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The release that keeps itself up to date.
+
+No copy of this app had ever looked for an update on its own; from this one it
+checks when it opens and every hour, and a shop can turn that off in Settings.
+Beside it: a storefront can quote a customer's upload with this shop's own
+prices, the Mac's own "price your model" finally prices anything, a Duet can be
+paused and cancelled, and a model that may not be sold says so on the job and
+the product built from it.
+
+### Added
+
+- **(Mac) A shop's storefront can quote an uploaded model with Khayt's own
+  prices.** When public model pricing is switched on, the Mac now publishes the
+  shop's pricing inputs to Khayt Cloud beside its delivery promise — the
+  material cost (net of tax the shop reclaims), one printer's rates, the margin,
+  minimum price, waste and packaging, and the calibrated estimator — so a
+  storefront running Khayt's calculator prices a part exactly as the shop
+  would. Switching pricing off withdraws it. It is served only to the shop's
+  own token, never on a public address. `lib/quote-sheet.js` builds it and
+  rebuilds a quote from it, and a test holds the two prices equal. (Needs the
+  matching Khayt Cloud release; until then the Mac says so and waits.)
+
+- **(Mac) A model that may not be sold is flagged where it would be sold.** The
+  library knew when a model's licence was NonCommercial, and nothing stopped it
+  being printed for a customer, invoiced or listed in the catalogue. A job, and
+  a product being built, now say "Not licensed for sale" and name the model.
+  And a licence BOUGHT from the designer can carry its proof — the licence
+  code, the page that verifies it, and the last day it covers, since a
+  designer's merchant tier is usually a subscription. From the day after, every
+  job and product using that model says the licence has run out. A model whose
+  licence nobody has recorded is never flagged: unknown is not no.
+
+### Fixed
+
+- **(Mac) The app never looked for an update on its own.** Every build was
+  published with Sparkle's automatic checks switched OFF, under a note saying
+  it would ask on first launch — but Sparkle only asks when that setting is
+  left out; switched off, it never checks and never asks. So a shop stayed on
+  whatever alpha it installed until it chose Check for Updates… by hand. It
+  now checks when Khayt opens and every hour after, and a shop that would
+  rather not can turn it off — or turn on installing updates automatically
+  when Khayt quits — in Settings → App Preferences → On this Mac.
+
+- **(Mac) "Let customers price their own model" could not price anything on a
+  real shop.** The Mac's price for an uploaded model looked for the printer
+  preset and the filament in a copy of the book that held neither, so every
+  upload was answered "not configured" however the shop had set it up. The
+  tests had supplied both themselves and never noticed. It prices from the
+  shop's presets and shelf now.
+
+- **(Mac) A Duet could be watched but not paused, resumed or cancelled.** Three
+  separate faults: a cancel — a pause and then a stop — was refused as "could
+  not be built" on every Duet; on a Duet with a Raspberry Pi (SBC) the G-code
+  was sent as an empty message, so pause and resume did nothing; and a Duet
+  with a password refused every command, because the Mac's session with it
+  belonged to the status display alone. All three are fixed: a cancel runs both
+  steps in order, the SBC gets its G-code, and a password-protected Duet is
+  signed in to before the command is sent again.
+
 ## [4.0.0-alpha.37] - 2026-09-23
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
