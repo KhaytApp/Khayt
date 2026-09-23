@@ -20,9 +20,12 @@
  *   node scripts/verify-release.mjs --app /path/to/Khayt.app
  *   node scripts/verify-release.mjs --app build/Khayt-3.9.0.AppImage --version 3.9.0
  *   node scripts/verify-release.mjs --app build/linux-unpacked
+ *   node scripts/verify-release.mjs --app build/Khayt-Setup-3.9.0.exe --version 3.9.0
  *
  * The tag form checks the build for the platform it runs on: the arm64 .app on
- * macOS, the x64 AppImage on Linux (extracted, so it needs no FUSE).
+ * macOS, the x64 AppImage on Linux (extracted, so it needs no FUSE), and on
+ * Windows the Setup installer, INSTALLED silently into a scratch folder first —
+ * so on Windows the installer itself is under test, not only what it carries.
  *
  * ── Why Linux, and why in release.yml ──────────────────────────────────────
  *
@@ -37,8 +40,10 @@
  * package is built from the same `build.files` allowlist and the same asar as
  * every other platform, so the packaging class this exists for (a module in the
  * repo but not in the build) shows up here whichever platforms a release has.
- * It does not stand in for a Windows launch: an NSIS- or signing-specific fault
- * is invisible to it.
+ * `build-windows` does the same with the NSIS installer it just built: installs
+ * it silently, then launches what it installed. That is the fault class Linux
+ * cannot see — an installer that does not install, or installs something that
+ * does not start.
  *
  * PROVEN, on an unsigned local build (`electron-builder --mac --dir` with
  * `-c.mac.identity=null`), by removing lib/branch-summary.js from the packaged
@@ -106,6 +111,9 @@ const FLAVORS = {
     // Confirmed from the v3.8.0 .deb: /opt/Khayt/khayt beside resources/app.asar.
     linuxAsset: (v) => `Khayt-${v}.AppImage`,
     linuxBinary: 'khayt',
+    // productName + .exe, beside resources/ — the layout NSIS installs.
+    winAsset: (v) => `Khayt-Setup-${v}.exe`,
+    winBinary: 'Khayt.exe',
     // A Khayt build must NOT carry the marker; if it does, the two flavours'
     // afterPack hooks have crossed and Khayt would boot as Bed Ready.
     marker: null,
@@ -123,6 +131,8 @@ const FLAVORS = {
     // reason. Say so instead.
     linuxAsset: null,
     linuxBinary: null,
+    winAsset: null,
+    winBinary: null,
     marker: 'bedready',
     shellClass: 'khayt-app',   // the shared shell; the flavour shows in <html data-app>
     expectApp: 'bedready',
@@ -150,6 +160,7 @@ const REPO = F.repo;
 /** The version inside the tag, whichever prefix it carries. */
 const tagVersion = tag ? tag.replace(/^bedready-/, '').replace(/^v/, '') : expectVersion;
 const linux = process.platform === 'linux';
+const windows = process.platform === 'win32';
 console.log(`Verifying ${flavorKey === 'bedready' ? 'Bed Ready' : 'Khayt'} ${tag || appPath}`);
 
 const fail = (msg) => { console.error(`\n✗ ${msg}`); process.exit(1); };
@@ -157,9 +168,10 @@ const ok = (msg) => console.log(`  ✓ ${msg}`);
 
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-verify-'));
 
-if (tag && linux) {
-  if (!F.linuxAsset) fail(`no Linux build is wired up for ${flavorKey} here`);
-  const asset = F.linuxAsset(tagVersion);
+if (tag && (linux || windows)) {
+  const assetFor = windows ? F.winAsset : F.linuxAsset;
+  if (!assetFor) fail(`no ${windows ? 'Windows' : 'Linux'} build is wired up for ${flavorKey} here`);
+  const asset = assetFor(tagVersion);
   const url = `https://github.com/${REPO}/releases/download/${tag}/${asset}`;
   console.log(`Downloading ${asset} …`);
   try {
@@ -200,15 +212,34 @@ if (/\.AppImage$/.test(appPath)) {
 }
 
 /**
+ * A Windows installer is RUN, silently, into a scratch folder — the step a shop
+ * takes and the one no other check here has ever taken. NSIS wants `/D=` last
+ * and unquoted, so the arguments are passed verbatim.
+ */
+if (/Setup-.*\.exe$/i.test(appPath)) {
+  if (!windows) fail('a Windows installer can only be checked on Windows');
+  const dest = path.join(work, 'installed');
+  try {
+    execFileSync(path.resolve(appPath), ['/S', `/D=${dest}`],
+      { stdio: 'pipe', windowsVerbatimArguments: true, timeout: 300_000 });
+  } catch (e) {
+    fail(`the installer did not finish: ${String((e && e.stderr) || e).slice(0, 300)}`);
+  }
+  appPath = dest;
+  ok('the installer ran silently');
+}
+
+/**
  * Where an Electron build keeps its parts. A macOS bundle nests them under
  * Contents/; a Linux build (linux-unpacked, an extracted AppImage, /opt/Khayt)
  * is flat: the executable beside `resources/`.
  */
 const isMacBundle = /\.app\/?$/.test(appPath);
-if (!isMacBundle && !F.linuxBinary) fail(`no Linux build is wired up for ${flavorKey} here`);
+const flatBinary = windows ? F.winBinary : F.linuxBinary;
+if (!isMacBundle && !flatBinary) fail(`no ${windows ? 'Windows' : 'Linux'} build is wired up for ${flavorKey} here`);
 const binary = isMacBundle
   ? path.join(appPath, 'Contents', 'MacOS', F.binary)
-  : path.join(appPath, F.linuxBinary);
+  : path.join(appPath, flatBinary);
 const resourcesDir = isMacBundle
   ? path.join(appPath, 'Contents', 'Resources')
   : path.join(appPath, 'resources');
@@ -249,13 +280,22 @@ if (F.marker) {
 const asarPath = path.join(resourcesDir, 'app.asar');
 if (!fs.existsSync(asarPath)) fail('no app.asar in the bundle');
 let packagedVersion = null;
+// The library first: electron-builder already installs it. Shelling out to
+// `npx` found nothing on Windows, where npx is npx.cmd and execFileSync will
+// not run a .cmd — so this check was silently skipped on every Windows run.
 try {
-  execFileSync('npx', ['--yes', '@electron/asar', 'extract-file', asarPath, 'package.json'], { cwd: work, stdio: 'pipe' });
-  packagedVersion = JSON.parse(fs.readFileSync(path.join(work, 'package.json'), 'utf8')).version;
-  ok(`package.json inside the bundle says ${packagedVersion}`);
+  const asar = await import('@electron/asar');
+  const read = asar.extractFile || (asar.default && asar.default.extractFile);
+  packagedVersion = JSON.parse(read(asarPath, 'package.json').toString('utf8')).version;
 } catch {
-  console.log('  … could not read package.json from the asar (skipping that check)');
+  try {
+    execFileSync('npx', ['--yes', '@electron/asar', 'extract-file', asarPath, 'package.json'],
+      { cwd: work, stdio: 'pipe', shell: windows });
+    packagedVersion = JSON.parse(fs.readFileSync(path.join(work, 'package.json'), 'utf8')).version;
+  } catch { /* reported below */ }
 }
+if (packagedVersion) ok(`package.json inside the bundle says ${packagedVersion}`);
+else console.log('  … could not read package.json from the asar (skipping that check; the running app is still asked)');
 if (tagVersion && packagedVersion && packagedVersion !== tagVersion) {
   fail(`expected ${tagVersion} but the bundle contains ${packagedVersion} — the tag was cut before the version bump`);
 }
@@ -277,6 +317,20 @@ if (tagVersion && packagedVersion && packagedVersion !== tagVersion) {
 // execFileSync waits for every holder to close it. A launch check that hangs
 // on the exact build it exists to catch blocks the release instead of
 // failing it.
+/**
+ * Kill a process and everything it started. POSIX signals a process group
+ * (hence `detached` on the diagnosis run); Windows has no groups to signal, and
+ * taskkill /T walks the tree instead.
+ */
+function killTree(pid, isGroupLeader) {
+  if (!pid) return;
+  if (windows) {
+    try { execFileSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' }); } catch { /* gone */ }
+    return;
+  }
+  try { process.kill(isGroupLeader ? -pid : pid, 'SIGKILL'); } catch { /* gone */ }
+}
+
 async function launchDiagnosis() {
   const probe = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-probe-'));
   const errFile = path.join(probe, 'stderr.txt');
@@ -296,7 +350,7 @@ async function launchDiagnosis() {
     child.on('exit', () => { clearTimeout(t); resolve(); });
     child.on('error', () => { clearTimeout(t); resolve(); });
   });
-  try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
+  killTree(child.pid, true);
   const err = fs.readFileSync(errFile, 'utf8').trim();
   if (!err) return null;   // it said nothing; the failure was elsewhere
   const lines = err.split('\n').filter(Boolean);
@@ -316,7 +370,7 @@ let app;
  * diagnosis runs.
  */
 function killLaunched() {
-  try { const p = app && app.process(); if (p && p.pid) process.kill(p.pid, 'SIGKILL'); } catch { /* gone */ }
+  try { const p = app && app.process(); if (p && p.pid) killTree(p.pid, false); } catch { /* gone */ }
 }
 
 // A launch failure surfaces as an uncaught exception from inside playwright, not

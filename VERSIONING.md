@@ -122,18 +122,22 @@ Each command updates `package.json` and `package-lock.json`. Edit `CHANGELOG.md`
    builds nothing at all.
 6. CI **Build & Release** builds installers from the tag (`on: push: tags: v*`).
 
-7. Verify the published build. **The Linux AppImage is launched for you**:
-   `build-linux` in release.yml runs `scripts/verify-release.mjs` against the
-   AppImage it just built, under xvfb, and `publish` waits on it — so a build
-   that does not open stays a draft. Read that step's log before announcing.
+7. Verify the published build. **Windows and Linux are launched for you**:
+   `build-linux` runs `scripts/verify-release.mjs` against the AppImage it just
+   built, under xvfb, and `build-windows` INSTALLS the Setup exe it just built
+   (silently, into a scratch folder) and launches what it installed. `publish`
+   waits on both, and `submit-store` on the Windows one — so a build that does
+   not open, or an installer that does not install, stays a draft. Read both
+   steps' logs before announcing.
    It exists because `v3.8.0` shipped with no launch check at all: the script
    was macOS-only, asked for `Khayt-<version>-arm64-mac.zip`, and a cut with
    `BUILD_MAC` unset has no such asset (404).
 
-   `npm run verify:release <tag>` still checks the build for the platform it
-   runs on — the arm64 .app on a Mac, the AppImage on Linux — and is worth
-   running on a Mac whenever `BUILD_MAC` was on. Nothing launches the Windows
-   installer; an NSIS- or signing-specific fault is invisible to both.
+   `npm run verify:release <tag>` checks the published build for the platform
+   it runs on — the arm64 .app on a Mac, the AppImage on Linux, the installed
+   Setup exe on Windows — and is worth running on a Mac whenever `BUILD_MAC`
+   was on, since no CI step launches the macOS build. Signing is still
+   unchecked: the Windows build is unsigned today (see `WIN_CSC_LINK`).
 
    The manifests are what `electron-updater` actually reads. Worth checking by
    hand:
