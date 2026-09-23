@@ -2446,6 +2446,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) A Duet could be watched but not paused, resumed or cancelled.** Three
+  separate faults: a cancel — a pause and then a stop — was refused as "could
+  not be built" on every Duet; on a Duet with a Raspberry Pi (SBC) the G-code
+  was sent as an empty message, so pause and resume did nothing; and a Duet
+  with a password refused every command, because the Mac's session with it
+  belonged to the status display alone. All three are fixed: a cancel runs both
+  steps in order, the SBC gets its G-code, and a password-protected Duet is
+  signed in to before the command is sent again.
+
 - **(Mac) "Let customers price their own model" could not price anything on a
   real shop.** The Mac's price for an uploaded model looked for the printer
   preset and the filament in a copy of the book that held neither, so every

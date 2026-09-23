@@ -19,6 +19,7 @@ import KhaytCore
 /// about what to send a printer that is mid-job.
 ///
 /// What IS here: the socket, and the guards around it.
+@MainActor
 enum PrinterControl {
 
     /// What a shop asked for.
@@ -51,7 +52,8 @@ enum PrinterControl {
     /// device on the shop's behalf and must not be steerable off the address
     /// that was checked, any more than the poller is.
     static func send(_ verb: Verb, to machine: Machine, engine: KhaytEngine,
-                     build: StoreReader.Build?) async throws {
+                     build: StoreReader.Build?,
+                     fetch: ((URLRequest) async throws -> (Data, URLResponse))? = nil) async throws {
         let type = machine.printerApi?.type ?? ""
         let base = try await PrinterWatch.baseURL(machine, engine: engine)
         let key = await self.key(for: machine, build: build)
@@ -77,7 +79,7 @@ enum PrinterControl {
             // something this process already knows.
             duetFlavour: PrinterWatch.knownDuetFlavour(for: base),
             printerSlug: machine.printerApi?.printerSlug ?? "")
-        try await perform(request, base: base, key: key, type: type)
+        try await perform(request, base: base, key: key, type: type, engine: engine, fetch: fetch)
     }
 
     /// What is on a Klipper plate right now.
@@ -119,17 +121,53 @@ enum PrinterControl {
     }
 
     private static func perform(_ request: KhaytEngine.PrinterRequest, base: URL,
-                                key: String, type: String) async throws {
+                                key: String, type: String, engine: KhaytEngine? = nil,
+                                fetch: ((URLRequest) async throws -> (Data, URLResponse))? = nil) async throws {
         // A protocol that cannot do this says so, and that sentence goes to the
         // shop unchanged: "Bambu requires Bambu Connect for remote job control"
         // is something to act on, unlike a request that fails obscurely.
         if let why = request.unsupported { throw Failure.unsupported(why) }
+        // MORE THAN ONE CALL: in order, and the first refusal stops it. A Duet
+        // cancel is a pause and then a stop; stopping without the pause having
+        // landed is not the command the shop pressed.
+        if let steps = request.sequence {
+            guard !steps.isEmpty else { throw Failure.refused("The printer's command could not be built.") }
+            for step in steps {
+                try await perform(step, base: base, key: key, type: type, engine: engine, fetch: fetch)
+            }
+            return
+        }
         guard let method = request.method, let path = request.path else {
             throw Failure.refused("The printer's command could not be built.")
         }
-        _ = try await PrinterWatch.send(base, path: path, method: method,
-                                        body: request.body,
-                                        contentType: request.contentType,
-                                        key: key, type: type)
+        do {
+            _ = try await PrinterWatch.send(base, path: path, method: method, body: request.body,
+                                            contentType: request.contentType, key: key, type: type,
+                                            fetch: fetch)
+        } catch PrinterWatch.Refusal.http(let code, _) where type == "duet" && (code == 401 || code == 403) {
+            // A DUET WITH A PASSWORD refuses every command without a session —
+            // 401 standalone, 403 on an SBC — and the poller's session key was
+            // its own, so the Mac could watch such a printer and never pause
+            // it. Shake hands the way the poller does, then send once more.
+            guard let engine else { throw PrinterWatch.Refusal.http(code, "") }
+            let headers = try await duetSession(base: base, key: key, engine: engine, fetch: fetch)
+            _ = try await PrinterWatch.send(base, path: path, method: method, body: request.body,
+                                            contentType: request.contentType, key: key, type: type,
+                                            headers: headers, fetch: fetch)
+        }
+    }
+
+    /// The session header a Duet hands out on connect, for the firmware the
+    /// poller last heard answer here (standalone when it has heard nothing).
+    private static func duetSession(base: URL, key: String, engine: KhaytEngine,
+                                    fetch: ((URLRequest) async throws -> (Data, URLResponse))?) async throws
+        -> [String: String] {
+        let known = await PrinterWatch.knownDuetFlavour(for: base)
+        let flavour = known.isEmpty ? "standalone" : known
+        let ep = try await engine.duetEndpoints(flavour: flavour, password: key)
+        let raw = try await PrinterWatch.get(base, path: ep.connect, key: key, type: "duet", fetch: fetch)
+        let answer = try await engine.duetConnect(flavour: flavour, raw: raw)
+        guard answer.ok else { throw Failure.refused("The Duet refused the password: \(answer.error ?? "no reason given")") }
+        return answer.sessionKey.map { ["X-Session-Key": $0] } ?? [:]
     }
 }

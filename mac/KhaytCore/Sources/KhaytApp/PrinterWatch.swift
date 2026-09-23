@@ -173,7 +173,8 @@ final class PrinterWatch {
     /// first. Nothing is persisted: a wrong guess costs one extra request once
     /// per launch, and a machine that is re-flashed between launches is then
     /// found rather than remembered wrongly.
-    private static var duetFlavours: [String: String] = [:]
+    // Internal, not private: a test says what the poller has already learned.
+    static var duetFlavours: [String: String] = [:]
 
     /// Is this a machine this app can ask? Nil when it can.
     static func notWatched(_ machine: Machine) -> NotWatched? {
@@ -774,6 +775,7 @@ final class PrinterWatch {
     static func send(_ base: URL, path: String, method: String,
                      body: JSONValue? = nil, contentType: String? = nil,
                      key: String = "", type: String = "",
+                     headers: [String: String] = [:],
                      timeout seconds: TimeInterval = timeout,
                      fetch: ((URLRequest) async throws -> (Data, URLResponse))? = nil)
         async throws -> [String: JSONValue] {
@@ -784,9 +786,18 @@ final class PrinterWatch {
         if !key.isEmpty, ["octoprint", "prusalink", "moonraker", "repetier"].contains(type) {
             request.setValue(key, forHTTPHeaderField: "X-Api-Key")
         }
+        // A session key and anything else a protocol earned, after the key
+        // rule so the two never fight over one header.
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         if let body, case .object = body {
             request.httpBody = try? JSONEncoder().encode(body)
             request.setValue(contentType ?? "application/json", forHTTPHeaderField: "Content-Type")
+        } else if let body, case .string(let text) = body {
+            // TEXT, sent as text. A Duet on an SBC takes its G-code as the body
+            // of `POST /machine/code`, `text/plain` — and this used to send only
+            // object bodies, so every pause and resume went out EMPTY.
+            request.httpBody = Data(text.utf8)
+            request.setValue(contentType ?? "text/plain", forHTTPHeaderField: "Content-Type")
         }
         let (data, response) = try await (fetch ?? { try await Self.session.data(for: $0) })(request)
         if let http = response as? HTTPURLResponse {
