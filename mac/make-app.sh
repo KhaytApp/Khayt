@@ -441,8 +441,15 @@ SPARKLE_KEYS=""
 if [ -n "${KHAYT_APPCAST:-}" ] && [ "$SPARKLE_EMBEDDED" = "1" ]; then
   SPARKLE_KEYS="  <key>SUFeedURL</key><string>${KHAYT_APPCAST}</string>
   <key>SUPublicEDKey</key><string>iXX6JdzKwbQCUdCd2kLwvUUVHNIE51LR01dYZa1uA6c=</string>
-  <!-- Sparkle asks on first launch rather than deciding for the shop. -->
-  <key>SUEnableAutomaticChecks</key><false/>"
+  <!-- ON, and checked hourly. This was <false/> under a comment saying Sparkle
+       would ASK on first launch — but Sparkle only asks when the key is ABSENT;
+       NO turns checking off without asking (sparkle-project.org, Customization).
+       So no copy of this app ever looked for an update on its own. An alpha
+       line ships several builds a day, so the interval is Sparkle's minimum,
+       one hour, and the app also looks once at every launch (Updates.swift).
+       A shop can turn it off in Settings → App Preferences → On this Mac. -->
+  <key>SUEnableAutomaticChecks</key><true/>
+  <key>SUScheduledCheckInterval</key><integer>3600</integer>"
 fi
 
 cat > "$APP/Contents/Info.plist" <<PLIST

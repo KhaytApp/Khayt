@@ -61,6 +61,14 @@ final class Updates {
         do {
             try controller.updater.start()
             self.controller = controller
+            // AT LAUNCH, as well as on Sparkle's hourly schedule — when the
+            // shop has left automatic checks on. Sparkle's own scheduler waits
+            // out the interval from the LAST check, so a Mac opened each
+            // morning could run yesterday's build until lunchtime. In the
+            // background: a found update is offered, nothing interrupts.
+            if controller.updater.automaticallyChecksForUpdates {
+                controller.updater.checkForUpdatesInBackground()
+            }
         } catch {
             // A shop cannot act on this and the app works without it, so it is
             // not a dialog. It IS a log line, because "updates silently never
@@ -75,6 +83,47 @@ final class Updates {
     var isAvailable: Bool { controller != nil }
 
     func checkForUpdates() { controller?.updater.checkForUpdates() }
+
+    /// Whether this Mac looks for updates by itself — Sparkle's own setting,
+    /// kept in this Mac's defaults, never in the shop's book.
+    var checksAutomatically: Bool {
+        get { controller?.updater.automaticallyChecksForUpdates ?? false }
+        set { controller?.updater.automaticallyChecksForUpdates = newValue }
+    }
+
+    /// Whether a found update is downloaded and installed on quit without
+    /// asking. Off unless the shop turns it on.
+    var installsAutomatically: Bool {
+        get { controller?.updater.automaticallyDownloadsUpdates ?? false }
+        set { controller?.updater.automaticallyDownloadsUpdates = newValue }
+    }
+}
+
+/// The two switches, in Settings → App Preferences → On this Mac.
+///
+/// This Mac's choice, applied the moment it is flipped — not part of the pane's
+/// Save, which writes the shop's book to every device.
+struct UpdateToggles: View {
+    let shop: Shop
+    @State private var checks = Updates.shared.checksAutomatically
+    @State private var installs = Updates.shared.installsAutomatically
+
+    var body: some View {
+        Toggle(shop.words.callIt("mac.updates_auto_check"), isOn: $checks)
+            .disabled(!Updates.shared.isAvailable)
+            .onChange(of: checks) { _, on in
+                Updates.shared.checksAutomatically = on
+                if !on { installs = false }
+            }
+        Toggle(shop.words.callIt("mac.updates_auto_install"), isOn: $installs)
+            .disabled(!Updates.shared.isAvailable || !checks)
+            .onChange(of: installs) { _, on in Updates.shared.installsAutomatically = on }
+        if !Updates.shared.isAvailable {
+            // A local build has no feed; say so rather than show dead switches.
+            Text(shop.words.callIt("mac.updates_unavailable"))
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
 }
 
 /// The menu item, in the app menu where macOS puts it in every other app.

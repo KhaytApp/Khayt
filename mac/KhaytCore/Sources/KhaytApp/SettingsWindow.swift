@@ -1008,6 +1008,7 @@ struct PreferencesPane: View {
                 // done: the snapshot runner could not open the settings window
                 // while an orphaned Khayt held the status bar.
                 Section(shop.words.callIt("mac.on_this_mac")) {
+                    UpdateToggles(shop: shop)
                     Toggle(shop.words.callIt("mac.menu_bar"), isOn: $menuBar)
                         .onChange(of: menuBar) { _, on in
                             // AppKit, so nothing redraws itself: say so plainly.
