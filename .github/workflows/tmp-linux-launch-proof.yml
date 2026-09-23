@@ -1,0 +1,44 @@
+# TEMPORARY — removed before this PR merges. Proves scripts/verify-release.mjs
+# on a real Linux runner, which the author's Mac cannot: that it opens the
+# shipped v3.8.0 AppImage, and that it FAILS on a copy missing a lib/ module.
+name: TEMP Linux launch proof
+
+on: pull_request
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: The shipped v3.8.0 AppImage opens (tag mode, Linux)
+        run: xvfb-run -a node scripts/verify-release.mjs v3.8.0
+
+      - name: The same AppImage via --app, with the version it must report
+        run: |
+          curl -fsSL -o Khayt-3.8.0.AppImage https://github.com/KhaytApp/Khayt/releases/download/v3.8.0/Khayt-3.8.0.AppImage
+          xvfb-run -a node scripts/verify-release.mjs --app Khayt-3.8.0.AppImage --version 3.8.0
+
+      - name: A build missing lib/branch-summary.js is refused, and named
+        run: |
+          chmod +x Khayt-3.8.0.AppImage && ./Khayt-3.8.0.AppImage --appimage-extract >/dev/null
+          npx --yes @electron/asar extract squashfs-root/resources/app.asar x
+          rm x/lib/branch-summary.js
+          npx --yes @electron/asar pack x squashfs-root/resources/app.asar
+          if xvfb-run -a node scripts/verify-release.mjs --app squashfs-root --version 3.8.0 > out.txt 2>&1; then
+            cat out.txt; echo "::error::a broken build PASSED"; exit 1
+          fi
+          cat out.txt
+          grep -q "Cannot find module" out.txt || { echo "::error::failed, but not for the missing module"; exit 1; }
+
+      - name: A wrong --version is refused
+        run: |
+          if xvfb-run -a node scripts/verify-release.mjs --app Khayt-3.8.0.AppImage --version 9.9.9 > v.txt 2>&1; then
+            cat v.txt; echo "::error::a version mismatch PASSED"; exit 1
+          fi
+          cat v.txt
