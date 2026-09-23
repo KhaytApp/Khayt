@@ -233,6 +233,15 @@ struct CompanionBook {
                                      collection: collection, id: id, change: change)
     }
 
+    /// The Mac has taken everything this phone had changed.
+    ///
+    /// The baseline becomes the book, so the next outbox measures from here.
+    /// Called only after a send the Mac confirmed — see `sendPendingChanges`.
+    func markSynced() throws {
+        let current = try Data(contentsOf: url)
+        try current.write(to: baselineURL, options: [.atomic, .completeFileProtection])
+    }
+
     /// Forget the shop entirely. Unpairing must not leave a client list behind.
     func forget() {
         // The baseline is a second full copy of the shop's records — same client

@@ -5,7 +5,11 @@ struct ConnectionBanner: View {
     @EnvironmentObject private var api: KhaytAPIClient
 
     var body: some View {
-        if health.state != .connected {
+        // Shown when the Mac is out of reach, and ALSO when it is not but this
+        // phone is still holding edits. An edit waiting to be sent is a fact
+        // about the shop's records; leaving it invisible is how somebody comes
+        // to believe a job was advanced when the Mac has never heard of it.
+        if health.state != .connected || api.pendingCount > 0 {
             HStack(spacing: 10) {
                 Circle()
                     .fill(iconColor)
@@ -17,6 +21,11 @@ struct ConnectionBanner: View {
                     Text(message)
                         .font(.system(size: 11))
                         .foregroundStyle(KhaytDesign.textDim)
+                    if api.pendingCount > 0 {
+                        Text(String(format: L10n.tr("sync.pending"), api.pendingCount))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(KhaytDesign.textDim)
+                    }
                 }
                 Spacer(minLength: 0)
                 if health.state == .unreachable || health.state == .unauthorized {

@@ -52,6 +52,34 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   once it is made, because the number it leaves behind looks exactly like a
   number somebody counted.
 
+
+- **(iOS + Mac) The phone works with the Mac switched off.** Advancing a job,
+  putting it on a printer, correcting a spool and triaging a walk-in all used to
+  fail the moment the desktop was out of reach — which is the back room, the
+  machines, and most of a working day. They are written to the phone's own book
+  now and carried to the Mac when it comes back, and the banner says how many
+  are waiting rather than letting somebody believe a job moved when the Mac has
+  never heard of it.
+
+  What protects the shop's book is the fold, not the phone: `applyDeltas` keeps
+  the higher revision, so an edit made on a phone holding a stale copy loses to
+  work done at the desk instead of overwriting it.
+
+  Two things the phone deliberately will not do offline: declining a walk-in
+  request, because the endpoint MOVES it into `waitingListHistory` and removes
+  it from the list, and a removal is a deletion this phone cannot express; and
+  assigning a printer the shop does not have, which the endpoint answers 404
+  for. Both fall through to the desktop, which fails honestly when the Mac is
+  away rather than producing a book that being online would not produce.
+
+  These writes set fields and stamp them. They do NOT run the status rules — no
+  `moveJob`, no filament deduction, no customer email — and that is parity
+  rather than a shortcut: `PATCH /api/orders/:id` has always answered with
+  `updated.status = status`, and the renderer's own handler does the same in
+  memory. Running the rules from the phone would be a change in what the
+  product does, and belongs to a decision about the product.
+
+  The Arabic for the one new string has had no native read.
 - **(Mac) A piece can be sold off the shelf, and the shop can see how many
   went.** Every order this app has ever written is work the shop made for
   somebody. A piece printed in a batch weeks ago, for nobody in particular, had

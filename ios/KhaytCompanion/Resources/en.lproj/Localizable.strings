@@ -16,6 +16,7 @@
 "connection.banner.pin" = "LAN PIN rejected. Update PIN in Settings to match desktop.";
 "connection.banner.checking" = "Connecting to desktop…";
 "connection.retry" = "Retry";
+"sync.pending" = "%d change(s) on this phone, waiting for the Mac.";
 "connection.error.reach_status" = "Cannot reach %@. Same Wi‑Fi? Desktop → Settings → LAN API: enabled, listen on all interfaces, note the IP and port.";
 "settings.host_required" = "Enter your computer's IP address.";
 "settings.host_invalid" = "Invalid address. Use e.g. 192.168.1.42 (not a full URL with http://).";

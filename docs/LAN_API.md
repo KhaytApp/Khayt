@@ -218,9 +218,11 @@ with nothing.
 
 A paired client's changes, folded into the shop's book. **Requires owner PIN.**
 
-> **Served by the native Mac app only, and off unless the app switches it on.**
-> `LanServer.Host.fold` is `nil` by default; a build that has not wired it answers
-> `405` and says so, rather than failing as though something broke.
+> **Served by the native Mac app only.** `LanServer.Host.fold` is `nil` by
+> default — a build that has not wired it answers `405` and says so, rather than
+> failing as though something broke. The shipping Mac app wires it, so the
+> companion's offline edits land; `lib/lan-server.js` does not implement this
+> route at all.
 
 **Request** — an outbox, the shape `KhaytCloudOutbox.changesToSend` produces and
 `KhaytSync.applyDeltas` consumes:
