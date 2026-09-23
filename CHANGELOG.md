@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Cloud sync could stop finishing for a shop near its plan's size.** The
+  server refuses a new change once a shop's history of small changes is full,
+  and asks for the whole store instead. One of its reasons — the shop is close
+  to its plan's size limit — is one the desktop cannot see, and the desktop
+  read the refusal as another device having saved first. It fetched, found
+  nothing new, sent the same change again and was refused again, for as long
+  as the app was open. It now sends the whole store when the server asks for
+  it, which clears the history, and goes back to sending only what changed.
+
 - **(iOS) The companion is in Arabic end to end.** The pairing wizard — the
   first screen a new shop sees — had no Arabic at all; neither did adding a
   spool, both scanners, the new-order sheet, order and spool detail, the
