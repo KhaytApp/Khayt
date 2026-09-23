@@ -204,3 +204,16 @@
 "exp.cat.power" = "كهرباء";
 "exp.cat.shipping" = "شحن";
 "exp.cat.other" = "أخرى";
+
+/* Redesign: order and spool rows (design/iOS UI/khayt-i18n.jsx) */
+"orders.late" = "متأخر";
+"orders.queue_clear" = "الطابور فارغ";
+"orders.queue_clear.sub" = "كل شيء منجز — لا طلبات نشطة";
+"orders.no_completed" = "لا طلبات مكتملة";
+"orders.no_completed.sub" = "ستظهر الطلبات المكتملة هنا";
+"inventory.low" = "منخفض";
+"inventory.none" = "لا توجد بكرات بعد";
+"inventory.none.sub" = "أضف أول بكرة للبدء";
+"inventory.no_results" = "لا نتائج";
+"inventory.no_results.sub" = "جرّب بحثاً مختلفاً";
+"inventory.delete" = "حذف";

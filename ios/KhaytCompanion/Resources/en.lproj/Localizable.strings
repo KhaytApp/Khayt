@@ -204,3 +204,16 @@
 "exp.cat.power" = "Power";
 "exp.cat.shipping" = "Shipping";
 "exp.cat.other" = "Other";
+
+/* Redesign: order and spool rows (design/iOS UI/khayt-i18n.jsx) */
+"orders.late" = "LATE";
+"orders.queue_clear" = "Queue is clear";
+"orders.queue_clear.sub" = "All caught up — no active orders";
+"orders.no_completed" = "No completed orders";
+"orders.no_completed.sub" = "Completed orders will appear here";
+"inventory.low" = "LOW";
+"inventory.none" = "No spools yet";
+"inventory.none.sub" = "Add your first spool to get started";
+"inventory.no_results" = "No results";
+"inventory.no_results.sub" = "Try a different search";
+"inventory.delete" = "Delete";

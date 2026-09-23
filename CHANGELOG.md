@@ -22,6 +22,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   (8–14 digits, anything else dropped) and `GET` returns it; the desktop's
   own forms do not show it yet.
 
+- **(iOS) Orders and Inventory look like the design now.** An order is one
+  compact row — a stripe in its stage's colour, the job, who it is for and
+  which printer, its stage and due date, and a LATE tag when it is — and
+  **swiping it left moves it to the next stage**, labelled and coloured for
+  where it is going. That replaces an Advance button in every row, which made
+  each row three times the mockup's height. The stage filters are coloured
+  and counted, and an Overdue filter appears only when something is.
+
+  A spool row shows its colour as a proper swatch, a LOW tag, and how much is
+  left as a bar — red under 15%, amber under 30% — measured against what the
+  roll weighed when it arrived, and left out when the book never recorded
+  that. The All / Low stock filters are on the screen with their counts
+  rather than inside a menu. New labels are in English and Arabic, from the
+  mockup's own strings, and the layout mirrors in Arabic.
+
 ### Security
 
 - **Khayt would send a webhook, a cloud request or mail to a Tailscale

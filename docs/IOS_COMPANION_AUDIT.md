@@ -38,7 +38,7 @@ Branch: `cursor/ios-companion-app-2e93`.
 
 | Priority | Finding | Status |
 |----------|---------|--------|
-| P0 | Orders/Inventory/Add spool not mockup card layouts | **Open** — tokens applied; full card/swipe redesign deferred |
+| P0 | Orders/Inventory/Add spool not mockup card layouts | **Fixed** for Orders and Inventory — `khayt-orders.jsx` OrderRow/RecentRow/FilterChips with swipe to advance, `khayt-inventory.jsx` SpoolRow with swatch and level bar. Add spool keeps its form layout |
 | P1 | System `.secondary` / `.primary` colors | **Partial** — Orders, Inventory rows, Settings |
 | P1 | Filter chips / tab touch targets &lt; 44pt | **Fixed** — min heights on chips, kanban, tab bar |
 | P2 | Arabic uppercase on section/kanban labels | **Fixed** — skip uppercase when Arabic layout |
@@ -47,10 +47,10 @@ Branch: `cursor/ios-companion-app-2e93`.
 
 ## Remaining (optional)
 
-- Rebuild Orders list as inset cards + swipe advance (`khayt-orders.jsx`)
-- Inventory color swatch + progress bar (`khayt-inventory.jsx`)
 - Custom bottom sheet for order detail and add spool
-- Light mode (`LIGHT_TOKENS`)
+- Light mode follows the system (every token is a dynamic colour); the brand
+  indigo in light is the desktop's `#4F5BF2`, not the mockup's `#5856D6`, on
+  purpose
 
 ## Verify on device
 
