@@ -74,13 +74,25 @@ pick_identity() {
 }
 
 notarize_app() {
+  # A notarytool keychain profile (`xcrun notarytool store-credentials`) is how
+  # a person releases from their own Mac: the app-specific password stays in
+  # the Keychain instead of an environment variable. CI passes the three below.
+  local auth
+  if [ -n "${NOTARY_PROFILE:-}" ]; then
+    auth=(--keychain-profile "$NOTARY_PROFILE")
+  else
+    auth=(--apple-id "${APPLE_ID:-}" --password "${APPLE_APP_SPECIFIC_PASSWORD:-}" --team-id "${APPLE_TEAM_ID:-}")
+  fi
   local missing=""
-  [ -n "${APPLE_ID:-}" ]                    || missing="$missing APPLE_ID"
-  [ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] || missing="$missing APPLE_APP_SPECIFIC_PASSWORD"
-  [ -n "${APPLE_TEAM_ID:-}" ]               || missing="$missing APPLE_TEAM_ID"
+  if [ -z "${NOTARY_PROFILE:-}" ]; then
+    [ -n "${APPLE_ID:-}" ]                    || missing="$missing APPLE_ID"
+    [ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] || missing="$missing APPLE_APP_SPECIFIC_PASSWORD"
+    [ -n "${APPLE_TEAM_ID:-}" ]               || missing="$missing APPLE_TEAM_ID"
+  fi
   if [ -n "$missing" ]; then
     echo "cannot notarise — missing:$missing" >&2
     echo "  These are the same credentials the Electron release uses." >&2
+    echo "  Or set NOTARY_PROFILE to a profile saved with notarytool store-credentials." >&2
     return 1
   fi
   if [ "$IDENTITY" = "-" ]; then
@@ -96,11 +108,7 @@ notarize_app() {
   ditto -c -k --keepParent "$APP" "$zip"
 
   echo "  notarising (this waits on Apple, usually a few minutes)…"
-  if ! xcrun notarytool submit "$zip" \
-        --apple-id "$APPLE_ID" \
-        --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-        --team-id "$APPLE_TEAM_ID" \
-        --wait --timeout 30m; then
+  if ! xcrun notarytool submit "$zip" "${auth[@]}" --wait --timeout 30m; then
     echo "notarisation FAILED. The log above names the offending binary." >&2
     echo "  xcrun notarytool log <submission-id> --apple-id … for the detail." >&2
     rm -f "$zip"

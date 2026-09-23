@@ -155,3 +155,41 @@ test('a published Mac build checks for updates by itself', () => {
   assert.ok(m, 'no check interval: Sparkle would wait a day between checks on an alpha line');
   assert.ok(+m[1] >= 3600, 'Sparkle refuses an interval under an hour');
 });
+
+/**
+ * The same lane, run from a Mac instead of a hosted runner (two hours there,
+ * fifteen minutes here). It is only a faster copy if it makes the same checks:
+ * each of the ones below caught a shipped alpha that every other step called
+ * a success.
+ */
+test('the local release makes the checks the CI lane makes', () => {
+  const local = fs.readFileSync(path.join(__dirname, '..', 'mac', 'release-local.sh'), 'utf8');
+  for (const must of [
+    /KHAYT_APPCAST="\$FEED_URL" \.\/mac\/make-app\.sh/,   // the updater is switched on
+    /make-app\.sh --notarize/,
+    /SUFeedURL/, /SUPublicEDKey/, /Sparkle\.framework/,
+    /stapler validate/,
+    /--check-resources/,                                  // alpha.1/.2 could not launch
+    /ditto -c -k --keepParent/,
+    /for wf in mac-release\.yml mac-publish\.yml/,        // never race a CI release
+  ]) assert.match(local, must);
+  // The Sparkle key lives only in a repo secret, so the local half uploads a
+  // DRAFT and GitHub signs it; a public release would be unsigned in the feed.
+  assert.match(local, /gh release create "\$TAG" "\$ARCHIVE" --repo KhaytApp\/khayt-mac --draft/);
+  assert.match(local, /gh workflow run mac-publish\.yml/);
+});
+
+test('the publish half re-checks the archive, signs it, and publishes the release before the feed', () => {
+  const pub = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'mac-publish.yml'), 'utf8');
+  for (const must of [/isDraft/, /SUFeedURL/, /SUPublicEDKey/, /stapler validate/, /--check-resources/,
+    /codesign --verify/, /sign_update -f - -p/]) assert.match(pub, must);
+  assert.ok(pub.indexOf('--draft=false') < pub.indexOf('mac-appcast.js'),
+    'the release must be public before the feed names it');
+  // Only through env: a tag typed into the form must never be pasted into a script.
+  assert.doesNotMatch(pub, /run:[^\n]*\$\{\{ inputs\.tag \}\}/);
+});
+
+test('make-app.sh can notarise with a keychain profile, never a password on the command line', () => {
+  const script = fs.readFileSync(path.join(__dirname, '..', 'mac', 'make-app.sh'), 'utf8');
+  assert.match(script, /--keychain-profile "\$NOTARY_PROFILE"/);
+});
