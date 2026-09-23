@@ -3844,6 +3844,8 @@ final class Shop {
 
     /// The job waiting for someone to say what was paid.
     var pendingPayment: PendingHold?
+    /// A job being handed to a carrier, or a parcel being updated by hand.
+    var pendingShipment: PendingHold?
 
     /// The payment methods Khayt offers, in its own order.
     ///
@@ -4105,6 +4107,38 @@ final class Shop {
             }
             return OneOrderEdit(order: changed, activity: "\(id) → shipped")
         }
+    }
+
+    /// Hand a finished job to a carrier: who, which service, and the tracking
+    /// number — `lib/shipment.js`, the Electron Ship dialog's own rule.
+    ///
+    /// Only a finished job not yet handed over, which is `markShipped`'s gate:
+    /// a parcel cannot leave before the thing in it is made.
+    func ship(_ id: Order.ID, carrier: String, service: String?, trackingNumber: String) async {
+        await writeToOneOrder(id, named: words.callIt("ship.title")) { order, engine, _ in
+            guard case .object(let o) = order, o["status"] == .string("completed"),
+                  o["deliveredAt"] == nil || o["deliveredAt"] == .null else {
+                throw MoveRefused(sentence: self.words.callIt("mac.not_finished_yet"))
+            }
+            let shipped = try await engine.shipmentCreate(order: order, carrier: carrier, service: service,
+                                                          trackingNumber: trackingNumber, at: Date())
+            return OneOrderEdit(order: shipped, activity: "\(id) → shipped")
+        }
+    }
+
+    /// A parcel already sent: a corrected tracking number, or a status picked
+    /// by hand. Never moves it backwards — `carriers.advanceShippingStatus`.
+    func updateShipment(_ id: Order.ID, status: String?, trackingNumber: String) async {
+        await writeToOneOrder(id, named: words.callIt("ship.manage_title")) { order, engine, _ in
+            OneOrderEdit(order: try await engine.shipmentUpdate(order: order, status: status,
+                                                                trackingNumber: trackingNumber, at: Date()).order)
+        }
+    }
+
+    /// The carriers the Ship sheet offers, Manual last and always there.
+    func carriersToShipWith() async -> [KhaytEngine.CarrierChoice] {
+        guard let engine else { return [] }
+        return (try? await engine.carriersToShipWith(settings: .object(settingsDict))) ?? []
     }
 
     /// Undo a payment: the money was never received, or was recorded against
@@ -9327,6 +9361,7 @@ final class Shop {
         pendingHold = nil
         pendingCompletion = nil
         pendingPayment = nil
+        pendingShipment = nil
         pendingEdit = nil
         pendingQcFail = nil
         pendingInvoice = nil

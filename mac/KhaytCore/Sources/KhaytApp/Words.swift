@@ -2532,13 +2532,24 @@ final class Words {
         "mac.online_desc":   ["en": "This Mac serves the live queue to phones on the shop's Wi‑Fi, "
                                     + "the customer intake form, quote approval, the tracking page "
                                     + "and the calendar feed, and the same status API the Windows "
-                                    + "and Linux app serves, and it takes orders from Salla and Zid. "
-                                    + "Carrier and printer webhooks run in that app for now.",
+                                    + "and Linux app serves. It takes orders from Salla and Zid, and parcel "
+                                    + "updates from SMSA, Aramex and Saudi Post. Printer webhooks run in that app "
+                                    + "for now.",
                               "ar": "يقدّم هذا الماك قائمة الانتظار المباشرة للهواتف على شبكة Wi‑Fi الخاصة بالمحل، "
                                     + "ونموذج طلبات العملاء واعتماد عروض الأسعار وصفحة تتبّع الطلب "
                                     + "وتقويم المواعيد، ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس، "
-                                    + "ويستقبل الطلبات من سلة وزد. "
-                                    + "أما ويب هوك شركات الشحن والطابعات فيعمل في ذلك التطبيق حالياً."],
+                                    + "ويستقبل الطلبات من سلة وزد وتحديثات الشحنات من سمسا وأرامكس والبريد السعودي. "
+                                    + "أما ويب هوك الطابعات فيعمل في ذلك التطبيق حالياً."],
+        "mac.carriers_hint": ["en": "Optional — shipping works fully by hand. A carrier turned on here is offered "
+                                    + "when a job is shipped, and with a webhook secret it updates a parcel's status "
+                                    + "by itself. Labels are created from the Windows and Linux app.",
+                              "ar": "اختياري — الشحن يعمل يدويًا بالكامل. شركة الشحن المفعّلة هنا تظهر عند شحن "
+                                    + "الطلب، ومع سرّ الويب هوك تُحدّث حالة الشحنة تلقائيًا. "
+                                    + "تُنشأ بطاقات الشحن من تطبيق ويندوز ولينكس."],
+        "mac.ship_hint":     ["en": "Type the tracking number from the carrier's receipt. A carrier set up "
+                                    + "with a webhook secret moves the parcel along by itself.",
+                              "ar": "اكتب رقم التتبّع من إيصال شركة الشحن. شركة الشحن المُعدّة "
+                                    + "بسرّ ويب هوك تُحدّث حالة الشحنة تلقائيًا."],
         "mac.storefront_hooks_title": ["en": "Orders from a storefront",
                                        "ar": "طلبات المتجر الإلكتروني"],
         "mac.storefront_hooks_hint": ["en": "Paste the secret from the storefront's dashboard, and give it "

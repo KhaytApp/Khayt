@@ -688,3 +688,22 @@ test('a field the form does not know about survives', () => {
   const out = apply(held, { ai: { enabled: false } });
   assert.deepEqual(out.ai.spend, { month: '2026-09', calls: 12 });
 });
+
+test('carrier settings merge per carrier, and a secret absent from the form is kept', () => {
+  // The Mac's Shipping settings save through this function; before this
+  // branch the form's `shipping` key was ignored and the save changed nothing.
+  const stored = { shipping: {
+    smsa: { enabled: true, apiKey: 'sealed-key', accountNumber: '100', webhookSecret: 'sealed-wh' },
+    aramex: { enabled: false, apiKey: 'ax-key' },
+  } };
+  const out = apply(stored, { shipping: { smsa: { enabled: false, accountNumber: ' 200 ', webhookSecret: 'new-wh' } } });
+  assert.deepEqual(out.shipping.smsa, { enabled: false, apiKey: 'sealed-key', accountNumber: '200', webhookSecret: 'new-wh' });
+  assert.deepEqual(out.shipping.aramex, stored.shipping.aramex, 'a carrier the form did not name was touched');
+  // An empty string is the forget switch.
+  assert.equal(apply(stored, { shipping: { smsa: { webhookSecret: '' } } }).shipping.smsa.webhookSecret, '');
+  // A form without the block leaves it exactly as stored.
+  assert.deepEqual(apply(stored, { shopName: 'x' }).shipping, stored.shipping);
+  // A carrier set up for the first time.
+  assert.deepEqual(apply({}, { shipping: { spl: { enabled: true } } }).shipping.spl,
+    { enabled: true, accountNumber: '', apiKey: '', webhookSecret: '' });
+});

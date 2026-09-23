@@ -79,6 +79,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Ship a job with a carrier, and let the carrier move it along.** The
+  Mac could stamp a job shipped and never say who took it or under what
+  tracking number, so a Mac shop's customer had "shipped" with nothing to
+  follow, and a carrier had no number to report against. Now:
+  - **Ship order…** (Job menu, the orders table's right-click menu and the job
+    inspector) picks the carrier, its service and the tracking number; a
+    parcel already sent takes a corrected number or a status picked by hand,
+    never moving backwards. The inspector shows the carrier, the number
+    (selectable, to copy) and where the parcel has got to.
+  - **Settings → Integrations → Shipping & Fulfillment** turns SMSA, Aramex and
+    Saudi Post on, and keeps their account number, API key and webhook secret —
+    the two secrets sealed. The Mac does not create labels itself; the pane
+    says so.
+  - **SMSA, Aramex and Saudi Post status webhooks arrive on the Mac,** with the
+    Windows and Linux app's answers in its order. Only the printer webhook is
+    still that app's.
+  What a shipment writes is one shared rule now, `lib/shipment.js`, which the
+  Electron Ship dialog also runs — held to that dialog's original code by a
+  test that runs every case through both.
+
 - **(Mac) Orders from Salla and Zid arrive on the Mac.** The Mac could show a
   storefront's orders once they were in the book, and nothing on it put them
   there: `/api/webhook/salla` and `/api/webhook/zid` answered 404, and the

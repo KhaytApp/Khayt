@@ -24,9 +24,10 @@ import KhaytCore
 /// on a phone's home screen, the customer intake form and its estimate, the
 /// quote page and its approval, the order's own tracking page and survey, and
 /// `/calendar.ics`, and the other app's `/status/<id>` address for that same
-/// tracking page, and the signed Salla and Zid order webhooks. It arrived one
-/// slice at a time; what has NOT been lifted is the carrier and printer
-/// webhooks.
+/// tracking page, the signed Salla and Zid order webhooks, and the SMSA, Aramex
+/// and Saudi Post status webhooks. It arrived one slice at a time; what has NOT
+/// been lifted is the printer webhook — which matters least here, because this
+/// app polls its printers itself.
 ///
 /// That list is not decoration: `OnlinePaneTruthTests` reads this route table
 /// and fails the build if the Online settings pane sends a shop to the other
@@ -129,6 +130,13 @@ final class LanServer {
         /// race to its own first delivery). Throws when the book cannot be
         /// written.
         var storefrontOrder: (_ source: String, _ payload: JSONValue) async throws -> JSONValue?
+            = { _, _ in throw CocoaError(.fileWriteUnknown) }
+        /// The carriers' webhook secrets, opened, by carrier id —
+        /// `settings.shipping.<id>.webhookSecret`. None configured is 403.
+        var carrierSecrets: [String: String] = [:]
+        /// Put a carrier's event on the book, INSIDE the write. Returns the job
+        /// it moved, or nil when the book as it is now had nothing to move.
+        var carrierEvent: (_ event: JSONValue, _ at: String) async throws -> JSONValue?
             = { _, _ in throw CocoaError(.fileWriteUnknown) }
     }
 
@@ -635,6 +643,9 @@ final class LanServer {
 
         case (Self.storefrontHookPath + "zid", false) where request.method == "POST":
             return await storefrontHook(request, source: "zid")
+
+        case (_, false) where request.method == "POST" && Self.carrierHookId(path) != nil:
+            return await carrierHook(request, carrier: Self.carrierHookId(path)!)
 
         case ("/api/survey", false) where request.method == "POST":
             return await surveySubmit(request)
@@ -1306,6 +1317,69 @@ final class LanServer {
         }
     }
 
+    // MARK: - Carrier status webhooks
+
+    nonisolated static let carrierHookIds = ["smsa", "aramex", "spl"]
+
+    /// The carrier a path names, for `/api/webhook/smsa|aramex|spl`, else nil.
+    nonisolated static func carrierHookId(_ path: String) -> String? {
+        guard path.hasPrefix(storefrontHookPath) else { return nil }
+        let id = String(path.dropFirst(storefrontHookPath.count))
+        return carrierHookIds.contains(id) ? id : nil
+    }
+
+    /// `POST /api/webhook/smsa|aramex|spl`: a carrier saying where a parcel is.
+    ///
+    /// The Node server's answers, in its order: locked out 429, no secret 403,
+    /// a signature that does not match 401 (counted), a replay 409, a payload
+    /// with no tracking number and status Khayt can read 422 — said only to a
+    /// sender that already proved it holds the secret, so it leaks nothing —
+    /// and otherwise 200. A tracking number the shop does not hold is ALSO 200:
+    /// a different answer would tell whoever holds the secret which parcels
+    /// this shop has. Reading the payload and moving the job are
+    /// `lib/carrier-webhook.js`.
+    private func carrierHook(_ request: Request, carrier: String) async -> Response {
+        let now = host.now()
+        let key = request.remote + ":wh:" + carrier
+        let record = webhookFailures[key]
+        if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
+            return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
+        }
+        guard let secret = host.carrierSecrets[carrier], !secret.isEmpty else {
+            return .json(403, #"{"error":"Carrier webhook secret not configured in Shipping settings"}"#)
+        }
+        let provided = request.headers["x-khayt-signature"] ?? request.headers["x-signature"] ?? ""
+        guard Self.constantTimeEqual(provided, Self.webhookSignature(request.body, secret: secret)) else {
+            if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
+                webhookFailures[key] = bumped
+            }
+            sweepWebhookFailures(now: now)
+            return .json(401, #"{"error":"Invalid signature"}"#)
+        }
+        if replayed(provided, now: now) {
+            return .json(409, #"{"error":"Duplicate delivery ignored"}"#)
+        }
+        let payload = (try? JSONDecoder().decode(JSONValue.self, from: request.body)) ?? .null
+        var config: JSONValue = .object([:])
+        if case .object(let settings)? = host.store()["settings"], case .object(let shipping)? = settings["shipping"],
+           let mine = shipping[carrier] { config = mine }
+        guard let event = try? await host.engine.carrierEvent(carrier: carrier, payload: payload, config: config) else {
+            return .json(422, #"{"error":"Signature valid, but this payload carried no tracking number and status Khayt could read.","carrier":"\#(carrier)"}"#)
+        }
+        var at = StoreWriter.iso(now)
+        if case .object(let e) = event, case .string(let when)? = e["at"], !when.isEmpty { at = when }
+        // Nothing to move — an unknown parcel, or an event that arrived out of
+        // order — is answered without a write.
+        let early = try? await host.engine.carrierApply(store: .object(host.store()), event: event, at: at)
+        guard early?.outcome == "advanced" else { return .json(200, #"{"ok":true}"#) }
+        do {
+            _ = try await host.carrierEvent(event, at)
+            return .json(200, #"{"ok":true}"#)
+        } catch {
+            return .json(400, Self.errorBody(String(describing: error)))
+        }
+    }
+
     /// `'sha256=' + hex(HMAC-SHA256(secret, body))` — over the raw bytes, as
     /// both storefronts sign and as the Node server checks.
     nonisolated static func webhookSignature(_ body: Data, secret: String) -> String {
@@ -1485,6 +1559,8 @@ struct LanConfig: Equatable, Sendable {
     /// reason: a changed secret has to restart the server, because it is
     /// opened once at start and never read back out of the book per request.
     var storefrontSecrets: [String: String] = [:]
+    /// The carriers' webhook secrets as STORED, for the same reason.
+    var carrierSecrets: [String: String] = [:]
 }
 
 extension Shop {
@@ -1495,7 +1571,8 @@ extension Shop {
         let port = (raw >= 1 && raw <= 65535) ? UInt16(raw) : 3219
         return LanConfig(enabled: lan.flag("enabled"), port: port, bindLan: lan.flag("bindLan"), pin: lan.text("pin"),
                          storefrontSecrets: ["salla": lan.text("sallaWebhookSecret"),
-                                             "zid": lan.text("zidWebhookSecret")])
+                                             "zid": lan.text("zidWebhookSecret")],
+                         carrierSecrets: carrierSecretsStored)
     }
 
     /// The address a phone is told, while the server is up.
@@ -1539,6 +1616,15 @@ extension Shop {
             secrets[platform] = (try? await Secrets.open(sealed, for: source)) ?? ""
         }
         host.storefrontSecrets = secrets
+        var carrierSecrets: [String: String] = [:]
+        for (carrier, sealed) in config.carrierSecrets where !sealed.isEmpty {
+            carrierSecrets[carrier] = (try? await Secrets.open(sealed, for: source)) ?? ""
+        }
+        host.carrierSecrets = carrierSecrets
+        host.carrierEvent = { [weak self] event, at in
+            guard let self else { throw CocoaError(.fileWriteUnknown) }
+            return try await self.recordCarrierEvent(event, at: at)
+        }
         host.storefrontOrder = { [weak self] platform, payload in
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             return try await self.recordStorefrontOrder(platform, payload: payload)
@@ -1665,6 +1751,53 @@ extension Shop {
         // The rule puts the new order at the TOP of the log; stamp it there.
         if case .array(var log)? = next["printLog"], !log.isEmpty {
             log[0] = .object(order)
+            next["printLog"] = .array(log)
+        }
+        root = next
+        return .object(order)
+    }
+
+    /// Each carrier's webhook secret as stored, sealed — `settings.shipping`.
+    var carrierSecretsStored: [String: String] {
+        var out: [String: String] = [:]
+        guard case .object(let shipping)? = settingsDict["shipping"] else { return out }
+        for id in LanServer.carrierHookIds {
+            if case .object(let cfg)? = shipping[id], case .string(let secret)? = cfg["webhookSecret"] {
+                out[id] = secret
+            }
+        }
+        return out
+    }
+
+    /// A carrier's status update, onto the book: the shared rule run INSIDE
+    /// the write on the newest book, so two events arriving together cannot
+    /// each build the trail from the same base. Returns the job it moved.
+    func recordCarrierEvent(_ event: JSONValue, at: String) async throws -> JSONValue? {
+        guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
+        var moved: JSONValue?
+        try await StoreWriter.update(
+            storeURL: build.storeURL,
+            owns: { StoreLock.weOwnIt(build) },
+            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+        ) { root in
+            moved = try await Self.applyCarrierEvent(into: &root, engine: engine, event: event, at: at)
+        }
+        if moved != nil { await load(source) }
+        return moved
+    }
+
+    /// The mutation `recordCarrierEvent` runs inside the write, separate so a
+    /// test runs exactly it against a real file. The job it moves is stamped,
+    /// and nothing else.
+    static func applyCarrierEvent(into root: inout [String: JSONValue], engine: KhaytEngine,
+                                  event: JSONValue, at: String) async throws -> JSONValue? {
+        let result = try await engine.carrierApply(store: .object(root), event: event, at: at)
+        guard result.outcome == "advanced", case .object(var next) = result.store,
+              case .object(var order)? = result.order, case .string(let id)? = order["id"] else { return nil }
+        StoreWriter.stamp(&order)
+        if case .array(var log)? = next["printLog"],
+           let i = log.firstIndex(where: { if case .object(let o) = $0 { return o["id"] == .string(id) } else { return false } }) {
+            log[i] = .object(order)
             next["printLog"] = .array(log)
         }
         root = next

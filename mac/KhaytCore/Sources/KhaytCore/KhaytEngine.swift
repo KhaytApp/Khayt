@@ -702,6 +702,16 @@ public actor KhaytEngine {
         "lan-intake",
         "lan-quote-page",
         "carriers",
+        // A job handed to a carrier: who, which service, under what tracking
+        // number, and a parcel's status moved by hand without going backwards.
+        // It was the Electron Ship dialog's own code, so this app could stamp a
+        // job shipped and never say who took it. After `carriers` and
+        // `order-status`, both of which it reads.
+        "shipment",
+        // A carrier's signed status update, onto the job holding its tracking
+        // number — the rule both LAN servers run. After `carriers` and
+        // `order-status`.
+        "carrier-webhook",
         "lan-order-page",
         "upload-scan",
         "feature-tiers",
@@ -5817,6 +5827,94 @@ public actor KhaytEngine {
           + " var r = KhaytOrderStatus.markShipped(o, { now: ARG1 });"
           + " return { ok: r.ok, order: r.ok ? o : null }; })()",
             [order, .number(now.timeIntervalSince1970 * 1000)], as: Handover.self)
+    }
+
+    // MARK: - Shipments
+
+    /// A carrier a shop can ship with, as the Ship sheet offers it.
+    public struct CarrierChoice: Decodable, Sendable, Identifiable, Hashable {
+        public struct Service: Decodable, Sendable, Hashable { public let id: String; public let label: String }
+        public let id: String
+        public let label: [String: String]
+        public let services: [Service]
+        public func name(_ language: String) -> String { label[language] ?? label["en"] ?? id }
+    }
+
+    /// The carriers the Ship sheet offers: every one the shop has set up, then
+    /// Manual, which is always there — `carriers.configuredCarriers`, the
+    /// Electron dialog's own list.
+    public func carriersToShipWith(settings: JSONValue) throws -> [CarrierChoice] {
+        try runtime.call2("""
+            KhaytCarriers.configuredCarriers(ARG0).map(function (c) {
+              return { id: c.id, label: c.label || { en: c.id }, services: c.services || [] };
+            })
+            """, [settings], as: [CarrierChoice].self)
+    }
+
+    /// Every carrier Khayt knows, Manual included, set up or not.
+    public func allCarriers() throws -> [CarrierChoice] {
+        try runtime.call2("""
+            KhaytCarriers.listCarriers().map(function (c) {
+              return { id: c.id, label: c.label || { en: c.id }, services: c.services || [] };
+            })
+            """, [], as: [CarrierChoice].self)
+    }
+
+    /// The statuses a person may pick for a parcel already on its way.
+    public func shippingStatuses() throws -> [String] {
+        try runtime.call2("KhaytShipment.MANUAL_STATUSES.slice()", [], as: [String].self)
+    }
+
+    /// Hand a job to a carrier — `lib/shipment.js`'s `create`.
+    public func shipmentCreate(order: JSONValue, carrier: String, service: String?,
+                               trackingNumber: String, at: Date) throws -> JSONValue {
+        try runtime.call2("""
+            (function (o) { KhaytShipment.create(o, { carrier: ARG1, service: ARG2, trackingNumber: ARG3,
+                                                      source: 'manual' }, ARG4); return o; })(ARG0)
+            """, [order, .string(carrier), service.map(JSONValue.string) ?? .null,
+                  .string(trackingNumber), .string(StoreWriter.iso(at))], as: JSONValue.self)
+    }
+
+    /// What a carrier's status update did to the book.
+    public struct CarrierApplied: Decodable, Sendable {
+        public let store: JSONValue
+        public let order: JSONValue?
+        /// `unknown`, `unchanged` or `advanced`.
+        public let outcome: String
+    }
+
+    /// The event in a carrier's payload, or nil when there is none Khayt can
+    /// read — which a server answers 422, since the signature already proved it
+    /// is the carrier. `lib/carrier-webhook.js`'s `read`.
+    public func carrierEvent(carrier: String, payload: JSONValue, config: JSONValue) throws -> JSONValue? {
+        let evt = try runtime.call2("KhaytCarrierWebhook.read(ARG0, ARG1, {}, ARG2)",
+                                    [.string(carrier), payload, config], as: JSONValue.self)
+        if case .null = evt { return nil }
+        return evt
+    }
+
+    /// The book with a carrier's event on it — `lib/carrier-webhook.js`'s
+    /// `apply`, run INSIDE the write, or on the last-read book to answer an
+    /// event that changes nothing without writing.
+    public func carrierApply(store: JSONValue, event: JSONValue, at: String) throws -> CarrierApplied {
+        try runtime.call2("KhaytCarrierWebhook.apply(ARG0, ARG1, ARG2)",
+                          [store, event, .string(at)], as: CarrierApplied.self)
+    }
+
+    public struct ShipmentUpdated: Decodable, Sendable {
+        public let order: JSONValue
+        public let changed: Bool
+    }
+
+    /// A corrected tracking number and a status picked by hand —
+    /// `lib/shipment.js`'s `update`, which never moves a parcel backwards.
+    public func shipmentUpdate(order: JSONValue, status: String?, trackingNumber: String,
+                               at: Date) throws -> ShipmentUpdated {
+        try runtime.call2("""
+            (function (o) { var c = KhaytShipment.update(o, { status: ARG1, trackingNumber: ARG2 }, ARG3);
+                            return { order: o, changed: c }; })(ARG0)
+            """, [order, status.map(JSONValue.string) ?? .null, .string(trackingNumber),
+                  .string(StoreWriter.iso(at))], as: ShipmentUpdated.self)
     }
 
     /// Change a job's due date and priority, and write the edit down.

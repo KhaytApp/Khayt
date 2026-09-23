@@ -597,9 +597,28 @@ instead.
   already has on the shelf, takes them off `settings.storefront.stockQty`. An
   order the shelf covers in full is written `completed` and `fromStock`.
 
-The carrier (`/api/webhook/smsa|aramex|spl`) and printer
-(`/api/webhook/printer/:id`) webhooks are **served by the Windows and Linux app
-only.**
+### `POST /api/webhook/smsa`, `/aramex`, `/spl`
+
+A carrier saying where a parcel is. **Served by both apps**; the rule is
+`lib/carrier-webhook.js`.
+
+- **Signature:** `X-Khayt-Signature` (or `X-Signature`), `sha256=` + the hex
+  HMAC-SHA256 of the raw body, keyed with
+  `settings.shipping.<carrier>.webhookSecret` (Settings → Shipping, or
+  Integrations → Shipping & Fulfillment on the Mac).
+- **Answers, in order:** 429 locked out (per carrier, its own bucket); 403 no
+  secret; 401 bad signature; 409 replay; **422** a signed payload with no
+  tracking number and status Khayt can read (so it shows in the carrier's own
+  dashboard); otherwise 200 `{ "ok": true }` — **including** a tracking number
+  the shop does not hold, because a different answer would say which parcels it
+  has.
+- **What it writes:** on the job holding that tracking number, the status moved
+  forward (never back; `exception` always), a line of `shippingHistory`, and
+  `shippedAt` / `deliveredAt` by `order-status.stampFromShipping`. An event
+  that changes nothing is not written.
+
+The printer webhook (`/api/webhook/printer/:id`) is **served by the Windows
+and Linux app only** — the Mac polls its printers itself.
 
 ## Errors
 

@@ -430,6 +430,36 @@
       };
     }
 
+    // ── CARRIERS, WHEN A FORM CARRIES THEM ────────────────────────────────
+    //
+    // `settings.shipping` is `{ smsa: { enabled, apiKey, accountNumber,
+    // webhookSecret }, … }`. The only screen that wrote it was the Electron
+    // Shipping section, straight into the book; the Mac saves through here, so
+    // without this branch its carrier settings would save and change nothing.
+    //
+    // Merged PER CARRIER over what is stored, so a form naming one carrier
+    // leaves the others alone. The two secrets are OPAQUE — sealed by the host
+    // before they arrive — and follow Telegram's rule: absent keeps what is
+    // stored, an empty string clears it.
+    if (has(f, 'shipping') && f.shipping && typeof f.shipping === 'object') {
+      const held = s.shipping || {};
+      const next = { ...held };
+      for (const [id, g] of Object.entries(f.shipping)) {
+        if (!g || typeof g !== 'object') continue;
+        const was = held[id] || {};
+        const opaque = (k) => (has(g, k) ? String(g[k] || '') : (was[k] || ''));
+        next[id] = {
+          ...was,
+          enabled: has(g, 'enabled') ? !!g.enabled : !!was.enabled,
+          accountNumber: has(g, 'accountNumber') ? String(g.accountNumber == null ? '' : g.accountNumber).trim()
+            : (was.accountNumber || ''),
+          apiKey: opaque('apiKey'),
+          webhookSecret: opaque('webhookSecret'),
+        };
+      }
+      out.shipping = next;
+    }
+
     // ── EMAIL, WHEN A FORM CARRIES IT ─────────────────────────────────────
     //
     // `out.emailConfig` a hundred lines up keeps whatever is stored, because
