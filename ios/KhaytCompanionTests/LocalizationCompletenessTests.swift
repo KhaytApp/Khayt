@@ -132,4 +132,14 @@ final class LocalizationCompletenessTests: XCTestCase {
         XCTAssertEqual(L10n.count("spool.add.n", 1), "Add 1 spool")
         XCTAssertEqual(L10n.count("spool.add.n", 3), "Add 3 spools")
     }
+
+    func testTheModelsFileStaysCompilableOnItsOwn() throws {
+        // `scripts/ios-contract-decode.swift` compiles KhaytModels.swift ALONE
+        // against live server responses. Translating an error in place once
+        // made it reach for `L10n`, and the contract check stopped compiling.
+        let models = try String(contentsOf: Self.appDir.appending(path: "Models/KhaytModels.swift"), encoding: .utf8)
+        let code = models.split(separator: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+        XCTAssertFalse(code.contains { $0.contains("L10n.") },
+                       "KhaytModels.swift uses L10n; put the words in an extension elsewhere")
+    }
 }
