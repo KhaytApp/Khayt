@@ -65,11 +65,11 @@ struct AddSpoolSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(L10n.tr("common.cancel")) { dismiss() }
                 }
                 if step != .chooseMethod && step != .review {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button("Back") { goBack() }
+                        Button(L10n.tr("pair.back")) { goBack() }
                     }
                 }
             }
@@ -77,7 +77,7 @@ struct AddSpoolSheet: View {
                 if BarcodeScannerView.isSupported() {
                     BarcodeScannerView(scannedText: $scannedRaw)
                 } else {
-                    Text("Camera not available on this device.")
+                    Text(L10n.tr("spool.add.no_camera"))
                         .padding()
                 }
             }
@@ -100,51 +100,51 @@ struct AddSpoolSheet: View {
 
     private var navTitle: String {
         switch step {
-        case .chooseMethod: return "Add filament"
-        case .barcode: return "Product barcode"
-        case .scanLabel: return "Scan label"
-        case .nfc: return "NFC tag"
-        case .review: return "Confirm spool"
+        case .chooseMethod: return L10n.tr("spool.add.title")
+        case .barcode: return L10n.tr("spool.add.barcode_title")
+        case .scanLabel: return L10n.tr("scan.title")
+        case .nfc: return L10n.tr("spool.add.nfc_title")
+        case .review: return L10n.tr("spool.add.confirm")
         }
     }
 
     private var chooseMethodView: some View {
         List {
             Section {
-                Text("How would you like to add this spool?")
+                Text(L10n.tr("spool.add.how"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
             Section {
                 methodRow(
-                    title: "Scan product barcode",
-                    subtitle: "The UPC/EAN on the box, looked up for you",
+                    title: L10n.tr("spool.method.barcode"),
+                    subtitle: L10n.tr("spool.method.barcode.sub"),
                     icon: "barcode"
                 ) {
                     step = .barcode
                     showBarcodeScanner = true
                 }
                 methodRow(
-                    title: "Scan label",
-                    subtitle: "QR code or text on the spool label",
+                    title: L10n.tr("scan.title"),
+                    subtitle: L10n.tr("spool.method.label.sub"),
                     icon: "barcode.viewfinder"
                 ) {
                     step = .scanLabel
                 }
                 methodRow(
-                    title: "Tap NFC tag",
-                    subtitle: "OpenSpool, OpenTag3D, or Prusa OpenPrintTag",
+                    title: L10n.tr("spool.method.nfc"),
+                    subtitle: L10n.tr("spool.method.nfc.sub"),
                     icon: "wave.3.right"
                 ) {
                     step = .nfc
                 }
                 methodRow(
-                    title: "Enter manually",
-                    subtitle: "Type details yourself",
+                    title: L10n.tr("spool.method.manual"),
+                    subtitle: L10n.tr("spool.method.manual.sub"),
                     icon: "keyboard"
                 ) {
                     draft = SpoolDraft()
-                    draft.sourceNote = "Manual"
+                    draft.sourceNote = L10n.tr("spool.source.manual")
                     step = .review
                 }
             }
@@ -177,18 +177,18 @@ struct AddSpoolSheet: View {
             if lookingUp {
                 ProgressView()
                     .controlSize(.large)
-                Text("Looking it up…")
+                Text(L10n.tr("spool.lookup.busy"))
                     .font(.title3.bold())
-                Text("Your shelf first, then the product database.")
+                Text(L10n.tr("spool.lookup.busy.sub"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
                 Image(systemName: "barcode")
                     .font(.system(size: 56))
                     .foregroundStyle(Color.accentColor)
-                Text("Scan the barcode on the box")
+                Text(L10n.tr("spool.lookup.title"))
                     .font(.title3.bold())
-                Text("A filament you have booked in before is filled in from your own shelf, price included.")
+                Text(L10n.tr("spool.lookup.body"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -196,7 +196,7 @@ struct AddSpoolSheet: View {
                 Button {
                     showBarcodeScanner = true
                 } label: {
-                    Label("Open scanner", systemImage: "barcode.viewfinder")
+                    Label(L10n.tr("spool.lookup.open"), systemImage: "barcode.viewfinder")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -222,9 +222,9 @@ struct AddSpoolSheet: View {
             Image(systemName: "camera.viewfinder")
                 .font(.system(size: 56))
                 .foregroundStyle(Color.accentColor)
-            Text("Point at the label")
+            Text(L10n.tr("spool.label.title"))
                 .font(.title3.bold())
-            Text("Use Photo mode for best results — take a clear picture of the whole label.")
+            Text(L10n.tr("spool.label.body"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -232,7 +232,7 @@ struct AddSpoolSheet: View {
             Button {
                 showCamera = true
             } label: {
-                Label("Open camera", systemImage: "camera.fill")
+                Label(L10n.tr("spool.label.open"), systemImage: "camera.fill")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -248,17 +248,17 @@ struct AddSpoolSheet: View {
             Image(systemName: "nfc")
                 .font(.system(size: 56))
                 .foregroundStyle(Color.accentColor)
-            Text("Hold iPhone near the spool")
+            Text(L10n.tr("spool.nfc.title"))
                 .font(.title3.bold())
             if !nfc.isAvailable {
-                Text("NFC is not available on this device.")
+                Text(L10n.tr("spool.nfc.unavailable"))
                     .foregroundStyle(.orange)
                     .font(.caption)
             }
             Button {
                 nfc.beginScan()
             } label: {
-                Label(nfc.isScanning ? "Scanning…" : "Scan NFC", systemImage: "wave.3.right")
+                Label(nfc.isScanning ? L10n.tr("spool.nfc.scanning") : L10n.tr("spool.nfc.scan"), systemImage: "wave.3.right")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -268,7 +268,7 @@ struct AddSpoolSheet: View {
             if let tag = nfc.lastTag {
                 TagPreviewCard(tag: tag)
                     .padding(.horizontal)
-                Button("Continue") {
+                Button(L10n.tr("pair.continue")) {
                     draft = SpoolDraft.from(tag: tag)
                     nfc.clearLastTag()
                     step = .review
@@ -345,9 +345,9 @@ struct SpoolReviewForm: View {
                 }
             }
 
-            Section(header: Text("Required")) {
-                TextField("Material name", text: $draft.material)
-                TextField("Weight (grams)", text: Binding(
+            Section(header: Text(L10n.tr("spool.form.required"))) {
+                TextField(L10n.tr("spool.form.material"), text: $draft.material)
+                TextField(L10n.tr("spool.form.weight"), text: Binding(
                     get: { String(draft.weightGrams) },
                     set: { draft.weightGrams = Int($0) ?? draft.weightGrams }
                 ))
@@ -355,11 +355,11 @@ struct SpoolReviewForm: View {
             }
 
             Section(footer: Text(draft.quantity > 1
-                                 ? "\(draft.quantity) separate spools, each tracked on its own."
-                                 : "Several boxes of the same filament? Add them in one go.")) {
+                                 ? String(format: L10n.tr("spool.quantity.many"), draft.quantity)
+                                 : L10n.tr("spool.quantity.one"))) {
                 Stepper(value: $draft.quantity, in: 1...SpoolDraft.maxQuantity) {
                     HStack {
-                        Text("How many")
+                        Text(L10n.tr("spool.quantity"))
                         Spacer()
                         Text("\(draft.quantity)")
                             .monospacedDigit()
@@ -368,18 +368,18 @@ struct SpoolReviewForm: View {
                 }
             }
 
-            Section(header: Text("Optional"),
-                    footer: Text("What the roll cost. Jobs printed from it are priced off this.")) {
-                TextField("Price paid", text: $draft.cost)
+            Section(header: Text(L10n.tr("spool.form.optional")),
+                    footer: Text(L10n.tr("spool.form.cost.footer"))) {
+                TextField(L10n.tr("spool.form.cost"), text: $draft.cost)
                     .keyboardType(.decimalPad)
-                TextField("Brand", text: $draft.brand)
-                TextField("SKU", text: $draft.sku)
-                TextField("Barcode (UPC/EAN)", text: $draft.barcode)
+                TextField(L10n.tr("field.brand"), text: $draft.brand)
+                TextField(L10n.tr("spool.form.sku"), text: $draft.sku)
+                TextField(L10n.tr("spool.form.barcode"), text: $draft.barcode)
                     .keyboardType(.numberPad)
-                TextField("Batch / lot no.", text: $draft.lot)
-                TextField("Print temp (°C)", text: $draft.printTemp)
+                TextField(L10n.tr("spool.form.lot"), text: $draft.lot)
+                TextField(L10n.tr("spool.form.print_temp"), text: $draft.printTemp)
                     .keyboardType(.numberPad)
-                TextField("Bed temp (°C)", text: $draft.bedTemp)
+                TextField(L10n.tr("spool.form.bed_temp"), text: $draft.bedTemp)
                     .keyboardType(.numberPad)
             }
 
@@ -388,7 +388,7 @@ struct SpoolReviewForm: View {
                     if isUploading {
                         ProgressView().frame(maxWidth: .infinity)
                     } else {
-                        Text(draft.quantity > 1 ? "Add \(draft.quantity) spools" : "Add to Khayt inventory")
+                        Text(draft.quantity > 1 ? String(format: L10n.tr("spool.add.n"), draft.quantity) : L10n.tr("spool.add.one"))
                             .frame(maxWidth: .infinity)
                     }
                 }
@@ -420,7 +420,7 @@ struct TagPreviewCard: View {
                         .frame(width: 28, height: 28)
                 }
                 VStack(alignment: .leading) {
-                    Text(tag.materialLabel.isEmpty ? "Filament" : tag.materialLabel)
+                    Text(tag.materialLabel.isEmpty ? L10n.tr("spool.detail.filament") : tag.materialLabel)
                         .font(.headline)
                     Text(tag.standard)
                         .font(.caption)
@@ -428,9 +428,9 @@ struct TagPreviewCard: View {
                 }
             }
             HStack(spacing: 12) {
-                if let w = tag.weight { meta("Weight", "\(w) g") }
-                if let p = tag.printTemp { meta("Print", "\(p)°C") }
-                if let b = tag.bedTemp { meta("Bed", "\(b)°C") }
+                if let w = tag.weight { meta(L10n.tr("spool.tag.weight"), "\(w) g") }
+                if let p = tag.printTemp { meta(L10n.tr("spool.tag.print"), "\(p)°C") }
+                if let b = tag.bedTemp { meta(L10n.tr("spool.tag.bed"), "\(b)°C") }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

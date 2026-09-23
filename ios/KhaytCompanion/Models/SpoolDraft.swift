@@ -60,7 +60,7 @@ struct SpoolDraft: Sendable {
         if let b = parsed.bedTemp { d.bedTemp = String(b) }
         d.sku = parsed.sku ?? ""
         d.lot = parsed.lot ?? ""
-        d.sourceNote = "Scanned label"
+        d.sourceNote = L10n.tr("spool.source.label")
         return d
     }
 
@@ -113,7 +113,7 @@ struct SpoolDraft: Sendable {
         if let b = spool.bedTemp { d.bedTemp = String(b) }
         d.sku = InputLimits.clamp(spool.sku ?? "")
         d.lot = InputLimits.clamp(spool.lot ?? "")
-        d.sourceNote = "Inventory"
+        d.sourceNote = L10n.tr("tab.inventory")
         return d
     }
 }

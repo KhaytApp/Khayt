@@ -431,7 +431,7 @@ final class KhaytAPIClient: ObservableObject {
         draft.weightGrams = weight
         draft.colorHex = color
         draft.brand = brand ?? ""
-        draft.sourceNote = "Manual"
+        draft.sourceNote = L10n.tr("spool.source.manual")
         return try await addSpool(draft: draft)
     }
 

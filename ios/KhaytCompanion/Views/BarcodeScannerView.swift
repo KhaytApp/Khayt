@@ -19,6 +19,7 @@ struct BarcodeScannerView: View {
         case photo = "Photo"
         case live = "Live"
         var id: String { rawValue }
+        var title: String { L10n.tr(self == .photo ? "scan.mode.photo" : "scan.mode.live") }
     }
 
     var body: some View {
@@ -29,9 +30,9 @@ struct BarcodeScannerView: View {
                         .ignoresSafeArea()
                 } else if mode == .live {
                     ContentUnavailableView(
-                        "Live scan unavailable",
+                        L10n.tr("scan.live_unavailable"),
                         systemImage: "camera.fill",
-                        description: Text("Use Photo mode on this device.")
+                        description: Text(L10n.tr("scan.live_unavailable.sub"))
                     )
                 } else {
                     photoPlaceholder
@@ -42,15 +43,15 @@ struct BarcodeScannerView: View {
                     capturePanel
                 }
             }
-            .navigationTitle("Scan label")
+            .navigationTitle(L10n.tr("scan.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(L10n.tr("common.cancel")) { dismiss() }
                 }
                 if !capturedLines.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Clear") {
+                        Button(L10n.tr("scan.clear")) {
                             accumulator.value.clear()
                             syncLines()
                         }
@@ -77,9 +78,9 @@ struct BarcodeScannerView: View {
             Image(systemName: "camera.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(Color.accentColor)
-            Text("Take a clear photo of the label")
+            Text(L10n.tr("scan.photo.title"))
                 .font(.title3.bold())
-            Text("Fill the frame with text — SKU, batch, temps, and material. Works better than live scan for small print.")
+            Text(L10n.tr("scan.photo.body"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -87,7 +88,7 @@ struct BarcodeScannerView: View {
             Button {
                 showPhotoPicker = true
             } label: {
-                Label("Take photo", systemImage: "camera.shutter.button")
+                Label(L10n.tr("scan.photo.take"), systemImage: "camera.shutter.button")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -100,9 +101,9 @@ struct BarcodeScannerView: View {
 
     private var capturePanel: some View {
         VStack(spacing: 10) {
-            Picker("Mode", selection: $mode) {
+            Picker(L10n.tr("scan.mode"), selection: $mode) {
                 ForEach(ScanMode.allCases) { m in
-                    Text(m.rawValue).tag(m)
+                    Text(m.title).tag(m)
                 }
             }
             .pickerStyle(.segmented)
@@ -112,14 +113,14 @@ struct BarcodeScannerView: View {
                 Button {
                     showPhotoPicker = true
                 } label: {
-                    Label(isProcessingPhoto ? "Reading label…" : "Take photo", systemImage: "camera.shutter.button")
+                    Label(isProcessingPhoto ? L10n.tr("scan.photo.reading") : L10n.tr("scan.photo.take"), systemImage: "camera.shutter.button")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .disabled(isProcessingPhoto)
                 .padding(.horizontal)
             } else {
-                Text("Slowly pan across the label. Captured text is kept even when it leaves the frame.")
+                Text(L10n.tr("scan.live.hint"))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -156,7 +157,7 @@ struct BarcodeScannerView: View {
             Button {
                 finishCapture()
             } label: {
-                Label("Use captured text (\(capturedLines.count))", systemImage: "checkmark.circle.fill")
+                Label(String(format: L10n.tr("scan.use_text"), capturedLines.count), systemImage: "checkmark.circle.fill")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -177,7 +178,7 @@ struct BarcodeScannerView: View {
         do {
             let text = try await LabelPhotoOCR.recognizeText(in: image)
             guard !text.isEmpty else {
-                photoError = "No text found. Try brighter light and fill the frame with the label."
+                photoError = L10n.tr("scan.photo.none")
                 return
             }
             accumulator.value.ingestPhotoText(text)
