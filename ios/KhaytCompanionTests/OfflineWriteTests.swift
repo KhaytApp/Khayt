@@ -137,16 +137,40 @@ final class OfflineWriteTests: XCTestCase {
                        "a correction of half a tonne is a typo, and the endpoint says so")
     }
 
-    func testDecliningIsRefusedBecauseThePhoneCannotExpressIt() throws {
-        // The endpoint MOVES a declined request: into `waitingListHistory` with
-        // a `declinedAt`, and out of `waitingList`. The second half is a
-        // deletion, and nothing on this phone writes a tombstone — so setting
-        // the field would look like it worked and produce a different book from
-        // the one being online produces.
-        XCTAssertThrowsError(try writer.setWaitingStatus(id: "W-1", to: "declined")) { error in
-            XCTAssertEqual(error as? BookWriter.Refusal, .declineNeedsTheMac)
+    /// The endpoint MOVES a declined request: into `waitingListHistory` with a
+    /// `declinedAt`, and out of `waitingList`. The phone makes the same move,
+    /// and the removal travels as a tombstone.
+    func testDecliningMovesTheRequestAndTheMoveReachesTheMac() async throws {
+        let macCopy = try book.read()             // what the Mac holds before
+        try writer.setWaitingStatus(id: "W-1", to: "declined")
+
+        // On the phone: gone from the queue, in the history, with a tombstone.
+        guard case .array(let queue)? = try book.read()["waitingList"] else { return XCTFail() }
+        XCTAssertTrue(queue.isEmpty, "a declined request is not in the queue")
+        let declined = try record("waitingListHistory", "W-1")
+        XCTAssertEqual(declined["status"], .string("declined"))
+        XCTAssertNotNil(declined["declinedAt"])
+        guard case .array(let tombs)? = try book.read()["tombstones"], case .object(let t)? = tombs.first else {
+            return XCTFail("no tombstone: the removal would never reach the Mac")
         }
-        // And the request is untouched, rather than half-declined.
+        XCTAssertEqual(t["collection"], .string("waitingList"))
+        XCTAssertEqual(t["rev"], .number(1), "the rev the phone saw, which the conflict check measures")
+
+        // And through the shop's own fold: the Mac's copy ends up the same shape.
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        XCTAssertEqual(outbox.tombstones.count, 1)
+        let engine = try await reader.sharedEngine()
+        let folded = try await engine.foldDeltas(base: macCopy, deltas: [outbox.wire]).store
+        guard case .array(let macQueue)? = folded["waitingList"],
+              case .array(let macHistory)? = folded["waitingListHistory"] else { return XCTFail("\(folded.keys)") }
+        XCTAssertTrue(macQueue.isEmpty, "the Mac would otherwise put the request straight back in the queue")
+        XCTAssertEqual(macHistory.count, 1)
+    }
+
+    func testDecliningARequestThatIsAlreadyGoneChangesNothing() throws {
+        try writer.setWaitingStatus(id: "W-gone", to: "declined")
+        XCTAssertNil(try book.read()["tombstones"])
         XCTAssertEqual(try record("waitingList", "W-1")["status"], .string("new"))
     }
 
