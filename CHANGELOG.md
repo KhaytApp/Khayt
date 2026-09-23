@@ -2850,6 +2850,116 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [4.0.0-alpha.36] - 2026-09-23
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The release where orders arrive on the Mac by themselves, and parcels leave it
+with a name and a number.
+
+A storefront's orders used to reach a Mac shop only by way of the other app:
+Salla and Zid now deliver straight to this Mac, signed, never recorded twice,
+and anything already on the shelf comes off it. Going the other way, a job
+could be stamped "shipped" and nothing more; now it is handed to SMSA, Aramex
+or Saudi Post with a service and a tracking number, and those carriers move the
+parcel along by themselves. A phone paired to the Mac keeps working when the
+Mac is off, and catches up when it is back. And the masthead stopped printing a
+month's net above its own gross.
+
+### Security
+
+- **A carrier's API key and webhook secret were stored in the clear.**
+  `carriers.js` has always marked SMSA, Aramex and Saudi Post's `apiKey` and
+  `webhookSecret` as secrets, and neither was on the list the store encrypts,
+  masks and restores by — so both sat in `khayt-store.json` as typed and
+  reached the window unmasked, unlike every other credential Khayt holds. They
+  are encrypted at rest and masked now, and a test fails if a carrier gains a
+  secret field that is not protected. Existing values are encrypted the next
+  time the book is saved.
+
+### Added
+
+- **(Mac) Ship a job with a carrier, and let the carrier move it along.** The
+  Mac could stamp a job shipped and never say who took it or under what
+  tracking number, so a Mac shop's customer had "shipped" with nothing to
+  follow, and a carrier had no number to report against. Now:
+  - **Ship order…** (Job menu, the orders table's right-click menu and the job
+    inspector) picks the carrier, its service and the tracking number; a
+    parcel already sent takes a corrected number or a status picked by hand,
+    never moving backwards. The inspector shows the carrier, the number
+    (selectable, to copy) and where the parcel has got to.
+  - **Settings → Integrations → Shipping & Fulfillment** turns SMSA, Aramex and
+    Saudi Post on, and keeps their account number, API key and webhook secret —
+    the two secrets sealed. The Mac does not create labels itself; the pane
+    says so.
+  - **SMSA, Aramex and Saudi Post status webhooks arrive on the Mac,** with the
+    Windows and Linux app's answers in its order. Only the printer webhook is
+    still that app's.
+  What a shipment writes is one shared rule now, `lib/shipment.js`, which the
+  Electron Ship dialog also runs — held to that dialog's original code by a
+  test that runs every case through both.
+
+- **(Mac) Orders from Salla and Zid arrive on the Mac.** The Mac could show a
+  storefront's orders once they were in the book, and nothing on it put them
+  there: `/api/webhook/salla` and `/api/webhook/zid` answered 404, and the
+  secret a storefront signs with could only be typed into the Windows and Linux
+  app. Both addresses are answered now, with the same answers in the same order
+  as that app — a bad signature is refused and counted, a replay is refused, a
+  retry of an order already recorded is acknowledged and not recorded twice —
+  and an order for something already on the shelf comes off it. The two
+  secrets are set in Settings → Online. What an order becomes is one shared
+  rule now, `lib/storefront-webhook.js`, which both servers run. Carrier and
+  printer webhooks are still the other app's.
+
+- **(iOS + Mac) The phone works with the Mac switched off.** Advancing a job,
+  putting it on a printer, correcting a spool and triaging a walk-in all used to
+  fail the moment the desktop was out of reach — which is the back room, the
+  machines, and most of a working day. They are written to the phone's own book
+  now and carried to the Mac when it comes back, and the banner says how many
+  are waiting rather than letting somebody believe a job moved when the Mac has
+  never heard of it.
+
+  What protects the shop's book is the fold, not the phone: `applyDeltas` keeps
+  the higher revision, so an edit made on a phone holding a stale copy loses to
+  work done at the desk instead of overwriting it.
+
+  Two things the phone deliberately will not do offline: declining a walk-in
+  request, because the endpoint MOVES it into `waitingListHistory` and removes
+  it from the list, and a removal is a deletion this phone cannot express; and
+  assigning a printer the shop does not have, which the endpoint answers 404
+  for. Both fall through to the desktop, which fails honestly when the Mac is
+  away rather than producing a book that being online would not produce.
+
+  These writes set fields and stamp them. They do NOT run the status rules — no
+  `moveJob`, no filament deduction, no customer email — and that is parity
+  rather than a shortcut: `PATCH /api/orders/:id` has always answered with
+  `updated.status = status`, and the renderer's own handler does the same in
+  memory. Running the rules from the phone would be a change in what the
+  product does, and belongs to a decision about the product.
+
+  The Arabic for the one new string has had no native read.
+
+### Fixed
+
+- **(Maintainers) The carrier webhook's rule is shared now.** Reading an SMSA,
+  Aramex or Saudi Post status update, finding the job by its tracking number
+  and moving its shipping status forward is `lib/carrier-webhook.js`, so the
+  Mac's LAN server can run it. The route had never been sent a request by any
+  test; it is now, over real HTTP, and the same tests pass against the handler
+  before the lift. The window is also told about the record that was written
+  rather than a draft built before the write.
+
+- **(Mac) The masthead's "Gross" and its month's net described different
+  jobs.** The net is the month's finished work, net of tax — the P&L's own
+  figure. The gross beside it summed the month's paid-up jobs whatever their
+  stage, so a job finished and not yet paid for counted in one and not the
+  other, and the net could read above the gross: 1,671.90 beside 1,243.09 on
+  the sample shop, whose dates move with the calendar. That turned
+  `MastheadNetTests` red on `main` on 23 September for every pull request.
+  The gross is now the same P&L row's revenue plus the tax collected on it —
+  what was charged for exactly those jobs — so it can never sit below the net.
+
 ## [4.0.0-alpha.35] - 2026-09-22
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
