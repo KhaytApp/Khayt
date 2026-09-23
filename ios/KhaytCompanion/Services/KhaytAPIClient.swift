@@ -198,7 +198,7 @@ final class KhaytAPIClient: ObservableObject {
         // because the phone must not depend on the Mac being the version that
         // keeps it.
         guard !store.isEmpty else {
-            throw KhaytAPIError.server("The Mac sent an empty book. Nothing was changed on this phone.")
+            throw KhaytAPIError.server(L10n.tr("error.empty_book"))
         }
 
         try book.replace(with: store, scope: envelope.scope)
@@ -398,7 +398,7 @@ final class KhaytAPIClient: ObservableObject {
 
     func createOrder(_ draft: NewOrderDraft) async throws {
         let project = draft.project.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !project.isEmpty else { throw KhaytAPIError.server("Project name is required.") }
+        guard !project.isEmpty else { throw KhaytAPIError.server(L10n.tr("error.project_required")) }
 
         var payload: [String: Any] = [
             "project": InputLimits.clamp(project, max: InputLimits.maxMaterial),
@@ -451,7 +451,7 @@ final class KhaytAPIClient: ObservableObject {
     func addSpools(draft: SpoolDraft) async throws -> [InventorySpool] {
         let material = draft.material.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !material.isEmpty else {
-            throw KhaytAPIError.server("Material name is required.")
+            throw KhaytAPIError.server(L10n.tr("error.material_required"))
         }
         let count = min(SpoolDraft.maxQuantity, max(1, draft.quantity))
 
@@ -474,7 +474,7 @@ final class KhaytAPIClient: ObservableObject {
             do {
                 added.append(try await postSpool(draft: draft, material: material))
             } catch where !added.isEmpty {
-                throw KhaytAPIError.server("Added \(added.count) of \(count) spools, then: \(error.localizedDescription)")
+                throw KhaytAPIError.server(String(format: L10n.tr("error.partial_add"), added.count, count, error.localizedDescription))
             }
         }
         return added
@@ -522,7 +522,7 @@ final class KhaytAPIClient: ObservableObject {
         if let decoded = try? JSONDecoder().decode(AddResponse.self, from: responseData), let spool = decoded.spool {
             return spool
         }
-        throw KhaytAPIError.server("Unexpected response adding spool")
+        throw KhaytAPIError.server(L10n.tr("error.unexpected_spool"))
     }
 
     func validatePairing() async throws -> ShopStatus {
@@ -610,12 +610,12 @@ final class KhaytAPIClient: ObservableObject {
               trimmed.count <= 128,
               !trimmed.contains("/"),
               !trimmed.contains("..") else {
-            throw KhaytAPIError.server("Invalid order ID.")
+            throw KhaytAPIError.server(L10n.tr("error.invalid_order_id"))
         }
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-_")
         guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: allowed) else {
-            throw KhaytAPIError.server("Invalid order ID.")
+            throw KhaytAPIError.server(L10n.tr("error.invalid_order_id"))
         }
         return encoded
     }

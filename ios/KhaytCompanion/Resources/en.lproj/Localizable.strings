@@ -410,3 +410,19 @@
 "spool.tag.weight" = "Weight";
 "spool.tag.print" = "Print";
 "spool.tag.bed" = "Bed";
+
+/* Errors */
+"error.not_configured" = "Connect to your Khayt desktop app in Settings.";
+"error.invalid_url" = "Invalid server address.";
+"error.unauthorized" = "Wrong LAN PIN. Check Settings → LAN API on desktop.";
+"error.no_such_machine" = "That printer is not in the shop's list.";
+"error.decline_needs_mac" = "Declining a request needs the Mac.";
+"error.material_required" = "Material name is required.";
+"error.record_not_added" = "That record could not be added to the book.";
+"error.empty_book" = "The Mac sent an empty book. Nothing was changed on this phone.";
+"error.project_required" = "Project name is required.";
+"error.partial_add" = "Added %1$d of %2$d spools, then: %3$@";
+"error.unexpected_spool" = "Unexpected response adding spool";
+"error.invalid_order_id" = "Invalid order ID.";
+"settings.notifications.allow" = "Allow notifications";
+"unit.g" = "g";

@@ -62,7 +62,7 @@ struct LogWasteSheet: View {
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .frame(maxWidth: 90)
-                        Text("g").foregroundStyle(KhaytDesign.textMuted)
+                        Text(L10n.tr("unit.g")).foregroundStyle(KhaytDesign.textMuted)
                     }
                 }
                 Section(L10n.tr("waste.why")) {

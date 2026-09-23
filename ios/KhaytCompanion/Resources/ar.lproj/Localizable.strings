@@ -410,3 +410,19 @@
 "spool.tag.weight" = "الوزن";
 "spool.tag.print" = "الطباعة";
 "spool.tag.bed" = "السرير";
+
+/* Errors */
+"error.not_configured" = "اربط التطبيق بـ Khayt على سطح المكتب من الإعدادات.";
+"error.invalid_url" = "عنوان الخادم غير صالح.";
+"error.unauthorized" = "رمز PIN خاطئ. راجع الإعدادات ← LAN API على سطح المكتب.";
+"error.no_such_machine" = "هذه الطابعة ليست في قائمة الورشة.";
+"error.decline_needs_mac" = "رفض الطلب يحتاج جهاز Mac.";
+"error.material_required" = "اسم المادة مطلوب.";
+"error.record_not_added" = "تعذّرت إضافة هذا السجل إلى الدفتر.";
+"error.empty_book" = "أرسل جهاز Mac دفتراً فارغاً. لم يتغير شيء على هذا الهاتف.";
+"error.project_required" = "اسم المشروع مطلوب.";
+"error.partial_add" = "أُضيفت %1$d من %2$d بكرات، ثم: %3$@";
+"error.unexpected_spool" = "رد غير متوقع عند إضافة البكرة";
+"error.invalid_order_id" = "رقم الطلب غير صالح.";
+"settings.notifications.allow" = "السماح بالإشعارات";
+"unit.g" = "غ";

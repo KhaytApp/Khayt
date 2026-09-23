@@ -634,9 +634,9 @@ enum KhaytAPIError: LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
-        case .notConfigured: return "Connect to your Khayt desktop app in Settings."
-        case .invalidURL: return "Invalid server address."
-        case .unauthorized: return "Wrong LAN PIN. Check Settings → LAN API on desktop."
+        case .notConfigured: return L10n.tr("error.not_configured")
+        case .invalidURL: return L10n.tr("error.invalid_url")
+        case .unauthorized: return L10n.tr("error.unauthorized")
         case .server(let msg): return msg
         case .transport(let err): return err.localizedDescription
         }
