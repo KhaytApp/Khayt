@@ -2267,6 +2267,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) Preferences could not be opened.** Settings had nine tabs in a window
+  too narrow for them, so the last ones went behind a » button at the end of
+  the toolbar, and there SwiftUI shows a tab greyed out and unclickable.
+  Preferences, the last tab, was out of reach, and with it the update switches,
+  the menu bar, simple mode, language and the estimate defaults. Settings lists
+  its panes in a sidebar now, which has room for all of them in any language.
+
 - **(Mac) A spool running out mid-print raised no alert on the Mac.** The Mac
   asked the alert rule for a fixed set of alert types that left filament
   runout out, so an empty spool was noticed only by whoever walked past. It is

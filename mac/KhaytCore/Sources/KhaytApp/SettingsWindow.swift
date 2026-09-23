@@ -6,9 +6,44 @@ import KhaytCore
 enum SettingsPane: String, CaseIterable, Identifiable {
     case business, invoice, payments, operations, integrations, slicers, online, assistant, preferences
     var id: String { rawValue }
+
+    /// The pane's name, as the Electron page's navigation says it.
+    var wordKey: String {
+        switch self {
+        case .business:     "set.nav_biz"
+        case .invoice:      "set.nav_invoice"
+        case .payments:     "set.nav_payments"
+        case .operations:   "set.nav_ops"
+        case .integrations: "mac.nav_integrations"
+        case .slicers:      "mac.nav_slicers"
+        case .online:       "mac.nav_online"
+        case .assistant:    "set.ai_master"
+        case .preferences:  "mac.preferences"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .business:     "building.2"
+        case .invoice:      "doc.text"
+        case .payments:     "creditcard"
+        case .operations:   "gearshape.2"
+        case .integrations: "shippingbox"
+        case .slicers:      "cube.transparent"
+        case .online:       "wifi"
+        case .assistant:    "sparkles"
+        case .preferences:  "slider.horizontal.3"
+        }
+    }
 }
 
 /// The shop's own settings — ⌘, — in nine panes.
+///
+/// A SIDEBAR, not toolbar tabs. Nine tabs need about 680pt in English and more
+/// in Arabic, and the window is 600pt of pane: AppKit put whatever did not fit
+/// behind a » chevron at the end of the toolbar, so Preferences — the last tab —
+/// could not be found at all, and every pane added would have pushed another
+/// one out. A list has room for any number, in any language.
 ///
 /// Each pane is its own draft with its own Save. A pane saves ONLY the keys it
 /// shows, and `lib/settings-edit.js` keeps everything else as it finds it: the
@@ -23,40 +58,41 @@ struct SettingsWindow: View {
     @Bindable var shop: Shop
 
     var body: some View {
-        TabView(selection: $shop.settingsPane) {
-            BusinessPane(shop: shop)
-                .tabItem { Label(shop.words.callIt("set.nav_biz"), systemImage: "building.2") }
-                .tag(SettingsPane.business)
-            InvoicePane(shop: shop)
-                .tabItem { Label(shop.words.callIt("set.nav_invoice"), systemImage: "doc.text") }
-                .tag(SettingsPane.invoice)
-            PaymentsPane(shop: shop)
-                .tabItem { Label(shop.words.callIt("set.nav_payments"), systemImage: "creditcard") }
-                .tag(SettingsPane.payments)
-            OperationsPane(shop: shop)
-                .tabItem { Label(shop.words.callIt("set.nav_ops"), systemImage: "gearshape.2") }
-                .tag(SettingsPane.operations)
-            IntegrationsPane(shop: shop)
-                .tabItem { Label(shop.words.callIt("mac.nav_integrations"), systemImage: "shippingbox") }
-                .tag(SettingsPane.integrations)
-            SlicersPane(shop: shop)
-                .tabItem { Label(shop.words.callIt("mac.nav_slicers"), systemImage: "cube.transparent") }
-                .tag(SettingsPane.slicers)
-            OnlinePane(shop: shop)
-                .tabItem { Label(shop.words.callIt("mac.nav_online"), systemImage: "wifi") }
-                .tag(SettingsPane.online)
-            AssistantPane(shop: shop)
-                .tabItem { Label(shop.words.callIt("set.ai_master"), systemImage: "sparkles") }
-                .tag(SettingsPane.assistant)
-            PreferencesPane(shop: shop)
-                .tabItem { Label(shop.words.callIt("mac.preferences"), systemImage: "slider.horizontal.3") }
-                .tag(SettingsPane.preferences)
+        HStack(spacing: 0) {
+            List(SettingsPane.allCases, selection: Binding(
+                get: { Optional(shop.settingsPane) },
+                set: { if let pane = $0 { shop.settingsPane = pane } }
+            )) { pane in
+                Label(shop.words.callIt(pane.wordKey), systemImage: pane.symbol)
+                    .tag(pane)
+            }
+            .listStyle(.sidebar)
+            .frame(width: 200)
+            Divider()
+            pane(shop.settingsPane)
+                .frame(width: 600)
         }
-        .frame(width: 600, height: 640)
+        .frame(height: 640)
+        .navigationTitle(shop.words.callIt(shop.settingsPane.wordKey))
         // Raised HERE rather than from the shop window: the list it is reached
         // from lives on the Integrations pane, and a sheet bound to the same
         // state from two windows presents itself twice.
         .sheet(item: $shop.editingTemplate) { TemplateSheet(shop: shop, template: $0) }
+    }
+
+    @ViewBuilder
+    private func pane(_ which: SettingsPane) -> some View {
+        switch which {
+        case .business:     BusinessPane(shop: shop)
+        case .invoice:      InvoicePane(shop: shop)
+        case .payments:     PaymentsPane(shop: shop)
+        case .operations:   OperationsPane(shop: shop)
+        case .integrations: IntegrationsPane(shop: shop)
+        case .slicers:      SlicersPane(shop: shop)
+        case .online:       OnlinePane(shop: shop)
+        case .assistant:    AssistantPane(shop: shop)
+        case .preferences:  PreferencesPane(shop: shop)
+        }
     }
 }
 
