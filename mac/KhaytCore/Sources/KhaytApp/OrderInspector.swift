@@ -31,6 +31,9 @@ private struct Detail: View {
     let split: TaxSplit?
     @State private var zatca: KhaytEngine.ZatcaReporting.Invoice?
     @State private var editing: Order.Part?
+    /// Carrier names, for the Shipment section. Read once, and only for a job
+    /// that has a carrier.
+    @State private var carriers: [KhaytEngine.CarrierChoice] = []
     /// The papers this job's product carries. Empty for a job typed by hand.
     @State private var papers: [KhaytEngine.OrderDocument] = []
 
@@ -40,6 +43,10 @@ private struct Detail: View {
                 header
                 Divider()
                 money
+                if Shop.finishedStatuses.contains(job.status), job.shippingStatus != nil || shop.canMoveJobs {
+                    Divider()
+                    shipment
+                }
                 if !job.parts.isEmpty {
                     Divider()
                     parts
@@ -157,6 +164,40 @@ private struct Detail: View {
                 Label(job.client, systemImage: "person")
                     .font(.callout)
                     .padding(.top, 2)
+            }
+        }
+    }
+
+    /// Who took the parcel, its number and where it has got to — or, before
+    /// it has gone, the way to send it. A tracking number is the one thing a
+    /// shop is asked for by the customer, so it is selectable to copy.
+    private var shipment: some View {
+        DetailSection(shop.words.callIt("ship.manage_title")) {
+            if let status = job.shippingStatus {
+                if let carrier = job.carrier {
+                    DetailLine(shop.words.callIt("ship.carrier"),
+                               carriers.first { $0.id == carrier }?.name(shop.words.language) ?? carrier)
+                }
+                if let number = job.trackingNumber {
+                    LabeledContent(shop.words.callIt("ship.tracking")) {
+                        Text(number).textSelection(.enabled).monospacedDigit()
+                    }
+                    .font(.callout)
+                }
+                DetailLine(shop.words.callIt("ship.status"), shop.words.callIt("ship.st." + status))
+            }
+            if shop.canMoveJobs, job.shippingStatus != nil || job.deliveredAt == nil {
+                Button(shop.words.callIt(job.shippingStatus != nil ? "ship.manage_title" : "ship.title") + "…") {
+                    shop.pendingShipment = Shop.PendingHold(id: job.id, project: job.project)
+                }
+                .buttonStyle(.link)
+                .font(.callout)
+                .padding(.top, 2)
+            }
+        }
+        .task(id: job.carrier) {
+            if job.carrier != nil, carriers.isEmpty, let engine = shop.engine {
+                carriers = (try? await engine.allCarriers()) ?? []
             }
         }
     }

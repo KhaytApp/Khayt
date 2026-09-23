@@ -47,6 +47,8 @@ struct OnlinePaneTruthTests {
               english: ["survey"], arabic: ["استبيان"]),
         .init(name: "orders from Salla and Zid", route: "case (Self.storefrontHookPath + \"salla\", false)",
               english: ["salla", "zid", "storefront"], arabic: ["سلة", "زد"]),
+        .init(name: "carrier status updates", route: "Self.carrierHookId(path) != nil",
+              english: ["carrier", "smsa", "aramex", "parcel"], arabic: ["الشحن", "سمسا", "أرامكس"]),
     ]
 
     /// The sentence that sends the shop somewhere else, if there is one.
@@ -117,11 +119,10 @@ struct OnlinePaneTruthTests {
         let server = MenuCoverageTests.source("LanServer.swift")
         let english = try #require(Words.own["mac.online_desc"]?["en"]).lowercased()
         let arabic = try #require(Words.own["mac.online_desc"]?["ar"])
-        // The carrier and printer webhooks: no route here answers one, and the
-        // pane says where they run. Salla and Zid ARE answered, and the
+        // The printer webhook: no route here answers it, and the pane says
+        // where it runs. Salla, Zid and the carriers ARE answered, and the
         // capability list above holds the pane to that.
         let unserved: [(name: String, route: String, english: String, arabic: String)] = [
-            ("carrier webhooks", "\"smsa\"", "carrier", "الشحن"),
             ("printer webhooks", "webhook/printer", "printer", "الطابعات"),
         ]
         for hook in unserved {

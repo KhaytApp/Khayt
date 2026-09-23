@@ -72,6 +72,15 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// When the parcel left the shop. A shipped job is still `completed`;
     /// see `Stage.of` and `lib/order-status.js`.
     let shippedAt: String?
+    /// Who took the parcel and under what number — `lib/shipment.js` writes
+    /// both. Absent on a job shipped by hand-stamping the date, which is every
+    /// job this app shipped before the Ship sheet.
+    let carrier: String?
+    let trackingNumber: String?
+    let shippingService: String?
+    /// Where the parcel is: `label_created` → `in_transit` → `out_for_delivery`
+    /// → `delivered`, or `exception`. Moved by hand or by the carrier's webhook.
+    let shippingStatus: String?
     let dueDate: String?
     let parts: [Part]
     /// The payment plan written on this job, in the order it is collected.
@@ -88,6 +97,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         case id, date, status, project, client, currency, price, paidAmount, costBasis
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
         case machineId, clientId, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
+        case carrier, trackingNumber, shippingService, shippingStatus
         case fromStock
         case instalments, instalmentBase
     }
@@ -108,6 +118,16 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// So they are defaulted rather than required. Everything else stays strict:
     /// a row missing an `id` or a `price` is a row this app should refuse rather
     /// than guess at.
+    /// A text field that may be absent, null, empty or — for a numeric AWB —
+    /// a number. Empty reads as absent.
+    private static func lenientText(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> String? {
+        if let s = try? c.decodeIfPresent(String.self, forKey: key) { return s.isEmpty ? nil : s }
+        if let n = try? c.decodeIfPresent(Double.self, forKey: key) {
+            return n == n.rounded() && abs(n) < 1e15 ? String(Int(n)) : String(n)
+        }
+        return nil
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
@@ -134,6 +154,12 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
         deliveredAt = try c.decodeIfPresent(String.self, forKey: .deliveredAt)
         shippedAt = try c.decodeIfPresent(String.self, forKey: .shippedAt)
+        // Leniently: the Electron dialog has written `null` for a missing
+        // tracking number, and older books a NUMBER for a numeric AWB.
+        carrier = Self.lenientText(c, .carrier)
+        trackingNumber = Self.lenientText(c, .trackingNumber)
+        shippingService = Self.lenientText(c, .shippingService)
+        shippingStatus = Self.lenientText(c, .shippingStatus)
         dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate)
         parts = try c.decodeIfPresent([Part].self, forKey: .parts) ?? []
         instalments = try c.decodeIfPresent([PlanRow].self, forKey: .instalments) ?? []

@@ -351,6 +351,11 @@ struct JobActions: View {
         }
         .disabled(!shop.canMoveJobs || job.status != "completed"
                   || job.shippedAt != nil || job.deliveredAt != nil)
+        Button(shop.words.callIt(job.shippingStatus != nil ? "ship.manage_title" : "ship.title") + "…") {
+            shop.pendingShipment = Shop.PendingHold(id: job.id, project: job.project)
+        }
+        .disabled(!shop.canMoveJobs || job.status != "completed"
+                  || (job.deliveredAt != nil && job.shippingStatus == nil))
         Button(shop.words.callIt("queue.delivered")) {
             Task { await shop.markDelivered(job.id) }
         }

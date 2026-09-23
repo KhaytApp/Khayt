@@ -381,6 +381,13 @@ private struct JobMenu: View {
         }
         .disabled(!canMove || job?.status != "completed"
                   || job?.shippedAt != nil || job?.deliveredAt != nil)
+        // Who took it and under what number — or, for a parcel already sent,
+        // where it has got to. "Shipped" above only stamps the date.
+        Button(Words.upfront(job?.shippingStatus != nil ? "ship.manage_title" : "ship.title") + "…") {
+            if let one = job { shop.pendingShipment = Shop.PendingHold(id: one.id, project: one.project) }
+        }
+        .disabled(!canMove || job?.status != "completed"
+                  || (job?.deliveredAt != nil && job?.shippingStatus == nil))
         Button(Words.upfront("queue.delivered")) {
             if let id = shop.selection { Task { await shop.markDelivered(id) } }
         }

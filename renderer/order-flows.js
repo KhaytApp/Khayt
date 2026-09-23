@@ -1055,26 +1055,17 @@ function reprintSinglePart(order, partIndex) {
    Shipping & fulfillment — ship a completed order (manual-first).
    See docs/KHAYT-3.0-SHIPPING-SPEC.md.
    ============================================================ */
+// A shipment's fields and how its status moves are `lib/shipment.js`, which the
+// Mac's Ship sheet runs too. These two stay as names because other screens
+// (and the export below) reach them.
 function pushShippingHistory(order, status, source, note) {
-  if (!Array.isArray(order.shippingHistory)) order.shippingHistory = [];
-  order.shippingHistory.push({ status, at: new Date().toISOString(), source: source || 'manual', note: note || '' });
-  if (order.shippingHistory.length > 100) order.shippingHistory = order.shippingHistory.slice(-100);
+  KhaytShipment.pushHistory(order, status, source, new Date().toISOString(), note);
 }
 
-// Apply a shipping-status change to an order without regressing, mark delivered when
-// it reaches 'delivered', and record history. Shared by the manual picker and webhooks.
+// Apply a shipping-status change without regressing, stamp shipped/delivered,
+// and record history.
 function applyShippingStatus(order, next, source) {
-  const C = (typeof KhaytCarriers !== 'undefined') ? KhaytCarriers : null;
-  const advanced = C ? C.advanceShippingStatus(order.shippingStatus, next) : next;
-  if (advanced === order.shippingStatus) return false;
-  order.shippingStatus = advanced;
-  pushShippingHistory(order, advanced, source);
-  // `shippedAt` and `deliveredAt` both, from one rule — see
-  // KhaytOrderStatus.stampFromShipping. This stamped only the delivery, so a
-  // job tracked by a carrier jumped from Completed to Delivered and was never
-  // once seen in the post.
-  KhaytOrderStatus.stampFromShipping(order, advanced, new Date().toISOString());
-  return true;
+  return KhaytShipment.advance(order, next, source, new Date().toISOString());
 }
 
 function openShipModal(orderId) {
@@ -1091,7 +1082,7 @@ function openShipModal(orderId) {
   const client = order.clientId ? clients.find(c => c.id === order.clientId) : null;
   const addresses = (client && Array.isArray(client.addresses)) ? client.addresses : [];
 
-  const statusOpts = ['label_created', 'in_transit', 'out_for_delivery', 'delivered', 'exception'];
+  const statusOpts = KhaytShipment.MANUAL_STATUSES;
 
   openFormModal({
     title: alreadyShipped ? (t('ship.manage_title') || 'Shipment') : (t('ship.title') || 'Ship order'),
@@ -1137,10 +1128,10 @@ function openShipModal(orderId) {
     async onSave(modal) {
       // Existing shipment → just apply a manual status update.
       if (alreadyShipped) {
-        const next = modal.querySelector('#shipStatus')?.value;
-        const typedTn = modal.querySelector('#shipTracking')?.value.trim();
-        if (typedTn) order.trackingNumber = typedTn;
-        if (next) applyShippingStatus(order, next, 'manual');
+        KhaytShipment.update(order, {
+          status: modal.querySelector('#shipStatus')?.value,
+          trackingNumber: modal.querySelector('#shipTracking')?.value,
+        }, new Date().toISOString());
         saveAll();
         renderKanban(); renderLogs();
         if (typeof republishPortalIfPublished === 'function') republishPortalIfPublished(order.id);
@@ -1172,16 +1163,8 @@ function openShipModal(orderId) {
         }
       }
 
-      order.carrier = carrierId;
-      order.trackingNumber = trackingNumber || null;
-      order.shippingService = service;
-      order.labelUrl = labelUrl;
-      order.shipmentMeta = meta;
-      order.shippedAt = new Date().toISOString();
-      order.shippingStatus = 'label_created';
-      // Back-compat: the order editor's free-text courier + Track button read courierName.
-      order.courierName = carrier ? ((carrier.label && carrier.label.en) || carrierId) : carrierId;
-      pushShippingHistory(order, 'label_created', source);
+      KhaytShipment.create(order, { carrier: carrierId, service, trackingNumber, source, labelUrl, meta },
+        new Date().toISOString());
 
       if (typeof fireWebhook === 'function') fireWebhook('order_shipped', { orderId: order.id, project: order.project, carrier: carrierId, trackingNumber: order.trackingNumber });
       saveAll();

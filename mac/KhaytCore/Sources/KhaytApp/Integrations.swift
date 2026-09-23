@@ -139,6 +139,10 @@ struct IntegrationsPane: View {
                 // been able to be set up for it.
                 TelegramSettings(shop: shop)
 
+                // Which carriers the shop ships with, and the secret each signs
+                // its status updates with. Saves itself, for the same reason.
+                CarrierSettings(shop: shop)
+
                 // The shop's own messages, on the page where the rest of
                 // reaching a customer lives. They are a COLLECTION rather than
                 // a setting, so they save on their own rather than through the
