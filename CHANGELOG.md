@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Cloud sync never recovered for a shop whose cloud store was gone.** If
+  the server no longer had a shop's store — a reset, or the shop moved to a
+  new cloud — the desktop kept sending changes against the version it last
+  saw. The server refused each one, the desktop checked, found nothing there,
+  and tried the same thing again, so the shop's data never went back up. It
+  now takes "nothing here" at its word and sends the whole store, which is
+  what the Mac app already did.
+
 - **Cloud sync could stop finishing for a shop near its plan's size.** The
   server refuses a new change once a shop's history of small changes is full,
   and asks for the whole store instead. One of its reasons — the shop is close
