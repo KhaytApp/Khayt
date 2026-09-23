@@ -351,6 +351,10 @@ struct JobActions: View {
         }
         .disabled(!shop.canMoveJobs || job.status != "completed"
                   || job.shippedAt != nil || job.deliveredAt != nil)
+        Button(shop.words.callIt("mac.send_title") + "…") {
+            shop.pendingSend = Shop.PendingHold(id: job.id, project: job.project)
+        }
+        .disabled(!shop.canMoveJobs || shop.sendablePrinters.isEmpty)
         Button(shop.words.callIt(job.shippingStatus != nil ? "ship.manage_title" : "ship.title") + "…") {
             shop.pendingShipment = Shop.PendingHold(id: job.id, project: job.project)
         }

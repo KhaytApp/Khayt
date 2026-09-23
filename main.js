@@ -113,6 +113,7 @@ const { contentHash: modelContentHash } = require('./lib/model-identity');
 const { extract: extractPrintThumb } = require('./lib/thumbnail-extract');
 const bambu = require('./lib/bambu');
 const { bambuFtpUpload } = require('./lib/bambu-ftp');
+const printerUpload = require('./lib/printer-upload');
 const { sendSms } = require('./lib/sms');
 const cloudClient = require('./lib/cloud-client');
 const { summarizeBranch, totalBranches } = require('./lib/branch-summary');
@@ -1216,49 +1217,51 @@ ipcMain.handle('hub:detect-slicers', async () => {
   catch (e) { return { ok: false, error: String(e && e.message || e), slicers: [] }; }
 });
 
-// Upload a G-code file to a printer (OctoPrint / Moonraker / PrusaLink) and
-// optionally start it. Uses the same host allowlist as the status poller (SSRF-safe).
+// Upload a sliced file to a printer (OctoPrint / Moonraker / PrusaLink / Bambu)
+// and optionally start it. Uses the same host allowlist as the status poller
+// (SSRF-safe). WHAT each printer is asked — which files it runs, the remote
+// name, the request — is `lib/printer-upload.js`, which the Mac app sends with
+// too; this function is the wire.
 async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
   const { type, host, port, apiKey, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
   const printerHost = sanitizePrinterHost(host);
   if (!isAllowedPrinterHost(printerHost)) return { ok: false, error: 'Invalid printer host' };
   const portNum = parseInt(port || defaultPrinterPort(type), 10);
   if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) return { ok: false, error: 'Invalid port' };
+  const fit = printerUpload.check(type, gcodePath);
+  if (!fit.ok) {
+    if (fit.code === 'unsupported') return { ok: false, error: `Send-to-printer isn't supported for ${type || 'this printer'} yet (OctoPrint, Moonraker, PrusaLink, Bambu Lab).` };
+    if (fit.code === 'not_sliced') return { ok: false, error: 'That file has to be sliced first.' };
+    return { ok: false, error: `This printer cannot run a .${fit.kind} file.` };
+  }
   const bytes = fs.readFileSync(gcodePath);
+  const name = printerUpload.remoteName(gcodePath, Date.now());
   // Bambu Lab: upload over FTPS (:990), then start it over MQTT (:8883).
   if (type === 'bambu') {
     const dev = String(serial || printerSlug || '').trim();
     if (!dev) return { ok: false, error: 'Bambu needs the printer serial number.' };
     if (!accessCode) return { ok: false, error: 'Bambu needs the LAN access code.' };
-    const ext = /\.3mf$/i.test(gcodePath) ? '3mf' : 'gcode';
-    const remoteName = `khayt-${Date.now().toString(36)}.${ext}`;
     try {
-      await bambuFtpUpload({ host: printerHost, accessCode, remoteName, data: bytes });
-      if (startPrint) await bambu.bambuSendPrint({ host: printerHost, accessCode, serial: dev, fileName: remoteName });
-      return { ok: true, started: !!startPrint, filename: remoteName };
+      await bambuFtpUpload({ host: printerHost, accessCode, remoteName: name, data: bytes });
+      if (startPrint) await bambu.bambuSendPrint({ host: printerHost, accessCode, serial: dev, fileName: name });
+      return { ok: true, started: !!startPrint, filename: name };
     } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   }
-  const base = `http://${printerHost}:${portNum}`;
-  const name = `khayt-${Date.now().toString(36)}.gcode`;
-  const ok = (res) => (res.status >= 200 && res.status < 300) ? { ok: true, started: !!startPrint, filename: name } : { ok: false, error: `Printer responded ${res.status}` };
+  const req = printerUpload.request(type, { apiKey, name, startPrint });
+  let body;
+  if (req.body.kind === 'multipart') {
+    body = new FormData();
+    body.set(req.body.file.field, new Blob([bytes], { type: req.body.file.contentType }), name);
+    for (const [k, v] of req.body.fields) body.set(k, v);
+  } else {
+    body = bytes;
+  }
   try {
-    if (type === 'octoprint' || type === 'moonraker') {
-      const fd = new FormData();
-      fd.set('file', new Blob([bytes], { type: 'text/plain' }), name);
-      let url, headers = {};
-      if (type === 'octoprint') { fd.set('select', 'true'); fd.set('print', startPrint ? 'true' : 'false'); url = `${base}/api/files/local`; headers['X-Api-Key'] = apiKey || ''; }
-      else { fd.set('root', 'gcodes'); fd.set('print', startPrint ? 'true' : 'false'); url = `${base}/server/files/upload`; if (apiKey) headers['X-Api-Key'] = apiKey; }
-      return ok(await fetch(url, { method: 'POST', headers, body: fd, signal: AbortSignal.timeout(60000) }));
-    }
-    if (type === 'prusalink') {
-      // PrusaLink v1: PUT raw G-code to USB storage; Print-After-Upload auto-starts.
-      return ok(await fetch(`${base}/api/v1/files/usb/${encodeURIComponent(name)}`, {
-        method: 'PUT',
-        headers: { 'X-Api-Key': apiKey || '', 'Content-Type': 'application/octet-stream', 'Print-After-Upload': startPrint ? '1' : '0' },
-        body: bytes, signal: AbortSignal.timeout(60000),
-      }));
-    }
-    return { ok: false, error: `Send-to-printer isn't supported for ${type || 'this printer'} yet (OctoPrint, Moonraker, PrusaLink, Bambu Lab).` };
+    const res = await fetch(`http://${printerHost}:${portNum}${req.path}`,
+      { method: req.method, headers: req.headers, body, signal: AbortSignal.timeout(60000) });
+    return printerUpload.accepted(res.status)
+      ? { ok: true, started: !!startPrint, filename: name }
+      : { ok: false, error: `Printer responded ${res.status}` };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 }
 

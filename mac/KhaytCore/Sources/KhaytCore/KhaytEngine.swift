@@ -712,6 +712,10 @@ public actor KhaytEngine {
         // number — the rule both LAN servers run. After `carriers` and
         // `order-status`.
         "carrier-webhook",
+        // Sending a sliced file to a printer: which files each one runs, the
+        // name it is stored under, and the request. Lifted out of main.js's
+        // `uploadGcodeToPrinter` so this app could send one at all.
+        "printer-upload",
         "lan-order-page",
         "upload-scan",
         "feature-tiers",
@@ -5827,6 +5831,55 @@ public actor KhaytEngine {
           + " var r = KhaytOrderStatus.markShipped(o, { now: ARG1 });"
           + " return { ok: r.ok, order: r.ok ? o : null }; })()",
             [order, .number(now.timeIntervalSince1970 * 1000)], as: Handover.self)
+    }
+
+    // MARK: - Sending a file to a printer
+
+    /// Whether a printer of this type can be sent this file —
+    /// `lib/printer-upload.js`'s `check`. `code` is `unsupported`,
+    /// `not_sliced` or `wrong_kind` when it cannot.
+    public struct UploadFit: Decodable, Sendable, Equatable {
+        public let ok: Bool
+        public let code: String?
+        public let kind: String?
+        public init(ok: Bool, code: String?, kind: String?) { self.ok = ok; self.code = code; self.kind = kind }
+    }
+
+    public func printerUploadCheck(type: String, fileName: String) throws -> UploadFit {
+        try runtime.call2("KhaytPrinterUpload.check(ARG0, ARG1)", [.string(type), .string(fileName)],
+                          as: UploadFit.self)
+    }
+
+    /// `khayt-<time>.<kind>`, keeping what the file is.
+    public func printerUploadName(fileName: String, now: Date) throws -> String {
+        try runtime.call2("KhaytPrinterUpload.remoteName(ARG0, ARG1)",
+                          [.string(fileName), .number((now.timeIntervalSince1970 * 1000).rounded(.down))],
+                          as: String.self)
+    }
+
+    /// What an HTTP printer is asked. `body.kind` is `multipart` (the file
+    /// part first, then `fields` in order) or `raw` (the bytes are the body).
+    public struct UploadRequest: Decodable, Sendable, Equatable {
+        public struct FilePart: Decodable, Sendable, Equatable { public let field: String; public let contentType: String }
+        public struct Body: Decodable, Sendable, Equatable {
+            public let kind: String
+            public let file: FilePart?
+            public let fields: [[String]]?
+            public let contentType: String?
+        }
+        public let method: String
+        public let path: String
+        public let headers: [String: String]
+        public let body: Body
+    }
+
+    public func printerUploadRequest(type: String, apiKey: String, name: String,
+                                     startPrint: Bool) throws -> UploadRequest? {
+        let raw = try runtime.call2(
+            "KhaytPrinterUpload.request(ARG0, { apiKey: ARG1, name: ARG2, startPrint: ARG3 })",
+            [.string(type), .string(apiKey), .string(name), .bool(startPrint)], as: JSONValue.self)
+        if case .null = raw { return nil }
+        return try JSONDecoder().decode(UploadRequest.self, from: JSONEncoder().encode(raw))
     }
 
     // MARK: - Shipments

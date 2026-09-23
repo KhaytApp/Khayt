@@ -2540,6 +2540,27 @@ final class Words {
                                     + "وتقويم المواعيد، ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس، "
                                     + "ويستقبل الطلبات من سلة وزد وتحديثات الشحنات من سمسا وأرامكس والبريد السعودي. "
                                     + "أما ويب هوك الطابعات فيعمل في ذلك التطبيق حالياً."],
+        "mac.send_title":    ["en": "Send to printer", "ar": "إرسال إلى الطابعة"],
+        "mac.send_printer":  ["en": "Printer", "ar": "الطابعة"],
+        "mac.send_file":     ["en": "File", "ar": "الملف"],
+        "mac.send_choose":   ["en": "Choose…", "ar": "اختيار…"],
+        "mac.send_choose_hint": ["en": "Choose a sliced file — G-code, binary G-code, or a sliced 3MF project.",
+                                 "ar": "اختر ملفًا مُقطّعًا — G-code أو G-code ثنائي أو مشروع 3MF مُقطّع."],
+        "mac.send_no_files": ["en": "No sliced file beside this job's models", "ar": "لا يوجد ملف مُقطّع بجانب نماذج هذا الطلب"],
+        "mac.send_no_printers": ["en": "No machine has a printer connection. Add one in the machine's settings.",
+                                 "ar": "لا توجد آلة متصلة بطابعة. أضف الاتصال من إعدادات الآلة."],
+        "mac.send_start":    ["en": "Start printing when it arrives", "ar": "ابدأ الطباعة عند وصول الملف"],
+        "mac.send_and_start": ["en": "Send and print", "ar": "إرسال وطباعة"],
+        "mac.send_only":     ["en": "Send", "ar": "إرسال"],
+        "mac.send_not_sliced": ["en": "That is a model, not a sliced file. Slice it first, then send the result.",
+                                "ar": "هذا نموذج وليس ملفًا مُقطّعًا. قطّعه أولًا ثم أرسل الناتج."],
+        "mac.send_wrong_kind": ["en": "This printer cannot run a .{kind} file.",
+                                "ar": "لا تستطيع هذه الطابعة تشغيل ملف ‎.{kind}‎."],
+        "mac.send_unsupported": ["en": "Sending a file to this kind of printer is not supported from the Mac yet.",
+                                 "ar": "إرسال ملف إلى هذا النوع من الطابعات غير مدعوم من الماك بعد."],
+        "mac.send_started":  ["en": "Sent to {name}, and printing.", "ar": "أُرسل إلى {name} وبدأت الطباعة."],
+        "mac.send_uploaded": ["en": "Sent to {name}. Start it from the printer when ready.",
+                              "ar": "أُرسل إلى {name}. ابدأ الطباعة من الطابعة عند الاستعداد."],
         "mac.carriers_hint": ["en": "Optional — shipping works fully by hand. A carrier turned on here is offered "
                                     + "when a job is shipped, and with a webhook secret it updates a parcel's status "
                                     + "by itself. Labels are created from the Windows and Linux app.",

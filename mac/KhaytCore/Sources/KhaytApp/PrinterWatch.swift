@@ -801,6 +801,44 @@ final class PrinterWatch {
         return (try? JSONDecoder().decode([String: JSONValue].self, from: data)) ?? [:]
     }
 
+    /// One upload of a whole sliced file, with the same refusals as `send`.
+    ///
+    /// Its own session, because a G-code file is not a command: tens or
+    /// hundreds of megabytes over a shop's Wi‑Fi to a printer's small board
+    /// can take minutes, and `session` gives up long before that. The redirect
+    /// is refused all the same — an upload moved onto another address by a
+    /// 302 is the same forgery a moved `cancel` would be.
+    static func upload(_ base: URL, path: String, method: String, headers: [String: String],
+                       body: Data, fetch: ((URLRequest) async throws -> (Data, URLResponse))? = nil)
+        async throws {
+        guard let url = URL(string: base.absoluteString + path) else { throw Refusal.noHost }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = uploadTimeout
+        request.httpMethod = method
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        request.httpBody = body
+        let (data, response) = try await (fetch ?? { try await Self.uploadSession.data(for: $0) })(request)
+        if let http = response as? HTTPURLResponse {
+            if (300..<400).contains(http.statusCode) { throw Refusal.redirected }
+            guard (200..<300).contains(http.statusCode) else {
+                throw Refusal.http(http.statusCode, String(decoding: data.prefix(200), as: UTF8.self))
+            }
+        }
+    }
+
+    /// Ten minutes for a whole file — long enough for a large plate over slow
+    /// Wi‑Fi, short enough that a printer that went away is eventually said.
+    static let uploadTimeout: TimeInterval = 600
+
+    private static let uploadSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.urlCache = nil
+        config.timeoutIntervalForRequest = uploadTimeout
+        config.timeoutIntervalForResource = uploadTimeout
+        return URLSession(configuration: config, delegate: NoRedirects.shared, delegateQueue: nil)
+    }()
+
     /// Which Duet firmware answered last at this address, if the poller has
     /// learned it. Empty when it has not, which the shared module reads as
     /// "try the usual one first".

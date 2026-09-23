@@ -2103,6 +2103,54 @@ final class Shop {
         }
     }
 
+    // MARK: - Sending a file to a printer
+
+    /// The job a file is being sent for, while the Send sheet is open.
+    var pendingSend: PendingHold?
+    /// What the last send said, beside the button that made it.
+    var sendNote: String?
+
+    /// The machines a file can be sent to: every one with a printer
+    /// connection. A type that cannot be sent to yet is still listed — the
+    /// sheet says why rather than hiding the shop's own printer.
+    var sendablePrinters: [Machine] {
+        machines.filter { !($0.printerApi?.type ?? "").isEmpty }
+    }
+
+    /// The sliced files beside a job's models, newest first. Read off the
+    /// disk, like a model's guides: a plate sliced into the model's folder is
+    /// offered by being there, with nothing to record.
+    func slicedFiles(for job: Order) -> [URL] {
+        var out: [URL] = []
+        for part in job.parts {
+            guard let id = part.printFileId, let file = files.first(where: { $0.id == id }),
+                  let dir = directory(for: file) else { continue }
+            for url in PrinterSend.slicedFiles(in: dir) where !out.contains(url) { out.append(url) }
+        }
+        return out
+    }
+
+    /// Send a sliced file to a machine, and start it if asked. The key is
+    /// opened now and dropped when this returns.
+    func sendToPrinter(_ file: URL, machineId: String, startPrint: Bool) async {
+        guard let engine, let machine = machines.first(where: { $0.id == machineId }) else { return }
+        sendNote = nil
+        printerProblem[machine.id] = nil
+        printerBusy.insert(machine.id)
+        defer { printerBusy.remove(machine.id) }
+        do {
+            let key = await PrinterControl.key(for: machine, build: source.build)
+            let sent = try await PrinterSend.send(file, to: machine, key: key, startPrint: startPrint, engine: engine)
+            sendNote = words.callIt(sent.started ? "mac.send_started" : "mac.send_uploaded",
+                                    ["name": .string(machine.name)])
+            await printers.refresh(machine, shop: self)
+        } catch {
+            let said = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            printerProblem[machine.id] = said
+            sendNote = said
+        }
+    }
+
     /// What is on a machine's plate, for the sheet that offers to drop one.
     func plate(of machine: Machine) async -> KhaytEngine.Plate? {
         guard let engine else { return nil }
@@ -9362,6 +9410,7 @@ final class Shop {
         pendingCompletion = nil
         pendingPayment = nil
         pendingShipment = nil
+        pendingSend = nil
         pendingEdit = nil
         pendingQcFail = nil
         pendingInvoice = nil

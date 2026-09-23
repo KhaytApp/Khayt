@@ -363,3 +363,18 @@ test('a machine edited without touching downtime keeps what it had', () => {
   assert.equal(m.downtimeBlocks.length, 1);
   assert.equal(m.downtimeBlocks[0].reason, 'kept');
 });
+
+test('an edit keeps what it does not own — a Bambu or Elegoo serial above all', () => {
+  // The record was rebuilt from a fixed list of fields, and `serial` was not on
+  // it: correcting a Bambu's host on the Mac erased the one thing the printer
+  // is addressed by, and polling it stopped with nothing to say why.
+  const m = { id: 'M2', name: 'X1C', printerApi: {
+    type: 'bambu', host: '10.0.0.7', accessCode: '__enc__CODE', serial: '01S00C123456789',
+    printerSlug: '', someFutureField: 'kept',
+  } };
+  M.applyEdit(m, { printerApi: { type: 'bambu', host: '10.0.0.8' } }, {});
+  assert.equal(m.printerApi.host, '10.0.0.8');
+  assert.equal(m.printerApi.serial, '01S00C123456789', 'the serial was dropped by an edit that never named it');
+  assert.equal(m.printerApi.someFutureField, 'kept', 'a field this edit does not know about was dropped');
+  assert.equal(m.printerApi.accessCode, '__enc__CODE');
+});

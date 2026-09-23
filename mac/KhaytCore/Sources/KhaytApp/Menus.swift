@@ -381,6 +381,11 @@ private struct JobMenu: View {
         }
         .disabled(!canMove || job?.status != "completed"
                   || job?.shippedAt != nil || job?.deliveredAt != nil)
+        // A sliced plate straight onto a machine, instead of a USB stick.
+        Button(Words.upfront("mac.send_title") + "…") {
+            if let one = job { shop.pendingSend = Shop.PendingHold(id: one.id, project: one.project) }
+        }
+        .disabled(!canMove || shop.sendablePrinters.isEmpty)
         // Who took it and under what number — or, for a parcel already sent,
         // where it has got to. "Shipped" above only stamps the date.
         Button(Words.upfront(job?.shippingStatus != nil ? "ship.manage_title" : "ship.title") + "…") {
