@@ -280,13 +280,22 @@ if (F.marker) {
 const asarPath = path.join(resourcesDir, 'app.asar');
 if (!fs.existsSync(asarPath)) fail('no app.asar in the bundle');
 let packagedVersion = null;
+// The library first: electron-builder already installs it. Shelling out to
+// `npx` found nothing on Windows, where npx is npx.cmd and execFileSync will
+// not run a .cmd — so this check was silently skipped on every Windows run.
 try {
-  execFileSync('npx', ['--yes', '@electron/asar', 'extract-file', asarPath, 'package.json'], { cwd: work, stdio: 'pipe' });
-  packagedVersion = JSON.parse(fs.readFileSync(path.join(work, 'package.json'), 'utf8')).version;
-  ok(`package.json inside the bundle says ${packagedVersion}`);
+  const asar = await import('@electron/asar');
+  const read = asar.extractFile || (asar.default && asar.default.extractFile);
+  packagedVersion = JSON.parse(read(asarPath, 'package.json').toString('utf8')).version;
 } catch {
-  console.log('  … could not read package.json from the asar (skipping that check)');
+  try {
+    execFileSync('npx', ['--yes', '@electron/asar', 'extract-file', asarPath, 'package.json'],
+      { cwd: work, stdio: 'pipe', shell: windows });
+    packagedVersion = JSON.parse(fs.readFileSync(path.join(work, 'package.json'), 'utf8')).version;
+  } catch { /* reported below */ }
 }
+if (packagedVersion) ok(`package.json inside the bundle says ${packagedVersion}`);
+else console.log('  … could not read package.json from the asar (skipping that check; the running app is still asked)');
 if (tagVersion && packagedVersion && packagedVersion !== tagVersion) {
   fail(`expected ${tagVersion} but the bundle contains ${packagedVersion} — the tag was cut before the version bump`);
 }
