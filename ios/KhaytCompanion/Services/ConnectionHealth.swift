@@ -60,7 +60,7 @@ final class ConnectionHealth: ObservableObject {
     }
 
     func refresh() async {
-        guard api.isConfigured else {
+        guard api.canSync else {
             state = .unreachable
             lastStatus = nil
             lastChecked = Date()

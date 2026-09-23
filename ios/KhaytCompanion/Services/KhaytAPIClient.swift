@@ -55,6 +55,11 @@ final class KhaytAPIClient: ObservableObject {
 
     var isConfigured: Bool { settings.isConfigured }
 
+    /// Whether this phone has any way home at all — a Mac it is paired with, a
+    /// Khayt Cloud sign-in, or both. A phone set up from the cloud alone, while
+    /// the Mac is out of reach or not yet reachable, is a working phone.
+    var canSync: Bool { settings.isConfigured || cloud != nil }
+
     init(settings: ConnectionSettings) {
         self.settings = settings
         let config = URLSessionConfiguration.default
@@ -102,7 +107,7 @@ final class KhaytAPIClient: ObservableObject {
     /// fails silently, which is correct — the screens are still right, they are
     /// just as of the last pull.
     private func refreshBookIfConnected() {
-        guard let book, settings.isConfigured, !refreshing else { return }
+        guard let book, canSync, !refreshing else { return }
         if let lastRefresh, Date().timeIntervalSince(lastRefresh) < 60 { return }
         refreshing = true
         Task { [weak self] in
@@ -288,11 +293,11 @@ final class KhaytAPIClient: ObservableObject {
     /// copy that is never behind this phone. The Mac's book is taken only when
     /// the cloud cannot be reached.
     private func refreshEverywhere(_ book: CompanionBook) async {
-        if (try? await sendPendingChanges()) != nil {
+        if settings.isConfigured, (try? await sendPendingChanges()) != nil {
             lastSync = SyncMark(route: .mac, at: Date())
         }
         if cloud != nil, await syncThroughCloud() != nil { return }
-        if (try? await pullBook(into: book)) != nil {
+        if settings.isConfigured, (try? await pullBook(into: book)) != nil {
             lastSync = SyncMark(route: .mac, at: Date())
         }
     }
@@ -302,7 +307,7 @@ final class KhaytAPIClient: ObservableObject {
     func deliverPending() async {
         await refreshPendingCount()
         guard pendingCount > 0 else { return }
-        if (try? await sendPendingChanges()) != nil {
+        if settings.isConfigured, (try? await sendPendingChanges()) != nil {
             lastSync = SyncMark(route: .mac, at: Date())
         }
         if pendingCount > 0, cloud != nil { await syncThroughCloud() }

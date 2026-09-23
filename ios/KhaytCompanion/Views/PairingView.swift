@@ -13,6 +13,7 @@ struct PairingView: View {
     @StateObject private var browser = ShopBrowser()
     @State private var resolving: String?
     @State private var showManual = false
+    @State private var showCloudSignIn = false
 
     private let totalSteps = 4
 
@@ -36,6 +37,12 @@ struct PairingView: View {
             }
             .navigationTitle(L10n.tr("pair.title"))
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showCloudSignIn) { CloudSignInSheet() }
+            // Signing in to the cloud IS setting up: the phone takes the shop
+            // from there and can pair with the Mac later, from Settings.
+            .onChange(of: api.cloud) { _, session in
+                if session != nil { settings.isPaired = true }
+            }
         }
     }
 
@@ -84,11 +91,28 @@ struct PairingView: View {
     // MARK: - Steps
 
     private var welcomeStep: some View {
-        stepCard(
-            icon: "iphone.and.arrow.forward",
-            title: L10n.tr("pair.welcome.title"),
-            body: L10n.tr("pair.welcome.body")
-        )
+        VStack(spacing: 16) {
+            stepCard(
+                icon: "iphone.and.arrow.forward",
+                title: L10n.tr("pair.welcome.title"),
+                body: L10n.tr("pair.welcome.body")
+            )
+            // For a shop whose Mac is not on this Wi-Fi — or cannot be reached
+            // yet — but which syncs to Khayt Cloud.
+            Button {
+                showCloudSignIn = true
+            } label: {
+                Label(L10n.tr("pair.use_cloud"), systemImage: "icloud")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .padding(.horizontal)
+            Text(L10n.tr("pair.use_cloud.footer"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
     }
 
     private var desktopStep: some View {

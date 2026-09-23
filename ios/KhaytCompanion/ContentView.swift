@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var settings: ConnectionSettings
+    @EnvironmentObject private var api: KhaytAPIClient
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab = 0
 
@@ -16,7 +17,9 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if settings.isPaired && settings.isConfigured {
+            // Paired with a Mac, or set up from Khayt Cloud alone — either is a
+            // way home, and a phone with one of them has a shop to show.
+            if settings.isPaired && (settings.isConfigured || api.cloud != nil) {
                 MainTabView(selectedTab: $selectedTab, tabs: tabs)
             } else {
                 PairingView()

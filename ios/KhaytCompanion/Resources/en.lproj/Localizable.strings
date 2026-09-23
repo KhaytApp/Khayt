@@ -452,3 +452,6 @@
 "cloud.signin.wrong_passphrase" = "That passphrase does not open this shop's key.";
 "settings.widget.howto" = "How to add the widget";
 "spool.detail.id" = "ID";
+
+"pair.use_cloud" = "Use Khayt Cloud instead";
+"pair.use_cloud.footer" = "If the shop syncs to Khayt Cloud, the phone can start from there and pair with the Mac later.";

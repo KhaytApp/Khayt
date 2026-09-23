@@ -452,3 +452,6 @@
 "cloud.signin.wrong_passphrase" = "عبارة المرور هذه لا تفتح مفتاح الورشة.";
 "settings.widget.howto" = "كيف تضيف الأداة";
 "spool.detail.id" = "المعرّف";
+
+"pair.use_cloud" = "استخدم Khayt Cloud بدلاً من ذلك";
+"pair.use_cloud.footer" = "إن كانت الورشة تتزامن مع Khayt Cloud، يبدأ الهاتف منها ويُربط بجهاز Mac لاحقاً.";
