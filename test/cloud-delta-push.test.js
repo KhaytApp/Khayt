@@ -119,6 +119,8 @@ function makeDeltaServer({ takesDeltas = true, gatedShops = null, gateStatus = 4
     },
     /** Head = base rev, advanced by every delta appended after it. */
     chainLength(shopId) { return (chain.get(shopId) || []).length; },
+    /** The shop has no store here any more — a reset, or a move to a new host. */
+    wipe(shopId) { base.delete(shopId); chain.delete(shopId); },
   };
 
   function headRev(shopId) {
@@ -479,6 +481,52 @@ test('a 409 without `compact` is still a moved head, and still a conflict', asyn
   const res = await b.backend.push(stamped(b.engine, { clients: [{ id: 'c3', name: 'B' }] }));
   assert.equal(res.conflict, true, 'only `compact: true` may turn a 409 into a full push');
   assert.equal(b.backend.chainState().dueForCompaction, false);
+});
+
+test('a server with NO store answers a delta with rev 0, and gets the whole store', async () => {
+  const server = makeDeltaServer();
+  const dek = freshDek();
+  const a = device(server, 'shopA', dek);
+
+  const store = stamped(a.engine, { clients: [{ id: 'c1', name: 'Acme' }] });
+  await a.backend.push(store);
+  store.clients.push({ id: 'c2', name: 'as a delta' });
+  a.engine.stampChanges(store);
+  assert.equal((await a.backend.push(store)).delta, true);
+
+  server.wipe('shopA');
+  store.clients.push({ id: 'c3', name: 'after the wipe' });
+  a.engine.stampChanges(store);
+  const res = await a.backend.push(store);
+
+  assert.equal(res.conflict, false, 'rev 0 is "nothing here", not a race — pulling cannot help');
+  assert.equal(res.delta, undefined, 'the answer is the whole store');
+  const names = (await device(server, 'shopA', dek).backend.pull()).store.clients.map((c) => c.name).sort();
+  assert.deepEqual(names, ['Acme', 'after the wipe', 'as a delta'],
+    'every record goes back up, not just the one that changed since the wipe');
+});
+
+test('a 204 resets the head, so the renderer\'s pull-then-re-push recovers', async () => {
+  // The whole-store path has no rev-0 branch of its own; it relies on the
+  // caller's conflict loop (renderer/cloud-sync.js: push → pull → push). That
+  // loop only converges if the pull tells the backend the head is now 0.
+  const server = makeDeltaServer();
+  const dek = freshDek();
+  const a = device(server, 'shopA', dek, { deltaWrites: false });
+
+  const store = stamped(a.engine, { clients: [{ id: 'c1', name: 'Acme' }] });
+  await a.backend.push(store);
+  server.wipe('shopA');
+
+  assert.equal((await a.backend.push(store)).conflict, true, 'a stale baseRev is refused');
+  const pulled = await a.backend.pull();
+  assert.equal(pulled.store, null);
+  assert.equal(pulled.rev, 0, 'no store means the head is 0 — not the rev this device last saw');
+  const retry = await a.backend.push(store);
+  assert.equal(retry.conflict, false, 'before the fix this 409\'d forever');
+
+  const names = (await device(server, 'shopA', dek).backend.pull()).store.clients.map((c) => c.name);
+  assert.deepEqual(names, ['Acme']);
 });
 
 test('compaction loses nothing — the store still round-trips afterwards', async () => {
