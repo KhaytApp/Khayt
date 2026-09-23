@@ -18,10 +18,27 @@
  * Usage:
  *   node scripts/verify-release.mjs v3.5.1        # download and check that tag
  *   node scripts/verify-release.mjs --app /path/to/Khayt.app
+ *   node scripts/verify-release.mjs --app build/Khayt-3.9.0.AppImage --version 3.9.0
+ *   node scripts/verify-release.mjs --app build/linux-unpacked
  *
- * macOS only for now — it checks the arm64 .app, because that is what can be
- * launched on the machine this is usually run from. Deliberately NOT in CI: it
- * downloads ~150 MB and needs a display. Run it once, after publishing.
+ * The tag form checks the build for the platform it runs on: the arm64 .app on
+ * macOS, the x64 AppImage on Linux (extracted, so it needs no FUSE).
+ *
+ * ── Why Linux, and why in release.yml ──────────────────────────────────────
+ *
+ * This used to be macOS-only and run by hand after publishing. v3.8.0 shipped
+ * with no macOS build at all, so the one launch check this repo had could not
+ * run — `Khayt-3.8.0-arm64-mac.zip` was a 404 — and a Windows/Linux-only
+ * release went out with NOTHING having opened the packaged app. A check that
+ * cannot run looks exactly like one that passed.
+ *
+ * So `build-linux` in release.yml now runs this against the AppImage it just
+ * built, under xvfb, before `publish` makes the release public. The Linux
+ * package is built from the same `build.files` allowlist and the same asar as
+ * every other platform, so the packaging class this exists for (a module in the
+ * repo but not in the build) shows up here whichever platforms a release has.
+ * It does not stand in for a Windows launch: an NSIS- or signing-specific fault
+ * is invisible to it.
  *
  * PROVEN, on an unsigned local build (`electron-builder --mac --dir` with
  * `-c.mac.identity=null`), by removing lib/branch-summary.js from the packaged
@@ -38,7 +55,7 @@
  * diagnosis below is what turns that into the cause.
  */
 import { _electron as electron } from 'playwright-core';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -85,6 +102,10 @@ const FLAVORS = {
     asset: (v) => `Khayt-${v}-arm64-mac.zip`,
     bundle: 'Khayt.app',
     binary: 'Khayt',
+    // electron-builder names the Linux executable after package.json `name`.
+    // Confirmed from the v3.8.0 .deb: /opt/Khayt/khayt beside resources/app.asar.
+    linuxAsset: (v) => `Khayt-${v}.AppImage`,
+    linuxBinary: 'khayt',
     // A Khayt build must NOT carry the marker; if it does, the two flavours'
     // afterPack hooks have crossed and Khayt would boot as Bed Ready.
     marker: null,
@@ -97,6 +118,11 @@ const FLAVORS = {
     asset: (v) => `BedReady-${v}-mac-arm64.zip`,
     bundle: 'Bed Ready.app',
     binary: 'Bed Ready',
+    // Not wired: Bed Ready's Linux build has never been looked inside here, and
+    // guessing its executable name would be a check that fails for the wrong
+    // reason. Say so instead.
+    linuxAsset: null,
+    linuxBinary: null,
     marker: 'bedready',
     shellClass: 'khayt-app',   // the shared shell; the flavour shows in <html data-app>
     expectApp: 'bedready',
@@ -104,12 +130,14 @@ const FLAVORS = {
 };
 
 const args = process.argv.slice(2);
-const appFlag = args.indexOf('--app');
-const tag = appFlag === -1 ? args[0] : null;
-let appPath = appFlag === -1 ? null : args[appFlag + 1];
+const flag = (name) => { const i = args.indexOf(name); return i === -1 ? null : args[i + 1]; };
+let appPath = flag('--app');
+const tag = appPath ? null : args.find((a) => !a.startsWith('--'));
+/** The version the build must report. Implied by a tag; given with --app. */
+const expectVersion = flag('--version');
 
 if (!tag && !appPath) {
-  console.error('usage: node scripts/verify-release.mjs <tag> | --app <path to .app>');
+  console.error('usage: node scripts/verify-release.mjs <tag> | --app <.app | .AppImage | linux-unpacked dir> [--version X]');
   console.error('       tags: v3.7.0-beta.8 (Khayt) | bedready-v1.2.0 (Bed Ready)');
   process.exit(2);
 }
@@ -120,7 +148,8 @@ const flavorKey = (tag ? tag.startsWith('bedready-') : /Bed Ready\.app\/?$/.test
 const F = FLAVORS[flavorKey];
 const REPO = F.repo;
 /** The version inside the tag, whichever prefix it carries. */
-const tagVersion = tag ? tag.replace(/^bedready-/, '').replace(/^v/, '') : null;
+const tagVersion = tag ? tag.replace(/^bedready-/, '').replace(/^v/, '') : expectVersion;
+const linux = process.platform === 'linux';
 console.log(`Verifying ${flavorKey === 'bedready' ? 'Bed Ready' : 'Khayt'} ${tag || appPath}`);
 
 const fail = (msg) => { console.error(`\n✗ ${msg}`); process.exit(1); };
@@ -128,7 +157,19 @@ const ok = (msg) => console.log(`  ✓ ${msg}`);
 
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-verify-'));
 
-if (tag) {
+if (tag && linux) {
+  if (!F.linuxAsset) fail(`no Linux build is wired up for ${flavorKey} here`);
+  const asset = F.linuxAsset(tagVersion);
+  const url = `https://github.com/${REPO}/releases/download/${tag}/${asset}`;
+  console.log(`Downloading ${asset} …`);
+  try {
+    execFileSync('curl', ['-fsSL', '-o', path.join(work, asset), url], { stdio: 'pipe' });
+  } catch {
+    fail(`could not download ${url}\n  A published release must carry ${asset}.`);
+  }
+  appPath = path.join(work, asset);
+  ok(`downloaded ${asset}`);
+} else if (tag) {
   const asset = F.asset(tagVersion);
   const url = `https://github.com/${REPO}/releases/download/${tag}/${asset}`;
   console.log(`Downloading ${asset} …`);
@@ -142,7 +183,35 @@ if (tag) {
   ok(`downloaded and unpacked ${asset}`);
 }
 
-const binary = path.join(appPath, 'Contents', 'MacOS', F.binary);
+/**
+ * An AppImage is unpacked rather than mounted: `--appimage-extract` needs no
+ * FUSE, which a CI runner may not have, and it yields the same tree the mounted
+ * image would run from — the one the .deb installs to /opt/Khayt.
+ */
+if (/\.AppImage$/.test(appPath)) {
+  fs.chmodSync(appPath, 0o755);
+  try {
+    execFileSync(path.resolve(appPath), ['--appimage-extract'], { cwd: work, stdio: 'pipe' });
+  } catch (e) {
+    fail(`could not extract ${appPath}: ${String((e && e.stderr) || e).slice(0, 300)}`);
+  }
+  appPath = path.join(work, 'squashfs-root');
+  ok('extracted the AppImage');
+}
+
+/**
+ * Where an Electron build keeps its parts. A macOS bundle nests them under
+ * Contents/; a Linux build (linux-unpacked, an extracted AppImage, /opt/Khayt)
+ * is flat: the executable beside `resources/`.
+ */
+const isMacBundle = /\.app\/?$/.test(appPath);
+if (!isMacBundle && !F.linuxBinary) fail(`no Linux build is wired up for ${flavorKey} here`);
+const binary = isMacBundle
+  ? path.join(appPath, 'Contents', 'MacOS', F.binary)
+  : path.join(appPath, F.linuxBinary);
+const resourcesDir = isMacBundle
+  ? path.join(appPath, 'Contents', 'Resources')
+  : path.join(appPath, 'resources');
 if (!fs.existsSync(binary)) fail(`no executable at ${binary}`);
 
 /**
@@ -153,7 +222,7 @@ if (!fs.existsSync(binary)) fail(`no executable at ${binary}`);
  * ships. The file is the mechanism; the runtime assertion further down is the
  * consequence. Both, because either alone reads as fine.
  */
-const markerPath = path.join(appPath, 'Contents', 'Resources', 'flavor');
+const markerPath = path.join(resourcesDir, 'flavor');
 const markerValue = fs.existsSync(markerPath)
   ? fs.readFileSync(markerPath, 'utf8').trim().toLowerCase() : null;
 if (F.marker) {
@@ -177,7 +246,7 @@ if (F.marker) {
 
 // The version inside the bundle must match the tag. A mismatch means the tag was
 // cut before the bump landed, which auto-update would then read as "no update".
-const asarPath = path.join(appPath, 'Contents', 'Resources', 'app.asar');
+const asarPath = path.join(resourcesDir, 'app.asar');
 if (!fs.existsSync(asarPath)) fail('no app.asar in the bundle');
 let packagedVersion = null;
 try {
@@ -187,8 +256,8 @@ try {
 } catch {
   console.log('  … could not read package.json from the asar (skipping that check)');
 }
-if (tag && packagedVersion && packagedVersion !== tagVersion) {
-  fail(`tag ${tag} but the bundle contains ${packagedVersion} — the tag was cut before the version bump`);
+if (tagVersion && packagedVersion && packagedVersion !== tagVersion) {
+  fail(`expected ${tagVersion} but the bundle contains ${packagedVersion} — the tag was cut before the version bump`);
 }
 
 /**
@@ -200,22 +269,40 @@ if (tag && packagedVersion && packagedVersion !== tagVersion) {
  * stderr turns that into the actual reason — for the fault this script exists to
  * catch, the line is `Cannot find module './lib/…'`.
  */
-function launchDiagnosis() {
+//
+// stderr goes to a FILE and the whole process group is killed, because the
+// obvious version — execFileSync with a pipe and a timeout — hung a Linux
+// runner for three hours on a build missing a module. The timeout killed the
+// app, but Chromium's crashpad_handler inherits the pipe and outlives it, and
+// execFileSync waits for every holder to close it. A launch check that hangs
+// on the exact build it exists to catch blocks the release instead of
+// failing it.
+async function launchDiagnosis() {
   const probe = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-probe-'));
+  const errFile = path.join(probe, 'stderr.txt');
+  const fd = fs.openSync(errFile, 'w');
+  let child;
   try {
-    execFileSync(binary, [`--user-data-dir=${probe}`], {
-      timeout: 15_000, stdio: 'pipe',
+    child = spawn(binary, [`--user-data-dir=${probe}`], {
+      detached: true,            // its own process group, so its helpers die with it
+      stdio: ['ignore', 'ignore', fd],
       env: { ...process.env, ELECTRON_DISABLE_SANDBOX: '1' },
     });
-    return null;   // it stayed up on its own; the failure was elsewhere
-  } catch (e) {
-    const err = String((e && e.stderr) || '').trim();
-    if (!err) return null;
-    const lines = err.split('\n').filter(Boolean);
-    // The module-resolution failure is the one worth naming outright.
-    const missing = lines.find((l) => /Cannot find module/.test(l));
-    return { missing, tail: lines.slice(0, 12).join('\n    ') };
+  } finally {
+    fs.closeSync(fd);
   }
+  await new Promise((resolve) => {
+    const t = setTimeout(resolve, 15_000);
+    child.on('exit', () => { clearTimeout(t); resolve(); });
+    child.on('error', () => { clearTimeout(t); resolve(); });
+  });
+  try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
+  const err = fs.readFileSync(errFile, 'utf8').trim();
+  if (!err) return null;   // it said nothing; the failure was elsewhere
+  const lines = err.split('\n').filter(Boolean);
+  // The module-resolution failure is the one worth naming outright.
+  const missing = lines.find((l) => /Cannot find module/.test(l));
+  return { missing, tail: lines.slice(0, 12).join('\n    ') };
 }
 
 console.log('Launching the packaged app …');
@@ -223,10 +310,20 @@ const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-verify-data-'));
 const problems = [];
 let app;
 
+/**
+ * The app playwright launched can still be up behind a main-process error
+ * dialog. It must not hold the display, or keep this process alive, while the
+ * diagnosis runs.
+ */
+function killLaunched() {
+  try { const p = app && app.process(); if (p && p.pid) process.kill(p.pid, 'SIGKILL'); } catch { /* gone */ }
+}
+
 // A launch failure surfaces as an uncaught exception from inside playwright, not
 // only as a rejection, so the diagnosis has to be reachable from both.
-process.on('uncaughtException', (e) => {
-  const why = launchDiagnosis();
+process.on('uncaughtException', async (e) => {
+  killLaunched();
+  const why = await launchDiagnosis();
   console.error(`\n✗ the packaged app did not come up: ${e && e.message ? e.message : e}`);
   if (why && why.missing) {
     console.error(`\n  ${why.missing}`);
@@ -287,7 +384,7 @@ try {
   ok('the dashboard rendered');
 
   const reported = await page.evaluate(() => window.hubAPI.appVersion());
-  if (tag && reported !== tagVersion) fail(`the running app reports ${reported}, not ${tagVersion}`);
+  if (tagVersion && reported !== tagVersion) fail(`the running app reports ${reported}, not ${tagVersion}`);
   ok(`the running app reports ${reported}`);
 
   // One round trip per process boundary — preload bridge and main handler. If a
@@ -314,7 +411,8 @@ try {
   }
   ok(`the main process answers IPC (fresh profile → ${store.type})`);
 } catch (e) {
-  const why = launchDiagnosis();
+  killLaunched();
+  const why = await launchDiagnosis();
   console.error(`\n✗ the packaged app did not come up: ${e && e.message ? e.message : e}`);
   if (why && why.missing) {
     console.error(`\n  ${why.missing}`);

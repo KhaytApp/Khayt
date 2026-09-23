@@ -122,16 +122,21 @@ Each command updates `package.json` and `package-lock.json`. Edit `CHANGELOG.md`
    builds nothing at all.
 6. CI **Build & Release** builds installers from the tag (`on: push: tags: v*`).
 
-7. Verify the published build — but check FIRST that there is something to
-   verify it with. `npm run verify:release <tag>` downloads the release and
-   launches it, and it is **macOS-only**: it asks for `Khayt-<version>-arm64-mac.zip`.
-   A cut made with `BUILD_MAC` unset publishes no such asset, so the check
-   cannot run at all — `v3.8.0` returns 404 for it. That is the one check CI
-   structurally cannot do (it needs a display and ~150 MB), so a Windows- or
-   Linux-only release ships with no launch check anywhere.
+7. Verify the published build. **The Linux AppImage is launched for you**:
+   `build-linux` in release.yml runs `scripts/verify-release.mjs` against the
+   AppImage it just built, under xvfb, and `publish` waits on it — so a build
+   that does not open stays a draft. Read that step's log before announcing.
+   It exists because `v3.8.0` shipped with no launch check at all: the script
+   was macOS-only, asked for `Khayt-<version>-arm64-mac.zip`, and a cut with
+   `BUILD_MAC` unset has no such asset (404).
 
-   What is left for those platforms is the manifests, which is what
-   `electron-updater` actually reads. Worth doing by hand:
+   `npm run verify:release <tag>` still checks the build for the platform it
+   runs on — the arm64 .app on a Mac, the AppImage on Linux — and is worth
+   running on a Mac whenever `BUILD_MAC` was on. Nothing launches the Windows
+   installer; an NSIS- or signing-specific fault is invisible to both.
+
+   The manifests are what `electron-updater` actually reads. Worth checking by
+   hand:
 
    ```bash
    # every file latest.yml / latest-linux.yml names must exist, and its

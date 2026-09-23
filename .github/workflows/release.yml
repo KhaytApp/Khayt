@@ -596,6 +596,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPIMAGE_EXTRACT_AND_RUN: 1
 
+      # Open the AppImage that was just built — the file a shop downloads — and
+      # see whether it runs. The upload above went to the DRAFT release; `publish`
+      # needs this job, so a build that does not open never goes public.
+      #
+      # This is the only launch check a release has when BUILD_MAC is off:
+      # scripts/verify-release.mjs used to be macOS-only, and v3.8.0 shipped
+      # Windows/Linux-only with nothing having opened the packaged app at all.
+      # The asar is the same on every platform, so a module missing from
+      # `build.files` fails here whichever platforms a release carries.
+      - name: Launch the packaged app before it goes public
+        # A hang must FAIL the release, not hold it for the job's six hours.
+        # Normal is about ten seconds; a broken build takes ~2.5 minutes to be
+        # named (a 120 s launch timeout, then a 15 s diagnosis run).
+        timeout-minutes: 10
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          xvfb-run -a node scripts/verify-release.mjs --app "build/Khayt-$v.AppImage" --version "$v"
+
       - uses: actions/upload-artifact@v7
         with:
           name: linux-x64
