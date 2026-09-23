@@ -4268,6 +4268,11 @@ public actor KhaytEngine {
         public let contentType: String?
         public let needsJobId: Bool?
         public let unsupported: String?
+        /// A command that is genuinely more than one call — a Duet's cancel is
+        /// M25 then M0. Run in order, stopping at the first failure. Missing
+        /// from this type until Sep 2026, so a Duet cancel decoded as a request
+        /// with no method and no path and was refused as "could not be built".
+        public let sequence: [PrinterRequest]?
     }
 
     /// What to send a printer for `pause`, `resume` or `cancel`.
