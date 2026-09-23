@@ -185,7 +185,7 @@ extension Shop {
     /// own. The dash is then what it always should have meant: nothing to
     /// show yet, rather than nothing we are willing to say.
     var monthNet: Double? { monthNetRevenue }
-    var monthGross: Double? { monthTotals }
+    var monthGross: Double? { monthGrossRevenue }
 
     /// Only while there is no figure. A note explaining an absence, printed
     /// under a number that is present, reads as a warning about that number.
@@ -216,11 +216,5 @@ extension Shop {
             let its = Calendar.current.dateComponents([.year, .month], from: day)
             return its.year == month.year && its.month == month.month
         }
-    }
-
-    private var monthTotals: Double? {
-        let settled = thisMonthsOrders.filter { $0.isSettled }
-        guard !settled.isEmpty else { return nil }
-        return settled.reduce(0) { $0 + $1.price }
     }
 }

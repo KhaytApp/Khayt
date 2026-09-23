@@ -72,6 +72,32 @@ struct MastheadNetTests {
                 Comment(rawValue: "net \(net) is above gross \(gross)"))
     }
 
+    @Test("the gross is the same jobs as the net, before the tax comes out")
+    func grossIsTheSameJobs() async throws {
+        // It summed the month's PAID-UP jobs while the net beside it summed the
+        // FINISHED ones, so a job finished and not yet paid for counted in one
+        // and not the other. The sample book is re-dated to today on every
+        // load, and on 23 September 2026 that put exactly such a job into the
+        // month: 1,671.90 net beside 1,243.09 gross, and `netIsNotGross` red
+        // on `main` for every pull request in the repository.
+        //
+        // Asked the way Reports asks it, so the gross cannot come from a
+        // different set of jobs again without this noticing.
+        let shop = await Self.loaded()
+        let engine = try #require(shop.engine)
+        let rows = try await engine.pnlByPeriod(
+            orders: shop.orderRows, expenses: shop.expenseRows,
+            settings: shop.settingsDict, clients: shop.clientRows,
+            currencies: Invoice.currencyTable(shop), now: Date(),
+            granularity: "month")
+        let row = rows.first { $0.period == DateRange.localMonth(Date()) }
+        let expected = row.map { $0.revenue + $0.vatCollected }
+        let said = shop.monthGross.map { "\($0)" } ?? "nil"
+        let theirs = expected.map { "\($0)" } ?? "nil"
+        #expect(shop.monthGross == expected,
+                Comment(rawValue: "masthead gross \(said) vs Reports' charged \(theirs)"))
+    }
+
     @Test("the note explaining the dash is gone once there is a number")
     func theNoteFollowsTheFigure() async {
         // A line saying "reconciled in Reports, not here" printed UNDER a
