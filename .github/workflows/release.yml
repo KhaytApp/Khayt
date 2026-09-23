@@ -606,6 +606,10 @@ jobs:
       # The asar is the same on every platform, so a module missing from
       # `build.files` fails here whichever platforms a release carries.
       - name: Launch the packaged app before it goes public
+        # A hang must FAIL the release, not hold it for the job's six hours.
+        # Normal is about ten seconds; a broken build takes ~2.5 minutes to be
+        # named (a 120 s launch timeout, then a 15 s diagnosis run).
+        timeout-minutes: 10
         run: |
           v="${GITHUB_REF_NAME#v}"
           xvfb-run -a node scripts/verify-release.mjs --app "build/Khayt-$v.AppImage" --version "$v"

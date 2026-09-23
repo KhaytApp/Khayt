@@ -55,7 +55,7 @@
  * diagnosis below is what turns that into the cause.
  */
 import { _electron as electron } from 'playwright-core';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -269,22 +269,40 @@ if (tagVersion && packagedVersion && packagedVersion !== tagVersion) {
  * stderr turns that into the actual reason — for the fault this script exists to
  * catch, the line is `Cannot find module './lib/…'`.
  */
-function launchDiagnosis() {
+//
+// stderr goes to a FILE and the whole process group is killed, because the
+// obvious version — execFileSync with a pipe and a timeout — hung a Linux
+// runner for three hours on a build missing a module. The timeout killed the
+// app, but Chromium's crashpad_handler inherits the pipe and outlives it, and
+// execFileSync waits for every holder to close it. A launch check that hangs
+// on the exact build it exists to catch blocks the release instead of
+// failing it.
+async function launchDiagnosis() {
   const probe = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-probe-'));
+  const errFile = path.join(probe, 'stderr.txt');
+  const fd = fs.openSync(errFile, 'w');
+  let child;
   try {
-    execFileSync(binary, [`--user-data-dir=${probe}`], {
-      timeout: 15_000, stdio: 'pipe',
+    child = spawn(binary, [`--user-data-dir=${probe}`], {
+      detached: true,            // its own process group, so its helpers die with it
+      stdio: ['ignore', 'ignore', fd],
       env: { ...process.env, ELECTRON_DISABLE_SANDBOX: '1' },
     });
-    return null;   // it stayed up on its own; the failure was elsewhere
-  } catch (e) {
-    const err = String((e && e.stderr) || '').trim();
-    if (!err) return null;
-    const lines = err.split('\n').filter(Boolean);
-    // The module-resolution failure is the one worth naming outright.
-    const missing = lines.find((l) => /Cannot find module/.test(l));
-    return { missing, tail: lines.slice(0, 12).join('\n    ') };
+  } finally {
+    fs.closeSync(fd);
   }
+  await new Promise((resolve) => {
+    const t = setTimeout(resolve, 15_000);
+    child.on('exit', () => { clearTimeout(t); resolve(); });
+    child.on('error', () => { clearTimeout(t); resolve(); });
+  });
+  try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
+  const err = fs.readFileSync(errFile, 'utf8').trim();
+  if (!err) return null;   // it said nothing; the failure was elsewhere
+  const lines = err.split('\n').filter(Boolean);
+  // The module-resolution failure is the one worth naming outright.
+  const missing = lines.find((l) => /Cannot find module/.test(l));
+  return { missing, tail: lines.slice(0, 12).join('\n    ') };
 }
 
 console.log('Launching the packaged app …');
@@ -292,10 +310,20 @@ const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-verify-data-'));
 const problems = [];
 let app;
 
+/**
+ * The app playwright launched can still be up behind a main-process error
+ * dialog. It must not hold the display, or keep this process alive, while the
+ * diagnosis runs.
+ */
+function killLaunched() {
+  try { const p = app && app.process(); if (p && p.pid) process.kill(p.pid, 'SIGKILL'); } catch { /* gone */ }
+}
+
 // A launch failure surfaces as an uncaught exception from inside playwright, not
 // only as a rejection, so the diagnosis has to be reachable from both.
-process.on('uncaughtException', (e) => {
-  const why = launchDiagnosis();
+process.on('uncaughtException', async (e) => {
+  killLaunched();
+  const why = await launchDiagnosis();
   console.error(`\n✗ the packaged app did not come up: ${e && e.message ? e.message : e}`);
   if (why && why.missing) {
     console.error(`\n  ${why.missing}`);
@@ -383,7 +411,8 @@ try {
   }
   ok(`the main process answers IPC (fresh profile → ${store.type})`);
 } catch (e) {
-  const why = launchDiagnosis();
+  killLaunched();
+  const why = await launchDiagnosis();
   console.error(`\n✗ the packaged app did not come up: ${e && e.message ? e.message : e}`);
   if (why && why.missing) {
     console.error(`\n  ${why.missing}`);
