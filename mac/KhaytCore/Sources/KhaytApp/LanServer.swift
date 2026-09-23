@@ -113,6 +113,11 @@ final class LanServer {
         var measure: (Data, String) throws -> JSONValue? = { data, ext in
             try LanServer.measureUpload(data, ext: ext)
         }
+        /// The listener went down AFTER it was up, and could not be brought
+        /// back. The shop is told through this — the Online pane shows it —
+        /// because a server that believes it is running while nothing listens
+        /// is the one failure a shop cannot see.
+        var failed: @MainActor (String) -> Void = { _ in }
         /// Slice a CLEARED upload with the shop's own slicer and take the
         /// slicer's own figures. Nil when the shop has not turned this on, has
         /// no slicer, or the slice produced nothing usable — in every case the
@@ -182,6 +187,11 @@ final class LanServer {
     private var listener: NWListener?
     private(set) var port: UInt16 = 0
     private(set) var running = false
+    /// Whether the running listener is advertising over Bonjour, and what it
+    /// was started with — so a refused advert can be dropped and the same
+    /// port listened on again without it.
+    private var advertising = false
+    private var startedWith: (port: UInt16, bind: Bind)?
     /// Failed PINs by address — the Node server's `failedAttempts` map.
     private var failures: [String: KhaytEngine.LanFailures] = [:]
     /// Intake form sessions by token — the Node server's `intakeSessions`.
@@ -284,7 +294,12 @@ final class LanServer {
 
     /// Start, and return the port actually bound (asked for 0, given one).
     func start(port wanted: UInt16, bind: Bind) async throws -> UInt16 {
+        try await start(port: wanted, bind: bind, advertise: true)
+    }
+
+    private func start(port wanted: UInt16, bind: Bind, advertise: Bool) async throws -> UInt16 {
         stop()
+        startedWith = (wanted, bind)
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
         let nwPort = NWEndpoint.Port(rawValue: wanted) ?? .any
@@ -312,7 +327,9 @@ final class LanServer {
         // Mac, so advertising it would put a shop on a phone's list that the
         // phone can never connect to — a setup step that looks like it is
         // working right up until it does not.
-        if case .lan = bind {
+        advertising = false
+        if case .lan = bind, advertise {
+            advertising = true
             var txt = NWTXTRecord()
             // The LAN API this build speaks, so a much older phone can decline
             // rather than half-work.
@@ -338,12 +355,18 @@ final class LanServer {
             // The handler fires for every state for the listener's whole
             // life; the continuation may be resumed exactly once.
             let once = Once()
-            listener.stateUpdateHandler = { state in
+            listener.stateUpdateHandler = { [weak self] state in
                 switch state {
                 case .ready:
                     if once.first() { cont.resume(returning: listener.port?.rawValue ?? wanted) }
                 case .failed(let error):
                     if once.first() { cont.resume(throwing: error) }
+                    // AFTER READY IS STILL A FAILURE. The Bonjour advert is
+                    // registered once the socket is up, and when it is refused
+                    // the framework cancels the socket and reports `failed` —
+                    // after this continuation already said "ready". Ignored,
+                    // that left a server that believed it was running.
+                    else { Task { @MainActor [weak self] in self?.failedAfterReady(error) } }
                 case .cancelled:
                     if once.first() { cont.resume(throwing: CancellationError()) }
                 default: break
@@ -368,6 +391,28 @@ final class LanServer {
         running = false
         port = 0
     }
+
+    /// The listener failed after it was up. If it was advertising, the advert
+    /// is the likely cause — a refused Bonjour registration takes the socket
+    /// down with it — so listen again on the same port WITHOUT it: a phone can
+    /// still connect by address, which beats a shop with no server at all.
+    /// Otherwise, or if that fails too, say so.
+    func failedAfterReady(_ error: Error) {
+        running = false
+        guard let was = startedWith else { host.failed(String(describing: error)); return }
+        if advertising {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                do { _ = try await self.start(port: was.port, bind: was.bind, advertise: false) }
+                catch { self.host.failed(String(describing: error)) }
+            }
+        } else {
+            host.failed(String(describing: error))
+        }
+    }
+
+    /// Whether the running listener is advertising — for the tests.
+    var isAdvertising: Bool { advertising }
 
     // MARK: - One connection
 
@@ -1621,6 +1666,10 @@ extension Shop {
         }
         host.storefrontSecrets = secrets
         host.pricing = { [weak self] in self?.pricingBook ?? [:] }
+        host.failed = { [weak self] said in
+            guard let self else { return }
+            self.lanProblem = self.words.callIt("mac.lan_failed", ["error": .string(said)])
+        }
         var carrierSecrets: [String: String] = [:]
         for (carrier, sealed) in config.carrierSecrets where !sealed.isEmpty {
             carrierSecrets[carrier] = (try? await Secrets.open(sealed, for: source)) ?? ""

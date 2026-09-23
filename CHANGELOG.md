@@ -2456,6 +2456,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) The phone could not find the Mac: switching the Online server on to
+  the shop's network started nothing.** The Mac announces itself so a phone can
+  find it by name, and the app never declared that name to macOS — so macOS
+  refused the announcement, and the refusal took the whole server down with it,
+  seconds after it started. The app went on believing it was running, so the
+  Online pane showed no problem, and nothing was listening. Measured on the
+  shop's own Mac from the system log. The name is declared now; if an
+  announcement is ever refused again the server keeps listening without it (a
+  phone can still connect by address), and anything it cannot recover from is
+  shown on the Online pane instead of being swallowed.
+
 - **(Mac) A Duet could be watched but not paused, resumed or cancelled.** Three
   separate faults: a cancel — a pause and then a stop — was refused as "could
   not be built" on every Duet; on a Duet with a Raspberry Pi (SBC) the G-code
