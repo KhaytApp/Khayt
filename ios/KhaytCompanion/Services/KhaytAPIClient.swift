@@ -400,6 +400,17 @@ final class KhaytAPIClient: ObservableObject {
         let project = draft.project.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !project.isEmpty else { throw KhaytAPIError.server(L10n.tr("error.project_required")) }
 
+        // Into the phone's own book when it keeps one, and sent on — see
+        // `BookWriter.addOrder`. A machine the shop does not have is refused
+        // here exactly as the endpoint's 404 refuses it.
+        if let book, book.exists, let reader {
+            let machines = (try? await reader.machines()) ?? []
+            _ = try BookWriter(book: book).addOrder(draft, machines: machines)
+            await refreshPendingCount()
+            _ = try? await sendPendingChanges()
+            return
+        }
+
         var payload: [String: Any] = [
             "project": InputLimits.clamp(project, max: InputLimits.maxMaterial),
             "status": draft.isQuote ? "quote" : "pending"
@@ -408,9 +419,9 @@ final class KhaytAPIClient: ObservableObject {
         if !client.isEmpty { payload["client"] = InputLimits.clamp(client) }
         let material = draft.material.trimmingCharacters(in: .whitespacesAndNewlines)
         if !material.isEmpty { payload["material"] = InputLimits.clamp(material, max: InputLimits.maxMaterial) }
-        if let price = Double(draft.price.trimmingCharacters(in: .whitespaces)), price >= 0 {
-            payload["price"] = price
-        }
+        // The same reading of the price as the offline path — a comma or an
+        // Arabic keypad's digits are a price, not nothing.
+        if let price = SpoolDraft.price(draft.price) { payload["price"] = price }
         if !draft.dueDate.isEmpty { payload["dueDate"] = draft.dueDate }
         if let machineId = draft.machineId, !machineId.isEmpty { payload["machineId"] = machineId }
 
