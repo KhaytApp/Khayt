@@ -7088,12 +7088,29 @@ final class Shop {
             cloudDek = dek
             if case .locked = syncStatus { syncStatus = .idle }
             await load(source)
-            // Said, not swallowed: a server that holds no keyset cannot hand
-            // this shop's key to the NEXT machine, so the recovery key is the
-            // only copy that is not on a disk in this room. That is worth
-            // knowing before it matters.
-            moveNotices = fromServer
-                ? [words.callIt("mac.cloud_signed_in")]
+            // ── A KEY ONLY THIS BOOK HOLDS GOES TO THE CLOUD ──────────────
+            //
+            // The server sent none, and the book's has just been proven with
+            // the passphrase. A server with no keyset cannot hand the key to
+            // the NEXT device — a phone stops at "no keyset" and never syncs —
+            // so it is published now, only if the cloud truly has none
+            // (`KeysetPublisher`), and then the book is sent: a keyset with
+            // nothing behind it is a shop that restores to empty.
+            var published = false
+            if !fromServer, session.role != "viewer" {
+                do {
+                    let connection = CloudReader.Connection(url: url, shopId: session.shopId, storedToken: sealed)
+                    let web = URLSession(configuration: .ephemeral)
+                    published = try await KeysetPublisher.publishIfAbsent(
+                        connection, token: session.token, keyset: keyset) { try await web.data(for: $0) } == .published
+                } catch {
+                    cloudProblem = words.callIt("mac.cloud_key_not_published") + " "
+                        + ((error as? CustomStringConvertible)?.description ?? String(describing: error))
+                }
+                if published { await sendToCloud() }
+            }
+            moveNotices = fromServer || published
+                ? [words.callIt("mac.cloud_signed_in")] + (published ? [words.callIt("mac.cloud_key_published")] : [])
                 : [words.callIt("mac.cloud_signed_in"), words.callIt("mac.cloud_key_local")]
         } catch let failure as CloudSignIn.Failure {
             cloudProblem = failure.errorDescription ?? String(describing: failure)
