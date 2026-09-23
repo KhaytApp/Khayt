@@ -4,6 +4,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(iOS) The companion is in Arabic end to end.** The pairing wizard — the
+  first screen a new shop sees — had no Arabic at all; neither did adding a
+  spool, both scanners, the new-order sheet, order and spool detail, the
+  queue, intake, clients, machines or the app's own error messages. All of
+  them are translated now, and counts take Arabic's own plural forms
+  ("إضافة بكرتين", not "إضافة 2 بكرة") even when the phone itself is set to
+  English. The welcome screen no longer says the shop's data stays on the
+  desktop, which stopped being true when the phone started keeping a copy;
+  and the new-order price field shows the shop's currency instead of "SAR"
+  for everyone.
+
+  A test now holds English and Arabic to the same keys and the same format
+  arguments, fails on any key the app asks for that does not exist, and
+  keeps literal English off every translated screen.
+
 - **(iOS) Scan the barcode on a box of filament, and book in several at
   once.** "Scan product barcode" reads the UPC/EAN on the box — EAN-13, EAN-8
   and UPC-E, with the check digit checked so a half-read code is never looked

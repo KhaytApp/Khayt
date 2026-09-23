@@ -426,3 +426,4 @@
 "error.invalid_order_id" = "رقم الطلب غير صالح.";
 "settings.notifications.allow" = "السماح بالإشعارات";
 "unit.g" = "غ";
+"inventory.remove.body" = "ستُزال %@ من المخزون.";

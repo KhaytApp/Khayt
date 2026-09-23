@@ -75,11 +75,11 @@ struct InventoryView: View {
             .sheet(item: $selectedSpool) { spool in
                 SpoolDetailSheet(spool: spool) { Task { await load() } }
             }
-            .alert("Remove spool?", isPresented: showDeleteAlert, presenting: spoolToDelete) { spool in
-                Button("Remove", role: .destructive) { Task { await delete(spool) } }
-                Button("Cancel", role: .cancel) {}
+            .alert(L10n.tr("spool.detail.remove_q"), isPresented: showDeleteAlert, presenting: spoolToDelete) { spool in
+                Button(L10n.tr("common.remove"), role: .destructive) { Task { await delete(spool) } }
+                Button(L10n.tr("common.cancel"), role: .cancel) {}
             } message: { spool in
-                Text("\(spool.displayLabel) will be removed from inventory.")
+                Text(String(format: L10n.tr("inventory.remove.body"), spool.displayLabel))
             }
             .task { await load() }
         }

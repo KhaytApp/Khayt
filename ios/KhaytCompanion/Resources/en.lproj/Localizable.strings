@@ -426,3 +426,4 @@
 "error.invalid_order_id" = "Invalid order ID.";
 "settings.notifications.allow" = "Allow notifications";
 "unit.g" = "g";
+"inventory.remove.body" = "%@ will be removed from inventory.";

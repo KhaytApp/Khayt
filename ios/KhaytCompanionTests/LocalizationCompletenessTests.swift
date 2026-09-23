@@ -91,6 +91,7 @@ final class LocalizationCompletenessTests: XCTestCase {
         "SettingsView.swift",
         "LogWasteSheet.swift",
         "ContentView.swift",
+        "InventoryView.swift",
         "DashboardView.swift",
         "QuoteSheet.swift",
         "ExpenseSheet.swift",
@@ -100,7 +101,7 @@ final class LocalizationCompletenessTests: XCTestCase {
 
     func testTranslatedScreensHaveNoEnglishLeftInThem() throws {
         let literal = try NSRegularExpression(pattern:
-            #"\b(Text|Label|Button|TextField|SecureField|Toggle|Stepper|DisclosureGroup|Section|Picker|ContentUnavailableView|navigationTitle)\("[A-Za-z]"#)
+            #"\b(Text|Label|Button|TextField|SecureField|Toggle|Stepper|DisclosureGroup|Section|Picker|ContentUnavailableView|navigationTitle|alert|confirmationDialog)\("[A-Za-z]"#)
         var found: [String] = []
         for (name, text) in try swiftSources() where Self.translatedScreens.contains(name) {
             for (number, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
