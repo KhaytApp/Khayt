@@ -44,6 +44,7 @@
 /* Orders */
 "orders.active" = "Active";
 "orders.recent" = "Recent";
+"orders.history.windowed" = "Showing the newest %1$d of %2$d. Older history stays on the Mac.";
 "orders.filter.all" = "All";
 "orders.advance" = "Advance";
 "orders.overdue" = "Overdue";

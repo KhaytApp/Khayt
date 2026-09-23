@@ -290,7 +290,10 @@ struct SpoolReviewForm: View {
                 .keyboardType(.numberPad)
             }
 
-            Section(header: Text("Optional")) {
+            Section(header: Text("Optional"),
+                    footer: Text("What the roll cost. Jobs printed from it are priced off this.")) {
+                TextField("Price paid", text: $draft.cost)
+                    .keyboardType(.decimalPad)
                 TextField("Brand", text: $draft.brand)
                 TextField("SKU", text: $draft.sku)
                 TextField("Batch / lot no.", text: $draft.lot)

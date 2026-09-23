@@ -11,6 +11,35 @@ struct SpoolDraft: Sendable {
     var printTemp: String = ""
     var bedTemp: String = ""
     var sourceNote: String = ""
+    /// What the roll cost, as typed. Empty is "not said", which the shop's
+    /// own rule books as zero — see `costValue`.
+    var cost: String = ""
+
+    /// The price as a number, or nil when none was given.
+    ///
+    /// ── WHY THE PHONE ASKS AT ALL ─────────────────────────────────────────
+    ///
+    /// The desk's build screen prices a job as `spoolCost / spoolWeight x
+    /// grams`, and picking a spool copies ITS cost into that box. A roll
+    /// booked in without one copies a zero, and every job quoted off it
+    /// charged nothing for filament. The companion is where most rolls get
+    /// booked in — label, tag, camera — and it never asked.
+    ///
+    /// Whatever the keypad typed is accepted: a European one sends `75,50`,
+    /// an Arabic one `٧٥٫٥٠`. `Double` reads neither, and reading a price as
+    /// nothing is exactly how it went missing before.
+    var costValue: Double? { Self.price(cost) }
+
+    static func price(_ typed: String) -> Double? {
+        var t = ""
+        for ch in typed.trimmingCharacters(in: .whitespaces) {
+            if let d = ch.wholeNumberValue, ch.isNumber { t.append(String(d)) }
+            else if ch == "," || ch == "٫" || ch == "." { t.append(".") }
+            else { return nil }
+        }
+        guard let v = Double(t), v.isFinite, v > 0 else { return nil }
+        return v
+    }
 
     static func from(parsed: ParsedFilamentLabel) -> SpoolDraft {
         var d = SpoolDraft()

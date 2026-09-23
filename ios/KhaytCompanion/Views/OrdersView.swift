@@ -179,39 +179,57 @@ struct OrdersView: View {
                     description: Text(errorMessage ?? "—")
                 )
             } else {
-                List(recent) { entry in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(entry.displayTitle)
-                                .font(.headline)
-                                .foregroundStyle(KhaytDesign.text)
-                            Spacer()
-                            CompanionStatusBadge(status: entry.status, compact: true)
-                        }
-                        Text(entry.displayClient)
-                            .font(.subheadline)
-                            .foregroundStyle(KhaytDesign.textDim)
-                        HStack {
-                            if let date = entry.date ?? entry.dueDate {
-                                Text(date)
-                                    .font(.caption)
-                                    .foregroundStyle(KhaytDesign.textMuted)
-                            }
-                            if entry.isOverdue {
-                                Text(L10n.tr("orders.overdue"))
-                                    .font(.caption2.bold())
-                                    .foregroundStyle(KhaytDesign.danger)
-                            }
-                        }
+                List {
+                    ForEach(recent) { entry in
+                        recentRow(entry)
                     }
-                    .padding(.vertical, 2)
-                    .listRowBackground(KhaytDesign.surface)
+                    // Where the rest of it is. Without this the list simply
+                    // stops, and a shop that scrolls to the bottom concludes it
+                    // has done two hundred jobs in its life.
+                    if let window = api.historyWindow {
+                        Text(String(format: L10n.tr("orders.history.windowed"),
+                                    window.sent, window.available))
+                            .font(.caption)
+                            .foregroundStyle(KhaytDesign.textMuted)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 6)
+                            .listRowBackground(Color.clear)
+                    }
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
                 .environment(\.defaultMinListRowHeight, 56)
             }
         }
+    }
+
+    private func recentRow(_ entry: OrderLogEntry) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(entry.displayTitle)
+                    .font(.headline)
+                    .foregroundStyle(KhaytDesign.text)
+                Spacer()
+                CompanionStatusBadge(status: entry.status, compact: true)
+            }
+            Text(entry.displayClient)
+                .font(.subheadline)
+                .foregroundStyle(KhaytDesign.textDim)
+            HStack {
+                if let date = entry.date ?? entry.dueDate {
+                    Text(date)
+                        .font(.caption)
+                        .foregroundStyle(KhaytDesign.textMuted)
+                }
+                if entry.isOverdue {
+                    Text(L10n.tr("orders.overdue"))
+                        .font(.caption2.bold())
+                        .foregroundStyle(KhaytDesign.danger)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+        .listRowBackground(KhaytDesign.surface)
     }
 
     private func load() async {

@@ -149,6 +149,38 @@ final class BookContractTests: XCTestCase {
                         "the names do not match the shop's machines")
     }
 
+    /// A list that simply stops is a shop concluding it has done 200 jobs.
+    func testAWindowedHistorySaysWhereTheRestIs() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appending(path: "window-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let book = CompanionBook(directory: dir)
+        let reader = BookReader(book: book)
+
+        // A three-year-old shop: the phone holds 200 of 3,140 orders.
+        try book.replace(with: ["printLog": .array([])], scope: BookScope.Taken(
+            collections: ["printLog": .init(whole: false, sent: 200, available: 3_140),
+                          "clients": .init(whole: true, sent: 31, available: nil)],
+            omitted: [], takenAt: "2026-09-22T22:00:00.000Z"))
+
+        let window = try XCTUnwrap(reader.orderHistoryWindow())
+        XCTAssertEqual(window.sent, 200)
+        XCTAssertEqual(window.available, 3_140)
+
+        // A shop small enough that the phone has everything says nothing — a
+        // note about missing history under a complete list is its own untruth.
+        try book.replace(with: ["printLog": .array([])], scope: BookScope.Taken(
+            collections: ["printLog": .init(whole: true, sent: 12, available: nil)],
+            omitted: [], takenAt: "2026-09-22T22:00:00.000Z"))
+        XCTAssertNil(reader.orderHistoryWindow())
+
+        // And a phone that does not know what it is missing also says nothing,
+        // rather than guessing at a total it cannot support.
+        try book.replace(with: ["printLog": .array([])], scope: nil)
+        XCTAssertNil(reader.orderHistoryWindow())
+    }
+
     /// The statuses a real shop's book actually contains, against what the app
     /// can name. `cancelled` lives in shipping books and is not in the desktop's
     /// own STATUSES list, which is why `status` is a String on the wire and the

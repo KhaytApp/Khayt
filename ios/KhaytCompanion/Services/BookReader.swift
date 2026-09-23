@@ -50,6 +50,15 @@ actor BookReader {
         return made
     }
 
+    /// A roll, as the shop's own rule would book it in — built here, written
+    /// by `BookWriter.addSpool`. See `BookWriter.spoolRecord` for the rule.
+    func newSpool(from draft: SpoolDraft, now: Date = Date()) async throws -> [String: JSONValue] {
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = try book.read()["settings"] { settings = s }
+        return try await BookWriter.spoolRecord(from: draft, engine: engine(), settings: settings,
+                                                id: BookWriter.newSpoolId(now: now), now: now)
+    }
+
     /// Is there a book on this phone at all?
     ///
     /// `nonisolated` so a read path can ask without hopping onto the actor just
@@ -153,6 +162,18 @@ actor BookReader {
         // Newest first, which is what the screen shows and what `limit` means.
         rows.sort { ($0.date ?? "") > ($1.date ?? "") }
         return Array(rows.prefix(max(0, limit)))
+    }
+
+    /// How much of the order history this phone holds, when it holds only part.
+    ///
+    /// `nil` when it has all of it — and also when it has no idea, because a
+    /// phone that cannot say what it is missing must not claim to be complete.
+    /// The screen shows nothing in either case; the difference only matters if
+    /// something ever starts totalling history, which is what `holdsAll` is for.
+    nonisolated func orderHistoryWindow() -> HeldWindow? {
+        guard let held = book.scope()?.collections["printLog"],
+              !held.whole, let available = held.available else { return nil }
+        return HeldWindow(sent: held.sent, available: available)
     }
 
     func inventory() throws -> [InventorySpool] { try decode("inventory") }

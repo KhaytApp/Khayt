@@ -22,6 +22,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+
+- **(iOS) The order history said where the rest of it is.** The phone carries the
+  newest two hundred finished jobs and every unfinished one; the list simply
+  stopped at the end of them. A shop scrolling to the bottom of its own history
+  had nothing to tell it that the other two thousand were on the Mac — which
+  reads as a shop that has done two hundred jobs in its life.
+
+  It now says "Showing the newest 200 of 3,140", from the scope the phone
+  already records at every pull. A shop small enough that the phone holds
+  everything is told nothing, because a note about missing history under a
+  complete list is its own untruth — and so is a phone that cannot say what it
+  is missing, which says nothing rather than guessing.
+
+  The Arabic is mine and has had no native read.
 - **An order from your online store now comes off the shelf.** Khayt could
   tell a storefront where to send its orders and could not show you one that
   had arrived. The Integrations screen has always handed out the address to
@@ -52,6 +66,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   once it is made, because the number it leaves behind looks exactly like a
   number somebody counted.
 
+
+- **(iOS) A roll booked in from the phone now says what it cost, and books in
+  with the Mac switched off.** The add-spool sheet never asked for a price, so
+  every roll booked in from a label, a tag or the camera went on the shelf at
+  zero — and the desk's build screen copies a spool's cost into the job when
+  it is picked, so every job quoted off that roll charged nothing for filament.
+  There is a "Price paid" field now; it reads `75,50` and `٧٥٫٥٠` as well as
+  `75.50`.
+
+  Booking in also goes to the phone's own book first and travels with the
+  other offline edits. That matters beyond a dead Wi-Fi: the native Mac app
+  serves no `/api/inventory`, so for a shop on it, booking a roll in from the
+  phone had never worked at all. The record is built by the shop's own rules
+  (`KhaytSpoolEdit.newSpool` then `applyEdit`, in KhaytCore) with the
+  endpoint's field work after them, dated by the shop's calendar day rather
+  than UTC, and shelved in the branch the desk is showing. The colour library
+  is not taught from the phone: it lives in `settings`, which the fold does
+  not carry.
 
 - **(iOS + Mac) The phone works with the Mac switched off.** Advancing a job,
   putting it on a printer, correcting a spool and triaging a walk-in all used to
