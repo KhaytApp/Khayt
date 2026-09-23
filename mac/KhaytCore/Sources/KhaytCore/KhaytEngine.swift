@@ -458,6 +458,9 @@ public actor KhaytEngine {
         // Electron window could add a spool or fix a weight — and a shop's
         // shelf drifts every day.
         "spool-edit",
+        // A shop's Spoolman spools, onto the shelf — never twice, and never
+        // written back. After `spool-edit`, whose record shape it follows.
+        "spoolman-import",
         // A machine, and what picking a printer model fills in. NOZZLE-WEAR IS
         // ALREADY ABOVE and must be: the threshold falls back to what a nozzle
         // material is expected to last, and without it a shop gets a
@@ -6422,6 +6425,34 @@ public actor KhaytEngine {
 
     /// A new spool, as the shelf records it. `refused` is `material` when it
     /// has none — a spool no job can be matched to.
+    /// What a Spoolman import would do to this shelf — `lib/spoolman-import.js`.
+    public struct SpoolmanPlan: Decodable, Sendable {
+        public struct Skipped: Decodable, Sendable, Equatable {
+            public let archived: Int
+            public let already: Int
+            public let unnamed: Int
+        }
+        public let add: [JSONValue]
+        public let skipped: Skipped
+    }
+
+    /// `ids` are handed out in order, one per spool added; pass at least as
+    /// many as there are Spoolman spools.
+    public func spoolmanPlan(spools: [JSONValue], inventory: JSONValue, ids: [String],
+                             today: String) throws -> SpoolmanPlan {
+        try runtime.call2("""
+            (function (ids) { var i = 0;
+              return KhaytSpoolmanImport.plan(ARG0, ARG1, { today: ARG3, mintId: function () { return ids[i++]; } });
+            })(ARG2)
+            """, [.array(spools), inventory, .array(ids.map(JSONValue.string)), .string(today)],
+            as: SpoolmanPlan.self)
+    }
+
+    public func spoolmanListPath(offset: Int, limit: Int) throws -> String {
+        try runtime.call2("KhaytSpoolmanImport.listPath(ARG0, ARG1)", [.number(Double(offset)), .number(Double(limit))],
+                          as: String.self)
+    }
+
     public func newSpool(_ input: [String: JSONValue], id: String, today: String) throws -> SpoolWritten {
         try runtime.call2("KhaytSpoolEdit.newSpool(ARG0, {id: ARG1, today: ARG2})",
                           [.object(input), .string(id), .string(today)], as: SpoolWritten.self)

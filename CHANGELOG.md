@@ -88,6 +88,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Import a shop's spools from Spoolman.** A shop that already keeps its
+  rolls in Spoolman had to type every one into Khayt again. **Import from
+  Spoolman…** on the Inventory screen takes the address Spoolman runs at and
+  brings every roll across — vendor and material, colour, price, what it held
+  new and what is left on it, lot number and where it is kept. Run it again
+  after buying rolls and only the new ones come across; weights Khayt has
+  already counted down are never put back. Spoolman is only read, never
+  changed, and only an address on the shop's own network is accepted. The rule
+  is `lib/spoolman-import.js`, written against Spoolman's own data models.
+
 - **(Mac) Send a sliced file to a printer, and start it.** The Mac could watch
   a printer, pause it and skip an object on it, and could not hand it a file —
   a shop sliced a job and then carried a USB stick over. **Send to printer…**

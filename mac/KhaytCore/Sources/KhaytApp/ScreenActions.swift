@@ -104,6 +104,10 @@ struct ScreenActions: View {
                 // The comment above this struct listed the inventory among
                 // the screens that "simply have no actions", which is how it
                 // stayed unnoticed: the absence read as a decision.
+                // Every roll a shop already keeps in Spoolman, in one go
+                // rather than one form at a time.
+                Button(shop.words.callIt("mac.spoolman_import") + "…") { shop.importingSpoolman = true }
+                    .disabled(!shop.canMoveJobs)
                 plus("mac.new_spool", enabled: shop.canMoveJobs) { shop.addingSpool = true }
             } else if shop.showingExpenses {
                 period

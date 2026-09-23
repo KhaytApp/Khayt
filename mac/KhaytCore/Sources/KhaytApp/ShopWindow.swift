@@ -608,6 +608,7 @@ struct WindowSheets: ViewModifier {
             .sheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
             .sheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }
             .sheet(isPresented: $shop.addingSpool) { SpoolSheet(shop: shop, existing: nil) }
+            .sheet(isPresented: $shop.importingSpoolman) { SpoolmanSheet(shop: shop) }
             .sheet(item: $shop.editingConsumable) { ConsumableSheet(shop: shop, existing: $0) }
             .sheet(isPresented: $shop.addingConsumable) { ConsumableSheet(shop: shop, existing: nil) }
             .sheet(isPresented: $shop.issuingGiftCard) { GiftCardSheet(shop: shop) }
