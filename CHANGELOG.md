@@ -22,6 +22,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Orders from Salla and Zid arrive on the Mac.** The Mac could show a
+  storefront's orders once they were in the book, and nothing on it put them
+  there: `/api/webhook/salla` and `/api/webhook/zid` answered 404, and the
+  secret a storefront signs with could only be typed into the Windows and Linux
+  app. Both addresses are answered now, with the same answers in the same order
+  as that app — a bad signature is refused and counted, a replay is refused, a
+  retry of an order already recorded is acknowledged and not recorded twice —
+  and an order for something already on the shelf comes off it. The two
+  secrets are set in Settings → Online. What an order becomes is one shared
+  rule now, `lib/storefront-webhook.js`, which both servers run. Carrier and
+  printer webhooks are still the other app's.
+
 
 - **(iOS) The order history said where the rest of it is.** The phone carries the
   newest two hundred finished jobs and every unfinished one; the list simply

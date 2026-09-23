@@ -178,7 +178,9 @@ with different rules; nothing in this file applies to them.
   any device, so removing a path from it leaks that secret to every paired phone.
 - **The LAN API has two implementations that are not the same.** `lib/lan-server.js`
   serves the full surface; the native Mac's `LanServer.swift` serves `/api/status`,
-  `/api/queue`, `/api/store` and the customer intake, and nothing else. Do not
+  `/api/queue`, `/api/store`, the customer intake, quotes, tracking, the calendar
+  and the Salla/Zid order webhooks — not the carrier or printer webhooks, nor the
+  phone's write routes (`/api/orders`, `/api/inventory`, …). Do not
   assume a route exists on both. [`docs/LAN_API.md`](docs/LAN_API.md) marks which is which.
 - **`scripts/ios-contract-capture.mjs` must be fixed against what the desktop
   actually writes, not what seems reasonable.** It built its fixture with

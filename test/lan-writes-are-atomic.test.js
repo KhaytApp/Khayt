@@ -58,11 +58,23 @@ test('the two storefront webhooks re-check for a duplicate inside the write', ()
   // A provider retry arriving while the first write is in flight passes the
   // outer check — the log it reads has not been updated yet — so without the
   // inner one the same order is inserted twice.
+  //
+  // The re-check is `lib/storefront-webhook.js`'s `record` now, which both
+  // servers call inside their write: so the handler must call it from inside
+  // `updateStoreOnDisk`, and `record` must check before it inserts.
   const lan = code('lib/lan-server.js');
   for (const source of ['salla', 'zid']) {
-    assert.ok(lan.includes(`alreadyRecorded(log, '${source}'`),
-      `the ${source} webhook does not re-check for a duplicate inside updateStoreOnDisk`);
+    const at = lan.indexOf(`storefrontWebhook.record('${source}', parsed, cur`);
+    assert.ok(at > 0, `the ${source} webhook does not record through the shared rule`);
+    const write = lan.lastIndexOf('updateStoreOnDisk((cur)', at);
+    assert.ok(write > 0 && at - write < 200,
+      `the ${source} webhook records outside updateStoreOnDisk`);
   }
+  const rule = code('lib/storefront-webhook.js');
+  const recordFn = rule.slice(rule.indexOf('function record('));
+  const check = recordFn.indexOf('alreadyRecorded(source, parsed, log)');
+  const insert = recordFn.indexOf('log.unshift(');
+  assert.ok(check > 0 && check < insert, 'record inserts before re-checking for a duplicate');
 });
 
 test('every mutator is synchronous', () => {

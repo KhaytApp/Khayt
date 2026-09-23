@@ -45,6 +45,8 @@ struct OnlinePaneTruthTests {
               english: ["calendar"], arabic: ["تقويم"]),
         .init(name: "the survey", route: "case (\"/api/survey\", false)",
               english: ["survey"], arabic: ["استبيان"]),
+        .init(name: "orders from Salla and Zid", route: "case (Self.storefrontHookPath + \"salla\", false)",
+              english: ["salla", "zid", "storefront"], arabic: ["سلة", "زد"]),
     ]
 
     /// The sentence that sends the shop somewhere else, if there is one.
@@ -90,8 +92,11 @@ struct OnlinePaneTruthTests {
         let arabic = try #require(Words.own["mac.online_desc"]?["ar"],
                                   "the Online pane has no Arabic")
 
-        // The Arabic sentence that defers to the other app names it.
-        let sentence = arabic.components(separatedBy: "،")
+        // The Arabic sentence that defers to the other app names it. Split on
+        // the full stop as well as the Arabic comma: a clause ending in "."
+        // otherwise reads as part of the next sentence, and the one that says
+        // what this app serves is judged by the one that says what it does not.
+        let sentence = arabic.components(separatedBy: CharacterSet(charactersIn: "،."))
             .first { $0.contains("ذلك التطبيق") }
         for capability in Self.capabilities where server.contains(capability.route) {
             guard let sentence else { continue }
@@ -110,12 +115,22 @@ struct OnlinePaneTruthTests {
     @Test("what this app does not serve is still said plainly")
     func unservedIsDeclared() throws {
         let server = MenuCoverageTests.source("LanServer.swift")
-        // Webhooks: no route here answers one, and none is claimed.
-        let routesWebhooks = server.contains("case (\"/api/webhook")
-        #expect(!routesWebhooks, "webhooks are served now — say so in the Online pane")
-
-        let english = try #require(Words.own["mac.online_desc"]?["en"])
-        #expect(english.lowercased().contains("webhook"),
-                "the pane no longer says where webhooks run")
+        let english = try #require(Words.own["mac.online_desc"]?["en"]).lowercased()
+        let arabic = try #require(Words.own["mac.online_desc"]?["ar"])
+        // The carrier and printer webhooks: no route here answers one, and the
+        // pane says where they run. Salla and Zid ARE answered, and the
+        // capability list above holds the pane to that.
+        let unserved: [(name: String, route: String, english: String, arabic: String)] = [
+            ("carrier webhooks", "\"smsa\"", "carrier", "الشحن"),
+            ("printer webhooks", "webhook/printer", "printer", "الطابعات"),
+        ]
+        for hook in unserved {
+            #expect(!server.contains(hook.route),
+                    Comment(rawValue: "\(hook.name) are served now — say so in the Online pane"))
+            #expect(english.contains(hook.english),
+                    Comment(rawValue: "the pane no longer says where \(hook.name) run"))
+            #expect(arabic.contains(hook.arabic),
+                    Comment(rawValue: "the Arabic pane no longer says where \(hook.name) run"))
+        }
     }
 }

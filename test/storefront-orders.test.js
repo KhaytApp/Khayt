@@ -120,54 +120,50 @@ const fs = require('fs');
 const path = require('path');
 const lan = fs.readFileSync(path.join(__dirname, '..', 'lib', 'lan-server.js'), 'utf8');
 
-test('both storefront handlers check before they create, and record the id', () => {
+test('both storefront handlers check before they create, and record through the shared rule', () => {
   // The failure this guards is a THIRD platform handler written by copying one
   // of these two — which is how both of them came to build an order inline with
   // a random id in the first place.
+  //
+  // What the order IS — its id field, its note, the duplicate check redone
+  // inside the write, the shelf — is `lib/storefront-webhook.js` now, and is
+  // tested there by behaviour (test/storefront-webhook.test.js). What stays
+  // here is the wiring: each handler asks early, and records INSIDE the write.
   for (const source of ['salla', 'zid']) {
-    const at = lan.indexOf(`sourceOrderIdFrom('${source}'`);
-    assert.ok(at > 0, `the ${source} handler does not read the platform's order id`);
-    // The window is generous on purpose. It was 1400 and the handlers outgrew it
-    // the moment they gained a few lines of comment, which fails this guard for
-    // a reason that has nothing to do with what it checks — a test that breaks
-    // on prose is a test people learn to edit rather than read.
-    const body = lan.slice(at, at + 3000);
-    const check = body.indexOf(`alreadyRecorded(storeData.printLog, '${source}'`);
-    // `log.unshift(recorded)`, not `newOrder`: what goes in the book is the
-    // order AFTER the shelf has been read against it — `fromStock`, the
-    // status and the note all come from there. See the next assertion.
-    const create = body.indexOf('log.unshift(recorded)');
+    const at = lan.indexOf(`pathname === '/api/webhook/${source}' && req.method === 'POST'`);
+    assert.ok(at > 0, `no ${source} handler`);
+    // The window is generous on purpose; a test that breaks on prose is a test
+    // people learn to edit rather than read.
+    const body = lan.slice(at, at + 5000);
+    const check = body.indexOf(`storefrontWebhook.alreadyRecorded('${source}', parsed`);
+    const write = body.indexOf('updateStoreOnDisk(');
+    const rec = body.indexOf(`storefrontWebhook.record('${source}', parsed, cur`);
     assert.ok(check > 0, `the ${source} handler does not check for a duplicate`);
-    assert.ok(create > 0, `the ${source} handler no longer creates an order here`);
-    assert.ok(check < create, `the ${source} handler creates the order before checking for it`);
-    // The check answering the request is not enough. A provider retry arriving
-    // while the first write is still in flight reads a log that has not been
-    // updated yet and passes it, so the check has to be repeated INSIDE the
-    // write, against the store as it stands when that write's turn comes.
-    const inWrite = body.indexOf(`alreadyRecorded(log, '${source}'`);
-    assert.ok(inWrite > 0,
-      `the ${source} handler does not re-check for a duplicate inside updateStoreOnDisk`);
-    assert.ok(inWrite < create,
-      `the ${source} handler inserts before re-checking inside the write`);
-    assert.match(body, /sourceOrderId: \w+Ref \|\| undefined/,
-      `the ${source} handler does not record the id, so the NEXT delivery cannot be recognised`);
-    assert.match(body, /notes:\s+storefrontOrders\.noteFor\(/,
-      `the ${source} handler writes its own note string instead of the shared one`);
+    assert.ok(write > 0 && rec > 0, `the ${source} handler no longer records through the shared rule`);
+    assert.ok(check < write, `the ${source} handler writes before checking`);
+    // `cur`, and after the write chain opens: the rule's own re-check and the
+    // shelf are read-modify-writes, and outside the chain two deliveries
+    // arriving together would each read the same log and the same count.
+    assert.ok(write < rec, `the ${source} handler records outside updateStoreOnDisk`);
+  }
+});
 
-    // ── AND THE SHELF IS READ INSIDE THE SAME WRITE ───────────────────
-    //
-    // An online order for something already printed is a sale: it comes off
-    // `settings.storefront.stockQty`, which is the count the storefront
-    // publishes and sells against. Doing that outside `updateStoreOnDisk`
-    // would be a read-modify-write racing the duplicate check beside it —
-    // two deliveries arriving together would each read the same figure and
-    // each write their own.
-    const shelf = body.indexOf(`takeOnlineOrderOffTheShelf('${source}'`);
-    assert.ok(shelf > 0,
-      `the ${source} handler does not read the shelf, so an order for a piece `
-      + 'already made still goes to a machine and the published count stays wrong');
-    assert.ok(check < shelf && shelf < create,
-      `the ${source} handler reads the shelf outside the checked write`);
+test('a duplicate answers 200, so the provider stops retrying', () => {
+  // Not 409. A retry is the provider asking "did you get this?", and the honest
+  // answer is yes — the order is recorded. A non-2xx tells it to try again, and
+  // on some platforms eventually to mark the delivery failed and alert the shop
+  // about a webhook that is working perfectly. Both answers: the early one, and
+  // the one for a retry that lost the race inside the write.
+  for (const source of ['salla', 'zid']) {
+    const at = lan.indexOf(`storefrontWebhook.alreadyRecorded('${source}'`);
+    const body = lan.slice(at, at + 400);
+    assert.match(body, /writeHead\(200/, `a duplicate ${source} delivery is answered with a non-2xx`);
+    assert.match(body, /duplicate: true/, `the ${source} response does not say it was a duplicate`);
+    const lost = lan.indexOf('if (!recorded) {', at);
+    assert.ok(lost > at, `the ${source} handler has no answer for a retry that lost the race`);
+    const tail = lan.slice(lost, lost + 300);
+    assert.match(tail, /writeHead\(200/);
+    assert.match(tail, /duplicate: true/);
   }
 });
 
@@ -183,19 +179,6 @@ test('the window is sent the order that was written', () => {
     'a storefront handler tells the window about its draft rather than its record');
   assert.equal((lan.match(/lan-order-updated', recorded\)/g) || []).length, 2,
     'both storefront handlers should send the record they wrote');
-});
-
-test('a duplicate answers 200, so the provider stops retrying', () => {
-  // Not 409. A retry is the provider asking "did you get this?", and the honest
-  // answer is yes — the order is recorded. A non-2xx tells it to try again, and
-  // on some platforms eventually to mark the delivery failed and alert the shop
-  // about a webhook that is working perfectly.
-  for (const source of ['salla', 'zid']) {
-    const at = lan.indexOf(`alreadyRecorded(storeData.printLog, '${source}'`);
-    const body = lan.slice(at, at + 400);
-    assert.match(body, /writeHead\(200/, `a duplicate ${source} delivery is answered with a non-2xx`);
-    assert.match(body, /duplicate: true/, `the ${source} response does not say it was a duplicate`);
-  }
 });
 
 /**

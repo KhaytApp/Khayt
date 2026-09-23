@@ -21,6 +21,10 @@ struct OnlinePane: View {
         var pin = ""
         /// Whether the book has a PIN at all, sealed or not.
         var pinStored = false
+        /// The storefront webhook secrets as typed — blank keeps the stored
+        /// one, as for the PIN — and whether each is stored at all.
+        var sallaSecret = "", zidSecret = ""
+        var sallaStored = false, zidStored = false
 
         @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
             let lan = SettingsReader(settings: SettingsReader(settings: settings).object("lanApi"))
@@ -29,6 +33,8 @@ struct OnlinePane: View {
                           bindLan: lan.flag("bindLan"),
                           pin: "",
                           pinStored: !lan.text("pin").isEmpty)
+            d.sallaStored = !lan.text("sallaWebhookSecret").isEmpty
+            d.zidStored = !lan.text("zidWebhookSecret").isEmpty
             readQuote(settings, into: &d)
             return d
         }
@@ -125,6 +131,30 @@ struct OnlinePane: View {
                         Label(shop.words.callIt("mac.lan_pin_missing"), systemImage: "exclamationmark.triangle")
                             .font(.caption).foregroundStyle(Khayt.attention)
                     }
+                }
+                // ── ORDERS FROM A STOREFRONT ──────────────────────────
+                //
+                // Salla and Zid sign every order they send with a secret the
+                // shop copies out of their dashboard. Without one here the
+                // address answers 403 to everybody, which is the point: an
+                // unsigned order is anyone on the network writing into the
+                // queue.
+                Section(shop.words.callIt("mac.storefront_hooks_title")) {
+                    LabeledContent(shop.words.callIt("lan.salla_secret")) {
+                        SecureField(draft.sallaStored ? shop.words.callIt("common.secret_unchanged") : "",
+                                    text: $draft.sallaSecret)
+                            .frame(maxWidth: 220)
+                    }
+                    LabeledContent(shop.words.callIt("lan.zid_secret")) {
+                        SecureField(draft.zidStored ? shop.words.callIt("common.secret_unchanged") : "",
+                                    text: $draft.zidSecret)
+                            .frame(maxWidth: 220)
+                    }
+                    Text(shop.words.callIt("mac.storefront_hooks_hint",
+                                           ["url": .string((shop.lanURL ?? "http://…/") + "api/webhook/")]))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 // ── LETTING A STRANGER SEE A PRICE ────────────────────
                 //
@@ -283,7 +313,9 @@ struct OnlinePane: View {
                     save: { Task {
                         await shop.saveLanSettings(enabled: draft.enabled, port: draft.portNumber,
                                                    pin: draft.pin, bindLan: draft.bindLan,
-                                                   intakeQuote: draft.quoteForm())
+                                                   intakeQuote: draft.quoteForm(),
+                                                   storefrontSecrets: ["salla": draft.sallaSecret,
+                                                                       "zid": draft.zidSecret])
                         reset()
                     } },
                     revert: { draft = original })

@@ -535,6 +535,13 @@
         bindLan: has(l, 'bindLan') ? !!l.bindLan : !!storedLan.bindLan,
         pin: typedPin || storedLan.pin || '',
       };
+      // The storefront webhook secrets, by the same rule as the PIN: blank
+      // keeps what is stored. Only ever WRITTEN when typed, so a book that has
+      // never had one does not gain an empty key by being saved.
+      for (const key of ['sallaWebhookSecret', 'zidWebhookSecret']) {
+        const typed = l[key] == null ? '' : String(l[key]).trim();
+        if (typed) out.lanApi[key] = typed;
+      }
       // Public model pricing, kept WHOLE — the shape the Electron page keeps
       // it in, so an older book without the key simply arrives as "off". It is
       // merged over what was stored rather than replacing it, because a pane

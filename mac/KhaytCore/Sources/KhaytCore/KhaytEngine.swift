@@ -28,6 +28,14 @@ public actor KhaytEngine {
         // is shared because the desktop, the LAN server and this app all have
         // to reach the same figure about a count a customer can see.
         "shelf-sale",
+        // A signed Salla or Zid order, as the print log records it: the row it
+        // becomes, the platform's own id that stops a retry being a second
+        // order, and what it takes off the shelf above. The rule the LAN
+        // server's webhook runs, lifted out of `lib/lan-server.js` so this app
+        // answers the address it hands a storefront. After `shelf-sale`, which
+        // it reads.
+        "storefront-orders",
+        "storefront-webhook",
         // The warning a shop gets when filament runs out. It was twelve lines
         // inside the renderer, so this app drew the switch that turns it on
         // and had nothing to send.
@@ -5636,6 +5644,38 @@ public actor KhaytEngine {
                        printLog: r.error ? null : data.printLog };
             })(ARG0, ARG1, ARG2)
             """, [store, .string(orderId), .string(nowIso)], as: LanQuoteApproval.self)
+    }
+
+    // MARK: - Storefront order webhooks
+
+    /// What a signed storefront delivery did to the book.
+    public struct StorefrontRecorded: Decodable, Sendable {
+        /// The whole book, as it should be written. The book handed in, when
+        /// this was a duplicate.
+        public let store: JSONValue
+        /// The row written — after the shelf was read against it — or nil for
+        /// a duplicate.
+        public let order: JSONValue?
+        public let duplicate: Bool
+    }
+
+    /// `lib/storefront-webhook.js`'s `record`, run INSIDE the write: the
+    /// duplicate check and the shelf are read-modify-writes of the book.
+    ///
+    /// `day` is the shop's calendar day and `at` the moment, both the caller's,
+    /// so the rule stays pure and a test can say exactly what they were.
+    public func storefrontRecord(source: String, payload: JSONValue, store: JSONValue,
+                                 id: String, day: String, at: String) throws -> StorefrontRecorded {
+        try runtime.call2("globalThis.KhaytStorefrontWebhook.record(ARG0, ARG1, ARG2, { id: ARG3, day: ARG4, at: ARG5 })",
+                          [.string(source), payload, store, .string(id), .string(day), .string(at)],
+                          as: StorefrontRecorded.self)
+    }
+
+    /// Whether the book already holds this delivery's order — the early
+    /// answer, asked before any write so a provider's retry costs nothing.
+    public func storefrontAlreadyRecorded(source: String, payload: JSONValue, printLog: JSONValue) throws -> Bool {
+        try runtime.call2("globalThis.KhaytStorefrontWebhook.alreadyRecorded(ARG0, ARG1, ARG2)",
+                          [.string(source), payload, printLog], as: Bool.self)
     }
 
     // MARK: - Break-even

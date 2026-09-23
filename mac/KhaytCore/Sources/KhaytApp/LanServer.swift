@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Network
 import KhaytCore
@@ -23,8 +24,9 @@ import KhaytCore
 /// on a phone's home screen, the customer intake form and its estimate, the
 /// quote page and its approval, the order's own tracking page and survey, and
 /// `/calendar.ics`, and the other app's `/status/<id>` address for that same
-/// tracking page. It arrived one slice at a time and the list above is the end
-/// of that; what has NOT been lifted is the webhooks.
+/// tracking page, and the signed Salla and Zid order webhooks. It arrived one
+/// slice at a time; what has NOT been lifted is the carrier and printer
+/// webhooks.
 ///
 /// That list is not decoration: `OnlinePaneTruthTests` reads this route table
 /// and fails the build if the Online settings pane sends a shop to the other
@@ -116,6 +118,18 @@ final class LanServer {
         /// caller falls back to measuring the shape, which is what it did
         /// before this existed.
         var sliceUpload: (Data, String) async -> JSONValue? = { _, _ in nil }
+        /// The storefront webhook secrets, opened, by platform (`salla`,
+        /// `zid`) — `settings.lanApi.sallaWebhookSecret` and
+        /// `zidWebhookSecret`. A platform with none is refused outright, as the
+        /// Node server refuses it: an unsigned order is anyone on the network
+        /// writing into the shop's queue.
+        var storefrontSecrets: [String: String] = [:]
+        /// Record a signed storefront order, INSIDE the write. Returns the row
+        /// written, or nil when the book already held it (a retry that lost the
+        /// race to its own first delivery). Throws when the book cannot be
+        /// written.
+        var storefrontOrder: (_ source: String, _ payload: JSONValue) async throws -> JSONValue?
+            = { _, _ in throw CocoaError(.fileWriteUnknown) }
     }
 
     struct Request {
@@ -168,6 +182,16 @@ final class LanServer {
     /// What was quoted, by reference — so a submitted form is attached to the
     /// figure THIS server produced and not to whatever the browser posts back.
     private var quoted: [String: (quote: JSONValue, at: Date, ip: String)] = [:]
+    /// Failed webhook signatures, by address AND channel — the Node server's
+    /// `${ip}:wh:${channel}` keys. Its own map, so a misconfigured storefront
+    /// hammering a wrong secret cannot lock the owner out of the queue, and a
+    /// guessed PIN cannot lock a storefront out of delivering.
+    private var webhookFailures: [String: KhaytEngine.LanFailures] = [:]
+    /// Signatures seen lately, oldest first, with when each stops counting —
+    /// the Node server's `isReplayedWebhook` LRU.
+    private var seenSignatures: [(signature: String, until: Date)] = []
+    nonisolated static let seenSignatureMax = 500
+    nonisolated static let seenSignatureTTL: TimeInterval = 10 * 60
     /// Meshes being measured right now. Reading a 32 MB model is not free, and
     /// three at once is a shop's machine given over to strangers.
     private var measuring = 0
@@ -605,6 +629,12 @@ final class LanServer {
         // The other app's address for the same page, behind the same token.
         case (_, true) where Self.statusPath(path) != nil:
             return await trackingPage(request, id: Self.statusPath(path)!, store: store)
+
+        case (Self.storefrontHookPath + "salla", false) where request.method == "POST":
+            return await storefrontHook(request, source: "salla")
+
+        case (Self.storefrontHookPath + "zid", false) where request.method == "POST":
+            return await storefrontHook(request, source: "zid")
 
         case ("/api/survey", false) where request.method == "POST":
             return await surveySubmit(request)
@@ -1217,6 +1247,102 @@ final class LanServer {
         }
     }
 
+    // MARK: - Storefront order webhooks
+
+    nonisolated static let storefrontHookPath = "/api/webhook/"
+    /// Where each platform's secret is kept under `settings.lanApi`.
+    nonisolated static let storefrontSecretField = ["salla": "sallaWebhookSecret", "zid": "zidWebhookSecret"]
+
+    /// `POST /api/webhook/salla` and `/api/webhook/zid`: a storefront telling
+    /// the shop it has an order.
+    ///
+    /// The answers, in the Node server's order: locked out 429, no secret
+    /// configured 403, a signature that does not match 401 (and a failure
+    /// counted), a replay of a signature already seen 409, an order the book
+    /// already holds 200 `duplicate`, and otherwise the order is recorded and
+    /// 200. What the order IS — its row, the platform's id, the shelf — is
+    /// `lib/storefront-webhook.js`, the rule the Node server runs.
+    private func storefrontHook(_ request: Request, source: String) async -> Response {
+        let now = host.now()
+        let key = request.remote + ":wh:" + source
+        let record = webhookFailures[key]
+        if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
+            return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
+        }
+        guard let secret = host.storefrontSecrets[source], !secret.isEmpty else {
+            let name = source == "salla" ? "Salla" : "Zid"
+            return .json(403, #"{"error":"\#(name) webhook secret not configured in LAN settings"}"#)
+        }
+        let header = source == "salla" ? "x-salla-signature" : "x-zid-signature"
+        let provided = request.headers[header] ?? ""
+        guard Self.constantTimeEqual(provided, Self.webhookSignature(request.body, secret: secret)) else {
+            if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
+                webhookFailures[key] = bumped
+            }
+            sweepWebhookFailures(now: now)
+            return .json(401, #"{"error":"Invalid signature"}"#)
+        }
+        if replayed(provided, now: now) {
+            return .json(409, #"{"error":"Duplicate delivery ignored"}"#)
+        }
+        // A body that is not JSON is recorded as an order with nothing in it,
+        // exactly as the Node server's `safeJsonParse` hands the rule
+        // `undefined`: it is signed, so it IS the storefront, and a row the
+        // shop can see beats a delivery silently dropped.
+        let payload = (try? JSONDecoder().decode(JSONValue.self, from: request.body)) ?? .null
+        // The early answer, from the book as it is before any write, so a
+        // provider's retry costs nothing. The rule asks again inside the write.
+        if (try? await host.engine.storefrontAlreadyRecorded(
+                source: source, payload: payload, printLog: host.store()["printLog"] ?? .array([]))) == true {
+            return .json(200, #"{"ok":true,"duplicate":true}"#)
+        }
+        do {
+            guard try await host.storefrontOrder(source, payload) != nil else {
+                return .json(200, #"{"ok":true,"duplicate":true}"#)
+            }
+            return .json(200, #"{"ok":true}"#)
+        } catch {
+            return .json(400, Self.errorBody(String(describing: error)))
+        }
+    }
+
+    /// `'sha256=' + hex(HMAC-SHA256(secret, body))` — over the raw bytes, as
+    /// both storefronts sign and as the Node server checks.
+    nonisolated static func webhookSignature(_ body: Data, secret: String) -> String {
+        let mac = HMAC<SHA256>.authenticationCode(for: body, using: SymmetricKey(data: Data(secret.utf8)))
+        return "sha256=" + mac.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Whether this signature was seen within the last ten minutes, and if
+    /// not, remember it. A captured delivery replayed byte for byte is
+    /// refused; a genuine retry past the window is caught by the book instead.
+    private func replayed(_ signature: String, now: Date) -> Bool {
+        guard !signature.isEmpty else { return false }
+        seenSignatures.removeAll { $0.until <= now }
+        if seenSignatures.contains(where: { $0.signature == signature }) { return true }
+        seenSignatures.append((signature, now.addingTimeInterval(Self.seenSignatureTTL)))
+        if seenSignatures.count > Self.seenSignatureMax {
+            seenSignatures.removeFirst(seenSignatures.count - Self.seenSignatureMax)
+        }
+        return false
+    }
+
+    private func sweepWebhookFailures(now: Date) {
+        guard webhookFailures.count > Self.maxFailureKeys else { return }
+        let ms = now.timeIntervalSince1970 * 1000
+        webhookFailures = webhookFailures.filter { $0.value.resetAt > ms }
+        while webhookFailures.count > Self.maxFailureKeys, let any = webhookFailures.keys.first {
+            webhookFailures.removeValue(forKey: any)
+        }
+    }
+
+    /// `{"error": "..."}`, escaped properly — an error's description can hold
+    /// a quote.
+    nonisolated static func errorBody(_ message: String) -> String {
+        let data = (try? JSONEncoder().encode(["error": message])) ?? Data()
+        return String(decoding: data, as: UTF8.self)
+    }
+
     // MARK: - The PIN
 
     /// Nil when the caller may pass; the refusal to send otherwise. The same
@@ -1355,6 +1481,10 @@ struct LanConfig: Equatable, Sendable {
     /// enough to know whether it changed, and keeps the opened PIN out of one
     /// more place.
     var pin: String
+    /// The storefront webhook secrets as STORED — sealed — for the same
+    /// reason: a changed secret has to restart the server, because it is
+    /// opened once at start and never read back out of the book per request.
+    var storefrontSecrets: [String: String] = [:]
 }
 
 extension Shop {
@@ -1363,7 +1493,9 @@ extension Shop {
         let lan = SettingsReader(settings: SettingsReader(settings: settingsDict).object("lanApi"))
         let raw = lan.number("port", 3219)
         let port = (raw >= 1 && raw <= 65535) ? UInt16(raw) : 3219
-        return LanConfig(enabled: lan.flag("enabled"), port: port, bindLan: lan.flag("bindLan"), pin: lan.text("pin"))
+        return LanConfig(enabled: lan.flag("enabled"), port: port, bindLan: lan.flag("bindLan"), pin: lan.text("pin"),
+                         storefrontSecrets: ["salla": lan.text("sallaWebhookSecret"),
+                                             "zid": lan.text("zidWebhookSecret")])
     }
 
     /// The address a phone is told, while the server is up.
@@ -1402,6 +1534,15 @@ extension Shop {
         var host = LanServer.Host(store: { [weak self] in self?.lanBook ?? [:] }, pin: pin, engine: engine)
         host.intakeToken = intakeToken
         host.calendarToken = calendarToken
+        var secrets: [String: String] = [:]
+        for (platform, sealed) in config.storefrontSecrets where !sealed.isEmpty {
+            secrets[platform] = (try? await Secrets.open(sealed, for: source)) ?? ""
+        }
+        host.storefrontSecrets = secrets
+        host.storefrontOrder = { [weak self] platform, payload in
+            guard let self else { throw CocoaError(.fileWriteUnknown) }
+            return try await self.recordStorefrontOrder(platform, payload: payload)
+        }
         host.record = { [weak self] entry in
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             try await self.recordIntake(entry)
@@ -1483,6 +1624,51 @@ extension Shop {
             root["waitingList"] = .array(list)
         }
         await load(source)
+    }
+
+    /// A signed storefront order, into the book: the shared rule run INSIDE
+    /// the write, on the newest book, because its duplicate check and the
+    /// shelf it takes from are both read-modify-writes. Returns the row
+    /// written, or nil when the book already held the order.
+    ///
+    /// The new row is stamped, and so is nothing else: `settings` is not a
+    /// record, and a revision the order never had would be invented.
+    func recordStorefrontOrder(_ platform: String, payload: JSONValue) async throws -> JSONValue? {
+        guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
+        let now = Date()
+        let id = LanServer.uniqueId(platform)
+        var written: JSONValue?
+        try await StoreWriter.update(
+            storeURL: build.storeURL,
+            owns: { StoreLock.weOwnIt(build) },
+            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+        ) { root in
+            written = try await Self.recordStorefront(into: &root, engine: engine, platform: platform,
+                                                      payload: payload, id: id, now: now)
+        }
+        if written != nil { await load(source) }
+        return written
+    }
+
+    /// The mutation `recordStorefrontOrder` runs inside the write — separate
+    /// so a test can run exactly it against a real file, rather than a copy
+    /// of it assembled in the test.
+    static func recordStorefront(into root: inout [String: JSONValue], engine: KhaytEngine,
+                                 platform: String, payload: JSONValue, id: String,
+                                 now: Date) async throws -> JSONValue? {
+        let result = try await engine.storefrontRecord(
+            source: platform, payload: payload, store: .object(root), id: id,
+            day: LanServer.localDay(now), at: StoreWriter.iso(now))
+        guard !result.duplicate, case .object(var next) = result.store,
+              case .object(var order)? = result.order else { return nil }
+        StoreWriter.stamp(&order)
+        // The rule puts the new order at the TOP of the log; stamp it there.
+        if case .array(var log)? = next["printLog"], !log.isEmpty {
+            log[0] = .object(order)
+            next["printLog"] = .array(log)
+        }
+        root = next
+        return .object(order)
     }
 
     /// The link a customer approves a quote from: this Mac's address, the job,
@@ -1660,7 +1846,8 @@ extension Shop {
     /// in, the way a printer key is; a blank one keeps the stored PIN, which
     /// is the rule's own reading of a blank.
     func saveLanSettings(enabled: Bool, port: Int, pin typed: String, bindLan: Bool,
-                         intakeQuote: [String: JSONValue]? = nil) async {
+                         intakeQuote: [String: JSONValue]? = nil,
+                         storefrontSecrets typedSecrets: [String: String] = [:]) async {
         var lan: [String: JSONValue] = ["enabled": .bool(enabled), "port": .number(Double(port)),
                                         "bindLan": .bool(bindLan)]
         // Kept whole rather than spread, as the other app's page keeps it, so
@@ -1669,6 +1856,15 @@ extension Shop {
         let trimmed = typed.trimmingCharacters(in: .whitespaces)
         if !trimmed.isEmpty, let build = source.build {
             do { lan["pin"] = .string(try await Secrets.seal(trimmed, for: build)) }
+            catch { settingsProblem = String(describing: error); return }
+        }
+        // Blank keeps what is stored, as it does for the PIN; anything typed is
+        // sealed before it goes near the book.
+        for (platform, typedSecret) in typedSecrets {
+            let secret = typedSecret.trimmingCharacters(in: .whitespaces)
+            guard !secret.isEmpty, let build = source.build,
+                  let field = LanServer.storefrontSecretField[platform] else { continue }
+            do { lan[field] = .string(try await Secrets.seal(secret, for: build)) }
             catch { settingsProblem = String(describing: error); return }
         }
         await saveSettings(["lanApi": .object(lan)])

@@ -571,6 +571,31 @@ Live printer telemetry from desktop API polling (OctoPrint, Moonraker, PrusaLink
 
 **Response 200** — array per machine with `state`, `progress`, `tempNozzle`, `tempBed`, `timeRemaining`, `filename`, `error`, `lastUpdated`.
 
+### `POST /api/webhook/salla` and `POST /api/webhook/zid`
+
+A storefront telling the shop it has an order. **Served by both apps** — the
+native Mac app since the storefront rule moved to `lib/storefront-webhook.js`.
+Not behind the owner PIN: the storefront proves itself with a signature
+instead.
+
+- **Signature:** `X-Salla-Signature` / `X-Zid-Signature`, `sha256=` + the hex
+  HMAC-SHA256 of the raw body, keyed with `settings.lanApi.sallaWebhookSecret`
+  / `zidWebhookSecret` (set in either app's Online / LAN settings).
+- **Answers, in order:** 429 locked out (ten bad signatures from one address,
+  per platform — its own bucket, so it never locks the owner's PIN); 403 no
+  secret configured; 401 bad signature; 409 a byte-identical replay within ten
+  minutes; 200 `{ "ok": true, "duplicate": true }` for an order the book
+  already holds (by the platform's own order id, so a retry is never a second
+  order); otherwise 200 `{ "ok": true }`.
+- **What it writes:** one `printLog` row at the top — `source`,
+  `sourceOrderId`, the platform's total as `price` — and, for items the shop
+  already has on the shelf, takes them off `settings.storefront.stockQty`. An
+  order the shelf covers in full is written `completed` and `fromStock`.
+
+The carrier (`/api/webhook/smsa|aramex|spl`) and printer
+(`/api/webhook/printer/:id`) webhooks are **served by the Windows and Linux app
+only.**
+
 ## Errors
 
 | HTTP | Meaning |
