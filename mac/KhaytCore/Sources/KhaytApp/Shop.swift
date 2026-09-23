@@ -8598,7 +8598,10 @@ final class Shop {
     /// never sent. A shop that never switched public pricing on is never sent a
     /// withdrawal, every six hours, for ever.
     private(set) var quoteSheetPublished: JSONValue??
+    /// What the last attempt said, in the shop's words, for the Online pane.
     private(set) var quoteSheetSaid: String?
+    private(set) var quoteSheetAt: Date?
+    private(set) var quoteSheetProblem = false
 
     /// Build the shop's quote sheet from the pricing book and send it — or
     /// withdraw the last one. `lib/quote-sheet.js` decides what is in it.
@@ -8616,16 +8619,22 @@ final class Shop {
                 try await session.data(for: $0)
             }
             quoteSheetPublished = .some(sheet)
-            quoteSheetSaid = sheet == nil ? "withdrawn" : "published"
+            quoteSheetSaid = words.callIt(sheet == nil ? "mac.qs_withdrawn" : "mac.qs_published")
+            quoteSheetProblem = false
         } catch CloudReader.Failure.notConnected {
+            // Not a fault: the pane says to sign in instead.
             quoteSheetSaid = nil
         } catch QuoteSheetPublisher.Failure.notOffered {
             // Khayt Cloud has not shipped the endpoint yet. Not a fault here.
-            quoteSheetSaid = "Khayt Cloud does not take a quote sheet yet"
+            quoteSheetSaid = words.callIt("mac.qs_not_offered")
+            quoteSheetProblem = false
         } catch {
-            quoteSheetSaid = String(describing: error)
+            quoteSheetSaid = words.callIt("mac.qs_failed") + " "
+                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+            quoteSheetProblem = true
         }
         if let said = quoteSheetSaid {
+            quoteSheetAt = Date()
             FileHandle.standardError.write(Data("khayt: quote sheet — \(said)\n".utf8))
         }
     }

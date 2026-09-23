@@ -2055,5 +2055,10 @@ extension Shop {
             catch { settingsProblem = String(describing: error); return }
         }
         await saveSettings(["lanApi": .object(lan)])
+        // NOW, not on the next tick. The publisher runs ninety seconds after
+        // launch and then every six hours, so a shop that switched storefront
+        // pricing on (or changed a margin) waited up to six hours for its
+        // storefront to hear about it, with nothing on screen to say so.
+        if intakeQuote != nil { await publishQuoteSheet() }
     }
 }

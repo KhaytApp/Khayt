@@ -1724,6 +1724,12 @@ final class Words {
         "mac.new_spool":     ["en": "New Spool",    "ar": "بكرة جديدة"],
         // The storefront promise, which reported only to stderr.
         "mac.lead_time_last": ["en": "Lead time last", "ar": "آخر مدة تسليم"],
+        "mac.qs_last":       ["en": "Storefront prices", "ar": "أسعار المتجر"],
+        "mac.qs_published":  ["en": "Sent to Khayt Cloud for your storefront.", "ar": "أُرسلت إلى سحابة خيط لمتجرك."],
+        "mac.qs_withdrawn":  ["en": "Withdrawn from your storefront.", "ar": "سُحبت من متجرك."],
+        "mac.qs_not_offered": ["en": "Khayt Cloud does not take storefront prices yet.", "ar": "لا تستقبل سحابة خيط أسعار المتجر بعد."],
+        "mac.qs_failed":     ["en": "Not sent:", "ar": "لم تُرسل:"],
+        "mac.qs_needs_cloud": ["en": "Sign in to the cloud (Book menu) so your storefront can use these prices.", "ar": "سجّل الدخول إلى السحابة (قائمة الدفتر) ليستخدم متجرك هذه الأسعار."],
         // The calculator's own rates, which it could not show or change.
         "mac.calc_cost_rates":    ["en": "Cost rates", "ar": "أسعار التكلفة"],
         "mac.calc_rates_default": ["en": "Khayt's defaults", "ar": "الإعدادات الافتراضية"],

@@ -2321,6 +2321,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   unlocks by itself. The passphrase itself is still never stored. Locking the
   cloud from the menu bar removes the kept key. If the shop's key changes on
   another device, this Mac asks once rather than keep sending with the old one.
+- **(Mac) A storefront waited up to six hours for its prices.** The prices a
+  storefront quotes an upload from are sent to Khayt Cloud on a timer: ninety
+  seconds after the app opens, then every six hours. Switching storefront
+  pricing on, or changing a margin, therefore reached the storefront hours
+  later, and nothing said whether it had. Saving that section now sends them
+  straight away, and Settings → Online says what happened: sent, withdrawn, or
+  why not, including "sign in to the cloud" when the Mac is not signed in.
 
 - **(Mac) Preferences could not be opened.** Settings had nine tabs in a window
   too narrow for them, so the last ones went behind a » button at the end of
