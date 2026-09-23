@@ -68,6 +68,18 @@ enum L10n {
     static func tr(_ key: String) -> String {
         NSLocalizedString(key, bundle: bundle, comment: "")
     }
+
+    /// A string that counts something, in the chosen language's own plural
+    /// forms (`Localizable.stringsdict`).
+    ///
+    /// Formatted with THAT language's locale, not the device's: the plural
+    /// rule comes from the locale, and a phone set to English with the app
+    /// set to Arabic otherwise gets English's two forms — "إضافة 2 بكرة"
+    /// where Arabic says "إضافة بكرتين".
+    static func count(_ key: String, _ n: Int) -> String {
+        let locale = currentLanguage.locale ?? Locale.current
+        return String(format: tr(key), locale: locale, n)
+    }
 }
 
 /// Apply shop language to SwiftUI tree.

@@ -17,9 +17,9 @@ struct IntakeView: View {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if items.isEmpty {
                     ContentUnavailableView(
-                        "Inbox is clear",
+                        L10n.tr("intake.empty"),
                         systemImage: "tray",
-                        description: Text(errorMessage ?? "New job requests from your intake form, WhatsApp, and more show up here.")
+                        description: Text(errorMessage ?? L10n.tr("intake.empty.sub"))
                     )
                 } else {
                     List(items) { item in
@@ -28,12 +28,12 @@ struct IntakeView: View {
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
                                     Task { await setStatus(item, "declined") }
-                                } label: { Label("Decline", systemImage: "xmark") }
+                                } label: { Label(L10n.tr("intake.decline"), systemImage: "xmark") }
                             }
                             .swipeActions(edge: .leading, allowsFullSwipe: false) {
                                 Button {
                                     Task { await setStatus(item, "reminded") }
-                                } label: { Label("Remind", systemImage: "bell") }
+                                } label: { Label(L10n.tr("intake.remind"), systemImage: "bell") }
                                     .tint(KhaytDesign.warn)
                             }
                     }
@@ -42,10 +42,10 @@ struct IntakeView: View {
                     .refreshable { await load() }
                 }
             }
-            .khaytScreen(title: "Intake")
+            .khaytScreen(title: L10n.tr("intake.title"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button(L10n.tr("common.done")) { dismiss() }
                 }
             }
             .task {
@@ -103,7 +103,7 @@ private struct IntakeRow: View {
                 Spacer(minLength: 4)
                 if isWorking { ProgressView().controlSize(.small) }
                 if (item.status ?? "") == "reminded" {
-                    KhaytPill(text: "Reminded", color: KhaytDesign.warn)
+                    KhaytPill(text: L10n.tr("intake.reminded"), color: KhaytDesign.warn)
                 }
             }
             Text(item.displayClient)
@@ -133,13 +133,13 @@ private struct IntakeRow: View {
 
             HStack(spacing: 8) {
                 if let dial = item.dialNumber, let url = URL(string: "tel:\(dial)") {
-                    contactLink("Call", "phone.fill", url, KhaytDesign.ok)
+                    contactLink(L10n.tr("intake.call"), "phone.fill", url, KhaytDesign.ok)
                 }
                 if let dial = item.dialNumber, let url = URL(string: "https://wa.me/\(dial.hasPrefix("+") ? String(dial.dropFirst()) : dial)") {
-                    contactLink("WhatsApp", "message.fill", url, KhaytDesign.brand)
+                    contactLink(L10n.tr("intake.whatsapp"), "message.fill", url, KhaytDesign.brand)
                 }
                 if let email = item.email, !email.isEmpty, let url = URL(string: "mailto:\(email)") {
-                    contactLink("Email", "envelope.fill", url, KhaytDesign.textDim)
+                    contactLink(L10n.tr("intake.email"), "envelope.fill", url, KhaytDesign.textDim)
                 }
             }
             .padding(.top, 2)

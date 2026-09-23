@@ -625,20 +625,14 @@ struct ExpenseDraft: Codable, Sendable {
     var receiptBase64: String?
 }
 
-enum KhaytAPIError: LocalizedError, Sendable {
+/// What it says to a person is in `KhaytAPIError+Words.swift`, not here: this
+/// file is compiled ON ITS OWN by `scripts/ios-contract-decode.swift` against
+/// live server responses, and anything it reaches for outside Foundation —
+/// `L10n`, say — breaks that check. `LocalizationCompletenessTests` holds it.
+enum KhaytAPIError: Error, Sendable {
     case notConfigured
     case invalidURL
     case unauthorized
     case server(String)
     case transport(Error)
-
-    var errorDescription: String? {
-        switch self {
-        case .notConfigured: return "Connect to your Khayt desktop app in Settings."
-        case .invalidURL: return "Invalid server address."
-        case .unauthorized: return "Wrong LAN PIN. Check Settings → LAN API on desktop."
-        case .server(let msg): return msg
-        case .transport(let err): return err.localizedDescription
-        }
-    }
 }

@@ -14,9 +14,9 @@ struct QueueView: View {
                     ProgressView()
                 } else if orders.isEmpty {
                     ContentUnavailableView(
-                        "Queue empty",
+                        L10n.tr("queue.empty"),
                         systemImage: "tray",
-                        description: Text(errorMessage ?? "No active orders.")
+                        description: Text(errorMessage ?? L10n.tr("queue.empty.sub"))
                     )
                 } else {
                     List(orders) { order in
@@ -30,7 +30,7 @@ struct QueueView: View {
                     .listStyle(.insetGrouped)
                 }
             }
-            .navigationTitle("Production queue")
+            .navigationTitle(L10n.tr("queue.title"))
             .refreshable { await load() }
             .task { await load() }
         }
@@ -98,7 +98,7 @@ private struct QueueRow: View {
                     Button(st.localizedLabel) { onSetStatus(st.rawValue) }
                 }
             } label: {
-                Label("Set status", systemImage: "arrow.triangle.branch")
+                Label(L10n.tr("orders.detail.set_status"), systemImage: "arrow.triangle.branch")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -109,7 +109,7 @@ private struct QueueRow: View {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                     } else {
-                        Label("Advance to next stage", systemImage: "arrow.right.circle.fill")
+                        Label(L10n.tr("orders.detail.advance"), systemImage: "arrow.right.circle.fill")
                             .frame(maxWidth: .infinity)
                     }
                 }

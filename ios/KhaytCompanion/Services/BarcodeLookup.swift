@@ -52,19 +52,19 @@ struct BarcodeLookup {
     func lookUp(_ code: String, shelf: [InventorySpool]) async -> Found {
         if let roll = Self.onShelf(code, in: shelf) {
             var draft = SpoolDraft.again(from: roll, barcode: code)
-            draft.sourceNote = "Barcode · same as a roll already on your shelf"
+            draft.sourceNote = L10n.tr("barcode.source.shelf")
             return .onShelf(draft, from: roll)
         }
         do {
             if let product = try await productDatabase(code) {
                 var draft = Self.draft(fromTitle: product.title, brand: product.brand)
                 draft.barcode = code
-                draft.sourceNote = "Barcode · \(product.title)"
+                draft.sourceNote = String(format: L10n.tr("barcode.source.database"), product.title)
                 return .inDatabase(draft, title: product.title)
             }
-            return Self.notFound(code, "Not in the product database. Fill it in once and the next box is found on your shelf.")
+            return Self.notFound(code, L10n.tr("barcode.not_found"))
         } catch {
-            return Self.notFound(code, "The product database could not be reached. Fill it in once and the next box is found on your shelf.")
+            return Self.notFound(code, L10n.tr("barcode.unreachable"))
         }
     }
 
@@ -98,7 +98,7 @@ struct BarcodeLookup {
     private static func notFound(_ code: String, _ reason: String) -> Found {
         var draft = SpoolDraft()
         draft.barcode = code
-        draft.sourceNote = "Barcode \(code) · \(reason)"
+        draft.sourceNote = String(format: L10n.tr("barcode.source.code"), code, reason)
         return .notFound(draft, reason: reason)
     }
 

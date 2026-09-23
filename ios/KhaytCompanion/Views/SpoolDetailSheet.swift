@@ -16,9 +16,9 @@ struct SpoolDetailSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Filament") {
+                Section(L10n.tr("spool.detail.filament")) {
                     if let hex = spool.colorHex {
-                        LabeledContent("Color") {
+                        LabeledContent(L10n.tr("spool.detail.color")) {
                             HStack(spacing: 8) {
                                 RoundedRectangle(cornerRadius: 5)
                                     .fill(Color(hex: hex) ?? .gray)
@@ -33,19 +33,19 @@ struct SpoolDetailSheet: View {
                             }
                         }
                     }
-                    LabeledContent("Name", value: spool.displayLabel)
+                    LabeledContent(L10n.tr("spool.detail.name"), value: spool.displayLabel)
                     if let brand = spool.brand, !brand.isEmpty {
-                        LabeledContent("Brand", value: brand)
+                        LabeledContent(L10n.tr("field.brand"), value: brand)
                     }
                     if let material = spool.material, !material.isEmpty {
-                        LabeledContent("Material", value: material)
+                        LabeledContent(L10n.tr("field.material"), value: material)
                     }
                 }
 
-                Section("Stock") {
-                    LabeledContent("Remaining", value: "\(remainingGrams) g")
+                Section(L10n.tr("spool.detail.stock")) {
+                    LabeledContent(L10n.tr("spool.detail.remaining"), value: "\(remainingGrams) g")
                     if spool.isLowStock && localRemaining == nil {
-                        Label("Low stock", systemImage: "exclamationmark.triangle.fill")
+                        Label(L10n.tr("inventory.low_badge"), systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
                     }
                     // `spool.weight` is what is LEFT, not what it started as —
@@ -54,33 +54,33 @@ struct SpoolDetailSheet: View {
                     // 860 g spool of a 1 kg roll read 860 / 860: every spool in
                     // the shop looked unopened.
                     if let initial = spool.initialWeight {
-                        LabeledContent("Initial weight", value: "\(Int(initial)) g")
+                        LabeledContent(L10n.tr("spool.detail.initial"), value: "\(Int(initial)) g")
                     }
                     if let purchased = spool.purchasedAt {
-                        LabeledContent("Purchased", value: purchased)
+                        LabeledContent(L10n.tr("spool.detail.purchased"), value: purchased)
                     }
                     Button {
                         adjustText = "\(remainingGrams)"
                         showAdjust = true
                     } label: {
-                        Label("Adjust remaining", systemImage: "slider.horizontal.3")
+                        Label(L10n.tr("spool.detail.adjust"), systemImage: "slider.horizontal.3")
                     }
                     .disabled(isWorking)
                 }
 
                 if spool.hasOptionalMeta {
-                    Section("Label / tag info") {
+                    Section(L10n.tr("spool.detail.label_info")) {
                         if let sku = spool.sku, !sku.isEmpty {
                             LabeledContent("SKU", value: sku)
                         }
                         if let lot = spool.lot, !lot.isEmpty {
-                            LabeledContent("Batch / lot", value: lot)
+                            LabeledContent(L10n.tr("spool.detail.lot"), value: lot)
                         }
                         if let p = spool.printTemp {
-                            LabeledContent("Print temp", value: "\(p)°C")
+                            LabeledContent(L10n.tr("spool.detail.print_temp"), value: "\(p)°C")
                         }
                         if let b = spool.bedTemp {
-                            LabeledContent("Bed temp", value: "\(b)°C")
+                            LabeledContent(L10n.tr("spool.detail.bed_temp"), value: "\(b)°C")
                         }
                     }
                 }
@@ -108,7 +108,7 @@ struct SpoolDetailSheet: View {
                     Button(role: .destructive) {
                         showDeleteConfirm = true
                     } label: {
-                        Label("Remove spool", systemImage: "trash")
+                        Label(L10n.tr("spool.detail.remove"), systemImage: "trash")
                     }
                     .disabled(isWorking)
                 }
@@ -118,27 +118,27 @@ struct SpoolDetailSheet: View {
                         .font(.caption)
                 }
             }
-            .navigationTitle("Spool")
+            .navigationTitle(L10n.tr("spool.detail.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button(L10n.tr("common.done")) { dismiss() }
                 }
             }
             .sheet(isPresented: $showWriteNFC) {
                 WriteNFCTagSheet(draft: SpoolDraft.from(spool: spool))
             }
-            .alert("Adjust remaining", isPresented: $showAdjust) {
-                TextField("Grams", text: $adjustText)
+            .alert(L10n.tr("spool.detail.adjust"), isPresented: $showAdjust) {
+                TextField(L10n.tr("spool.detail.grams"), text: $adjustText)
                     .keyboardType(.numberPad)
-                Button("Save") { Task { await saveRemaining() } }
-                Button("Cancel", role: .cancel) {}
+                Button(L10n.tr("common.save")) { Task { await saveRemaining() } }
+                Button(L10n.tr("common.cancel"), role: .cancel) {}
             } message: {
-                Text("Set the remaining filament for this spool, in grams.")
+                Text(L10n.tr("spool.detail.adjust.body"))
             }
-            .alert("Remove spool?", isPresented: $showDeleteConfirm) {
-                Button("Remove", role: .destructive) { Task { await removeSpool() } }
-                Button("Cancel", role: .cancel) {}
+            .alert(L10n.tr("spool.detail.remove_q"), isPresented: $showDeleteConfirm) {
+                Button(L10n.tr("common.remove"), role: .destructive) { Task { await removeSpool() } }
+                Button(L10n.tr("common.cancel"), role: .cancel) {}
             } message: {
                 Text("\(spool.displayLabel) will be removed from inventory.")
             }
@@ -151,7 +151,7 @@ struct SpoolDetailSheet: View {
 
     private func saveRemaining() async {
         guard let grams = Int(adjustText.trimmingCharacters(in: .whitespaces)) else {
-            errorMessage = "Enter a number in grams."
+            errorMessage = L10n.tr("spool.detail.grams_error")
             return
         }
         isWorking = true

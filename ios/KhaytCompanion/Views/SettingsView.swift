@@ -65,7 +65,7 @@ struct SettingsView: View {
                     Button {
                         Task { await CompanionNotifications.shared.requestAuthorizationIfNeeded() }
                     } label: {
-                        Text("Allow notifications")
+                        Text(L10n.tr("settings.notifications.allow"))
                     }
                 }
 

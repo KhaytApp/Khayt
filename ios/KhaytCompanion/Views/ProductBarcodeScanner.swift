@@ -27,18 +27,18 @@ struct ProductBarcodeScanner: View {
                         .ignoresSafeArea(edges: .horizontal)
                 } else {
                     ContentUnavailableView(
-                        "Camera scanning unavailable",
+                        L10n.tr("barcode.unavailable"),
                         systemImage: "barcode.viewfinder",
-                        description: Text("Type the numbers under the barcode instead.")
+                        description: Text(L10n.tr("barcode.unavailable.sub"))
                     )
                 }
                 entryPanel
             }
-            .navigationTitle("Scan barcode")
+            .navigationTitle(L10n.tr("barcode.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(L10n.tr("common.cancel")) { dismiss() }
                 }
             }
         }
@@ -46,22 +46,22 @@ struct ProductBarcodeScanner: View {
 
     private var entryPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Or type the numbers under the barcode")
+            Text(L10n.tr("barcode.type"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             HStack {
-                TextField("e.g. 6938936716785", text: $typed)
+                TextField(L10n.tr("barcode.placeholder"), text: $typed)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
                     .focused($typing)
-                Button("Look up") {
+                Button(L10n.tr("barcode.look_up")) {
                     if let code = typedCode { finish(code) }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(typedCode == nil)
             }
             if !typed.isEmpty, typedCode == nil {
-                Text("That is not a valid UPC/EAN — check the last digit.")
+                Text(L10n.tr("barcode.invalid"))
                     .font(.caption2)
                     .foregroundStyle(.orange)
             }

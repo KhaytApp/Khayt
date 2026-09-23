@@ -84,13 +84,13 @@ struct BookWriter {
         var errorDescription: String? {
             switch self {
             case .noSuchMachine:
-                return "That printer is not in the shop's list."
+                return L10n.tr("error.no_such_machine")
             case .declineNeedsTheMac:
-                return "Declining a request needs the Mac."
+                return L10n.tr("error.decline_needs_mac")
             case .noMaterial:
-                return "Material name is required."
+                return L10n.tr("error.material_required")
             case .recordHasNoId, .idTaken:
-                return "That record could not be added to the book."
+                return L10n.tr("error.record_not_added")
             }
         }
     }

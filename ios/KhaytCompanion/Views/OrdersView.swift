@@ -47,7 +47,7 @@ struct OrdersView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("Orders", selection: $segment) {
+                Picker(L10n.tr("tab.orders"), selection: $segment) {
                     ForEach(Segment.allCases) { s in
                         Text(s.title).tag(s)
                     }

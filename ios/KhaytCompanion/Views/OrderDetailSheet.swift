@@ -13,31 +13,31 @@ struct OrderDetailSheet: View {
         NavigationStack {
             List {
                 Section {
-                    LabeledContent("Project", value: order.displayTitle)
-                    LabeledContent("Client", value: order.displayClient)
-                    LabeledContent("Status") {
+                    LabeledContent(L10n.tr("field.project"), value: order.displayTitle)
+                    LabeledContent(L10n.tr("field.client"), value: order.displayClient)
+                    LabeledContent(L10n.tr("field.status")) {
                         CompanionStatusBadge(status: order.status)
                     }
                     if let machine = order.machine, !machine.isEmpty {
-                        LabeledContent("Machine", value: machine)
+                        LabeledContent(L10n.tr("field.machine"), value: machine)
                     }
                     if let due = order.dueDate, !due.isEmpty {
-                        LabeledContent("Due", value: due)
+                        LabeledContent(L10n.tr("field.due"), value: due)
                     }
                     if let priority = order.priority, !priority.isEmpty {
-                        LabeledContent("Priority", value: priority.capitalized)
+                        LabeledContent(L10n.tr("field.priority"), value: priority.capitalized)
                     }
-                    LabeledContent("Order ID", value: order.id)
+                    LabeledContent(L10n.tr("order.detail.id"), value: order.id)
                         .font(.caption)
                 }
 
                 if let onAssignMachine, !machines.isEmpty {
-                    Section("Machine") {
+                    Section(L10n.tr("field.machine")) {
                         Menu {
                             Button {
                                 onAssignMachine(nil)
                             } label: {
-                                Label("Unassigned", systemImage: order.machineId == nil ? "checkmark" : "circle")
+                                Label(L10n.tr("common.unassigned"), systemImage: order.machineId == nil ? "checkmark" : "circle")
                             }
                             ForEach(machines) { m in
                                 Button {
@@ -48,10 +48,10 @@ struct OrderDetailSheet: View {
                             }
                         } label: {
                             HStack {
-                                Text("Assigned to")
+                                Text(L10n.tr("order.detail.assigned"))
                                     .foregroundStyle(KhaytDesign.text)
                                 Spacer()
-                                Text(order.machine ?? "Unassigned")
+                                Text(order.machine ?? L10n.tr("common.unassigned"))
                                     .foregroundStyle(KhaytDesign.textDim)
                                 if isUpdating {
                                     ProgressView().controlSize(.small)
@@ -101,11 +101,11 @@ struct OrderDetailSheet: View {
                     }
                 }
             }
-            .navigationTitle("Order")
+            .navigationTitle(L10n.tr("order.detail.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button(L10n.tr("common.done")) { dismiss() }
                 }
             }
         }
