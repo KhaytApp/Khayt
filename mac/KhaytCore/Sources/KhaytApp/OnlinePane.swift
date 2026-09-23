@@ -177,6 +177,32 @@ struct OnlinePane: View {
                         Text(shop.words.callIt("lan.iq_enable_hint"))
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        // WHERE THE STOREFRONT'S PRICES WENT. The sheet is sent to
+                        // Khayt Cloud for a storefront to read, on a timer and on
+                        // every save here, and said so only to stderr: a shop
+                        // switching this on could not tell whether its storefront
+                        // had heard. Said here, like the lead time below.
+                        if draft.quoteOn && !Shop.cloudConnected(shop.settingsDict) {
+                            Label(shop.words.callIt("mac.qs_needs_cloud"), systemImage: "icloud.slash")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else if let said = shop.quoteSheetSaid {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(shop.words.callIt("mac.qs_last"))
+                                    .font(.caption).foregroundStyle(.secondary)
+                                Text(said)
+                                    .font(.caption)
+                                    .foregroundStyle(shop.quoteSheetProblem
+                                                     ? AnyShapeStyle(Khayt.attention)
+                                                     : AnyShapeStyle(.secondary))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Spacer(minLength: 0)
+                                if let at = shop.quoteSheetAt {
+                                    Text(shop.words.say(at, Date.FormatStyle(date: .omitted, time: .shortened)))
+                                        .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                                }
+                            }
+                        }
                         LabeledContent(shop.words.callIt("lan.iq_printer")) {
                             Picker("", selection: $draft.presetId) {
                                 Text(shop.words.callIt("lan.iq_pick")).tag("")
