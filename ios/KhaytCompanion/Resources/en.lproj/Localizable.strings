@@ -455,3 +455,7 @@
 
 "pair.use_cloud" = "Use Khayt Cloud instead";
 "pair.use_cloud.footer" = "If the shop syncs to Khayt Cloud, the phone can start from there and pair with the Mac later.";
+
+"pair.pin.prompt" = "Enter the PIN set on the Mac";
+"pair.missing.shop" = "Tap your shop above, or enter its address.";
+"pair.missing.pin" = "Enter the Owner LAN PIN to continue.";
