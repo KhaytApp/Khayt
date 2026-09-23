@@ -78,6 +78,8 @@ struct BookWriter {
         /// A new record the shop's rule would not make — a spool with no
         /// material, which no job can ever be matched to.
         case noMaterial
+        /// An order with no project name, which the endpoint answers 400.
+        case noProject
         case recordHasNoId
         case idTaken
 
@@ -89,6 +91,8 @@ struct BookWriter {
                 return L10n.tr("error.decline_needs_mac")
             case .noMaterial:
                 return L10n.tr("error.material_required")
+            case .noProject:
+                return L10n.tr("error.project_required")
             case .recordHasNoId, .idTaken:
                 return L10n.tr("error.record_not_added")
             }
@@ -266,5 +270,103 @@ struct BookWriter {
         f.timeZone = zone
         f.dateFormat = "yyyy-MM-dd"
         return f.string(from: date)
+    }
+
+    // MARK: - Raising an order
+
+    /// Raise an order or a quote, as `POST /api/orders` would.
+    ///
+    /// ── NOTHING HERE NEEDS THE MAC ───────────────────────────────────────
+    ///
+    /// The endpoint takes no number from a shop counter. Its id is the shop's
+    /// prefix, the year, the time and four random hex digits — nothing two
+    /// devices could hand out twice — and every other field is copied or
+    /// defaulted. So the record built here is the one the endpoint writes, and
+    /// the Mac folds it in like any other new row. The native Mac serves no
+    /// `POST /api/orders` at all, so for a shop on it this is the only way an
+    /// order raised on the phone reaches the queue.
+    ///
+    /// Written at the FRONT of `printLog`, as the endpoint does. The fold on
+    /// the Mac appends a record it has not seen, so there it lands at the end;
+    /// screens order by date and `queuePos`, not by position in the array.
+    func addOrder(_ draft: NewOrderDraft, machines: [MachineInfo], now: Date = Date()) throws -> [String: JSONValue] {
+        var made: [String: JSONValue] = [:]
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = try book.read()["settings"] { settings = s }
+        try book.insertRecord(collection: "printLog", atFront: true) { rows in
+            made = try Self.orderRecord(from: draft, settings: settings, machines: machines,
+                                        existing: rows, now: now)
+            return made
+        }
+        return made
+    }
+
+    static func orderRecord(from draft: NewOrderDraft, settings: [String: JSONValue],
+                            machines: [MachineInfo], existing: [JSONValue],
+                            now: Date = Date(), zone: TimeZone = .current) throws -> [String: JSONValue] {
+        let project = String(draft.project.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
+        guard !project.isEmpty else { throw Refusal.noProject }
+
+        let asQuote = draft.isQuote
+        let status = asQuote ? "quote" : "pending"
+        func setting(_ key: String) -> String? {
+            if case .string(let v)? = settings[key], !v.isEmpty { return v }
+            return nil
+        }
+        // The desk's own prefix — `invPrefix`, not an `orderPrefix` that never
+        // existed; the endpoint's comment is about exactly that mistake.
+        let prefix = asQuote ? (setting("quotePrefix") ?? "QUO") : (setting("invPrefix") ?? "INV")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let year = calendar.component(.year, from: now)
+        let ms = Int(now.timeIntervalSince1970 * 1000)
+        let id = "\(prefix)-\(year)-\(ms)-\(String(format: "%04x", UInt16.random(in: .min ... .max)))"
+
+        // A machine the shop does not have is refused, as the endpoint's 404.
+        var machineId: JSONValue = .null
+        var machineName: JSONValue = .null
+        if let wanted = draft.machineId, !wanted.isEmpty {
+            guard let machine = machines.first(where: { $0.id == wanted }) else { throw Refusal.noSuchMachine }
+            machineId = .string(wanted)
+            machineName = machine.name.map(JSONValue.string) ?? .null
+        }
+
+        let client = String(draft.client.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
+        let material = String(draft.material.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
+        let price = ((SpoolDraft.price(draft.price) ?? 0) * 100).rounded() / 100
+        let pending = existing.filter {
+            if case .object(let o) = $0, o["status"] == .string("pending") { return true }
+            return false
+        }.count
+        let day = localDay(now, in: zone)
+        let stamp = StoreWriter.iso(now)
+
+        var order: [String: JSONValue] = [
+            "id": .string(id),
+            "date": .string(day),
+            "timestamp": .string(stamp),
+            "project": .string(project),
+            "client": client.isEmpty ? .null : .string(client),
+            "clientId": .null,
+            "material": material.isEmpty ? .null : .string(material),
+            "price": .number(price),
+            "status": .string(status),
+            "statusHistory": .array([.object(["status": .string(status), "at": .string(stamp)])]),
+            "queuePos": .number(Double(pending + 1)),
+            "machineId": machineId,
+            "machine": machineName,
+            "notes": .string(""),
+            "dueDate": draft.dueDate.isEmpty ? .null : .string(draft.dueDate),
+            "paymentStatus": .string("unpaid"),
+            "parts": .array([]),
+        ]
+        if asQuote {
+            var days = 7.0
+            if case .number(let n)? = settings["quoteValidityDays"], n > 0 { days = n }
+            order["quoteSentAt"] = .string(day)
+            order["quoteExpiresAt"] = .string(localDay(now.addingTimeInterval(days * 86_400), in: zone))
+            order["quoteVersion"] = .number(1)
+        }
+        return order
     }
 }

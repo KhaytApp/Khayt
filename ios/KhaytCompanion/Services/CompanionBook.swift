@@ -273,6 +273,29 @@ struct CompanionBook {
         }
     }
 
+    /// Put one new record in, built against the collection AS IT IS inside the
+    /// write — for a field that counts its neighbours, like an order's
+    /// `queuePos`, which a count taken before the write could get wrong.
+    func insertRecord(collection: String, atFront: Bool,
+                      make: ([JSONValue]) throws -> [String: JSONValue]) throws {
+        try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+            var rows: [JSONValue] = []
+            if case .array(let had)? = root[collection] { rows = had }
+            var record = try make(rows)
+            guard case .string(let id)? = record["id"], !id.isEmpty else {
+                throw BookWriter.Refusal.recordHasNoId
+            }
+            let taken = rows.contains {
+                if case .object(let o) = $0, case .string(let rowId)? = o["id"] { return rowId == id }
+                return false
+            }
+            guard !taken else { throw BookWriter.Refusal.idTaken }
+            StoreWriter.stamp(&record)
+            if atFront { rows.insert(.object(record), at: 0) } else { rows.append(.object(record)) }
+            root[collection] = .array(rows)
+        }
+    }
+
     /// The Mac has taken everything this phone had changed.
     ///
     /// The baseline becomes the book, so the next outbox measures from here.

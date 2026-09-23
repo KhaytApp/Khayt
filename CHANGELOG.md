@@ -13,6 +13,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   as the app was open. It now sends the whole store when the server asks for
   it, which clears the history, and goes back to sending only what changed.
 
+- **(iOS) Raise an order or a quote on the phone with the Mac switched off.**
+  It goes into the phone's copy of the shop and reaches the Mac with the
+  other offline edits — and for a shop on the native Mac app, which serves no
+  `POST /api/orders`, raising an order from the phone had never worked at all.
+  The record is the one the endpoint writes: the shop's own `invPrefix` /
+  `quotePrefix`, the shop's calendar day, the printer's name beside its id, a
+  queue position counted from the jobs already pending, and the shop's quote
+  validity. A price typed as `120,5` is read as 120.5 in both paths now.
+
 - **(iOS) The companion is in Arabic end to end.** The pairing wizard — the
   first screen a new shop sees — had no Arabic at all; neither did adding a
   spool, both scanners, the new-order sheet, order and spool detail, the
