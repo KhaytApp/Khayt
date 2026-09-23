@@ -338,7 +338,8 @@ struct MachineBandView: View {
 
                     if row.known {
                         ForEach(row.blocks.filter { !$0.beyond && $0.minutes > 0 }) { block in
-                            Block(block: block, shop: shop, compact: compact)
+                            Block(block: block, shop: shop, compact: compact,
+                                  width: max(2, w * (block.minutes / band.minutes)))
                                 .frame(width: max(2, w * (block.minutes / band.minutes)), height: height)
                                 .offset(x: w * (block.startMinute / band.minutes))
                         }
@@ -383,26 +384,39 @@ struct MachineBandView: View {
         let block: KhaytEngine.MachineBand.Block
         let shop: Shop
         let compact: Bool
+        /// How wide the block is drawn.
+        var width: CGFloat = .infinity
+
+        /// Below this a label can only be drawn as its first letter and an
+        /// ellipsis ("(n…" over "2:…" on the shop's U1 with two hours left of a
+        /// 48-hour band), which reads as a fault rather than as a job. The
+        /// tooltip carries it whole, so a narrow block is drawn bare.
+        static let labelledFrom: CGFloat = 60
 
         var body: some View {
             VStack(alignment: .leading, spacing: 2) {
-                Text(block.title.isEmpty ? shop.words.callIt("mac.unnamed") : block.title)
-                    .font(.caption.weight(.semibold)).foregroundStyle(ink).lineLimit(1)
-                // The second line goes first when there is no room for it. It
-                // is the detail; the name is the thing being looked for. Both
-                // stay in the tooltip either way.
-                if !compact {
-                    Text(sub).font(.caption2).monospacedDigit()
-                        .foregroundStyle(block.kind == "blocked"
-                                         ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.secondary))
-                        .lineLimit(1)
-                }
+                if width >= Self.labelledFrom { labels }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(.horizontal, 7).padding(.vertical, compact ? 3 : 5)
+            .padding(.horizontal, width >= Self.labelledFrom ? 7 : 0)
+            .padding(.vertical, compact ? 3 : 5)
             .background(fill, in: RoundedRectangle(cornerRadius: 3))
             .overlay(shape)
             .help(block.title + " · " + sub)
+        }
+
+        @ViewBuilder private var labels: some View {
+            Text(block.title.isEmpty ? shop.words.callIt("mac.unnamed") : block.title)
+                .font(.caption.weight(.semibold)).foregroundStyle(ink).lineLimit(1)
+            // The second line goes first when there is no room for it. It
+            // is the detail; the name is the thing being looked for. Both
+            // stay in the tooltip either way.
+            if !compact {
+                Text(sub).font(.caption2).monospacedDigit()
+                    .foregroundStyle(block.kind == "blocked"
+                                     ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.secondary))
+                    .lineLimit(1)
+            }
         }
 
         /// A cut end is DASHED, and it is the whole reason this reads honestly:

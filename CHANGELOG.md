@@ -2347,6 +2347,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   time" also appeared whenever any machine was simply free; it now appears
   only when that is true. A machine in a maintenance window no longer shows
   the raw text `mac.band_state_down`.
+- **(Mac) A short job on the 48-hour band read as "(n…".** A block too narrow
+  for its name (two hours of a forty-eight-hour band) was drawn with its label
+  cut to a letter and an ellipsis. It is drawn bare now; the name and time are
+  in its tooltip, as they always were.
 
 - **(Mac) Preferences could not be opened.** Settings had nine tabs in a window
   too narrow for them, so the last ones went behind a » button at the end of
