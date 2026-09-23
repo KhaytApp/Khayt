@@ -124,12 +124,23 @@ struct OrdersView: View {
         if !queue.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    FilterChip(title: L10n.tr("orders.filter.all"), selected: activeFilter == .all) { activeFilter = .all }
-                    FilterChip(title: L10n.tr("orders.overdue"), selected: activeFilter == .overdue) { activeFilter = .overdue }
+                    FilterChip(title: L10n.tr("orders.filter.all"), count: queue.count,
+                               tint: KhaytDesign.brand, selected: activeFilter == .all) { activeFilter = .all }
                     ForEach([OrderStatus.pending, .printing, .post, .qc], id: \.self) { st in
-                        FilterChip(title: st.localizedLabel, selected: activeFilter == .status(st)) {
+                        FilterChip(title: st.localizedLabel,
+                                   count: queue.filter { $0.status == st.rawValue }.count,
+                                   tint: KhaytDesign.statusColor(for: st.rawValue),
+                                   dot: true,
+                                   selected: activeFilter == .status(st)) {
                             activeFilter = .status(st)
                         }
+                    }
+                    // Not a stage, so it goes last — but it is the one filter a
+                    // shop reaches for when the dashboard says something is late.
+                    let late = queue.filter(\.isOverdue).count
+                    if late > 0 || activeFilter == .overdue {
+                        FilterChip(title: L10n.tr("orders.overdue"), count: late,
+                                   tint: KhaytDesign.danger, selected: activeFilter == .overdue) { activeFilter = .overdue }
                     }
                 }
                 .padding(.horizontal)
@@ -142,23 +153,35 @@ struct OrdersView: View {
                 ProgressView()
             } else if filteredQueue.isEmpty {
                 ContentUnavailableView(
-                    L10n.tr("tab.orders"),
-                    systemImage: "tray",
-                    description: Text(errorMessage ?? "—")
+                    errorMessage == nil ? L10n.tr("orders.queue_clear") : L10n.tr("tab.orders"),
+                    systemImage: errorMessage == nil ? "checkmark.circle" : "tray",
+                    description: Text(errorMessage ?? L10n.tr("orders.queue_clear.sub"))
                 )
             } else {
                 List(filteredQueue) { order in
                     Button {
                         selectedOrder = order
                     } label: {
-                        QueueOrderRow(
-                            order: order,
-                            isUpdating: updatingId == order.id,
-                            onAdvance: { Task { await advance(order) } }
-                        )
+                        QueueOrderRow(order: order, isUpdating: updatingId == order.id)
                     }
                     .buttonStyle(.plain)
                     .listRowBackground(KhaytDesign.surface)
+                    .listRowInsets(EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 16))
+                    // `khayt-orders.jsx` SwipeRow: swipe left to move the job on.
+                    // The action is named and coloured for the stage it moves TO,
+                    // so a swipe says where the job is going before it goes. It is
+                    // the same write the detail sheet's Advance makes, offline
+                    // included, and VoiceOver reads it as a custom action.
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if let next = OrderStatus(rawValue: order.status)?.nextInQueue {
+                            Button {
+                                Task { await advance(order) }
+                            } label: {
+                                Label(next.localizedLabel, systemImage: "arrow.right")
+                            }
+                            .tint(KhaytDesign.statusColor(for: next.rawValue))
+                        }
+                    }
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
@@ -174,9 +197,9 @@ struct OrdersView: View {
                 ProgressView()
             } else if recent.isEmpty {
                 ContentUnavailableView(
-                    L10n.tr("orders.recent"),
+                    errorMessage == nil ? L10n.tr("orders.no_completed") : L10n.tr("orders.recent"),
                     systemImage: "clock",
-                    description: Text(errorMessage ?? "—")
+                    description: Text(errorMessage ?? L10n.tr("orders.no_completed.sub"))
                 )
             } else {
                 List {
@@ -203,33 +226,38 @@ struct OrdersView: View {
         }
     }
 
+    /// `khayt-orders.jsx` RecentRow: a status tile, the job, and its date.
     private func recentRow(_ entry: OrderLogEntry) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
+        HStack(spacing: 12) {
+            Image(systemName: CompanionTheme.statusIcon(for: entry.status))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(KhaytDesign.statusColor(for: entry.status))
+                .frame(width: 36, height: 36)
+                .background(KhaytDesign.statusSoft(for: entry.status),
+                            in: RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 2) {
                 Text(entry.displayTitle)
-                    .font(.headline)
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(KhaytDesign.text)
-                Spacer()
-                CompanionStatusBadge(status: entry.status, compact: true)
+                    .lineLimit(1)
+                Text([entry.displayClient, entry.id].joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundStyle(KhaytDesign.textDim)
+                    .lineLimit(1)
             }
-            Text(entry.displayClient)
-                .font(.subheadline)
-                .foregroundStyle(KhaytDesign.textDim)
-            HStack {
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 4) {
                 if let date = entry.date ?? entry.dueDate {
                     Text(date)
                         .font(.caption)
                         .foregroundStyle(KhaytDesign.textMuted)
                 }
-                if entry.isOverdue {
-                    Text(L10n.tr("orders.overdue"))
-                        .font(.caption2.bold())
-                        .foregroundStyle(KhaytDesign.danger)
-                }
+                if entry.isOverdue { LateBadge() }
             }
         }
-        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
         .listRowBackground(KhaytDesign.surface)
+        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
     }
 
     private func load() async {
@@ -299,73 +327,110 @@ struct OrdersView: View {
     }
 }
 
+/// `khayt-orders.jsx` FilterChips: tinted by the stage it filters, with a count.
 private struct FilterChip: View {
     let title: String
+    var count: Int = 0
+    var tint: Color = KhaytDesign.brand
+    var dot = false
     let selected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.caption.bold())
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .frame(minHeight: 44)
-                .background(selected ? KhaytDesign.brand : KhaytDesign.surface2, in: Capsule())
-                .foregroundStyle(selected ? Color.white : KhaytDesign.textDim)
+            HStack(spacing: 5) {
+                if selected && dot {
+                    Circle().fill(tint).frame(width: 5, height: 5)
+                }
+                Text(title)
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.caption2.bold())
+                        .monospacedDigit()
+                        .padding(.horizontal, 5)
+                        .frame(minWidth: 16)
+                        .background(selected ? tint : KhaytDesign.surface3, in: Capsule())
+                        .foregroundStyle(selected ? Color.white : KhaytDesign.textMuted)
+                }
+            }
+            .font(.caption.bold())
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(selected ? tint.opacity(0.16) : KhaytDesign.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(selected ? tint.opacity(0.32) : KhaytDesign.sep, lineWidth: 1.5))
+            .foregroundStyle(selected ? tint : KhaytDesign.textDim)
+            // A 32pt pill, touched anywhere in a 44pt band around it.
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
+/// The red "late" tag beside a job's name.
+struct LateBadge: View {
+    var body: some View {
+        Text(L10n.tr("orders.late"))
+            .font(.system(size: 9, weight: .bold))
+            .tracking(0.4)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .foregroundStyle(KhaytDesign.danger)
+            .background(KhaytDesign.dangerSoft, in: RoundedRectangle(cornerRadius: 4))
+    }
+}
+
+/// `khayt-orders.jsx` OrderRow: a stage strip, the job, who it is for, and
+/// its stage and due date. Moving it on is a swipe (see `activeContent`),
+/// not a button in every row — that is what made each row three times taller
+/// than the mockup's.
 private struct QueueOrderRow: View {
     let order: QueueOrder
     let isUpdating: Bool
-    let onAdvance: () -> Void
+
+    private var subtitle: String {
+        // Which printer a job is on is worth more on a shop floor than its id,
+        // which the detail sheet shows anyway.
+        let second = (order.machine?.isEmpty == false) ? order.machine! : order.id
+        return [order.displayClient, second].joined(separator: " · ")
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(order.displayTitle)
-                    .font(.headline)
-                    .foregroundStyle(KhaytDesign.text)
-                Spacer()
-                CompanionStatusBadge(status: order.status, compact: true)
-            }
-            Text(order.displayClient)
-                .font(.subheadline)
-                .foregroundStyle(KhaytDesign.textDim)
-            if let machine = order.machine, !machine.isEmpty {
-                Label(machine, systemImage: "printer")
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(KhaytDesign.statusColor(for: order.status))
+                .frame(width: 3)
+                .padding(.vertical, 2)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(order.displayTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(KhaytDesign.text)
+                        .lineLimit(1)
+                    if order.isOverdue { LateBadge() }
+                }
+                Text(subtitle)
                     .font(.caption)
-                    .foregroundStyle(KhaytDesign.textMuted)
+                    .foregroundStyle(KhaytDesign.textDim)
+                    .lineLimit(1)
             }
-            HStack {
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 5) {
+                if isUpdating {
+                    ProgressView().controlSize(.small)
+                } else {
+                    CompanionStatusBadge(status: order.status, compact: true)
+                }
                 if let due = order.formattedDueDate {
-                    Label(String(format: L10n.tr("orders.due"), due), systemImage: "calendar")
+                    Text(due)
                         .font(.caption2)
                         .foregroundStyle(order.isOverdue ? KhaytDesign.danger : KhaytDesign.textMuted)
                 }
-                if order.isOverdue {
-                    Text(L10n.tr("orders.overdue"))
-                        .font(.caption2.bold())
-                        .foregroundStyle(KhaytDesign.danger)
-                }
-            }
-            if OrderStatus(rawValue: order.status)?.nextInQueue != nil {
-                Button(action: onAdvance) {
-                    if isUpdating {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Label(L10n.tr("orders.advance"), systemImage: "arrow.right.circle")
-                            .font(.caption.bold())
-                    }
-                }
-                .frame(minHeight: 44, alignment: .leading)
-                .foregroundStyle(KhaytDesign.brand)
-                .disabled(isUpdating)
             }
         }
-        .padding(.vertical, 4)
+        .fixedSize(horizontal: false, vertical: true)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }
