@@ -8544,6 +8544,54 @@ final class Shop {
     var editingSpool: Spool?
     /// True while the sheet is for a spool that is not on the shelf yet.
     var addingSpool = false
+    /// The Spoolman import sheet is open.
+    var importingSpoolman = false
+
+    /// Bring every spool across from Spoolman that is not already on the
+    /// shelf. Returns the sentence to show, or throws what went wrong —
+    /// fetching first, then one write for the whole import, so a network
+    /// failure halfway leaves the shelf untouched.
+    func importFromSpoolman(_ address: String) async throws -> String {
+        guard let build = source.build else { throw MoveRefused(sentence: words.callIt("mac.move_sample")) }
+        guard let engine else { throw MoveRefused(sentence: words.callIt("mac.move_no_engine")) }
+        let base = try await SpoolmanImport.base(address, engine: engine)
+        let spools = try await SpoolmanImport.fetchAll(base, engine: engine)
+        var plan: KhaytEngine.SpoolmanPlan?
+        try await StoreWriter.update(
+            storeURL: build.storeURL,
+            owns: { StoreLock.weOwnIt(build) },
+            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+        ) { root in
+            plan = try await Self.addFromSpoolman(into: &root, spools: spools, engine: engine, today: Self.today())
+        }
+        await load(source)
+        guard let plan else { return "" }
+        return words.callIt("mac.spoolman_done", [
+            "added": .number(Double(plan.add.count)),
+            "already": .number(Double(plan.skipped.already)),
+            "skipped": .number(Double(plan.skipped.archived + plan.skipped.unnamed)),
+        ])
+    }
+
+    /// The mutation the import runs INSIDE the write, on the newest shelf —
+    /// so a spool added a moment ago by another window is still seen as
+    /// already imported. Each new spool is stamped. Separate so a test can run
+    /// exactly this against a real file.
+    static func addFromSpoolman(into root: inout [String: JSONValue], spools: [JSONValue],
+                                engine: KhaytEngine, today: String) async throws -> KhaytEngine.SpoolmanPlan {
+        let shelf = rows(root, "inventory")
+        let ids = (0..<spools.count).map { _ in uid("INV") }
+        let plan = try await engine.spoolmanPlan(spools: spools, inventory: .array(shelf), ids: ids, today: today)
+        guard !plan.add.isEmpty else { return plan }
+        var next = shelf
+        for row in plan.add {
+            guard case .object(var record) = row else { continue }
+            StoreWriter.stamp(&record)
+            next.append(.object(record))
+        }
+        root["inventory"] = .array(next)
+        return plan
+    }
 
     /// Put a spool on the shelf, or correct one that is already there.
     ///

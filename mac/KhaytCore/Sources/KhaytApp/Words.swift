@@ -2540,6 +2540,16 @@ final class Words {
                                     + "وتقويم المواعيد، ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس، "
                                     + "ويستقبل الطلبات من سلة وزد وتحديثات الشحنات من سمسا وأرامكس والبريد السعودي. "
                                     + "أما ويب هوك الطابعات فيعمل في ذلك التطبيق حالياً."],
+        "mac.spoolman_import": ["en": "Import from Spoolman", "ar": "استيراد من Spoolman"],
+        "mac.spoolman_address": ["en": "Spoolman address", "ar": "عنوان Spoolman"],
+        "mac.spoolman_hint": ["en": "Every spool Spoolman holds comes onto the shelf, with its vendor, colour, price "
+                                   + "and what is left on it. Spools already brought across are skipped, and Spoolman "
+                                   + "itself is only read, never changed.",
+                              "ar": "تُضاف كل بكرة في Spoolman إلى الرف مع المورّد واللون والسعر والكمية المتبقية. "
+                                   + "تُتخطّى البكرات المستوردة سابقًا، ويُقرأ Spoolman فقط دون أي تغيير عليه."],
+        "mac.spoolman_go":   ["en": "Import", "ar": "استيراد"],
+        "mac.spoolman_done": ["en": "{added} spools added. {already} were already on the shelf; {skipped} skipped.",
+                              "ar": "أُضيفت {added} بكرة. {already} موجودة مسبقًا على الرف، وتُخطّيت {skipped}."],
         "mac.send_title":    ["en": "Send to printer", "ar": "إرسال إلى الطابعة"],
         "mac.send_printer":  ["en": "Printer", "ar": "الطابعة"],
         "mac.send_file":     ["en": "File", "ar": "الملف"],
