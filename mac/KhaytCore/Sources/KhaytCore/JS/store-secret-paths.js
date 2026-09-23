@@ -65,6 +65,18 @@
     'settings.bnpl.tamara.notificationToken',
     'settings.bnpl.stripe.apiKey',
     'settings.telegram.botToken',
+    // A carrier's API key and the secret its status webhooks are signed with.
+    // Missing until Sep 2026 while `carriers.js` marked both `secret: true`:
+    // written to disk in the clear and handed to the renderer unmasked. Listed
+    // per carrier because this list names paths, not patterns —
+    // every-secret-is-protected.test.js fails if a carrier gains a secret
+    // field that is not here.
+    'settings.shipping.smsa.apiKey',
+    'settings.shipping.smsa.webhookSecret',
+    'settings.shipping.aramex.apiKey',
+    'settings.shipping.aramex.webhookSecret',
+    'settings.shipping.spl.apiKey',
+    'settings.shipping.spl.webhookSecret',
     'settings.lanApi.webhookToken',
     'settings.lanApi.sallaWebhookSecret',
     'settings.lanApi.zidWebhookSecret',

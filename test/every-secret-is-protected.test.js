@@ -95,3 +95,24 @@ test('hasPlaintextSecrets answers no when everything is already encrypted', () =
   }
   assert.equal(io.hasPlaintextSecrets({ settings: { shopName: 'Khayt' } }), false);
 });
+
+test('every field a carrier marks secret is on the list', () => {
+  // `carriers.js` has declared `apiKey` and `webhookSecret` as `secret: true`
+  // since it was written, and neither was here — so a shop's SMSA key sat in
+  // the store in the clear and reached the renderer unmasked. The carrier
+  // module is where a new secret field would be added, so it is read directly.
+  const { listCarriers, getCarrier } = require('../lib/carriers.js');
+  const ids = (typeof listCarriers === 'function' ? listCarriers() : ['smsa', 'aramex', 'spl'].map(getCarrier))
+    .map((c) => (typeof c === 'string' ? c : c.id));
+  let checked = 0;
+  for (const id of ids) {
+    const carrier = getCarrier(id);
+    for (const f of (carrier && carrier.configFields) || []) {
+      if (!f.secret) continue;
+      checked += 1;
+      assert.ok(SECRET_PATHS.includes(`settings.shipping.${id}.${f.key}`),
+        `settings.shipping.${id}.${f.key} is marked secret by carriers.js and is not protected`);
+    }
+  }
+  assert.ok(checked >= 6, `only ${checked} carrier secrets were found to check — the carrier list moved`);
+});
