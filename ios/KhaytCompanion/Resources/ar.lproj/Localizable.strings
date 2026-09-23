@@ -427,3 +427,31 @@
 "settings.notifications.allow" = "السماح بالإشعارات";
 "unit.g" = "غ";
 "inventory.remove.body" = "ستُزال %@ من المخزون.";
+
+/* Khayt Cloud */
+"cloud.title" = "Khayt Cloud";
+"cloud.sign_in" = "تسجيل الدخول إلى Khayt Cloud";
+"cloud.sign_out" = "تسجيل الخروج من Khayt Cloud";
+"cloud.sync_now" = "مزامنة الآن";
+"cloud.shop" = "الورشة";
+"cloud.role" = "الدور";
+"cloud.last_sync" = "آخر مزامنة";
+"cloud.via_cloud" = "%@ عبر Khayt Cloud";
+"cloud.via_mac" = "%@ عبر جهاز Mac";
+"cloud.footer.off" = "يُبقي هذا الهاتف متزامناً حين لا يكون جهاز Mac على نفس الشبكة. وتذهب التغييرات مباشرة إلى جهاز Mac متى أجاب.";
+"cloud.footer.on" = "يقرأ الهاتف الورشة من Khayt Cloud، ويرسل التغييرات إلى جهاز Mac حين يجيب، وعبر السحابة حين لا يجيب.";
+"cloud.needs_mac" = "لا تقبل Khayt Cloud التغييرات منفردة الآن. هي محفوظة على هذا الهاتف؛ افتح Khayt على جهاز Mac ليُكمل المزامنة.";
+"cloud.signin.email" = "البريد الإلكتروني";
+"cloud.signin.password" = "كلمة المرور";
+"cloud.signin.account_footer" = "حساب الورشة في Khayt Cloud. يحصل هذا الهاتف على دخول خاص به يمكن إنهاؤه وحده.";
+"cloud.signin.passphrase" = "عبارة مرور الورشة";
+"cloud.signin.passphrase_footer" = "عبارة المرور التي تُشفَّر بها نسخة الورشة في السحابة — التي عُيّنت على جهاز Mac عند ربطه أول مرة. تفتح المفتاح على هذا الهاتف ولا تُحفظ.";
+"cloud.signin.advanced" = "متقدم";
+"cloud.signin.server" = "عنوان الخادم";
+"cloud.signin.action" = "تسجيل الدخول";
+"cloud.signin.wrong_passphrase" = "عبارة المرور هذه لا تفتح مفتاح الورشة.";
+"settings.widget.howto" = "كيف تضيف الأداة";
+"spool.detail.id" = "المعرّف";
+
+"pair.use_cloud" = "استخدم Khayt Cloud بدلاً من ذلك";
+"pair.use_cloud.footer" = "إن كانت الورشة تتزامن مع Khayt Cloud، يبدأ الهاتف منها ويُربط بجهاز Mac لاحقاً.";

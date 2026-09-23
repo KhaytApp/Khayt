@@ -43,6 +43,10 @@ actor BookReader {
     /// Starting it loads the shop's business rules into JavaScriptCore, which
     /// costs about a fifth of a second. That is nothing once and everything on
     /// every scroll, and a screen that re-read the queue would pay it each time.
+    /// The same engine, for work that belongs to the book but not the reader
+    /// — a cloud sync folds with it.
+    func sharedEngine() throws -> KhaytEngine { try engine() }
+
     private func engine() throws -> KhaytEngine {
         if let engineHandle { return engineHandle }
         let made = try KhaytEngine()
@@ -75,6 +79,30 @@ actor BookReader {
               case .string(let code)? = settings["currency"],
               !code.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
         return code
+    }
+
+    /// Take a book from upstream — the Mac's `/api/store` or the cloud — without
+    /// losing what was changed here and not sent yet.
+    ///
+    /// ── WHY THIS IS NOT JUST `replace` ──────────────────────────────────
+    ///
+    /// A pull that simply replaced the book took every unsent edit with it,
+    /// and the pending count with them: edit a job offline, walk back into
+    /// range, open any screen, and the refresh that screen triggers wiped the
+    /// edit without a word. So the outbox is measured BEFORE the swap, folded
+    /// onto the incoming book by the shop's own rule (a newer rev from
+    /// upstream still wins), and the baseline is set to upstream's copy alone
+    /// — which keeps exactly those edits pending.
+    func adopt(_ upstream: [String: JSONValue], scope: BookScope.Taken?) async throws {
+        var merged = upstream
+        if book.exists, let baseline = book.baseline() {
+            let outbox = try await engine().changesToSend(local: try book.read(), server: baseline)
+            if !outbox.isEmpty {
+                merged = try await engine().foldDeltas(base: upstream, deltas: [outbox.wire]).store
+            }
+        }
+        try book.replace(with: merged, scope: scope)
+        try book.replaceBaseline(with: upstream)
     }
 
     /// Is there a book on this phone at all?

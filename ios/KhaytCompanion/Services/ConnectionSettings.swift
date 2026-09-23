@@ -176,6 +176,9 @@ final class ConnectionSettings: ObservableObject {
         // shop. `forget` takes the `.prev` rollback copy too — it is the same
         // client list, one write behind.
         try? CompanionBook.inSharedContainer().forget()
+        // And the cloud sign-in: a device token and the shop's data key are a
+        // way back into everything the book held.
+        CloudSession.forget()
     }
 }
 

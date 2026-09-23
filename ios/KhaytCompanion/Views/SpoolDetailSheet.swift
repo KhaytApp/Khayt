@@ -71,7 +71,7 @@ struct SpoolDetailSheet: View {
                 if spool.hasOptionalMeta {
                     Section(L10n.tr("spool.detail.label_info")) {
                         if let sku = spool.sku, !sku.isEmpty {
-                            LabeledContent("SKU", value: sku)
+                            LabeledContent(L10n.tr("spool.form.sku"), value: sku)
                         }
                         if let lot = spool.lot, !lot.isEmpty {
                             LabeledContent(L10n.tr("spool.detail.lot"), value: lot)
@@ -114,7 +114,7 @@ struct SpoolDetailSheet: View {
                 }
 
                 Section {
-                    LabeledContent("ID", value: spool.id)
+                    LabeledContent(L10n.tr("spool.detail.id"), value: spool.id)
                         .font(.caption)
                 }
             }

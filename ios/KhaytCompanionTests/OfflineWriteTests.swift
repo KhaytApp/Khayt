@@ -229,4 +229,30 @@ final class OfflineWriteTests: XCTestCase {
         let produced = try await reopened.pendingChanges()
         XCTAssertEqual(try XCTUnwrap(produced).count, 1)
     }
+
+    /// Edit offline, walk back into range, open a screen: the refresh that
+    /// screen triggers used to REPLACE the book and take the edit with it.
+    func testAPullFromTheMacKeepsAnEditNotYetSent() async throws {
+        try writer.setOrderStatus(orderId: "O-1", to: "qc")         // rev 3 → 4, pending
+        var fromMac = shop()
+        // The Mac's copy moved on elsewhere too: a spool it corrected at rev 5.
+        fromMac["inventory"] = .array([.object(["id": .string("S-1"), "material": .string("PLA"),
+                                                "weight": .number(300), "rev": .number(5)])])
+        try await reader.adopt(fromMac, scope: nil)
+
+        XCTAssertEqual(try record("printLog", "O-1")["status"], .string("qc"), "the edit survived the pull")
+        XCTAssertEqual(try record("inventory", "S-1")["weight"], .number(300), "and the Mac's own change arrived")
+        let produced = try await reader.pendingChanges()
+        XCTAssertEqual(try XCTUnwrap(produced).count, 1, "still on its way — and only it")
+    }
+
+    func testANewerChangeFromTheMacStillWins() async throws {
+        try writer.setOrderStatus(orderId: "O-1", to: "qc")         // rev 4 here
+        var fromMac = shop()
+        fromMac["printLog"] = .array([.object(["id": .string("O-1"), "status": .string("completed"),
+                                               "project": .string("Bracket"), "rev": .number(9)])])
+        try await reader.adopt(fromMac, scope: nil)
+        XCTAssertEqual(try record("printLog", "O-1")["status"], .string("completed"),
+                       "the higher revision wins, as it does everywhere else")
+    }
 }
