@@ -40,6 +40,13 @@ enum LANHostValidator {
             return scopedIPv6(inner).map { "[\($0)]" }
         }
 
+        // An IPv4 address with an interface on it — `192.168.68.75%en0`, which
+        // is what the resolver used to hand back and a phone may have saved —
+        // is the same address without one.
+        if let percent = h.firstIndex(of: "%"), isValidIPv4(String(h[..<percent])) {
+            h = String(h[..<percent])
+        }
+
         // `Turkis-MacBook-Air.local.` — a resolver's fully-qualified name ends
         // in a dot, and it names the same host without one.
         if h.hasSuffix("."), !h.hasSuffix("..") { h.removeLast() }

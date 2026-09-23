@@ -98,4 +98,17 @@ final class ShopBrowserTests: XCTestCase {
         XCTAssertNil(ConnectionSettings.baseURL(host: "[fe80::1%25en0@x.com]", port: 3219))
         XCTAssertNil(ConnectionSettings.baseURL(host: "[fe80::zz]", port: 3219))
     }
+
+    func testAnIPv4AddressFromTheResolverLosesItsInterface() throws {
+        // Turki's phone, alpha.40: IPv4-first resolution handed back
+        // `192.168.68.75%en0`, and the settings called it invalid.
+        let v4 = try XCTUnwrap(IPv4Address("192.168.68.75%en0"))
+        let (host, port) = ShopBrowser.address(host: .ipv4(v4), port: NWEndpoint.Port(rawValue: 3219)!)
+        XCTAssertEqual(host, "192.168.68.75")
+        XCTAssertEqual(ConnectionSettings.baseURL(host: host, port: Int(port))?.absoluteString,
+                       "http://192.168.68.75:3219")
+        // And the value a phone already saved from the old resolver works as it is.
+        XCTAssertEqual(ConnectionSettings.baseURL(host: "192.168.68.75%en0", port: 3219)?.absoluteString,
+                       "http://192.168.68.75:3219")
+    }
 }

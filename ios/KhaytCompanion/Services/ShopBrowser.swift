@@ -183,7 +183,12 @@ final class ShopBrowser: ObservableObject {
         let text: String
         switch host {
         case .ipv4(let v4):
-            text = "\(v4)"
+            // `"\(v4)"` carries the interface too — `192.168.68.75%en0` — and
+            // an IPv4 address needs no zone to be reached. Found on a real
+            // phone: the settings refused the address the phone had just
+            // resolved, and a shop was left looking at "Invalid address".
+            let raw = "\(v4)"
+            text = raw.split(separator: "%").first.map(String.init) ?? raw
         case .ipv6(let v6):
             // `"\(v6)"` includes the zone for a link-local address.
             let raw = "\(v6)"
