@@ -9710,6 +9710,17 @@ final class Shop {
     /// it emptied, the ones that are now low.
     var moveNotices: [String] = []
 
+    /// How long a notice stays once the last one arrived. Long enough to read
+    /// three sentences after looking back at the screen, short enough that a
+    /// confirmation is gone before it becomes furniture.
+    static let noticeLifetime: Duration = .seconds(15)
+
+    /// Close one notice, and leave the others.
+    func dismissNotice(at index: Int) {
+        guard moveNotices.indices.contains(index) else { return }
+        moveNotices.remove(at: index)
+    }
+
     /// Move a job to a stage, and take what it costs off the shelf.
     ///
     /// Three collections change together and are written in one swap: the job,
