@@ -924,6 +924,9 @@ final class Words {
         "mac.never_printed": ["en": "Never printed", "ar": "لم تُطبع"],
         "mac.ready_on":      ["en": "Ready on {name}", "ar": "جاهز على {name}"],
         "mac.ready_now":     ["en": "Ready to start", "ar": "جاهز للطباعة"],
+        "mach.loaded":       ["en": "Loaded now", "ar": "المحمّل الآن"],
+        "mach.loaded_hint":  ["en": "What is in each head, so the library can say what is ready to start. A printer that reports its spools is read instead.", "ar": "ما في كل رأس، ليعرف المعرض ما هو جاهز للطباعة. الطابعة التي تُبلغ عن بكراتها تُقرأ بدلًا من ذلك."],
+        "mach.head_n":       ["en": "Head {n}", "ar": "الرأس {n}"],
         "mac.needs_swap":    ["en": "Needs a spool swap", "ar": "يحتاج تبديل بكرة"],
         // ── WHAT IS ALREADY PRINTED AND BOXED ─────────────────────────────
         //

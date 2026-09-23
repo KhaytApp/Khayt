@@ -33,6 +33,25 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
     /// cosmetic; see `lib/machine-edit.js`.
     let downtimeBlocks: [Downtime]?
 
+    /// What the shop says is loaded, head by head, for a printer that cannot
+    /// report it. Every field optional: a row this app cannot read is skipped,
+    /// never allowed to fail the whole machine list. See `lib/machine-edit.js`.
+    let loaded: [Loaded]?
+
+    struct Loaded: Decodable, Hashable, Sendable {
+        let slot: Int?
+        let hex: String?
+        let material: String?
+    }
+
+    /// The hand-entered spools as the library's rule reads them.
+    var loadedByHand: [KhaytEngine.LoadedSlot] {
+        (loaded ?? []).enumerated().compactMap { index, row in
+            guard let hex = row.hex, !hex.isEmpty else { return nil }
+            return KhaytEngine.LoadedSlot(slot: row.slot ?? index, hex: hex, material: row.material ?? "")
+        }
+    }
+
     struct Downtime: Decodable, Hashable, Sendable {
         let from: String?
         let to: String?

@@ -84,6 +84,8 @@ struct MachineSheet: View {
     /// When this machine is out of action. Loaded from the record and written
     /// back through the shared rule, which drops a window that cannot be read.
     @State private var downtime: [Shop.DowntimeBlock] = []
+    /// What is in each head, typed by the shop. See `LoadedRow`.
+    @State private var loadedRows: [LoadedRow] = []
     @State private var hasStoredKey = false
     @State private var forgetKey = false
     /// What a Bambu or an Elegoo is addressed by on its own transport — the
@@ -241,6 +243,34 @@ struct MachineSheet: View {
                     Text(shop.words.callIt("mach.color")).foregroundStyle(.secondary)
                     ColorPicker("", selection: $swatch, supportsOpacity: false).labelsHidden()
                 }
+                // WHAT IS LOADED, for a printer that cannot say. The library's
+                // "Ready on" chip reads it; a printer that reports its spools
+                // (a U1) is read instead, so for those this is only a fallback.
+                if kind == "fdm" {
+                    GridRow(alignment: .top) {
+                        Text(shop.words.callIt("mach.loaded")).foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach($loadedRows) { $row in
+                                HStack(spacing: 8) {
+                                    Toggle(shop.words.callIt("mach.head_n", ["n": .number(Double(row.id + 1))]),
+                                           isOn: $row.on)
+                                        // One width for every head, or "Head 1"
+                                        // is narrower and its row's fields sit
+                                        // out of line with the rest.
+                                        .frame(minWidth: 90, alignment: .leading)
+                                    ColorPicker("", selection: $row.colour, supportsOpacity: false)
+                                        .labelsHidden().disabled(!row.on)
+                                    TextField("PLA", text: $row.material)
+                                        .textFieldStyle(.roundedBorder).frame(width: 110)
+                                        .disabled(!row.on)
+                                }
+                            }
+                            Text(shop.words.callIt("mach.loaded_hint"))
+                                .font(.callout).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
                 // A nozzle diameter is a question for a filament printer and
                 // nonsense for a laser cutter. A form that asks it anyway is a
                 // form that records nonsense.
@@ -372,6 +402,7 @@ struct MachineSheet: View {
     }
 
     private func fill() {
+        loadedRows = LoadedRow.rows(for: existing)
         guard let machine = existing else { focused = true; return }
         name = machine.name
         // What the module says this machine is, which for every machine
@@ -598,6 +629,7 @@ struct MachineSheet: View {
         let turn = camRotate
         let mirrorH = camFlipH, mirrorV = camFlipV
         let windows = downtime
+        let loadedNow = kind == "fdm" ? loadedRows.filter(\.on) : nil
         let build = shop.source.build
         dismiss()
         Task {
@@ -677,7 +709,39 @@ struct MachineSheet: View {
                let clean = try? await engine.sanitizeWebcam(cam, printerApi: .object(api)) {
                 input["webcam"] = clean
             }
+            // Through the shared rule, which drops a colour it cannot read.
+            if let loadedNow {
+                input["loaded"] = .array(loadedNow.map {
+                    .object(["slot": .number(Double($0.id)),
+                             "hex": .string(NSColor($0.colour).hexString ?? ""),
+                             "material": .string($0.material.trimmingCharacters(in: .whitespaces))])
+                })
+            }
             await shop.saveMachine(input, id: id, catalogId: catalogId)
+            shop.loadedChanged()
+        }
+    }
+}
+
+/// One head in the sheet's "Loaded now" rows.
+struct LoadedRow: Identifiable, Equatable {
+    let id: Int
+    var on: Bool
+    var colour: Color
+    var material: String
+
+    /// One row per head: as many as the machine has, or as it has rows for,
+    /// with what it last had typed in them.
+    static func rows(for machine: Machine?) -> [LoadedRow] {
+        let kept = machine?.loadedByHand ?? []
+        let heads = min(16, max(1, machine?.maxColors ?? 1, (kept.map(\.slot).max() ?? -1) + 1))
+        return (0..<heads).map { slot in
+            if let row = kept.first(where: { $0.slot == slot }) {
+                return LoadedRow(id: slot, on: true,
+                                 colour: Color(nsColor: NSColor(hex: row.hex) ?? .white),
+                                 material: row.material)
+            }
+            return LoadedRow(id: slot, on: false, colour: .white, material: "PLA")
         }
     }
 }

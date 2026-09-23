@@ -109,6 +109,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   code, and materials by family, so PLA Silk goes in a PLA slot and PETG does
   not. The count updates when a spool is swapped.
 
+- **(Mac) Say what is loaded on a printer that cannot.** Most printers do not
+  report their spools, so a machine's sheet now has **Loaded now**: one row per
+  head, a colour and a material. The library's Ready chip and a model's
+  details use it the same way as a U1's own reading, and a printer that does
+  report its spools is always read instead.
+
 - **(Mac) Printer alerts reach the shop's phone — through Telegram, and now
   ntfy.** The Mac showed a printer fault as a notification on the Mac and told
   nobody else: its Telegram switches for printer error, offline and stalled were

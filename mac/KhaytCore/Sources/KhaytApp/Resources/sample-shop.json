@@ -2427,6 +2427,12 @@
   {
    "id": "MACH-u1",
    "name": "Snapmaker U1",
+   "loaded": [
+    { "slot": 0, "hex": "#C8A97E", "material": "PLA" },
+    { "slot": 1, "hex": "#8F5D1C", "material": "PLA" },
+    { "slot": 2, "hex": "#3B2F22", "material": "PLA" },
+    { "slot": 3, "hex": "#EDE3D2", "material": "PLA" }
+   ],
    "vendor": "Snapmaker",
    "printerModelName": "Snapmaker U1",
    "bed": {
@@ -2470,6 +2476,9 @@
   {
    "id": "MACH-core-one",
    "name": "Prusa CORE One",
+   "loaded": [
+    { "slot": 0, "hex": "#1E1E1E", "material": "PETG" }
+   ],
    "vendor": "Prusa",
    "printerModelName": "Prusa CORE One",
    "bed": {

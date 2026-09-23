@@ -11564,9 +11564,13 @@ final class Shop {
     /// Which models are ready on which machine, from the last recount.
     private(set) var readyByMachine: [String: Set<String>] = [:]
 
-    /// What a machine has loaded, as it last reported it.
+    /// What a machine has loaded: as it last reported it, or, for a printer
+    /// that cannot say, what the shop typed on the machine. The printer's own
+    /// reading wins whenever it has one — it is the thing that was swapped.
     func loadedSlots(for machineId: String) -> [KhaytEngine.LoadedSlot] {
-        printers.readings[machineId]?.status?.loaded ?? []
+        let reported = printers.readings[machineId]?.status?.loaded ?? []
+        if !reported.isEmpty { return reported }
+        return machines.first { $0.id == machineId }?.loadedByHand ?? []
     }
 
     /// Can this model start on that machine now, with what it has loaded?
