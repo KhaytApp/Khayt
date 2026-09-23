@@ -113,7 +113,7 @@ enum PrinterControl {
     /// The same rule the poller follows: an unset key is sent as NOTHING rather
     /// than as the string "undefined", and Moonraker in trusted-client mode
     /// needs none at all.
-    private static func key(for machine: Machine, build: StoreReader.Build?) async -> String {
+    static func key(for machine: Machine, build: StoreReader.Build?) async -> String {
         guard let sealed = machine.printerApi?.apiKey, !sealed.isEmpty, let build else { return "" }
         return (try? await Secrets.open(sealed, for: build)) ?? ""
     }

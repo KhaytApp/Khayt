@@ -41,6 +41,22 @@ private struct Detail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                if shop.canMoveJobs, !shop.sendablePrinters.isEmpty,
+                   !Shop.finishedStatuses.contains(job.status), job.status != "cancelled" {
+                    // Beside the job it is for: the plate goes to a machine
+                    // from where the shop is already looking at the work.
+                    VStack(alignment: .leading, spacing: 4) {
+                        Button(shop.words.callIt("mac.send_title") + "…") {
+                            shop.pendingSend = Shop.PendingHold(id: job.id, project: job.project)
+                        }
+                        .buttonStyle(.link)
+                        .font(.callout)
+                        if let note = shop.sendNote {
+                            Text(note).font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
                 Divider()
                 money
                 if Shop.finishedStatuses.contains(job.status), job.shippingStatus != nil || shop.canMoveJobs {

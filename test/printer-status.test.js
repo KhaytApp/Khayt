@@ -100,11 +100,14 @@ test('Moonraker sends its API key like every other authenticated adapter', () =>
 });
 
 test('the upload path authenticates Moonraker too', () => {
-  const upload = mainSrc.slice(
-    mainSrc.indexOf("fd.set('root', 'gcodes')") - 200,
-    mainSrc.indexOf("fd.set('root', 'gcodes')") + 260,
-  );
-  assert.match(upload, /X-Api-Key/, 'moonraker upload sends no key');
+  // The request is `lib/printer-upload.js` now, which both apps send with; it
+  // is asked rather than read, so this holds whichever app is sending.
+  const U = require('../lib/printer-upload.js');
+  assert.equal(U.request('moonraker', { apiKey: 'K', name: 'a.gcode' }).headers['X-Api-Key'], 'K',
+    'moonraker upload sends no key');
+  assert.equal(U.request('moonraker', { apiKey: '', name: 'a.gcode' }).headers['X-Api-Key'], undefined,
+    'an unset key is sent as a header anyway');
+  assert.match(mainSrc, /printerUpload\.request\(type,/, 'main.js no longer sends through the rule');
 });
 
 test('an unset key is not sent as the string "undefined"', () => {

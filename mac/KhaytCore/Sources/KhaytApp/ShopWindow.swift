@@ -548,6 +548,7 @@ struct WindowSheets: ViewModifier {
             .sheet(item: $shop.pendingCompletion) { CompletionSheet(shop: shop, subject: $0) }
             .sheet(item: $shop.pendingPayment) { PaymentSheet(shop: shop, subject: $0) }
             .sheet(item: $shop.pendingShipment) { ShipSheet(shop: shop, subject: $0) }
+            .sheet(item: $shop.pendingSend) { SendToPrinterSheet(shop: shop, subject: $0) }
             .sheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }
             .sheet(item: $shop.pendingQcFail) { QcFailSheet(shop: shop, subject: $0) }
             .sheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }

@@ -79,6 +79,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Send a sliced file to a printer, and start it.** The Mac could watch
+  a printer, pause it and skip an object on it, and could not hand it a file —
+  a shop sliced a job and then carried a USB stick over. **Send to printer…**
+  (Job menu, the orders table's right-click menu, and the job inspector) opens
+  on the job's own machine and its newest sliced plate from the model's folder,
+  or any file chosen from disk, and sends it to a Moonraker (Klipper, Snapmaker
+  U1), OctoPrint or PrusaLink printer — starting it straight away unless asked
+  not to. A file the printer cannot run is refused before anything is sent,
+  with the reason. Bambu printers are still sent to from the Windows and Linux
+  app.
+
 - **(Mac) Ship a job with a carrier, and let the carrier move it along.** The
   Mac could stamp a job shipped and never say who took it or under what
   tracking number, so a Mac shop's customer had "shipped" with nothing to
@@ -2378,6 +2389,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   stop asking for a job number when what they filter is filament and products.
 
 ### Fixed
+
+- **A Prusa could not be sent binary G-code, and a Klipper printer was sent
+  3MF files it cannot print.** Every upload was stored on the printer as
+  `.gcode` whatever it was. A Prusa CORE One, MK4 or XL slices to binary G-code
+  (`.bgcode`) by default, so sending one read it as text and refused it; a 3MF
+  sent to Moonraker or OctoPrint failed on the printer. The file keeps its own
+  kind now, and one the printer cannot run is refused before sending, with the
+  reason. What each printer is asked is one shared rule,
+  `lib/printer-upload.js`, which the Mac sends with too.
+- **(Mac) Editing a Bambu or Elegoo printer on the Mac erased its serial
+  number.** The machine edit rebuilt the printer connection from a fixed list
+  of fields and `serial` was not on it, so correcting even the address cut the
+  printer off with nothing saying why. Every stored field is kept now.
 
 - **(Maintainers) The carrier webhook's rule is shared now.** Reading an SMSA,
   Aramex or Saudi Post status update, finding the job by its tracking number
