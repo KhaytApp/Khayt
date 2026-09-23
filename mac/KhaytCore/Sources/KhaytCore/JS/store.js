@@ -36,6 +36,7 @@
     mask(s.printLibrary?.gdrive, 'refreshToken');
     mask(s.printLibrary?.gdrive, 'clientSecret');
     mask(s.telegram, 'botToken');
+    mask(s.ntfy, 'token');
     mask(s.webhooks, 'secret');
     mask(s.eventWebhooks, 'secret');
     mask(s.ai, 'apiKey');

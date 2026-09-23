@@ -139,6 +139,9 @@ struct IntegrationsPane: View {
                 // been able to be set up for it.
                 TelegramSettings(shop: shop)
 
+                // A second way to reach a phone: ntfy, with no bot to set up.
+                NtfySettings(shop: shop)
+
                 // Which carriers the shop ships with, and the secret each signs
                 // its status updates with. Saves itself, for the same reason.
                 CarrierSettings(shop: shop)

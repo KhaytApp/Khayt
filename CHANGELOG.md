@@ -115,6 +115,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) Printer alerts reach the shop's phone — through Telegram, and now
+  ntfy.** The Mac showed a printer fault as a notification on the Mac and told
+  nobody else: its Telegram switches for printer error, offline and stalled were
+  saved and never read. It now sends each alert to Telegram as those switches
+  say, and to **ntfy** — a push to a phone with no account and no bot: pick a
+  topic in Settings → Integrations, install the ntfy app, subscribe. A
+  self-hosted ntfy server and an access token (sealed) work too, each alert
+  type can be switched on or off, and a Test button sends one.
+
 - **(Mac) A model that may not be sold is flagged where it would be sold.** The
   library knew when a model's licence was NonCommercial, and nothing stopped it
   being printed for a customer, invoiced or listed in the catalogue. A job, and
@@ -2465,6 +2474,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   stop asking for a job number when what they filter is filament and products.
 
 ### Fixed
+
+- **(Mac) A spool running out mid-print raised no alert on the Mac.** The Mac
+  asked the alert rule for a fixed set of alert types that left filament
+  runout out, so an empty spool was noticed only by whoever walked past. It is
+  an alert now, on the Mac and to any phone channel set up.
 
 - **(Mac) A shop whose key never reached Khayt Cloud could not sync its other
   devices.** A book can hold its encryption key without the cloud ever having
