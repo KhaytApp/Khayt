@@ -1,7 +1,7 @@
 #!/bin/bash
-# Release the Mac app from THIS Mac: the same steps as
+# Release the Mac app with the build made on THIS Mac: the same checks as
 # .github/workflows/mac-release.yml, in about fifteen minutes instead of two
-# hours on a hosted runner.
+# hours on a hosted runner, nearly all of which was compiling.
 #
 #   ./mac/release-local.sh            a prerelease (every 4.0 alpha)
 #   ./mac/release-local.sh --final    a full release
@@ -11,11 +11,13 @@
 # edited under a ten-minute build. Cut the version first (bump-mac-version.js +
 # its CHANGELOG section, merged), then run this.
 #
+# It builds, notarises and checks here, uploads the archive as a DRAFT release,
+# and hands the rest to .github/workflows/mac-publish.yml: the Sparkle key
+# lives only in the SPARKLE_PRIVATE_KEY secret, so the signature, the release
+# going public and the feed happen there, in a few minutes, compiling nothing.
+#
 # Needs, once per Mac:
 #   xcrun notarytool store-credentials khayt     (Apple ID, team, app password)
-#   the Sparkle EdDSA key in the login Keychain  (generate_keys put it there)
-# Neither ever leaves the Keychain. Run it in Terminal.app: the Keychain may ask
-# to let sign_update use the key, and "Always Allow" makes that a one-off.
 set -euo pipefail
 
 PRERELEASE=1
@@ -37,10 +39,14 @@ xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1 \
 
 # Two releases racing would let the older feed land last and walk every
 # install backwards, so a CI release in flight is a hard stop.
-if gh run list -R KhaytApp/Khayt --workflow mac-release.yml --status in_progress \
-     --json databaseId --jq '.[].databaseId' | grep -q .; then
-  fail "a mac-release.yml run is still in progress on GitHub — let it finish first"
-fi
+for wf in mac-release.yml mac-publish.yml; do
+  for st in in_progress queued; do
+    if gh run list -R KhaytApp/Khayt --workflow "$wf" --status "$st" \
+         --json databaseId --jq '.[].databaseId' | grep -q .; then
+      fail "a $wf run is still $st on GitHub — let it finish first"
+    fi
+  done
+done
 
 git -C "$REPO_DIR" fetch -q origin main
 if [ -d "$WT/.git" ] || [ -f "$WT/.git" ]; then
@@ -55,25 +61,12 @@ V="$(node -p "require('./mac/version.json').version")"
 B="$(node -p "require('./mac/version.json').build")"
 TAG="v$V"
 echo "  Khayt for macOS $V (build $B), from $(git rev-parse --short HEAD)"
-if gh release view "$TAG" -R KhaytApp/khayt-mac >/dev/null 2>&1; then
-  fail "$TAG is already published — cut the next version before releasing"
-fi
+DRAFT="$(gh release view "$TAG" -R KhaytApp/khayt-mac --json isDraft --jq .isDraft 2>/dev/null || true)"
+[ "$DRAFT" = "false" ] && fail "$TAG is already published — cut the next version before releasing"
 node scripts/changelog-section.js "$V" >/dev/null 2>&1 \
   || fail "CHANGELOG.md has no section for $V — the release would ship without notes"
 
-# sign_update ships inside the Sparkle package; the first build fetches it.
-find_sign() { find mac/KhaytCore/.build/artifacts/sparkle -name sign_update -type f 2>/dev/null | head -1; }
-SIGN="$(find_sign)"
-if [ -z "$SIGN" ]; then
-  (cd mac/KhaytCore && swift package resolve >/dev/null)
-  SIGN="$(find_sign)"
-fi
-[ -x "$SIGN" ] || fail "sign_update not found in the Sparkle artifacts"
-# Prove the key is reachable NOW, not after the build and notarisation.
-PROBE="$(mktemp)"; echo probe > "$PROBE"
-"$SIGN" -p "$PROBE" >/dev/null 2>&1 || { rm -f "$PROBE"; fail "sign_update cannot reach the Sparkle key in the login Keychain"; }
-rm -f "$PROBE"
-echo "  notary profile, Sparkle key, version: ok"
+echo "  notary profile, version: ok"
 
 # ── BUILD, NOTARISE, STAPLE ─────────────────────────────────────────────
 say "building (about ten minutes, silent for most of it)"
@@ -94,41 +87,38 @@ KEY="$(plutil -extract SUPublicEDKey raw "$A/Contents/Info.plist" 2>/dev/null ||
 xcrun stapler validate "$A" >/dev/null 2>&1 || fail "the notarisation ticket is not stapled"
 "$A/Contents/MacOS/Khayt" --check-resources || fail "the bundle reaches outside itself for resources"
 
-# ── PACK AND SIGN ───────────────────────────────────────────────────────
-say "packing and signing"
+# ── PACK, AND HAND IT TO GITHUB TO SIGN AND PUBLISH ─────────────────────
+say "packing"
 ARCHIVE="mac/dist/Khayt-$V.zip"
 rm -f "$ARCHIVE"
 ditto -c -k --keepParent "$A" "$ARCHIVE"
-SIG="$("$SIGN" -p "$ARCHIVE")"
-[ -n "$SIG" ] || fail "sign_update produced no signature"
-echo "  $ARCHIVE ($(stat -f%z "$ARCHIVE") bytes), signed"
+echo "  $ARCHIVE ($(stat -f%z "$ARCHIVE") bytes)"
 
-# ── PUBLISH: THE RELEASE FIRST, THE FEED AFTER ──────────────────────────
-# A feed naming an asset that is not uploaded yet sends every install that
-# checks in between to a 404.
-say "publishing $TAG to KhaytApp/khayt-mac"
+say "uploading $TAG as a draft to KhaytApp/khayt-mac"
 NOTES="$(mktemp)"
 node scripts/changelog-section.js "$V" > "$NOTES"
-FLAGS=()
-[ "$PRERELEASE" = 1 ] && FLAGS=(--prerelease)
-gh release create "$TAG" "$ARCHIVE" --repo KhaytApp/khayt-mac \
-  --title "Khayt for macOS $V" --notes-file "$NOTES" ${FLAGS[@]+"${FLAGS[@]}"}
+if [ "$DRAFT" = "true" ]; then
+  # A draft left by a run that stopped after uploading: replace its archive.
+  gh release upload "$TAG" "$ARCHIVE" -R KhaytApp/khayt-mac --clobber
+else
+  gh release create "$TAG" "$ARCHIVE" --repo KhaytApp/khayt-mac --draft \
+    --title "Khayt for macOS $V" --notes-file "$NOTES"
+fi
 rm -f "$NOTES"
 
-say "publishing the Sparkle feed"
-SITE="$(mktemp -d)"
-gh repo clone KhaytApp/khayt-website "$SITE/site" -- --depth 1 -q
-node scripts/mac-appcast.js --archive "$ARCHIVE" --signature "$SIG" \
-  --url "https://github.com/KhaytApp/khayt-mac/releases/download/$TAG/$(basename "$ARCHIVE")" \
-  --notes-url "https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG" \
-  --out "$SITE/site/mac/appcast.xml"
-node scripts/mac-site-version.js "$SITE/site/index.html" \
-  || echo "  (could not update the version line on the site; the download link still resolves)"
-git -C "$SITE/site" add mac/appcast.xml index.html
-git -C "$SITE/site" commit -q -m "Khayt for macOS $V: the Sparkle feed" \
-  || echo "  nothing to commit — the feed already names this build"
-git -C "$SITE/site" push -q
-rm -rf "$SITE"
+say "signing and publishing on GitHub (a few minutes)"
+PRE=true; [ "$PRERELEASE" = 1 ] || PRE=false
+BEFORE="$(gh run list -R KhaytApp/Khayt --workflow mac-publish.yml --limit 1 --json databaseId --jq '.[0].databaseId // 0')"
+gh workflow run mac-publish.yml -R KhaytApp/Khayt --ref main -f tag="$TAG" -f prerelease="$PRE" -f publish_appcast=true
+RUN=""
+for _ in $(seq 1 30); do
+  sleep 5
+  RUN="$(gh run list -R KhaytApp/Khayt --workflow mac-publish.yml --limit 1 --json databaseId --jq '.[0].databaseId // 0')"
+  [ "$RUN" != "$BEFORE" ] && break
+done
+[ -n "$RUN" ] && [ "$RUN" != "$BEFORE" ] || fail "the publish run did not start — the draft is uploaded; start mac-publish.yml with tag=$TAG"
+gh run watch "$RUN" -R KhaytApp/Khayt --exit-status >/dev/null \
+  || fail "the publish run failed: https://github.com/KhaytApp/Khayt/actions/runs/$RUN (the draft is still there; re-run it)"
 
 say "done"
 echo "  Release: https://github.com/KhaytApp/khayt-mac/releases/tag/$TAG"
