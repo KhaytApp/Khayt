@@ -723,6 +723,11 @@ public actor KhaytEngine {
         "upload-scan",
         "feature-tiers",
         "public-quote",
+        // The shop's pricing inputs, published so a storefront quotes uploads
+        // with this calculator — built from the same resolution `publicQuote`
+        // uses, and rebuilt by the storefront with `toStore`. After
+        // `public-quote`, whose `materialBasis` it calls.
+        "quote-sheet",
         "gcode-parse",
         // Which customers are worth keeping.
         // Whether the shop can take another job, and when it would start.
@@ -5604,6 +5609,24 @@ public actor KhaytEngine {
               });
             })(ARG0, ARG1, ARG2)
             """, [intake, store, .number(Double(qty))], as: JSONValue.self)
+    }
+
+    /// The quote sheet this book would publish — `lib/quote-sheet.js` — or nil
+    /// when public pricing is off or unconfigured, which is how it is
+    /// withdrawn. The estimator is resolved EXACTLY as `publicQuote` above
+    /// resolves it, calibration included, so the web and the LAN quote alike.
+    public func quoteSheet(store: JSONValue, now: Date, staleAfterHours: Double) throws -> JSONValue? {
+        let sheet = try runtime.call2("""
+            (function (store, nowMs, stale) {
+              var s = (store && store.settings) || {};
+              var cal = KhaytEstimateCalibration.calibrate((store && store.printLog) || [],
+                                                   { allocate: KhaytOrderFileLink.allocateActuals }, {});
+              var opts = KhaytEstimateCalibration.applyCalibration(KhaytStl.fromSettings(s), cal);
+              return KhaytQuoteSheet.build(store, { now: new Date(nowMs), staleAfterHours: stale, estimatorOpts: opts });
+            })(ARG0, ARG1, ARG2)
+            """, [store, .number(now.timeIntervalSince1970 * 1000), .number(staleAfterHours)], as: JSONValue.self)
+        if case .null = sheet { return nil }
+        return sheet
     }
 
     /// The shop's due dates as a calendar: `lib/lan-calendar.js`.

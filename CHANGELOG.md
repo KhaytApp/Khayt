@@ -105,6 +105,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A shop's storefront can quote an uploaded model with Khayt's own
+  prices.** When public model pricing is switched on, the Mac now publishes the
+  shop's pricing inputs to Khayt Cloud beside its delivery promise — the
+  material cost (net of tax the shop reclaims), one printer's rates, the margin,
+  minimum price, waste and packaging, and the calibrated estimator — so a
+  storefront running Khayt's calculator prices a part exactly as the shop
+  would. Switching pricing off withdraws it. It is served only to the shop's
+  own token, never on a public address. `lib/quote-sheet.js` builds it and
+  rebuilds a quote from it, and a test holds the two prices equal. (Needs the
+  matching Khayt Cloud release; until then the Mac says so and waits.)
+
 - **(Mac) A Bambu, an Elegoo resin printer, or one printer of several on a
   Repetier-Server can be set up on the Mac.** The Mac could watch all three,
   and its machine settings had no field for what each is reached by, so a shop
@@ -2434,6 +2445,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   stop asking for a job number when what they filter is filament and products.
 
 ### Fixed
+
+- **(Mac) "Let customers price their own model" could not price anything on a
+  real shop.** The Mac's price for an uploaded model looked for the printer
+  preset and the filament in a copy of the book that held neither, so every
+  upload was answered "not configured" however the shop had set it up. The
+  tests had supplied both themselves and never noticed. It prices from the
+  shop's presets and shelf now.
 
 - **(Mac) The app never looked for an update on its own.** Every build was
   published with Sparkle's automatic checks switched OFF, under a note saying

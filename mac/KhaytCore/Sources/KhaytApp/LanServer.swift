@@ -134,6 +134,10 @@ final class LanServer {
         /// The carriers' webhook secrets, opened, by carrier id —
         /// `settings.shipping.<id>.webhookSecret`. None configured is 403.
         var carrierSecrets: [String: String] = [:]
+        /// What a customer's upload is priced from — `Shop.pricingBook`:
+        /// settings, presets, the shelf and the log. Separate from `store`,
+        /// which is the phone's book and has no presets or shelf in it.
+        var pricing: @MainActor () -> [String: JSONValue] = { [:] }
         /// Put a carrier's event on the book, INSIDE the write. Returns the job
         /// it moved, or nil when the book as it is now had nothing to move.
         var carrierEvent: (_ event: JSONValue, _ at: String) async throws -> JSONValue?
@@ -1080,7 +1084,7 @@ final class LanServer {
             return .open(400, #"{"ok":false,"reason":"no-numbers"}"#)
         }
         let qty = max(1, min(1000, Int(request.query["qty"] ?? "1") ?? 1))
-        guard let quote = try? await engine.publicQuote(intake: intake, store: store, qty: qty),
+        guard let quote = try? await engine.publicQuote(intake: intake, store: .object(host.pricing()), qty: qty),
               case .object(let q) = quote else {
             return .open(500, #"{"ok":false,"reason":"no-price"}"#)
         }
@@ -1616,6 +1620,7 @@ extension Shop {
             secrets[platform] = (try? await Secrets.open(sealed, for: source)) ?? ""
         }
         host.storefrontSecrets = secrets
+        host.pricing = { [weak self] in self?.pricingBook ?? [:] }
         var carrierSecrets: [String: String] = [:]
         for (carrier, sealed) in config.carrierSecrets where !sealed.isEmpty {
             carrierSecrets[carrier] = (try? await Secrets.open(sealed, for: source)) ?? ""
