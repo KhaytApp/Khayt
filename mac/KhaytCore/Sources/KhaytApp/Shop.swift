@@ -12438,6 +12438,13 @@ final class Shop {
         guard let engine else { return nil }
         var live: [String: JSONValue] = [:]
         for (id, reading) in printers.readings {
+            // A printer that has stopped answering, after the same three misses
+            // the offline alert waits for (one is a wifi hiccup). The band
+            // leaves it out of the free hours rather than calling it free.
+            if reading.status == nil, let problem = reading.problem, reading.consecutiveFailures >= 3 {
+                live[id] = .object(["error": .string(problem)])
+                continue
+            }
             guard let status = reading.status, PrinterWatch.isPrinting(status.state) else { continue }
             var seen: [String: JSONValue] = ["progress": .number(Double(status.progress))]
             if let left = status.timeRemaining { seen["timeRemaining"] = .number(left) }

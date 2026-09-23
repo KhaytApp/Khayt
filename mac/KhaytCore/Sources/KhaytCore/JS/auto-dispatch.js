@@ -31,6 +31,9 @@
   /** Printer states that mean "not printing, and not in trouble". */
   const IDLE_STATES = ['idle', 'ready', 'standby', 'operational', 'finished', 'complete', 'cancelled'];
 
+  /** Printer states that mean the printer itself is reporting a fault. */
+  const FAULT_STATES = ['error', 'offline after error', 'attention', 'halted', 'fault'];
+
   /** A job Khayt would dispatch: agreed, not started, not stopped. */
   const DISPATCHABLE = ['pending'];
 
@@ -48,11 +51,21 @@
     const api = machine && machine.printerApi;
     if (!api || !api.type || api.type === 'none') return 'ad.no_printer';
     const status = live || {};
-    if (status.error) return 'ad.printer_error';
     const state = lower(status.state);
+    // ── A POLL THAT FAILED IS NOT A FAULT ─────────────────────────────────
+    //
+    // `error` is the POLLER's, not the printer's: printer-poll-cache's
+    // mergePollFailure keeps the last good state and adds the failure message
+    // (printer-alerts' isFailedPoll reads it the same way). So an idle CORE One
+    // switched off overnight arrived as { state: 'idle', error: 'ECONNREFUSED' }
+    // and this said "Reporting a fault" beside a dashboard saying "not
+    // answering". It is not answering. A printer that answers and reports a
+    // fault says so in its state.
+    if (status.error) return 'ad.no_reading';
     // Nothing heard from it at all. Not an error, and not something to start a
     // print on either — a machine that has never answered may not be on.
     if (!state) return 'ad.no_reading';
+    if (FAULT_STATES.includes(state)) return 'ad.printer_error';
     if (!IDLE_STATES.includes(state)) return 'ad.busy';
     if (options.paused && options.paused[machine.id]) return 'ad.held';
 
