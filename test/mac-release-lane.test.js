@@ -155,3 +155,29 @@ test('a published Mac build checks for updates by itself', () => {
   assert.ok(m, 'no check interval: Sparkle would wait a day between checks on an alpha line');
   assert.ok(+m[1] >= 3600, 'Sparkle refuses an interval under an hour');
 });
+
+/**
+ * The same lane, run from a Mac instead of a hosted runner (two hours there,
+ * fifteen minutes here). It is only a faster copy if it makes the same checks:
+ * each of the ones below caught a shipped alpha that every other step called
+ * a success.
+ */
+test('the local release makes the checks the CI lane makes', () => {
+  const local = fs.readFileSync(path.join(__dirname, '..', 'mac', 'release-local.sh'), 'utf8');
+  for (const must of [
+    /KHAYT_APPCAST="\$FEED_URL" \.\/mac\/make-app\.sh/,   // the updater is switched on
+    /make-app\.sh --notarize/,
+    /SUFeedURL/, /SUPublicEDKey/, /Sparkle\.framework/,
+    /stapler validate/,
+    /--check-resources/,                                  // alpha.1/.2 could not launch
+    /ditto -c -k --keepParent/,
+    /mac-release\.yml --status in_progress/,              // never race a CI release
+  ]) assert.match(local, must);
+  assert.ok(local.indexOf('gh release create') < local.indexOf('mac-appcast.js --archive'),
+    'the release must be uploaded before the feed names it');
+});
+
+test('make-app.sh can notarise with a keychain profile, never a password on the command line', () => {
+  const script = fs.readFileSync(path.join(__dirname, '..', 'mac', 'make-app.sh'), 'utf8');
+  assert.match(script, /--keychain-profile "\$NOTARY_PROFILE"/);
+});
