@@ -4,14 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Cloud sync never recovered for a shop whose cloud store was gone.** If
-  the server no longer had a shop's store — a reset, or the shop moved to a
-  new cloud — the desktop kept sending changes against the version it last
-  saw. The server refused each one, the desktop checked, found nothing there,
-  and tried the same thing again, so the shop's data never went back up. It
-  now takes "nothing here" at its word and sends the whole store, which is
-  what the Mac app already did.
-
 - **(Mac + iOS) The cloud client moves into KhaytCore, so the phone can share
   it.** `CloudSignIn`, `CloudReader` and `CloudWriter` move from the Mac app
   into KhaytCore, unchanged apart from becoming public API. The one piece that
@@ -21,15 +13,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   its own 409, append-only sends) in one place for both apps, instead of a
   second copy on the phone that could drift. Agreed with the Mac session; the
   Mac's call sites and its cloud tests are unchanged.
-
-- **Cloud sync could stop finishing for a shop near its plan's size.** The
-  server refuses a new change once a shop's history of small changes is full,
-  and asks for the whole store instead. One of its reasons — the shop is close
-  to its plan's size limit — is one the desktop cannot see, and the desktop
-  read the refusal as another device having saved first. It fetched, found
-  nothing new, sent the same change again and was refused again, for as long
-  as the app was open. It now sends the whole store when the server asks for
-  it, which clears the history, and goes back to sending only what changed.
 
 - **(iOS) Raise an order or a quote on the phone with the Mac switched off.**
   It goes into the phone's copy of the shop and reaches the Mac with the
@@ -88,30 +71,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rather than inside a menu. New labels are in English and Arabic, from the
   mockup's own strings, and the layout mirrors in Arabic.
 
-### Security
-
-- **A carrier's API key and webhook secret were stored in the clear.**
-  `carriers.js` has always marked SMSA, Aramex and Saudi Post's `apiKey` and
-  `webhookSecret` as secrets, and neither was on the list the store encrypts,
-  masks and restores by — so both sat in `khayt-store.json` as typed and
-  reached the window unmasked, unlike every other credential Khayt holds. They
-  are encrypted at rest and masked now, and a test fails if a carrier gains a
-  secret field that is not protected. Existing values are encrypted the next
-  time the book is saved.
-
-- **Khayt would send a webhook, a cloud request or mail to a Tailscale
-  address.** Every outbound address a shop types is checked against the
-  private ranges first, so a URL pointing at the machine Khayt is running on
-  or at something else on the office network is refused rather than fetched.
-  `10.x`, `172.16–31.x`, `192.168.x`, loopback and the cloud metadata address
-  were all blocked. `100.64.0.0/10` was not — and that range is carrier-grade
-  NAT, which in practice means the whole of Tailscale.
-
-  A shop that runs Tailscale to reach its printers from home has its machines,
-  its NAS and everything else on that tailnet addressed there, and
-  `100.100.100.100` is Tailscale's own resolver. It is now refused like every
-  other private range. The rest of `100.x` is ordinary public space and is
-  untouched.
 
 ### Added
 
@@ -207,7 +166,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rule now, `lib/storefront-webhook.js`, which both servers run. Carrier and
   printer webhooks are still the other app's.
 
-
 - **(iOS) The order history said where the rest of it is.** The phone carries the
   newest two hundred finished jobs and every unfinished one; the list simply
   stopped at the end of them. A shop scrolling to the bottom of its own history
@@ -221,37 +179,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   is missing, which says nothing rather than guessing.
 
   The Arabic is mine and has had no native read.
-- **An order from your online store now comes off the shelf.** Khayt could
-  tell a storefront where to send its orders and could not show you one that
-  had arrived. The Integrations screen has always handed out the address to
-  paste into Shopify, Salla, Zid, WooCommerce, Etsy or Medusa, and every order
-  those sent has been sitting in a queue nothing on the Mac ever asked for.
-
-  The Mac reads that queue now, from the catalogue — which is where the shelf
-  is, because the question an online order raises is *do I already have this
-  made?* Each order is checked against the shelf first, line by line, and the
-  button says what will happen: **Record the sale** for an order that is
-  already printed, **Add to the queue** for one that is not.
-
-  An order that takes pieces off the shelf takes them off the count as well.
-  That count is what your storefront publishes and sells against, and until
-  now one screen in the whole app had ever written it — a person typing a
-  number. Nothing took one off. So a shop that printed twelve, listed twelve
-  and sold four went on publishing twelve, and the next publish put the four
-  that were gone back on sale.
-
-  The same is true of the Salla and Zid webhooks the desktop's own LAN server
-  takes: those orders now take what they use off the shelf too, and an order
-  the shelf can answer in full is recorded as finished rather than queued for
-  a printer that has nothing to make.
-
-  **It does not guess.** A line is matched on the whole product name, in
-  either language, and a near miss is reported as *Not in your catalogue*
-  rather than quietly taken off the nearest shelf — a deduction is invisible
-  once it is made, because the number it leaves behind looks exactly like a
-  number somebody counted.
-
-
 - **(iOS) A roll booked in from the phone now says what it cost, and books in
   with the Mac switched off.** The add-spool sheet never asked for a price, so
   every roll booked in from a label, a tag or the camera went on the shelf at
@@ -525,19 +452,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   triangles that come out are the ones that went in, in the same order, which
   is asserted rather than assumed.
 
-- **(Everyone) The queue a shop puts on its phones was called "Khayt", never
-  the shop.** Add the live queue to a phone's home screen and the icon was
-  labelled Khayt; open the page and it was headed Khayt. Both read a setting
-  called `shopName` that nothing in either app has ever written — the name a
-  shop actually types is kept under its business details, in both languages.
-  The quote page, in the next file along, had always fallen back to it
-  properly; these two had not.
-
-  They read the shop's real name now, in the language the page is in, and a
-  shop that has set an explicit name for these pages still gets that first.
-  A shop with no name at all still says Khayt — what changed is how rarely
-  anyone reaches that.
-
 - **(Mac) Settings looked like a list of facts rather than a form, and the two
   languages were the wrong way round.** Every text field in the settings window
   drew without a border, so a filled one read as a value and an EMPTY one was
@@ -550,31 +464,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the right of its box and the Arabic name at the left, each reading as the
   other script's direction. Each one starts at the edge its own script reads
   from now, in an Arabic window as well as an English one.
-
-- **(Everyone) A Saudi shop running Khayt in English was offered Shopify and
-  Stripe.** Settings → Integrations opened on the market matching the
-  INTERFACE LANGUAGE, and where a shop sells is a different question from what
-  it reads. A Riyadh shop with the app in English was shown the United States
-  directory — Shopify, WooCommerce, Etsy, Stripe, PayPal — instead of Salla,
-  Zid, Mada, STC Pay and Tabby, while its own book said its country was Saudi
-  Arabia, its currency SAR, and its invoices carried a ZATCA QR.
-
-  The directory opens on where the shop sells now: its country if it has given
-  one, otherwise what it charges in — a book priced in riyals with a ZATCA QR
-  on its invoices is not ambiguous, and plenty of shops never fill the country
-  field in at all. The interface language remains the last resort. The euro is
-  deliberately not read, because Spain, France and Germany all use it.
-
-  **Most shops will see this change**, and that is the intent rather than a
-  side effect: Khayt's own default currency is the riyal, so a shop that has
-  never touched either field now opens on Salla, Zid, Mada, STC Pay and Tabby
-  instead of Shopify, WooCommerce, Etsy, Stripe and PayPal. For an app that
-  builds in ZATCA invoices, the riyal and Hijri dates, that is the right way
-  round. A shop selling elsewhere sets its country once, or picks another
-  market from the selector that has always been there. The picker is untouched:
-  a shop selling into two markets exists, which is what it is for. Both apps
-  read the same rule, so they cannot open on different markets for the same
-  shop.
 
 - **(Mac) What the shop pays every month can be entered here, so break-even
   and the P&L stop pretending it has no overhead.** Reports has always told a
@@ -603,22 +492,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rule that decides which spools get the low badge on the shelf — the old copy
   read a threshold straight out of settings, so a spool could be badged low and
   never warned about, or warned about and not badged.
-
-
-- **(Maintainers) A fault inside the shared rules left no trace at all.** This
-  app asks those rules 263 questions and almost every one is asked in a way
-  that swallows a failure — which is right, because a fault in one rule should
-  not take a window down. The cost showed up this week: a rule reached for
-  something that exists only in the other app, the Invoice button said "could
-  not be built", and there was nothing written down anywhere to say why. It was
-  found by photographing the app.
-
-  Every engine call in both products goes through one place, so that is where
-  the fault is now recorded on its way past — the last sixteen, in memory, and
-  the crash note carries them. Nothing a shop sees changes. What is kept is the
-  error and the SHAPE of the call that failed, never its arguments: a script
-  carries its data inline, and a crash note is a file a shop is asked to send
-  on. `KHAYT_ENGINE_LOG=1` writes them as they happen.
 
 - **(Mac) A tracking link a shop had already sent a customer answered "invalid
   link" on this app.** The Windows and Linux app gives a customer an address
@@ -652,19 +525,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   sample book. There are tests on both sides now, and the one in plain Node
   would have caught this the day it was written.
 
-- **(Maintainers) Two tests read the sample book at a date that stopped
-  moving with it.** The sample shop is re-dated to today every time it is
-  opened, so it never shows a queue entirely in the past — and two tests asked
-  what the consumables shelf looked like on a fixed date. A fixed date against
-  a book that moves drifts apart by a day every day, and on 22 September one of
-  the sample's consumables crossed from "still above its minimum but running
-  out soon" into "low", the case emptied, and both tests failed on `main`
-  having passed on the same commit the evening before. Five open pull requests
-  went red at once, each looking as though it had broken something. They read
-  the book at today now, and a new guard fails the build if a test ever again
-  pins a clock over data that moves.
-
-
 - **(Mac) The Riyal mark is Khayt's own now, drawn rather than borrowed.** The
   face every money figure is set in has no Riyal sign in it, so the mark beside
   the digits was being taken from a different face — a different cut and a
@@ -677,34 +537,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   on the screen, at the colour and the size of the digits it belongs to,
   because it is drawn rather than looked up — and a test holds the two copies
   of that outline together so they cannot drift into being two marks again.
-
-- **(Everyone) The app icon is the letter khāʾ now — and until today it was not
-  one.** The mark is خ, the first letter of خيط, and خ is ح with a dot above
-  it. The shipped icon had no dot, so what every Dock, every Home screen and
-  every browser tab has been showing is ح: a different letter. The dot is not
-  decoration on this letter, it is the letter.
-
-  The nozzle has gone with it. It was grey on navy — the lowest-contrast thing
-  in the icon — and it took the top third of the tile, so at the size an icon
-  is actually looked at it was a smudge above a letter rather than a printer
-  above a thread.
-
-  What replaced it is the same letterform the mark has always had, with the dot
-  restored and the stroke redrawn — no gradient down it, no highlight inside
-  it, nothing that turns to noise when small. The stroke's width follows the
-  room the letter leaves itself: it thins where the letter doubles back on
-  itself and is full everywhere else, which is what the brush was doing and
-  what keeps the counter there open. Drawn at one width throughout, this letter
-  fills that counter in and reads as a blot rather than a letter — measured,
-  the tightest the letterform comes to itself is 0.080 of the canvas against a
-  stroke 0.105 wide.
-
-  There are two masters now. The large one carries that taper; the small one,
-  which takes over at 64 points and under, is a single heavier width with a
-  larger dot, because below 64 the counter cannot be seen at all and weight is
-  the only thing that survives. All 72 assets are regenerated from them, and
-  `assets/logo/khayt-mark.svg` is emitted from the same centreline, so the
-  vector mark and the PNGs cannot drift apart.
 
 - **(Mac) A mistyped address told a stranger on the shop's Wi‑Fi which
   storefront and which courier the shop uses.** Ask this app's LAN server for
@@ -720,20 +552,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the host knows what it serves. A test asks the running server for every line
   it advertises and fails if one answers 404, so the list cannot drift from the
   route table; another fails if the other server's routes reappear in it.
-
-- **(Maintainers) The SMTP wire tests failed on a busy machine and blamed the
-  network.** The client waits two minutes in these tests, because a build box
-  running two and a half thousand tests beside a Python SMTP server is not a
-  shop's Mac. The fake server was still on thirty seconds, so under load it
-  was the SERVER that gave up: its TLS handshake timed out while the client
-  was waiting happily, and the failure arrived as "server closed session with
-  no notification" — a network fault, apparently, in code that was working.
-  Measured in the same window: a pure-JavaScript parity test that takes ten
-  milliseconds on a desk took 58 seconds.
-
-  Both ends carry the same figure now, from one constant on each side, and a
-  test fails if the two ever drift apart — raising one alone only moves which
-  end gives up first.
 
 - **(Mac) The Online settings pane sent the shop to the other app for three
   things this app has served since alpha.18.** "The customer intake form, quote
@@ -781,16 +599,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   side of it are the bytes that were already there. A file this app genuinely
   cannot read the layout of converts anyway and says the plates were left where
   the source slicer put them, which is a sentence a shop can act on.
-- **(Maintainers) "Runs in the Windows and Linux app" cannot be printed by
-  accident.** One line was left in the Mac's assistant settings pointing a shop
-  at the other app, and it was unreachable — every AI feature the shared rule
-  offers is performed here. Unreachable is not the same as impossible: a fifth
-  feature added to the shared list would have been in neither the Mac's list
-  nor the test's, so both existing guards would have passed and Settings would
-  have quietly drawn that line. It is a failing build now, which says to build
-  the feature here rather than leave the shop a note. The line itself no longer
-  names another app.
-
 - **(Mac) A shop on its own mail server can send from the Mac now, and any
   shop can set email up here at all.** Khayt sends a customer's update through
   SendGrid, Mailgun, or a shop's own SMTP server, and the Mac could do the
@@ -808,20 +616,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   details, which moves get emailed, and a Send test email button that tells you
   what a mail server said rather than that "it failed".
 
-- **(Everyone) A stored key or password could be replaced but never forgotten,
-  and two ways to be told a customer was not emailed.** "Forget the stored key"
-  on the assistant settings could be switched on and saved and left the key
-  exactly where it was — a shop that meant to revoke a key would believe it
-  had. Asking for a stored secret to be forgotten now forgets it, on the
-  assistant and on the new email settings both. Separately, the check for
-  whether a mail server offered to encrypt matched the word "STARTTLS"
-  anywhere in the server's reply, so a server whose greeting merely contained
-  it could talk either app into sending a password over an unencrypted
-  connection; it has to be offered properly now. And the list of moves a shop
-  can have emailed lived in two places that could disagree, which is a switch
-  that never fires or one that cannot be turned off.
-
-
 - **(Mac) The board can be worked from the keyboard.** It could not be at all:
   the library was the only screen in the app with arrow keys, and the board is
   the one a shop stands at with a part in one hand. The arrows walk the
@@ -832,7 +626,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   ⌘ changes where the work is. In a mirrored window the arrows follow the
   screen, and at the ends nothing is swallowed, so the beep still means there
   is nothing that way.
-
 
 - **(Mac) A shop with a webhook switched on could move a job and could not
   record the money for it.** Recording a payment asked where that would reach
@@ -854,7 +647,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   is on Settings → Online now, beside the rest of the storefront, in words
   rather than as an alarm: a promise to a website is not worth interrupting
   somebody mid-job for.
-
 
 - **(Mac) The Profit & Loss page showed a slice of itself.** The page a shop
   opens Reports on had five things stacked down it — the quarter drawn out, the
@@ -2533,26 +2325,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Zid secrets and the carrier settings' fields had the same fault. They are
   bordered now, and a test fails if any field in the app is drawn without one.
 
-- **A Prusa could not be sent binary G-code, and a Klipper printer was sent
-  3MF files it cannot print.** Every upload was stored on the printer as
-  `.gcode` whatever it was. A Prusa CORE One, MK4 or XL slices to binary G-code
-  (`.bgcode`) by default, so sending one read it as text and refused it; a 3MF
-  sent to Moonraker or OctoPrint failed on the printer. The file keeps its own
-  kind now, and one the printer cannot run is refused before sending, with the
-  reason. What each printer is asked is one shared rule,
-  `lib/printer-upload.js`, which the Mac sends with too.
 - **(Mac) Editing a Bambu or Elegoo printer on the Mac erased its serial
   number.** The machine edit rebuilt the printer connection from a fixed list
   of fields and `serial` was not on it, so correcting even the address cut the
   printer off with nothing saying why. Every stored field is kept now.
-
-- **(Maintainers) The carrier webhook's rule is shared now.** Reading an SMSA,
-  Aramex or Saudi Post status update, finding the job by its tracking number
-  and moving its shipping status forward is `lib/carrier-webhook.js`, so the
-  Mac's LAN server can run it. The route had never been sent a request by any
-  test; it is now, over real HTTP, and the same tests pass against the handler
-  before the lift. The window is also told about the record that was written
-  rather than a draft built before the write.
 
 - **(Mac) The masthead's "Gross" and its month's net described different
   jobs.** The net is the month's finished work, net of tax — the P&L's own
@@ -3016,6 +2792,265 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.9.0] - 2026-09-23
+
+The work since 3.8.0. Individual entries are kept below; this is what
+changed for you.
+
+**Cloud sync could stop and never start again, in two ways.** A shop close
+to its plan's size limit, and a shop whose cloud copy had gone (after a reset
+or a move to a new cloud), each got stuck the same way: the desktop took the
+cloud's refusal for another device having saved first, checked, found nothing,
+and sent the same thing again, for as long as the app was open. Both now send
+the whole store, which is what the cloud was asking for, and carry on.
+
+**Two security fixes.** A shipping carrier's API key and webhook secret were
+stored as typed and shown unmasked, unlike every other password Khayt keeps;
+they are encrypted and masked now. And an address you type for a webhook, the
+cloud or mail could point into a Tailscale network, which the check that
+refuses private addresses did not cover; it does now.
+
+**An online order can come off the shelf.** A Salla or Zid order that arrives
+through Khayt takes what it uses off the shelf count, so your storefront stops
+selling pieces you no longer have, and an order the shelf covers in full is
+recorded as finished rather than queued for printing.
+
+**Settings → Integrations opens on where you sell.** A shop in Saudi Arabia
+running Khayt in English was shown Shopify and Stripe; it now sees Salla, Zid,
+Mada, STC Pay and Tabby, because the directory follows the shop's country or
+currency rather than the interface language. **Most shops will see this
+change.** Pick another market from the selector if you sell elsewhere.
+
+**Smaller things.** A stored key or password can now be removed, not only
+replaced. The live queue on your phones carries your shop's name, not Khayt's.
+The app icon is the letter خ it was always meant to be; the old one was
+missing its dot. And a Prusa can be sent binary G-code.
+
+### Security
+
+- **A carrier's API key and webhook secret were stored in the clear.**
+  `carriers.js` has always marked SMSA, Aramex and Saudi Post's `apiKey` and
+  `webhookSecret` as secrets, and neither was on the list the store encrypts,
+  masks and restores by — so both sat in `khayt-store.json` as typed and
+  reached the window unmasked, unlike every other credential Khayt holds. They
+  are encrypted at rest and masked now, and a test fails if a carrier gains a
+  secret field that is not protected. Existing values are encrypted the next
+  time the book is saved.
+
+- **Khayt would send a webhook, a cloud request or mail to a Tailscale
+  address.** Every outbound address a shop types is checked against the
+  private ranges first, so a URL pointing at the machine Khayt is running on
+  or at something else on the office network is refused rather than fetched.
+  `10.x`, `172.16–31.x`, `192.168.x`, loopback and the cloud metadata address
+  were all blocked. `100.64.0.0/10` was not — and that range is carrier-grade
+  NAT, which in practice means the whole of Tailscale.
+
+  A shop that runs Tailscale to reach its printers from home has its machines,
+  its NAS and everything else on that tailnet addressed there, and
+  `100.100.100.100` is Tailscale's own resolver. It is now refused like every
+  other private range. The rest of `100.x` is ordinary public space and is
+  untouched.
+
+### Added
+
+- **An order from your online store now comes off the shelf.** Khayt could
+  tell a storefront where to send its orders and could not show you one that
+  had arrived. The Integrations screen has always handed out the address to
+  paste into Shopify, Salla, Zid, WooCommerce, Etsy or Medusa, and every order
+  those sent has been sitting in a queue nothing on the Mac ever asked for.
+
+  The Mac reads that queue now, from the catalogue — which is where the shelf
+  is, because the question an online order raises is *do I already have this
+  made?* Each order is checked against the shelf first, line by line, and the
+  button says what will happen: **Record the sale** for an order that is
+  already printed, **Add to the queue** for one that is not.
+
+  An order that takes pieces off the shelf takes them off the count as well.
+  That count is what your storefront publishes and sells against, and until
+  now one screen in the whole app had ever written it — a person typing a
+  number. Nothing took one off. So a shop that printed twelve, listed twelve
+  and sold four went on publishing twelve, and the next publish put the four
+  that were gone back on sale.
+
+  The same is true of the Salla and Zid webhooks the desktop's own LAN server
+  takes: those orders now take what they use off the shelf too, and an order
+  the shelf can answer in full is recorded as finished rather than queued for
+  a printer that has nothing to make.
+
+  **It does not guess.** A line is matched on the whole product name, in
+  either language, and a near miss is reported as *Not in your catalogue*
+  rather than quietly taken off the nearest shelf — a deduction is invisible
+  once it is made, because the number it leaves behind looks exactly like a
+  number somebody counted.
+
+### Changed
+
+- **(Everyone) The queue a shop puts on its phones was called "Khayt", never
+  the shop.** Add the live queue to a phone's home screen and the icon was
+  labelled Khayt; open the page and it was headed Khayt. Both read a setting
+  called `shopName` that nothing in either app has ever written — the name a
+  shop actually types is kept under its business details, in both languages.
+  The quote page, in the next file along, had always fallen back to it
+  properly; these two had not.
+
+  They read the shop's real name now, in the language the page is in, and a
+  shop that has set an explicit name for these pages still gets that first.
+  A shop with no name at all still says Khayt — what changed is how rarely
+  anyone reaches that.
+
+- **(Everyone) A Saudi shop running Khayt in English was offered Shopify and
+  Stripe.** Settings → Integrations opened on the market matching the
+  INTERFACE LANGUAGE, and where a shop sells is a different question from what
+  it reads. A Riyadh shop with the app in English was shown the United States
+  directory — Shopify, WooCommerce, Etsy, Stripe, PayPal — instead of Salla,
+  Zid, Mada, STC Pay and Tabby, while its own book said its country was Saudi
+  Arabia, its currency SAR, and its invoices carried a ZATCA QR.
+
+  The directory opens on where the shop sells now: its country if it has given
+  one, otherwise what it charges in — a book priced in riyals with a ZATCA QR
+  on its invoices is not ambiguous, and plenty of shops never fill the country
+  field in at all. The interface language remains the last resort. The euro is
+  deliberately not read, because Spain, France and Germany all use it.
+
+  **Most shops will see this change**, and that is the intent rather than a
+  side effect: Khayt's own default currency is the riyal, so a shop that has
+  never touched either field now opens on Salla, Zid, Mada, STC Pay and Tabby
+  instead of Shopify, WooCommerce, Etsy, Stripe and PayPal. For an app that
+  builds in ZATCA invoices, the riyal and Hijri dates, that is the right way
+  round. A shop selling elsewhere sets its country once, or picks another
+  market from the selector that has always been there. The picker is untouched:
+  a shop selling into two markets exists, which is what it is for. Both apps
+  read the same rule, so they cannot open on different markets for the same
+  shop.
+
+- **(Maintainers) A fault inside the shared rules left no trace at all.** This
+  app asks those rules 263 questions and almost every one is asked in a way
+  that swallows a failure — which is right, because a fault in one rule should
+  not take a window down. The cost showed up this week: a rule reached for
+  something that exists only in the other app, the Invoice button said "could
+  not be built", and there was nothing written down anywhere to say why. It was
+  found by photographing the app.
+
+  Every engine call in both products goes through one place, so that is where
+  the fault is now recorded on its way past — the last sixteen, in memory, and
+  the crash note carries them. Nothing a shop sees changes. What is kept is the
+  error and the SHAPE of the call that failed, never its arguments: a script
+  carries its data inline, and a crash note is a file a shop is asked to send
+  on. `KHAYT_ENGINE_LOG=1` writes them as they happen.
+
+- **(Maintainers) Two tests read the sample book at a date that stopped
+  moving with it.** The sample shop is re-dated to today every time it is
+  opened, so it never shows a queue entirely in the past — and two tests asked
+  what the consumables shelf looked like on a fixed date. A fixed date against
+  a book that moves drifts apart by a day every day, and on 22 September one of
+  the sample's consumables crossed from "still above its minimum but running
+  out soon" into "low", the case emptied, and both tests failed on `main`
+  having passed on the same commit the evening before. Five open pull requests
+  went red at once, each looking as though it had broken something. They read
+  the book at today now, and a new guard fails the build if a test ever again
+  pins a clock over data that moves.
+
+- **(Everyone) The app icon is the letter khāʾ now — and until today it was not
+  one.** The mark is خ, the first letter of خيط, and خ is ح with a dot above
+  it. The shipped icon had no dot, so what every Dock, every Home screen and
+  every browser tab has been showing is ح: a different letter. The dot is not
+  decoration on this letter, it is the letter.
+
+  The nozzle has gone with it. It was grey on navy — the lowest-contrast thing
+  in the icon — and it took the top third of the tile, so at the size an icon
+  is actually looked at it was a smudge above a letter rather than a printer
+  above a thread.
+
+  What replaced it is the same letterform the mark has always had, with the dot
+  restored and the stroke redrawn — no gradient down it, no highlight inside
+  it, nothing that turns to noise when small. The stroke's width follows the
+  room the letter leaves itself: it thins where the letter doubles back on
+  itself and is full everywhere else, which is what the brush was doing and
+  what keeps the counter there open. Drawn at one width throughout, this letter
+  fills that counter in and reads as a blot rather than a letter — measured,
+  the tightest the letterform comes to itself is 0.080 of the canvas against a
+  stroke 0.105 wide.
+
+  There are two masters now. The large one carries that taper; the small one,
+  which takes over at 64 points and under, is a single heavier width with a
+  larger dot, because below 64 the counter cannot be seen at all and weight is
+  the only thing that survives. All 72 assets are regenerated from them, and
+  `assets/logo/khayt-mark.svg` is emitted from the same centreline, so the
+  vector mark and the PNGs cannot drift apart.
+
+- **(Maintainers) The SMTP wire tests failed on a busy machine and blamed the
+  network.** The client waits two minutes in these tests, because a build box
+  running two and a half thousand tests beside a Python SMTP server is not a
+  shop's Mac. The fake server was still on thirty seconds, so under load it
+  was the SERVER that gave up: its TLS handshake timed out while the client
+  was waiting happily, and the failure arrived as "server closed session with
+  no notification" — a network fault, apparently, in code that was working.
+  Measured in the same window: a pure-JavaScript parity test that takes ten
+  milliseconds on a desk took 58 seconds.
+
+  Both ends carry the same figure now, from one constant on each side, and a
+  test fails if the two ever drift apart — raising one alone only moves which
+  end gives up first.
+
+- **(Maintainers) "Runs in the Windows and Linux app" cannot be printed by
+  accident.** One line was left in the Mac's assistant settings pointing a shop
+  at the other app, and it was unreachable — every AI feature the shared rule
+  offers is performed here. Unreachable is not the same as impossible: a fifth
+  feature added to the shared list would have been in neither the Mac's list
+  nor the test's, so both existing guards would have passed and Settings would
+  have quietly drawn that line. It is a failing build now, which says to build
+  the feature here rather than leave the shop a note. The line itself no longer
+  names another app.
+
+- **(Everyone) A stored key or password could be replaced but never forgotten,
+  and two ways to be told a customer was not emailed.** "Forget the stored key"
+  on the assistant settings could be switched on and saved and left the key
+  exactly where it was — a shop that meant to revoke a key would believe it
+  had. Asking for a stored secret to be forgotten now forgets it, on the
+  assistant and on the new email settings both. Separately, the check for
+  whether a mail server offered to encrypt matched the word "STARTTLS"
+  anywhere in the server's reply, so a server whose greeting merely contained
+  it could talk either app into sending a password over an unencrypted
+  connection; it has to be offered properly now. And the list of moves a shop
+  can have emailed lived in two places that could disagree, which is a switch
+  that never fires or one that cannot be turned off.
+
+### Fixed
+
+- **Cloud sync never recovered for a shop whose cloud store was gone.** If
+  the server no longer had a shop's store — a reset, or the shop moved to a
+  new cloud — the desktop kept sending changes against the version it last
+  saw. The server refused each one, the desktop checked, found nothing there,
+  and tried the same thing again, so the shop's data never went back up. It
+  now takes "nothing here" at its word and sends the whole store, which is
+  what the Mac app already did.
+
+- **Cloud sync could stop finishing for a shop near its plan's size.** The
+  server refuses a new change once a shop's history of small changes is full,
+  and asks for the whole store instead. One of its reasons — the shop is close
+  to its plan's size limit — is one the desktop cannot see, and the desktop
+  read the refusal as another device having saved first. It fetched, found
+  nothing new, sent the same change again and was refused again, for as long
+  as the app was open. It now sends the whole store when the server asks for
+  it, which clears the history, and goes back to sending only what changed.
+
+- **A Prusa could not be sent binary G-code, and a Klipper printer was sent
+  3MF files it cannot print.** Every upload was stored on the printer as
+  `.gcode` whatever it was. A Prusa CORE One, MK4 or XL slices to binary G-code
+  (`.bgcode`) by default, so sending one read it as text and refused it; a 3MF
+  sent to Moonraker or OctoPrint failed on the printer. The file keeps its own
+  kind now, and one the printer cannot run is refused before sending, with the
+  reason. What each printer is asked is one shared rule,
+  `lib/printer-upload.js`, which the Mac sends with too.
+
+- **(Maintainers) The carrier webhook's rule is shared now.** Reading an SMSA,
+  Aramex or Saudi Post status update, finding the job by its tracking number
+  and moving its shipping status forward is `lib/carrier-webhook.js`, so the
+  Mac's LAN server can run it. The route had never been sent a request by any
+  test; it is now, over real HTTP, and the same tests pass against the handler
+  before the lift. The window is also told about the record that was written
+  rather than a draft built before the write.
 
 ## [4.0.0-alpha.40] - 2026-09-23
 
