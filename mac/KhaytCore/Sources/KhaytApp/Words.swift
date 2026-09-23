@@ -2546,6 +2546,24 @@ final class Words {
                                     + "وتقويم المواعيد، ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس، "
                                     + "ويستقبل الطلبات من سلة وزد وتحديثات الشحنات من سمسا وأرامكس والبريد السعودي. "
                                     + "أما ويب هوك الطابعات فيعمل في ذلك التطبيق حالياً."],
+        "mac.licence_proof": ["en": "Licence proof", "ar": "إثبات الترخيص"],
+        "mac.licence_code":  ["en": "Licence code", "ar": "رمز الترخيص"],
+        "mac.licence_verify": ["en": "Verification page", "ar": "صفحة التحقق"],
+        "mac.licence_has_end": ["en": "It ends on a date (a subscription)", "ar": "ينتهي في تاريخ محدد (اشتراك)"],
+        "mac.licence_until": ["en": "Covers sales until", "ar": "يغطي البيع حتى"],
+        "mac.licence_lapsed": ["en": "Lapsed on", "ar": "انتهى في"],
+        "mac.licence_proof_hint": ["en": "The code and page the designer gave you for selling prints of this model. "
+                                        + "After the last day, every job and product using it says it is no longer covered.",
+                                   "ar": "الرمز والصفحة التي أعطاك إياها المصمم لبيع مطبوعات هذا النموذج. "
+                                        + "بعد آخر يوم، ينبّه كل طلب ومنتج يستخدمه أنه لم يعد مشمولًا."],
+        "mac.licence_bad_link": ["en": "The verification page must be an http or https address.",
+                                 "ar": "يجب أن تكون صفحة التحقق عنوان http أو https."],
+        "mac.licence_bad_date": ["en": "That end date could not be read.", "ar": "تعذّرت قراءة تاريخ الانتهاء."],
+        "mac.licence_not_for_sale": ["en": "Not licensed for sale", "ar": "غير مرخّص للبيع"],
+        "mac.licence_nc_line": ["en": "{name}: its licence does not allow selling prints.",
+                                "ar": "{name}: ترخيصه لا يسمح ببيع المطبوعات."],
+        "mac.licence_expired_line": ["en": "{name}: the bought licence ended on {until}.",
+                                     "ar": "{name}: انتهى الترخيص المشترى في {until}."],
         "mac.mach_serial":   ["en": "Serial number", "ar": "الرقم التسلسلي"],
         "mac.mach_mainboard": ["en": "Mainboard ID", "ar": "معرّف اللوحة الأم"],
         "mac.mach_slug":     ["en": "Printer on the server", "ar": "الطابعة على الخادم"],

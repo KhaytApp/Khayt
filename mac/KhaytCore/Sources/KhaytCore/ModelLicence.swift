@@ -126,6 +126,65 @@ public enum ModelLicence {
             return sellable(str(o["licence"])) == false
         }
     }
+
+    /// Whether a BOUGHT licence has run out on `today` (`YYYY-MM-DD`). See
+    /// `lib/model-licence.js` — held to it by `ModelLicenceParityTests`.
+    public static func expired(_ record: JSONValue?, today: String) -> Bool {
+        guard case .object(let o)? = record else { return false }
+        guard str(o["licence"]).lowercased() == "commercial" else { return false }
+        let until = str(o["licenceExpires"])
+        let day = today.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isDay(until), isDay(day) else { return false }
+        return until < day
+    }
+
+    /// `sellable`, and a lapsed bought licence is a no. Nil when nobody has said.
+    public static func sellableOn(_ record: JSONValue?, today: String) -> Bool? {
+        var licence = ""
+        if case .object(let o)? = record { licence = str(o["licence"]) }
+        let yes = sellable(licence)
+        return yes == true && expired(record, today: today) ? false : yes
+    }
+
+    /// One model behind a sale that may not be sold today.
+    public struct SaleProblem: Equatable, Sendable {
+        public let id: String
+        public let name: String
+        public let licence: String
+        /// `not-commercial` or `expired`.
+        public let reason: String
+        public let until: String
+    }
+
+    /// The models behind a sale that may not be sold today, in the order asked.
+    /// Unknown licences are not problems — unknown is not no.
+    public static func saleProblems(_ ids: [String], records: [JSONValue], today: String) -> [SaleProblem] {
+        var seen = Set<String>()
+        var out: [SaleProblem] = []
+        for raw in ids {
+            let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !key.isEmpty, !seen.contains(key) else { continue }
+            seen.insert(key)
+            guard let record = records.first(where: {
+                if case .object(let o) = $0 { return str(o["id"]) == key } else { return false }
+            }), case .object(let o) = record else { continue }
+            var name = str(o["name"])
+            if name.isEmpty { name = str(o["originalName"]) }
+            let plain = sellable(str(o["licence"]))
+            if plain == false {
+                out.append(.init(id: key, name: name, licence: str(o["licence"]).lowercased(),
+                                 reason: "not-commercial", until: ""))
+            } else if plain == true, expired(record, today: today) {
+                out.append(.init(id: key, name: name, licence: "commercial", reason: "expired",
+                                 until: str(o["licenceExpires"])))
+            }
+        }
+        return out
+    }
+
+    private static func isDay(_ s: String) -> Bool {
+        s.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil
+    }
 }
 
 extension ModelLicence {

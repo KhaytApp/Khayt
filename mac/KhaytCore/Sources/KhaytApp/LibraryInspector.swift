@@ -10,6 +10,8 @@ struct LibraryInspector: View {
     @State private var setups: KhaytEngine.PrintSetups?
     @State private var versions: KhaytEngine.PrintVersions?
     @State private var parts: KhaytEngine.PrintParts?
+    /// The model whose bought-licence proof is being edited.
+    @State private var proofFor: LibraryFile?
 
     var body: some View {
         if shop.fileSelection.count > 1 {
@@ -310,7 +312,34 @@ struct LibraryInspector: View {
                                                  + standing.licence.replacingOccurrences(of: "-", with: "_")),
                                warn: standing.sellable == false)
                 }
+                // ── A BOUGHT LICENCE, AND THE PROOF OF IT ─────────────────
+                //
+                // "Commercial" is only as good as the receipt: a designer's
+                // merchant tier is usually a subscription, and a print sold the
+                // week after it lapsed is sold without a licence. The last day
+                // it covers turns amber once it has passed, and every sale of
+                // the model says so (`Shop.saleProblems`).
+                if standing.licence == "commercial" {
+                    if let until = file.licenceExpires, !until.isEmpty {
+                        let lapsed = ModelLicence.expired(
+                            .object(["licence": .string("commercial"), "licenceExpires": .string(until)]),
+                            today: Shop.today())
+                        DetailLine(shop.words.callIt(lapsed ? "mac.licence_lapsed" : "mac.licence_until"),
+                                   until, warn: lapsed)
+                    }
+                    if let code = file.licenceCode, !code.isEmpty {
+                        DetailLine(shop.words.callIt("mac.licence_code"), code)
+                    }
+                    if let link = file.licenceUrl, let url = URL(string: link) {
+                        Link(shop.words.callIt("mac.licence_verify"), destination: url).font(.callout)
+                    }
+                    if shop.canMoveJobs {
+                        Button(shop.words.callIt("mac.licence_proof") + "…") { proofFor = file }
+                            .buttonStyle(.link).font(.callout)
+                    }
+                }
             }
+            .sheet(item: $proofFor) { LicenceProofSheet(shop: shop, file: $0) }
         }
     }
 

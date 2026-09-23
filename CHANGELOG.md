@@ -105,6 +105,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A model that may not be sold is flagged where it would be sold.** The
+  library knew when a model's licence was NonCommercial, and nothing stopped it
+  being printed for a customer, invoiced or listed in the catalogue. A job, and
+  a product being built, now say "Not licensed for sale" and name the model.
+  And a licence BOUGHT from the designer can carry its proof — the licence
+  code, the page that verifies it, and the last day it covers, since a
+  designer's merchant tier is usually a subscription. From the day after, every
+  job and product using that model says the licence has run out. A model whose
+  licence nobody has recorded is never flagged: unknown is not no.
+
 - **(Mac) A shop's storefront can quote an uploaded model with Khayt's own
   prices.** When public model pricing is switched on, the Mac now publishes the
   shop's pricing inputs to Khayt Cloud beside its delivery promise — the

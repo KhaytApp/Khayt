@@ -41,6 +41,16 @@ private struct Detail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                // ── MAY THIS BE SOLD? ─────────────────────────────────────
+                //
+                // Asked where the sale is, not only where the model is. A
+                // non-commercial model, or one whose bought licence has run
+                // out, printed and invoiced is the one mistake here with a
+                // designer on the other end of it.
+                let problems = shop.saleProblems(job.parts.compactMap(\.printFileId))
+                if !problems.isEmpty {
+                    LicenceWarning(shop: shop, problems: problems)
+                }
                 if shop.canMoveJobs, !shop.sendablePrinters.isEmpty,
                    !Shop.finishedStatuses.contains(job.status), job.status != "cancelled" {
                     // Beside the job it is for: the plate goes to a machine
