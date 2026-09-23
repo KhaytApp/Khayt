@@ -27,6 +27,21 @@ final class KhaytAPIClient: ObservableObject {
     /// What this phone holds of the order history, when it holds only part.
     @Published private(set) var historyWindow: HeldWindow?
 
+    /// This phone's own Khayt Cloud sign-in, when it has one — see `CloudSession`.
+    @Published private(set) var cloud: CloudSession? = CloudSession.load()
+    /// Which way the book last went home, and when. Said on screen because a
+    /// phone that synced through the cloud has reached the Mac only if the Mac
+    /// has synced since.
+    @Published private(set) var lastSync: SyncMark?
+    /// Why the last cloud sync did not finish, in a sentence, or nil.
+    @Published private(set) var cloudProblem: String?
+
+    struct SyncMark: Equatable {
+        enum Route: Equatable { case mac, cloud }
+        let route: Route
+        let at: Date
+    }
+
     /// The book, and the reader that turns it into what the screens decode.
     ///
     /// Optional because a build without its App Group container has neither, and
@@ -94,8 +109,7 @@ final class KhaytAPIClient: ObservableObject {
             defer { Task { @MainActor in self?.refreshing = false } }
             // Send first: what the Mac takes now does not need carrying
             // through the pull. `adopt` keeps whatever it did not take.
-            _ = try? await self?.sendPendingChanges()
-            _ = try? await self?.pullBook(into: book)
+            await self?.refreshEverywhere(book)
             await MainActor.run { self?.lastRefresh = Date() }
         }
     }
@@ -259,6 +273,87 @@ final class KhaytAPIClient: ObservableObject {
         return outbox.count
     }
 
+    // MARK: - Two ways home: the Mac, then the cloud
+
+    /// Bring the book up to date, by whichever way home is open.
+    ///
+    /// ── WITH A CLOUD SIGN-IN, THE CLOUD IS WHERE THE PHONE READS FROM ────
+    ///
+    /// Edits go to the Mac directly when it answers — it is the quicker way —
+    /// but the book is REFRESHED from the cloud. The two are not the same copy
+    /// at every moment: an edit this phone sent through the cloud is in the
+    /// cloud before the Mac has pulled it, and adopting the Mac's book then
+    /// would show the edit undone until the Mac caught up. The cloud has
+    /// everything the Mac has sent and everything the phone has, so it is the
+    /// copy that is never behind this phone. The Mac's book is taken only when
+    /// the cloud cannot be reached.
+    private func refreshEverywhere(_ book: CompanionBook) async {
+        if (try? await sendPendingChanges()) != nil {
+            lastSync = SyncMark(route: .mac, at: Date())
+        }
+        if cloud != nil, await syncThroughCloud() != nil { return }
+        if (try? await pullBook(into: book)) != nil {
+            lastSync = SyncMark(route: .mac, at: Date())
+        }
+    }
+
+    /// After an edit: to the Mac if it takes it, otherwise through the cloud.
+    /// Never required — the edit is safe on the phone before either is tried.
+    func deliverPending() async {
+        await refreshPendingCount()
+        guard pendingCount > 0 else { return }
+        if (try? await sendPendingChanges()) != nil {
+            lastSync = SyncMark(route: .mac, at: Date())
+        }
+        if pendingCount > 0, cloud != nil { await syncThroughCloud() }
+    }
+
+    /// One round through Khayt Cloud: pull what changed, send what is pending.
+    /// A viewer's sign-in only pulls. See `CloudSync` for what is never done.
+    @discardableResult
+    func syncThroughCloud() async -> CloudSync.Pushed? {
+        guard let session = cloud, let book, let reader else { return nil }
+        do {
+            let sync = CloudSync(book: book, engine: try await reader.sharedEngine())
+            var next = session
+            var pushed: CloudSync.Pushed?
+            if session.canWrite {
+                let result = try await sync.push(session)
+                next = result.0; pushed = result.1
+            } else {
+                next = try await sync.pull(session).0
+                pushed = .readOnly
+            }
+            next.save()
+            cloud = next
+            lastSync = SyncMark(route: .cloud, at: Date())
+            cloudProblem = pushed == .needsTheMac ? L10n.tr("cloud.needs_mac") : nil
+            await refreshPendingCount()
+            return pushed
+        } catch {
+            cloudProblem = error.localizedDescription
+            return nil
+        }
+    }
+
+    /// Sign this phone in to the shop's cloud, and take its first pull.
+    func signInToCloud(url: String, email: String, password: String, passphrase: String) async throws {
+        guard let reader else { throw KhaytAPIError.notConfigured }
+        let engine = try await reader.sharedEngine()
+        let session = try await CloudSync.signIn(url: url, email: email, password: password,
+                                                 passphrase: passphrase, engine: engine)
+        session.save()
+        cloud = session
+        await syncThroughCloud()
+    }
+
+    func signOutOfCloud() {
+        CloudSession.forget()
+        cloud = nil
+        cloudProblem = nil
+        if lastSync?.route == .cloud { lastSync = nil }
+    }
+
     /// How many edits are waiting to reach the Mac, for a screen that says so.
     func refreshPendingCount() async {
         guard let reader else { return }
@@ -282,7 +377,7 @@ final class KhaytAPIClient: ObservableObject {
             return false
         }
         await refreshPendingCount()
-        _ = try? await sendPendingChanges()
+        await deliverPending()
         return true
     }
 
@@ -417,7 +512,7 @@ final class KhaytAPIClient: ObservableObject {
             let machines = (try? await reader.machines()) ?? []
             _ = try BookWriter(book: book).addOrder(draft, machines: machines)
             await refreshPendingCount()
-            _ = try? await sendPendingChanges()
+            await deliverPending()
             return
         }
 
@@ -483,7 +578,7 @@ final class KhaytAPIClient: ObservableObject {
             let records = try await reader.newSpools(from: draft, count: count)
             try BookWriter(book: book).addSpools(records)
             await refreshPendingCount()
-            _ = try? await sendPendingChanges()
+            await deliverPending()
             return try records.map { record in
                 let data = try JSONEncoder().encode(JSONValue.object(record))
                 return try JSONDecoder().decode(InventorySpool.self, from: data)

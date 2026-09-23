@@ -427,3 +427,28 @@
 "settings.notifications.allow" = "Allow notifications";
 "unit.g" = "g";
 "inventory.remove.body" = "%@ will be removed from inventory.";
+
+/* Khayt Cloud */
+"cloud.title" = "Khayt Cloud";
+"cloud.sign_in" = "Sign in to Khayt Cloud";
+"cloud.sign_out" = "Sign out of Khayt Cloud";
+"cloud.sync_now" = "Sync now";
+"cloud.shop" = "Shop";
+"cloud.role" = "Role";
+"cloud.last_sync" = "Last sync";
+"cloud.via_cloud" = "%@ via Khayt Cloud";
+"cloud.via_mac" = "%@ via the Mac";
+"cloud.footer.off" = "Keeps this phone in step when the Mac is not on the same Wi-Fi. Changes still go straight to the Mac whenever it answers.";
+"cloud.footer.on" = "The phone reads the shop from Khayt Cloud and sends changes to the Mac when it answers, through the cloud when it does not.";
+"cloud.needs_mac" = "Khayt Cloud is not taking changes one at a time right now. They are kept on this phone; open Khayt on the Mac to let it sync.";
+"cloud.signin.email" = "Email";
+"cloud.signin.password" = "Password";
+"cloud.signin.account_footer" = "The account the shop uses for Khayt Cloud. This phone gets a sign-in of its own that can be signed out on its own.";
+"cloud.signin.passphrase" = "Shop passphrase";
+"cloud.signin.passphrase_footer" = "The passphrase the shop's cloud copy is encrypted with — the one set on the Mac when it first connected. It opens the key on this phone and is not stored.";
+"cloud.signin.advanced" = "Advanced";
+"cloud.signin.server" = "Server address";
+"cloud.signin.action" = "Sign in";
+"cloud.signin.wrong_passphrase" = "That passphrase does not open this shop's key.";
+"settings.widget.howto" = "How to add the widget";
+"spool.detail.id" = "ID";

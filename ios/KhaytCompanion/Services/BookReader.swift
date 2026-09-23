@@ -43,6 +43,10 @@ actor BookReader {
     /// Starting it loads the shop's business rules into JavaScriptCore, which
     /// costs about a fifth of a second. That is nothing once and everything on
     /// every scroll, and a screen that re-read the queue would pay it each time.
+    /// The same engine, for work that belongs to the book but not the reader
+    /// — a cloud sync folds with it.
+    func sharedEngine() throws -> KhaytEngine { try engine() }
+
     private func engine() throws -> KhaytEngine {
         if let engineHandle { return engineHandle }
         let made = try KhaytEngine()

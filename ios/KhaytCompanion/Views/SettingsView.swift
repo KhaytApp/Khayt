@@ -7,6 +7,8 @@ struct SettingsView: View {
 
     @State private var testResult: String?
     @State private var isTesting = false
+    @State private var showCloudSignIn = false
+    @State private var cloudSyncing = false
 
     var body: some View {
         NavigationStack {
@@ -73,8 +75,10 @@ struct SettingsView: View {
                     header: Text(L10n.tr("settings.widget")),
                     footer: Text(L10n.tr("settings.widget.footer"))
                 ) {
-                    Link("How to add the widget", destination: URL(string: "https://github.com/khaytapp/Khayt/blob/main/ios/XCODE_WIDGET.md")!)
+                    Link(L10n.tr("settings.widget.howto"), destination: URL(string: "https://github.com/khaytapp/Khayt/blob/main/ios/XCODE_WIDGET.md")!)
                 }
+
+                cloudSection
 
                 Section {
                     Button {
@@ -110,6 +114,44 @@ struct SettingsView: View {
             .background(KhaytDesign.bg)
             .foregroundStyle(KhaytDesign.text)
             .khaytScreen(title: L10n.tr("tab.settings"))
+            .sheet(isPresented: $showCloudSignIn) { CloudSignInSheet() }
+        }
+    }
+
+    /// Khayt Cloud: how this phone keeps in step when the Mac is elsewhere.
+    @ViewBuilder
+    private var cloudSection: some View {
+        Section(header: Text(L10n.tr("cloud.title")),
+                footer: Text(L10n.tr(api.cloud == nil ? "cloud.footer.off" : "cloud.footer.on"))) {
+            if let session = api.cloud {
+                LabeledContent(L10n.tr("cloud.shop"), value: session.shopId)
+                LabeledContent(L10n.tr("cloud.role"), value: session.role)
+                if let mark = api.lastSync {
+                    LabeledContent(L10n.tr("cloud.last_sync"),
+                                   value: String(format: L10n.tr(mark.route == .cloud ? "cloud.via_cloud" : "cloud.via_mac"),
+                                                 mark.at.formatted(date: .omitted, time: .shortened)))
+                }
+                if let problem = api.cloudProblem {
+                    Text(problem).font(.footnote).foregroundStyle(KhaytDesign.warn)
+                }
+                Button {
+                    Task {
+                        cloudSyncing = true
+                        await api.syncThroughCloud()
+                        cloudSyncing = false
+                    }
+                } label: {
+                    HStack {
+                        Text(L10n.tr("cloud.sync_now"))
+                        Spacer()
+                        if cloudSyncing { ProgressView() }
+                    }
+                }
+                .disabled(cloudSyncing)
+                Button(L10n.tr("cloud.sign_out"), role: .destructive) { api.signOutOfCloud() }
+            } else {
+                Button(L10n.tr("cloud.sign_in")) { showCloudSignIn = true }
+            }
         }
     }
 
