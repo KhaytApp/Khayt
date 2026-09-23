@@ -12,6 +12,7 @@
  *
  *   POST /v1/shops/{id}/deltas   { ciphertext, baseRev }
  *        200 { rev } · 409 { rev } on a stale head · 404 if unsupported
+ *        409 { rev, compact: true } when the chain is full (`chainCap`)
  *   GET  /v1/shops/{id}/store[?since={rev}]
  *        200 { ciphertext?, rev, deltas: [{ rev, ciphertext }] }
  *        `ciphertext` only when the caller is behind the base; `rev` is always
@@ -55,7 +56,7 @@ function freshDek(pass = 'p') {
  * A delta-capable server: one base blob per shop plus an ordered chain of
  * opaque deltas. It never decrypts anything.
  */
-function makeDeltaServer({ takesDeltas = true, gatedShops = null, gateStatus = 404 } = {}) {
+function makeDeltaServer({ takesDeltas = true, gatedShops = null, gateStatus = 404, chainCap = Infinity } = {}) {
   const base = new Map();     // shopId -> { rev, ciphertext }
   const chain = new Map();    // shopId -> [{ rev, ciphertext }]
   const bytes = { blob: 0, delta: 0, pull: 0 };
@@ -74,6 +75,10 @@ function makeDeltaServer({ takesDeltas = true, gatedShops = null, gateStatus = 4
         if (gatedShops && gatedShops.has(shopId)) return { status: gateStatus };
         const head = headRev(shopId);
         if ((body.baseRev | 0) !== head) return { status: 409, body: { rev: head } };
+        // Chain full. The real servers have three triggers and one of them — the
+        // plan's size — is invisible to the desktop, so a bare count stands in
+        // for "the server decided" here (docs/api-contract.md, POST /deltas).
+        if ((chain.get(shopId) || []).length >= chainCap) return { status: 409, body: { rev: head, compact: true } };
         const rev = head + 1;
         const arr = chain.get(shopId) || [];
         arr.push({ rev, ciphertext: body.ciphertext });
@@ -420,6 +425,60 @@ test('a chain past the byte ratio is compacted by a full push', async () => {
   assert.equal(server.chainLength('shopA'), 0, 'the server chain is reset');
   assert.equal(a.backend.chainState().chainCount, 0);
   assert.equal(a.backend.chainState().chainWireBytes, 0);
+});
+
+test('a chain the SERVER calls full is compacted by a full push, not pulled forever', async () => {
+  // Cap at 2 on a real-sized store, so the desktop's own rule is nowhere near
+  // firing: this is the plan-size case, where only the server knows.
+  const server = makeDeltaServer({ chainCap: 2 });
+  const dek = freshDek();
+  const a = device(server, 'shopA', dek);
+
+  const store = bigStore(a.engine);
+  await a.backend.push(store);
+  for (let i = 0; i < 2; i++) {
+    store.clients.push({ id: 'd' + i, name: 'delta ' + i });
+    a.engine.stampChanges(store);
+    assert.equal((await a.backend.push(store)).delta, true);
+  }
+  assert.equal(a.backend.chainState().dueForCompaction, false,
+    'the desktop must not see this coming, or the test proves nothing');
+
+  store.clients.push({ id: 'full', name: 'refused as a delta' });
+  a.engine.stampChanges(store);
+  const res = await a.backend.push(store);
+
+  // Before the fix this came back { conflict: true }, the caller pulled (a no-op
+  // at its own head) and pushed the same delta into the same 409, forever.
+  assert.equal(res.conflict, false, 'a full chain is not a conflict — pulling cannot fix it');
+  assert.equal(res.delta, undefined, 'the answer to a full chain is the whole store');
+  assert.equal(server.chainLength('shopA'), 0, 'the server chain is compacted');
+  assert.equal(a.backend.chainState().dueForCompaction, false, 'and the demand is cleared');
+
+  const check = device(server, 'shopA', dek);
+  const names = (await check.backend.pull()).store.clients.map((c) => c.name);
+  assert.ok(names.includes('refused as a delta'), 'the edit the refused delta carried still arrives');
+
+  // Deltas resume after the compaction rather than every push staying a blob.
+  store.clients.push({ id: 'after', name: 'after' });
+  a.engine.stampChanges(store);
+  assert.equal((await a.backend.push(store)).delta, true);
+});
+
+test('a 409 without `compact` is still a moved head, and still a conflict', async () => {
+  const server = makeDeltaServer({ chainCap: 1000 });
+  const dek = freshDek();
+  const a = device(server, 'shopA', dek);
+  const b = device(server, 'shopA', dek);
+  const store = stamped(a.engine, { clients: [{ id: 'c1', name: 'Acme' }] });
+  await a.backend.push(store);
+  await b.backend.pull();
+  store.clients.push({ id: 'c2', name: 'from A' });
+  a.engine.stampChanges(store);
+  await a.backend.push(store);
+  const res = await b.backend.push(stamped(b.engine, { clients: [{ id: 'c3', name: 'B' }] }));
+  assert.equal(res.conflict, true, 'only `compact: true` may turn a 409 into a full push');
+  assert.equal(b.backend.chainState().dueForCompaction, false);
 });
 
 test('compaction loses nothing — the store still round-trips afterwards', async () => {
