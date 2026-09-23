@@ -867,9 +867,11 @@ final class Shop {
         //
         // One more crossing per LOAD, beside the several already here — not
         // per redraw.
-        monthNetRevenue = await Self.thisMonthsNet(
+        let month = await Self.thisMonthsRow(
             engine: engine, orders: orders, expenses: expenses,
             settings: settings, clients: clients, currencies: Invoice.currencyTable(self))
+        monthNetRevenue = month?.revenue
+        monthGrossRevenue = month.map { $0.revenue + $0.vatCollected }
         var perMachine: [String: NozzleWear] = [:]
         for machine in machines {
             guard case .object(let record) = machine,
@@ -11419,6 +11421,24 @@ final class Shop {
     /// rather than a confident zero.
     private(set) var monthNetRevenue: Double?
 
+    /// The same jobs as `monthNetRevenue`, before the tax is taken out.
+    ///
+    /// ── IT WAS A DIFFERENT SET OF JOBS ──────────────────────────────────
+    ///
+    /// The masthead printed "Gross" beside the month's net, and summed it over
+    /// the month's PAID-UP jobs, whatever their stage — while the net beside
+    /// it is the month's FINISHED jobs, paid or not. Two populations under
+    /// labels that promise one: a job finished and not yet paid for counted
+    /// in the net and not the gross, and the sample shop showed 1,671.90 net
+    /// beside 1,243.09 gross on 23 September 2026, which is the day
+    /// `MastheadNetTests` noticed.
+    ///
+    /// Revenue plus the tax collected on it is what was charged for exactly
+    /// those jobs: an inclusive-VAT shop gets its prices back, an exclusive
+    /// one its prices with the tax on top, an unregistered one the net itself.
+    /// Never below the net, by construction rather than by luck.
+    private(set) var monthGrossRevenue: Double?
+
     /// The current month's row, or nil.
     ///
     /// The period key is `YYYY-MM` in LOCAL time, built by `DateRange` — the
@@ -11429,11 +11449,23 @@ final class Shop {
                               clients: [JSONValue],
                               currencies: [String: JSONValue],
                               now: Date = Date()) async -> Double? {
+        await thisMonthsRow(engine: engine, orders: orders, expenses: expenses,
+                            settings: settings, clients: clients,
+                            currencies: currencies, now: now)?.revenue
+    }
+
+    /// The current month's whole P&L row — the net and the gross come from it
+    /// together, so they cannot describe different jobs.
+    static func thisMonthsRow(engine: KhaytEngine?, orders: [JSONValue],
+                              expenses: [JSONValue], settings: [String: JSONValue],
+                              clients: [JSONValue],
+                              currencies: [String: JSONValue],
+                              now: Date = Date()) async -> PnlPeriod? {
         guard let engine else { return nil }
         let periods = (try? await engine.pnlByPeriod(
             orders: orders, expenses: expenses, settings: settings, clients: clients,
             currencies: currencies, now: now, granularity: "month")) ?? []
-        return periods.first { $0.period == DateRange.localMonth(now) }?.revenue
+        return periods.first { $0.period == DateRange.localMonth(now) }
     }
 
     /// Ask the shared rule when the queue will finish.

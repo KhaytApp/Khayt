@@ -2230,6 +2230,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) The masthead's "Gross" and its month's net described different
+  jobs.** The net is the month's finished work, net of tax — the P&L's own
+  figure. The gross beside it summed the month's paid-up jobs whatever their
+  stage, so a job finished and not yet paid for counted in one and not the
+  other, and the net could read above the gross: 1,671.90 beside 1,243.09 on
+  the sample shop, whose dates move with the calendar. That turned
+  `MastheadNetTests` red on `main` on 23 September for every pull request.
+  The gross is now the same P&L row's revenue plus the tax collected on it —
+  what was charged for exactly those jobs — so it can never sit below the net.
+
 - **(Mac) A busy shop's cloud copy could quietly stop updating.** Khayt Cloud
   keeps a shop's changes as a chain, and a chain has a bound — a thousand
   changes, or four times the size of the book under it. When it is reached the
