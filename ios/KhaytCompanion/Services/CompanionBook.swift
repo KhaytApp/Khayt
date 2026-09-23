@@ -243,20 +243,32 @@ struct CompanionBook {
     /// An id already in the collection is refused rather than duplicated: two
     /// records with one id is a book the sync rules cannot reason about.
     func appendRecord(collection: String, record: [String: JSONValue]) throws {
-        guard case .string(let id)? = record["id"], !id.isEmpty else {
-            throw BookWriter.Refusal.recordHasNoId
+        try appendRecords(collection: collection, records: [record])
+    }
+
+    /// Several at once, in ONE write: either every record lands or none does.
+    /// Ten boxes booked in are not left as six when the fourth write fails.
+    func appendRecords(collection: String, records: [[String: JSONValue]]) throws {
+        var ids = Set<String>()
+        for record in records {
+            guard case .string(let id)? = record["id"], !id.isEmpty else {
+                throw BookWriter.Refusal.recordHasNoId
+            }
+            guard ids.insert(id).inserted else { throw BookWriter.Refusal.idTaken }
         }
         try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
             var rows: [JSONValue] = []
             if case .array(let had)? = root[collection] { rows = had }
             let taken = rows.contains {
-                if case .object(let o) = $0, case .string(let rowId)? = o["id"] { return rowId == id }
+                if case .object(let o) = $0, case .string(let rowId)? = o["id"] { return ids.contains(rowId) }
                 return false
             }
             guard !taken else { throw BookWriter.Refusal.idTaken }
-            var stamped = record
-            StoreWriter.stamp(&stamped)
-            rows.append(.object(stamped))
+            for record in records {
+                var stamped = record
+                StoreWriter.stamp(&stamped)
+                rows.append(.object(stamped))
+            }
             root[collection] = .array(rows)
         }
     }

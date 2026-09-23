@@ -53,10 +53,20 @@ actor BookReader {
     /// A roll, as the shop's own rule would book it in — built here, written
     /// by `BookWriter.addSpool`. See `BookWriter.spoolRecord` for the rule.
     func newSpool(from draft: SpoolDraft, now: Date = Date()) async throws -> [String: JSONValue] {
+        try await newSpools(from: draft, count: 1, now: now)[0]
+    }
+
+    /// `count` identical rolls, each its own record with its own id.
+    func newSpools(from draft: SpoolDraft, count: Int, now: Date = Date()) async throws -> [[String: JSONValue]] {
         var settings: [String: JSONValue] = [:]
         if case .object(let s)? = try book.read()["settings"] { settings = s }
-        return try await BookWriter.spoolRecord(from: draft, engine: engine(), settings: settings,
-                                                id: BookWriter.newSpoolId(now: now), now: now)
+        let engine = try engine()
+        var records: [[String: JSONValue]] = []
+        for id in BookWriter.newSpoolIds(max(1, count), now: now) {
+            records.append(try await BookWriter.spoolRecord(from: draft, engine: engine, settings: settings,
+                                                            id: id, now: now))
+        }
+        return records
     }
 
     /// Is there a book on this phone at all?

@@ -14,6 +14,16 @@ struct SpoolDraft: Sendable {
     /// What the roll cost, as typed. Empty is "not said", which the shop's
     /// own rule books as zero — see `costValue`.
     var cost: String = ""
+    /// The product barcode (UPC/EAN) off the box, normalized — see
+    /// `ProductBarcode`. Kept on the record so the next box of the same
+    /// filament is found on the shelf instead of looked up again.
+    var barcode: String = ""
+    /// How many identical rolls to book in. Each is its own spool on the
+    /// shelf — a job deducts from one roll, not from a pile — so ten boxes
+    /// of the same filament are ten records, made in one go.
+    var quantity: Int = 1
+
+    static let maxQuantity = 50
 
     /// The price as a number, or nil when none was given.
     ///
@@ -68,6 +78,28 @@ struct SpoolDraft: Sendable {
         d.sku = InputLimits.clamp(tag.sku ?? "")
         d.lot = InputLimits.clamp(tag.lot ?? "")
         d.sourceNote = InputLimits.clamp(tag.standard, max: 64)
+        return d
+    }
+
+    /// The same filament again, from a roll the shop has already booked in.
+    ///
+    /// Everything the box says is copied — material, brand, colour, the
+    /// temperatures, the price last paid — and the size it arrived at rather
+    /// than what is left on that roll now. The lot is NOT copied: it is a
+    /// fact about one production run, and a new box is usually another.
+    static func again(from spool: InventorySpool, barcode: String) -> SpoolDraft {
+        var d = SpoolDraft()
+        d.material = InputLimits.clamp(spool.material ?? spool.materialType ?? "", max: InputLimits.maxMaterial)
+        d.brand = InputLimits.clamp(spool.brand ?? "")
+        if let hex = spool.color, !hex.isEmpty { d.colorHex = InputLimits.clamp(hex, max: 32) }
+        if let full = spool.initialWeight ?? spool.weight {
+            d.weightGrams = min(max(Int(full.rounded()), 1), 50_000)
+        }
+        if let p = spool.printTemp { d.printTemp = String(p) }
+        if let b = spool.bedTemp { d.bedTemp = String(b) }
+        d.sku = InputLimits.clamp(spool.sku ?? "")
+        if let cost = spool.cost, cost > 0 { d.cost = String(format: "%.2f", cost) }
+        d.barcode = barcode
         return d
     }
 

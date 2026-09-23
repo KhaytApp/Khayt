@@ -340,6 +340,8 @@ struct InventorySpool: Codable, Identifiable, Sendable {
     var materialType: String?
     var lot: String?
     var sku: String?
+    /// The product barcode off the box, when the roll was booked in by one.
+    var barcode: String?
     var printTemp: Int?
     var bedTemp: Int?
     /// What the spool held when it arrived, which is NOT `weight`.
@@ -353,7 +355,7 @@ struct InventorySpool: Codable, Identifiable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id, material, brand, color, weight, remaining, cost, purchasedAt, addedAt
-        case materialType, lot, sku, printTemp, bedTemp
+        case materialType, lot, sku, barcode, printTemp, bedTemp
         case weightRemaining, weightTotal, spoolWeight
     }
 
@@ -383,6 +385,7 @@ struct InventorySpool: Codable, Identifiable, Sendable {
         materialType = try c.decodeIfPresent(String.self, forKey: .materialType)
         lot = try c.decodeIfPresent(String.self, forKey: .lot)
         sku = try c.decodeIfPresent(String.self, forKey: .sku)
+        barcode = try c.decodeIfPresent(String.self, forKey: .barcode)
         printTemp = try c.decodeIfPresent(Int.self, forKey: .printTemp)
         bedTemp = try c.decodeIfPresent(Int.self, forKey: .bedTemp)
         remaining = try c.decodeIfPresent(Double.self, forKey: .remaining)
@@ -407,6 +410,7 @@ struct InventorySpool: Codable, Identifiable, Sendable {
         try c.encodeIfPresent(materialType, forKey: .materialType)
         try c.encodeIfPresent(lot, forKey: .lot)
         try c.encodeIfPresent(sku, forKey: .sku)
+        try c.encodeIfPresent(barcode, forKey: .barcode)
         try c.encodeIfPresent(printTemp, forKey: .printTemp)
         try c.encodeIfPresent(bedTemp, forKey: .bedTemp)
     }

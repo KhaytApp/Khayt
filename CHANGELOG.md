@@ -4,6 +4,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(iOS) Scan the barcode on a box of filament, and book in several at
+  once.** "Scan product barcode" reads the UPC/EAN on the box — EAN-13, EAN-8
+  and UPC-E, with the check digit checked so a half-read code is never looked
+  up — or takes the digits typed. The shop's own shelf is asked first: a
+  filament booked in before comes back with its material, colour,
+  temperatures and the price last paid, offline. Anything else goes to
+  UPCitemdb's free lookup, sending the digits and nothing else, and its
+  retail title is read like a spool label. A code nobody knows still opens
+  the form with the barcode filled in, so the next box is found on the shelf.
+
+  The review form has a "How many" stepper, up to 50: ten boxes of the same
+  filament are ten spools, each tracked on its own, written to the phone's
+  book in one go — all of them or none.
+
+  Spools carry a new `barcode` field. `POST /api/inventory` accepts it
+  (8–14 digits, anything else dropped) and `GET` returns it; the desktop's
+  own forms do not show it yet.
+
 ### Security
 
 - **Khayt would send a webhook, a cloud request or mail to a Tailscale

@@ -126,6 +126,15 @@ test('pickLanSpoolFields allowlists inventory fields only', () => {
   assert.equal(Object.hasOwn(spool, '__proto__'), false);
 });
 
+test('pickLanSpoolFields keeps a product barcode, and only a real one', () => {
+  // The companion finds the next box of a filament by this field; a roll booked
+  // in without it cannot be found, and one stored with junk matches nothing.
+  assert.equal(pickLanSpoolFields({ material: 'PLA', barcode: '0012345678905' }).barcode, '0012345678905');
+  assert.equal(pickLanSpoolFields({ material: 'PLA', barcode: ' 96385074 ' }).barcode, '96385074');
+  assert.equal(Object.hasOwn(pickLanSpoolFields({ material: 'PLA', barcode: 'https://x.test' }), 'barcode'), false);
+  assert.equal(Object.hasOwn(pickLanSpoolFields({ material: 'PLA', barcode: '1234' }), 'barcode'), false);
+});
+
 test('sanitizeLanHttpUrl accepts http(s) only', () => {
   assert.equal(sanitizeLanHttpUrl('https://example.com/x'), 'https://example.com/x');
   assert.equal(sanitizeLanHttpUrl('javascript:alert(1)'), undefined);

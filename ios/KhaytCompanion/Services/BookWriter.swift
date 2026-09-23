@@ -155,11 +155,29 @@ struct BookWriter {
         try book.appendRecord(collection: "inventory", record: record)
     }
 
+    /// Several identical rolls, in one write.
+    func addSpools(_ records: [[String: JSONValue]]) throws {
+        try book.appendRecords(collection: "inventory", records: records)
+    }
+
     /// The id the desk's own endpoint would have given it — `uniqueLanId`'s
     /// shape, so a roll reads the same wherever it was booked in.
     static func newSpoolId(now: Date = Date()) -> String {
         let ms = Int(now.timeIntervalSince1970 * 1000)
         return "spool-\(ms)-\(String(format: "%04x", UInt16.random(in: .min ... .max)))"
+    }
+
+    /// `count` ids, all different. Minted in the same millisecond, so the
+    /// random tail is all that separates them — and 1 in 65,536 is too often
+    /// to leave to chance when a shop books in fifty boxes.
+    static func newSpoolIds(_ count: Int, now: Date = Date()) -> [String] {
+        var ids: [String] = []
+        var seen = Set<String>()
+        while ids.count < count {
+            let id = newSpoolId(now: now)
+            if seen.insert(id).inserted { ids.append(id) }
+        }
+        return ids
     }
 
     /// A roll, built the way `POST /api/inventory` builds one.
@@ -226,6 +244,7 @@ struct BookWriter {
         if !brand.isEmpty { record["brand"] = .string(brand) }
         let sku = InputLimits.clamp(draft.sku.trimmingCharacters(in: .whitespacesAndNewlines))
         if !sku.isEmpty { record["sku"] = .string(sku) }
+        if let code = ProductBarcode.normalize(draft.barcode) { record["barcode"] = .string(code) }
 
         // All three names for what is left, as the endpoint writes them.
         let left = record["weight"] ?? .number(grams)
