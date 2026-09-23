@@ -2918,6 +2918,75 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [4.0.0-alpha.37] - 2026-09-23
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The release where the Mac talks to the printers it watches.
+
+A sliced plate goes straight from a job to a Moonraker, OctoPrint or PrusaLink
+printer — the Snapmaker U1 and the Prusa CORE One included — and starts, instead
+of travelling on a USB stick. A Bambu, an Elegoo resin printer or a Repetier
+printer can now be set up on the Mac at all, a shop's Spoolman rolls come across
+in one go, and the owner PIN that makes the phone queue safe finally has a field
+you can see.
+
+### Added
+
+- **(Mac) Send a sliced file to a printer, and start it.** The Mac could watch
+  a printer, pause it and skip an object on it, and could not hand it a file —
+  a shop sliced a job and then carried a USB stick over. **Send to printer…**
+  (Job menu, the orders table's right-click menu, and the job inspector) opens
+  on the job's own machine and its newest sliced plate from the model's folder,
+  or any file chosen from disk, and sends it to a Moonraker (Klipper, Snapmaker
+  U1), OctoPrint or PrusaLink printer — starting it straight away unless asked
+  not to. A file the printer cannot run is refused before anything is sent,
+  with the reason. Bambu printers are still sent to from the Windows and Linux
+  app.
+
+- **(Mac) Import a shop's spools from Spoolman.** A shop that already keeps its
+  rolls in Spoolman had to type every one into Khayt again. **Import from
+  Spoolman…** on the Inventory screen takes the address Spoolman runs at and
+  brings every roll across — vendor and material, colour, price, what it held
+  new and what is left on it, lot number and where it is kept. Run it again
+  after buying rolls and only the new ones come across; weights Khayt has
+  already counted down are never put back. Spoolman is only read, never
+  changed, and only an address on the shop's own network is accepted. The rule
+  is `lib/spoolman-import.js`, written against Spoolman's own data models.
+
+- **(Mac) A Bambu, an Elegoo resin printer, or one printer of several on a
+  Repetier-Server can be set up on the Mac.** The Mac could watch all three,
+  and its machine settings had no field for what each is reached by, so a shop
+  could pick the protocol and never make it answer. A Bambu now takes its
+  serial number and LAN access code (sealed like every credential, with a line
+  saying which printer modes open the connection), an Elegoo its mainboard id,
+  and a Repetier printer its slug on the server. The API key field is no longer
+  offered to the two printers that do not take one.
+
+### Fixed
+
+- **(Mac) There was nowhere visible to type the owner PIN.** The PIN field on
+  Settings → Online drew with no border and, until a PIN was saved, no
+  placeholder — a blank strip beside "Owner LAN PIN", on the one field the
+  phone's queue needs before it is safe to switch on. The port, the Salla and
+  Zid secrets and the carrier settings' fields had the same fault. They are
+  bordered now, and a test fails if any field in the app is drawn without one.
+
+- **A Prusa could not be sent binary G-code, and a Klipper printer was sent
+  3MF files it cannot print.** Every upload was stored on the printer as
+  `.gcode` whatever it was. A Prusa CORE One, MK4 or XL slices to binary G-code
+  (`.bgcode`) by default, so sending one read it as text and refused it; a 3MF
+  sent to Moonraker or OctoPrint failed on the printer. The file keeps its own
+  kind now, and one the printer cannot run is refused before sending, with the
+  reason. What each printer is asked is one shared rule,
+  `lib/printer-upload.js`, which the Mac sends with too.
+
+- **(Mac) Editing a Bambu or Elegoo printer on the Mac erased its serial
+  number.** The machine edit rebuilt the printer connection from a fixed list
+  of fields and `serial` was not on it, so correcting even the address cut the
+  printer off with nothing saying why. Every stored field is kept now.
+
 ## [4.0.0-alpha.36] - 2026-09-23
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
