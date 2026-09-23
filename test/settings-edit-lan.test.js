@@ -86,3 +86,18 @@ test('a form with no pricing block leaves the stored one exactly as it was', () 
   const none = apply({ lanApi: { enabled: false } }, { lanApi: { enabled: true } });
   assert.equal(none.lanApi.intakeQuote, undefined, 'a block the shop never had was invented');
 });
+
+test('a storefront webhook secret is saved when typed and kept when blank', () => {
+  // The Mac's Online pane sets these now; before, only the other app could,
+  // so a Mac-only shop could hand Salla an address and never switch it on.
+  const had = { lanApi: { ...stored.lanApi, sallaWebhookSecret: 'sealed:salla' } };
+  const typed = apply(had, { lanApi: { sallaWebhookSecret: ' new ', zidWebhookSecret: 'zid-1' } });
+  assert.equal(typed.lanApi.sallaWebhookSecret, 'new');
+  assert.equal(typed.lanApi.zidWebhookSecret, 'zid-1');
+  for (const blank of ['', '   ', null, undefined]) {
+    const kept = apply(had, { lanApi: { enabled: true, sallaWebhookSecret: blank } });
+    assert.equal(kept.lanApi.sallaWebhookSecret, 'sealed:salla', `${JSON.stringify(blank)} lost the stored secret`);
+  }
+  // Never written by a save that did not type one.
+  assert.equal('zidWebhookSecret' in apply(stored, { lanApi: { enabled: true } }).lanApi, false);
+});

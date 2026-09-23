@@ -2532,11 +2532,21 @@ final class Words {
         "mac.online_desc":   ["en": "This Mac serves the live queue to phones on the shop's Wi‑Fi, "
                                     + "the customer intake form, quote approval, the tracking page "
                                     + "and the calendar feed, and the same status API the Windows "
-                                    + "and Linux app serves. Webhooks run in that app for now.",
+                                    + "and Linux app serves, and it takes orders from Salla and Zid. "
+                                    + "Carrier and printer webhooks run in that app for now.",
                               "ar": "يقدّم هذا الماك قائمة الانتظار المباشرة للهواتف على شبكة Wi‑Fi الخاصة بالمحل، "
                                     + "ونموذج طلبات العملاء واعتماد عروض الأسعار وصفحة تتبّع الطلب "
-                                    + "وتقويم المواعيد، ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس. "
-                                    + "أما الويب هوك فيعمل في ذلك التطبيق حالياً."],
+                                    + "وتقويم المواعيد، ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس، "
+                                    + "ويستقبل الطلبات من سلة وزد. "
+                                    + "أما ويب هوك شركات الشحن والطابعات فيعمل في ذلك التطبيق حالياً."],
+        "mac.storefront_hooks_title": ["en": "Orders from a storefront",
+                                       "ar": "طلبات المتجر الإلكتروني"],
+        "mac.storefront_hooks_hint": ["en": "Paste the secret from the storefront's dashboard, and give it "
+                                          + "{url}salla or {url}zid. The storefront has to be able to reach "
+                                          + "this Mac, so off the shop's own network it needs a tunnel.",
+                                      "ar": "الصق السر من لوحة تحكم المتجر، وأعطه العنوان "
+                                          + "{url}salla أو {url}zid. يجب أن يصل المتجر إلى هذا الماك، "
+                                          + "فمن خارج شبكة المحل يلزمه نفق."],
         "mac.lan_open":      ["en": "Open on a phone on the same Wi‑Fi:",
                               "ar": "افتحه على هاتف متصل بنفس شبكة Wi‑Fi:"],
         "mac.lan_pin_missing": ["en": "Set an owner PIN — the queue shows customers' names.",
