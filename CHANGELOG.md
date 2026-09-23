@@ -285,6 +285,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Changed
 
+- **(Everyone) The original app icon is back.** The redrawn khāʾ, with the dot
+  and without the nozzle (3.9.0 and the Mac alphas from 4.0.0-alpha.34), is
+  taken back at the shop's request. The Dock, the Home screen, the Windows
+  tiles and the browser tab show the nozzle and the thread again, exactly as
+  before.
+
 - **(Mac) Every save downloaded the whole book again.** Khayt checks the cloud
   before it sends, and that check asked for everything each time — the whole
   book plus every change since it was last compacted — to work out which few
