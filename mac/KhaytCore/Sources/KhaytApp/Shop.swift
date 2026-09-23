@@ -774,6 +774,7 @@ final class Shop {
             // The shop's published delivery dates. Not for the sample book,
             // whose cloud settings belong to nobody.
             if next.build != nil { startPublishingLeadTime() } else { stopPublishingLeadTime() }
+            if next.build != nil { await restoreCloudKey() }
             refreshSyncStatus()
             // Move a service log a Mac alpha wrote under the wrong key. Inside
             // the write chain, because anything that reads and writes the store
@@ -7001,9 +7002,34 @@ final class Shop {
     /// Has somebody unlocked the cloud this session?
     var cloudUnlocked: Bool { cloudDek != nil }
 
+    /// The shop locked the cloud this session. Cleared by the next unlock.
+    private var cloudLockedByShop = false
+
+    private var cloudShopId: String? {
+        guard case .object(let cloud)? = settingsDict["cloud"],
+              case .string(let shopId)? = cloud["shopId"], !shopId.isEmpty else { return nil }
+        return shopId
+    }
+
+    /// Unlock with the key this Mac kept at the last unlock, so opening the
+    /// app does not ask for the passphrase again. Only while the book's keyset
+    /// is the one that key came from; see `CloudKeyMemory`.
+    func restoreCloudKey() async {
+        guard cloudDek == nil, !cloudLockedByShop, Self.cloudConnected(settingsDict), let shopId = cloudShopId,
+              let print = CloudKeyMemory.fingerprint(of: cloudKeyset()) else { return }
+        guard let dek = await CloudKeyMemory.recall(shopId: shopId, fingerprint: print),
+              cloudDek == nil else { return }
+        cloudDek = dek
+    }
+
     /// Lock the cloud again: drop the data key and stop syncing until somebody
     /// unlocks it. The shop's own choice, from the menu bar.
     func forgetCloudKey() {
+        // Off this Mac as well: "Lock" means the next launch asks again.
+        if let shopId = cloudShopId { Task { await CloudKeyMemory.forget(shopId: shopId) } }
+        // And no restore this session: the Keychain delete runs off the main
+        // actor, and a reload in between would read the old key straight back.
+        cloudLockedByShop = true
         cloudDek = nil
         cloudSent = nil
         // And what the cloud held, which is a decrypted copy of the shop's
@@ -7127,6 +7153,10 @@ final class Shop {
             }
 
             cloudDek = dek
+            cloudLockedByShop = false
+            // Kept on this Mac, so the next launch does not ask again.
+            await CloudKeyMemory.remember(dek, fingerprint: CloudKeyMemory.fingerprint(of: .object(keyset)) ?? "",
+                                          shopId: session.shopId)
             if case .locked = syncStatus { syncStatus = .idle }
             await load(source)
             // ── A KEY ONLY THIS BOOK HOLDS GOES TO THE CLOUD ──────────────
@@ -7253,6 +7283,9 @@ final class Shop {
             let dek = try SyncCrypto.unwrapDek(secret: passphrase, wrapped: wrapped,
                                                kdf: SyncCrypto.Kdf.from(keyset["kdf"]))
             cloudDek = dek
+            cloudLockedByShop = false
+            await CloudKeyMemory.remember(dek, fingerprint: CloudKeyMemory.fingerprint(of: .object(keyset)) ?? "",
+                                          shopId: connection.shopId)
             // Unlocked. From here on this app pushes on its own, and the first
             // push carries whatever was changed while it was locked.
             if case .locked = syncStatus { syncStatus = .idle }
