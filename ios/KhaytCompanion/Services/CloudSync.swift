@@ -107,7 +107,7 @@ struct CloudSync {
         if reply.base != nil || !warm {
             let whole = try await CloudReader.store(reply, dek: s.dek, engine: engine)
             let taken = BookScope.take(from: whole.store, now: now)
-            try await replaceKeepingLocalEdits(with: taken.store, scope: taken.taken)
+            try await BookReader(book: book).adopt(taken.store, scope: taken.taken)
             s.seenRev = reply.rev
             return (s, .whole(records: CompanionAPIRecordCount.of(taken.store)))
         }
@@ -128,23 +128,6 @@ struct CloudSync {
         }
         s.seenRev = reply.rev
         return (s, .changes(folded.applied + folded.removed))
-    }
-
-    /// Take the cloud's book as the new starting point without losing what was
-    /// changed here and not sent yet.
-    private func replaceKeepingLocalEdits(with cloud: [String: JSONValue],
-                                          scope: BookScope.Taken) async throws {
-        var merged = cloud
-        if book.exists, let baseline = book.baseline() {
-            let outbox = try await engine.changesToSend(local: try book.read(), server: baseline)
-            if !outbox.isEmpty {
-                merged = try await engine.foldDeltas(base: cloud, deltas: [outbox.wire]).store
-            }
-        }
-        try book.replace(with: merged, scope: scope)
-        // `replace` makes the baseline the book. The baseline is the CLOUD's
-        // copy, so the edits folded back in above stay pending.
-        try book.replaceBaseline(with: cloud)
     }
 
     // MARK: - Pushing

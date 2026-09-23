@@ -92,6 +92,9 @@ final class KhaytAPIClient: ObservableObject {
         refreshing = true
         Task { [weak self] in
             defer { Task { @MainActor in self?.refreshing = false } }
+            // Send first: what the Mac takes now does not need carrying
+            // through the pull. `adopt` keeps whatever it did not take.
+            _ = try? await self?.sendPendingChanges()
             _ = try? await self?.pullBook(into: book)
             await MainActor.run { self?.lastRefresh = Date() }
         }
@@ -201,7 +204,14 @@ final class KhaytAPIClient: ObservableObject {
             throw KhaytAPIError.server(L10n.tr("error.empty_book"))
         }
 
-        try book.replace(with: store, scope: envelope.scope)
+        // Adopted, not replaced: edits made here and not sent yet survive the
+        // pull and stay pending. See `BookReader.adopt`.
+        if let reader {
+            try await reader.adopt(store, scope: envelope.scope)
+        } else {
+            try book.replace(with: store, scope: envelope.scope)
+        }
+        await refreshPendingCount()
         return Self.recordCount(in: store)
     }
 
