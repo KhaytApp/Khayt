@@ -466,3 +466,20 @@ test('a machine with no downtime is exactly as it was', () => {
   assert.equal(b.rows[0].freeMinutes, 44 * 60);
   assert.equal(b.rows[0].blocks.find(x => x.orderId === 'A').startsAt, NOW);
 });
+
+test('an idle printer that stopped answering is not free, and not counted in the free hours', () => {
+  // The shop's CORE One, switched off overnight: the poller's `error`, nothing printing.
+  const b = MB.band({
+    machines: [machine('M1', 'U1'), machine('M2', 'CORE One')],
+    orders: [],
+    live: { M2: { error: 'connect ECONNREFUSED' } },
+    now: NOW, hours: 48,
+  });
+  const core = b.rows.find((r) => r.machineId === 'M2');
+  assert.equal(core.state, 'offline');
+  assert.equal(core.known, false);
+  assert.equal(core.freeMinutes, 0);
+  // The total is over the one machine that can be asked, not two.
+  assert.equal(b.rows.filter((r) => r.known).length, 1);
+  assert.equal(b.unknownMachines, 1);
+});

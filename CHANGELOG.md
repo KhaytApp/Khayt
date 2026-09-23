@@ -2333,6 +2333,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the dashboard's shelf tinted all three as running out. Nothing was low: both
   screens counted every spool the low-stock rule had looked at, not the ones
   it said were low. They now count only those.
+- **(Everyone) A printer that was switched off was said to be "reporting a
+  fault".** When a printer stops answering, Khayt keeps its last reading and
+  notes the failed check; the rule that suggests what to run next read that
+  note as the printer reporting an error. It says "Not answering" now, and a
+  fault is only called a fault when the printer itself says so.
+- **(Mac) A printer that is not answering was shown as free.** The 48-hour
+  band on Machines drew a switched-off printer as "Free", with forty-eight free
+  hours counted into the shop's total, next to a dashboard saying "not
+  answering". It is shown as not answering now, with its hours left out of the
+  total, after the same three missed checks the offline alert waits for. The
+  line under the band that said something was "printing something Khayt cannot
+  time" also appeared whenever any machine was simply free; it now appears
+  only when that is true. A machine in a maintenance window no longer shows
+  the raw text `mac.band_state_down`.
 
 - **(Mac) Preferences could not be opened.** Settings had nine tabs in a window
   too narrow for them, so the last ones went behind a » button at the end of

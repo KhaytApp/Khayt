@@ -53,7 +53,13 @@ test('a cleared bed after the last print is offered', () => {
 
 test('a printer that is printing, errored, silent or unlinked is not offered', () => {
   assert.equal(ad.machineBlocked(machine(), { state: 'printing' }), 'ad.busy');
-  assert.equal(ad.machineBlocked(machine(), { state: 'idle', error: 'thermal' }), 'ad.printer_error');
+  // `error` is a poll that failed (printer-poll-cache keeps the last state and
+  // adds it), so the printer is not answering; it is not reporting a fault.
+  assert.equal(ad.machineBlocked(machine(), { state: 'idle', error: 'connect ECONNREFUSED' }), 'ad.no_reading');
+  // A fault is what the printer SAYS, in its state.
+  assert.equal(ad.machineBlocked(machine(), { state: 'error' }), 'ad.printer_error');
+  assert.equal(ad.machineBlocked(machine(), { state: 'Offline after error' }), 'ad.printer_error');
+  assert.equal(ad.machineBlocked(machine(), { state: 'halted' }), 'ad.printer_error');
   // Never heard from. Not an error — and not something to start a print on.
   assert.equal(ad.machineBlocked(machine(), {}), 'ad.no_reading');
   assert.equal(ad.machineBlocked(machine({ printerApi: { type: 'none' } }), ready), 'ad.no_printer');

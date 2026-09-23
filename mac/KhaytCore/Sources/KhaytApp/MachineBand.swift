@@ -174,13 +174,22 @@ struct MachineBandView: View {
     /// identical on a status panel and mean opposite things, so both appear
     /// when both apply.
     @ViewBuilder private var whyBlank: some View {
-        let blank = band.rows.filter { $0.blocks.isEmpty }
+        // Only the rows whose hours are UNKNOWN. A free machine has no blocks
+        // either, and counting it here printed "printing something Khayt cannot
+        // time" under a shop where nothing was printing blind.
+        let blank = band.rows.filter { !$0.known }
         let noProtocol = blank.contains { shop.machineKinds[$0.machineId]?.polled == false }
-        let noAnswer = blank.contains { shop.machineKinds[$0.machineId]?.polled != false }
-        if noProtocol || noAnswer {
+        let offline = blank.contains { $0.state == "offline" }
+        let noAnswer = blank.contains {
+            shop.machineKinds[$0.machineId]?.polled != false && $0.state != "offline"
+        }
+        if noProtocol || noAnswer || offline {
             VStack(alignment: .leading, spacing: 2) {
                 if noAnswer {
                     Text(shop.words.callIt("mac.band_cannot_ask"))
+                }
+                if offline {
+                    Text(shop.words.callIt("mac.band_offline_note"))
                 }
                 if noProtocol {
                     Text(shop.words.callIt("mac.band_no_protocol"))
