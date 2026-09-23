@@ -62,11 +62,11 @@ test('every size in the iconset is the size its name claims', () => {
 });
 
 test('the masters the whole set is derived from are all present', () => {
-  // A missing master is not an error at generation time — `derive-icons.py`
-  // falls back to the full mark when `fg-small.png` is absent, which silently
-  // ships the detailed art at 16px, where it is a smudge.
-  for (const [name, px] of [['fg.png', 2048], ['fg-small.png', 1024],
-                            ['mono.png', 1024]]) {
+  // The icon is the ORIGINAL mark, with no dot and with the nozzle: the redraw in
+  // #1476 was taken back at the shop's request. That set has no `fg-small.png`,
+  // so `derive-icons.py` uses the full mark at every size. That is deliberate.
+  // Do not add a small master without asking.
+  for (const [name, px] of [['fg.png', 2048], ['mono.png', 1024]]) {
     const head = pngHead(at(path.join('assets/icon-masters', name)));
     assert.equal(head.width, px, `${name} is ${head.width}px, not ${px}`);
     assert.equal(head.colourType, 6, `${name} must be RGBA — the ground is added later`);
