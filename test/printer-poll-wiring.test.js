@@ -139,10 +139,12 @@ test('a carrier webhook tells an unreadable body apart from an unknown order', (
   assert.match(body, /Signature valid, but this payload carried no tracking number/);
 
   // Unknown order → still 200, because THAT is the case that would leak which
-  // tracking numbers this shop holds.
-  const unknownOrder = body.indexOf('if (idx < 0)');
-  assert.notEqual(unknownOrder, -1);
-  assert.match(body.slice(unknownOrder, unknownOrder + 300), /writeHead\(200/);
+  // tracking numbers this shop holds. The lookup is `lib/carrier-webhook.js`
+  // now; the handler writes only on `advanced` and answers 200 otherwise, and
+  // `carrier-webhook.test.js` sends an unknown parcel over HTTP to prove it.
+  const gate = body.indexOf("outcome === 'advanced'");
+  assert.notEqual(gate, -1, 'the handler no longer answers an unknown parcel without writing');
+  assert.match(body.slice(gate, gate + 2000), /writeHead\(200/);
 
   // And the signature check still comes first — a 422 must never be reachable
   // by an unsigned caller probing for a response that differs.

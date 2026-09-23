@@ -54,6 +54,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Security
 
+- **A carrier's API key and webhook secret were stored in the clear.**
+  `carriers.js` has always marked SMSA, Aramex and Saudi Post's `apiKey` and
+  `webhookSecret` as secrets, and neither was on the list the store encrypts,
+  masks and restores by — so both sat in `khayt-store.json` as typed and
+  reached the window unmasked, unlike every other credential Khayt holds. They
+  are encrypted at rest and masked now, and a test fails if a carrier gains a
+  secret field that is not protected. Existing values are encrypted the next
+  time the book is saved.
+
 - **Khayt would send a webhook, a cloud request or mail to a Tailscale
   address.** Every outbound address a shop types is checked against the
   private ranges first, so a URL pointing at the machine Khayt is running on
@@ -2349,6 +2358,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   stop asking for a job number when what they filter is filament and products.
 
 ### Fixed
+
+- **(Maintainers) The carrier webhook's rule is shared now.** Reading an SMSA,
+  Aramex or Saudi Post status update, finding the job by its tracking number
+  and moving its shipping status forward is `lib/carrier-webhook.js`, so the
+  Mac's LAN server can run it. The route had never been sent a request by any
+  test; it is now, over real HTTP, and the same tests pass against the handler
+  before the lift. The window is also told about the record that was written
+  rather than a draft built before the write.
 
 - **(Mac) The masthead's "Gross" and its month's net described different
   jobs.** The net is the month's finished work, net of tax — the P&L's own
