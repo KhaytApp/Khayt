@@ -86,6 +86,15 @@ struct MachineSheet: View {
     @State private var downtime: [Shop.DowntimeBlock] = []
     @State private var hasStoredKey = false
     @State private var forgetKey = false
+    /// What a Bambu or an Elegoo is addressed by on its own transport — the
+    /// serial on a Bambu, the mainboard id on SDCP. Not a secret.
+    @State private var apiSerial = ""
+    /// Which printer, on a Repetier-Server running several.
+    @State private var apiSlug = ""
+    /// A Bambu's LAN access code, as TYPED — the same rules as the key.
+    @State private var accessCode = ""
+    @State private var hasStoredCode = false
+    @State private var forgetCode = false
     @State private var testing = false
     /// What the printer said, or why it could not be reached.
     @State private var testSaid: String?
@@ -274,6 +283,8 @@ struct MachineSheet: View {
             Connection(
                 shop: shop, type: $apiType, host: $apiHost, port: $apiPort,
                 key: $apiKey, hasStoredKey: $hasStoredKey, forgetKey: $forgetKey,
+                serial: $apiSerial, slug: $apiSlug,
+                code: $accessCode, hasStoredCode: $hasStoredCode, forgetCode: $forgetCode,
                 testing: $testing, said: $testSaid, worked: $testWorked,
                 test: test)
 
@@ -388,6 +399,9 @@ struct MachineSheet: View {
         // Whether there IS one, never what it is. Opening a credential to put
         // it in a text field is how a secret ends up in a screenshot.
         hasStoredKey = !(machine.printerApi?.apiKey ?? "").isEmpty
+        hasStoredCode = !(machine.printerApi?.accessCode ?? "").isEmpty
+        apiSerial = machine.printerApi?.serial ?? ""
+        apiSlug = machine.printerApi?.printerSlug ?? ""
         focused = true
     }
 
@@ -575,6 +589,10 @@ struct MachineSheet: View {
         let catalogId = chosen
         let typed = apiKey
         let clearing = forgetKey
+        let typedCode = accessCode
+        let clearingCode = forgetCode
+        let serial = apiSerial.trimmingCharacters(in: .whitespaces)
+        let slug = apiSlug.trimmingCharacters(in: .whitespaces)
         let wantsCamera = camEnabled
         let still = camSnapshot.trimmingCharacters(in: .whitespaces)
         let turn = camRotate
@@ -611,6 +629,28 @@ struct MachineSheet: View {
                         shop.spendProblem = String(describing: error)
                     }
                     return
+                }
+            }
+            // The identifier each transport addresses a machine by. Sent only
+            // for the protocols that use it, so switching a Bambu to Moonraker
+            // does not write an empty serial over the one it had.
+            if ["bambu", "sdcp"].contains(apiType) { api["serial"] = .string(serial) }
+            if apiType == "repetier" { api["printerSlug"] = .string(slug) }
+            // A Bambu's access code: sealed here or not written, exactly as the
+            // key above — it is the MQTT password and a registered secret path.
+            if apiType == "bambu" {
+                if clearingCode {
+                    api["accessCode"] = .string("")
+                } else if !typedCode.isEmpty {
+                    guard let build else {
+                        await MainActor.run { shop.spendProblem = shop.words.callIt("mac.move_sample") }
+                        return
+                    }
+                    do { api["accessCode"] = .string(try await Secrets.seal(typedCode, for: build)) }
+                    catch {
+                        await MainActor.run { shop.spendProblem = String(describing: error) }
+                        return
+                    }
                 }
             }
             input["printerApi"] = .object(api)
@@ -651,6 +691,11 @@ private struct Connection: View {
     @Binding var key: String
     @Binding var hasStoredKey: Bool
     @Binding var forgetKey: Bool
+    @Binding var serial: String
+    @Binding var slug: String
+    @Binding var code: String
+    @Binding var hasStoredCode: Bool
+    @Binding var forgetCode: Bool
     @Binding var testing: Bool
     @Binding var said: String?
     @Binding var worked: Bool
@@ -698,31 +743,82 @@ private struct Connection: View {
                                 .onChange(of: port) { _, _ in said = nil }
                         }
                     }
-                    GridRow {
-                        Text(shop.words.callIt("mach.api_key")).foregroundStyle(.secondary)
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 6) {
-                                SecureField(hasStoredKey && !forgetKey
-                                            ? shop.words.callIt("mach.key_kept")
-                                            : shop.words.callIt("mach.key_ph"), text: $key)
-                                    .textFieldStyle(.roundedBorder)
-                                    .disabled(forgetKey)
-                                    .onChange(of: key) { _, _ in said = nil }
-                                if hasStoredKey {
-                                    Button(shop.words.callIt(forgetKey ? "common.undo" : "mach.key_forget")) {
-                                        forgetKey.toggle()
-                                        if forgetKey { key = "" }
-                                        said = nil
+                    if type == "bambu" || type == "sdcp" {
+                        // One field, two meanings, as the other app has it: the
+                        // string each transport addresses a machine by.
+                        GridRow {
+                            Text(shop.words.callIt(type == "bambu" ? "mac.mach_serial" : "mac.mach_mainboard"))
+                                .foregroundStyle(.secondary)
+                            TextField(type == "bambu" ? "00M00A000000000" : "", text: $serial)
+                                .textFieldStyle(.roundedBorder).monospaced()
+                                .onChange(of: serial) { _, _ in said = nil }
+                        }
+                    }
+                    if type == "repetier" {
+                        GridRow {
+                            Text(shop.words.callIt("mac.mach_slug")).foregroundStyle(.secondary)
+                            TextField("default", text: $slug)
+                                .textFieldStyle(.roundedBorder)
+                                .onChange(of: slug) { _, _ in said = nil }
+                        }
+                    }
+                    if type == "bambu" {
+                        GridRow {
+                            Text(shop.words.callIt("mac.mach_access_code")).foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    SecureField(hasStoredCode && !forgetCode
+                                                ? shop.words.callIt("mach.key_kept") : "", text: $code)
+                                        .textFieldStyle(.roundedBorder)
+                                        .disabled(forgetCode)
+                                        .onChange(of: code) { _, _ in said = nil }
+                                    if hasStoredCode {
+                                        Button(shop.words.callIt(forgetCode ? "common.undo" : "mach.key_forget")) {
+                                            forgetCode.toggle()
+                                            if forgetCode { code = "" }
+                                            said = nil
+                                        }
+                                        .buttonStyle(.link).font(.caption)
                                     }
-                                    .buttonStyle(.link).font(.caption)
                                 }
+                                // What makes it answer at all, which is the
+                                // question every Bambu owner asks first.
+                                Text(shop.words.callIt("mac.mach_bambu_hint"))
+                                    .font(.caption2).foregroundStyle(.tertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            // WHAT HAPPENS TO IT, in a sentence. A field that
-                            // takes a credential and says nothing about where
-                            // it goes is one a shop is right to distrust.
-                            Text(shop.words.callIt(forgetKey ? "mach.key_will_clear" : "mach.key_where"))
-                                .font(.caption2).foregroundStyle(.tertiary)
-                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    // A Bambu and an Elegoo take no API key: the access code and
+                    // nothing at all, respectively. A key field there is one a
+                    // shop would fill in for nothing.
+                    if type != "bambu" && type != "sdcp" {
+                        GridRow {
+                            Text(shop.words.callIt("mach.api_key")).foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    SecureField(hasStoredKey && !forgetKey
+                                                ? shop.words.callIt("mach.key_kept")
+                                                : shop.words.callIt("mach.key_ph"), text: $key)
+                                        .textFieldStyle(.roundedBorder)
+                                        .disabled(forgetKey)
+                                        .onChange(of: key) { _, _ in said = nil }
+                                    if hasStoredKey {
+                                        Button(shop.words.callIt(forgetKey ? "common.undo" : "mach.key_forget")) {
+                                            forgetKey.toggle()
+                                            if forgetKey { key = "" }
+                                            said = nil
+                                        }
+                                        .buttonStyle(.link).font(.caption)
+                                    }
+                                }
+                                // WHAT HAPPENS TO IT, in a sentence. A field that
+                                // takes a credential and says nothing about where
+                                // it goes is one a shop is right to distrust.
+                                Text(shop.words.callIt(forgetKey ? "mach.key_will_clear" : "mach.key_where"))
+                                    .font(.caption2).foregroundStyle(.tertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                     }
                 }

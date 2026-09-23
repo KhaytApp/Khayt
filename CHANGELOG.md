@@ -97,6 +97,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A Bambu, an Elegoo resin printer, or one printer of several on a
+  Repetier-Server can be set up on the Mac.** The Mac could watch all three,
+  and its machine settings had no field for what each is reached by, so a shop
+  could pick the protocol and never make it answer. A Bambu now takes its
+  serial number and LAN access code (sealed like every credential, with a line
+  saying which printer modes open the connection), an Elegoo its mainboard id,
+  and a Repetier printer its slug on the server. The API key field is no longer
+  offered to the two printers that do not take one.
+
 - **(Mac) Import a shop's spools from Spoolman.** A shop that already keeps its
   rolls in Spoolman had to type every one into Khayt again. **Import from
   Spoolman…** on the Inventory screen takes the address Spoolman runs at and

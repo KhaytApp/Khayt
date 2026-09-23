@@ -249,11 +249,14 @@
         type: trim(a.type),
         host: trim(a.host),
         port: port > 0 ? port : undefined,
-        // Carried rather than edited: it is Bambu's, and no screen here sets it.
-        printerSlug: was.printerSlug || '',
+        // Which printer on a Repetier-Server. Absent keeps what is stored.
+        printerSlug: a.printerSlug === undefined ? (was.printerSlug || '') : trim(a.printerSlug),
         apiKey: a.apiKey === undefined ? (was.apiKey || '') : String(a.apiKey),
         accessCode: a.accessCode === undefined ? (was.accessCode || '') : String(a.accessCode),
       };
+      // The serial (Bambu) or mainboard id (Elegoo SDCP), when the form sends
+      // one; otherwise the stored one is carried by the spread above.
+      if (a.serial !== undefined) next.serial = trim(a.serial);
       // Switching a printer off must not throw its credentials away — a shop
       // that unplugs a machine for a week should not have to find its key
       // again to plug it back in.
