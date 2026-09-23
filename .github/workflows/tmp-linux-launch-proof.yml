@@ -25,6 +25,7 @@ jobs:
           xvfb-run -a node scripts/verify-release.mjs --app Khayt-3.8.0.AppImage --version 3.8.0
 
       - name: A build missing lib/branch-summary.js is refused, and named
+        timeout-minutes: 8
         run: |
           chmod +x Khayt-3.8.0.AppImage && ./Khayt-3.8.0.AppImage --appimage-extract >/dev/null
           npx --yes @electron/asar extract squashfs-root/resources/app.asar x
@@ -37,6 +38,7 @@ jobs:
           grep -q "Cannot find module" out.txt || { echo "::error::failed, but not for the missing module"; exit 1; }
 
       - name: A wrong --version is refused
+        timeout-minutes: 8
         run: |
           if xvfb-run -a node scripts/verify-release.mjs --app Khayt-3.8.0.AppImage --version 9.9.9 > v.txt 2>&1; then
             cat v.txt; echo "::error::a version mismatch PASSED"; exit 1
