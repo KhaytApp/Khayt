@@ -770,7 +770,7 @@ struct Inventory: View {
                     LazyVGrid(columns: columns, spacing: 14) {
                         ForEach(shown) { spool in
                             SpoolCard(spool: spool, shop: shop,
-                                      low: shop.lowSpools[spool.id] ?? false,
+                                      low: shop.lowSpools.contains(spool.id),
                                       runway: shop.spoolRunway[spool.id],
                                       dryness: shop.spoolDryness[spool.id],
                                       selected: selection == spool.id)

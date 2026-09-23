@@ -262,7 +262,7 @@ struct SampleBookShowsTheAppTests {
     @Test("the sample shelf has a spool running low, and the rule agrees")
     func shelfShowsLow() async throws {
         let shop = try await Self.shop()
-        let low = shop.spools.filter { shop.lowSpools[$0.id] == true }
+        let low = shop.spools.filter { shop.lowSpools.contains($0.id) }
         #expect(!low.isEmpty, "no low item — the shelf cannot show its warning")
         // Under the shared rule's default threshold, and visibly so. The
         // FILAMENT one, which is what this test was written about and the only
@@ -271,7 +271,7 @@ struct SampleBookShowsTheAppTests {
         #expect(lowFilament.count == 1)
         #expect((lowFilament.first?.weight ?? 999) < 200)
         // And most are not, or every card would wear the warning.
-        #expect(shop.lowSpools.values.filter { $0 }.count < shop.spools.count / 2)
+        #expect(shop.lowSpools.count < shop.spools.count / 2)
     }
 
     /// The delta, pinned separately: "low" now means something different per
@@ -283,7 +283,7 @@ struct SampleBookShowsTheAppTests {
         let shop = try await Self.shop()
         let sheets = shop.spools.filter { shop.unit(of: $0)?.unit == "sheet" }
         #expect(!sheets.isEmpty, "nothing on the shelf is counted in sheets")
-        let lowSheets = sheets.filter { shop.lowSpools[$0.id] == true }
+        let lowSheets = sheets.filter { shop.lowSpools.contains($0.id) }
         #expect(!lowSheets.isEmpty,
                 "no sheet stock is low, so the per-unit threshold is never drawn")
         // And it is low at a figure the gram rule would have called plenty.
