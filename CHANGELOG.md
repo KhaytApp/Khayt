@@ -2352,6 +2352,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   cut to a letter and an ellipsis. It is drawn bare now; the name and time are
   in its tooltip, as they always were.
 
+- **(Mac) Every banner at the top of the window can be closed.** The green
+  ticks ("12 models were measured again", "3 repeat orders created", a
+  conversion saved) could appear at launch and stayed until the next library
+  action, and a warning that had been read could not be put away. Each has a
+  Close button now, and the ticks also go on their own after 15 seconds.
+
 - **(Mac) Preferences could not be opened.** Settings had nine tabs in a window
   too narrow for them, so the last ones went behind a » button at the end of
   the toolbar, and there SwiftUI shows a tab greyed out and unclickable.
