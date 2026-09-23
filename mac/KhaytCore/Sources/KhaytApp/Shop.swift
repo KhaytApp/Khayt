@@ -653,7 +653,8 @@ final class Shop {
                                                orders: orderRows, engine: engine)
             riskWhen = try? await engine?.riskWhen(settings: Self.settings(root))
             await rejudgeStoredRisks()
-            lowSpools = (try? await engine?.lowStock(inventoryRows, settings: settingsDict)) ?? [:]
+            lowSpools = Set(((try? await engine?.lowStock(inventoryRows, settings: settingsDict)) ?? [:])
+                .filter(\.value).keys)
             await warnAboutLowStock(inventoryRows, settings: Self.settings(root))
             spoolRunway = (try? await engine?.runway(spools: inventoryRows, orders: orderRows,
                                                      now: Date())) ?? [:]
@@ -11781,9 +11782,15 @@ final class Shop {
     var convertProblem: String?
     private(set) var converting = false
 
-    /// Which spools are running low, by id — the shared rule's answer, asked
+    /// The ids of the spools running low — the shared rule's answer, asked
     /// once for the whole shelf.
-    private(set) var lowSpools: [String: Bool] = [:]
+    ///
+    /// A SET, not the rule's `[id: Bool]`. That map has an entry for every
+    /// spool, and two screens read "has an entry" as "is low": the sidebar
+    /// counted `.count` (▼3 on a shelf of three full spools) and the
+    /// dashboard tinted every figure as a warning. Only the low ones are kept,
+    /// so counting and asking are both right by construction.
+    private(set) var lowSpools: Set<String> = []
     /// How long each spool has got, by id.
     ///
     /// The reorder list's own arithmetic, asked of every spool rather than

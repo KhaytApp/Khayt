@@ -2328,6 +2328,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   later, and nothing said whether it had. Saving that section now sends them
   straight away, and Settings → Online says what happened: sent, withdrawn, or
   why not, including "sign in to the cloud" when the Mac is not signed in.
+- **(Mac) Every spool was called low.** With three spools at 859 g, 1,000 g and
+  1,000 g and a 200 g threshold, the sidebar showed ▼3 beside Inventory and
+  the dashboard's shelf tinted all three as running out. Nothing was low: both
+  screens counted every spool the low-stock rule had looked at, not the ones
+  it said were low. They now count only those.
 
 - **(Mac) Preferences could not be opened.** Settings had nine tabs in a window
   too narrow for them, so the last ones went behind a » button at the end of
