@@ -296,6 +296,15 @@ struct CompanionBook {
         }
     }
 
+    /// Set what this phone last agreed with upstream about, without touching the
+    /// book — a cloud pull folds the cloud's changes into both, and a first
+    /// cloud pull keeps local edits pending by making the baseline the cloud's
+    /// copy alone. See `CloudSync`.
+    func replaceBaseline(with store: [String: JSONValue]) throws {
+        let data = try JSONEncoder().encode(store)
+        try data.write(to: baselineURL, options: [.atomic, .completeFileProtection])
+    }
+
     /// The Mac has taken everything this phone had changed.
     ///
     /// The baseline becomes the book, so the next outbox measures from here.
