@@ -24,12 +24,12 @@ import KhaytCore
 /// revisioned records, so a delta has nowhere to put them. `Outbox` reports
 /// that and the screen says so.
 @MainActor
-enum CloudWriter {
+public enum CloudWriter {
 
     /// English, like `CloudReader.Failure` beside it. These say what the
     /// service did, and they are the same sentences whichever language the shop
     /// runs in — a gap both of them share and neither should close alone.
-    enum Failure: Error, CustomStringConvertible, Equatable {
+    public enum Failure: Error, CustomStringConvertible, Equatable {
         /// The cloud moved on between the check and the send. Carries the head
         /// it moved to, purely so the message can be specific.
         case moved(Int)
@@ -59,7 +59,7 @@ enum CloudWriter {
         case http(Int, String)
         case malformed(String)
 
-        var description: String {
+        public var description: String {
             switch self {
             case .moved(let rev):
                 return "Khayt Cloud changed while this was on screen — it is now at revision \(rev). "
@@ -83,15 +83,19 @@ enum CloudWriter {
         }
     }
 
-    struct Sent: Sendable {
+    public struct Sent: Sendable {
         /// The chain head after the append — the cloud's new revision.
-        let rev: Int
-        let deltas: Int
-        let tombstones: Int
+        public let rev: Int
+        public let deltas: Int
+        public let tombstones: Int
         /// True when the shop's chain was closed and the whole book went up
         /// instead. Worth saying on screen: it is a different thing.
-        var wholeStore = false
-        var count: Int { deltas + tombstones }
+        public var wholeStore = false
+        public var count: Int { deltas + tombstones }
+
+        public init(rev: Int, deltas: Int, tombstones: Int, wholeStore: Bool = false) {
+            self.rev = rev; self.deltas = deltas; self.tombstones = tombstones; self.wholeStore = wholeStore
+        }
     }
 
     /// Append one payload to the shop's delta chain.
@@ -105,7 +109,7 @@ enum CloudWriter {
     /// `fetch` is a seam, for the same reason it is one in `CloudReader`: the
     /// whole path is exercised in the tests and none of them has a shop's
     /// credentials.
-    static func send(_ connection: CloudReader.Connection, token: String,
+    public static func send(_ connection: CloudReader.Connection, token: String,
                      payload: KhaytEngine.Outbox, dek: Data, baseRev: Int,
                      fetch: (URLRequest) async throws -> (Data, URLResponse)) async throws -> Sent {
         var request = try CloudReader.request(connection, token: token,
@@ -147,7 +151,7 @@ enum CloudWriter {
     /// THE DANGEROUS ONE, and the doc comment at the top of this file says why:
     /// a whole store from a device that has not merged is that device's records
     /// and nobody else's, and the server takes it. So this is deliberately NOT
-    /// reachable on its own. `Shop.sendToCloud` calls it in exactly one place —
+    /// reachable on its own. the Mac app's `Shop.sendToCloud` calls it in exactly one place —
     /// after `POST /deltas` has been refused for the shop, and after the cloud
     /// has been MERGED INTO THIS BOOK — which is the same order the desktop
     /// uses when the chain is unavailable to it.
@@ -159,7 +163,7 @@ enum CloudWriter {
     /// `baseRev` is the revision the merge was folded from. The server compares
     /// it against the head and answers 409 if anything arrived in between, so a
     /// book that is no longer a superset of the cloud cannot overwrite it.
-    static func sendWholeStore(_ connection: CloudReader.Connection, token: String,
+    public static func sendWholeStore(_ connection: CloudReader.Connection, token: String,
                                store: [String: JSONValue], dek: Data, baseRev: Int,
                                mergedFrom: KhaytEngine.Merged,
                                fetch: (URLRequest) async throws -> (Data, URLResponse)) async throws -> Sent {
@@ -200,7 +204,7 @@ enum CloudWriter {
     /// Every refusal this app can meet carries `{"error": "…"}` — a sentence,
     /// in the shop's own terms ("Store exceeds your plan's size limit"). The
     /// first 200 bytes of the JSON around it is not that sentence.
-    static func said(_ data: Data) -> String {
+    public static func said(_ data: Data) -> String {
         if let body = try? JSONDecoder().decode(ServerError.self, from: data),
            let error = body.error, !error.isEmpty { return error }
         return String(decoding: data.prefix(200), as: UTF8.self)
