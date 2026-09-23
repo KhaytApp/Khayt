@@ -55,6 +55,9 @@ struct LanServerTests {
                 icon: { LanServer.bundledIcon($0) })
             host.intakeToken = intakeToken
             host.calendarToken = calendarToken
+            // The pricing inputs, from the same bench book — the app hands the
+            // server `Shop.pricingBook` here; see `PricingBookTests` for why.
+            host.pricing = { book.value }
             // Per BENCH, not per process: the stall tests run in parallel and a
             // shared static put one test's restore in the middle of another
             // test's wait.

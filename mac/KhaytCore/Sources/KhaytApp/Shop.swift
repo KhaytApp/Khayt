@@ -498,10 +498,8 @@ final class Shop {
             // at a screen that is no longer theirs.
             if shelf == .reports, !has("analytics") { shelf = .dashboard }
             if shelf == .expenses, !has("expenses") { shelf = .dashboard }
-            lanBook = ["printLog": root["printLog"] ?? .array([]),
-                       "waitingList": root["waitingList"] ?? .array([]),
-                       "settings": root["settings"] ?? .object([:]),
-                       "machines": root["machines"] ?? .array([])]
+            lanBook = Self.lanBook(from: root)
+            pricingBook = Self.pricingBook(from: root)
             await syncLanServer()
             // AFTER the words, because the name is read in the shop's language.
             // It is `bizEn`/`bizAr`, the fields Khayt's own Settings page
@@ -3661,7 +3659,35 @@ final class Shop {
 
     /// The book as the LAN server's shared pages read it — `printLog`,
     /// `waitingList`, `settings` and `machines`, raw. See `LanServer`.
+    ///
+    /// It is also what `/api/store` hands a paired phone, so what is in it is
+    /// the phone's contract — which is why the pricing inputs below are a
+    /// separate book rather than two more collections in this one.
     private(set) var lanBook: [String: JSONValue] = [:]
+    /// What a price is computed from: `settings`, the printer presets
+    /// (`printers`), the shelf (`inventory`) and `printLog`, whose recorded
+    /// actuals calibrate the estimator.
+    ///
+    /// THE LAN ESTIMATE PRICED NOTHING WITHOUT IT. `publicQuote` finds the
+    /// preset in `store.printers` and the filament in `store.inventory`, and
+    /// the server was handed `lanBook`, which has neither — so on a real shop
+    /// every upload came back "not configured". The tests never saw it: their
+    /// bench put `printers` straight into the server's book.
+    private(set) var pricingBook: [String: JSONValue] = [:]
+
+    static func lanBook(from root: [String: JSONValue]) -> [String: JSONValue] {
+        ["printLog": root["printLog"] ?? .array([]),
+         "waitingList": root["waitingList"] ?? .array([]),
+         "settings": root["settings"] ?? .object([:]),
+         "machines": root["machines"] ?? .array([])]
+    }
+
+    static func pricingBook(from root: [String: JSONValue]) -> [String: JSONValue] {
+        ["settings": root["settings"] ?? .object([:]),
+         "printers": root["printers"] ?? .array([]),
+         "inventory": root["inventory"] ?? .array([]),
+         "printLog": root["printLog"] ?? .array([])]
+    }
     /// The phone's way in, while the settings say it should be running.
     var lanServer: LanServer?
     /// What the running server was started with, so a save that changed the
@@ -8413,6 +8439,8 @@ final class Shop {
             try? await Task.sleep(for: Shop.leadTimeFirst)
             while !Task.isCancelled {
                 await self?.publishLeadTime()
+                // Beside it, on the same timer: the storefront's pricing inputs.
+                await self?.publishQuoteSheet()
                 try? await Task.sleep(for: Shop.leadTimeEvery)
             }
         }
@@ -8472,6 +8500,42 @@ final class Shop {
         } catch {
             leadTimeProblem = String(describing: error)
             note(String(describing: error))
+        }
+    }
+
+    /// What was last sent as the quote sheet — `.some(nil)` a withdrawal, `nil`
+    /// never sent. A shop that never switched public pricing on is never sent a
+    /// withdrawal, every six hours, for ever.
+    private(set) var quoteSheetPublished: JSONValue??
+    private(set) var quoteSheetSaid: String?
+
+    /// Build the shop's quote sheet from the pricing book and send it — or
+    /// withdraw the last one. `lib/quote-sheet.js` decides what is in it.
+    func publishQuoteSheet() async {
+        guard let engine, let build = source.build else { return }
+        do {
+            let connection = try CloudReader.connection(settingsDict)
+            let sheet = try await engine.quoteSheet(store: .object(pricingBook), now: Date(),
+                                                    staleAfterHours: QuoteSheetPublisher.staleAfterHours)
+            if sheet == nil, quoteSheetPublished == nil { return }
+            let token = try await Secrets.open(connection.storedToken, for: build)
+            guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
+            let session = URLSession(configuration: .ephemeral)
+            try await QuoteSheetPublisher.publish(connection, token: token, sheet: sheet) {
+                try await session.data(for: $0)
+            }
+            quoteSheetPublished = .some(sheet)
+            quoteSheetSaid = sheet == nil ? "withdrawn" : "published"
+        } catch CloudReader.Failure.notConnected {
+            quoteSheetSaid = nil
+        } catch QuoteSheetPublisher.Failure.notOffered {
+            // Khayt Cloud has not shipped the endpoint yet. Not a fault here.
+            quoteSheetSaid = "Khayt Cloud does not take a quote sheet yet"
+        } catch {
+            quoteSheetSaid = String(describing: error)
+        }
+        if let said = quoteSheetSaid {
+            FileHandle.standardError.write(Data("khayt: quote sheet — \(said)\n".utf8))
         }
     }
 
