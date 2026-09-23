@@ -27,14 +27,41 @@ enum LANHostValidator {
             }
         }
 
+        // An IPv6 literal, bracketed — and possibly SCOPED. A Mac found by
+        // Bonjour often resolves to a link-local address, which only means
+        // something with the interface it was found on: `fe80::1%en0`, written
+        // in a URL as `[fe80::1%25en0]`. The zone used to be refused here, so
+        // the address the phone had just found was "not configured" and
+        // pairing could not continue. It comes back BRACKETED, zone encoded,
+        // for `baseURL` to set as an already-encoded host.
         if h.hasPrefix("[") {
             guard h.hasSuffix("]"), h.count > 2 else { return nil }
             let inner = String(h.dropFirst().dropLast())
-            return isValidIPv6Literal(inner) ? inner : nil
+            return scopedIPv6(inner).map { "[\($0)]" }
         }
+
+        // `Turkis-MacBook-Air.local.` — a resolver's fully-qualified name ends
+        // in a dot, and it names the same host without one.
+        if h.hasSuffix("."), !h.hasSuffix("..") { h.removeLast() }
 
         guard isValidIPv4(h) || isValidHostname(h) else { return nil }
         return h
+    }
+
+    /// `fe80::1`, `fe80::1%25en0` or `fe80::1%en0` → the literal with its zone
+    /// percent-encoded, or nil. A zone is an interface name: letters and digits.
+    private static func scopedIPv6(_ inner: String) -> String? {
+        var address = inner
+        var zone: String?
+        if let range = inner.range(of: "%25") ?? inner.range(of: "%") {
+            address = String(inner[..<range.lowerBound])
+            zone = String(inner[range.upperBound...])
+        }
+        guard isValidIPv6Literal(address) else { return nil }
+        guard let zone else { return address }
+        guard !zone.isEmpty, zone.count <= 16,
+              zone.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) && $0.isASCII }) else { return nil }
+        return address + "%25" + zone
     }
 
     private static func isValidIPv4(_ host: String) -> Bool {
@@ -151,12 +178,23 @@ final class ConnectionSettings: ObservableObject {
     }
 
     /// HTTP base URL built with `URLComponents` (no relative URL resolution).
-    var baseURL: URL? {
+    var baseURL: URL? { Self.baseURL(host: host, port: port) }
+
+    /// The desktop's address as a URL, or nil when the host is not one this app
+    /// will connect to. Static so the resolver's output can be tested against
+    /// it directly — the two halves once disagreed about a scoped IPv6 address
+    /// and nothing noticed, because each was tested on its own.
+    nonisolated static func baseURL(host: String, port: Int) -> URL? {
         var effectivePort = port
         guard let hostPart = LANHostValidator.normalizeHost(host, effectivePort: &effectivePort) else { return nil }
         var components = URLComponents()
         components.scheme = "http"
-        components.host = hostPart
+        if hostPart.hasPrefix("[") {
+            // Already bracketed and encoded — see `normalizeHost`.
+            components.percentEncodedHost = hostPart
+        } else {
+            components.host = hostPart
+        }
         components.port = effectivePort
         return components.url
     }

@@ -124,7 +124,20 @@ final class ShopBrowser: ObservableObject {
     /// The connection is cancelled the moment the path is read. It exists to
     /// answer one question.
     func resolve(_ shop: Shop, timeout: TimeInterval = 5) async -> (host: String, port: UInt16)? {
-        let connection = NWConnection(to: shop.endpoint, using: .tcp)
+        // IPv4 first. A Mac on the same Wi-Fi nearly always has one, and it is
+        // an address that stays good after this phone changes interface; a
+        // link-local IPv6 address is only good on the interface it was found
+        // on. Whatever the path offers, if there is no IPv4.
+        if let v4 = await resolve(shop, timeout: timeout, ipv4Only: true) { return v4 }
+        return await resolve(shop, timeout: timeout, ipv4Only: false)
+    }
+
+    private func resolve(_ shop: Shop, timeout: TimeInterval, ipv4Only: Bool) async -> (host: String, port: UInt16)? {
+        let parameters = NWParameters.tcp
+        if ipv4Only, let ip = parameters.defaultProtocolStack.internetProtocol as? NWProtocolIP.Options {
+            ip.version = .v4
+        }
+        let connection = NWConnection(to: shop.endpoint, using: parameters)
         defer { connection.cancel() }
 
         return await withCheckedContinuation { continuation in
@@ -176,7 +189,9 @@ final class ShopBrowser: ObservableObject {
             let raw = "\(v6)"
             text = "[\(raw.replacingOccurrences(of: "%", with: "%25"))]"
         case .name(let name, _):
-            text = name
+            // `Turkis-MacBook-Air.local.` names the same host as without the
+            // dot, and it is the form without it that goes in a URL.
+            text = name.hasSuffix(".") ? String(name.dropLast()) : name
         @unknown default:
             text = "\(host)"
         }

@@ -60,4 +60,42 @@ final class ShopBrowserTests: XCTestCase {
         XCTAssertFalse(ShopBrowser.servesBook([:]))
         XCTAssertFalse(ShopBrowser.servesBook(["v": "1"]))
     }
+
+    // MARK: - What the resolver writes, the settings must accept
+
+    /// The two halves met on Turki's phone and not in any test: the resolver
+    /// wrote `[fe80::…%25en0]`, the settings refused the zone, the Mac counted
+    /// as not configured, and pairing could not continue. Each half had its
+    /// own passing test.
+    func testAScopedIPv6AddressFromTheResolverIsAnAddressTheSettingsTake() throws {
+        let raw = try XCTUnwrap(IPv6Address("fe80::1c3d:ff:fe12:3456%en0"))
+        let (host, port) = ShopBrowser.address(host: .ipv6(raw), port: NWEndpoint.Port(rawValue: 3219)!)
+        let url = try XCTUnwrap(ConnectionSettings.baseURL(host: host, port: Int(port)),
+                                "the settings refused the address the resolver just found")
+        XCTAssertEqual(url.absoluteString, "http://[fe80::1c3d:ff:fe12:3456%25en0]:3219")
+        XCTAssertNotNil(URL(string: "/api/status", relativeTo: url))
+    }
+
+    func testAPlainIPv6AndAnIPv4AddressStillWork() throws {
+        XCTAssertEqual(ConnectionSettings.baseURL(host: "[fe80::1]", port: 3219)?.absoluteString, "http://[fe80::1]:3219")
+        XCTAssertEqual(ConnectionSettings.baseURL(host: "192.168.68.75", port: 3219)?.absoluteString, "http://192.168.68.75:3219")
+    }
+
+    func testAResolversTrailingDotIsTheSameHost() throws {
+        let (host, port) = ShopBrowser.address(host: .name("Turkis-MacBook-Air.local.", nil),
+                                               port: NWEndpoint.Port(rawValue: 3219)!)
+        XCTAssertEqual(host, "Turkis-MacBook-Air.local")
+        XCTAssertEqual(ConnectionSettings.baseURL(host: host, port: Int(port))?.absoluteString,
+                       "http://Turkis-MacBook-Air.local:3219")
+        // Typed with the dot, it is accepted too.
+        XCTAssertNotNil(ConnectionSettings.baseURL(host: "Turkis-MacBook-Air.local.", port: 3219))
+    }
+
+    func testAZoneIsAnInterfaceNameAndNothingElse() {
+        // Still a guard: a "zone" is where an injected path or userinfo would go.
+        XCTAssertNil(ConnectionSettings.baseURL(host: "[fe80::1%25en0/evil]", port: 3219))
+        XCTAssertNil(ConnectionSettings.baseURL(host: "[fe80::1%25]", port: 3219))
+        XCTAssertNil(ConnectionSettings.baseURL(host: "[fe80::1%25en0@x.com]", port: 3219))
+        XCTAssertNil(ConnectionSettings.baseURL(host: "[fe80::zz]", port: 3219))
+    }
 }
