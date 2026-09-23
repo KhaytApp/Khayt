@@ -378,3 +378,18 @@ test('an edit keeps what it does not own — a Bambu or Elegoo serial above all'
   assert.equal(m.printerApi.someFutureField, 'kept', 'a field this edit does not know about was dropped');
   assert.equal(m.printerApi.accessCode, '__enc__CODE');
 });
+
+test('a serial, a mainboard id and a Repetier slug can be set, and cleared, from a form', () => {
+  // The Mac's machine sheet now sends them; before, no Mac screen could set up
+  // a Bambu, an Elegoo or a second printer on a Repetier-Server at all.
+  const m = { id: 'M3', name: 'P1S', printerApi: { type: 'bambu', host: '10.0.0.7', accessCode: '__enc__CODE' } };
+  M.applyEdit(m, { printerApi: { type: 'bambu', host: '10.0.0.7', serial: ' 01P00A123456789 ' } }, {});
+  assert.equal(m.printerApi.serial, '01P00A123456789');
+  M.applyEdit(m, { printerApi: { type: 'bambu', host: '10.0.0.7', serial: '' } }, {});
+  assert.equal(m.printerApi.serial, '', 'an empty serial is the shop clearing it');
+  const r = { id: 'M4', name: 'Rep', printerApi: { type: 'repetier', host: '10.0.0.9', printerSlug: 'old' } };
+  M.applyEdit(r, { printerApi: { type: 'repetier', host: '10.0.0.9' } }, {});
+  assert.equal(r.printerApi.printerSlug, 'old', 'absent keeps the stored slug');
+  M.applyEdit(r, { printerApi: { type: 'repetier', host: '10.0.0.9', printerSlug: ' ender3 ' } }, {});
+  assert.equal(r.printerApi.printerSlug, 'ender3');
+});

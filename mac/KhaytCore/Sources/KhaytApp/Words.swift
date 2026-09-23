@@ -2540,6 +2540,14 @@ final class Words {
                                     + "وتقويم المواعيد، ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس، "
                                     + "ويستقبل الطلبات من سلة وزد وتحديثات الشحنات من سمسا وأرامكس والبريد السعودي. "
                                     + "أما ويب هوك الطابعات فيعمل في ذلك التطبيق حالياً."],
+        "mac.mach_serial":   ["en": "Serial number", "ar": "الرقم التسلسلي"],
+        "mac.mach_mainboard": ["en": "Mainboard ID", "ar": "معرّف اللوحة الأم"],
+        "mac.mach_slug":     ["en": "Printer on the server", "ar": "الطابعة على الخادم"],
+        "mac.mach_access_code": ["en": "Access code", "ar": "رمز الوصول"],
+        "mac.mach_bambu_hint": ["en": "On the printer, turn on LAN-only Mode and Developer Mode; the access code is "
+                                    + "on that same screen. Developer Mode is what opens the connection Khayt uses.",
+                                "ar": "على الطابعة، فعّل وضع الشبكة المحلية فقط ووضع المطوّر؛ رمز الوصول في نفس "
+                                    + "الشاشة. وضع المطوّر هو ما يفتح الاتصال الذي يستخدمه خيط."],
         "mac.spoolman_import": ["en": "Import from Spoolman", "ar": "استيراد من Spoolman"],
         "mac.spoolman_address": ["en": "Spoolman address", "ar": "عنوان Spoolman"],
         "mac.spoolman_hint": ["en": "Every spool Spoolman holds comes onto the shelf, with its vendor, colour, price "
