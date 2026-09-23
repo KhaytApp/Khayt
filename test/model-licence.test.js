@@ -105,3 +105,27 @@ test('standing carries the source through, trimmed', () => {
   assert.equal(s.sellable, true);
   assert.equal(s.attribution, true);
 });
+
+test('a bought licence covers sales through its last day, and not after', () => {
+  const r = { licence: 'commercial', licenceExpires: '2026-09-30' };
+  assert.equal(L.expired(r, '2026-09-30'), false);
+  assert.equal(L.expired(r, '2026-10-01'), true);
+  assert.equal(L.sellableOn(r, '2026-10-01'), false);
+  assert.equal(L.sellableOn({ licence: 'commercial' }, '2099-01-01'), true, 'no date is taken at its word');
+  assert.equal(L.expired({ licence: 'cc-by', licenceExpires: '2000-01-01' }, '2026-01-01'), false,
+    'a Creative Commons licence does not expire');
+  assert.equal(L.sellableOn({}, '2026-10-01'), null, 'unknown stays unknown');
+});
+
+test('the models behind a sale that may not be sold, and only those', () => {
+  const lib = [
+    { id: 'A', name: 'Koi', licence: 'cc-by-nc' },
+    { id: 'B', originalName: 'dragon.3mf', licence: 'commercial', licenceExpires: '2026-09-01' },
+    { id: 'C', name: 'Mine', licence: 'own' },
+    { id: 'D', name: 'Unfilled' },
+  ];
+  const out = L.saleProblems(['A', 'B', 'C', 'D', 'A', 'missing'], lib, '2026-09-23');
+  assert.deepEqual(out.map((p) => [p.id, p.reason]), [['A', 'not-commercial'], ['B', 'expired']]);
+  assert.equal(out[1].name, 'dragon.3mf');
+  assert.equal(out[1].until, '2026-09-01');
+});

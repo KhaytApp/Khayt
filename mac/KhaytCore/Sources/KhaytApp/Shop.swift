@@ -11075,6 +11075,42 @@ final class Shop {
         }
     }
 
+    /// Record the proof behind a bought licence — code, verification page, last
+    /// day covered. Blank clears a field. A link must be an http(s) address and
+    /// a date must be a real `YYYY-MM-DD`, or nothing is written: a proof the
+    /// shop cannot click, or a date `lib/model-licence.js` cannot read, is a
+    /// proof that silently never expires.
+    func setLicenceProof(_ fileId: LibraryFile.ID, code: String, url: String, expires: String) {
+        let code = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let url = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        let expires = expires.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !url.isEmpty {
+            guard let u = URL(string: url), ["http", "https"].contains(u.scheme?.lowercased() ?? ""),
+                  u.host() != nil else { writeProblem = words.callIt("mac.licence_bad_link"); return }
+        }
+        if !expires.isEmpty {
+            let f = DateFormatter()
+            f.calendar = Calendar(identifier: .gregorian)
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = "yyyy-MM-dd"
+            guard f.date(from: expires).map({ f.string(from: $0) == expires }) == true else {
+                writeProblem = words.callIt("mac.licence_bad_date"); return
+            }
+        }
+        editFiles([fileId], named: words.callIt("mac.licence_proof")) { record in
+            for (key, value) in [("licenceCode", code), ("licenceUrl", url), ("licenceExpires", expires)] {
+                if value.isEmpty { record.removeValue(forKey: key) } else { record[key] = .string(value) }
+            }
+        }
+    }
+
+    /// The models behind a job or a product that may not be sold TODAY —
+    /// non-commercial, or a bought licence past its last day. Unknown licences
+    /// are not in it: unknown is not no. `ModelLicence.saleProblems`.
+    func saleProblems(_ printFileIds: [String]) -> [ModelLicence.SaleProblem] {
+        ModelLicence.saleProblems(printFileIds, records: libraryRows, today: Self.today())
+    }
+
     /// Read provenance out of the model files a shop ALREADY has.
     ///
     /// ── A FIX ONLY ON NEW IMPORTS STRANDS THE WHOLE LIBRARY ───────────────

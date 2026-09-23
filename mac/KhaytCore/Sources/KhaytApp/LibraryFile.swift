@@ -74,6 +74,12 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// What its licence lets a shop do. `lib/model-licence.js` reads it; this
     /// only carries it.
     let licence: String?
+    /// Proof of a BOUGHT licence: the designer's licence code, a page that
+    /// verifies it, and the last day it covers (`YYYY-MM-DD`) — merchant tiers
+    /// are subscriptions. Only meaningful when `licence` is `commercial`.
+    let licenceCode: String?
+    let licenceUrl: String?
+    let licenceExpires: String?
     let timesPrinted: Int?
     let lastPrinted: String?
 

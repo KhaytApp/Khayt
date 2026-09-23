@@ -115,4 +115,75 @@ struct ModelLicenceParityTests {
         #expect(ModelLicence.notForSale([.object(["id": .string("a")]),
                                          .object(["id": .string("b")])]).isEmpty)
     }
+
+    // ── A BOUGHT LICENCE THAT RUNS OUT, AND THE MODELS BEHIND A SALE ─────────
+
+    /// Every licence × every way of writing an expiry × days either side of it.
+    private var expiryCases: [(licence: String, until: String?, today: String)] {
+        var out: [(String, String?, String)] = []
+        for licence in ["commercial", "Commercial ", "cc-by", "cc-by-nc", "own", "", "unknown"] {
+            for until in [nil, "", "2026-09-30", " 2026-09-30 ", "2026-9-30", "30/09/2026", "soon"] as [String?] {
+                for today in ["2026-09-29", "2026-09-30", "2026-10-01", "", "yesterday"] {
+                    out.append((licence, until, today))
+                }
+            }
+        }
+        return out
+    }
+
+    private func record(_ licence: String, _ until: String?) -> JSONValue {
+        var o: [String: JSONValue] = ["id": .string("F1"), "name": .string("Koi"), "licence": .string(licence)]
+        if let until { o["licenceExpires"] = .string(until) }
+        return .object(o)
+    }
+
+    @Test("a bought licence expires the day after its date, and nothing else expires")
+    func expiryMatches() throws {
+        let js = try js()
+        for c in expiryCases {
+            let r = record(c.licence, c.until)
+            let theirs = try js.value("KhaytModelLicence.expired(ARG0, ARG1)", [r, .string(c.today)])
+            #expect(.bool(ModelLicence.expired(r, today: c.today)) == theirs,
+                    Comment(rawValue: "expired \(c)"))
+            let theirSale = try js.value("KhaytModelLicence.sellableOn(ARG0, ARG1)", [r, .string(c.today)])
+            let mine: JSONValue = ModelLicence.sellableOn(r, today: c.today).map(JSONValue.bool) ?? .null
+            #expect(mine == theirSale, Comment(rawValue: "sellableOn \(c)"))
+        }
+        // The one that matters, said plainly.
+        let lapsed = record("commercial", "2026-09-30")
+        #expect(ModelLicence.sellableOn(lapsed, today: "2026-09-30") == true, "the last day is still covered")
+        #expect(ModelLicence.sellableOn(lapsed, today: "2026-10-01") == false)
+        #expect(ModelLicence.sellableOn(record("", nil), today: "2026-10-01") == nil, "unknown became no")
+    }
+
+    @Test("the models behind a sale that may not be sold, as the JavaScript finds them")
+    func saleProblemsMatch() throws {
+        let js = try js()
+        let library: [JSONValue] = [
+            .object(["id": .string("A"), "name": .string("Koi"), "licence": .string("cc-by-nc")]),
+            .object(["id": .string("B"), "originalName": .string("dragon.3mf"), "licence": .string("commercial"),
+                     "licenceExpires": .string("2026-09-01")]),
+            .object(["id": .string("C"), "name": .string("Mine"), "licence": .string("own")]),
+            .object(["id": .string("D"), "name": .string("Unfilled")]),
+            .object(["id": .string("E"), "name": .string("Bought"), "licence": .string("commercial"),
+                     "licenceExpires": .string("2027-01-01")]),
+        ]
+        for ids in [["A", "B", "C", "D", "E"], ["B", "A", "A", " B "], [], ["Z"], ["", "C"]] {
+            let mine = ModelLicence.saleProblems(ids, records: library, today: "2026-09-23")
+            let theirs = try js.value("KhaytModelLicence.saleProblems(ARG0, ARG1, ARG2)",
+                                      [.array(ids.map(JSONValue.string)), .array(library), .string("2026-09-23")])
+            guard case .array(let rows) = theirs else { Issue.record("not an array"); continue }
+            #expect(rows.count == mine.count, Comment(rawValue: "\(ids)"))
+            for (row, m) in zip(rows, mine) {
+                guard case .object(let o) = row else { continue }
+                #expect(o["id"] == .string(m.id) && o["reason"] == .string(m.reason)
+                        && o["name"] == .string(m.name) && o["licence"] == .string(m.licence),
+                        Comment(rawValue: "\(ids): \(row) vs \(m)"))
+            }
+        }
+        let problems = ModelLicence.saleProblems(["A", "B", "C", "D", "E"], records: library, today: "2026-09-23")
+        #expect(problems.map(\.id) == ["A", "B"], "unfilled, own and a live bought licence are not problems")
+        #expect(problems.map(\.reason) == ["not-commercial", "expired"])
+        #expect(problems[1].name == "dragon.3mf", "a model with no title is named by its file")
+    }
 }

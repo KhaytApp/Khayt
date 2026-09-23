@@ -196,6 +196,12 @@ struct ProductSheet: View {
         SheetFrame(width: Self.width) {
             Text(shop.words.callIt(isNew ? "mac.new_product" : "mac.edit_product"))
                 .font(.headline)
+            // A product is a promise to sell it, so a model it is built from
+            // that may not be sold is said here, where the promise is made.
+            let problems = shop.saleProblems(parts.compactMap(\.printFileId))
+            if !problems.isEmpty {
+                LicenceWarning(shop: shop, problems: problems)
+            }
 
             if shop.catalogueLanguages.count > 1 {
                 Picker("", selection: $language) {
