@@ -429,24 +429,36 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     func addSpool(draft: SpoolDraft) async throws -> InventorySpool {
-        let today = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
         let material = draft.material.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !material.isEmpty else {
             throw KhaytAPIError.server("Material name is required.")
         }
 
+        // Booked into this phone's own book when it keeps one, and sent on.
+        // The native Mac has no `/api/inventory` at all, so for a shop on it
+        // this is the only way a roll booked in here reaches the shelf.
+        if let book, book.exists, let reader {
+            let record = try await reader.newSpool(from: draft)
+            try BookWriter(book: book).addSpool(record)
+            await refreshPendingCount()
+            _ = try? await sendPendingChanges()
+            let data = try JSONEncoder().encode(JSONValue.object(record))
+            return try JSONDecoder().decode(InventorySpool.self, from: data)
+        }
+
+        // `id`, `purchasedAt` and `remaining` are not sent: the server decides
+        // the first two (the shop's calendar, not this phone's UTC one) and
+        // derives the third, and `pickLanSpoolFields` drops all of them.
         var payload: [String: Any] = [
-            "id": "spool-\(Int(Date().timeIntervalSince1970 * 1000))",
             "material": InputLimits.clamp(material, max: InputLimits.maxMaterial),
             "brand": InputLimits.clamp(draft.brand.trimmingCharacters(in: .whitespacesAndNewlines)),
             "color": InputLimits.clamp(draft.colorHex.isEmpty ? "#888888" : draft.colorHex, max: 32),
             "weight": draft.weightGrams,
             "weightTotal": draft.weightGrams,
             "weightRemaining": draft.weightGrams,
-            "remaining": draft.weightGrams,
-            "purchasedAt": today,
             "materialType": "fdm"
         ]
+        if let cost = draft.costValue { payload["cost"] = cost }
 
         let sku = InputLimits.clamp(draft.sku.trimmingCharacters(in: .whitespacesAndNewlines))
         if !sku.isEmpty { payload["sku"] = sku }

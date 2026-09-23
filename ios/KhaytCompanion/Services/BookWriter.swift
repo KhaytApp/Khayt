@@ -75,6 +75,11 @@ struct BookWriter {
         /// Declining moves the request to `waitingListHistory` and removes it
         /// from `waitingList` — a deletion, which this phone cannot express.
         case declineNeedsTheMac
+        /// A new record the shop's rule would not make — a spool with no
+        /// material, which no job can ever be matched to.
+        case noMaterial
+        case recordHasNoId
+        case idTaken
 
         var errorDescription: String? {
             switch self {
@@ -82,6 +87,10 @@ struct BookWriter {
                 return "That printer is not in the shop's list."
             case .declineNeedsTheMac:
                 return "Declining a request needs the Mac."
+            case .noMaterial:
+                return "Material name is required."
+            case .recordHasNoId, .idTaken:
+                return "That record could not be added to the book."
             }
         }
     }
@@ -137,5 +146,106 @@ struct BookWriter {
         try book.updateRecord(collection: "waitingList", id: id) { record in
             record["status"] = .string(status)
         }
+    }
+
+    // MARK: - Booking a roll in
+
+    /// Put a roll on the shelf.
+    func addSpool(_ record: [String: JSONValue]) throws {
+        try book.appendRecord(collection: "inventory", record: record)
+    }
+
+    /// The id the desk's own endpoint would have given it — `uniqueLanId`'s
+    /// shape, so a roll reads the same wherever it was booked in.
+    static func newSpoolId(now: Date = Date()) -> String {
+        let ms = Int(now.timeIntervalSince1970 * 1000)
+        return "spool-\(ms)-\(String(format: "%04x", UInt16.random(in: .min ... .max)))"
+    }
+
+    /// A roll, built the way `POST /api/inventory` builds one.
+    ///
+    /// ── THE SAME TWO RULES, IN THE SAME ORDER ────────────────────────────
+    ///
+    /// `KhaytSpoolEdit.newSpool` makes the record from what it arrived as,
+    /// then `applyEdit` sets what is left and the numbers off the label. Both
+    /// run in KhaytCore here, as they do in the endpoint, so a roll booked in
+    /// on a phone in a car park is the record the desk would have written —
+    /// what follows `applyEdit` is the endpoint's own field work, copied line
+    /// for line. `SpoolBookingTests` pins the record that comes out; if the
+    /// endpoint's field work changes, this has to change with it.
+    ///
+    /// ── TWO THINGS THAT ARE THE SHOP'S, NOT THE PHONE'S ─────────────────
+    ///
+    /// The DAY is the local calendar day. The endpoint's comment is about
+    /// exactly this phone: it once dated rolls with `ISO8601DateFormatter`,
+    /// which is UTC, and "a roll booked in at 02:00 in Riyadh was shelved
+    /// under yesterday". The phone is in the shop's time zone for the same
+    /// reason the shop is.
+    ///
+    /// The BRANCH is the one the book's settings say the desk is showing,
+    /// which is what the endpoint uses when a caller names none.
+    ///
+    /// ── AND ONE THING DELIBERATELY NOT DONE ──────────────────────────────
+    ///
+    /// The colour library is not taught. That lives in `settings`, and the fold
+    /// on the Mac carries records and tombstones, never settings — a variant
+    /// learned here would vanish on the way. The endpoint hands `applyEdit` a
+    /// scratch settings object too, and nothing on this phone names a variant.
+    static func spoolRecord(from draft: SpoolDraft, engine: KhaytEngine,
+                            settings: [String: JSONValue], id: String,
+                            now: Date = Date()) async throws -> [String: JSONValue] {
+        let material = draft.material.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !material.isEmpty else { throw Refusal.noMaterial }
+        let grams = Double(min(50_000, max(1, draft.weightGrams)))
+        let today = localDay(now)
+
+        var input: [String: JSONValue] = [
+            "material": .string(InputLimits.clamp(material, max: InputLimits.maxMaterial)),
+            "weight": .number(grams),
+            "color": .string(InputLimits.clamp(draft.colorHex.isEmpty ? "#888888" : draft.colorHex, max: 32)),
+            "materialType": .string("fdm"),
+        ]
+        if let cost = draft.costValue { input["cost"] = .number(cost) }
+        let lot = InputLimits.clamp(draft.lot.trimmingCharacters(in: .whitespacesAndNewlines))
+        if !lot.isEmpty { input["lot"] = .string(lot) }
+        if case .string(let branch)? = settings["activeLocationId"], !branch.isEmpty {
+            input["locationId"] = .string(branch)
+        }
+
+        let made = try await engine.newSpool(input, id: id, today: today)
+        guard case .object? = made.spool, let spool = made.spool else { throw Refusal.noMaterial }
+
+        var edit: [String: JSONValue] = ["weight": .number(grams)]
+        if let p = Int(draft.printTemp.trimmingCharacters(in: .whitespaces)), p > 0 { edit["printTemp"] = .number(Double(p)) }
+        if let b = Int(draft.bedTemp.trimmingCharacters(in: .whitespaces)), b > 0 { edit["bedTemp"] = .number(Double(b)) }
+        let edited = try await engine.editSpool(spool, input: edit, settings: [:], today: today)
+        guard case .object(var record) = edited.spool else { throw Refusal.noMaterial }
+
+        // The record's own fields, which the shelf's rule has never owned.
+        let brand = InputLimits.clamp(draft.brand.trimmingCharacters(in: .whitespacesAndNewlines))
+        if !brand.isEmpty { record["brand"] = .string(brand) }
+        let sku = InputLimits.clamp(draft.sku.trimmingCharacters(in: .whitespacesAndNewlines))
+        if !sku.isEmpty { record["sku"] = .string(sku) }
+
+        // All three names for what is left, as the endpoint writes them.
+        let left = record["weight"] ?? .number(grams)
+        record["remaining"] = left
+        record["weightRemaining"] = left
+        if case .number(let w) = left, case .number(let arrived)? = record["spoolWeight"], w > arrived {
+            record["spoolWeight"] = .number(w)
+        }
+        record["weightTotal"] = record["spoolWeight"]
+        record["addedAt"] = .string(StoreWriter.iso(now))
+        return record
+    }
+
+    /// `localDay()` in `lib/lan-server.js`: the calendar day where the shop is.
+    static func localDay(_ date: Date, in zone: TimeZone = .current) -> String {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = zone
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
     }
 }

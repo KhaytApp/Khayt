@@ -50,6 +50,15 @@ actor BookReader {
         return made
     }
 
+    /// A roll, as the shop's own rule would book it in — built here, written
+    /// by `BookWriter.addSpool`. See `BookWriter.spoolRecord` for the rule.
+    func newSpool(from draft: SpoolDraft, now: Date = Date()) async throws -> [String: JSONValue] {
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = try book.read()["settings"] { settings = s }
+        return try await BookWriter.spoolRecord(from: draft, engine: engine(), settings: settings,
+                                                id: BookWriter.newSpoolId(now: now), now: now)
+    }
+
     /// Is there a book on this phone at all?
     ///
     /// `nonisolated` so a read path can ask without hopping onto the actor just

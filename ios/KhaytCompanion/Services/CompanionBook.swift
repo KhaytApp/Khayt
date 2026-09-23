@@ -233,6 +233,34 @@ struct CompanionBook {
                                      collection: collection, id: id, change: change)
     }
 
+    /// Put a new record in the book, stamped.
+    ///
+    /// The stamp is not what makes it travel — `changesToSend` sends any
+    /// record the baseline has never seen, whatever its revision — but every
+    /// record the desk writes carries one, and one written here without it is
+    /// a record whose first edit anywhere is indistinguishable from its birth.
+    ///
+    /// An id already in the collection is refused rather than duplicated: two
+    /// records with one id is a book the sync rules cannot reason about.
+    func appendRecord(collection: String, record: [String: JSONValue]) throws {
+        guard case .string(let id)? = record["id"], !id.isEmpty else {
+            throw BookWriter.Refusal.recordHasNoId
+        }
+        try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+            var rows: [JSONValue] = []
+            if case .array(let had)? = root[collection] { rows = had }
+            let taken = rows.contains {
+                if case .object(let o) = $0, case .string(let rowId)? = o["id"] { return rowId == id }
+                return false
+            }
+            guard !taken else { throw BookWriter.Refusal.idTaken }
+            var stamped = record
+            StoreWriter.stamp(&stamped)
+            rows.append(.object(stamped))
+            root[collection] = .array(rows)
+        }
+    }
+
     /// The Mac has taken everything this phone had changed.
     ///
     /// The baseline becomes the book, so the next outbox measures from here.
