@@ -136,4 +136,20 @@ struct EmptyColumnTests {
                 "the notices no longer clear themselves")
         #expect(Shop.noticeLifetime >= .seconds(10), "too short to read three sentences")
     }
+
+    /// Every banner that tells a shop something can be put away: the four
+    /// refusals by hand, the two green ticks by hand or on their own.
+    @Test("every warning and every tick on the window has a Close button")
+    func everyBannerCloses() {
+        let banners = BannerTests.source("Banners.swift")
+        for field in ["moveProblem", "importProblem", "convertProblem", "slicerProblem",
+                      "importNote", "convertNote"] {
+            #expect(banners.contains("BannerClose(words: shop.words) { shop.\(field) = nil }"),
+                    "\(field) is on the window with no way to close it")
+        }
+        for note in ["importNote", "convertNote"] {
+            #expect(banners.contains("if !Task.isCancelled, shop.\(note) == note { shop.\(note) = nil }"),
+                    "\(note) is a tick that stays until the next gesture")
+        }
+    }
 }

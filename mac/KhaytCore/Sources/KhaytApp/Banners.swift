@@ -49,15 +49,25 @@ struct MoveBanners: View {
             }
         }
         if let problem = shop.moveProblem {
-            Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention)
+            Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention) {
+                BannerClose(words: shop.words) { shop.moveProblem = nil }
+            }
         }
         // What adding a model had to say. A refusal — a duplicate, a kind Khayt
         // does not read — is the common case and is not an error.
         if let problem = shop.importProblem {
-            Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention)
+            Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention) {
+                BannerClose(words: shop.words) { shop.importProblem = nil }
+            }
         }
         if let note = shop.importNote {
-            Banner(text: note, symbol: "checkmark.circle", tint: Khayt.done)
+            Banner(text: note, symbol: "checkmark.circle", tint: Khayt.done) {
+                BannerClose(words: shop.words) { shop.importNote = nil }
+            }
+            .task(id: note) {
+                try? await Task.sleep(for: Shop.noticeLifetime)
+                if !Task.isCancelled, shop.importNote == note { shop.importNote = nil }
+            }
         }
         if shop.importing {
             // A batch says where it has got to and offers a way out. Three
@@ -93,10 +103,18 @@ struct MoveBanners: View {
         // banner because it is the same gesture — a model, a menu, an answer
         // with nowhere else to appear.
         if let problem = shop.convertProblem {
-            Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention)
+            Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention) {
+                BannerClose(words: shop.words) { shop.convertProblem = nil }
+            }
         }
         if let note = shop.convertNote {
-            Banner(text: note, symbol: "checkmark.circle", tint: Khayt.done)
+            Banner(text: note, symbol: "checkmark.circle", tint: Khayt.done) {
+                BannerClose(words: shop.words) { shop.convertNote = nil }
+            }
+            .task(id: note) {
+                try? await Task.sleep(for: Shop.noticeLifetime)
+                if !Task.isCancelled, shop.convertNote == note { shop.convertNote = nil }
+            }
         }
         if shop.converting {
             Banner(text: shop.words.callIt("mac.converting"),
@@ -107,7 +125,9 @@ struct MoveBanners: View {
         // refused move does: the gesture was a menu item on a model, and there
         // is nowhere on that menu for an answer to appear.
         if let problem = shop.slicerProblem {
-            Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention)
+            Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention) {
+                BannerClose(words: shop.words) { shop.slicerProblem = nil }
+            }
         }
         // By position, not by text: two spools running low can produce the same
         // sentence, and a ForEach with two identical ids draws one.
@@ -117,18 +137,11 @@ struct MoveBanners: View {
         // and went on working had three success sentences pinned over every
         // screen, reading like warnings nobody could clear. Each has a Close
         // button now, and they all go on their own a while after the last one
-        // arrived. Problems are not notices, and they stay.
+        // arrived. Problems are not notices: they stay until closed.
         Group {
             ForEach(Array(shop.moveNotices.enumerated()), id: \.offset) { index, notice in
                 Banner(text: notice, symbol: "info.circle", tint: .secondary) {
-                    Button {
-                        shop.dismissNotice(at: index)
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
-                    .buttonStyle(.borderless)
-                    .help(shop.words.callIt("common.close"))
-                    .accessibilityLabel(shop.words.callIt("common.close"))
+                    BannerClose(words: shop.words) { shop.dismissNotice(at: index) }
                 }
             }
         }
@@ -137,6 +150,24 @@ struct MoveBanners: View {
             try? await Task.sleep(for: Shop.noticeLifetime)
             if !Task.isCancelled { shop.moveNotices = [] }
         }
+    }
+}
+
+/// The × at the end of a banner. Every banner a shop can be told something
+/// in has one: "Signed in" pinned over every screen with no way to close it
+/// read as a stuck warning (Turki, Sep 2026), and so does a real warning that
+/// has been read and cannot be put away.
+struct BannerClose: View {
+    let words: Words
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+        }
+        .buttonStyle(.borderless)
+        .help(words.callIt("common.close"))
+        .accessibilityLabel(words.callIt("common.close"))
     }
 }
 
