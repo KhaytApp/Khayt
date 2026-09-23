@@ -206,6 +206,15 @@ struct LibraryInspector: View {
             if file.swaps > 0 {
                 DetailLine(shop.words.callIt("mac.swaps"), "\(file.swaps)", dim: true)
             }
+            // Can it start now, on each machine that says what it has loaded?
+            // The same answer the Ready chip counts, so the two cannot disagree.
+            ForEach(shop.libraryFacets.ready) { row in
+                if shop.isReady(file, on: row.machineId) {
+                    DetailLine(row.machineName, shop.words.callIt("mac.ready_now"), tint: Khayt.done)
+                } else if !(file.colors ?? []).isEmpty {
+                    DetailLine(row.machineName, shop.words.callIt("mac.needs_swap"), dim: true)
+                }
+            }
         }
     }
 

@@ -407,8 +407,13 @@ final class PrinterWatch {
                     try await Self.session.data(for: request)
                 }
             }
+            let loadedBefore = readings[machine.id]?.status?.loaded ?? []
             readings[machine.id] = Reading(status: status, problem: nil, at: Date(),
                                            consecutiveFailures: 0)
+            // A spool swapped on the machine changes what the library can call
+            // ready on it. Only then: a recount on every poll would be every
+            // few seconds for nothing.
+            if (status.loaded ?? []) != loadedBefore { shop.loadedChanged() }
             // AFTER the reading is recorded, because a shop looking at the
             // screen should not wait on a store write to see its printer's
             // progress move. This is the only thing that notices a job ending.
