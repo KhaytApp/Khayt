@@ -2546,6 +2546,10 @@ final class Words {
                                     + "وتقويم المواعيد، ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس، "
                                     + "ويستقبل الطلبات من سلة وزد وتحديثات الشحنات من سمسا وأرامكس والبريد السعودي. "
                                     + "أما ويب هوك الطابعات فيعمل في ذلك التطبيق حالياً."],
+        "mac.cloud_key_published": ["en": "This shop's key is on Khayt Cloud now, and the book has been sent, so your other devices can sign in and sync.",
+                                    "ar": "مفتاح المتجر موجود الآن على خيط السحابي، وأُرسل الدفتر، فيمكن لأجهزتك الأخرى تسجيل الدخول والمزامنة."],
+        "mac.cloud_key_not_published": ["en": "Signed in, but this shop's key could not be put on Khayt Cloud, so other devices cannot sync yet. Sign in again to retry.",
+                                        "ar": "تم تسجيل الدخول، لكن تعذّر وضع مفتاح المتجر على خيط السحابي، فلا يمكن للأجهزة الأخرى المزامنة بعد. سجّل الدخول مجددًا للمحاولة."],
         "mac.licence_proof": ["en": "Licence proof", "ar": "إثبات الترخيص"],
         "mac.licence_code":  ["en": "Licence code", "ar": "رمز الترخيص"],
         "mac.licence_verify": ["en": "Verification page", "ar": "صفحة التحقق"],

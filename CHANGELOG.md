@@ -2466,6 +2466,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) A shop whose key never reached Khayt Cloud could not sync its other
+  devices.** A book can hold its encryption key without the cloud ever having
+  been given it — the other app made it and never sent it. The Mac signed in
+  with the book's copy and worked; a phone, which can only take the key from
+  the cloud, stopped at "no keyset" and never synced. Signing in on the Mac now
+  puts the book's own key on the cloud when the cloud has none — after the
+  passphrase has proven it, never over a key another device put there, and
+  never a newly made one, which would orphan the shop's recovery key — and then
+  sends the book, so the next device has something to open.
+
 - **(Mac) The phone could not find the Mac: switching the Online server on to
   the shop's network started nothing.** The Mac announces itself so a phone can
   find it by name, and the app never declared that name to macOS — so macOS
