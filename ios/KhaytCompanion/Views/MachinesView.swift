@@ -17,9 +17,9 @@ struct MachinesView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if live.isEmpty {
                     ContentUnavailableView(
-                        "No machines",
+                        L10n.tr("machines.none"),
                         systemImage: "printer",
-                        description: Text(errorMessage ?? "Add printers in Khayt desktop.")
+                        description: Text(errorMessage ?? L10n.tr("machines.none.sub"))
                     )
                 } else {
                     List(live) { m in
@@ -104,7 +104,7 @@ private struct MachineLiveRow: View {
                     .foregroundStyle(KhaytDesign.textDim)
             }
             if !live.hasPrinterApi {
-                Text("No live connection")
+                Text(L10n.tr("machines.no_live"))
                     .font(.caption2)
                     .foregroundStyle(KhaytDesign.textMuted)
             }

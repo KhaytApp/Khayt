@@ -13,43 +13,48 @@ struct NewOrderSheet: View {
     @State private var dueDate = Date()
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var currency: String?
 
     private var canSave: Bool {
         !draft.project.trimmingCharacters(in: .whitespaces).isEmpty && !isSaving
     }
 
     private var selectedMachineName: String {
-        machines.first { $0.id == draft.machineId }?.name ?? "Unassigned"
+        machines.first { $0.id == draft.machineId }?.name ?? L10n.tr("order.new.unassigned")
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Picker("Type", selection: $draft.isQuote) {
-                    Text("Order").tag(false)
-                    Text("Quote").tag(true)
+                Picker(L10n.tr("order.new.type"), selection: $draft.isQuote) {
+                    Text(L10n.tr("order.new.order")).tag(false)
+                    Text(L10n.tr("order.new.quote")).tag(true)
                 }
                 .pickerStyle(.segmented)
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
 
-                Section("Details") {
-                    TextField("Project", text: $draft.project)
-                    TextField("Client", text: $draft.client)
-                    TextField("Material", text: $draft.material)
-                    TextField("Price (SAR)", text: $draft.price)
+                Section(L10n.tr("order.new.details")) {
+                    TextField(L10n.tr("order.new.project"), text: $draft.project)
+                    TextField(L10n.tr("order.new.client"), text: $draft.client)
+                    TextField(L10n.tr("order.new.material"), text: $draft.material)
+                    // The shop's own currency when the book says it — this
+                    // said "SAR" to every shop, wherever it was.
+                    TextField(currency.map { String(format: L10n.tr("order.new.price_in"), Money.mark($0)) }
+                              ?? L10n.tr("order.new.price"),
+                              text: $draft.price)
                         .keyboardType(.decimalPad)
                 }
 
-                Section("Schedule & machine") {
-                    Toggle("Set due date", isOn: $hasDueDate)
+                Section(L10n.tr("order.new.schedule")) {
+                    Toggle(L10n.tr("order.new.set_due"), isOn: $hasDueDate)
                     if hasDueDate {
-                        DatePicker("Due", selection: $dueDate, displayedComponents: .date)
+                        DatePicker(L10n.tr("order.new.due"), selection: $dueDate, displayedComponents: .date)
                     }
                     if !machines.isEmpty {
                         Menu {
                             Button { draft.machineId = nil } label: {
-                                Label("Unassigned", systemImage: draft.machineId == nil ? "checkmark" : "circle")
+                                Label(L10n.tr("order.new.unassigned"), systemImage: draft.machineId == nil ? "checkmark" : "circle")
                             }
                             ForEach(machines) { m in
                                 Button { draft.machineId = m.id } label: {
@@ -58,7 +63,7 @@ struct NewOrderSheet: View {
                             }
                         } label: {
                             HStack {
-                                Text("Machine").foregroundStyle(KhaytDesign.text)
+                                Text(L10n.tr("order.new.machine")).foregroundStyle(KhaytDesign.text)
                                 Spacer()
                                 Text(selectedMachineName).foregroundStyle(KhaytDesign.textDim)
                                 Image(systemName: "chevron.up.chevron.down")
@@ -81,20 +86,21 @@ struct NewOrderSheet: View {
                         if isSaving {
                             ProgressView().frame(maxWidth: .infinity)
                         } else {
-                            Text(draft.isQuote ? "Create quote" : "Add to queue")
+                            Text(L10n.tr(draft.isQuote ? "order.new.create_quote" : "order.new.add"))
                                 .frame(maxWidth: .infinity)
                         }
                     }
                     .disabled(!canSave)
                 }
             }
-            .navigationTitle(draft.isQuote ? "New quote" : "New order")
+            .navigationTitle(L10n.tr(draft.isQuote ? "order.new.title_quote" : "order.new.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(L10n.tr("common.cancel")) { dismiss() }
                 }
             }
+            .task { currency = await api.shopCurrency() }
         }
     }
 

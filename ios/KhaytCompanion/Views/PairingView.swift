@@ -34,7 +34,7 @@ struct PairingView: View {
                 bottomBar
                     .padding()
             }
-            .navigationTitle("Set up Khayt")
+            .navigationTitle(L10n.tr("pair.title"))
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -48,7 +48,7 @@ struct PairingView: View {
                         .frame(height: 4)
                 }
             }
-            Text("Step \(step + 1) of \(totalSteps)")
+            Text(String(format: L10n.tr("pair.step_of"), step + 1, totalSteps))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -57,15 +57,15 @@ struct PairingView: View {
     private var bottomBar: some View {
         HStack {
             if step > 0 {
-                Button("Back") { step -= 1 }
+                Button(L10n.tr("pair.back")) { step -= 1 }
             }
             Spacer()
             if step < totalSteps - 1 {
-                Button("Continue") { step += 1 }
+                Button(L10n.tr("pair.continue")) { step += 1 }
                     .buttonStyle(.borderedProminent)
                     .disabled(!canAdvance)
             } else {
-                Button("Open Khayt") {
+                Button(L10n.tr("pair.open")) {
                     settings.isPaired = true
                 }
                 .buttonStyle(.borderedProminent)
@@ -86,8 +86,8 @@ struct PairingView: View {
     private var welcomeStep: some View {
         stepCard(
             icon: "iphone.and.arrow.forward",
-            title: "Companion for your shop",
-            body: "This app connects to **Khayt on your Mac or PC** over Wi‑Fi. Your data stays on the desktop — the phone is for queue, inventory, and scanning spools on the go."
+            title: L10n.tr("pair.welcome.title"),
+            body: L10n.tr("pair.welcome.body")
         )
     }
 
@@ -95,13 +95,13 @@ struct PairingView: View {
         VStack(alignment: .leading, spacing: 16) {
             stepCard(
                 icon: "desktopcomputer",
-                title: "Prepare Khayt desktop",
-                body: "On the computer running Khayt, open **Settings → LAN API** and turn on:"
+                title: L10n.tr("pair.desktop.title"),
+                body: L10n.tr("pair.desktop.body")
             )
             VStack(alignment: .leading, spacing: 10) {
-                checklistRow("Enable LAN REST API", icon: "network")
-                checklistRow("Listen on all network interfaces", icon: "antenna.radiowaves.left.and.right")
-                checklistRow("Set an Owner LAN PIN (remember it)", icon: "key.fill")
+                checklistRow(L10n.tr("pair.desktop.enable"), icon: "network")
+                checklistRow(L10n.tr("pair.desktop.listen"), icon: "antenna.radiowaves.left.and.right")
+                checklistRow(L10n.tr("pair.desktop.pin"), icon: "key.fill")
             }
             .padding()
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -114,8 +114,8 @@ struct PairingView: View {
             VStack(alignment: .leading, spacing: 16) {
                 stepCard(
                     icon: "link",
-                    title: "Choose your shop",
-                    body: "Phone and computer must be on the **same Wi‑Fi**. Khayt looks for it — you should not have to type an address."
+                    title: L10n.tr("pair.shop.title"),
+                    body: L10n.tr("pair.shop.body")
                 )
 
                 shopsOnThisNetwork
@@ -128,7 +128,7 @@ struct PairingView: View {
                 // between its wireless and wired sides is common enough in
                 // buildings that were wired by somebody else. Removing this
                 // would make those shops unpairable rather than inconvenient.
-                DisclosureGroup("Enter the address myself", isExpanded: $showManual) {
+                DisclosureGroup(L10n.tr("pair.manual"), isExpanded: $showManual) {
                     manualEntry
                         .padding(.top, 8)
                 }
@@ -138,7 +138,7 @@ struct PairingView: View {
                 // not discoverable, deliberately, and the Mac does not advertise
                 // whether it needs one — a stale "no PIN needed" would be the
                 // phone telling a shop something untrue.
-                SecureField("Owner LAN PIN", text: $settings.pin)
+                SecureField(L10n.tr("pair.pin"), text: $settings.pin)
                     .textFieldStyle(.roundedBorder)
 
             }
@@ -159,7 +159,7 @@ struct PairingView: View {
     private var shopsOnThisNetwork: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text("Shops on this Wi‑Fi").font(.subheadline.weight(.semibold))
+                Text(L10n.tr("pair.shops")).font(.subheadline.weight(.semibold))
                 if browser.isSearching && browser.shops.isEmpty {
                     ProgressView().controlSize(.small)
                 }
@@ -170,9 +170,9 @@ struct PairingView: View {
                 // permission sends somebody to reboot a router that is fine.
                 Label {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Khayt cannot look for shops on this network.")
+                        Text(L10n.tr("pair.browse.failed"))
                         Text(failure).font(.caption).foregroundStyle(.secondary)
-                        Text("If you declined the local network prompt, allow it in Settings → Khayt → Local Network.")
+                        Text(L10n.tr("pair.browse.permission"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 } icon: {
@@ -181,8 +181,8 @@ struct PairingView: View {
                 .font(.footnote)
             } else if browser.shops.isEmpty {
                 Text(browser.isSearching
-                     ? "Looking… make sure Khayt is open on the Mac with its LAN API switched on."
-                     : "Nothing found yet.")
+                     ? L10n.tr("pair.browse.looking")
+                     : L10n.tr("pair.browse.none"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
@@ -198,8 +198,8 @@ struct PairingView: View {
                                 // empties when it loses the Mac. Worth knowing
                                 // before pairing, not after.
                                 Text(shop.servesBook
-                                     ? "Can work offline with this shop"
-                                     : "Needs the Mac in reach for every screen")
+                                     ? L10n.tr("pair.shop.offline")
+                                     : L10n.tr("pair.shop.online_only"))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -225,23 +225,23 @@ struct PairingView: View {
 
     private var manualEntry: some View {
         Group {
-            TextField("Shop name (optional label)", text: $settings.shopLabel)
-            TextField("Computer IP address", text: $settings.host)
+            TextField(L10n.tr("pair.manual.name"), text: $settings.shopLabel)
+            TextField(L10n.tr("pair.manual.host"), text: $settings.host)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
-            Stepper("Port: \(settings.port)", value: $settings.port, in: 1024...65535)
+            Stepper(String(format: L10n.tr("settings.port"), settings.port), value: $settings.port, in: 1024...65535)
 
-            DisclosureGroup("How do I find the IP address?", isExpanded: $showIPHelp) {
+            DisclosureGroup(L10n.tr("pair.ip_help"), isExpanded: $showIPHelp) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("On the Mac running Khayt, open **Terminal** and run:")
+                    Text(Self.markdown(L10n.tr("pair.ip_help.terminal")))
                         .font(.caption)
-                    Text("ipconfig getifaddr en0")
+                    Text(verbatim: "ipconfig getifaddr en0")
                         .font(.system(.caption, design: .monospaced))
                         .padding(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-                    Text("Use the number shown (e.g. 192.168.1.42). If empty, try **en1** or check **System Settings → Wi‑Fi → Details**.")
+                    Text(Self.markdown(L10n.tr("pair.ip_help.result")))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -276,8 +276,8 @@ struct PairingView: View {
         VStack(spacing: 20) {
             stepCard(
                 icon: "checkmark.shield",
-                title: "Test connection",
-                body: "We’ll reach your desktop and confirm the PIN with a quick queue check."
+                title: L10n.tr("pair.verify.title"),
+                body: L10n.tr("pair.verify.body")
             )
             .padding(.horizontal)
 
@@ -285,7 +285,7 @@ struct PairingView: View {
                 Task { await runPairingTest() }
             } label: {
                 HStack {
-                    Label("Test now", systemImage: "bolt.fill")
+                    Label(L10n.tr("pair.verify.test"), systemImage: "bolt.fill")
                     Spacer()
                     if isTesting { ProgressView() }
                 }
@@ -322,12 +322,20 @@ struct PairingView: View {
             Text(title)
                 .font(.title2.bold())
                 .multilineTextAlignment(.center)
-            Text(LocalizedStringKey(body))
+            Text(Self.markdown(body))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
         .padding(.vertical, 8)
+    }
+
+    /// A translated sentence with its **bold** kept. `Text(LocalizedStringKey:)`
+    /// would look the already-translated words up a second time.
+    static func markdown(_ text: String) -> AttributedString {
+        (try? AttributedString(markdown: text,
+                               options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+            ?? AttributedString(text)
     }
 
     private func checklistRow(_ text: String, icon: String) -> some View {
@@ -348,7 +356,7 @@ struct PairingView: View {
         do {
             let status = try await api.validatePairing()
             testOK = true
-            var message = "Connected — \(status.queued) job(s) in queue. PIN accepted."
+            var message = String(format: L10n.tr("pair.verify.ok"), status.queued)
 
             // ── AND THEN ASK FOR THE BOOK, BUT DO NOT INSIST ─────────────
             //
@@ -367,18 +375,16 @@ struct PairingView: View {
             do {
                 let book = try CompanionBook.inSharedContainer()
                 let records = try await api.pullBook(into: book)
-                message += " \(records) record(s) are on this phone, so it keeps working "
-                        + "when this Mac is not in reach."
+                message += " " + String(format: L10n.tr("pair.verify.book"), records)
                 // Said plainly, because the alternative is a phone that looks
                 // like it has the shop on it and quietly does not. The history
                 // stays on the Mac by design; what is worth saying is that it is
                 // still there rather than gone.
                 if let scope = book.scope(), !scope.omitted.isEmpty {
-                    message += " Older history stays on the Mac and is fetched when you ask for it."
+                    message += " " + L10n.tr("pair.verify.history")
                 }
             } catch {
-                message += " This desktop does not hand over its book, so the phone will "
-                        + "ask it again for every screen and will empty when it is out of reach."
+                message += " " + L10n.tr("pair.verify.no_book")
             }
             testMessage = message
         } catch {

@@ -119,6 +119,13 @@ final class KhaytAPIClient: ObservableObject {
         return try await get(path, requiresPin: true, as: [OrderLogEntry].self)
     }
 
+    /// The shop's currency, when this phone holds its book. A price field
+    /// labelled with a currency the app assumed is worse than an unlabelled one.
+    func shopCurrency() async -> String? {
+        guard let reader, reader.holdsAnyBook else { return nil }
+        return try? await reader.shopCurrency()
+    }
+
     func fetchInventory() async throws -> [InventorySpool] {
         if let local = await fromBook({ try await $0.inventory() }) { return local }
         return try await get("/api/inventory", requiresPin: true, as: [InventorySpool].self)

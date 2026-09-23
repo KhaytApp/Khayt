@@ -23,7 +23,7 @@ struct ClientsView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                KhaytSearchField(text: $searchText, prompt: "Name, phone, email")
+                KhaytSearchField(text: $searchText, prompt: L10n.tr("clients.search"))
                     .padding(.horizontal, KhaytDesign.pad)
                     .padding(.top, 4)
                     .padding(.bottom, 8)
@@ -43,9 +43,9 @@ struct ClientsView: View {
             Spacer(); ProgressView(); Spacer()
         } else if displayed.isEmpty {
             ContentUnavailableView(
-                clients.isEmpty ? "No clients" : "No match",
+                clients.isEmpty ? L10n.tr("clients.none") : L10n.tr("clients.no_match"),
                 systemImage: "person.2",
-                description: Text(errorMessage ?? (searchText.isEmpty ? "Add clients in Khayt desktop." : "No client matches \"\(searchText)\"."))
+                description: Text(errorMessage ?? (searchText.isEmpty ? L10n.tr("clients.none.sub") : String(format: L10n.tr("clients.no_match.sub"), searchText)))
             )
         } else {
             List(displayed) { client in

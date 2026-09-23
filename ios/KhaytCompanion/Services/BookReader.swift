@@ -69,6 +69,14 @@ actor BookReader {
         return records
     }
 
+    /// The shop's currency code from its settings, or nil when it has none.
+    func shopCurrency() throws -> String? {
+        guard case .object(let settings)? = try book.read()["settings"],
+              case .string(let code)? = settings["currency"],
+              !code.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        return code
+    }
+
     /// Is there a book on this phone at all?
     ///
     /// `nonisolated` so a read path can ask without hopping onto the actor just

@@ -217,3 +217,122 @@
 "inventory.no_results" = "لا نتائج";
 "inventory.no_results.sub" = "جرّب بحثاً مختلفاً";
 "inventory.delete" = "حذف";
+/* Pairing */
+"pair.title" = "إعداد Khayt";
+"pair.step_of" = "الخطوة %1$d من %2$d";
+"pair.back" = "رجوع";
+"pair.continue" = "متابعة";
+"pair.open" = "فتح Khayt";
+"pair.welcome.title" = "رفيق ورشتك";
+"pair.welcome.body" = "يتصل هذا التطبيق بـ **Khayt على جهاز Mac أو الكمبيوتر** عبر الواي فاي. ويحتفظ بنسخة مما يحتاجه الهاتف، فتبقى الطلبات والمخزون ومسح البكرات تعمل بعيداً عن المكتب.";
+"pair.desktop.title" = "جهّز Khayt على سطح المكتب";
+"pair.desktop.body" = "على الكمبيوتر الذي يعمل عليه Khayt، افتح **الإعدادات ← LAN API** وفعّل:";
+"pair.desktop.enable" = "تفعيل LAN REST API";
+"pair.desktop.listen" = "الاستماع على كل واجهات الشبكة";
+"pair.desktop.pin" = "تعيين رمز PIN للمالك (احفظه)";
+"pair.shop.title" = "اختر ورشتك";
+"pair.shop.body" = "يجب أن يكون الهاتف والكمبيوتر على **نفس شبكة الواي فاي**. يبحث Khayt عنها — لا حاجة لكتابة عنوان.";
+"pair.manual" = "إدخال العنوان يدوياً";
+"pair.pin" = "رمز PIN للمالك";
+"pair.shops" = "الورش على هذه الشبكة";
+"pair.browse.failed" = "لا يستطيع Khayt البحث عن الورش على هذه الشبكة.";
+"pair.browse.permission" = "إن رفضت طلب الشبكة المحلية، فاسمح به من الإعدادات ← Khayt ← الشبكة المحلية.";
+"pair.browse.looking" = "جاري البحث… تأكد أن Khayt مفتوح على جهاز Mac وأن LAN API مفعّل.";
+"pair.browse.none" = "لم يُعثر على شيء بعد.";
+"pair.shop.offline" = "يعمل دون اتصال مع هذه الورشة";
+"pair.shop.online_only" = "يحتاج جهاز Mac في المتناول لكل شاشة";
+"pair.manual.name" = "اسم الورشة (اختياري)";
+"pair.manual.host" = "عنوان IP للكمبيوتر";
+"pair.ip_help" = "كيف أجد عنوان IP؟";
+"pair.ip_help.terminal" = "على جهاز Mac الذي يعمل عليه Khayt، افتح **Terminal** وشغّل:";
+"pair.ip_help.result" = "استخدم الرقم الظاهر (مثلاً 192.168.1.42). إن كان فارغاً، جرّب **en1** أو راجع **إعدادات النظام ← Wi‑Fi ← التفاصيل**.";
+"pair.verify.title" = "اختبار الاتصال";
+"pair.verify.body" = "سنصل إلى سطح المكتب ونتحقق من رمز PIN بفحص سريع للطابور.";
+"pair.verify.test" = "اختبر الآن";
+"pair.verify.ok" = "متصل — الطلبات في الطابور: %d. تم قبول رمز PIN.";
+"pair.verify.book" = "السجلات على هذا الهاتف: %d، فيبقى يعمل حين يكون جهاز Mac بعيداً.";
+"pair.verify.history" = "يبقى السجل الأقدم على جهاز Mac ويُجلب عند طلبه.";
+"pair.verify.no_book" = "سطح المكتب هذا لا يسلّم دفتره، فسيسأله الهاتف في كل شاشة وسيفرغ حين يكون بعيداً.";
+
+/* Shared words */
+"common.done" = "تم";
+"common.cancel" = "إلغاء";
+"common.save" = "حفظ";
+"common.remove" = "إزالة";
+"common.unassigned" = "غير مُسنَد";
+"field.project" = "المشروع";
+"field.client" = "العميل";
+"field.status" = "الحالة";
+"field.machine" = "الطابعة";
+"field.due" = "الاستحقاق";
+"field.priority" = "الأولوية";
+"field.material" = "المادة";
+"field.brand" = "العلامة التجارية";
+
+/* New order */
+"order.new.title" = "طلب جديد";
+"order.new.title_quote" = "عرض سعر جديد";
+"order.new.type" = "النوع";
+"order.new.order" = "طلب";
+"order.new.quote" = "عرض سعر";
+"order.new.details" = "التفاصيل";
+"order.new.project" = "المشروع";
+"order.new.client" = "العميل";
+"order.new.material" = "المادة";
+"order.new.price" = "السعر";
+"order.new.price_in" = "السعر (%@)";
+"order.new.schedule" = "الموعد والطابعة";
+"order.new.set_due" = "تحديد تاريخ الاستحقاق";
+"order.new.due" = "الاستحقاق";
+"order.new.machine" = "الطابعة";
+"order.new.unassigned" = "غير مُسنَد";
+"order.new.create_quote" = "إنشاء عرض السعر";
+"order.new.add" = "إضافة إلى الطابور";
+
+/* Order detail */
+"order.detail.title" = "الطلب";
+"order.detail.id" = "رقم الطلب";
+"order.detail.assigned" = "مُسنَد إلى";
+
+/* Spool detail */
+"spool.detail.title" = "البكرة";
+"spool.detail.filament" = "الخيط";
+"spool.detail.color" = "اللون";
+"spool.detail.name" = "الاسم";
+"spool.detail.stock" = "المخزون";
+"spool.detail.remaining" = "المتبقي";
+"spool.detail.initial" = "الوزن عند الشراء";
+"spool.detail.purchased" = "تاريخ الشراء";
+"spool.detail.label_info" = "بيانات الملصق / الوسم";
+"spool.detail.lot" = "رقم الدفعة";
+"spool.detail.print_temp" = "حرارة الطباعة";
+"spool.detail.bed_temp" = "حرارة السرير";
+"spool.detail.adjust" = "تعديل المتبقي";
+"spool.detail.adjust.body" = "حدّد الخيط المتبقي في هذه البكرة بالغرام.";
+"spool.detail.grams" = "غرام";
+"spool.detail.grams_error" = "أدخل رقماً بالغرام.";
+"spool.detail.remove_q" = "إزالة البكرة؟";
+
+/* Queue, intake, clients, machines */
+"queue.title" = "طابور الإنتاج";
+"queue.empty" = "الطابور فارغ";
+"queue.empty.sub" = "لا طلبات نشطة.";
+"intake.title" = "الطلبات الواردة";
+"intake.empty" = "لا طلبات واردة";
+"intake.empty.sub" = "تظهر هنا طلبات العمل الجديدة من نموذج الطلب وواتساب وغيرها.";
+"intake.reminded" = "تم التذكير";
+"intake.call" = "اتصال";
+"intake.whatsapp" = "واتساب";
+"intake.email" = "بريد";
+"clients.search" = "الاسم، الهاتف، البريد";
+"clients.none" = "لا عملاء";
+"clients.none.sub" = "أضف العملاء من Khayt على سطح المكتب.";
+"clients.no_match" = "لا نتائج";
+"clients.no_match.sub" = "لا عميل يطابق “%@”.";
+"machines.none" = "لا طابعات";
+"machines.none.sub" = "أضف الطابعات من Khayt على سطح المكتب.";
+"machines.no_live" = "لا اتصال مباشر";
+
+"spool.detail.remove" = "إزالة البكرة";
+"intake.decline" = "رفض";
+"intake.remind" = "تذكير";
