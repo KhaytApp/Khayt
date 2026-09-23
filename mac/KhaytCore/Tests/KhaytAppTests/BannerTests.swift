@@ -115,4 +115,25 @@ struct EmptyColumnTests {
         #expect(!source.contains("@State private var decided"),
                 "the decision is back in view state")
     }
+
+    /// "Signed in", "Email sent": news, pinned over every screen until the next
+    /// job moved, with no way to clear it. Turki read three of them as stuck
+    /// warnings after signing in to the cloud.
+    @Test("a notice can be closed, and goes on its own")
+    func noticesCanBeCleared() {
+        let shop = Shop()
+        shop.moveNotices = ["one", "two", "three"]
+        shop.dismissNotice(at: 1)
+        #expect(shop.moveNotices == ["one", "three"])
+        shop.dismissNotice(at: 9)          // out of range: nothing, no trap
+        #expect(shop.moveNotices == ["one", "three"])
+
+        let banners = BannerTests.source("Banners.swift")
+        #expect(banners.contains("shop.dismissNotice(at: index)"),
+                "the notice banner lost its Close button")
+        #expect(banners.contains(".task(id: shop.moveNotices)")
+                && banners.contains("Shop.noticeLifetime"),
+                "the notices no longer clear themselves")
+        #expect(Shop.noticeLifetime >= .seconds(10), "too short to read three sentences")
+    }
 }

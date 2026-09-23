@@ -111,8 +111,31 @@ struct MoveBanners: View {
         }
         // By position, not by text: two spools running low can produce the same
         // sentence, and a ForEach with two identical ids draws one.
-        ForEach(Array(shop.moveNotices.enumerated()), id: \.offset) { _, notice in
-            Banner(text: notice, symbol: "info.circle", tint: .secondary)
+        //
+        // A notice is news, not a state: "Signed in", "Email sent". It used to
+        // stay until the next job moved, so a shop that signed in to the cloud
+        // and went on working had three success sentences pinned over every
+        // screen, reading like warnings nobody could clear. Each has a Close
+        // button now, and they all go on their own a while after the last one
+        // arrived. Problems are not notices, and they stay.
+        Group {
+            ForEach(Array(shop.moveNotices.enumerated()), id: \.offset) { index, notice in
+                Banner(text: notice, symbol: "info.circle", tint: .secondary) {
+                    Button {
+                        shop.dismissNotice(at: index)
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(shop.words.callIt("common.close"))
+                    .accessibilityLabel(shop.words.callIt("common.close"))
+                }
+            }
+        }
+        .task(id: shop.moveNotices) {
+            guard !shop.moveNotices.isEmpty else { return }
+            try? await Task.sleep(for: Shop.noticeLifetime)
+            if !Task.isCancelled { shop.moveNotices = [] }
         }
     }
 }

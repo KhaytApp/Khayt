@@ -2273,6 +2273,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) Confirmations stuck at the top of the window.** "Signed in", "Email
+  sent", "This shop's key is on Khayt Cloud now": each is news, and each stayed
+  pinned above every screen until a job was next moved, with no way to close
+  it, so they read like warnings. Every notice has a Close button now, and they
+  go on their own 15 seconds after the last one arrived. Problems still stay
+  until they are dealt with.
+
 - **(Mac) Preferences could not be opened.** Settings had nine tabs in a window
   too narrow for them, so the last ones went behind a » button at the end of
   the toolbar, and there SwiftUI shows a tab greyed out and unclickable.
