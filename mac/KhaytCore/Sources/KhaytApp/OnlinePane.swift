@@ -113,6 +113,7 @@ struct OnlinePane: View {
                     Toggle(shop.words.callIt("lan.enabled"), isOn: $draft.enabled)
                     LabeledContent(shop.words.callIt("lan.port")) {
                         TextField("", text: $draft.port)
+                            .textFieldStyle(.roundedBorder)
                             .frame(width: 90)
                             .multilineTextAlignment(.trailing)
                     }
@@ -123,8 +124,15 @@ struct OnlinePane: View {
                 }
                 Section {
                     LabeledContent(shop.words.callIt("lan.pin")) {
+                        // BORDERED, and that is the whole fix to "there is no
+                        // place to put the PIN": a field inside LabeledContent
+                        // draws with no bezel, and with no PIN stored yet its
+                        // placeholder was empty too — so the one field a shop
+                        // has to fill in before the server is safe was a blank
+                        // strip beside its own label. See #1489.
                         SecureField(draft.pinStored ? shop.words.callIt("common.secret_unchanged") : "",
                                     text: $draft.pin)
+                            .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 220)
                     }
                     if draft.enabled, !draft.pinStored, draft.pin.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -143,11 +151,13 @@ struct OnlinePane: View {
                     LabeledContent(shop.words.callIt("lan.salla_secret")) {
                         SecureField(draft.sallaStored ? shop.words.callIt("common.secret_unchanged") : "",
                                     text: $draft.sallaSecret)
+                            .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 220)
                     }
                     LabeledContent(shop.words.callIt("lan.zid_secret")) {
                         SecureField(draft.zidStored ? shop.words.callIt("common.secret_unchanged") : "",
                                     text: $draft.zidSecret)
+                            .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 220)
                     }
                     Text(shop.words.callIt("mac.storefront_hooks_hint",

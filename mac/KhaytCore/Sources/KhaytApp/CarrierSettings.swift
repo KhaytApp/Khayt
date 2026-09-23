@@ -41,16 +41,17 @@ struct CarrierSettings: View {
                     Toggle(carrier.name(shop.words.language), isOn: binding(carrier.id, \.enabled))
                     if draft[carrier.id]?.enabled == true {
                         LabeledContent(shop.words.callIt("ship.account")) {
-                            TextField("", text: binding(carrier.id, \.accountNumber)).frame(width: 220)
+                            TextField("", text: binding(carrier.id, \.accountNumber))
+                                .textFieldStyle(.roundedBorder).frame(width: 220)
                         }
                         LabeledContent(shop.words.callIt("ship.api_key")) {
                             SecureField(placeholder(carrier.id, "apiKey"), text: binding(carrier.id, \.apiKey))
-                                .frame(width: 220)
+                                .textFieldStyle(.roundedBorder).frame(width: 220)
                         }
                         LabeledContent(shop.words.callIt("ship.webhook_secret")) {
                             SecureField(placeholder(carrier.id, "webhookSecret"),
                                         text: binding(carrier.id, \.webhookSecret))
-                                .frame(width: 220)
+                                .textFieldStyle(.roundedBorder).frame(width: 220)
                         }
                         // Where the carrier sends its updates: this Mac's own
                         // address while the Online server runs. Selectable,

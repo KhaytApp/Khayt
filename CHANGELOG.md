@@ -2427,6 +2427,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) There was nowhere visible to type the owner PIN.** The PIN field on
+  Settings → Online drew with no border and, until a PIN was saved, no
+  placeholder — a blank strip beside "Owner LAN PIN", on the one field the
+  phone's queue needs before it is safe to switch on. The port, the Salla and
+  Zid secrets and the carrier settings' fields had the same fault. They are
+  bordered now, and a test fails if any field in the app is drawn without one.
+
 - **A Prusa could not be sent binary G-code, and a Klipper printer was sent
   3MF files it cannot print.** Every upload was stored on the printer as
   `.gcode` whatever it was. A Prusa CORE One, MK4 or XL slices to binary G-code
