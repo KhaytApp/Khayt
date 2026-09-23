@@ -298,6 +298,19 @@ jobs:
           # WIN_CSC_LINK:         ${{ secrets.WIN_CSC_LINK }}         # base64 .pfx
           # WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
+      # Install the Setup exe that was just built — silently, into a scratch
+      # folder — and open what it installed. The upload above went to the DRAFT
+      # release; `publish` and `submit-store` both need this job, so an
+      # installer that does not install, or an app that does not start, never
+      # reaches a shop or the Store. build-linux proves the asar; this proves
+      # the Windows installer, which nothing else here ever ran.
+      - name: Install and launch the packaged app before it goes public
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          node scripts/verify-release.mjs --app "build/Khayt-Setup-$v.exe" --version "$v"
+
       - name: Add Windows SDK makeAppx to PATH
         # electron-builder needs makeAppx.exe; find the latest installed SDK version
         shell: pwsh
