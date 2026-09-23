@@ -1,4 +1,5 @@
 import XCTest
+@testable import KhaytCompanion
 
 /**
  * Every screen in both languages, or a test that says which one is not.
@@ -107,5 +108,24 @@ final class LocalizationCompletenessTests: XCTestCase {
             }
         }
         XCTAssertEqual(found, [], "hard-coded English on a translated screen")
+    }
+
+    func testArabicCountsTakeTheirOwnForms() {
+        // Arabic has a form for two and another for eleven and up; "%d بكرات"
+        // is right only from three to ten. The rules live in
+        // Localizable.stringsdict, and the LOCALE picks which one applies — so
+        // with the device in English and the app in Arabic, formatting with
+        // the device's locale gave "إضافة 2 بكرة". `L10n.count` is the fix.
+        L10n.setLanguage(.ar)
+        defer { L10n.setLanguage(.system) }
+        func add(_ n: Int) -> String { L10n.count("spool.add.n", n) }
+        XCTAssertEqual(add(1), "إضافة بكرة واحدة")
+        XCTAssertEqual(add(2), "إضافة بكرتين")
+        // The digits are the locale's too, so the word is what is checked.
+        XCTAssertTrue(add(5).hasSuffix(" بكرات"), add(5))
+        XCTAssertTrue(add(11).hasSuffix(" بكرة"), add(11))
+        L10n.setLanguage(.en)
+        XCTAssertEqual(L10n.count("spool.add.n", 1), "Add 1 spool")
+        XCTAssertEqual(L10n.count("spool.add.n", 3), "Add 3 spools")
     }
 }

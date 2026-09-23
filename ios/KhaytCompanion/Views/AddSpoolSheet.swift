@@ -355,7 +355,7 @@ struct SpoolReviewForm: View {
             }
 
             Section(footer: Text(draft.quantity > 1
-                                 ? String(format: L10n.tr("spool.quantity.many"), draft.quantity)
+                                 ? L10n.count("spool.quantity.many", draft.quantity)
                                  : L10n.tr("spool.quantity.one"))) {
                 Stepper(value: $draft.quantity, in: 1...SpoolDraft.maxQuantity) {
                     HStack {
@@ -388,7 +388,7 @@ struct SpoolReviewForm: View {
                     if isUploading {
                         ProgressView().frame(maxWidth: .infinity)
                     } else {
-                        Text(draft.quantity > 1 ? String(format: L10n.tr("spool.add.n"), draft.quantity) : L10n.tr("spool.add.one"))
+                        Text(draft.quantity > 1 ? L10n.count("spool.add.n", draft.quantity) : L10n.tr("spool.add.one"))
                             .frame(maxWidth: .infinity)
                     }
                 }

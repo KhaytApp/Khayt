@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>spool.add.n</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>zero</key>
+			<string>إضافة %d بكرة</string>
+			<key>one</key>
+			<string>إضافة بكرة واحدة</string>
+			<key>two</key>
+			<string>إضافة بكرتين</string>
+			<key>few</key>
+			<string>إضافة %d بكرات</string>
+			<key>many</key>
+			<string>إضافة %d بكرة</string>
+			<key>other</key>
+			<string>إضافة %d بكرة</string>
+		</dict>
+	</dict>
+	<key>spool.quantity.many</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>zero</key>
+			<string>%d بكرة.</string>
+			<key>one</key>
+			<string>بكرة واحدة.</string>
+			<key>two</key>
+			<string>بكرتان منفصلتان، تُتابَع كل منهما على حدة.</string>
+			<key>few</key>
+			<string>%d بكرات منفصلة، تُتابَع كل منها على حدة.</string>
+			<key>many</key>
+			<string>%d بكرة منفصلة، تُتابَع كل منها على حدة.</string>
+			<key>other</key>
+			<string>%d بكرة منفصلة، تُتابَع كل منها على حدة.</string>
+		</dict>
+	</dict>
+</dict>
+</plist>
