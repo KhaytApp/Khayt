@@ -72,6 +72,55 @@ struct MastheadNetTests {
                 Comment(rawValue: "net \(net) is above gross \(gross)"))
     }
 
+    @Test("gross is the same jobs as net, before the tax came out")
+    func grossIsTheSameJobs() async throws {
+        // Gross used to be every PAID job this month, of any status, while net
+        // was the FINISHED ones — two sets of jobs under two labels side by
+        // side. On 23 Sep 2026 the sample book printed a net of 1,671.90 beside
+        // a gross of 1,243.09, and `netIsNotGross` above was the first thing
+        // to notice.
+        let shop = await Self.loaded()
+        let engine = try #require(shop.engine)
+        let rows = try await engine.pnlByPeriod(
+            orders: shop.orderRows, expenses: shop.expenseRows,
+            settings: shop.settingsDict, clients: shop.clientRows,
+            currencies: Invoice.currencyTable(shop), now: Date(), granularity: "month")
+        let row = rows.first { $0.period == DateRange.localMonth(Date()) }
+        let expected = row.map { $0.revenue + $0.vatCollected }
+        #expect(shop.monthGross == expected,
+                Comment(rawValue: "masthead gross \(shop.monthGross.map { "\($0)" } ?? "nil") vs Reports \(expected.map { "\($0)" } ?? "nil")"))
+    }
+
+    @Test("a finished job not yet paid for is in gross, and a paid one still printing is not")
+    func grossDoesNotDependOnPayment() async throws {
+        // The shape that broke it, built on purpose rather than waiting for
+        // the calendar to walk the sample book into it.
+        let shop = await Self.loaded()
+        let engine = try #require(shop.engine)
+        let today = DateFormatter.shopDay.string(from: Date())
+        let finishedUnpaid: JSONValue = .object([
+            "id": .string("gross-a"), "project": .string("Finished, unpaid"),
+            "status": .string("completed"), "date": .string(today),
+            "price": .number(200), "paidAmount": .number(0),
+        ])
+        let paidPrinting: JSONValue = .object([
+            "id": .string("gross-b"), "project": .string("Paid, printing"),
+            "status": .string("printing"), "date": .string(today),
+            "price": .number(900), "paidAmount": .number(900),
+        ])
+        let row = try #require(await Shop.thisMonthsRow(
+            engine: engine, orders: [finishedUnpaid, paidPrinting], expenses: [],
+            settings: shop.settingsDict, clients: [],
+            currencies: Invoice.currencyTable(shop)))
+        #expect(row.orders == 1, "the rule counted a job that is still printing")
+        let gross = row.revenue + row.vatCollected
+        // 200 if the shop prices tax-inclusive, 200 plus the tax if not —
+        // either way the finished job's price and nothing of the 900.
+        #expect(gross >= 199.99 && gross < 900,
+                Comment(rawValue: "gross \(gross) is not the finished job's 200"))
+        #expect(row.revenue <= gross + 0.005)
+    }
+
     @Test("the note explaining the dash is gone once there is a number")
     func theNoteFollowsTheFigure() async {
         // A line saying "reconciled in Reports, not here" printed UNDER a

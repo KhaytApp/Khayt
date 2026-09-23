@@ -867,9 +867,16 @@ final class Shop {
         //
         // One more crossing per LOAD, beside the several already here — not
         // per redraw.
-        monthNetRevenue = await Self.thisMonthsNet(
+        //
+        // Gross comes off the SAME row. It used to be every PAID job this
+        // month, of any status — a different set of jobs from the finished
+        // ones net counts — so a month with finished work not yet paid for
+        // printed a net above the gross beside it.
+        let month = await Self.thisMonthsRow(
             engine: engine, orders: orders, expenses: expenses,
             settings: settings, clients: clients, currencies: Invoice.currencyTable(self))
+        monthNetRevenue = month?.revenue
+        monthGrossRevenue = month.map { $0.revenue + $0.vatCollected }
         var perMachine: [String: NozzleWear] = [:]
         for machine in machines {
             guard case .object(let record) = machine,
@@ -11418,6 +11425,9 @@ final class Shop {
     /// which is a month nothing happened in. The masthead draws its dash then,
     /// rather than a confident zero.
     private(set) var monthNetRevenue: Double?
+    /// The same month's jobs before the tax came out: what was charged for the
+    /// work `monthNetRevenue` counts. Equal to it for a shop not registered.
+    private(set) var monthGrossRevenue: Double?
 
     /// The current month's row, or nil.
     ///
@@ -11429,11 +11439,21 @@ final class Shop {
                               clients: [JSONValue],
                               currencies: [String: JSONValue],
                               now: Date = Date()) async -> Double? {
+        await thisMonthsRow(engine: engine, orders: orders, expenses: expenses,
+                            settings: settings, clients: clients,
+                            currencies: currencies, now: now)?.revenue
+    }
+
+    static func thisMonthsRow(engine: KhaytEngine?, orders: [JSONValue],
+                              expenses: [JSONValue], settings: [String: JSONValue],
+                              clients: [JSONValue],
+                              currencies: [String: JSONValue],
+                              now: Date = Date()) async -> PnlPeriod? {
         guard let engine else { return nil }
         let periods = (try? await engine.pnlByPeriod(
             orders: orders, expenses: expenses, settings: settings, clients: clients,
             currencies: currencies, now: now, granularity: "month")) ?? []
-        return periods.first { $0.period == DateRange.localMonth(now) }?.revenue
+        return periods.first { $0.period == DateRange.localMonth(now) }
     }
 
     /// Ask the shared rule when the queue will finish.

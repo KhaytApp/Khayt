@@ -2230,6 +2230,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Mac) The masthead could print a month's net above its gross.** The two
+  figures sat side by side and counted different jobs: net was the month's
+  FINISHED work with the tax taken out, as Reports counts it, and gross was
+  every job PAID for this month, whatever state it was in. So a month with
+  finished work still unpaid, or paid work still printing, showed two numbers
+  that could not both be right — the sample shop printed a net of 1,671.90
+  beside a gross of 1,243.09. Gross now comes from the same Reports row as the
+  net: the same jobs, before the tax came out.
+
 - **(Mac) A busy shop's cloud copy could quietly stop updating.** Khayt Cloud
   keeps a shop's changes as a chain, and a chain has a bound — a thousand
   changes, or four times the size of the book under it. When it is reached the
