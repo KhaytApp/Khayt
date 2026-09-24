@@ -33,6 +33,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - **Attaching a second file with the same name to an order replaced the
     first.** Two `part.stl` files from different folders left only the last
     one. The second is now kept as `part-2.stl`.
+- **(Mac) Google Drive as the print library's online storage.** Settings →
+  Preferences → Online storage → Keep the copy in → Google Drive: add the OAuth
+  client ID from the shop's Google Cloud project (type "Desktop app"), press
+  Connect Google Drive, sign in in the browser. Backing up, freeing space and
+  bringing models back then work exactly as with a bucket. It is the desktop
+  app's Drive design — the `drive.file` scope (Khayt sees only what it put
+  there), one folder, every file tagged with its key — so with the same client
+  ID both apps share one Drive folder. Sign-in is a one-time listener on
+  127.0.0.1 with PKCE and a checked `state`; the refresh token and client
+  secret are sealed in the book like every other credential. Disconnecting
+  forgets the account here and says where to withdraw it at Google.
+
 - **(Mac) Online storage for the print library.** Settings → Preferences →
   Online storage points the library at a bucket — Cloudflare R2, Backblaze B2,
   Amazon S3, Wasabi and the other S3-compatible providers the desktop app

@@ -23,6 +23,11 @@ struct CloudLibrarySettings: View {
         var backsUp = true
         var tierOn = false
         var keepDays = 90
+        /// Google Drive rather than a bucket — the other app's `gdrive` block.
+        var useDrive = false
+        var driveClientId = ""
+        var driveSecret = ""     // typed this session, never the stored one
+        var driveFolder = ""
 
         @MainActor static func read(_ settings: [String: JSONValue]) -> Draft {
             var d = Draft()
@@ -35,6 +40,13 @@ struct CloudLibrarySettings: View {
                 d.prefix = Shop.plainString(s3["prefix"]) ?? ""
                 d.accessKeyId = Shop.plainString(s3["accessKeyId"]) ?? ""
                 d.backsUp = Shop.plainBool(s3["enabled"]) ?? false
+            }
+            if case .object(let gd)? = library["gdrive"] {
+                d.driveClientId = Shop.plainString(gd["clientId"]) ?? ""
+                d.driveFolder = Shop.plainString(gd["folderName"]) ?? ""
+                // Drive is what is in use when it is on and the bucket is not
+                // backing up: the bucket wins when both are, as in the other app.
+                d.useDrive = (Shop.plainBool(gd["enabled"]) ?? false) && !d.backsUp
             }
             if case .object(let t)? = library["tier"] {
                 d.tierOn = Shop.plainBool(t["enabled"]) ?? false
@@ -49,15 +61,28 @@ struct CloudLibrarySettings: View {
     @State private var storedSecret = false
     @State private var providers: [KhaytEngine.StorageProvider] = []
     @State private var summary: (count: Int, size: String, inCloud: Int)?
+    @State private var driveConnected = false
+    @State private var driveStatus: String?
 
     private var chosen: KhaytEngine.StorageProvider? { providers.first { $0.id == draft.provider } }
-    private var saved: Bool { !original.bucket.isEmpty && !original.accessKeyId.isEmpty && storedSecret }
+    private var saved: Bool {
+        original.useDrive ? driveConnected
+            : !original.bucket.isEmpty && !original.accessKeyId.isEmpty && storedSecret
+    }
 
     var body: some View {
         Section(shop.words.callIt("mac.cloudlib_title")) {
             Text(shop.words.callIt("mac.cloudlib_why"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Picker(shop.words.callIt("mac.gdrive_where"), selection: $draft.useDrive) {
+                Text(shop.words.callIt("mac.gdrive_bucket")).tag(false)
+                Text(verbatim: "Google Drive").tag(true)
+            }
+            .pickerStyle(.segmented)
+            if draft.useDrive {
+                driveFields
+            } else {
             LabeledContent(shop.words.callIt("mac.cloudlib_provider")) {
                 Picker("", selection: $draft.provider) {
                     ForEach(providers) { p in Text(verbatim: p.label).tag(p.id) }
@@ -100,6 +125,7 @@ struct CloudLibrarySettings: View {
                     .textFieldStyle(.roundedBorder).frame(width: 240)
             }
             Toggle(shop.words.callIt("mac.cloudlib_back_up"), isOn: $draft.backsUp)
+            }
             Toggle(shop.words.callIt("mac.cloudlib_tier"), isOn: $draft.tierOn)
             if draft.tierOn {
                 LabeledContent(shop.words.callIt("mac.cloudlib_keep_days")) {
@@ -164,6 +190,51 @@ struct CloudLibrarySettings: View {
         .onChange(of: draft.provider) { Task { await resolve() } }
     }
 
+    /// Google Drive: the shop's own OAuth client, a folder, and one button
+    /// that signs in through the browser.
+    @ViewBuilder private var driveFields: some View {
+        Text(shop.words.callIt("mac.gdrive_why"))
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        Text(shop.words.callIt("mac.gdrive_production"))
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        LabeledContent(shop.words.callIt("mac.gdrive_client_id")) {
+            TextField("", text: $draft.driveClientId, prompt: Text(verbatim: "….apps.googleusercontent.com"))
+                .textFieldStyle(.roundedBorder).frame(width: 320)
+        }
+        LabeledContent(shop.words.callIt("mac.gdrive_client_secret")) {
+            SecureField("", text: $draft.driveSecret).textFieldStyle(.roundedBorder).frame(width: 240)
+        }
+        LabeledContent(shop.words.callIt("mac.gdrive_folder")) {
+            TextField("", text: $draft.driveFolder, prompt: Text(verbatim: "Khayt print library"))
+                .textFieldStyle(.roundedBorder).frame(width: 240)
+        }
+        HStack {
+            Button(shop.words.callIt("mac.gdrive_connect")) {
+                Task {
+                    await shop.connectGoogleDrive(clientId: draft.driveClientId, typedSecret: draft.driveSecret,
+                                                  folderName: draft.driveFolder)
+                    reload(); await refresh()
+                }
+            }
+            .disabled(shop.cloudLibraryBusy || !shop.canMoveJobs
+                      || draft.driveClientId.trimmingCharacters(in: .whitespaces).isEmpty)
+            if driveConnected {
+                Button(shop.words.callIt("mac.gdrive_disconnect")) {
+                    Task { await shop.disconnectGoogleDrive(); reload(); await refresh() }
+                }
+                .disabled(shop.cloudLibraryBusy || !shop.canMoveJobs)
+                .help(shop.words.callIt("mac.gdrive_disconnect_warn"))
+            }
+            Spacer()
+        }
+        if let driveStatus {
+            Label(driveStatus, systemImage: "person.crop.circle.badge.checkmark")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
     /// The endpoint, filled in from the provider and the one or two things
     /// only the shop knows. A provider whose endpoint the shop types itself
     /// leaves the field alone.
@@ -179,15 +250,29 @@ struct CloudLibrarySettings: View {
         original = Draft.read(shop.settingsDict)
         draft = original
         storedSecret = false
+        driveConnected = false
+        if case .object(let l)? = shop.settingsDict["printLibrary"], case .object(let gd)? = l["gdrive"],
+           case .string(let t)? = gd["refreshToken"] { driveConnected = !t.isEmpty }
         if case .object(let l)? = shop.settingsDict["printLibrary"], case .object(let s3)? = l["s3"],
            case .string(let s)? = s3["secretAccessKey"] { storedSecret = !s.isEmpty }
     }
 
     private func refresh() async {
         summary = saved ? await shop.cloudTierSummary() : nil
+        driveStatus = nil
+        if original.useDrive, driveConnected, let st = await shop.googleDriveStatus() {
+            driveStatus = st.limit.map {
+                shop.words.callIt("mac.gdrive_connected_of", ["email": .string(st.email), "used": .string(st.used),
+                                                              "limit": .string($0)])
+            } ?? shop.words.callIt("mac.gdrive_connected_as", ["email": .string(st.email), "used": .string(st.used)])
+        }
     }
 
     private func save() async {
+        if draft.useDrive {
+            await shop.saveDriveLibrary(folderName: draft.driveFolder, tierOn: draft.tierOn, keepDays: draft.keepDays)
+            reload(); await refresh(); return
+        }
         await shop.saveCloudLibrary(provider: draft.provider, endpoint: draft.endpoint, bucket: draft.bucket,
                                     region: draft.region, prefix: draft.prefix, accessKeyId: draft.accessKeyId,
                                     typedSecret: draft.secret.trimmingCharacters(in: .whitespaces),
