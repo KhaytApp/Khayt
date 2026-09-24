@@ -100,6 +100,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the one Arabic-Indic figure in the catalogue now uses the Western digits
   every other one does. Sixty-four strings the rebuilt screens no longer use
   are gone from both languages.
+- **(iOS) New order follows the v2 design** — one card of labelled fields and
+  a single button — with one deliberate difference. The design refuses a
+  write while the Mac is away; the phone need not, because it saves into its
+  book and sends the change on. The note under the form says which of those
+  will happen, and only a phone with neither the Mac nor a book is refused.
 
 - **(iOS) The companion moves to its real design (v2).** It had been built
   against an older mockup; the current design is Turki's Claude Design

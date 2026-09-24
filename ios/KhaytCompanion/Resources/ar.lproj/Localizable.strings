@@ -515,3 +515,9 @@
 "intake.take" = "خذه";
 "intake.dismiss" = "تجاهل";
 "intake.take.needs_book" = "أخذ طلب إلى الطابور يحتاج دفتر الورشة على هذا الهاتف.";
+
+/* New order, as design/ios-v2 draws it */
+"order.new.note.sent" = "يُحفظ على هذا الهاتف ويُرسل إلى الماك الآن.";
+"order.new.note.later" = "الماك غير متاح. يُحفظ هذا على الهاتف ويصل إلى الماك حين يعود متاحاً.";
+"order.new.note.live" = "يُكتب مباشرة على الماك.";
+"order.new.note.blocked" = "الماك غير متاح، وهذا الهاتف لا يحمل دفتر الورشة، فلا مكان لحفظ هذا بعد.";

@@ -515,3 +515,9 @@
 "intake.take" = "Take it";
 "intake.dismiss" = "Dismiss";
 "intake.take.needs_book" = "Taking a request into the queue needs the shop’s book on this phone.";
+
+/* New order, as design/ios-v2 draws it */
+"order.new.note.sent" = "Saved on this phone and sent to the Mac now.";
+"order.new.note.later" = "The Mac is away. This is saved on this phone and reaches the Mac when it is back in reach.";
+"order.new.note.live" = "Written straight to the Mac.";
+"order.new.note.blocked" = "The Mac is away, and this phone does not hold the shop’s book, so there is nowhere to save this yet.";
