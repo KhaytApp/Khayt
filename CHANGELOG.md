@@ -73,6 +73,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   label (first, in blue), tap an NFC tag, the box barcode, or type it in — and
   a form that asks for brand, material, colour and weight first, with the Add
   button held at the bottom of the screen instead of the end of the form.
+- **(iOS) Machines and Clients follow the v2 design.** A machine is a card —
+  printing in orange with its progress and temperatures, a fault in red, idle
+  with no colour — and when the Mac is out of reach the list says these are
+  the book's last readings. A client shows how many of their jobs are open
+  and, only when the phone holds the whole order history, how many they have
+  ever placed; otherwise that figure is "On the Mac", not a short count.
 
 - **(iOS) The companion moves to its real design (v2).** It had been built
   against an older mockup; the current design is Turki's Claude Design

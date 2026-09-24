@@ -542,3 +542,20 @@
 "colour.purple" = "Purple";
 "colour.cyan" = "Cyan";
 "spool.method.label" = "Scan the label";
+
+/* Machines, as design/ios-v2 draws them */
+"machines.idle" = "Idle";
+"machines.error" = "Error";
+"machines.ready" = "Ready for the next job";
+"machines.nozzle" = "Nozzle";
+"machines.bed" = "Bed";
+"machines.stale" = "Live temperatures need the Mac. These are the last readings the book holds.";
+
+/* Clients, as design/ios-v2 draws them */
+"clients.open" = "%@ open";
+"clients.orders" = "orders";
+"clients.window.count" = "%@ clients";
+"clients.window.body" = "Every client travels. Their order totals do not — those need history the phone does not hold.";
+"clients.call" = "Call";
+"clients.whatsapp" = "WhatsApp";
+"clients.email" = "Email";
