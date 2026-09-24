@@ -136,9 +136,13 @@ public enum SyncCrypto {
         /// default, which is what every keyset written so far carries.
         public static func from(_ value: JSONValue?) throws -> Kdf {
             guard case .object(let fields)? = value else { return Kdf() }
+            // Bounded: these come from a book that syncs and restores, and an
+            // infinite or enormous N either trapped in `Int(v)` or asked scrypt
+            // for more memory than the Mac has, at unlock.
             let int = { (key: String, fallback: Int) -> Int in
-                if case .number(let v)? = fields[key] { return Int(v) }
-                return fallback
+                guard case .number(let v)? = fields[key], v.isFinite, v >= 1 else { return fallback }
+                let ceiling: Double = switch key { case "N": 1_048_576; case "r": 32; case "p": 16; default: 64 }
+                return Int(min(v, ceiling))
             }
             var algorithm = "scrypt"
             if case .string(let a)? = fields["algo"], !a.isEmpty { algorithm = a }

@@ -107,7 +107,10 @@ enum StoreLock {
     /// Is that pid a running process? `EPERM` means it exists and is not ours.
     static func pidIsAlive(_ pid: Int) -> Bool {
         if pid <= 0 { return false }
-        if kill(pid_t(pid), 0) == 0 { return true }
+        // A damaged lock file: a pid beyond Int32 trapped here, and a negative
+        // one made kill() signal-check every process and read as alive.
+        guard let p = pid_t(exactly: pid), p > 0 else { return false }
+        if kill(p, 0) == 0 { return true }
         return errno == EPERM
     }
 

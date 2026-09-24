@@ -111,7 +111,10 @@ public enum Zip {
                 throw Failure.corrupt("zip64 markers with no locator before the record")
             }
             let recordAt = u64(tail, locator + 8)
-            guard recordAt >= 0, recordAt + 56 <= fileSize else {
+            // Subtracted, never added: `recordAt` comes from the file and can be
+            // near Int.max, and an overflowing `+` traps in a release build —
+            // one crafted upload to the LAN intake took the whole app down.
+            guard recordAt >= 0, fileSize >= 56, recordAt <= fileSize - 56 else {
                 throw Failure.corrupt("the zip64 record is outside the file")
             }
             let record = try read(handle, at: recordAt, count: 56)
@@ -123,8 +126,8 @@ public enum Zip {
             directoryAt = u64(record, 48)
             guard count >= 0 else { throw Failure.corrupt("the zip64 record's entry count is not one") }
         }
-        guard directoryAt >= 0, directorySize >= 0,
-              directoryAt + directorySize <= fileSize else {
+        guard directoryAt >= 0, directorySize >= 0, directoryAt <= fileSize,
+              directorySize <= fileSize - directoryAt else {
             throw Failure.corrupt("the directory is outside the file")
         }
 
@@ -226,6 +229,13 @@ public enum Zip {
         // A stated size of zero is a real answer for an empty member, and would
         // otherwise become a zero-length destination buffer and a crash.
         guard size > 0 else { return Data() }
+        // THE SIZE IS THE FILE'S CLAIM, and the buffer is allocated from it. A
+        // few hundred bytes claiming 2^60 was an allocation that traps. DEFLATE
+        // cannot expand more than about 1,032 to 1, so a claim beyond that is a
+        // lie, and nothing this app reads is worth more than a gigabyte.
+        guard size <= raw.count &* 1_100 &+ 1_024, size <= 1 << 30 else {
+            throw Failure.corrupt("\(name) claims \(size) bytes, more than its data can hold")
+        }
         var out = Data(count: size)
         let written: Int = out.withUnsafeMutableBytes { destination in
             raw.withUnsafeBytes { source in

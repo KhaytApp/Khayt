@@ -482,7 +482,10 @@ final class PrinterWatch {
         let serial = (machine.printerApi?.serial ?? "").trimmingCharacters(in: .whitespaces)
         guard !serial.isEmpty else { throw Refusal.needsSerial }
         guard let host = base.host() else { throw Refusal.noHost }
-        let port = UInt16(machine.printerApi?.port ?? Int(BambuMqtt.defaultPort))
+        // `exactly:`, not a conversion that traps: the port field takes any
+        // number, and 88830 saved once crashed the app on every launch.
+        guard let port = UInt16(exactly: machine.printerApi?.port ?? Int(BambuMqtt.defaultPort)), port > 0
+        else { throw Refusal.noHost }
 
         let conversation = BambuConversation(host: host, port: port,
                                              accessCode: accessCode, serial: serial)

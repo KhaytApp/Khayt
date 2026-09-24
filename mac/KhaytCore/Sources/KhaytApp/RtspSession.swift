@@ -27,7 +27,8 @@ actor RtspSession {
               let h = parsed.host, !h.isEmpty else { throw Rtsp.Failure.notRtsp }
         self.url = raw
         self.host = NWEndpoint.Host(h)
-        self.port = NWEndpoint.Port(rawValue: UInt16(parsed.port ?? 554)) ?? 554
+        // A camera address with port 99999 must not crash the app.
+        self.port = NWEndpoint.Port(rawValue: UInt16(exactly: parsed.port ?? 554) ?? 554) ?? 554
     }
 
     /// One still, as PNG bytes.
@@ -168,7 +169,10 @@ actor RtspSession {
             if let range = buffer.range(of: Data("\r\n\r\n".utf8)) {
                 let head = String(decoding: buffer[buffer.startIndex..<range.lowerBound], as: UTF8.self)
                 buffer.removeSubrange(buffer.startIndex..<range.upperBound)
-                let length = Rtsp.header("Content-Length", in: head).flatMap(Int.init) ?? 0
+                // Clamped: the camera says how long its body is, and a reply of
+                // -1 made `prefix` and `removeFirst` trap. A megabyte is far more
+                // than any RTSP reply this reads.
+                let length = max(0, min(Rtsp.header("Content-Length", in: head).flatMap(Int.init) ?? 0, 1 << 20))
                 while buffer.count < length { guard try await fill() else { break } }
                 let body = String(decoding: buffer.prefix(length), as: UTF8.self)
                 buffer.removeFirst(min(length, buffer.count))

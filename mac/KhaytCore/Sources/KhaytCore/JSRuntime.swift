@@ -317,18 +317,38 @@ public final class JSRuntime {
 
     public func call2<T: Decodable>(_ expression: String, _ args: [JSONValue] = [],
                                     as type: T.Type) throws -> T {
+        // ── THE ARGUMENTS NEVER BECOME SOURCE CODE ────────────────────────
+        //
+        // This used to paste each argument's JSON into the expression, highest
+        // index first, over the WHOLE script — so text already pasted in for a
+        // later argument was scanned again for "ARG0". A job note reading
+        // "see ARG0" broke the call (and most callers swallow the failure with
+        // `try?`, so a merge simply stopped working while that note existed);
+        // a crafted string could close its own quotes and run as code, inside
+        // a write to the shop's book. Found by a bug hunt, reproduced.
+        //
+        // Now each argument is parsed by JSON.parse from a string handed over
+        // as a VALUE and bound to its own global, and only the expression the
+        // developer wrote is rewritten — `ARG3` becomes `__karg3`, in one pass,
+        // over text no argument can reach.
         let encoder = JSONEncoder()
-        var script = expression
-        // HIGHEST INDEX FIRST. "ARG1" is a prefix of "ARG10", so substituting in
-        // order turns ARG10 into the first argument's JSON followed by a stray
-        // "0" — which reaches JavaScriptCore as `SyntaxError: Unexpected number
-        // '0'`, from a script that reads perfectly well in the source. It sat
-        // here unnoticed while no expression had ten arguments.
-        for (i, arg) in args.enumerated().reversed() {
-            let data = try encoder.encode(arg)
-            script = script.replacingOccurrences(of: "ARG\(i)",
-                                                 with: String(data: data, encoding: .utf8) ?? "null")
+        let parse = context.objectForKeyedSubscript("JSON").objectForKeyedSubscript("parse")
+        var bound: [String] = []
+        defer {
+            for name in bound {
+                context.setObject(JSValue(undefinedIn: context), forKeyedSubscript: name as NSString)
+            }
         }
+        for (i, arg) in args.enumerated() {
+            let json = String(data: try encoder.encode(arg), encoding: .utf8) ?? "null"
+            lastException = nil
+            let value = parse?.call(withArguments: [json])
+            if let problem = lastException { throw KhaytJSError.evaluationFailed(problem) }
+            let name = "__karg\(i)"
+            context.setObject(value ?? JSValue(nullIn: context), forKeyedSubscript: name as NSString)
+            bound.append(name)
+        }
+        let script = expression.replacing(/\bARG(\d+)\b/) { match in "__karg" + match.output.1 }
         let value = try evaluate("JSON.stringify(\(script))")
         guard let json = value.toString(), json != "undefined", let data = json.data(using: .utf8) else {
             throw KhaytJSError.unexpectedResult(expression)

@@ -1064,7 +1064,9 @@ final class LanServer {
         if case .object(let settings)? = host.store()["settings"],
            case .object(let lan)? = settings["lanApi"], case .object(let cfg)? = lan["intakeQuote"],
            let typed = Shop.plainNumber(cfg["hourlyLimit"]), typed >= 1 {
-            perHour = min(10_000, Int(typed))
+            // Clamped as a Double first: `Int(1e20)` traps, and this runs on a
+            // request anyone on the shop's Wi-Fi can make.
+            perHour = typed.isFinite ? Int(min(10_000, typed)) : 10_000
         }
         let step = try? await engine.lanIntakeRate(estimates[request.remote], now: now, limit: perHour)
         if let step { estimates[request.remote] = step.rec; sweep(&estimates, now: now) }
