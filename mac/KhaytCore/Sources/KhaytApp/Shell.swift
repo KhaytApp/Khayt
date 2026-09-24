@@ -373,9 +373,25 @@ struct ShellSidebar: View {
                 // anything, and a line telling it so is one people stop
                 // reading.
                 let line = shop.syncLine
+                // Where people look for the cloud, so it is where the cloud
+                // can be handled: a click unlocks it (or checks it once it is
+                // unlocked), and a right-click has every cloud action.
                 noticeLine(line.text, line.symbol,
                            line.tone == .attention ? Role.lateOnNavy : Role.onNavy2,
-                           help: shop.words.callIt("mac.sync_auto_why"))
+                           help: shop.words.callIt("mac.sync_auto_why") + "\n"
+                               + shop.words.callIt("mac.cloud_line_hint"))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if shop.cloudUnlocked { shop.checkingCloud = true } else { shop.signingIntoCloud = true }
+                    }
+                    .contextMenu {
+                        Button(shop.words.callIt("mac.cloud_sign_in") + "\u{2026}") { shop.signingIntoCloud = true }
+                        Button(shop.words.callIt("mac.check_cloud") + "\u{2026}") { shop.checkingCloud = true }
+                        Button(shop.words.callIt("mac.lock_cloud")) { shop.forgetCloudKey() }
+                            .disabled(!shop.cloudUnlocked)
+                        Divider()
+                        Button(shop.words.callIt("mac.cloud_sign_out") + "\u{2026}") { shop.confirmingSignOut = true }
+                    }
             }
             if let crash = shop.lastCrash {
                 // Clicking it says it has been read.
