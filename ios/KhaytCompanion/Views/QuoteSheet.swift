@@ -60,6 +60,7 @@ struct QuoteSheet: View {
                     }
                 }
             }
+            .khaytForm()
             .navigationTitle(L10n.tr("quote.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

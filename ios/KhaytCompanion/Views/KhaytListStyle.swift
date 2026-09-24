@@ -11,6 +11,19 @@ extension View {
     }
 }
 
+extension View {
+    /// A system Form or List on the design's ground rather than iOS's grey —
+    /// for the sheets `design/ios-v2/` has not drawn yet (quote, waste,
+    /// expense, NFC write, cloud sign-in), so they sit in the same room as
+    /// the screens it has.
+    func khaytForm() -> some View {
+        self
+            .scrollContentBackground(.hidden)
+            .background(KhaytDesign.ground.ignoresSafeArea())
+            .tint(KhaytDesign.brand)
+    }
+}
+
 /// Inline search field — a native-looking replacement for `.searchable`, which
 /// segfaults when combined with toolbar appearance inside the app's nested
 /// NavigationStack-in-TabView layout.

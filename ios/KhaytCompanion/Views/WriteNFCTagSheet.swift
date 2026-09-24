@@ -104,6 +104,7 @@ struct WriteNFCTagSheet: View {
                         .font(.caption)
                 }
             }
+            .khaytForm()
             .navigationTitle(L10n.tr("nfc.write.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
