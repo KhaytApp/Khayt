@@ -117,7 +117,8 @@ enum ProductDocs {
     /// Unlink one nobody references any more.
     static func delete(_ name: String, in build: StoreReader.Build) {
         guard let at = resolve(name, in: build) else { return }
-        try? FileManager.default.removeItem(at: at)
+        // The Trash, not deleted, like the product photos beside it.
+        try? FileManager.default.trashItem(at: at, resultingItemURL: nil)
     }
 
     /// The file a record names, or nothing.

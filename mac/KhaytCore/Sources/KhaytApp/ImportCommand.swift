@@ -142,7 +142,7 @@ enum ImportCommand {
             return 2
         }
 
-        let files = Shop.modelsUnder(chosen, skipping: roots.primary)
+        let files = Shop.modelsUnder(chosen, skippingAll: roots.roots + [roots.primary])
         guard !files.isEmpty else {
             complain("Nothing there Khayt can read.")
             return 1

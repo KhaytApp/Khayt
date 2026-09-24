@@ -6573,6 +6573,15 @@ final class Shop {
     /// would throw away the copy taken before whatever the shop did earlier —
     /// so this writes a SECOND file for today, stamped with the time. Khayt's
     /// own rotation counts it as a day, which is right: it is one.
+    /// The backup taken before a cloud merge writes to the book. THROWS: a
+    /// merge that goes ahead after its safety copy failed has no safety copy,
+    /// and the old path swallowed the failure and carried on.
+    private func safetyBackup(_ build: StoreReader.Build) async throws {
+        _ = try await Backups.writeNow(for: build, engine: engine)
+        lastBackup = Backups.lastBackupDay(in: Backups.directory(for: build))
+        backupProblem = nil
+    }
+
     func backUpNow() async {
         spendProblem = nil
         spendNote = nil
@@ -7577,8 +7586,9 @@ final class Shop {
             }
 
             // Before anything is written. A shop that does not like what came
-            // down has this morning's book to go back to.
-            await backUpNow()
+            // down has this morning's book to go back to, and no copy means no
+            // merge.
+            try await safetyBackup(build)
 
             var report: KhaytEngine.Merged?
             try await StoreWriter.update(
@@ -7628,7 +7638,7 @@ final class Shop {
         session: URLSession
     ) async throws -> CloudWriter.Sent {
         // A backup first, exactly as a pull takes one: this writes to the book.
-        await backUpNow()
+        try await safetyBackup(build)
 
         var merged: KhaytEngine.Merged?
         var book: [String: JSONValue] = [:]
@@ -7818,12 +7828,22 @@ final class Shop {
     /// refuse every file as a duplicate, which is harmless, and take a very long
     /// time to do it.
     static func modelsUnder(_ chosen: [URL], skipping root: String?) -> [LibraryImport.Incoming] {
+        modelsUnder(chosen, skippingAll: root.map { [$0] } ?? [])
+    }
+
+    /// The same, skipping EVERY folder the library has lived in — the current
+    /// one, the built-in vault, the mirror and every past location. Skipping
+    /// only the current one meant importing from an old library folder moved
+    /// out files that existing records still point at, and they then read as
+    /// missing. And by folder boundary, so `/a/lib` does not also skip
+    /// `/a/library2`. Found by a file-safety scan.
+    static func modelsUnder(_ chosen: [URL], skippingAll roots: [String]) -> [LibraryImport.Incoming] {
         let fm = FileManager.default
         var found: [LibraryImport.Incoming] = []
-        let vault = root.map { URL(fileURLWithPath: $0).standardizedFileURL.path }
+        let vaults = roots.filter { !$0.isEmpty }.map { URL(fileURLWithPath: $0).standardizedFileURL.path }
         func isInVault(_ u: URL) -> Bool {
-            guard let vault else { return false }
-            return u.standardizedFileURL.path.hasPrefix(vault)
+            let path = u.standardizedFileURL.path
+            return vaults.contains { path == $0 || path.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }
         }
         for url in chosen where !isInVault(url) {
             var isDir: ObjCBool = false
@@ -7877,7 +7897,7 @@ final class Shop {
         //
         // The archive itself is never consumed: it stays where the shop put it,
         // and only copies of the models inside are moved into the vault.
-        var files = Self.modelsUnder(chosen, skipping: roots.primary)
+        var files = Self.modelsUnder(chosen, skippingAll: roots.roots + [roots.primary])
         var scratches: [URL] = []
         var refusals: [String] = []
         for url in chosen where ArchiveImport.kinds.contains(url.pathExtension.lowercased()) {
@@ -12574,9 +12594,16 @@ final class Shop {
     /// `trashItem`, and a model that could not be deleted because the disk it
     /// is on has no wastebasket would be a worse answer than the old one. The
     /// shop asked for it gone; this only changes WHERE it goes when it can.
+    ///
+    /// ── NEVER PERMANENTLY, ANY MORE ───────────────────────────────────────
+    ///
+    /// This fell back to deleting outright on ANY error from the Trash. A
+    /// model the Trash will not take (a share with no wastebasket) now stays
+    /// where it is and the delete says it was partial — which the caller
+    /// already reports — rather than going for good. Found by a file-safety
+    /// scan; the Finder can still delete it by hand.
     nonisolated static func trash(_ url: URL) throws {
-        do { try FileManager.default.trashItem(at: url, resultingItemURL: nil) }
-        catch { try FileManager.default.removeItem(at: url) }
+        try FileManager.default.trashItem(at: url, resultingItemURL: nil)
     }
 
     func deleteLibraryFile(_ file: LibraryFile) async {

@@ -277,7 +277,10 @@ enum Converter {
             }
         }
 
-        do { try ZipWrite.archive(out).write(to: destination) }
+        // ATOMIC: the Save panel lets a shop pick the model it is converting
+        // FROM, and a plain write truncated the only copy before writing the
+        // new one — a crash or a full disk in between lost both.
+        do { try ZipWrite.archive(out).write(to: destination, options: .atomic) }
         catch { throw Failure.unreadable(String(describing: error)) }
         return Result(url: destination, report: planned.report)
     }

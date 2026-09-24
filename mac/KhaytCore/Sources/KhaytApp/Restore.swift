@@ -129,7 +129,10 @@ enum Restore {
                                  owns: { StoreLock.weOwnIt(build) },
                                  whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
                                  protect: {
-                                     _ = try await Backups.writeNow(for: build, engine: engine, now: now)
+                                     // Never the backup being restored: it is the oldest one
+                                     // more often than not, and rotation used to delete it.
+                                     _ = try await Backups.writeNow(for: build, engine: engine, now: now,
+                                                                    except: [source.lastPathComponent])
                                  },
                                  forgetCloudView: { forgetCloudView(for: build) },
                                  engine: engine)

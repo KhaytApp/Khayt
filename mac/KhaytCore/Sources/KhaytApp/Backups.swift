@@ -91,28 +91,25 @@ enum Backups {
     /// and a shop asking for one now wants to keep BOTH sides of that.
     @discardableResult
     static func writeNow(for build: StoreReader.Build, engine: KhaytEngine?,
-                         now: Date = Date(), keep: Int = 30) async throws -> URL {
+                         now: Date = Date(), keep: Int = 30, except: [String] = []) async throws -> URL {
         let directory = Self.directory(for: build)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let stamp = DateFormatter()
         stamp.dateFormat = "HHmm"
         let target = directory.appending(path: Shop.today(now) + "-" + stamp.string(from: now) + ".json")
         try Data(contentsOf: build.storeURL).write(to: target, options: .atomic)
-        try await rotate(directory: directory, engine: engine, keep: keep)
+        try await rotate(directory: directory, engine: engine, keep: keep, except: except)
         return target
     }
 
-    /// Delete all but the most recent `keep` dated backups.
-    ///
-    /// A shop that opens the app on thirty consecutive days would otherwise
-    /// have its pre-upgrade backup deleted by routine housekeeping — so the
-    /// insurance would survive exactly as long as nobody needed it. Which files
-    /// are protected is `lib/upgrade-backup.js`'s answer, not this app's.
-    static func rotate(directory: URL, engine: KhaytEngine?, keep: Int) async throws {
+    /// Delete the backups the shared rule says to: the dailies and the
+    /// snapshots each keep their own newest set, so a day of cloud snapshots
+    /// can no longer push the last month of daily backups out. Protected
+    /// (pre-upgrade) backups and anything in `except` are never deleted.
+    /// `lib/upgrade-backup.js backupsToDelete` decides, for both apps.
+    static func rotate(directory: URL, engine: KhaytEngine?, keep: Int, except: [String] = []) async throws {
         guard let engine else { return }
-        let rotatable = try await engine.rotatableBackups(all(in: directory))
-        guard rotatable.count > keep else { return }
-        for name in rotatable.prefix(rotatable.count - keep) {
+        for name in try await engine.backupsToDelete(all(in: directory), except: except) {
             try? FileManager.default.removeItem(at: directory.appending(path: name))
         }
     }

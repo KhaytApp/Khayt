@@ -94,12 +94,26 @@ public struct StoreReader: Sendable {
     public init(build: Build, unlockSecrets: Bool = false) throws {
         self.build = build
         let url = build.storeURL
-        guard FileManager.default.fileExists(atPath: url.path) else { throw Failure.noStore(url) }
+        let prev = url.appendingPathExtension("prev")
+        let fm = FileManager.default
+        // A BOOK LEFT ONLY AS `.prev` — what an interrupted save by an older
+        // build (or by Electron) leaves behind. Put it back rather than showing
+        // the sample shop as though the shop had none; Electron's
+        // `recoverStoreRaw` heals the same case.
+        if !fm.fileExists(atPath: url.path), fm.fileExists(atPath: prev.path) {
+            try? fm.copyItem(at: prev, to: url)
+        }
+        guard fm.fileExists(atPath: url.path) else { throw Failure.noStore(url) }
         let data: Data
         do { data = try Data(contentsOf: url) } catch { throw Failure.unreadable(url, error) }
-        guard let root = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
-            throw Failure.notJSON(url)
+        var parsed = try? JSONDecoder().decode([String: JSONValue].self, from: data)
+        // A primary that will not parse, with a rollback that does: open the
+        // rollback, as Electron does. Nothing is overwritten here; the next
+        // save replaces the damaged file, and the damaged one becomes `.prev`.
+        if parsed == nil, let older = try? Data(contentsOf: prev) {
+            parsed = try? JSONDecoder().decode([String: JSONValue].self, from: older)
         }
+        guard let root = parsed else { throw Failure.notJSON(url) }
         self.raw = root
         self.secretsKey = unlockSecrets ? Self.keychainPassword(for: build).map(SafeStorage.key(fromPassword:)) : nil
     }
