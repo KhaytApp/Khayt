@@ -258,3 +258,12 @@ test('the destination folder is created, including for a nested path', async () 
   await moveOne(realIO(), path.join(from, 'PF-abc', 'thumb.png'), dest, 'thumb.png');
   assert.equal(fs.readFileSync(path.join(dest, 'thumb.png'), 'utf8'), 'png bytes');
 });
+
+test('a root that contains the library is never a source, even the root of a disk', () => {
+  const path = require('path');
+  const PLM = require('../lib/print-library-migrate');
+  const root = path.parse(process.cwd()).root;
+  const primary = path.join(root, 'Users', 'shop', 'Library');
+  assert.deepEqual(PLM.sources([root, primary], primary, null), [],
+    'the whole disk would be walked as a folder to move files out of');
+});

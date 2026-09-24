@@ -106,3 +106,21 @@ test('a record folder is named the same under every root', () => {
   assert.equal(itemDirName(''), 'unsorted');
   assert.equal(itemDirName(null), 'unsorted');
 });
+
+test('the root of a disk is never a library folder, however it arrives', () => {
+  // Settings arrive in restored backups and over cloud sync. A library "at /"
+  // makes insideLibrary() true for every file — which is what printlib-delete
+  // confines itself with — and gives a migration the whole disk as its source.
+  const path = require('path');
+  const PLL = require('../lib/print-library-location');
+  const root = path.parse(process.cwd()).root;
+  const base = path.join(root, 'app', 'print-library');
+  const r = PLL.resolveRoots({ root, mirror: root, history: [root, path.join(root, 'old')] }, base);
+  assert.equal(r.primary, base, 'a drive-root primary falls back to the built-in folder');
+  assert.equal(r.mirror, null);
+  assert.equal(r.isCustom, false);
+  assert.ok(!r.roots.includes(root), 'a drive root is in the known roots');
+  assert.ok(r.roots.includes(path.join(root, 'old')), 'an ordinary past root is still kept');
+  assert.equal(PLL.insideLibrary(path.join(root, 'etc', 'passwd'), r.roots), false,
+    'a file outside every real root counts as inside the library');
+});
