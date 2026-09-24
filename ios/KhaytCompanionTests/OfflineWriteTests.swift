@@ -168,6 +168,26 @@ final class OfflineWriteTests: XCTestCase {
         XCTAssertEqual(macHistory.count, 1)
     }
 
+    /// "Take it" is the desktop's `promoteWaitingItem`: the same move as a
+    /// decline, recorded as `converted` — so the shop's conversion funnel counts
+    /// it, and the Mac does not fold the request back into the queue.
+    func testTakingARequestRecordsItAsConvertedAndItReachesTheMac() async throws {
+        let macCopy = try book.read()
+        try writer.setWaitingStatus(id: "W-1", to: "converted")
+
+        let taken = try record("waitingListHistory", "W-1")
+        XCTAssertEqual(taken["status"], .string("converted"))
+        XCTAssertNotNil(taken["convertedAt"])
+        XCTAssertNil(taken["declinedAt"], "a request taken is not a request declined")
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        let engine = try await reader.sharedEngine()
+        let folded = try await engine.foldDeltas(base: macCopy, deltas: [outbox.wire]).store
+        guard case .array(let macQueue)? = folded["waitingList"] else { return XCTFail() }
+        XCTAssertTrue(macQueue.isEmpty)
+    }
+
     func testDecliningARequestThatIsAlreadyGoneChangesNothing() throws {
         try writer.setWaitingStatus(id: "W-gone", to: "declined")
         XCTAssertNil(try book.read()["tombstones"])

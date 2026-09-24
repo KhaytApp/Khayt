@@ -63,6 +63,7 @@ struct CloudSignInSheet: View {
                     .disabled(!ready)
                 }
             }
+            .khaytForm()
             .navigationTitle(L10n.tr("cloud.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

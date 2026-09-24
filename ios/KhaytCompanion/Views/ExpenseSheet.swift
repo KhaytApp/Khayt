@@ -79,6 +79,7 @@ struct ExpenseSheet: View {
                     }
                 }
             }
+            .khaytForm()
             .navigationTitle(L10n.tr("exp.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -79,6 +79,32 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the book's last readings. A client shows how many of their jobs are open
   and, only when the phone holds the whole order history, how many they have
   ever placed; otherwise that figure is "On the Mac", not a short count.
+- **(iOS) Settings follows the v2 design.** It opens on the connection, said
+  once (green with the Mac in reach, quiet without it when the phone has its
+  book, red only with neither), then "What this phone holds" — each
+  collection's count, amber where it is the newest few rather than all — and
+  what was not sent. Language is a two-way switch; the Mac's address and PIN
+  fold away until they are needed.
+- **(iOS) Intake follows the v2 design, and a walk-in can be taken.** Each
+  request is a card with "Take it" and "Dismiss". Taking one makes it a
+  pending job and moves the request to the waiting-list history as
+  `converted` — the desktop's own two writes, so its conversion funnel counts
+  it. That needs the shop's book on the phone (the LAN endpoint has no
+  `converted`); without one, the card offers Dismiss alone and says why.
+  Reminding and calling are a long-press away.
+- **(iOS) The Arabic the design's copy review flagged is fixed.** The heated
+  bed was "السرير" — the bed you sleep in — on four screens; it is المنصّة,
+  as the desktop says. "Owner" had been dropped from the owner-PIN label
+  (رمز المالك), which is the only word that tells it from the intake PIN. The
+  filament is الخيط, not a transliteration; the shop is a ورشة, not a محل; and
+  the one Arabic-Indic figure in the catalogue now uses the Western digits
+  every other one does. Sixty-four strings the rebuilt screens no longer use
+  are gone from both languages.
+- **(iOS) New order follows the v2 design** — one card of labelled fields and
+  a single button — with one deliberate difference. The design refuses a
+  write while the Mac is away; the phone need not, because it saves into its
+  book and sends the change on. The note under the form says which of those
+  will happen, and only a phone with neither the Mac nor a book is refused.
 
 - **(iOS) The companion moves to its real design (v2).** It had been built
   against an older mockup; the current design is Turki's Claude Design

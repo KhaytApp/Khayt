@@ -12,30 +12,16 @@
 "connection.unreachable" = "تعذر الوصول للكمبيوتر";
 "connection.unauthorized" = "رمز PIN خاطئ";
 "connection.banner.unreachable" = "لا يمكن الوصول إلى Khayt على الشبكة. تحقق من الواي فاي وتفعيل LAN API.";
-"connection.banner.cached" = "نعرض آخر ما أرسله جهازك، من {when}. أعد الاتصال للأرقام الحية.";
 "connection.banner.pin" = "رمز LAN مرفوض. حدّث PIN في الإعدادات ليطابق سطح المكتب.";
-"connection.banner.checking" = "جاري الاتصال بسطح المكتب…";
-"connection.retry" = "إعادة المحاولة";
 "sync.pending" = "%d تغيير على هذا الهاتف، بانتظار الماك.";
 "connection.error.reach_status" = "تعذر الوصول إلى %@. نفس شبكة الواي فاي؟ سطح المكتب → الإعدادات → LAN API: مفعّل، الاستماع على كل الواجهات، وتأكد من IP والمنفذ.";
 "settings.host_required" = "أدخل عنوان IP للكمبيوتر.";
 "settings.host_invalid" = "عنوان غير صالح. استخدم مثلاً 192.168.1.42 (بدون http://).";
-"settings.endpoint" = "الاتصال بـ";
 "home.pipeline" = "سير العمل";
-"home.all_orders" = "كل الطلبات";
-"home.no_printing" = "لا مهام";
 
 /* Home */
-"home.subtitle" = "مباشر من تطبيق Khayt على الكمبيوتر";
-"home.completed_today" = "مكتمل اليوم";
-"home.low_stock" = "%d بكرة منخفضة";
 "home.quick_actions" = "إجراءات سريعة";
 "home.action.add_spool" = "إضافة بكرة";
-"home.action.orders" = "الطلبات";
-"home.action.inventory" = "المخزون";
-"home.active_orders" = "طلبات نشطة";
-"home.see_all" = "عرض الكل";
-"home.overdue" = "%d متأخر";
 "stat.in_queue" = "في الطابور";
 "stat.printing" = "طباعة";
 "stat.post" = "ما بعد الطباعة";
@@ -43,41 +29,31 @@
 
 /* Orders */
 "orders.active" = "نشط";
-"orders.recent" = "الأخيرة";
 "orders.filter.all" = "الكل";
-"orders.advance" = "تقديم";
 "orders.overdue" = "متأخر";
-"orders.due" = "الاستحقاق %@";
 "orders.detail.set_status" = "تعيين الحالة";
 "orders.detail.advance" = "المرحلة التالية";
 
 /* Inventory */
-"inventory.search" = "مادة، SKU، دفعة…";
 "inventory.filter.all" = "الكل";
 "inventory.filter.low" = "مخزون منخفض";
-"inventory.sort.newest" = "الأحدث أولاً";
-"inventory.low_badge" = "منخفض";
 
 /* Settings */
-"settings.lan_status" = "حالة الشبكة";
 "settings.connection" = "الاتصال";
 "settings.connection.footer" = "نفس PIN من إعدادات Khayt → LAN API. يتطلب سطح المكتب 2.2.1+";
-"settings.shop_name" = "اسم المحل";
+"settings.shop_name" = "اسم الورشة";
 "settings.host" = "IP أو اسم المضيف";
 "settings.port" = "المنفذ: %d";
-"settings.pin" = "رمز PIN";
+"settings.pin" = "رمز المالك";
 "settings.retest" = "إعادة اختبار الاتصال";
 "settings.unpair" = "إلغاء الربط";
-"settings.unpair.footer" = "يحذف دفتر الورشة من هذا الهاتف، ومعه رمز PIN.";
+"settings.unpair.footer" = "يحذف دفتر الورشة من هذا الهاتف، ومعه الرمز.";
 "settings.language" = "اللغة";
 "settings.notifications" = "الإشعارات";
 "settings.notify.queue" = "تغييرات الطابور";
 "settings.notify.connection" = "انقطاع الاتصال";
 "settings.notify.overdue" = "طلبات متأخرة";
-"settings.notify.low_stock" = "فيلامنت منخفض";
-"settings.notify.footer" = "تنبيهات محلية عند اكتشاف التطبيق للتغييرات (استطلاع LAN).";
-"settings.widget" = "ودجة الشاشة الرئيسية";
-"settings.widget.footer" = "أضف ودجة Khayt Queue من معرض الودجات بعد البناء.";
+"settings.notify.low_stock" = "نقص الخيط";
 "settings.docs" = "مرجع LAN API";
 
 /* Status */
@@ -101,7 +77,7 @@
 "notify.offline.body" = "تعذر الوصول لسطح المكتب";
 "notify.overdue.title" = "طلبات متأخرة";
 "notify.overdue.body" = "%d طلب متأخر";
-"notify.low_stock.title" = "فيلامنت منخفض";
+"notify.low_stock.title" = "نقص الخيط";
 "notify.low_stock.body" = "%d بكرة أقل من 200غ";
 
 /* NFC */
@@ -116,7 +92,7 @@
 "nfc.write.brand" = "العلامة";
 "nfc.write.weight" = "الوزن";
 "nfc.write.print_temp" = "حرارة الطباعة";
-"nfc.write.bed_temp" = "حرارة السرير";
+"nfc.write.bed_temp" = "حرارة المنصّة";
 "nfc.write.tap_blank" = "المس بطاقة فارغة للكتابة";
 "nfc.write.scanning" = "قرّب من بطاقة فارغة…";
 "nfc.write.prompt" = "قرّب الآيفون من بطاقة NFC قابلة للكتابة.";
@@ -148,7 +124,7 @@
 "quote.weight" = "الوزن";
 "quote.time" = "مدة الطباعة";
 "quote.qty" = "الكمية";
-"quote.spool_cost" = "سعر البكرة (١ كجم)";
+"quote.spool_cost" = "سعر البكرة (1 كجم)";
 "quote.labor_rate" = "أجر العمل بالساعة";
 "quote.margin" = "هامش الربح";
 "quote.rush" = "طلب مستعجل";
@@ -195,7 +171,7 @@
 "exp.retake" = "إزالة الصورة";
 "exp.save" = "حفظ";
 "exp.no_camera" = "لا توجد كاميرا في هذا الجهاز — سيُحفظ المصروف بدون إيصال.";
-"exp.cat.filament" = "فيلامنت";
+"exp.cat.filament" = "الخيط";
 "exp.cat.resin" = "راتنج";
 "exp.cat.parts" = "قطع";
 "exp.cat.tools" = "أدوات";
@@ -210,48 +186,21 @@
 "orders.queue_clear.sub" = "كل شيء منجز — لا طلبات نشطة";
 "orders.no_completed" = "لا طلبات مكتملة";
 "orders.no_completed.sub" = "ستظهر الطلبات المكتملة هنا";
-"inventory.low" = "منخفض";
 "inventory.none" = "لا توجد بكرات بعد";
 "inventory.none.sub" = "أضف أول بكرة للبدء";
 "inventory.no_results" = "لا نتائج";
 "inventory.no_results.sub" = "جرّب بحثاً مختلفاً";
-"inventory.delete" = "حذف";
 /* Pairing */
-"pair.title" = "إعداد Khayt";
-"pair.step_of" = "الخطوة %1$d من %2$d";
 "pair.back" = "رجوع";
 "pair.continue" = "متابعة";
-"pair.open" = "فتح Khayt";
-"pair.welcome.title" = "رفيق ورشتك";
-"pair.welcome.body" = "يتصل هذا التطبيق بـ **Khayt على جهاز Mac أو الكمبيوتر** عبر الواي فاي. ويحتفظ بنسخة مما يحتاجه الهاتف، فتبقى الطلبات والمخزون ومسح البكرات تعمل بعيداً عن المكتب.";
-"pair.desktop.title" = "جهّز Khayt على سطح المكتب";
-"pair.desktop.body" = "على الكمبيوتر الذي يعمل عليه Khayt، افتح **الإعدادات ← LAN API** وفعّل:";
-"pair.desktop.enable" = "تفعيل LAN REST API";
-"pair.desktop.listen" = "الاستماع على كل واجهات الشبكة";
-"pair.desktop.pin" = "تعيين رمز PIN للمالك (احفظه)";
-"pair.shop.title" = "اختر ورشتك";
-"pair.shop.body" = "يجب أن يكون الهاتف والكمبيوتر على **نفس شبكة الواي فاي**. يبحث Khayt عنها — لا حاجة لكتابة عنوان.";
 "pair.manual" = "سأُدخل العنوان بنفسي";
-"pair.pin" = "رمز PIN للمالك";
-"pair.shops" = "الورش على هذه الشبكة";
 "pair.browse.failed" = "لا يستطيع Khayt البحث عن الورش على هذه الشبكة.";
 "pair.browse.permission" = "إن رفضت طلب الشبكة المحلية، فاسمح به من الإعدادات ← Khayt ← الشبكة المحلية.";
 "pair.browse.looking" = "جاري البحث… تأكد أن Khayt مفتوح على جهاز Mac وأن LAN API مفعّل.";
 "pair.browse.none" = "لم يُعثر على شيء بعد.";
 "pair.shop.offline" = "يعمل دون اتصال مع هذه الورشة";
-"pair.shop.online_only" = "يحتاج جهاز Mac في المتناول لكل شاشة";
-"pair.manual.name" = "اسم الورشة (اختياري)";
 "pair.manual.host" = "عنوان السطح";
-"pair.ip_help" = "كيف أجد عنوان IP؟";
-"pair.ip_help.terminal" = "على جهاز Mac الذي يعمل عليه Khayt، افتح **Terminal** وشغّل:";
-"pair.ip_help.result" = "استخدم الرقم الظاهر (مثلاً 192.168.1.42). إن كان فارغاً، جرّب **en1** أو راجع **إعدادات النظام ← Wi‑Fi ← التفاصيل**.";
-"pair.verify.title" = "اختبار الاتصال";
-"pair.verify.body" = "سنصل إلى سطح المكتب ونتحقق من رمز PIN بفحص سريع للطابور.";
-"pair.verify.test" = "اختبر الآن";
 "pair.verify.ok" = "متصل — الطلبات في الطابور: %d. تم قبول رمز PIN.";
-"pair.verify.book" = "السجلات على هذا الهاتف: %d، فيبقى يعمل حين يكون جهاز Mac بعيداً.";
-"pair.verify.history" = "يبقى السجل الأقدم على جهاز Mac ويُجلب عند طلبه.";
-"pair.verify.no_book" = "سطح المكتب هذا لا يسلّم دفتره، فسيسأله الهاتف في كل شاشة وسيفرغ حين يكون بعيداً.";
 
 /* Shared words */
 "common.done" = "تم";
@@ -294,18 +243,10 @@
 "order.detail.assigned" = "مُسنَد إلى";
 
 /* Spool detail */
-"spool.detail.title" = "البكرة";
 "spool.detail.filament" = "الخيط";
-"spool.detail.color" = "اللون";
-"spool.detail.name" = "الاسم";
-"spool.detail.stock" = "المخزون";
-"spool.detail.remaining" = "المتبقي";
-"spool.detail.initial" = "الوزن عند الشراء";
-"spool.detail.purchased" = "تاريخ الشراء";
-"spool.detail.label_info" = "بيانات الملصق / الوسم";
 "spool.detail.lot" = "رقم الدفعة";
 "spool.detail.print_temp" = "حرارة الفوهة";
-"spool.detail.bed_temp" = "حرارة السرير";
+"spool.detail.bed_temp" = "حرارة المنصّة";
 "spool.detail.adjust" = "تعديل المتبقي";
 "spool.detail.adjust.body" = "حدّد الخيط المتبقي في هذه البكرة بالغرام.";
 "spool.detail.grams" = "غرام";
@@ -402,13 +343,13 @@
 "spool.form.barcode" = "الباركود (UPC/EAN)";
 "spool.form.lot" = "رقم الدفعة";
 "spool.form.print_temp" = "حرارة الطباعة (°م)";
-"spool.form.bed_temp" = "حرارة السرير (°م)";
+"spool.form.bed_temp" = "حرارة المنصّة (°م)";
 "spool.quantity" = "العدد";
 "spool.quantity.one" = "عدة علب من الخيط نفسه؟ أضفها دفعة واحدة.";
 "spool.quantity.many" = "%d بكرات منفصلة، تُتابَع كل منها على حدة.";
 "spool.tag.weight" = "الوزن";
 "spool.tag.print" = "الطباعة";
-"spool.tag.bed" = "السرير";
+"spool.tag.bed" = "المنصّة";
 
 /* Errors */
 "error.not_configured" = "اربط التطبيق بـ Khayt على سطح المكتب من الإعدادات.";
@@ -449,15 +390,10 @@
 "cloud.signin.server" = "عنوان الخادم";
 "cloud.signin.action" = "تسجيل الدخول";
 "cloud.signin.wrong_passphrase" = "عبارة المرور هذه لا تفتح مفتاح الورشة.";
-"settings.widget.howto" = "كيف تضيف الأداة";
-"spool.detail.id" = "المعرّف";
 
 "pair.use_cloud" = "استخدم Khayt Cloud بدلاً من ذلك";
 "pair.use_cloud.footer" = "إن كانت الورشة تتزامن مع Khayt Cloud، يبدأ الهاتف منها ويُربط بجهاز Mac لاحقاً.";
 
-"pair.pin.prompt" = "أدخل رمز PIN المعيّن على جهاز Mac";
-"pair.missing.shop" = "اضغط على ورشتك أعلاه، أو أدخل عنوانها.";
-"pair.missing.pin" = "أدخل رمز PIN للمالك للمتابعة.";
 
 /* Order detail sheet (khayt-orders.jsx) */
 "order.detail.move_to" = "انقل إلى %@";
@@ -559,3 +495,29 @@
 "clients.call" = "اتصال";
 "clients.whatsapp" = "واتساب";
 "clients.email" = "بريد";
+
+/* Settings, as design/ios-v2 draws it */
+"settings.holds" = "ما يحتفظ به هذا الهاتف";
+"settings.mac_in_reach" = "الماك متاح";
+"settings.mac_away" = "الماك غير متاح";
+"settings.mac_away_since" = "الماك غير متاح · الدفتر حتى %@";
+"settings.from_book" = "يعمل من الدفتر";
+"settings.not_sent" = "لم تُرسل: %@.";
+"book.collection.expenses" = "المصروفات";
+"book.collection.printFiles" = "ملفات الطباعة";
+"book.collection.products" = "المنتجات";
+"book.collection.auditLog" = "سجل التدقيق";
+"book.collection.giftCards" = "بطاقات الهدايا";
+
+/* Intake, as design/ios-v2 draws it */
+"intake.foot" = "الزبائن المباشرون وقائمة الانتظار. أخذ أحدهم يضعه في الطابور كمعلّق.";
+"intake.foot.no_book" = "الزبائن المباشرون وقائمة الانتظار. أخذ طلب إلى الطابور يحتاج دفتر الورشة على هذا الهاتف؛ أما التجاهل فيعمل دائماً.";
+"intake.take" = "خذه";
+"intake.dismiss" = "تجاهل";
+"intake.take.needs_book" = "أخذ طلب إلى الطابور يحتاج دفتر الورشة على هذا الهاتف.";
+
+/* New order, as design/ios-v2 draws it */
+"order.new.note.sent" = "يُحفظ على هذا الهاتف ويُرسل إلى الماك الآن.";
+"order.new.note.later" = "الماك غير متاح. يُحفظ هذا على الهاتف ويصل إلى الماك حين يعود متاحاً.";
+"order.new.note.live" = "يُكتب مباشرة على الماك.";
+"order.new.note.blocked" = "الماك غير متاح، وهذا الهاتف لا يحمل دفتر الورشة، فلا مكان لحفظ هذا بعد.";

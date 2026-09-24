@@ -80,6 +80,7 @@ struct LogWasteSheet: View {
                     }
                 }
             }
+            .khaytForm()
             .navigationTitle(L10n.tr("waste.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

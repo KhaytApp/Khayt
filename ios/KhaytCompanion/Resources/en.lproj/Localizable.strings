@@ -12,30 +12,16 @@
 "connection.unreachable" = "Desktop unreachable";
 "connection.unauthorized" = "Wrong LAN PIN";
 "connection.banner.unreachable" = "Cannot reach Khayt on your network. Check Wi‑Fi and desktop LAN API.";
-"connection.banner.cached" = "Showing what your desktop last told us, from {when}. Reconnect for live numbers.";
 "connection.banner.pin" = "LAN PIN rejected. Update PIN in Settings to match desktop.";
-"connection.banner.checking" = "Connecting to desktop…";
-"connection.retry" = "Retry";
 "sync.pending" = "%d change(s) on this phone, waiting for the Mac.";
 "connection.error.reach_status" = "Cannot reach %@. Same Wi‑Fi? Desktop → Settings → LAN API: enabled, listen on all interfaces, note the IP and port.";
 "settings.host_required" = "Enter your computer's IP address.";
 "settings.host_invalid" = "Invalid address. Use e.g. 192.168.1.42 (not a full URL with http://).";
-"settings.endpoint" = "Connecting to";
 "home.pipeline" = "Pipeline";
-"home.all_orders" = "All orders";
-"home.no_printing" = "No jobs";
 
 /* Home */
-"home.subtitle" = "Live from your Khayt desktop";
-"home.completed_today" = "Completed today";
-"home.low_stock" = "%d spool(s) low on filament";
 "home.quick_actions" = "Quick actions";
 "home.action.add_spool" = "Add spool";
-"home.action.orders" = "Orders";
-"home.action.inventory" = "Inventory";
-"home.active_orders" = "Active orders";
-"home.see_all" = "See all";
-"home.overdue" = "%d overdue";
 "stat.in_queue" = "In queue";
 "stat.printing" = "Printing";
 "stat.post" = "Post-proc.";
@@ -43,23 +29,16 @@
 
 /* Orders */
 "orders.active" = "Active";
-"orders.recent" = "Recent";
 "orders.filter.all" = "All";
-"orders.advance" = "Advance";
 "orders.overdue" = "Overdue";
-"orders.due" = "Due %@";
 "orders.detail.set_status" = "Set status";
 "orders.detail.advance" = "Advance to next stage";
 
 /* Inventory */
-"inventory.search" = "Material, SKU, batch…";
 "inventory.filter.all" = "All";
 "inventory.filter.low" = "Low stock";
-"inventory.sort.newest" = "Newest first";
-"inventory.low_badge" = "Low stock";
 
 /* Settings */
-"settings.lan_status" = "LAN status";
 "settings.connection" = "Connection";
 "settings.connection.footer" = "Same PIN as Khayt Settings → LAN API. Desktop v2.2.1+ required.";
 "settings.shop_name" = "Shop name";
@@ -75,9 +54,6 @@
 "settings.notify.connection" = "Connection lost";
 "settings.notify.overdue" = "Overdue orders";
 "settings.notify.low_stock" = "Low filament";
-"settings.notify.footer" = "Local alerts on this iPhone when the app detects changes (LAN polling).";
-"settings.widget" = "Home Screen widget";
-"settings.widget.footer" = "Add the Khayt Queue widget from the home screen widget gallery after building.";
 "settings.docs" = "LAN API reference";
 
 /* Status */
@@ -210,48 +186,21 @@
 "orders.queue_clear.sub" = "All caught up — no active orders";
 "orders.no_completed" = "No completed orders";
 "orders.no_completed.sub" = "Completed orders will appear here";
-"inventory.low" = "LOW";
 "inventory.none" = "No spools yet";
 "inventory.none.sub" = "Add your first spool to get started";
 "inventory.no_results" = "No results";
 "inventory.no_results.sub" = "Try a different search";
-"inventory.delete" = "Delete";
 /* Pairing */
-"pair.title" = "Set up Khayt";
-"pair.step_of" = "Step %1$d of %2$d";
 "pair.back" = "Back";
 "pair.continue" = "Continue";
-"pair.open" = "Open Khayt";
-"pair.welcome.title" = "Companion for your shop";
-"pair.welcome.body" = "This app connects to **Khayt on your Mac or PC** over Wi‑Fi. It keeps a copy of what the phone needs, so the queue, inventory and spool scanning keep working away from the desk.";
-"pair.desktop.title" = "Prepare Khayt desktop";
-"pair.desktop.body" = "On the computer running Khayt, open **Settings → LAN API** and turn on:";
-"pair.desktop.enable" = "Enable LAN REST API";
-"pair.desktop.listen" = "Listen on all network interfaces";
-"pair.desktop.pin" = "Set an Owner LAN PIN (remember it)";
-"pair.shop.title" = "Choose your shop";
-"pair.shop.body" = "Phone and computer must be on the **same Wi‑Fi**. Khayt looks for it — you should not have to type an address.";
 "pair.manual" = "Enter the address myself";
-"pair.pin" = "Owner LAN PIN";
-"pair.shops" = "Shops on this Wi‑Fi";
 "pair.browse.failed" = "Khayt cannot look for shops on this network.";
 "pair.browse.permission" = "If you declined the local network prompt, allow it in Settings → Khayt → Local Network.";
 "pair.browse.looking" = "Looking… make sure Khayt is open on the Mac with its LAN API switched on.";
 "pair.browse.none" = "Nothing found yet.";
 "pair.shop.offline" = "Can work offline with this shop";
-"pair.shop.online_only" = "Needs the Mac in reach for every screen";
-"pair.manual.name" = "Shop name (optional label)";
 "pair.manual.host" = "Desktop IP";
-"pair.ip_help" = "How do I find the IP address?";
-"pair.ip_help.terminal" = "On the Mac running Khayt, open **Terminal** and run:";
-"pair.ip_help.result" = "Use the number shown (e.g. 192.168.1.42). If empty, try **en1** or check **System Settings → Wi‑Fi → Details**.";
-"pair.verify.title" = "Test connection";
-"pair.verify.body" = "We’ll reach your desktop and confirm the PIN with a quick queue check.";
-"pair.verify.test" = "Test now";
 "pair.verify.ok" = "Connected — jobs in queue: %d. PIN accepted.";
-"pair.verify.book" = "Records on this phone: %d, so it keeps working when this Mac is not in reach.";
-"pair.verify.history" = "Older history stays on the Mac and is fetched when you ask for it.";
-"pair.verify.no_book" = "This desktop does not hand over its book, so the phone will ask it again for every screen and will empty when it is out of reach.";
 
 /* Shared words */
 "common.done" = "Done";
@@ -294,15 +243,7 @@
 "order.detail.assigned" = "Assigned to";
 
 /* Spool detail */
-"spool.detail.title" = "Spool";
 "spool.detail.filament" = "Filament";
-"spool.detail.color" = "Color";
-"spool.detail.name" = "Name";
-"spool.detail.stock" = "Stock";
-"spool.detail.remaining" = "Remaining";
-"spool.detail.initial" = "Initial weight";
-"spool.detail.purchased" = "Purchased";
-"spool.detail.label_info" = "Label / tag info";
 "spool.detail.lot" = "Batch / lot";
 "spool.detail.print_temp" = "Nozzle temp";
 "spool.detail.bed_temp" = "Bed temp";
@@ -449,15 +390,10 @@
 "cloud.signin.server" = "Server address";
 "cloud.signin.action" = "Sign in";
 "cloud.signin.wrong_passphrase" = "That passphrase does not open this shop's key.";
-"settings.widget.howto" = "How to add the widget";
-"spool.detail.id" = "ID";
 
 "pair.use_cloud" = "Use Khayt Cloud instead";
 "pair.use_cloud.footer" = "If the shop syncs to Khayt Cloud, the phone can start from there and pair with the Mac later.";
 
-"pair.pin.prompt" = "Enter the PIN set on the Mac";
-"pair.missing.shop" = "Tap your shop above, or enter its address.";
-"pair.missing.pin" = "Enter the Owner LAN PIN to continue.";
 
 /* Order detail sheet (khayt-orders.jsx) */
 "order.detail.move_to" = "Move to %@";
@@ -559,3 +495,29 @@
 "clients.call" = "Call";
 "clients.whatsapp" = "WhatsApp";
 "clients.email" = "Email";
+
+/* Settings, as design/ios-v2 draws it */
+"settings.holds" = "What this phone holds";
+"settings.mac_in_reach" = "Mac in reach";
+"settings.mac_away" = "Mac away";
+"settings.mac_away_since" = "Mac away · the book is as of %@";
+"settings.from_book" = "Working from the book";
+"settings.not_sent" = "Not sent: %@.";
+"book.collection.expenses" = "expenses";
+"book.collection.printFiles" = "print files";
+"book.collection.products" = "products";
+"book.collection.auditLog" = "the audit log";
+"book.collection.giftCards" = "gift cards";
+
+/* Intake, as design/ios-v2 draws it */
+"intake.foot" = "Walk-ins and the waiting list. Taking one puts it in the queue as pending.";
+"intake.foot.no_book" = "Walk-ins and the waiting list. Taking one into the queue needs the shop’s book on this phone; dismissing works either way.";
+"intake.take" = "Take it";
+"intake.dismiss" = "Dismiss";
+"intake.take.needs_book" = "Taking a request into the queue needs the shop’s book on this phone.";
+
+/* New order, as design/ios-v2 draws it */
+"order.new.note.sent" = "Saved on this phone and sent to the Mac now.";
+"order.new.note.later" = "The Mac is away. This is saved on this phone and reaches the Mac when it is back in reach.";
+"order.new.note.live" = "Written straight to the Mac.";
+"order.new.note.blocked" = "The Mac is away, and this phone does not hold the shop’s book, so there is nowhere to save this yet.";
