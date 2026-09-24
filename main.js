@@ -302,8 +302,18 @@ function completePendingFullWipe() {
   if (!fs.existsSync(flag)) return false;
   try {
     fs.unlinkSync(flag);
+    // Everything goes except the safety copy hub:request-full-wipe took before
+    // it would schedule this — the one thing left to come back from a wipe
+    // that was a mistake.
     for (const entry of fs.readdirSync(userData)) {
-      fs.rmSync(path.join(userData, entry), { recursive: true, force: true });
+      const full = path.join(userData, entry);
+      if (entry === 'backups' && fs.statSync(full).isDirectory()) {
+        for (const f of fs.readdirSync(full)) {
+          if (!f.startsWith(upgradeBackup.WIPE_PREFIX)) fs.rmSync(path.join(full, f), { recursive: true, force: true });
+        }
+        continue;
+      }
+      fs.rmSync(full, { recursive: true, force: true });
     }
     console.log('Khayt: full data wipe completed on restart');
     return true;
@@ -366,9 +376,24 @@ ipcMain.handle('hub:request-full-wipe', async (event) => {
     noLink: true,
     title: 'Full wipe',
     message: 'Delete ALL Khayt data on this computer?',
-    detail: 'Store, photos, invoices, backups, and keys will be removed. The app will restart empty. This cannot be undone.',
+    detail: 'Store, photos, invoices, backups, and keys will be removed, and the app will restart empty. '
+      + 'One safety copy of your book is saved first, in the backups folder, so a wipe made by mistake can be restored from Settings → Backups.',
   });
   if (response !== 1) return { ok: false, canceled: true };
+  // The safety copy comes FIRST, and a wipe that cannot take one does not
+  // happen. Nothing has been deleted at this point, so refusing costs nothing.
+  let kept;
+  try { kept = writePreWipeBackup(); } catch (e) {
+    const why = String((e && e.message) || e);
+    console.error('hub:request-full-wipe: safety backup failed, nothing deleted:', why);
+    await dialog.showMessageBox(win || undefined, {
+      type: 'error', buttons: ['OK'], title: 'Full wipe',
+      message: 'Nothing was deleted.',
+      detail: `Khayt could not save a safety copy of your book first, so it stopped before deleting anything.\n\n${why}`,
+    });
+    return { ok: false, error: 'safety-backup-failed', detail: why };
+  }
+  if (kept) console.warn('full wipe: kept a safety copy at', kept);
   const flag = path.join(app.getPath('userData'), PENDING_WIPE_FLAG);
   fs.writeFileSync(flag, new Date().toISOString());
   app.relaunch();
@@ -838,6 +863,31 @@ function writePreUpgradeBackup(raw, diskVersion) {
   return fullPath;
 }
 
+/**
+ * The one copy of the book a full wipe keeps: written, then read back, before
+ * the wipe is scheduled. Throws if it cannot be both — the caller then deletes
+ * nothing. Returns null when there is no book to keep (a fresh install).
+ *
+ * Read through recoverStoreRaw, as a launch reads it, so a crash's .tmp/.prev
+ * is honoured; and written with encryptForDisk, like every other backup, so
+ * Settings → Backups restores it exactly as it restores a daily one. The keys
+ * that decrypt it live in the OS keychain, not in userData, so they survive
+ * the wipe.
+ */
+function writePreWipeBackup() {
+  const rec = recoverStoreRaw(MAX_STORE_BYTES);
+  if (!rec.data) {
+    if (!rec.existed) return null;
+    throw new Error('the book on disk could not be read, so there was nothing safe to copy');
+  }
+  const fullPath = path.join(backupsDir(), upgradeBackup.preWipeBackupName(new Date().toISOString()));
+  fs.writeFileSync(fullPath, JSON.stringify(encryptForDisk(rec.data)), { encoding: 'utf8', flag: 'wx' });
+  // Read it back. A copy nobody has read is a copy nobody knows is there.
+  const back = safeJsonParse(fs.readFileSync(fullPath, 'utf8'));
+  if (!back || typeof back !== 'object') throw new Error('the safety copy did not read back');
+  return fullPath;
+}
+
 // --- Daily auto-backup (new in 1.3) ---
 ipcMain.handle('hub:write-backup', async (event, jsonString) => {
   if (!jsonString || typeof jsonString !== 'string' || jsonString.length > MAX_STORE_BYTES) {
@@ -869,7 +919,12 @@ ipcMain.handle('hub:write-backup', async (event, jsonString) => {
   return fullPath;
 });
 ipcMain.handle('hub:last-backup-date', async () => {
-  const all = (await fs.promises.readdir(backupsDir())).filter(f => f.endsWith('.json')).sort();
+  // Dated dailies only. `pre-update-…`, `pre-upgrade-…` and `pre-wipe-…` all
+  // sort after every date, so the newest name was an insurance copy after any
+  // update: the settings screen showed it as the date, and the renderer's
+  // "has today's backup run?" never matched, so it wrote on every call. The
+  // Mac fixed the same thing in Backups.swift.
+  const all = (await fs.promises.readdir(backupsDir())).filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
   if (all.length === 0) return null;
   return all[all.length - 1].replace('.json', '');
 });
