@@ -79,6 +79,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the book's last readings. A client shows how many of their jobs are open
   and, only when the phone holds the whole order history, how many they have
   ever placed; otherwise that figure is "On the Mac", not a short count.
+- **(iOS) Settings follows the v2 design.** It opens on the connection, said
+  once (green with the Mac in reach, quiet without it when the phone has its
+  book, red only with neither), then "What this phone holds" — each
+  collection's count, amber where it is the newest few rather than all — and
+  what was not sent. Language is a two-way switch; the Mac's address and PIN
+  fold away until they are needed.
 
 - **(iOS) The companion moves to its real design (v2).** It had been built
   against an older mockup; the current design is Turki's Claude Design

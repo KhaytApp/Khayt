@@ -559,3 +559,16 @@
 "clients.call" = "Call";
 "clients.whatsapp" = "WhatsApp";
 "clients.email" = "Email";
+
+/* Settings, as design/ios-v2 draws it */
+"settings.holds" = "What this phone holds";
+"settings.mac_in_reach" = "Mac in reach";
+"settings.mac_away" = "Mac away";
+"settings.mac_away_since" = "Mac away · the book is as of %@";
+"settings.from_book" = "Working from the book";
+"settings.not_sent" = "Not sent: %@.";
+"book.collection.expenses" = "expenses";
+"book.collection.printFiles" = "print files";
+"book.collection.products" = "products";
+"book.collection.auditLog" = "the audit log";
+"book.collection.giftCards" = "gift cards";

@@ -559,3 +559,16 @@
 "clients.call" = "اتصال";
 "clients.whatsapp" = "واتساب";
 "clients.email" = "بريد";
+
+/* Settings, as design/ios-v2 draws it */
+"settings.holds" = "ما يحتفظ به هذا الهاتف";
+"settings.mac_in_reach" = "الماك متاح";
+"settings.mac_away" = "الماك غير متاح";
+"settings.mac_away_since" = "الماك غير متاح · الدفتر حتى %@";
+"settings.from_book" = "يعمل من الدفتر";
+"settings.not_sent" = "لم تُرسل: %@.";
+"book.collection.expenses" = "المصروفات";
+"book.collection.printFiles" = "ملفات الطباعة";
+"book.collection.products" = "المنتجات";
+"book.collection.auditLog" = "سجل التدقيق";
+"book.collection.giftCards" = "بطاقات الهدايا";

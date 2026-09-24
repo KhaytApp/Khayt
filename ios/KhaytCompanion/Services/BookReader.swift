@@ -252,6 +252,10 @@ actor BookReader {
     /// to find out there is nothing to read.
     nonisolated var holdsAnyBook: Bool { book.exists }
 
+    /// What the book on this phone holds of each collection, and what it was
+    /// not given — for Settings' "What this phone holds".
+    nonisolated func scope() -> BookScope.Taken? { book.scope() }
+
     /// What this phone was told it is missing, for a screen about to show a total.
     nonisolated func holdsAll(_ collection: String) -> Bool { book.holdsAll(collection) }
 
