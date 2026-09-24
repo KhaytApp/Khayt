@@ -1152,6 +1152,7 @@ struct PreferencesPane: View {
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                CloudLibrarySettings(shop: shop)
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,

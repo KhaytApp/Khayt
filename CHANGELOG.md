@@ -4,6 +4,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Online storage for the print library.** Settings → Preferences →
+  Online storage points the library at a bucket — Cloudflare R2, Backblaze B2,
+  Amazon S3, Wasabi and the other S3-compatible providers the desktop app
+  lists. New models are backed up as they come in, "Back up the whole library
+  now" covers the models already here, and, if the shop turns it on, models
+  nobody has used for a set number of days move to the bucket to free the
+  Mac's disk. A model that was moved says "In the cloud" in the library, with
+  "Bring back from the cloud" in its place. The bucket, its key layout and the
+  `.cloud` note left behind are the desktop app's, so one bucket serves both
+  apps and either brings back what the other moved. A model's local copy is
+  removed only after the bucket has confirmed, in a separate request, that it
+  holds the exact file (size and content hash, or a download and compare), and
+  a model brought back is checked against the hash recorded when it left.
+  Plain HTTP is refused except to this Mac or the shop's own network.
+
 - **(iOS) Decline a walk-in request with the Mac switched off.** Declining was
   the last edit the phone refused offline, because it is a MOVE: into
   `waitingListHistory`, out of `waitingList`. The phone now makes that move and

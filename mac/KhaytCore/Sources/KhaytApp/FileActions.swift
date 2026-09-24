@@ -142,6 +142,12 @@ struct ModelActions: View {
                 }
             }
             Divider()
+        } else if shop.isInCloudOnly(file) {
+            // Moved to the cloud to free space: the one thing to do with it is
+            // bring it back, and then everything above is offered again.
+            Button(shop.words.callIt("cl.bring_back")) { Task { await shop.bringBack(file) } }
+                .disabled(shop.cloudLibraryBusy)
+            Divider()
         } else if let dir = shop.directory(for: file) {
             Button(shop.words.callIt("mac.reveal_folder")) { FileActions.reveal(dir) }
             Divider()

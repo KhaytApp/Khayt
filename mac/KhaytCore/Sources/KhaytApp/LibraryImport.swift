@@ -379,6 +379,8 @@ enum LibraryImport {
     /// What a batch did, in the three numbers a shop wants afterwards.
     struct Report: Equatable, Sendable {
         var moved = 0
+        /// The ids of the models that came in, for backing them up.
+        var addedIds: [String] = []
         var duplicates = 0
         var failures: [String] = []
         /// True when the caller asked it to stop and it did.
@@ -458,6 +460,7 @@ enum LibraryImport {
                                           analyseRisk: analyseRisk,
                                           owns: owns, whoHasIt: whoHasIt)
                 report.moved += 1
+                report.addedIds.append(added.id)
                 if let hash = added.contentHash { known.insert(hash) }
             } catch Failure.alreadyHere {
                 report.duplicates += 1

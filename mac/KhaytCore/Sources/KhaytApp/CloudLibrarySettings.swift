@@ -1,0 +1,197 @@
+import SwiftUI
+import KhaytCore
+
+/// Online storage for the print library: which bucket, whether new models are
+/// backed up to it, and whether old ones move there to free this Mac's disk.
+///
+/// Saves ITSELF, like the ntfy section: the secret is sealed on the way in, and
+/// the buttons below act on what is saved, never on what is half-typed.
+/// Providers, their endpoints and what each costs come from
+/// `lib/storage-providers.js`, the list the other app shows.
+struct CloudLibrarySettings: View {
+    let shop: Shop
+
+    struct Draft: Equatable {
+        var provider = "r2"
+        var vars: [String: String] = [:]
+        var endpoint = ""
+        var bucket = ""
+        var region = ""
+        var prefix = ""
+        var accessKeyId = ""
+        var secret = ""          // typed this session, never the stored one
+        var backsUp = true
+        var tierOn = false
+        var keepDays = 90
+
+        @MainActor static func read(_ settings: [String: JSONValue]) -> Draft {
+            var d = Draft()
+            guard case .object(let library)? = settings["printLibrary"] else { return d }
+            if case .object(let s3)? = library["s3"] {
+                d.provider = Shop.plainString(s3["provider"]).flatMap { $0.isEmpty ? nil : $0 } ?? "r2"
+                d.endpoint = Shop.plainString(s3["endpoint"]) ?? ""
+                d.bucket = Shop.plainString(s3["bucket"]) ?? ""
+                d.region = Shop.plainString(s3["region"]) ?? ""
+                d.prefix = Shop.plainString(s3["prefix"]) ?? ""
+                d.accessKeyId = Shop.plainString(s3["accessKeyId"]) ?? ""
+                d.backsUp = Shop.plainBool(s3["enabled"]) ?? false
+            }
+            if case .object(let t)? = library["tier"] {
+                d.tierOn = Shop.plainBool(t["enabled"]) ?? false
+                if case .number(let n)? = t["keepDays"], n >= 1 { d.keepDays = Int(n) }
+            }
+            return d
+        }
+    }
+
+    @State private var draft = Draft()
+    @State private var original = Draft()
+    @State private var storedSecret = false
+    @State private var providers: [KhaytEngine.StorageProvider] = []
+    @State private var summary: (count: Int, size: String, inCloud: Int)?
+
+    private var chosen: KhaytEngine.StorageProvider? { providers.first { $0.id == draft.provider } }
+    private var saved: Bool { !original.bucket.isEmpty && !original.accessKeyId.isEmpty && storedSecret }
+
+    var body: some View {
+        Section(shop.words.callIt("cl.title")) {
+            Text(shop.words.callIt("cl.why"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            LabeledContent(shop.words.callIt("cl.provider")) {
+                Picker("", selection: $draft.provider) {
+                    ForEach(providers) { p in Text(verbatim: p.label).tag(p.id) }
+                }.labelsHidden().frame(width: 240)
+            }
+            if let p = chosen {
+                if let cost = p.cost, !cost.isEmpty {
+                    Text(verbatim: [cost, p.egress ?? ""].filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(p.vars, id: \.key) { v in
+                    LabeledContent(v.label) {
+                        TextField("", text: Binding(get: { draft.vars[v.key] ?? "" },
+                                                    set: { draft.vars[v.key] = $0; Task { await resolve() } }),
+                                  prompt: v.hint.map { Text(verbatim: $0) })
+                            .textFieldStyle(.roundedBorder).frame(width: 240)
+                    }
+                }
+            }
+            LabeledContent(shop.words.callIt("cl.endpoint")) {
+                TextField("", text: $draft.endpoint, prompt: Text(verbatim: "https://…"))
+                    .textFieldStyle(.roundedBorder).frame(width: 320)
+            }
+            LabeledContent(shop.words.callIt("cl.bucket")) {
+                TextField("", text: $draft.bucket).textFieldStyle(.roundedBorder).frame(width: 240)
+            }
+            LabeledContent(shop.words.callIt("cl.region")) {
+                TextField("", text: $draft.region, prompt: Text(verbatim: "auto"))
+                    .textFieldStyle(.roundedBorder).frame(width: 240)
+            }
+            LabeledContent(shop.words.callIt("cl.prefix")) {
+                TextField("", text: $draft.prefix, prompt: Text(verbatim: "khayt"))
+                    .textFieldStyle(.roundedBorder).frame(width: 240)
+            }
+            LabeledContent(shop.words.callIt("cl.key_id")) {
+                TextField("", text: $draft.accessKeyId).textFieldStyle(.roundedBorder).frame(width: 240)
+            }
+            LabeledContent(shop.words.callIt("cl.secret")) {
+                SecureField(storedSecret ? "••••••••" : "", text: $draft.secret)
+                    .textFieldStyle(.roundedBorder).frame(width: 240)
+            }
+            Toggle(shop.words.callIt("cl.back_up"), isOn: $draft.backsUp)
+            Toggle(shop.words.callIt("cl.tier"), isOn: $draft.tierOn)
+            if draft.tierOn {
+                LabeledContent(shop.words.callIt("cl.keep_days")) {
+                    HStack {
+                        TextField("", value: $draft.keepDays, format: .number)
+                            .multilineTextAlignment(.trailing).frame(width: 70)
+                        Text(shop.words.callIt("cl.days"))
+                    }
+                }
+                Text(shop.words.callIt("cl.safety"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Button(shop.words.callIt("common.save")) { Task { await save() } }
+                    .disabled(draft == original || !shop.canMoveJobs || shop.cloudLibraryBusy)
+                Button(shop.words.callIt("cl.test")) { Task { await shop.testCloudLibrary() } }
+                    .disabled(!saved || draft != original || shop.cloudLibraryBusy)
+                Spacer()
+            }
+            if saved {
+                HStack {
+                    Button(shop.words.callIt("cl.back_up_all")) { Task { await shop.backUpWholeLibrary(); await refresh() } }
+                    if original.tierOn {
+                        Button(shop.words.callIt("cl.free_now")) { Task { await shop.freeUpSpace(); await refresh() } }
+                    }
+                    if (summary?.inCloud ?? 0) > 0 {
+                        Button(shop.words.callIt("cl.bring_all")) { Task { await shop.bringEverythingBack(); await refresh() } }
+                    }
+                    Spacer()
+                }
+                .disabled(draft != original || shop.cloudLibraryBusy || !shop.canMoveJobs)
+                if let summary, original.tierOn {
+                    Text(shop.words.callIt("cl.could_move", ["n": .number(Double(summary.count)),
+                                                             "size": .string(summary.size),
+                                                             "cloud": .number(Double(summary.inCloud))]))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if let p = shop.cloudProgress {
+                ProgressView(value: Double(p.done), total: Double(max(p.total, 1))) {
+                    Text(shop.words.callIt("cl.progress", ["name": .string(p.name), "done": .number(Double(p.done)),
+                                                           "total": .number(Double(p.total))]))
+                        .font(.caption).lineLimit(1).truncationMode(.middle)
+                }
+            } else if shop.cloudLibraryBusy {
+                ProgressView().controlSize(.small)
+            }
+            if let note = shop.cloudLibraryNote {
+                Label(note, systemImage: "checkmark.circle").font(.caption).foregroundStyle(Khayt.done)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let problem = shop.cloudLibraryProblem {
+                Label(problem, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .task(id: shop.settingsValue) { reload(); await refresh() }
+        .task { providers = (try? await shop.engine?.storageProviders()) ?? [] }
+        .onChange(of: draft.provider) { Task { await resolve() } }
+    }
+
+    /// The endpoint, filled in from the provider and the one or two things
+    /// only the shop knows. A provider whose endpoint the shop types itself
+    /// leaves the field alone.
+    private func resolve() async {
+        guard let engine = shop.engine, chosen != nil,
+              let r = try? await engine.resolveEndpoint(provider: draft.provider, vars: draft.vars),
+              r.ok, let endpoint = r.endpoint else { return }
+        draft.endpoint = endpoint
+        if let region = r.region, !region.isEmpty { draft.region = region }
+    }
+
+    private func reload() {
+        original = Draft.read(shop.settingsDict)
+        draft = original
+        storedSecret = false
+        if case .object(let l)? = shop.settingsDict["printLibrary"], case .object(let s3)? = l["s3"],
+           case .string(let s)? = s3["secretAccessKey"] { storedSecret = !s.isEmpty }
+    }
+
+    private func refresh() async {
+        summary = saved ? await shop.cloudTierSummary() : nil
+    }
+
+    private func save() async {
+        await shop.saveCloudLibrary(provider: draft.provider, endpoint: draft.endpoint, bucket: draft.bucket,
+                                    region: draft.region, prefix: draft.prefix, accessKeyId: draft.accessKeyId,
+                                    typedSecret: draft.secret.trimmingCharacters(in: .whitespaces),
+                                    backsUp: draft.backsUp, tierOn: draft.tierOn, keepDays: draft.keepDays)
+        reload()
+        await refresh()
+    }
+}
