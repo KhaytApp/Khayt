@@ -3527,10 +3527,24 @@ missing its dot. And a Prusa can be sent binary G-code.
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
 [VERSIONING.md](./VERSIONING.md).*
 
-The rest of the September security scan: the book is guarded against web
+Add to the catalogue straight from the library, with the slicer's own figures
+read from each file at last. Beside it, the rest of the September security scan: the book is guarded against web
 pages that try to reach it through the owner's browser and against PIN
 guessing, printer credentials go only to the printer, and what runs on this
 Mac — its slicer — is never chosen by a restored book.
+
+### Added
+
+- **(Mac) Add to the catalogue straight from the library.** Asked for by the
+  shop: "I should be able to add to the catalogue using the library". A model's
+  inspector has an **Add to the catalogue** button beside Reveal and Open (it
+  was only in the right-click menu, as "Make a product from this"). With
+  several models selected: **as one product** — each model a part, for a set
+  or a kit — or **one product each**, written straight to the catalogue and
+  priced. A project folder's right-click menu adds the whole folder as one
+  product, named after the folder. Every part is filled by the same rule as a
+  single model: weight and time from the file, measured from the geometry
+  where the file cannot say, and linked to the model.
 
 ### Changed
 
@@ -3539,6 +3553,20 @@ Mac — its slicer — is never chosen by a restored book.
   book (#1574). The Mac's Restore list marks it "taken before everything was
   reset" — not "taken before an update", which is what it would otherwise
   have been called, or nothing at all.
+
+### Fixed
+
+- **(Mac) A sliced file's own time, weight and material are read at last.**
+  Reported by the shop: "it didn't get the info from the file". The Mac
+  imported models without reading what the slicer wrote into them, so a
+  Snapmaker U1 3MF that says 4 h 37 min and 57 g of PLA went into the
+  catalogue at a 0.97 h geometry guess — a price almost four times too low on
+  time. A 3MF's `slice_info.config` (Bambu, Orca, Snapmaker) and a G-code's own
+  summary are now read when a model comes in, by the same shared rules the
+  desktop app uses, and every model ALREADY in the library is read once in the
+  background — only where it has nothing recorded, and without touching Undo.
+  Products already made keep their figures: open one and fill its part from
+  the file again to take the slicer's.
 
 ### Security
 
