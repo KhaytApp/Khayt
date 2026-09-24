@@ -65,6 +65,9 @@ struct MainTabView: View {
         .tint(KhaytDesign.accent)
         .onAppear { health.startPolling() }
         .onDisappear { health.stopPolling() }
+        .onChange(of: ordersNav.lowStockRequest) { _, _ in
+            selectedTab = 2
+        }
         .onChange(of: ordersNav.ordersTabRequest) { _, _ in
             selectedTab = 1
         }

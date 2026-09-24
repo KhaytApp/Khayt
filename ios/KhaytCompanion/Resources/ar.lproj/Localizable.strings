@@ -476,3 +476,18 @@
 "connection.as_of" = "يعمل من الدفتر · حتى %@";
 "connection.live_only" = "مباشر من الماك · لا يُحفظ شيء على هذا الهاتف";
 "connection.refresh" = "تحديث";
+
+/* Shop Pulse (design v2) */
+"pulse.title" = "نبض الورشة";
+"pulse.money" = "المال";
+"pulse.tap_to_filter" = "اضغط للتصفية";
+"pulse.jobs" = "%d طلبات";
+"pulse.swipe_hint" = "اسحب الطلب للأمام لتقديمه. اضغط لفتحه.";
+"pulse.printing" = "قيد الطباعة";
+"pulse.done_today" = "أُنجز اليوم";
+"pulse.owed" = "مستحق";
+"pulse.unpaid" = "%d غير مدفوع";
+"pulse.this_month" = "هذا الشهر";
+"pulse.this_year" = "هذه السنة";
+"pulse.on_the_mac" = "على الماك";
+"pulse.move_to" = "انقل إلى";

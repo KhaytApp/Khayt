@@ -2,6 +2,13 @@ import SwiftUI
 
 struct InventoryView: View {
     @EnvironmentObject private var api: KhaytAPIClient
+    @EnvironmentObject private var ordersNav: OrdersNavigationState
+
+    private func takeLowStockRequest() {
+        guard ordersNav.pendingLowStock else { return }
+        ordersNav.pendingLowStock = false
+        filter = .lowStock
+    }
 
     enum Filter: String, CaseIterable, Identifiable {
         case all = "All"
@@ -82,6 +89,8 @@ struct InventoryView: View {
                 Text(String(format: L10n.tr("inventory.remove.body"), spool.displayLabel))
             }
             .task { await load() }
+            .onAppear { takeLowStockRequest() }
+            .onChange(of: ordersNav.lowStockRequest) { _, _ in takeLowStockRequest() }
         }
     }
 

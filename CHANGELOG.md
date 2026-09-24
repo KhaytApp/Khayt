@@ -41,6 +41,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   background — only where it has nothing recorded, and without touching Undo.
   Products already made keep their figures: open one and fill its part from
   the file again to take the slicer's.
+- **(iOS) Home is Shop Pulse, as the v2 design draws it.** Today's counts (in
+  queue, printing, done today), the money (owed, this month, this year), the
+  pipeline lanes, alerts for late jobs, low stock and people waiting, and the
+  next five jobs — each swiped forward to move it on. The money is the shop's
+  own rules (`orderOwedBase`, the P&L's month rows), and a figure the phone's
+  copy of the book cannot answer — a month or a year older than the oldest
+  finished order it holds — shows an em-dash and "On the Mac", never a zero.
 
 - **(iOS) The companion moves to its real design (v2).** It had been built
   against an older mockup; the current design is Turki's Claude Design

@@ -476,3 +476,18 @@
 "connection.as_of" = "Working from the book · as of %@";
 "connection.live_only" = "Live from the Mac · nothing is kept on this phone";
 "connection.refresh" = "Refresh";
+
+/* Shop Pulse (design v2) */
+"pulse.title" = "Shop Pulse";
+"pulse.money" = "Money";
+"pulse.tap_to_filter" = "tap to filter";
+"pulse.jobs" = "%d jobs";
+"pulse.swipe_hint" = "Swipe a job forward to advance it. Tap to open.";
+"pulse.printing" = "Printing";
+"pulse.done_today" = "Done today";
+"pulse.owed" = "Owed";
+"pulse.unpaid" = "%d unpaid";
+"pulse.this_month" = "This month";
+"pulse.this_year" = "This year";
+"pulse.on_the_mac" = "On the Mac";
+"pulse.move_to" = "Move to";
