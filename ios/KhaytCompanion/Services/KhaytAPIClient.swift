@@ -60,6 +60,25 @@ final class KhaytAPIClient: ObservableObject {
     /// the Mac is out of reach or not yet reachable, is a working phone.
     var canSync: Bool { settings.isConfigured || cloud != nil }
 
+    /// Does this phone hold a book at all?
+    var holdsBook: Bool { reader?.holdsAnyBook ?? false }
+
+    /// How old the book is: the later of its last pull and the last sync.
+    var bookAsOf: Date? {
+        let pulled = book?.scope().flatMap { ISO8601DateFormatter.withFractions.date(from: $0.takenAt) }
+        return [pulled, lastSync?.at].compactMap { $0 }.max()
+    }
+
+    /// One cheap question to the Mac itself — the public `/api/status` — for a
+    /// strip that has to say whether the Mac is there, not whether the book is.
+    func macAnswers() async -> Bool {
+        guard settings.isConfigured,
+              let (_, response) = try? await request(path: "/api/status?format=json", method: "GET",
+                                                     body: nil, requiresPin: false),
+              let http = response as? HTTPURLResponse else { return false }
+        return (200...299).contains(http.statusCode)
+    }
+
     init(settings: ConnectionSettings) {
         self.settings = settings
         let config = URLSessionConfiguration.default
@@ -799,4 +818,13 @@ final class KhaytAPIClient: ObservableObject {
         }
         return .server("Request failed (HTTP \(status))")
     }
+}
+
+extension ISO8601DateFormatter {
+    /// `new Date().toISOString()` — what `StoreWriter.iso` writes.
+    static let withFractions: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 }

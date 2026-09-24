@@ -1,5 +1,7 @@
 # Khayt Companion — iOS UI mockup
 
+> **Superseded.** The current iOS design is `design/ios-v2/` (Claude Design, v2). Do not build from this folder.
+
 Place your design export here (HTML, CSS, images from Figma / v0 / etc.).
 
 **From your Mac (Documents clone):**

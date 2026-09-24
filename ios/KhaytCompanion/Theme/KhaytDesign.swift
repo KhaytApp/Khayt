@@ -1,51 +1,70 @@
 import SwiftUI
 
-/// Design tokens — native-first (adapts to light/dark via system colors) with the
-/// Khayt indigo brand accent. Surfaces use the iOS grouped-background hierarchy so
-/// cards/sections feel at home; labels use the system label hierarchy.
+/// Design tokens — `design/ios-v2/` (Claude Design, v2): the prototype's own
+/// `DARK` and `LIGHT` palettes, warm neutrals with a blue brand.
+///
+/// The names this app already used are kept and mapped onto the design's, so
+/// every screen moves to the new palette at once; the design's own names
+/// (`ground`, `sunk`, `hot`, `attention`, `note`, `late`) are here too, for
+/// the screens rebuilt against it.
+///
+/// The stage colours are the prototype's `TONE`: printing is `hot`, QC is
+/// `attention`, done is `done`, and pending and post are quiet `note` — only
+/// printing and QC earn a rail ("rails stay rare").
 enum KhaytDesign {
-    // Backgrounds (grouped hierarchy: screen → card → nested)
-    static let bg = Color(uiColor: .systemGroupedBackground)
-    static let bg2 = Color(uiColor: .systemBackground)
-    static let surface = Color(uiColor: .secondarySystemGroupedBackground)
-    static let surface2 = Color(uiColor: .tertiarySystemGroupedBackground)
-    static let surface3 = Color(uiColor: .tertiarySystemGroupedBackground)
+    // ── The design's palette ────────────────────────────────────────────
+    static let ground = Color(light: 0xEFEBE3, dark: 0x16130F)
+    static let surfaceV2 = Color(light: 0xFBF9F5, dark: 0x201C17)
+    static let sunk = Color(light: 0xE3DED3, dark: 0x2A251E)
+    static let hairlineV2 = Color(light: 0xDCD5C8, dark: 0x3A342C)
+    static let brandV2 = Color(light: 0x0B54AD, dark: 0x4591ED)
+    static let onBrand = Color(light: 0xFFFFFF, dark: 0x0B1622)
+    static let hot = Color(light: 0xAF3E18, dark: 0xF0763D)
+    static let done = Color(light: 0x1B5E4F, dark: 0x4FBFA0)
+    static let attention = Color(light: 0x8A5A0B, dark: 0xE0A73C)
+    static let late = Color(light: 0xBB2D44, dark: 0xF2564A)
+    static let note = Color(light: 0x4F5B69, dark: 0x9EA7B3)
+    static let ink = Color(light: 0x1E1A15, dark: 0xF2EDE4)
 
-    // Labels (system hierarchy → automatic light/dark + accessibility contrast)
-    static let text = Color(uiColor: .label)
-    static let textDim = Color(uiColor: .secondaryLabel)
-    static let textMuted = Color(uiColor: .tertiaryLabel)
-    static let textFaint = Color(uiColor: .quaternaryLabel)
+    // ── The names the app uses, on the design's palette ────────────────
+    static let bg = ground
+    static let bg2 = ground
+    static let surface = surfaceV2
+    static let surface2 = sunk
+    static let surface3 = sunk
 
-    // Brand / accent — Khayt indigo (desktop Workbench #4F5BF2), lifted in dark.
-    static let brand = Color(light: 0x4F5BF2, dark: 0x8183FF)
+    static let text = ink
+    static let textDim = note
+    static let textMuted = note.opacity(0.75)
+    static let textFaint = hairlineV2
+
+    static let brand = brandV2
     static let accent = brand
     static let accentSoft = brand.opacity(0.14)
     static let brandDim = accentSoft
     static let accentText = brand
     static let accentLine = brand.opacity(0.40)
 
-    // Semantic — system colors so they read in both modes.
-    static let ok = Color(uiColor: .systemGreen)
-    static let okSoft = ok.opacity(0.16)
-    static let warn = Color(uiColor: .systemOrange)
-    static let warnSoft = warn.opacity(0.16)
-    static let danger = Color(uiColor: .systemRed)
-    static let dangerSoft = danger.opacity(0.16)
-    static let orange = Color(uiColor: .systemOrange)
-    static let orangeSoft = orange.opacity(0.16)
-    static let info = Color(uiColor: .systemGray)
-    static let infoSoft = info.opacity(0.16)
-    static let violet = Color(uiColor: .systemPurple)
-    static let violetSoft = violet.opacity(0.16)
+    static let ok = done
+    static let okSoft = done.opacity(0.16)
+    static let warn = attention
+    static let warnSoft = attention.opacity(0.16)
+    static let danger = late
+    static let dangerSoft = late.opacity(0.16)
+    static let orange = hot
+    static let orangeSoft = hot.opacity(0.16)
+    static let info = note
+    static let infoSoft = note.opacity(0.16)
+    static let violet = note
+    static let violetSoft = note.opacity(0.16)
 
-    static let border = Color(uiColor: .separator)
-    static let hairline = Color(uiColor: .separator)
-    static let sep = Color(uiColor: .separator)
+    static let border = hairlineV2
+    static let hairline = hairlineV2
+    static let sep = hairlineV2
 
-    static let tabBg = Color(uiColor: .systemBackground)
-    static let navBg = Color(uiColor: .systemBackground)
-    static let sheetBg = Color(uiColor: .secondarySystemGroupedBackground)
+    static let tabBg = ground
+    static let navBg = ground
+    static let sheetBg = surfaceV2
 
     static let radiusSM: CGFloat = 10
     static let radiusMD: CGFloat = 12
@@ -54,19 +73,26 @@ enum KhaytDesign {
 
     static let pad: CGFloat = 16
 
+    /// The prototype's `TONE`.
     static func statusColor(for status: String) -> Color {
         switch status.lowercased() {
-        case "pending": return info
-        case "printing": return brand
-        case "post": return violet
-        case "qc": return warn
-        case "completed": return ok
+        case "pending": return note
+        case "printing": return hot
+        case "post": return note
+        case "qc": return attention
+        case "completed", "delivered", "shipped": return done
         case "on_hold": return textMuted
         case "idle", "ready": return ok
-        case "busy": return orange
+        case "busy": return hot
         case "error": return danger
         default: return textDim
         }
+    }
+
+    /// Whether a stage earns a coloured rail on its row — the prototype's
+    /// `RAILED`: printing and QC, and nothing else.
+    static func isRailed(_ status: String) -> Bool {
+        ["printing", "qc"].contains(status.lowercased())
     }
 
     static func statusSoft(for status: String) -> Color {

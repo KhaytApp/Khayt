@@ -398,8 +398,10 @@ private struct QueueOrderRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            // The design's rule: only printing and QC earn a rail. A pending job
+            // with no colour is what makes the coloured ones readable.
             RoundedRectangle(cornerRadius: 1.5)
-                .fill(KhaytDesign.statusColor(for: order.status))
+                .fill(KhaytDesign.isRailed(order.status) ? KhaytDesign.statusColor(for: order.status) : .clear)
                 .frame(width: 3)
                 .padding(.vertical, 2)
             VStack(alignment: .leading, spacing: 3) {

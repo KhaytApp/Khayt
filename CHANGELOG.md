@@ -26,6 +26,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Products already made keep their figures: open one and fill its part from
   the file again to take the slicer's.
 
+- **(iOS) The companion moves to its real design (v2).** It had been built
+  against an older mockup; the current design is Turki's Claude Design
+  prototype, now exported into `design/ios-v2/`. This first step is the
+  foundation: the design's own dark and light palette (warm neutrals, a blue
+  brand, orange for printing, amber for QC), its typeface (Space Grotesk,
+  bundled), coloured rails only on printing and QC rows, and the connection
+  strip it specifies — losing the Mac while the phone holds the book is now a
+  quiet "Working from the book · as of 14:32" with Refresh, and red is kept for
+  a phone that holds nothing and cannot reach the Mac.
+
 - **(Mac) A restored backup no longer chooses this Mac's slicer, or blanks
   its alert topic.** Restoring a backup keeps this Mac's own slicer settings —
   the program and its arguments run here, and a book restored from elsewhere
