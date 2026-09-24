@@ -17,12 +17,11 @@ jobs:
       - run: npm ci
       - name: The release step, verbatim, on "Khayt Setup 3.9.0.exe"
         timeout-minutes: 10
-        env:
-          GITHUB_REF_NAME: v3.9.0
         run: |
           mkdir -p build
           curl -fsSL -o "build/Khayt Setup 3.9.0.exe" https://github.com/KhaytApp/Khayt/releases/download/v3.9.0/Khayt-Setup-3.9.0.exe
-          v="${GITHUB_REF_NAME#v}"
+          REF=v3.9.0   # GITHUB_REF_NAME is set by GitHub and cannot be overridden here
+          v="${REF#v}"
           shopt -s nullglob
           found=(build/*Setup*"$v".exe)
           if [ "${#found[@]}" -ne 1 ]; then
