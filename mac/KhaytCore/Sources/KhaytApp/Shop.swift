@@ -797,6 +797,7 @@ final class Shop {
             remeasureIfDue()
             createRecurringIfDue()
             readProvenanceIfDue()
+            readSlicerFiguresIfDue()
             // Beside the standing orders, which is the same kind of thing: a
             // write the shop asked to have made for it. After the book has
             // loaded, because it reads what is already on order to decide.
@@ -1065,6 +1066,59 @@ final class Shop {
     /// read per model — the part before `<resources`, not the geometry — which
     /// is why this can run again on the next launch rather than needing a
     /// marker written into the book.
+    /// The books whose slicer figures this launch has already read.
+    private var slicerFiguresReadBooks: Set<String> = []
+
+    /// Read the slicer's own time, weight and material off every sliced file
+    /// the library has none for — once per book per launch, in the background.
+    ///
+    /// ── THE DATA ALREADY ON DISK ─────────────────────────────────────────
+    ///
+    /// Until Sep 2026 the Mac imported models without these, so a shop's whole
+    /// library — 247 models in this one — carried no slicer figures, and a
+    /// product made from a U1 3MF that says 4 h 37 min was priced at a 0.97 h
+    /// geometry guess. Fixing the import alone would have left every model
+    /// already there wrong, so the ones there are read too. Only an EMPTY
+    /// `parsed` is filled; nothing the shop or the other app wrote is replaced,
+    /// no undo is registered, and products already made are left alone — a
+    /// price does not change behind the shop's back.
+    func readSlicerFiguresIfDue() {
+        guard case .store(let build) = source, let engine,
+              !slicerFiguresReadBooks.contains(build.rawValue) else { return }
+        slicerFiguresReadBooks.insert(build.rawValue)
+        let due: [(id: String, url: URL)] = files.compactMap { file in
+            guard case .object(let rec)? = row(for: file.id),
+                  { if case .object(let o)? = rec["parsed"] { return o.isEmpty } else { return true } }(),
+                  let url = modelFile(for: file),
+                  ["3mf", "gcode", "gco"].contains(url.pathExtension.lowercased()) else { return nil }
+            return (file.id, url)
+        }
+        guard !due.isEmpty else { return }
+        Task { [weak self] in
+            var found: [String: [String: JSONValue]] = [:]
+            for item in due {
+                if let parsed = await SlicerFigures.read(item.url, engine: engine) { found[item.id] = parsed }
+            }
+            guard let self, !found.isEmpty else { return }
+            do {
+                try StoreWriter.update(build) { root in
+                    guard case .array(var rows)? = root["printFiles"] else { return }
+                    for i in rows.indices {
+                        guard case .object(var r) = rows[i], case .string(let id)? = r["id"],
+                              let parsed = found[id] else { continue }
+                        if case .object(let now)? = r["parsed"], !now.isEmpty { continue }
+                        r["parsed"] = .object(parsed)
+                        StoreWriter.stamp(&r)
+                        rows[i] = .object(r)
+                    }
+                    root["printFiles"] = .array(rows)
+                }
+                await self.load(self.source)
+                FileHandle.standardError.write(Data("slicer figures: \(found.count) model(s) filled\n".utf8))
+            } catch {}
+        }
+    }
+
     func readProvenanceIfDue() {
         guard case .store(let build) = source,
               !provenanceReadBooks.contains(build.rawValue) else { return }

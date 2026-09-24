@@ -5622,6 +5622,45 @@ public actor KhaytEngine {
         return answer
     }
 
+    /// What the SLICER said a file will take — time, weight, material — read by
+    /// the shared parsers the other app imports with (`lib/model-intake.js`
+    /// order): a G-code's own summary first, then a Bambu/Orca/Snapmaker 3MF's
+    /// `slice_info.config` through `KhaytMfConvert.extractMeta`. Nil when the
+    /// file carries no time AND weight — an unsliced model.
+    ///
+    /// The Mac imported models without this until Sep 2026, so a sliced 3MF
+    /// that says 4 h 37 min was priced at a geometry guess of 0.97 h.
+    public func slicerFigures(configs: [String: String], gcodeText: String?) throws -> [String: JSONValue]? {
+        let members = JSONValue.array(configs.map { .object(["name": .string($0.key), "data": .string($0.value)]) })
+        let answer = try runtime.call2(#"""
+            (function (members, gtext) {
+              if (gtext) {
+                var p = globalThis.KhaytGcodeParse.parseGcodeText(gtext);
+                if (p && p.printTimeMins > 0 && p.filamentGrams > 0)
+                  return { printTimeMins: p.printTimeMins, filamentGrams: p.filamentGrams,
+                           filamentType: p.filamentType || '', filamentCost: p.filamentCost || null,
+                           slicer: p.slicer || '', source: 'slicer' };
+              }
+              for (var i = 0; i < members.length; i++) {
+                if (!/\.(config|txt)$/i.test(members[i].name)) continue;
+                var q = globalThis.KhaytGcodeParse.parseGcodeText(members[i].data);
+                if (q && q.printTimeMins > 0 && q.filamentGrams > 0)
+                  return { printTimeMins: q.printTimeMins, filamentGrams: q.filamentGrams,
+                           filamentType: q.filamentType || '', filamentCost: q.filamentCost || null,
+                           slicer: q.slicer || '', source: 'slicer' };
+              }
+              var meta = globalThis.KhaytMfConvert.extractMeta(members);
+              if (!(meta && meta.totalGrams > 0 && meta.printMinutes > 0)) return null;
+              var slice = (members.find(function (m) { return /slice_info\.config$/i.test(m.name); }) || {}).data || '';
+              var t = /<filament\b[^>]*\btype="([^"]+)"/i.exec(slice);
+              return { printTimeMins: meta.printMinutes, filamentGrams: meta.totalGrams,
+                       filamentType: t ? t[1] : '', slicer: 'Bambu/Orca', source: 'slicer' };
+            })(ARG0, ARG1)
+            """#, [members, gcodeText.map(JSONValue.string) ?? .null], as: JSONValue.self)
+        guard case .object(let o) = answer else { return nil }
+        return o
+    }
+
     /// What a stranger's uploaded model may be quoted at: `lib/public-quote.js`.
     ///
     /// `intake` is the parsed file — `{ exact, printTimeMins, filamentGrams }`
