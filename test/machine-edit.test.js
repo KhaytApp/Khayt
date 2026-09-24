@@ -393,3 +393,14 @@ test('a serial, a mainboard id and a Repetier slug can be set, and cleared, from
   M.applyEdit(r, { printerApi: { type: 'repetier', host: '10.0.0.9', printerSlug: ' ender3 ' } }, {});
   assert.equal(r.printerApi.printerSlug, 'ender3');
 });
+
+test('loaded spools typed by hand are cleaned by the shared rule, and kept by an edit that does not name them', () => {
+  const ME = require('../lib/machine-edit');
+  const m = { id: 'm1', name: 'CORE One', maxColors: 1 };
+  ME.applyEdit(m, { loaded: [{ hex: 'ff6600', material: 'PETG' }, { hex: 'not a colour', material: 'PLA' }] });
+  assert.deepEqual(m.loaded, [{ slot: 0, hex: '#FF6600', material: 'PETG' }]);
+  ME.applyEdit(m, { name: 'CORE One L' });
+  assert.equal(m.loaded.length, 1, 'renaming the machine forgot what was loaded');
+  ME.applyEdit(m, { loaded: [] });
+  assert.deepEqual(m.loaded, []);
+});
