@@ -104,18 +104,14 @@ struct Sidebar: View {
             // Simple shop. This one showed them to everybody, which is two
             // apps disagreeing about what a shop has. The waste log is not
             // gated anywhere and stays.
-            // The two counts below are for the chosen PERIOD, like the lists
-            // they open: "this month" showed three rows under a sidebar that
-            // said forty. Not the search — a count that moved as the shop
-            // typed would be a second search box.
             Section(shop.words.callIt("mac.money")) {
                 if shop.has("expenses") {
                     Row(title: shop.words.callIt("mac.nav_expenses"), mark: .expenses,
-                        count: shop.expenses.count { shop.inPeriod($0.date) }, selected: shop.shelf == .expenses)
+                        count: shop.expenses.count, selected: shop.shelf == .expenses)
                         .tag(Shop.Shelf.expenses)
                 }
                 Row(title: shop.words.callIt("mac.nav_waste"), mark: .waste,
-                    count: shop.wasteLog.count { shop.inPeriod($0.date) }, selected: shop.shelf == .waste)
+                    count: shop.wasteLog.count, selected: shop.shelf == .waste)
                     .tag(Shop.Shelf.waste)
                 // No count: a quarter is not a thing a shop has a number of.
                 if shop.has("analytics") {

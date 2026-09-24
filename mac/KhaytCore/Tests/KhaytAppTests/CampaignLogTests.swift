@@ -44,7 +44,7 @@ struct CampaignLogTests {
 
     @Test("a day, not an instant")
     func aDay() {
-        let runs = Self.runs([Self.run("2026-09-20T23:14:07.512Z",
+        let runs = Self.runs([Self.run("2026-09-20T11:14:07.512Z",
                                        reached: 5, sent: 5, failed: 0)])
         #expect(runs.first?.day == "2026-09-20",
                 "a list of times to the second is a list nobody reads")

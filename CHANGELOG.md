@@ -77,8 +77,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     notification to the Mac, Telegram and ntfy each time, and a stall was
     never reported for a shop that edits often. Watching now starts once per
     book.
-  - **The sidebar's Expenses and Waste counts** are for the chosen period,
-    like the lists they open.
   - **The first Undo after launch undid a change nobody made.** Reading each
     model's designer and licence from its file no longer lands on the Undo
     stack, runs off the main thread, and never overwrites a source typed in
