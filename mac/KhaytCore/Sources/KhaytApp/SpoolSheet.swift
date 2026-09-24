@@ -32,6 +32,9 @@ struct SpoolSheet: View {
     @State private var cost: Double = 0
     @State private var vatAmount: Double = 0
     @State private var weight: Double = 1000
+    /// What the spool held when it was bought — the figure a price per kilo is
+    /// worked out from. Asked only when editing: a new spool records it itself.
+    @State private var fullWeight: Double = 0
     @State private var lot = ""
     @State private var reorderPoint: Double = 200
     /// What this filament wants to be printed at. Zero means the shop has not
@@ -146,6 +149,21 @@ struct SpoolSheet: View {
                         TextField("", value: $weight, format: .number.precision(.fractionLength(0...1)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                         Text(shop.words.callIt(unitKey)).foregroundStyle(.secondary)
+                    }
+                }
+                // WHAT IT HELD WHEN BOUGHT. The price per kilo and the spool
+                // drawing both need it, and a spool added before it was
+                // recorded has none — so every one of this shop's spools drew
+                // as the same grey disc and "What materials cost" had nothing
+                // to say. The shop knows it: it bought a 1 kg roll.
+                if !isNew {
+                    GridRow {
+                        Text(shop.words.callIt("mac.full_spool")).foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            TextField("", value: $fullWeight, format: .number.precision(.fractionLength(0)))
+                                .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                            Text(shop.words.callIt(unitKey)).foregroundStyle(.secondary)
+                        }
                     }
                 }
                 GridRow {
@@ -335,6 +353,7 @@ struct SpoolSheet: View {
         cost = spool.cost ?? 0
         vatAmount = spool.vatAmount ?? 0
         weight = spool.weight ?? 0
+        fullWeight = spool.spoolWeight ?? 0
         unit = shop.unit(of: spool)?.unit ?? "g"
         lot = spool.lot ?? ""
         reorderPoint = spool.reorderPoint ?? 200
@@ -413,6 +432,7 @@ struct SpoolSheet: View {
             "bedTemp": .number(bedTemp),
             "maxSpeed": .number(maxSpeed),
         ]
+        if !isNew, fullWeight > 0 { input["spoolWeight"] = .number(fullWeight) }
         if !isNew {
             // Absent means "leave it as it is", so a cleared date has to be
             // sent as an empty string rather than left out.

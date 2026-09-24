@@ -150,6 +150,20 @@ struct Reports: View {
                         // table that scrolls rather than a page that does.
                         table
                             .frame(height: Self.tableHeight(rows.count))
+                        // WHY A MARGIN CAN READ −400%. Finished jobs charged
+                        // nothing still cost their material, and the margin
+                        // counts it. Said, with the way to leave them out,
+                        // rather than left as a number that looks like a fault.
+                        if let note = unpricedNote {
+                            Text(note)
+                                .font(.callout).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                // The screen's own margin, like the chart under
+                                // it — flush to the edge it read as overflow.
+                                .padding(.horizontal, Metric.screen)
+                                .padding(.top, 8)
+                        }
                         // Under the table rather than beside it: the quarters
                         // are what the shop earned, and this is the follow-up
                         // question — did any of it arrive.
@@ -227,6 +241,14 @@ struct Reports: View {
     static func tableHeight(_ count: Int) -> CGFloat {
         let rows = CGFloat(max(2, min(count, 10)))
         return 46 + rows * 44
+    }
+
+    /// The sentence under the table when some finished work was charged
+    /// nothing, or nil when none was.
+    private var unpricedNote: String? {
+        let n = rows.reduce(0) { $0 + ($1.unpriced ?? 0) }
+        guard n > 0 else { return nil }
+        return shop.words.callIt("mac.pnl_unpriced", ["n": .number(Double(n))])
     }
 
     private var table: some View {

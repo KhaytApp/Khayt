@@ -7648,6 +7648,14 @@ public actor KhaytEngine {
         return try runtime.call2("KhaytLoadedColours.fit(ARG0, ARG1)", [row, slots], as: LoadedFit.self)
     }
 
+    /// Mark a job as not business, or as business again, through the shared
+    /// setter (`lib/business-scope.js`), which removes the field rather than
+    /// writing `false` — the shape the other app writes.
+    public func setNonBusiness(_ order: JSONValue, on: Bool) throws -> JSONValue {
+        try runtime.call2("KhaytBusinessScope.setNonBusiness(ARG0, ARG1)", [order, .bool(on)],
+                          as: JSONValue.self)
+    }
+
     public struct PrinterAlerts: Decodable, Sendable {
         public let alerts: [Alert]
         /// The cooldown and stall bookkeeping, opaque and owned by the module.

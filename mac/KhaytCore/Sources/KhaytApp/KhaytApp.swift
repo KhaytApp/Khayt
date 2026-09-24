@@ -622,6 +622,37 @@ final class Activator: NSObject, NSApplicationDelegate {
                     + (shop.backupProblem.map { " — \($0)" } ?? "") + "\n"
                 FileHandle.standardError.write(Data(line.utf8))
             }
+            // ── EVERY SCREEN, FROM THE SHOP'S OWN BOOK (KHAYT_SNAPSHOT_REAL=1) ──
+            //
+            // The run above is for reviewing the DESIGN, so it deliberately
+            // swaps to the sample for most screens. That hides what only the
+            // shop's real records can show: a night's review of the three live
+            // screens found four real bugs (▼3 on three full spools, an
+            // unanswering printer called faulted and free). This walks every
+            // shelf of the real book and photographs it, and does nothing
+            // else: navigation only, no sheets, no gestures. Writes are gated
+            // on owning the book, and a running Khayt holds it.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_REAL"] == "1", let shop = subject {
+                if let real = Shop.available.first(where: \.isReal) { await shop.load(real) }
+                // Long enough for the printers to answer, which the dashboard
+                // and the machines screen draw.
+                try? await Task.sleep(for: .seconds(4))
+                let shelves: [(String, Shop.Shelf)] = [
+                    ("dashboard", .dashboard), ("jobs", .jobs(nil)), ("board", .board),
+                    ("library", .library(nil)), ("catalogue", .catalogue), ("customers", .customers),
+                    ("machines", .machines), ("inventory", .inventory), ("expenses", .expenses),
+                    ("waste", .waste), ("reports", .reports), ("portfolio", .portfolio),
+                    ("gift-cards", .giftCards), ("calculator", .calculator), ("colour", .colour),
+                ]
+                for (name, shelf) in shelves {
+                    shop.shelf = shelf
+                    await settle()
+                    try? await Task.sleep(for: .milliseconds(600))
+                    capture(named: "real-" + name, into: dir)
+                }
+                NSApp.terminate(nil)
+                return
+            }
             // DARK FIRST, then light, then everything else in light.
             //
             // A Mac app is used in both and every screenshot this runner has

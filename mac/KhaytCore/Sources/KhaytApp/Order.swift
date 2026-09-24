@@ -35,6 +35,10 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     let client: String
     let currency: String
     let price: Double
+    /// A test, a gift, something for the shop itself: out of revenue, order
+    /// counts and reports, still in nozzle wear and capacity. See
+    /// `lib/business-scope.js`. Absent is the ordinary case, a real job.
+    let nonBusiness: Bool?
     let paidAmount: Double
     let costBasis: Double
     let paymentStatus: String
@@ -99,6 +103,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         case machineId, clientId, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
         case carrier, trackingNumber, shippingService, shippingStatus
         case fromStock
+        case nonBusiness
         case instalments, instalmentBase
     }
 
@@ -136,6 +141,9 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         project = try c.decode(String.self, forKey: .project)
         client = try c.decodeIfPresent(String.self, forKey: .client) ?? ""
         currency = try c.decodeIfPresent(String.self, forKey: .currency) ?? ""
+        // Lenient: only `true` means anything, and a stray value in an old
+        // book must not take the whole job list down with it.
+        nonBusiness = (try? c.decodeIfPresent(Bool.self, forKey: .nonBusiness)) ?? nil
         price = try c.decode(Double.self, forKey: .price)
         paidAmount = try c.decode(Double.self, forKey: .paidAmount)
         costBasis = try c.decodeIfPresent(Double.self, forKey: .costBasis) ?? 0

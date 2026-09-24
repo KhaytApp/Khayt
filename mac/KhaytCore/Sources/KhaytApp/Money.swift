@@ -72,6 +72,17 @@ enum Money {
     /// altogether and hands back "1234567.89".
     private static let digits = Locale(identifier: "en_US")
 
+    /// A value that shows as zero at `decimals` places, as an UNSIGNED zero.
+    ///
+    /// −0.0 is a real Double — `-row.expenses` on a quarter that spent
+    /// nothing — and NumberFormatter keeps its sign, so the P&L chart labelled
+    /// an empty bar "−0.00", which reads as a figure somebody worked out. So
+    /// does −0.001 at two places. Every formatter here goes through this.
+    static func unsignedZero(_ x: Double, decimals: Int) -> Double {
+        let scale = pow(10, Double(max(0, decimals)))
+        return (x * scale).rounded() == 0 ? 0 : x
+    }
+
 
     /// A quantity that is NOT money — grams, hours, millilitres.
     ///
@@ -91,6 +102,7 @@ enum Money {
         f.locale = digits
         f.minimumFractionDigits = decimals
         f.maximumFractionDigits = decimals
+        let value = unsignedZero(value, decimals: decimals)
         return f.string(from: value as NSNumber) ?? "\(value)"
     }
 
@@ -100,6 +112,7 @@ enum Money {
         f.locale = digits
         f.minimumFractionDigits = 2
         f.maximumFractionDigits = 2
+        let amount = unsignedZero(amount, decimals: 2)
         let n = f.string(from: amount as NSNumber) ?? "\(amount)"
         return "\(n) \(mark(currency))"
     }
@@ -112,6 +125,7 @@ enum Money {
         f.locale = digits
         f.minimumFractionDigits = 2
         f.maximumFractionDigits = 2
+        let amount = unsignedZero(amount, decimals: 2)
         return f.string(from: amount as NSNumber) ?? "\(amount)"
     }
 
@@ -140,6 +154,7 @@ enum Money {
         f.locale = digits
         f.minimumFractionDigits = 0
         f.maximumFractionDigits = 1
+        let n = unsignedZero(n, decimals: 1)
         return f.string(from: n as NSNumber) ?? "\(n)"
     }
 

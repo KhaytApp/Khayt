@@ -108,6 +108,10 @@ struct ScreenActions: View {
                 // rather than one form at a time.
                 Button(shop.words.callIt("mac.spoolman_import") + "…") { shop.importingSpoolman = true }
                     .disabled(!shop.canMoveJobs)
+                    // ON NAVY. A system button draws its text for a light
+                    // surface, and on this strip that was dark grey on navy —
+                    // readable only by someone who already knew it was there.
+                    .environment(\.colorScheme, .dark)
                 plus("mac.new_spool", enabled: shop.canMoveJobs) { shop.addingSpool = true }
             } else if shop.showingExpenses {
                 period
@@ -126,6 +130,9 @@ struct ScreenActions: View {
                     Text(shop.words.callIt("mac.by_month")).tag(true)
                 }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
+                // On navy, like the button above: the segmented control's
+                // labels were dark grey on the strip.
+                .environment(\.colorScheme, .dark)
             }
 
             // THE PANEL'S SWITCH, on every screen that has a panel.

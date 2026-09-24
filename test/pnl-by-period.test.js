@@ -390,3 +390,24 @@ test('the margin is on what the shop kept: revenue net of tax, cost in the shop\
   assert.equal(q.revenue, 1000);
   assert.equal(q.marginPct, 60);
 });
+
+// The shop's real book, Sep 2026: one job at 50 and nineteen finished test
+// prints charged nothing, costing 297.9 between them. Q3 read -495.8%.
+test('a job marked not for the business is out of the P&L, and unpriced work is counted', () => {
+  const job = (id, price, costBasis, extra = {}) =>
+    Object.assign({ id, status: 'completed', date: '2026-09-10', price, costBasis }, extra);
+  const orders = [job('paid', 50, 35.91)];
+  for (let i = 0; i < 19; i++) orders.push(job('test' + i, 0, 13.47));
+  const ctx = { settings: {}, now: new Date('2026-09-24T12:00:00') };
+
+  const before = pnlByPeriod(orders, [], ctx)[0];
+  assert.equal(before.orders, 20);
+  assert.equal(before.unpriced, 19, 'the screen needs to be able to say why');
+  assert.ok(before.marginPct < -400, 'unmarked, their material is in the margin');
+
+  for (const o of orders.slice(1)) o.nonBusiness = true;
+  const after = pnlByPeriod(orders, [], ctx)[0];
+  assert.equal(after.orders, 1, 'marked not for the business, they are not trade');
+  assert.equal(after.unpriced, 0);
+  assert.equal(after.marginPct, 28.2);
+});

@@ -550,6 +550,8 @@ final class Words {
                               "ar": "لم يمر أي عمل بالفحص بعد."],
         // What the shelf costs.
         "mac.mc_title":      ["en": "What materials cost", "ar": "تكلفة المواد"],
+        "mac.full_spool":   ["en": "Full spool", "ar": "البكرة كاملة"],
+        "mac.mc_needs_full": ["en": "What a kilo costs needs each spool's full weight. Edit a spool and fill in Full spool (1,000 g for a 1 kg roll).", "ar": "تكلفة الكيلو تحتاج وزن كل بكرة كاملة. عدّل البكرة واملأ «البكرة كاملة» (1,000 غ لبكرة 1 كغ)."],
         "mac.mc_per":        ["en": "per {unit}",        "ar": "لكل {unit}"],
         "mac.mc_risen":      ["en": "{name} has risen {pct}% since you first bought it.",
                               "ar": "ارتفع {name} بنسبة {pct}% منذ أول شراء."],
@@ -1716,6 +1718,8 @@ final class Words {
         "mac.search_products": ["en": "Product, material or group", "ar": "منتج أو خامة أو مجموعة"],
         "mac.search_waste":  ["en": "Material, reason or failure", "ar": "خامة أو سبب أو نوع العطل"],
         "mac.of_which_fixed": ["en": "incl. overhead", "ar": "منها التكاليف الثابتة"],
+        "mac.pnl_unpriced": ["en": "{n} finished jobs were charged nothing. What they cost to make is in the margin. For a test, a gift or something for the shop itself, right-click the job and choose Not business to leave it out.", "ar": "{n} من الأعمال المنجزة لم يُحتسب عليها شيء، وتكلفتها داخلة في الهامش. إن كانت تجربة أو هدية أو شيئًا للمحل نفسه، انقر على العمل بالزر الأيمن واختر «ليس عملًا تجاريًا» لاستبعاده."],
+        "mac.not_business": ["en": "Not business", "ar": "ليس عملًا تجاريًا"],
         "mac.quarter_in_progress": ["en": "This quarter is still running, so its overhead is charged for the days elapsed.",
                                     "ar": "هذا الربع لم ينتهِ، فتُحتسب تكاليفه الثابتة بحسب الأيام المنقضية."],
         "mac.edit_spool":    ["en": "Edit spool",   "ar": "تعديل البكرة"],

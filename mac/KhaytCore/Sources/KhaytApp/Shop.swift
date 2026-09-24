@@ -4099,6 +4099,15 @@ final class Shop {
         }
     }
 
+    /// Mark a job as not business — a test, a gift, something for the shop
+    /// itself — or as business again. It leaves revenue, order counts and the
+    /// reports; it still wears the nozzle and still took the machine's time.
+    func setNonBusiness(_ id: Order.ID, _ on: Bool) async {
+        await writeToOneOrder(id, named: words.callIt("mac.not_business")) { order, engine, _ in
+            OneOrderEdit(order: try await engine.setNonBusiness(order, on: on))
+        }
+    }
+
     /// Change one part of a job, and re-cost it.
     ///
     /// ── WHY THE RATES ARE WRITTEN BACK, NOT JUST THE COST ──────────────────
