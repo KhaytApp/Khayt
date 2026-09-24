@@ -471,3 +471,8 @@
 "stage.short.post" = "معالجة";
 "stage.short.qc" = "فحص";
 "stage.short.completed" = "مكتمل";
+
+/* Connection strip (design v2) */
+"connection.as_of" = "يعمل من الدفتر · حتى %@";
+"connection.live_only" = "مباشر من الماك · لا يُحفظ شيء على هذا الهاتف";
+"connection.refresh" = "تحديث";

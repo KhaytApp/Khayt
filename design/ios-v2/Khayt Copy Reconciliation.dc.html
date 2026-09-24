@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+@font-face{font-family:"Space Grotesk";src:url("renderer/fonts/space-grotesk-latin-400.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Space Grotesk";src:url("renderer/fonts/space-grotesk-latin-500.woff2") format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"Space Grotesk";src:url("renderer/fonts/space-grotesk-latin-600.woff2") format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:"Space Grotesk";src:url("renderer/fonts/space-grotesk-latin-700.woff2") format("woff2");font-weight:700;font-display:swap}
+body{margin:0;background:#efebe3;font-family:"Space Grotesk","IBM Plex Sans Arabic",ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#0b54ad;text-decoration:none}
+a:hover{color:#08417f}
+</style>
+</helmet>
+
+<div style="max-width:1180px; margin:0 auto; padding:44px 32px 80px">
+
+  <div style="font:700 10px/1 'Space Grotesk',sans-serif; letter-spacing:.12em; text-transform:uppercase; color:#4f5b69; margin-bottom:12px">Khayt Companion · section 6</div>
+  <h1 style="margin:0 0 12px; font:600 34px/1.15 'Space Grotesk',sans-serif; letter-spacing:-.02em; color:#1E1A15">Copy reconciliation</h1>
+  <p style="margin:0 0 8px; max-width:660px; font:400 15px/1.6 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">{{ appKeyCount }} keys in <code style="font:500 13.5px ui-monospace,monospace">en.lproj</code> and <code style="font:500 13.5px ui-monospace,monospace">ar.lproj</code>, against the design's dictionary. <strong style="color:#1E1A15">Rows classed Same or App only are the app's real strings, transcribed, not reconstructed.</strong> The {{ newCount }} rows classed New are proposals — their Arabic is mine and has had no native read.</p>
+  <p style="margin:0 0 32px; max-width:660px; font:400 14px/1.6 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">I was wrong that the catalogue was uncommitted — it is at <code style="font:500 13px ui-monospace,monospace">ios/KhaytCompanion/Resources/*.lproj/Localizable.strings</code>. My file-name filter skipped <code style="font:500 13px ui-monospace,monospace">.strings</code> and I reported absence instead of saying my search had failed.</p>
+
+  <div style="background:#fbf9f5; border:1px solid #dcd5c8; border-radius:10px; padding:22px 24px; margin-bottom:34px">
+    <div style="font:700 10px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#bb2d44; margin-bottom:14px">Read these first — Arabic that differs in meaning, not style</div>
+    <div style="display:flex; flex-direction:column; gap:16px">
+      <sc-for list="{{ flags }}" as="fl" hint-placeholder-count="7">
+        <div style="position:relative; padding-inline-start:16px">
+          <span style="position:absolute; inset-block:2px 2px; inset-inline-start:0; width:3px; border-radius:2px; background:{{ fl.tone }}"></span>
+          <div style="display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; margin-bottom:5px">
+            <code style="font:600 12.5px ui-monospace,monospace; color:#1E1A15">{{ fl.key }}</code>
+            <span style="font:700 9px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; padding:3px 7px; border-radius:4px; color:{{ fl.tone }}; background:{{ fl.wash }}">{{ fl.severity }}</span>
+          </div>
+          <div style="display:flex; gap:18px; flex-wrap:wrap; margin-bottom:6px">
+            <span style="font:400 13px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69">EN <span style="color:#1E1A15">{{ fl.en }}</span></span>
+            <span style="font:400 13px/1.5 'IBM Plex Sans Arabic',sans-serif; color:#4f5b69" dir="rtl">AR <span style="color:#1E1A15">{{ fl.ar }}</span></span>
+          </div>
+          <div style="font:400 13px/1.55 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">{{ fl.why }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:22px">
+    <sc-for list="{{ filters }}" as="ft" hint-placeholder-count="4">
+      <button onClick="{{ ft.onPick }}" style="min-height:40px; padding:0 15px; border-radius:9px; cursor:pointer; font:600 13px 'Space Grotesk',sans-serif; background:{{ ft.bg }}; color:{{ ft.ink }}; border:1px solid {{ ft.line }}">{{ ft.label }} <span style="font-variant-numeric:tabular-nums; opacity:.65">{{ ft.count }}</span></button>
+    </sc-for>
+  </div>
+
+  <div style="position:relative; overflow:hidden; display:flex; align-items:flex-start; gap:11px; padding:13px 16px 13px 19px; margin-bottom:14px; background:rgba(138,90,11,.09); border:1px solid rgba(138,90,11,.3); border-radius:9px">
+    <span style="position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:#8a5a0b"></span>
+    <p style="margin:0; font:400 13px/1.55 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty"><strong style="color:#8a5a0b">Arabic in the {{ newCount }} “New” rows is unreviewed.</strong> Those keys do not exist in the app, so their Arabic could not be transcribed — I wrote it. It is the only Arabic in this document that no native speaker and no shipped build has seen. Treat it as a brief for a translator, not as copy.</p>
+  </div>
+
+  <div style="background:#fbf9f5; border:1px solid #dcd5c8; border-radius:10px; overflow:hidden">
+    <div style="display:flex; gap:12px; padding:11px 18px; background:#e3ded3; border-bottom:1px solid #dcd5c8">
+      <span style="flex:0 0 196px; font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69">App key</span>
+      <span style="flex:0 0 148px; font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69">Design key</span>
+      <span style="flex:1 1 190px; min-width:0; font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69">English</span>
+      <span style="flex:1 1 170px; min-width:0; font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69">Arabic</span>
+      <span style="flex:0 0 74px; font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69">Class</span>
+    </div>
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="30">
+      <div style="display:flex; gap:12px; align-items:flex-start; padding:10px 18px; border-bottom:1px solid #e6e0d5; background:{{ r.bg }}">
+        <code style="flex:0 0 196px; font:500 11.5px/1.45 ui-monospace,monospace; color:#1E1A15; word-break:break-all">{{ r.appKey }}</code>
+        <code style="flex:0 0 148px; font:500 11.5px/1.45 ui-monospace,monospace; color:{{ r.designTone }}; word-break:break-all">{{ r.designKey }}</code>
+        <span style="flex:1 1 190px; min-width:0; font:400 12.5px/1.45 ui-sans-serif,system-ui,sans-serif; color:#1E1A15">{{ r.en }}</span>
+        <span style="flex:1 1 170px; min-width:0">
+          <span style="display:block; font:400 12.5px/1.6 'IBM Plex Sans Arabic',sans-serif; color:#1E1A15" dir="rtl">{{ r.ar }}</span>
+          <sc-if value="{{ r.arUnreviewed }}" hint-placeholder-val="{{ false }}">
+            <span style="display:inline-block; margin-top:4px; padding:2px 6px; border-radius:4px; font:700 8.5px/1.3 'Space Grotesk',sans-serif; letter-spacing:.08em; text-transform:uppercase; color:#8a5a0b; background:rgba(138,90,11,.12)">Unreviewed · mine</span>
+          </sc-if>
+        </span>
+        <span style="flex:0 0 74px; font:700 9px/1.3 'Space Grotesk',sans-serif; letter-spacing:.06em; text-transform:uppercase; color:{{ r.tone }}">{{ r.cls }}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:20px; margin-top:34px">
+    <div style="flex:1 1 300px; min-width:0; background:#fbf9f5; border:1px solid #dcd5c8; border-radius:10px; padding:18px 20px">
+      <div style="font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-bottom:11px">How to read the classes</div>
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <div><span style="font:700 9px 'Space Grotesk',sans-serif; letter-spacing:.06em; text-transform:uppercase; color:#1b5e4f">Same</span> <span style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69">— (a) the app and the design mean the same thing. Where the wording differs, <strong>keep the app's</strong>: it is already translated and already shipped.</span></div>
+        <div><span style="font:700 9px 'Space Grotesk',sans-serif; letter-spacing:.06em; text-transform:uppercase; color:#0b54ad">New</span> <span style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69">— (b) the design needs a key the app has no equivalent for. Almost all of these are the partial-book vocabulary, which could not exist before the phone held records. <strong style="color:#8a5a0b">Their Arabic is mine and unreviewed</strong> — English is the source of truth for these rows; the Arabic is a starting point for a translator.</span></div>
+        <div><span style="font:700 9px 'Space Grotesk',sans-serif; letter-spacing:.06em; text-transform:uppercase; color:#8a5a0b">App only</span> <span style="font:400 12.5px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69">— (c) shipping strings the design does not use yet. Most are the three screens still to do; a few are genuinely obsolete under Bonjour.</span></div>
+      </div>
+    </div>
+    <div style="flex:1 1 300px; min-width:0; background:#fbf9f5; border:1px solid #dcd5c8; border-radius:10px; padding:18px 20px">
+      <div style="font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-bottom:11px">Obsolete under Bonjour</div>
+      <p style="margin:0 0 9px; font:400 12.5px/1.55 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty">These four exist to service a question nobody is asked any more. They stay only for the "enter the address myself" disclosure, and two of them can go outright.</p>
+      <div style="display:flex; flex-direction:column; gap:4px">
+        <code style="font:500 11.5px ui-monospace,monospace; color:#1E1A15">settings.endpoint</code>
+        <code style="font:500 11.5px ui-monospace,monospace; color:#1E1A15">settings.host_required</code>
+        <code style="font:500 11.5px ui-monospace,monospace; color:#1E1A15">settings.retest</code>
+        <code style="font:500 11.5px ui-monospace,monospace; color:#1E1A15">home.subtitle</code>
+      </div>
+      <p style="margin:9px 0 0; font:400 12px/1.5 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty"><code style="font:500 11px ui-monospace,monospace">home.subtitle</code> — "Live from your Khayt desktop" — is now false on any phone holding a book.</p>
+    </div>
+  </div>
+
+  <div style="background:#fbf9f5; border:1px solid #dcd5c8; border-radius:10px; padding:18px 20px; margin-top:20px">
+    <div style="font:700 9.5px/1 'Space Grotesk',sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#4f5b69; margin-bottom:11px">One the app already had, and I reinvented</div>
+    <p style="margin:0; font:400 13px/1.6 ui-sans-serif,system-ui,sans-serif; color:#4f5b69; text-wrap:pretty"><code style="font:500 12px ui-monospace,monospace">connection.banner.cached</code> — <em>"Showing what your desktop last told us, from {when}. Reconnect for live numbers."</em> — is the app's existing staleness sentence, and it already takes a <code style="font:500 12px ui-monospace,monospace">{when}</code>. My as-of stamp is the same idea with a different shape. <strong style="color:#1E1A15">Reuse the key, replace the sentence:</strong> the old wording frames staleness as a degraded state to be escaped ("reconnect for live numbers"), which was true of a cache and is wrong for a book. The parameter, the plumbing and the Arabic slot all already exist.</p>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1240,&quot;height&quot;:1200}}">
+// Every EN and AR string below is copied from
+// ios/KhaytCompanion/Resources/{en,ar}.lproj/Localizable.strings at main.
+// [appKey, en, ar, designKey|'', class]  class: s=same  a=appOnly
+const APP = [
+  ['tab.home', 'Home', 'الرئيسية', 'tab_home', 's'],
+  ['tab.orders', 'Orders', 'الطلبات', 'tab_orders', 's'],
+  ['tab.inventory', 'Inventory', 'المخزون', 'tab_inventory', 's'],
+  ['tab.machines', 'Machines', 'الآلات', 'tab_machines', 's'],
+  ['tab.clients', 'Clients', 'العملاء', 'tab_clients', 's'],
+  ['tab.settings', 'Settings', 'الإعدادات', 'tab_settings', 's'],
+
+  ['connection.checking', 'Checking…', 'جاري الاتصال…', '', 'a'],
+  ['connection.connected', 'Connected', 'متصل', 'macInReach', 's'],
+  ['connection.unreachable', 'Desktop unreachable', 'تعذر الوصول للكمبيوتر', 'macAway', 's'],
+  ['connection.unauthorized', 'Wrong LAN PIN', 'رمز PIN خاطئ', 'pinWrong', 's'],
+  ['connection.banner.unreachable', 'Cannot reach Khayt on your network. Check Wi-Fi and desktop LAN API.', 'لا يمكن الوصول إلى Khayt على الشبكة. تحقق من الواي فاي وتفعيل LAN API.', 'asOfNoBook', 's'],
+  ['connection.banner.cached', 'Showing what your desktop last told us, from {when}. Reconnect for live numbers.', 'نعرض آخر ما أرسله جهازك، من {when}. أعد الاتصال للأرقام الحية.', 'asOfBook', 's'],
+  ['connection.banner.pin', 'LAN PIN rejected. Update PIN in Settings to match desktop.', 'رمز LAN مرفوض. حدّث PIN في الإعدادات ليطابق سطح المكتب.', 'pinWrong', 's'],
+  ['connection.banner.checking', 'Connecting to desktop…', 'جاري الاتصال بسطح المكتب…', '', 'a'],
+  ['connection.retry', 'Retry', 'إعادة المحاولة', 'retry', 's'],
+  ['connection.error.reach_status', 'Cannot reach %@. Same Wi-Fi? Desktop → Settings → LAN API…', 'تعذر الوصول إلى %@. نفس شبكة الواي فاي؟…', '', 'a'],
+  ['settings.host_required', "Enter your computer's IP address.", 'أدخل عنوان IP للكمبيوتر.', '', 'a'],
+  ['settings.host_invalid', 'Invalid address. Use e.g. 192.168.1.42 (not a full URL with http://).', 'عنوان غير صالح. استخدم مثلاً 192.168.1.42 (بدون http://).', '', 'a'],
+  ['settings.endpoint', 'Connecting to', 'الاتصال بـ', '', 'a'],
+  ['home.pipeline', 'Pipeline', 'سير العمل', 'pipeline', 's'],
+  ['home.all_orders', 'All orders', 'كل الطلبات', '', 'a'],
+  ['home.no_printing', 'No jobs', 'لا مهام', '', 'a'],
+
+  ['home.subtitle', 'Live from your Khayt desktop', 'مباشر من تطبيق Khayt على الكمبيوتر', '', 'a'],
+  ['home.completed_today', 'Completed today', 'مكتمل اليوم', 'doneToday', 's'],
+  ['home.low_stock', '%d spool(s) low on filament', '%d بكرة منخفضة', 'lowStock', 's'],
+  ['home.quick_actions', 'Quick actions', 'إجراءات سريعة', '', 'a'],
+  ['home.action.add_spool', 'Add spool', 'إضافة بكرة', 'addSpool', 's'],
+  ['home.action.orders', 'Orders', 'الطلبات', '', 'a'],
+  ['home.action.inventory', 'Inventory', 'المخزون', '', 'a'],
+  ['home.active_orders', 'Active orders', 'طلبات نشطة', 'laneTitle', 's'],
+  ['home.see_all', 'See all', 'عرض الكل', '', 'a'],
+  ['home.overdue', '%d overdue', '%d متأخر', 'late', 's'],
+  ['stat.in_queue', 'In queue', 'في الطابور', 'inQueue', 's'],
+  ['stat.printing', 'Printing', 'طباعة', 'printingStat', 's'],
+  ['stat.post', 'Post-proc.', 'ما بعد', '', 'a'],
+  ['stat.qc', 'QC', 'فحص الجودة', '', 'a'],
+
+  ['orders.active', 'Active', 'نشط', 'active', 's'],
+  ['orders.recent', 'Recent', 'الأخيرة', 'history', 's'],
+  ['orders.filter.all', 'All', 'الكل', 'all', 's'],
+  ['orders.advance', 'Advance', 'تقديم', 'advanceTo', 's'],
+  ['orders.overdue', 'Overdue', 'متأخر', 'late', 's'],
+  ['orders.due', 'Due %@', 'الاستحقاق %@', 'dueDate', 's'],
+  ['orders.detail.set_status', 'Set status', 'تعيين الحالة', 'moveTo', 's'],
+  ['orders.detail.advance', 'Advance to next stage', 'المرحلة التالية', 'advanceLabel', 's'],
+
+  ['inventory.search', 'Material, SKU, batch…', 'مادة، SKU، دفعة…', 'searchPlaceholder', 's'],
+  ['inventory.filter.all', 'All', 'الكل', 'allStock', 's'],
+  ['inventory.filter.low', 'Low stock', 'مخزون منخفض', 'lowStockFilter', 's'],
+  ['inventory.sort.newest', 'Newest first', 'الأحدث أولاً', '', 'a'],
+  ['inventory.low_badge', 'Low stock', 'منخفض', 'lowStock', 's'],
+
+  ['settings.lan_status', 'LAN status', 'حالة الشبكة', '', 'a'],
+  ['settings.connection', 'Connection', 'الاتصال', '', 'a'],
+  ['settings.connection.footer', 'Same PIN as Khayt Settings → LAN API. Desktop v2.2.1+ required.', 'نفس PIN من إعدادات Khayt → LAN API. يتطلب سطح المكتب 2.2.1+', '', 'a'],
+  ['settings.shop_name', 'Shop name', 'اسم المحل', '', 'a'],
+  ['settings.host', 'Desktop IP or hostname', 'IP أو اسم المضيف', 'desktopIp', 's'],
+  ['settings.port', 'Port: %d', 'المنفذ: %d', 'port', 's'],
+  ['settings.pin', 'Owner LAN PIN', 'رمز PIN', 'pinTitle', 's'],
+  ['settings.retest', 'Re-test pairing', 'إعادة اختبار الاتصال', '', 'a'],
+  ['settings.unpair', 'Unpair this device', 'إلغاء الربط', 'unpairDevice', 's'],
+  ['settings.unpair.footer', 'Clears paired state; PIN stays in Keychain until you change it.', 'يمسح حالة الربط؛ يبقى PIN في Keychain.', 'unpairFoot', 's'],
+  ['settings.language', 'Language', 'اللغة', 'language', 's'],
+  ['settings.notifications', 'Notifications', 'الإشعارات', 'notifications', 's'],
+  ['settings.notify.queue', 'Queue changes', 'تغييرات الطابور', 'notifQueue', 's'],
+  ['settings.notify.connection', 'Connection lost', 'انقطاع الاتصال', '', 'a'],
+  ['settings.notify.overdue', 'Overdue orders', 'طلبات متأخرة', 'notifLate', 's'],
+  ['settings.notify.low_stock', 'Low filament', 'فيلامنت منخفض', 'notifStock', 's'],
+  ['settings.notify.footer', 'Local alerts on this iPhone when the app detects changes (LAN polling).', 'تنبيهات محلية عند اكتشاف التطبيق للتغييرات (استطلاع LAN).', '', 'a'],
+  ['settings.widget', 'Home Screen widget', 'ودجة الشاشة الرئيسية', '', 'a'],
+  ['settings.widget.footer', 'Add the Khayt Queue widget from the home screen widget gallery after building.', 'أضف ودجة Khayt Queue من معرض الودجات بعد البناء.', '', 'a'],
+  ['settings.docs', 'LAN API reference', 'مرجع LAN API', '', 'a'],
+
+  ['status.quote', 'Quote', 'عرض سعر', '', 'a'],
+  ['status.pending', 'Pending', 'قيد الانتظار', 'pending', 's'],
+  ['status.printing', 'Printing', 'طباعة', 'printing', 's'],
+  ['status.post', 'Post-processing', 'ما بعد الطباعة', 'post', 's'],
+  ['status.qc', 'QC', 'فحص الجودة', 'qc', 's'],
+  ['status.completed', 'Completed', 'مكتمل', 'completed', 's'],
+  ['status.delivered', 'Delivered', 'تم التسليم', '', 'a'],
+  ['status.shipped', 'Shipped', 'تم الشحن', '', 'a'],
+  ['status.on_hold', 'On hold', 'معلق', '', 'a'],
+
+  ['lang.system', 'System', 'النظام', '', 'a'],
+
+  ['notify.queue.title', 'Queue updated', 'تحديث الطابور', '', 'a'],
+  ['notify.queue.body', '%d jobs in queue (%d printing)', '%d في الطابور (%d طباعة)', '', 'a'],
+  ['notify.offline.title', 'Khayt disconnected', 'انقطع الاتصال', '', 'a'],
+  ['notify.offline.body', 'Desktop unreachable on LAN', 'تعذر الوصول لسطح المكتب', '', 'a'],
+  ['notify.overdue.title', 'Overdue orders', 'طلبات متأخرة', '', 'a'],
+  ['notify.overdue.body', '%d order(s) past due date', '%d طلب متأخر', '', 'a'],
+  ['notify.low_stock.title', 'Low filament', 'فيلامنت منخفض', '', 'a'],
+  ['notify.low_stock.body', '%d spool(s) under 200g', '%d بكرة أقل من 200غ', '', 'a'],
+
+  ['nfc.unavailable', 'NFC is not available on this device.', 'NFC غير متاح على هذا الجهاز.', '', 'a'],
+  ['nfc.read.prompt', 'Hold your iPhone near the filament spool tag.', 'قرّب الآيفون من بطاقة NFC على البكرة.', 'holdNearTag', 's'],
+  ['nfc.read.success', 'Tag read successfully.', 'تمت قراءة البطاقة بنجاح.', '', 'a'],
+  ['nfc.write.title', 'Write to NFC tag', 'كتابة على بطاقة NFC', 'writeNfc', 's'],
+  ['nfc.write.intro', 'Encode this spool data onto a blank NTAG213+ sticker. Pick the format your printer expects.', 'رمّز بيانات البكرة على ملصق NTAG213+ فارغ. اختر الصيغة التي يتوقعها الطابعة.', '', 'a'],
+  ['nfc.write.standard', 'Tag standard', 'معيار البطاقة', '', 'a'],
+  ['nfc.write.preview', 'Data to write', 'البيانات للكتابة', '', 'a'],
+  ['nfc.write.material', 'Material', 'المادة', 'material', 's'],
+  ['nfc.write.brand', 'Brand', 'العلامة', 'brand', 's'],
+  ['nfc.write.weight', 'Weight', 'الوزن', 'weight', 's'],
+  ['nfc.write.print_temp', 'Print temp', 'حرارة الطباعة', 'nozzleTemp', 's'],
+  ['nfc.write.bed_temp', 'Bed temp', 'حرارة السرير', 'bedTemp', 's'],
+  ['nfc.write.tap_blank', 'Tap blank tag to write', 'المس بطاقة فارغة للكتابة', '', 'a'],
+  ['nfc.write.scanning', 'Hold near blank tag…', 'قرّب من بطاقة فارغة…', '', 'a'],
+  ['nfc.write.prompt', 'Hold your iPhone near a blank writable NFC tag.', 'قرّب الآيفون من بطاقة NFC قابلة للكتابة.', '', 'a'],
+  ['nfc.write.success', 'Tag written successfully.', 'تمت كتابة البطاقة بنجاح.', 'tNfc', 's'],
+  ['nfc.write.done', 'Done', 'تم', '', 'a'],
+  ['nfc.write.footer', 'Use NTAG213+ writable tags (NTAG215/216 for OpenSpool)…', 'استخدم NTAG213+ قابل للكتابة (NTAG215/216 لـ OpenSpool)…', 'nfcFoot', 's'],
+  ['nfc.standard.openspool', 'OpenSpool', 'OpenSpool', '', 'a'],
+  ['nfc.standard.openspool.hint', 'Snapmaker U1 extended firmware, Bambu via OpenSpool reader — application/json', 'Snapmaker U1 بالبرنامج الموسّع، Bambu عبر قارئ OpenSpool — application/json', '', 'a'],
+  ['nfc.standard.opentag3d', 'OpenTag3D', 'OpenTag3D', '', 'a'],
+  ['nfc.standard.opentag3d.hint', 'Bambu Lab, Creality, generic — application/opentag3d', 'Bambu وCreality والعام — application/opentag3d', '', 'a'],
+  ['nfc.standard.openprinttag', 'OpenPrintTag (Prusa)', 'OpenPrintTag (Prusa)', '', 'a'],
+  ['nfc.standard.openprinttag.hint', 'Prusa MK4 / XL / MINI — application/vnd.openprinttag', 'Prusa MK4 / XL / MINI — application/vnd.openprinttag', '', 'a'],
+  ['nfc.error.missing_material', 'Material name is required to encode a tag.', 'اسم المادة مطلوب لترميز البطاقة.', '', 'a'],
+  ['nfc.error.payload_large', 'Encoded data is too large (%d bytes) for this tag.', 'البيانات المرمّزة كبيرة جداً (%d بايت) لهذه البطاقة.', '', 'a'],
+  ['nfc.error.invalid_color', 'Color hex is invalid.', 'لون hex غير صالح.', '', 'a'],
+  ['nfc.error.no_tag', 'No tag detected.', 'لم يُكتشف أي بطاقة.', '', 'a'],
+  ['nfc.error.unsupported_tag', 'Unsupported tag type.', 'نوع بطاقة غير مدعوم.', '', 'a'],
+  ['nfc.error.not_ndef', 'Tag does not support NDEF.', 'البطاقة لا تدعم NDEF.', '', 'a'],
+  ['nfc.error.read_only', 'Tag is read-only or locked. Use a blank writable tag.', 'البطاقة للقراءة فقط أو مقفلة. استخدم بطاقة فارغة قابلة للكتابة.', '', 'a'],
+  ['nfc.error.read_failed', 'Could not read tag.', 'تعذرت قراءة البطاقة.', '', 'a'],
+
+  ['home.action.quote', 'Quote', 'تسعير', '', 'a'],
+  ['quote.title', 'Quick quote', 'تسعير سريع', '', 'a'],
+  ['quote.part', 'Part', 'القطعة', '', 'a'],
+  ['quote.rates', 'Rates', 'الأسعار', '', 'a'],
+  ['quote.result', 'Price', 'السعر', '', 'a'],
+  ['quote.cost', 'What it costs you', 'التكلفة عليك', '', 'a'],
+  ['quote.weight', 'Weight', 'الوزن', '', 'a'],
+  ['quote.time', 'Print time', 'مدة الطباعة', '', 'a'],
+  ['quote.qty', 'Quantity', 'الكمية', 'orderQty', 's'],
+  ['quote.spool_cost', 'Spool cost (1 kg)', 'سعر البكرة (١ كجم)', '', 'a'],
+  ['quote.labor_rate', 'Labour rate per hour', 'أجر العمل بالساعة', '', 'a'],
+  ['quote.margin', 'Margin', 'هامش الربح', '', 'a'],
+  ['quote.rush', 'Rush job', 'طلب مستعجل', '', 'a'],
+  ['quote.calculate', 'Calculate', 'احسب', '', 'a'],
+  ['quote.total', 'Total', 'الإجمالي', '', 'a'],
+  ['quote.discount', 'Discount', 'الخصم', '', 'a'],
+  ['quote.rush_fee', 'Rush fee', 'رسوم الاستعجال', '', 'a'],
+  ['quote.tier', 'Tier price ({n}+)', 'سعر الشريحة ({n}+)', '', 'a'],
+  ['quote.unit_cost', 'Cost per unit', 'التكلفة للوحدة', '', 'a'],
+  ['quote.bd.material', 'Material', 'المواد', '', 'a'],
+  ['quote.bd.machine', 'Machine', 'الماكينة', '', 'a'],
+  ['quote.bd.labor', 'Labour', 'العمل', '', 'a'],
+  ['quote.bd.buffer', 'Failure buffer', 'احتياطي الفشل', '', 'a'],
+  ['common.close', 'Close', 'إغلاق', '', 'a'],
+
+  ['home.action.waste', 'Log waste', 'تسجيل هدر', '', 'a'],
+  ['waste.title', 'Log a failed print', 'تسجيل طباعة فاشلة', '', 'a'],
+  ['waste.what', 'What failed', 'ما الذي فشل', '', 'a'],
+  ['waste.why', 'Why', 'السبب', '', 'a'],
+  ['waste.material', 'Material', 'المادة', 'material', 's'],
+  ['waste.failure_type', 'Failure', 'نوع الفشل', '', 'a'],
+  ['waste.weight', 'Wasted', 'الكمية المهدرة', '', 'a'],
+  ['waste.reason', 'What happened?', 'ماذا حدث؟', '', 'a'],
+  ['waste.save', 'Log it', 'سجّل', '', 'a'],
+  ['waste.deduct', 'Take it off the spool', 'اخصمها من البكرة', '', 'a'],
+  ['waste.deduct.footer', 'Subtracts the wasted grams from your matching spool…', 'يخصم الغرامات المهدرة من البكرة المطابقة…', '', 'a'],
+  ['waste.ft.warping', 'Warping', 'التواء', '', 'a'],
+  ['waste.ft.adhesion', 'Bed adhesion', 'التصاق المنصة', '', 'a'],
+  ['waste.ft.clog', 'Clog', 'انسداد', '', 'a'],
+  ['waste.ft.layer_shift', 'Layer shift', 'إزاحة طبقات', '', 'a'],
+  ['waste.ft.power', 'Power loss', 'انقطاع كهرباء', '', 'a'],
+  ['waste.ft.other', 'Other', 'أخرى', '', 'a'],
+
+  ['home.action.expense', 'Expense', 'مصروف', '', 'a'],
+  ['exp.title', 'New expense', 'مصروف جديد', '', 'a'],
+  ['exp.what', 'What you paid for', 'ما الذي دفعته', '', 'a'],
+  ['exp.amount', 'Amount', 'المبلغ', '', 'a'],
+  ['exp.category', 'Category', 'التصنيف', '', 'a'],
+  ['exp.note', 'Note', 'ملاحظة', '', 'a'],
+  ['exp.receipt', 'Receipt', 'الإيصال', '', 'a'],
+  ['exp.photograph', 'Photograph the receipt', 'صوّر الإيصال', '', 'a'],
+  ['exp.retake', 'Remove photo', 'إزالة الصورة', '', 'a'],
+  ['exp.save', 'Save', 'حفظ', '', 'a'],
+  ['exp.no_camera', 'No camera on this device — the expense will be saved without a receipt.', 'لا توجد كاميرا في هذا الجهاز — سيُحفظ المصروف بدون إيصال.', '', 'a'],
+  ['exp.cat.filament', 'Filament', 'فيلامنت', '', 'a'],
+  ['exp.cat.resin', 'Resin', 'راتنج', '', 'a'],
+  ['exp.cat.parts', 'Parts', 'قطع', '', 'a'],
+  ['exp.cat.tools', 'Tools', 'أدوات', '', 'a'],
+  ['exp.cat.rent', 'Rent', 'إيجار', '', 'a'],
+  ['exp.cat.power', 'Power', 'كهرباء', '', 'a'],
+  ['exp.cat.shipping', 'Shipping', 'شحن', '', 'a'],
+  ['exp.cat.other', 'Other', 'أخرى', '', 'a'],
+];
+
+// (b) — keys the design needs that the app has no equivalent for. Proposed
+// under the app's own area.name convention. Arabic here is MINE and unreviewed.
+const NEW = [
+  ['book.scope.window', '{sent} of {available} orders', '{sent} من {available} طلب', 'windowCount'],
+  ['book.scope.window.body', 'Every unfinished one, and the newest {n} finished. Older history stays on the Mac.', 'كل غير المنتهية، وأحدث {n} منتهية. باقي السجل يبقى على الماك.', 'windowBody'],
+  ['book.scope.whole', 'The phone holds every spool the shop has.', 'الهاتف يحتفظ بكل بكرات الورشة.', 'wholeBody'],
+  ['book.scope.clients', 'Every client travels. Their order totals do not.', 'كل العملاء موجودون. أما إجمالي طلباتهم فلا.', 'clientsWindowBody'],
+  ['book.figure.deferred', 'On the Mac', 'على الماك', 'onTheMac'],
+  ['book.asof', 'Working from the book · as of {t}', 'يعمل من الدفتر · حتى {t}', 'asOfBook'],
+  ['book.live_only', 'Live from the Mac · nothing is kept on this phone', 'مباشر من الماك · لا يُحفظ شيء على هذا الهاتف', 'liveOnly'],
+  ['book.none.title', 'This phone has not been given the shop’s book yet', 'لم يُسلَّم هذا الهاتف دفتر الورشة بعد', 'notPulledTitle'],
+  ['book.none.body', 'This Mac runs the older desktop, which does not serve records.', 'هذا الماك يشغّل النسخة القديمة التي لا تسلّم السجلات.', 'notPulledBody'],
+  ['book.held.title', 'What this phone holds', 'ما يحتفظ به هذا الهاتف', 'theBook'],
+  ['book.omitted', 'Not sent: {list}.', 'لم تُرسل: {list}.', 'omittedLine'],
+  ['pair.find.title', 'Which shop?', 'أي ورشة؟', 'findTitle'],
+  ['pair.find.body', 'Macs running Khayt announce themselves on this Wi-Fi.', 'أجهزة الماك التي تشغّل خيط تعلن عن نفسها على هذه الشبكة.', 'findBody'],
+  ['pair.searching', 'Searching', 'جاري البحث', 'searching'],
+  ['pair.shop.offline_capable', 'Can work offline with this shop', 'يمكن العمل دون اتصال مع هذه الورشة', 'canWorkOffline'],
+  ['pair.shop.live_only', 'Needs the Mac in reach', 'يحتاج الماك قريباً', 'needsMac'],
+  ['pair.manual.disclose', 'Enter the address myself', 'سأُدخل العنوان بنفسي', 'enterAddress'],
+  ['pair.manual.why', 'For a Mac that does not advertise, or a network that blocks it.', 'لماك لا يعلن عن نفسه، أو شبكة تحجب ذلك.', 'enterAddressWhy'],
+  ['pair.pin.title', 'The owner PIN', 'رمز المالك', 'pinTitle'],
+  ['pair.pin.body', 'Four digits from Settings → LAN API. The intake PIN will not work here.', 'أربعة أرقام من الإعدادات ← واجهة الشبكة. رمز الاستقبال لا يصلح هنا.', 'pinBody'],
+  ['pair.pull.title', 'Copying the shop’s book', 'نسخ دفتر الورشة', 'pullTitle'],
+  ['pair.pull.body', 'A working set, not the whole thing — history stays on the Mac.', 'مجموعة عمل، لا الدفتر كاملاً — السجل يبقى على الماك.', 'pullBody'],
+  ['orders.no_estimate', 'No estimate yet — the machine has not reported one.', 'لا تقدير بعد — الآلة لم تُبلّغ عنه.', 'noEstimate'],
+  ['orders.swipe_hint', 'Swipe a job forward to advance it. Tap to open.', 'اسحب المهمة للأمام لتقديمها. اضغط للفتح.', 'swipeHint'],
+  ['write.blocked', 'The Mac is away. Khayt refuses writes rather than queueing them.', 'الماك غير متاح. خيط يرفض الكتابة بدل أن يؤجّلها.', 'writeBlocked'],
+];
+
+const FLAGS = [
+  {
+    key: 'nfc.write.bed_temp', en: 'Bed temp', ar: 'حرارة السرير', severity: 'Wrong word',
+    why: 'السرير is a bed you sleep in. The heated platform of a printer is المنصّة — which is what Khayt’s own desktop dictionary uses (renderer i18n: "حرارة المنصّة"). An Arabic-speaking operator reads a furniture word on a machine screen. This is the clearest error in the catalogue.',
+  },
+  {
+    key: 'settings.pin', en: 'Owner LAN PIN', ar: 'رمز PIN', severity: 'Meaning lost',
+    why: 'The Arabic drops "Owner". The troubleshooting guide is explicit that the owner PIN and the intake PIN are different codes and that using the wrong one returns 401 — and "Owner" is the only word in the string that distinguishes them. Suggest رمز المالك.',
+  },
+  {
+    key: 'settings.unpair.footer', en: 'PIN stays in Keychain until you change it.', ar: 'يبقى PIN في Keychain.', severity: 'Both stale',
+    why: 'Not a translation problem — the sentence is no longer true in either language. IOS_COMPANION_AUDIT.md records "PIN retained after unpair" as Fixed, with ConnectionSettings.unpair() now clearing the Keychain. The string still promises the opposite, which is a privacy statement pointing the wrong way.',
+  },
+  {
+    key: 'notify.low_stock.body · quote.spool_cost', en: 'under 200g · Spool cost (1 kg)', ar: 'أقل من 200غ · سعر البكرة (١ كجم)', severity: 'Inconsistent numerals',
+    why: 'The catalogue mixes Western digits (200غ) with Arabic-Indic (١ كجم) in the same language. Pick one and apply it everywhere. My recommendation is Western digits throughout: the shop reads SKUs, temperatures, gram weights and order numbers off machines and labels that are Western-digit only, and mixing the two inside one screen is harder than either alone.',
+  },
+  {
+    key: 'settings.shop_name', en: 'Shop name', ar: 'اسم المحل', severity: 'Register',
+    why: 'محل is a retail shop — a place that sells over a counter. Khayt’s own description calls this a print shop or workshop, which in Arabic is ورشة. A maker with two printers in a garage is not running a محل.',
+  },
+  {
+    key: 'exp.cat.filament', en: 'Filament', ar: 'فيلامنت', severity: 'Register',
+    why: 'A transliteration, where the desktop dictionary uses الخيط — which is also the product’s own name (خيط). Using the English word for the material the app is named after is a missed thread, and it sits next to راتنج (resin), which is properly translated.',
+  },
+  {
+    key: 'connection.unreachable', en: 'Desktop unreachable', ar: 'تعذر الوصول للكمبيوتر', severity: 'Inconsistent term',
+    why: 'الكمبيوتر here, but سطح المكتب in connection.banner.checking and notify.offline.body — two names for the same machine, in adjacent strings. Under Bonjour the machine now has a name the shop chose, so this is worth settling before it spreads.',
+  },
+  {
+    key: 'stat.post', en: 'Post-proc.', ar: 'ما بعد', severity: 'Reads unfinished',
+    why: '"ما بعد" is the preposition "after" with nothing after it. status.post gets this right with ما بعد الطباعة. The stat tile is abbreviated in English too, but an English abbreviation still contains its noun; the Arabic one does not.',
+  },
+  {
+    key: 'lang.system', en: 'System', ar: 'النظام', severity: 'Design gap',
+    why: 'Not a translation problem — a gap on my side. The app offers three language options and my design offers two. System is the right default on iOS and I dropped it; the prototype should gain it.',
+  },
+];
+
+class Component extends DCLogic {
+  state = { filter: 'all' };
+
+  renderVals() {
+    const f = this.state.filter;
+    const TONE = { s: '#1b5e4f', b: '#0b54ad', a: '#8a5a0b' };
+    const LABEL = { s: 'Same', b: 'New', a: 'App only' };
+
+    const all = APP.map(r => ({
+      appKey: r[0], en: r[1], ar: r[2],
+      designKey: r[3] || '—', designTone: r[3] ? '#0b54ad' : '#a79f8f',
+      cls: LABEL[r[4]], tone: TONE[r[4]], kind: r[4],
+    })).concat(NEW.map(r => ({
+      appKey: r[0], en: r[1], ar: r[2],
+      designKey: r[3], designTone: '#0b54ad',
+      cls: LABEL.b, tone: TONE.b, kind: 'b',
+      // These 25 are the only strings in the document with no native read and
+      // no shipped build behind them. Formatting them like the transcribed
+      // rows would let them pass as reviewed.
+      arUnreviewed: true,
+    })));
+
+    const counts = { all: all.length, s: 0, b: 0, a: 0 };
+    all.forEach(r => { counts[r.kind] += 1; });
+
+    const rows = (f === 'all' ? all : all.filter(r => r.kind === f))
+      .map((r, i) => ({ ...r, bg: i % 2 ? '#f5f2eb' : '#fbf9f5' }));
+
+    const filters = [
+      { id: 'all', label: 'Everything' }, { id: 's', label: 'Same meaning' },
+      { id: 'b', label: 'New in the design' }, { id: 'a', label: 'App only' },
+    ].map(x => ({
+      ...x, count: counts[x.id],
+      onPick: () => this.setState({ filter: x.id }),
+      bg: x.id === f ? '#1E1A15' : '#fbf9f5',
+      ink: x.id === f ? '#efebe3' : '#4f5b69',
+      line: x.id === f ? '#1E1A15' : '#dcd5c8',
+    }));
+
+    return {
+      rows, filters,
+      appKeyCount: String(APP.length),
+      newCount: String(NEW.length),
+      flags: FLAGS.map(x => ({
+        ...x,
+        tone: x.severity === 'Register' || x.severity === 'Design gap' ? '#8a5a0b' : '#bb2d44',
+        wash: x.severity === 'Register' || x.severity === 'Design gap' ? 'rgba(138,90,11,.12)' : 'rgba(187,45,68,.1)',
+      })),
+    };
+  }
+}
+</script>
+</body>
+</html>

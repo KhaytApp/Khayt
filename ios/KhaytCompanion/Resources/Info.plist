@@ -22,24 +22,6 @@
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>UILaunchScreen</key>
-	<dict/>
-	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-	</array>
-	<!-- Without this the browser returns nothing at all: iOS 14 and later will
-	     not let an app look for a service type it has not declared, and it does
-	     not report that as an error — it reports it as an empty network, which
-	     reads to a shop as "my Mac is not running". -->
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_khayt._tcp</string>
-	</array>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Khayt connects to your desktop app on the same Wi‑Fi to show queue, inventory, and printer status.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Khayt uses the camera to photograph and read text on filament spool labels (SKU, batch, temperatures).</string>
 	<key>NFCReaderUsageDescription</key>
 	<string>Khayt reads filament spool NFC tags when NFC capability is enabled.</string>
 	<key>NSAppTransportSecurity</key>
@@ -47,5 +29,26 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_khayt._tcp</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Khayt uses the camera to photograph and read text on filament spool labels (SKU, batch, temperatures).</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Khayt connects to your desktop app on the same Wi‑Fi to show queue, inventory, and printer status.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>SpaceGrotesk-400.ttf</string>
+		<string>SpaceGrotesk-500.ttf</string>
+		<string>SpaceGrotesk-600.ttf</string>
+		<string>SpaceGrotesk-700.ttf</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
 </dict>
 </plist>

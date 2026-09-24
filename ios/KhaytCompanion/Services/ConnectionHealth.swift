@@ -30,6 +30,10 @@ final class ConnectionHealth: ObservableObject {
     @Published private(set) var state: ConnectionHealthState = .unknown
     @Published private(set) var lastChecked: Date?
     @Published private(set) var lastStatus: ShopStatus?
+    /// Whether the Mac ITSELF answered the last check. Not the same as `state`:
+    /// with a book on the phone, the screens read the book and `state` reads
+    /// connected whether the Mac is there or not. The strip needs the truth.
+    @Published private(set) var macInReach = false
 
     private let api: KhaytAPIClient
     private weak var settings: ConnectionSettings?
@@ -60,6 +64,7 @@ final class ConnectionHealth: ObservableObject {
     }
 
     func refresh() async {
+        macInReach = await api.macAnswers()
         guard api.canSync else {
             state = .unreachable
             lastStatus = nil

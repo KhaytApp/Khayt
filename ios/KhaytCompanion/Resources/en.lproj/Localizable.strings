@@ -471,3 +471,8 @@
 "stage.short.post" = "Post";
 "stage.short.qc" = "QC";
 "stage.short.completed" = "Done";
+
+/* Connection strip (design v2) */
+"connection.as_of" = "Working from the book · as of %@";
+"connection.live_only" = "Live from the Mac · nothing is kept on this phone";
+"connection.refresh" = "Refresh";

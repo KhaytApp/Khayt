@@ -15,6 +15,7 @@ struct KhaytCompanionApp: App {
         _settings = StateObject(wrappedValue: s)
         _api = StateObject(wrappedValue: apiClient)
         _health = StateObject(wrappedValue: healthMonitor)
+        KhaytType.applyNavigationBarAppearance()
     }
 
     var body: some Scene {
@@ -27,6 +28,8 @@ struct KhaytCompanionApp: App {
                 .environmentObject(ordersNav)
                 .companionLocale(settings)
                 .tint(KhaytDesign.accent)
+                // The design's face for everything that does not choose its own.
+                .font(.khayt(17, relativeTo: .body))
                 .task {
                     await CompanionNotifications.shared.requestAuthorizationIfNeeded()
                 }
