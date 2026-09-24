@@ -528,3 +528,16 @@
 "inventory.whole.count" = "%@ بكرات";
 "inventory.whole.body" = "الهاتف يحتفظ بكل بكرات الورشة.";
 "common.clear" = "مسح";
+/* Add spool: colour */
+"spool.form.colour" = "اللون";
+"spool.form.colour.other" = "لون آخر";
+"colour.black" = "أسود";
+"colour.white" = "أبيض";
+"colour.grey" = "رمادي";
+"colour.red" = "أحمر";
+"colour.blue" = "أزرق";
+"colour.green" = "أخضر";
+"colour.orange" = "برتقالي";
+"colour.yellow" = "أصفر";
+"colour.purple" = "بنفسجي";
+"colour.cyan" = "سماوي";

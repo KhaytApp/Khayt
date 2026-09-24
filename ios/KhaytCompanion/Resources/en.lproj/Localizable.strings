@@ -528,3 +528,16 @@
 "inventory.whole.count" = "%@ spools";
 "inventory.whole.body" = "The phone holds every spool the shop has.";
 "common.clear" = "Clear";
+/* Add spool: colour */
+"spool.form.colour" = "Colour";
+"spool.form.colour.other" = "Other colour";
+"colour.black" = "Black";
+"colour.white" = "White";
+"colour.grey" = "Grey";
+"colour.red" = "Red";
+"colour.blue" = "Blue";
+"colour.green" = "Green";
+"colour.orange" = "Orange";
+"colour.yellow" = "Yellow";
+"colour.purple" = "Purple";
+"colour.cyan" = "Cyan";

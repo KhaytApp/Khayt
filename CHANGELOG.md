@@ -79,6 +79,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   strip it specifies — losing the Mac while the phone holds the book is now a
   quiet "Working from the book · as of 14:32" with Refresh, and red is kept for
   a phone that holds nothing and cannot reach the Mac.
+- **(iOS) A spool typed in by hand has a colour.** The add-spool form had no
+  colour at all, so every roll entered by hand went on the shelf grey. It has
+  the design's ten swatches and a picker for any other, and a row of common
+  materials to fill the field in one tap. The four ways to add a spool are
+  the design's cards.
 
 - **(Mac) A restored backup no longer chooses this Mac's slicer, or blanks
   its alert topic.** Restoring a backup keeps this Mac's own slicer settings —

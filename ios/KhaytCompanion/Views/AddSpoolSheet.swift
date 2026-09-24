@@ -109,13 +109,12 @@ struct AddSpoolSheet: View {
     }
 
     private var chooseMethodView: some View {
-        List {
-            Section {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
                 Text(L10n.tr("spool.add.how"))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Section {
+                    .foregroundStyle(KhaytDesign.textDim)
+                    .padding(.bottom, 4)
                 methodRow(
                     title: L10n.tr("spool.method.barcode"),
                     subtitle: L10n.tr("spool.method.barcode.sub"),
@@ -148,27 +147,36 @@ struct AddSpoolSheet: View {
                     step = .review
                 }
             }
+            .padding(KhaytDesign.pad)
         }
+        .background(KhaytDesign.bg)
     }
 
+    /// `khayt-inventory.jsx` method cards: an icon tile, what it is, how it works.
     private func methodRow(title: String, subtitle: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 36)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(KhaytDesign.brand)
+                    .frame(width: 52, height: 52)
+                    .background(KhaytDesign.brandDim, in: RoundedRectangle(cornerRadius: 14))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.headline).foregroundStyle(.primary)
-                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                    Text(title).font(.headline).foregroundStyle(KhaytDesign.text)
+                    Text(subtitle).font(.footnote).foregroundStyle(KhaytDesign.textDim)
+                        .multilineTextAlignment(.leading)
                 }
-                Spacer()
-                Image(systemName: "chevron.right")
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.forward")
                     .font(.caption.bold())
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(KhaytDesign.textMuted)
             }
-            .padding(.vertical, 4)
+            .padding(16)
+            .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(KhaytDesign.sep, lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 16))
         }
+        .buttonStyle(.plain)
     }
 
     private var barcodeView: some View {
@@ -321,6 +329,13 @@ struct AddSpoolSheet: View {
 // MARK: - Review form
 
 struct SpoolReviewForm: View {
+    static let materials = ["PLA", "PLA+", "PLA Matte", "PETG", "ABS", "ASA", "TPU", "Nylon", "PA-CF"]
+    /// `khayt-inventory.jsx` PRESET_COLORS.
+    static let colours: [(key: String, hex: String)] = [
+        ("black", "#1A1A1A"), ("white", "#F5F5F0"), ("grey", "#8A8A8A"), ("red", "#D13131"), ("blue", "#2563EB"),
+        ("green", "#16A34A"), ("orange", "#EA580C"), ("yellow", "#CA8A04"), ("purple", "#7C3AED"), ("cyan", "#0891B2"),
+    ]
+
     @Binding var draft: SpoolDraft
     let isUploading: Bool
     var errorMessage: String?
@@ -347,11 +362,53 @@ struct SpoolReviewForm: View {
 
             Section(header: Text(L10n.tr("spool.form.required"))) {
                 TextField(L10n.tr("spool.form.material"), text: $draft.material)
+                // The common ones, one tap each; anything else is typed.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Self.materials, id: \.self) { m in
+                            Button(m) { draft.material = m }
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 10)
+                                .frame(height: 30)
+                                .background(draft.material == m ? KhaytDesign.brandDim : KhaytDesign.surface2,
+                                            in: Capsule())
+                                .foregroundStyle(draft.material == m ? KhaytDesign.brand : KhaytDesign.textDim)
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
                 TextField(L10n.tr("spool.form.weight"), text: Binding(
                     get: { String(draft.weightGrams) },
                     set: { draft.weightGrams = Int($0) ?? draft.weightGrams }
                 ))
                 .keyboardType(.numberPad)
+            }
+
+            // A spool typed in by hand had no colour at all — every one of them
+            // went on the shelf grey. The mockup's presets, and any other.
+            Section(header: Text(L10n.tr("spool.form.colour"))) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
+                    ForEach(Self.colours, id: \.hex) { c in
+                        let picked = draft.colorHex.uppercased() == c.hex
+                        Button { draft.colorHex = c.hex } label: {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color(hex: c.hex) ?? .gray)
+                                .frame(height: 36)
+                                .overlay(RoundedRectangle(cornerRadius: 10)
+                                    .strokeBorder(picked ? KhaytDesign.brand : KhaytDesign.textFaint,
+                                                  lineWidth: picked ? 3 : 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.tr("colour.\(c.key)"))
+                        .accessibilityAddTraits(picked ? .isSelected : [])
+                    }
+                }
+                .padding(.vertical, 4)
+                ColorPicker(L10n.tr("spool.form.colour.other"), selection: Binding(
+                    get: { Color(hex: draft.colorHex) ?? .gray },
+                    set: { draft.colorHex = $0.hexString }
+                ), supportsOpacity: false)
             }
 
             Section(footer: Text(draft.quantity > 1
@@ -447,6 +504,14 @@ struct TagPreviewCard: View {
 }
 
 extension Color {
+    /// `#RRGGBB`, as a spool's `color` is stored.
+    var hexString: String {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a)
+        func byte(_ v: CGFloat) -> Int { Int((min(max(v, 0), 1) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", byte(r), byte(g), byte(b))
+    }
+
     init?(hex: String) {
         var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         if s.hasPrefix("#") { s.removeFirst() }
