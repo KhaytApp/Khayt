@@ -198,6 +198,15 @@ enum Restore {
             catch { throw Refusal.couldNotProtectTheBook(String(describing: error)) }
             snapshot = carryForward(into: snapshot, from: current, paths: try await engine?.secretPaths() ?? [])
         }
+        // WHAT RUNS ON THIS MAC STAYS THIS MAC'S. A backup's slicer settings
+        // are a program and its arguments, and a restored book choosing them
+        // could run any command through a genuine slicer. Kept from the book
+        // here — or dropped when this Mac has none. The shop's decision, Sep
+        // 24 2026. Refused outright if the rule cannot run: a restore that
+        // might carry another computer's slicer is not one to make quietly.
+        if let engine {
+            snapshot = try await engine.keepMachineLocal(local: current ?? [:], incoming: snapshot)
+        }
 
         let next = try JSONEncoder().encode(snapshot)
         guard next.count <= StoreWriter.maxStoreBytes else {
