@@ -2449,6 +2449,7 @@ final class Words {
                                              + "your own {n} measured jobs actually ran at.",
                                              "ar": "{fields} مُقدَّرة من المجسم، بالمعدل الذي جرت "
                                              + "به {n} من أعمالك المقيسة."],
+        "mac.product_costed_with": ["en": "Costed with your {spool} and your usual rates — change either on the sheet.", "ar": "حُسبت التكلفة بخامة {spool} وأسعارك المعتادة — غيّر أيًّا منها في الصفحة."],
         "mac.product_from_file_missing": ["en": "Filled in from the file. It could not answer for: {fields} — check those before you sell it.",
                                           "ar": "تم التعبئة من الملف. ولم يُجب عن: {fields} — راجعها قبل البيع."],
         // The catalogue's two layouts. Said as tooltips on the toggle, so they

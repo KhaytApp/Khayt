@@ -2705,6 +2705,28 @@ final class Shop {
                 ["fields": .string(estimated.joined(separator: ", ")),
                  "n": .number(Double(e?.jobs ?? 0))])
         }
+        // ── WHAT IT COSTS TO MAKE, NOT ONLY WHAT IT WEIGHS ────────────────
+        //
+        // A part from the library carried the file's weight and time and
+        // nothing else — no filament, no labour, no power, no wear, no
+        // failure allowance — so the catalogue priced it at NOTHING: "it is
+        // not calculating the price" (the shop, Sep 2026, on a 200 g, 9.5 h
+        // model saved at 0). The product sheet gives a part it composes the
+        // shop's rate defaults, but a part that ARRIVES from the library was
+        // treated as an existing one and left blank. So they are filled here,
+        // where every way from the library to the catalogue passes.
+        if let defaults = try? await engine.printRateDefaults() {
+            for (key, value) in defaults where part[key] == nil { part[key] = .number(value) }
+        }
+        var costedWith: String?
+        if part["filamentId"] == nil, let spool = Self.spool(for: part, file: rec, among: spools) {
+            part["filamentId"] = .string(spool.id)
+            part["material"] = .string(spool.material)
+            part["spoolCost"] = .number(spool.cost ?? 0)
+            part["spoolWeight"] = .number(max(1, spool.weight ?? 1000))
+            costedWith = spool.material
+        }
+
         let stillMissing = patch.missing.filter { field in
             Self.plainNumber(part[field]).map { $0 <= 0 } ?? true
         }
@@ -2716,7 +2738,29 @@ final class Shop {
             // and the one where the shop most needs telling.
             note = note.map { $0 + " " + gap } ?? gap
         }
+        if let costedWith {
+            let said = words.callIt("mac.product_costed_with", ["spool": .string(costedWith)])
+            note = note.map { $0 + " " + said } ?? said
+        }
         return (part, note)
+    }
+
+    /// The spool a library part is costed with: the shop's spool of the
+    /// material the slicer used, or — when the file says none, or the shop
+    /// stocks none of it — its first costed spool, and the note says which.
+    static func spool(for part: [String: JSONValue], file: JSONValue, among spools: [Spool]) -> Spool? {
+        let costed = spools.filter { ($0.cost ?? 0) > 0 }
+        guard !costed.isEmpty else { return nil }
+        var wanted = plainString(part["material"]) ?? ""
+        if wanted.isEmpty, case .object(let r) = file, case .object(let parsed)? = r["parsed"] {
+            wanted = plainString(parsed["filamentType"]) ?? ""
+        }
+        let w = wanted.lowercased().trimmingCharacters(in: .whitespaces)
+        if !w.isEmpty, let match = costed.first(where: {
+            let m = ($0.materialType ?? $0.material).lowercased()
+            return m == w || m.hasPrefix(w + " ") || m.hasPrefix(w + "+") || $0.material.lowercased().hasPrefix(w)
+        }) { return match }
+        return costed[0]
     }
 
     /// Open the product sheet on a product made from the selected model — or,

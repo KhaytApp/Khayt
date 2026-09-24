@@ -45,4 +45,32 @@ struct LibraryToCatalogueTests {
         #expect(inIt.allSatisfy { Shop.isUnder($0.groupName, top) })
         #expect(shop.files(inFolder: top + "-not-a-folder").isEmpty)
     }
+
+    @Test("a part from the library is COSTED — rates and a spool — so the product has a price")
+    func priced() async throws {
+        let shop = await Self.shop()
+        let file = try #require(shop.files.first { $0.mesh != nil } ?? shop.files.first)
+        let filled = try #require(await shop.partFields(from: file))
+        for key in ["laborRate", "elecRate", "failureRate", "wearRate", "powerDraw"] {
+            #expect(filled.part[key] != nil, "\(key) is blank, so it costs nothing")
+        }
+        #expect(filled.part["filamentId"] != nil && filled.part["spoolCost"] != nil)
+        let product = try #require(await shop.productFromFile(file))
+        guard case .array(let parts)? = product.rest["parts"] else { Issue.record("no parts"); return }
+        let pricing = try #require(await shop.priceProduct(parts: parts, margin: nil, components: nil))
+        #expect(pricing.price > 0, "it is not calculating the price")
+    }
+
+    @Test("the spool is the material the slicer used, else the first costed one")
+    func spoolChoice() throws {
+        let json = """
+        [{"id":"a","material":"PETG","cost":90,"weight":1000},{"id":"b","material":"PLA+ 2.0","cost":75,"weight":859},
+         {"id":"c","material":"TPU","cost":0}]
+        """
+        let spools = try JSONDecoder().decode([Spool].self, from: Data(json.utf8))
+        let pla: JSONValue = .object(["parsed": .object(["filamentType": .string("PLA")])])
+        #expect(Shop.spool(for: [:], file: pla, among: spools)?.id == "b")
+        #expect(Shop.spool(for: [:], file: .object([:]), among: spools)?.id == "a", "no material said: the first costed")
+        #expect(Shop.spool(for: [:], file: .object([:]), among: [spools[2]]) == nil, "a spool with no cost prices nothing")
+    }
 }
