@@ -210,10 +210,10 @@ extension Shop {
     }
 
     private var thisMonthsOrders: [Order] {
-        let month = Calendar.current.dateComponents([.year, .month], from: Date())
+        let month = Calendar.book.dateComponents([.year, .month], from: Date())
         return orders.filter { order in
             guard let day = Order.day(order.date) else { return false }
-            let its = Calendar.current.dateComponents([.year, .month], from: day)
+            let its = Calendar.book.dateComponents([.year, .month], from: day)
             return its.year == month.year && its.month == month.month
         }
     }

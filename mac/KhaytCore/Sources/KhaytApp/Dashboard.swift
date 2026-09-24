@@ -1263,7 +1263,7 @@ private struct Takings: View {
         components.year = key / 12
         components.month = key % 12 + 1
         components.day = 1
-        guard let date = Calendar.current.date(from: components) else { return "" }
+        guard let date = Calendar.book.date(from: components) else { return "" }
         return words.say(date, .dateTime.month(.abbreviated))
     }
 }

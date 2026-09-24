@@ -300,11 +300,19 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
 
     var day: Date? { Self.day(date) }
 
+    /// ── THE SHOP'S DAY, NOT UTC'S ────────────────────────────────────────
+    ///
+    /// This parsed "2026-08-08" as UTC midnight. In Riyadh that is 03:00, so a
+    /// job due today counted down to "3:00 AM" — a time nobody entered — and
+    /// west of UTC it fell on the PREVIOUS local day, so a job read as late on
+    /// its own due day. A day is now the shop's local midnight, and a full
+    /// timestamp is the local day it happened on: the same days `Calendar.book`
+    /// counts in. Found by the September 2026 scan.
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
+        f.calendar = .book
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
+        f.timeZone = .autoupdatingCurrent
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
@@ -312,8 +320,19 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     static func day(_ s: String?) -> Date? {
         guard let s, !s.isEmpty else { return nil }
         // Both shapes are in the store: "2026-08-08" and a full ISO timestamp.
-        if let d = dayFormatter.date(from: String(s.prefix(10))) { return d }
-        return ISO8601DateFormatter().date(from: s)
+        if s.count > 10, let instant = instant(s) {
+            return Calendar.book.startOfDay(for: instant)
+        }
+        return dayFormatter.date(from: String(s.prefix(10)))
+    }
+
+    /// A full ISO timestamp, with or without fractional seconds.
+    private static func instant(_ s: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: s) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: s)
     }
 }
 

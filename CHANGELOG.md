@@ -56,6 +56,33 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   own name is kept as the model's original name. Folders in iCloud Drive or a
   Google Drive / Dropbox folder import the same way; macOS downloads each file
   as it is read.
+- **(Mac) Fixes from the September scan, third batch.**
+  - **A Mac set to the Islamic calendar wrote Hijri dates into the book.**
+    Today's date, the report periods, the month tiles and the tax year all
+    read the Mac's own calendar, so on a Mac set to Umm al-Qura a job was
+    stamped "1448-04-02". The book is always Gregorian now, whatever the Mac
+    shows.
+  - **Backups made on a Mac in Arabic were named with Arabic-Indic digits** and
+    never rotated. They are named in ASCII digits now.
+  - **Recording an online order twice made two jobs** and took the shelf down
+    twice, when taking it out of the cloud queue had failed the first time.
+    An order already in the book (by its platform reference, or the queue
+    item it came from) is not written again, and is taken out of the queue.
+  - **A job due today counted down to "3:00 AM"**, and west of UTC a job read
+    as late on its own due day: a day in the book is now the shop's local
+    day, not UTC's. The maintenance year, the comms log and the campaign log
+    read the local day too.
+  - **Every edit re-sent printer alerts.** Saving anything restarted printer
+    watching and wiped its alert memory, so a printer in an error sent a fresh
+    notification to the Mac, Telegram and ntfy each time, and a stall was
+    never reported for a shop that edits often. Watching now starts once per
+    book.
+  - **The sidebar's Expenses and Waste counts** are for the chosen period,
+    like the lists they open.
+  - **The first Undo after launch undid a change nobody made.** Reading each
+    model's designer and licence from its file no longer lands on the Undo
+    stack, runs off the main thread, and never overwrites a source typed in
+    the meantime.
 
 - **(iOS) Decline a walk-in request with the Mac switched off.** Declining was
   the last edit the phone refused offline, because it is a MOVE: into

@@ -159,6 +159,8 @@ extension Shop {
         let now = Date()
         let effects = (try? await engine.shelfSaleEffects(order.reading, at: now)) ?? []
         let deductions = Self.deductions(effects)
+        let source = order.source.isEmpty ? "online" : order.source
+        var wasAlreadyHere = false
 
         do {
             try await StoreWriter.update(
@@ -167,12 +169,24 @@ extension Shop {
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
                 let orders = Self.rows(root, "printLog")
+                // ALREADY WRITTEN? The write below and the drain after it are
+                // two steps, and a drain that failed left the order in the
+                // queue with its job already in the book — so pressing Record
+                // again made a SECOND job and took the shelf down twice.
+                // Asked inside the chain, against the book as it is now: by
+                // the platform's own reference (the shared rule the webhook
+                // uses), or by the queue item this Mac recorded it from.
+                if await Self.alreadyInBook(order, source: source, orders: orders, engine: engine) {
+                    wasAlreadyHere = true; return
+                }
                 let out = try await engine.newOrder(
                     await onlineJobInput(order), orders: orders,
                     settings: Self.settings(root), now: now,
                     tokens: (tracking: Self.randomBytes(16),
                              quoteApproval: Self.randomBytes(16)))
                 guard case .object(var record) = out.order else { return }
+                // Which queue item this came from, so a second press finds it.
+                record["intakeId"] = .string(order.id)
                 if order.allFromShelf {
                     // Nothing about this waits on a machine. A shelf sale
                     // under Pending is a job somebody goes looking for a free
@@ -219,7 +233,11 @@ extension Shop {
             return
         }
 
-        // Written. Now, and only now, take it out of the queue.
+        if wasAlreadyHere { onlineProblem = words.callIt("mac.online_already_recorded") }
+
+        // Written (or found written). Now, and only now, take it out of the
+        // queue — for an order already in the book, this is the step that
+        // failed last time.
         do {
             let connection = try CloudReader.connection(settingsDict)
             let token = try await Secrets.open(connection.storedToken, for: build)
@@ -231,6 +249,22 @@ extension Shop {
                 + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
         }
         await reload()
+    }
+
+    /// Is this queue item's order already a job in the book? By the
+    /// platform's reference (the shared rule, so a webhook delivery and a
+    /// queue item for the same order are one), or by the queue item's own id.
+    static func alreadyInBook(_ order: OnlineOrder, source: String, orders: [JSONValue],
+                              engine: KhaytEngine) async -> Bool {
+        if !order.item.reference.isEmpty,
+           (try? await engine.storefrontOrderRecorded(printLog: .array(orders), source: source,
+                                                      sourceOrderId: order.item.reference)) == true {
+            return true
+        }
+        return orders.contains { row in
+            guard case .object(let o) = row, case .string(let id)? = o["intakeId"] else { return false }
+            return id == order.id
+        }
     }
 
     /// Product id to HOW MANY this order takes, out of the effects list.

@@ -402,7 +402,7 @@ struct Reports: View {
         // NINETY DAYS, and the same window the other app uses. Long enough that
         // one unusual job does not move the margin, short enough that last
         // year's prices do not set this month's target.
-        let since = Calendar.current.date(byAdding: .day, value: -90, to: Date()) ?? Date()
+        let since = Calendar.book.date(byAdding: .day, value: -90, to: Date()) ?? Date()
         let day = DateFormatter()
         day.locale = Locale(identifier: "en_US_POSIX")
         day.dateFormat = "yyyy-MM-dd"
@@ -537,7 +537,7 @@ struct Reports: View {
         // window its caption counts too. Built here rather than in the rule so
         // the caller owns "which months", which is the thing that was wrong.
         var months: [String] = []
-        let calendar = Calendar.current
+        let calendar = Calendar.book
         let now = Date()
         for back in stride(from: 5, through: 0, by: -1) {
             guard let month = calendar.date(byAdding: .month, value: -back, to: now)
@@ -584,7 +584,7 @@ struct Reports: View {
         // THREE MONTHS, the window the other app draws. Long enough to show a
         // machine that keeps going down and short enough that a repair last
         // spring is not still being counted against a printer.
-        let calendar = Calendar.current
+        let calendar = Calendar.book
         var periods: [(from: Date, to: Date)] = []
         var keys: [String] = []
         for back in stride(from: 2, through: 0, by: -1) {

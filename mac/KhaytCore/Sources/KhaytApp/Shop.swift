@@ -5955,7 +5955,7 @@ final class Shop {
     /// is a rate for the month, the figure is what has been done against it so
     /// far, and a shop reading 40% on the 12th is reading something true.
     func periodDays(now: Date = Date(), dates: [String] = []) -> Int {
-        let cal = Calendar.current
+        let cal = Calendar.book
         switch period {
         case .month:
             return cal.range(of: .day, in: .month, for: now)?.count ?? 30
@@ -5979,7 +5979,7 @@ final class Shop {
         guard !date.isEmpty else { return false }
         let ds = String(date.prefix(10))
         guard ds.count == 10, Order.day(ds) != nil else { return false }
-        let cal = Calendar.current
+        let cal = Calendar.book
         let year = cal.component(.year, from: now)
         let month = cal.component(.month, from: now)
         switch period {
@@ -6228,9 +6228,10 @@ final class Shop {
         }
     }
 
-    /// Today, as the book writes a day: the shop's own calendar.
+    /// Today, as the book writes a day: Gregorian, in the shop's time zone —
+    /// see `Calendar.book`.
     static func today(_ now: Date = Date()) -> String {
-        let c = Calendar.current.dateComponents([.year, .month, .day], from: now)
+        let c = Calendar.book.dateComponents([.year, .month, .day], from: now)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
 
@@ -9535,7 +9536,7 @@ final class Shop {
             settings = try await engine.chooseTaxCountry(settings, code: country)
         }
         settings = try await engine.applySettings(
-            settings, form: form, year: Calendar.current.component(.year, from: Date()))
+            settings, form: form, year: Calendar.book.component(.year, from: Date()))
         root["settings"] = .object(settings)
     }
 
@@ -10540,7 +10541,7 @@ final class Shop {
     /// DAY a job drew from it, not an instant, so UTC would put a Riyadh
     /// evening on the wrong date.
     static func localDay(_ date: Date = Date()) -> String {
-        let c = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: date)
+        let c = Calendar.book.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
 
@@ -11460,24 +11461,57 @@ final class Shop {
         }
         guard !candidates.isEmpty else { return 0 }
 
-        // Read first, write once. `editFiles` goes through the store's write
-        // chain, and opening ninety zips inside it would hold the book for as
-        // long as that takes.
+        // Read first, write once, and read OFF the main thread: this opens
+        // up to a few hundred model zips, and doing that on the MainActor
+        // froze the window just after launch.
+        let jobs: [(id: LibraryFile.ID, url: URL)] = candidates.compactMap { file in
+            modelFile(for: file).map { (file.id, $0) }
+        }
+        let read: [LibraryFile.ID: (designer: String, licence: String)] = await Task.detached {
+            var out: [LibraryFile.ID: (designer: String, licence: String)] = [:]
+            for job in jobs {
+                if Task.isCancelled { break }
+                guard let said = Mesh.provenance(of: job.url) else { continue }
+                out[job.id] = (said.designer, said.licence)
+            }
+            return out
+        }.value
         var found: [LibraryFile.ID: (source: String, licence: String)] = [:]
-        for file in candidates {
-            guard let url = modelFile(for: file),
-                  let said = Mesh.provenance(of: url) else { continue }
+        for (id, said) in read {
             let licence = ModelLicence.fromFile(said.licence)?.id ?? ""
             guard !said.designer.isEmpty || !licence.isEmpty else { continue }
-            found[file.id] = (said.designer, licence)
+            found[id] = (said.designer, licence)
         }
-        guard !found.isEmpty else { return 0 }
+        guard !found.isEmpty, let build = source.build else { return 0 }
 
-        editFiles(Set(found.keys), named: words.callIt("mac.source_set")) { record in
-            guard case .string(let id)? = record["id"], let said = found[id] else { return }
-            if !said.source.isEmpty { record["source"] = .string(said.source) }
-            if !said.licence.isEmpty { record["licence"] = .string(said.licence) }
+        // NOT `editFiles`: that registers an Undo, and the first Cmd-Z after
+        // launch then undid a change the shop never made. And each field is
+        // filled only if it is STILL blank in the book as it is now — a
+        // source typed while the zips were being read is the shop's, and
+        // wins. Found by the September 2026 scan.
+        do {
+            try StoreWriter.update(build) { root in
+                guard case .array(var rows)? = root["printFiles"] else { return }
+                for i in rows.indices {
+                    guard case .object(var record) = rows[i],
+                          case .string(let id)? = record["id"], let said = found[id] else { continue }
+                    var changed = false
+                    if !said.source.isEmpty, (Self.plainString(record["source"]) ?? "").isEmpty {
+                        record["source"] = .string(said.source); changed = true
+                    }
+                    if !said.licence.isEmpty, (Self.plainString(record["licence"]) ?? "").isEmpty {
+                        record["licence"] = .string(said.licence); changed = true
+                    }
+                    guard changed else { continue }
+                    StoreWriter.stamp(&record)
+                    rows[i] = .object(record)
+                }
+                root["printFiles"] = .array(rows)
+            }
+        } catch {
+            return 0
         }
+        await load(source)
         return found.count
     }
 
@@ -12454,7 +12488,7 @@ final class Shop {
                 id: at,
                 // The day, not the instant: a list of times to the second is a
                 // list nobody reads, and the shop asks "did I send this week".
-                day: String(at.prefix(10)),
+                day: Calendar.localDay(ofInstant: at),
                 reached: Int(Self.plainNumber(o["recipients"]) ?? 0),
                 sent: Int(Self.plainNumber(o["sent"]) ?? 0),
                 failed: Int(Self.plainNumber(o["failed"]) ?? 0))

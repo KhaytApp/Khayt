@@ -5740,6 +5740,14 @@ public actor KhaytEngine {
                           [.string(source), payload, printLog], as: Bool.self)
     }
 
+    /// Whether the book already holds this platform order, by the reference
+    /// the platform gave it — `lib/storefront-orders.js alreadyRecorded`. An
+    /// empty reference is never a match.
+    public func storefrontOrderRecorded(printLog: JSONValue, source: String, sourceOrderId: String) throws -> Bool {
+        try runtime.call2("globalThis.KhaytStorefrontOrders.alreadyRecorded(ARG0, ARG1, ARG2)",
+                          [printLog, .string(source), .string(sourceOrderId)], as: Bool.self)
+    }
+
     // MARK: - Break-even
 
     /// What a shop has to bill in a month to cover the costs it pays anyway.
