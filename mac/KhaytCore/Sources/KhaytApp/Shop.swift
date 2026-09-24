@@ -7003,6 +7003,61 @@ final class Shop {
     /// Has somebody unlocked the cloud this session?
     var cloudUnlocked: Bool { cloudDek != nil }
 
+    /// "Remember me on this Mac", from the sign-in sheet. On unless the shop
+    /// turned it off: keeping the key is what stops the passphrase being asked
+    /// at every launch, and a shared Mac is the case to opt out for.
+    static let rememberCloudKeyDefault = "cloud.rememberOnThisMac"
+    static var rememberCloudKey: Bool {
+        UserDefaults.standard.object(forKey: rememberCloudKeyDefault) as? Bool ?? true
+    }
+
+    /// Keep the unwrapped key on this Mac, or make sure none is kept, as the
+    /// shop chose.
+    private func keepCloudKey(_ dek: Data, keyset: [String: JSONValue], shopId: String) async {
+        if Self.rememberCloudKey {
+            await CloudKeyMemory.remember(dek, fingerprint: CloudKeyMemory.fingerprint(of: .object(keyset)) ?? "",
+                                          shopId: shopId)
+        } else {
+            await CloudKeyMemory.forget(shopId: shopId)
+        }
+    }
+
+    /// The book's side of signing out: `settings.cloud.enabled = false`, and
+    /// everything else in `settings.cloud` left as it was — the other app's
+    /// Disconnect writes exactly this.
+    static func markSignedOut(_ root: inout [String: JSONValue]) {
+        var settings = Self.settings(root)
+        guard case .object(var cloud)? = settings["cloud"] else { return }
+        cloud["enabled"] = .bool(false)
+        settings["cloud"] = .object(cloud)
+        root["settings"] = .object(settings)
+    }
+
+    /// Asked from the Book menu and the sidebar; the window confirms it.
+    var confirmingSignOut = false
+
+    /// Sign this Mac out of Khayt Cloud.
+    ///
+    /// What the other app's Disconnect does, and nothing more: stop syncing,
+    /// drop the key (here, and the copy kept in the Keychain), and write
+    /// `settings.cloud.enabled = false`. The book and the cloud copy both stay,
+    /// and the address and email are kept so signing in again is two fields.
+    func signOutOfCloud() async {
+        forgetCloudKey()
+        guard let build = source.build else { return }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in Self.markSignedOut(&root) }
+            await load(source)
+            moveNotices = [words.callIt("mac.cloud_signed_out")]
+        } catch {
+            cloudProblem = String(describing: error)
+        }
+    }
+
     /// The shop locked the cloud this session. Cleared by the next unlock.
     private var cloudLockedByShop = false
 
@@ -7016,7 +7071,8 @@ final class Shop {
     /// app does not ask for the passphrase again. Only while the book's keyset
     /// is the one that key came from; see `CloudKeyMemory`.
     func restoreCloudKey() async {
-        guard cloudDek == nil, !cloudLockedByShop, Self.cloudConnected(settingsDict), let shopId = cloudShopId,
+        guard Self.rememberCloudKey,
+              cloudDek == nil, !cloudLockedByShop, Self.cloudConnected(settingsDict), let shopId = cloudShopId,
               let print = CloudKeyMemory.fingerprint(of: cloudKeyset()) else { return }
         guard let dek = await CloudKeyMemory.recall(shopId: shopId, fingerprint: print),
               cloudDek == nil else { return }
@@ -7156,8 +7212,7 @@ final class Shop {
             cloudDek = dek
             cloudLockedByShop = false
             // Kept on this Mac, so the next launch does not ask again.
-            await CloudKeyMemory.remember(dek, fingerprint: CloudKeyMemory.fingerprint(of: .object(keyset)) ?? "",
-                                          shopId: session.shopId)
+            await keepCloudKey(dek, keyset: keyset, shopId: session.shopId)
             if case .locked = syncStatus { syncStatus = .idle }
             await load(source)
             // ── A KEY ONLY THIS BOOK HOLDS GOES TO THE CLOUD ──────────────
@@ -7285,8 +7340,7 @@ final class Shop {
                                                kdf: SyncCrypto.Kdf.from(keyset["kdf"]))
             cloudDek = dek
             cloudLockedByShop = false
-            await CloudKeyMemory.remember(dek, fingerprint: CloudKeyMemory.fingerprint(of: .object(keyset)) ?? "",
-                                          shopId: connection.shopId)
+            await keepCloudKey(dek, keyset: keyset, shopId: connection.shopId)
             // Unlocked. From here on this app pushes on its own, and the first
             // push carries whatever was changed while it was locked.
             if case .locked = syncStatus { syncStatus = .idle }

@@ -584,6 +584,18 @@ struct WindowSheets: ViewModifier {
             } message: {
                 Text(shop.words.callIt("mac.cancel_why"))
             }
+            // Signing out, in the other app's words. Nothing is deleted, so it
+            // is not the destructive role; it still asks, because sync stops.
+            .confirmationDialog(
+                shop.words.callIt("mac.cloud_sign_out_q"),
+                isPresented: $shop.confirmingSignOut,
+                titleVisibility: .visible
+            ) {
+                Button(shop.words.callIt("mac.cloud_sign_out_do")) {
+                    Task { await shop.signOutOfCloud() }
+                }
+                Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+            }
             // Deleting a model is the one library action that cannot be
             // undone — the files go — so it asks, in the words the Electron
             // app asks in, and the destructive button says what it does.

@@ -109,6 +109,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) "Remember me on this Mac", and a way to sign out of the cloud.**
+  Keeping the unlock key between launches is a choice now: a checkbox on the
+  cloud sign-in, on unless turned off, and worth turning off on a Mac other
+  people use. **Sign out of the cloud** is in the Book menu and on the cloud
+  line at the foot of the sidebar, which now also opens the sign-in (or the
+  cloud check) when clicked and lists every cloud action when right-clicked.
+  Signing out stops syncing on this Mac and removes the kept key; the book and
+  the cloud copy both stay, and signing back in needs only the password and
+  passphrase again.
+
 - **(Mac) See what can start now, with the filament already loaded.** A
   printer that reports its loaded spools (a Snapmaker U1 does, head by head)
   gets a **Ready on <printer>** chip in the library, counting the models whose

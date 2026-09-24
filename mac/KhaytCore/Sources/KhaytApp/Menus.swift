@@ -190,6 +190,10 @@ private struct BookMenu: View {
         // it does before it is ever needed.
         Button(Words.upfront("mac.lock_cloud")) { shop.forgetCloudKey() }
             .disabled(!shop.cloudUnlocked)
+        // Signing out is not locking: Lock keeps the shop signed in and only
+        // drops the key; this stops syncing on this Mac altogether.
+        Button(Words.upfront("mac.cloud_sign_out") + "\u{2026}") { shop.confirmingSignOut = true }
+            .disabled(!shop.cloudConnected)
         Button(Words.upfront("mac.export_copy")) {
             Task { await shop.exportForSharing() }
         }

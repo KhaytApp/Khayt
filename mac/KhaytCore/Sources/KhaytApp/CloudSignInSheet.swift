@@ -24,6 +24,8 @@ struct CloudSignInSheet: View {
     @State private var resetting = false
     @State private var code = ""
     @State private var newPassword = ""
+    /// "Remember me on this Mac". The choice outlives the sheet.
+    @AppStorage(Shop.rememberCloudKeyDefault) private var remember = true
     @FocusState private var focused: Field?
 
     private enum Field { case url, email, password, passphrase, code, newPassword }
@@ -78,6 +80,15 @@ struct CloudSignInSheet: View {
             Text(shop.words.callIt("mac.cloud_passphrase_why"))
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            // Keeping the unlocked key is what lets the next launch open signed
+            // in. Worth switching off on a Mac other people use.
+            VStack(alignment: .leading, spacing: 2) {
+                Toggle(shop.words.callIt("mac.cloud_remember"), isOn: $remember)
+                Text(shop.words.callIt("mac.cloud_remember_why"))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             // The way out of the one failure that stops everything else, and it
             // is HERE rather than in a menu: a shop that cannot remember its

@@ -36,7 +36,9 @@ struct CloudKeyMemoryTests {
         let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
-        let kept = shop.components(separatedBy: "CloudKeyMemory.remember(").count - 1
+        // Both unlocks go through keepCloudKey, which remembers or forgets as
+        // the shop chose ("Remember me on this Mac"); CloudSignOutTests pins that.
+        let kept = shop.components(separatedBy: "await keepCloudKey(").count - 1
         #expect(kept == 2, "sign-in and unlock must both keep the key (found \(kept))")
         #expect(shop.contains("await CloudKeyMemory.forget(shopId: shopId)"), "Lock no longer forgets it")
         #expect(shop.contains("if next.build != nil { await restoreCloudKey() }"),
