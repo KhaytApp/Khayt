@@ -4,6 +4,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Four ways Khayt could destroy a file you meant to keep.**
+  - **Generating a new ZATCA key replaced the old one with no copy.** That key
+    is the one your ZATCA certificate is bound to, so one click in Settings
+    could make every invoice after it fail ZATCA's check until you onboarded
+    again. The old key is now kept beside the new one, and if it cannot be
+    kept, no new key is written.
+  - **Deleting a model from the library deleted it for good.** It goes to the
+    Trash (the Recycle Bin on Windows) now, so a mistake can be undone. If the
+    Trash is not available, the file stays and Khayt says it could not be
+    deleted, rather than deleting it permanently.
+  - **In Saudi Arabia, the night overwrote the previous day's backup.** The
+    daily backup was named by the date in UTC while Khayt checked it against
+    your own date, so between midnight and 3 a.m. it kept writing over
+    yesterday's backup. It is named by your own date now: one per day, as the
+    setting says.
+  - **Attaching a second file with the same name to an order replaced the
+    first.** Two `part.stl` files from different folders left only the last
+    one. The second is now kept as `part-2.stl`.
 - **(Mac) Online storage for the print library.** Settings → Preferences →
   Online storage points the library at a bucket — Cloudflare R2, Backblaze B2,
   Amazon S3, Wasabi and the other S3-compatible providers the desktop app
