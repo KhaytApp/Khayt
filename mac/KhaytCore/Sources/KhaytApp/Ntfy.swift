@@ -12,8 +12,10 @@ enum Ntfy {
     enum Failure: Error, Equatable, CustomStringConvertible {
         case badAddress
         case refused(Int)
+        case tokenNeedsHTTPS
         var description: String {
             switch self {
+            case .tokenNeedsHTTPS: "An ntfy access token is only sent to an https:// server."
             case .badAddress: "The ntfy server or topic is not one ntfy can use."
             case .refused(let code): "ntfy answered \(code)."
             }
@@ -25,13 +27,20 @@ enum Ntfy {
         guard let url = URL(string: request.url), ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
             throw Failure.badAddress
         }
+        // A TOKEN ONLY OVER HTTPS. On plain HTTP the Bearer token crosses
+        // every hop readable. Sep 2026 scan.
+        if !token.isEmpty, url.scheme?.lowercased() != "https" { throw Failure.tokenNeedsHTTPS }
         var r = URLRequest(url: url)
         r.httpMethod = "POST"
         r.timeoutInterval = 10
         for (name, value) in request.headers where !value.isEmpty { r.setValue(value, forHTTPHeaderField: name) }
         if !token.isEmpty { r.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
         r.httpBody = Data(request.body.utf8)
-        let (_, response) = try await (fetch ?? { try await URLSession.shared.data(for: $0) })(r)
+        // No redirects: a server answering 30x would have had the token
+        // carried to wherever it pointed.
+        let (_, response) = try await (fetch ?? {
+            try await URLSession.shared.data(for: $0, delegate: RefuseRedirects.shared)
+        })(r)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(code) else { throw Failure.refused(code) }
     }

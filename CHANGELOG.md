@@ -9,6 +9,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   book (#1574). The Mac's Restore list marks it "taken before everything was
   reset" — not "taken before an update", which is what it would otherwise
   have been called, or nothing at all.
+- **(Mac) Security fixes from the September scan, fourth batch.**
+  - **A web page could read the shop's book through the owner's browser**
+    (DNS rebinding). The PIN-protected routes answer only to an address,
+    `localhost` or a `.local` name — never to somebody else's domain. Webhooks
+    and the customer pages are unaffected.
+  - **The PIN could be guessed from many addresses at once.** Wrong PINs now
+    also count against the whole server (the shared 50-a-minute rule, then a
+    minute's cooldown), and an IPv6 phone or attacker is counted by its /64
+    prefix. A NEW PIN must be at least eight characters.
+  - **A small crafted upload could freeze the app.** Measuring an upload runs
+    off the main thread with its real inflated size capped at 250× what was
+    sent, and the server takes at most 64 connections (16 per address).
+  - **A camera that is not the printer was sent the printer's key** (the
+    OctoPrint/PrusaLink API key or the Bambu access code) with every frame. It
+    goes only to the printer's own address now.
+  - **A Bambu printer's certificate was never checked**, so anyone on the
+    network answering for it received the access code. The certificate is now
+    remembered the first time and a different one refused; saving the access
+    code again re-trusts a replaced or reset printer.
+  - **An ntfy access token could go over plain HTTP or follow a redirect.** It
+    is sent only to https:// servers, and never on to a redirect.
 
 - **A full wipe keeps one copy of your book.** "Delete everything" used to
   delete everything, backups included, so a wipe made by mistake could not be

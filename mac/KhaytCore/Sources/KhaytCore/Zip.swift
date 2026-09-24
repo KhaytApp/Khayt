@@ -31,6 +31,12 @@ import Compression
 /// and it is a cap rather than a heuristic because the honest bound is known.
 public enum Zip {
 
+    /// A cap on what any ONE streamed read may inflate to, for the task that
+    /// sets it — an upload from a stranger is capped by its own size (250×),
+    /// where the shop's own 436 MB mesh is not. A structural scan only sees
+    /// the sizes an archive CLAIMS; this counts the bytes that come out.
+    @TaskLocal public static var inflateBudget: Int? = nil
+
     /// English, and technical. A shop never reads "the archive is damaged: a
     /// member's name runs past the directory" — whoever is working out why a
     /// file would not open does. See the note on `Mesh.Failure`.
@@ -263,6 +269,7 @@ public enum Zip {
     /// from `onChunk` stops the read.
     public static func stream(_ entry: Entry, in url: URL, totalLimit: Int = 4 << 30,
                        onChunk: (UnsafeRawBufferPointer) -> Bool) throws {
+        let limit = min(totalLimit, inflateBudget ?? totalLimit)
         guard entry.method == 0 || entry.method == 8 else {
             throw Failure.unsupported(name: entry.name, method: entry.method)
         }
@@ -335,8 +342,8 @@ public enum Zip {
                     let got = outSize - stream.dst_size
                     if got > 0 {
                         produced += got
-                        guard produced <= totalLimit else {
-                            throw Failure.tooBig(name: entry.name, size: produced, limit: totalLimit)
+                        guard produced <= limit else {
+                            throw Failure.tooBig(name: entry.name, size: produced, limit: limit)
                         }
                         if !onChunk(UnsafeRawBufferPointer(start: out, count: got)) { stop = true; return }
                     }

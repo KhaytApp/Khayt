@@ -5459,6 +5459,26 @@ public actor KhaytEngine {
                           [prev?.json ?? .null, .number(now.timeIntervalSince1970 * 1000), .number(lockoutMs)],
                           as: LanFailures.self)
     }
+    /// The whole server's failure budget: `lib/lan-auth.js globalAuthThrottle`
+    /// (50 wrong PINs a minute from ALL addresses, then a minute's cooldown).
+    /// Per-address lockouts alone let an attacker with many addresses — or one
+    /// IPv6 prefix — keep guessing at full speed.
+    public struct LanThrottle: Codable, Sendable, Equatable {
+        public var windowStart: Double = 0
+        public var count: Double = 0
+        public var blockedUntil: Double = 0
+        public init() {}
+    }
+    public func lanGlobalThrottle(_ state: LanThrottle, now: Date, failed: Bool) throws -> (blocked: Bool, state: LanThrottle) {
+        struct Out: Decodable { let blocked: Bool; let state: LanThrottle }
+        let st = JSONValue.object(["windowStart": .number(state.windowStart), "count": .number(state.count),
+                                   "blockedUntil": .number(state.blockedUntil)])
+        let out = try runtime.call2(
+            "(function (s) { const b = globalThis.KhaytLanAuth.globalAuthThrottle(s, ARG1, ARG2); return { blocked: b, state: s }; })(ARG0)",
+            [st, .number(now.timeIntervalSince1970 * 1000), .bool(failed)], as: Out.self)
+        return (out.blocked, out.state)
+    }
+
     public func lanIsLockedOut(_ rec: LanFailures?, now: Date) throws -> Bool {
         try runtime.call2("globalThis.KhaytLanAuth.isLockedOut(ARG0, ARG1)",
                           [rec?.json ?? .null, .number(now.timeIntervalSince1970 * 1000)], as: Bool.self)

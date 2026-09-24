@@ -786,6 +786,9 @@ struct MachineSheet: View {
                         await MainActor.run { shop.spendProblem = shop.words.callIt("mac.move_sample") }
                         return
                     }
+                    // A new access code re-trusts the printer's certificate:
+                    // this is how a replaced or reset Bambu is let back in.
+                    BambuPin.forget(serial: serial, host: apiHost.trimmingCharacters(in: .whitespaces))
                     do { api["accessCode"] = .string(try await Secrets.seal(typedCode, for: build)) }
                     catch {
                         await MainActor.run { shop.spendProblem = String(describing: error) }

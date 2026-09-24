@@ -1,4 +1,6 @@
 import Foundation
+import CryptoKit
+import Security
 import Network
 
 /// Enough MQTT 3.1.1 to ask a Bambu printer what it is doing.
@@ -153,7 +155,56 @@ enum BambuMqtt {
         /// code is refused with a CONNACK and a wrong address never connects.
         case silent
         case closed(String)
+        /// The printer presented a different certificate from the one it
+        /// presented the first time — see `BambuPin`.
+        case certificateChanged
     }
+}
+
+/// ── TRUST ON FIRST USE, FOR A CERTIFICATE NOTHING CAN VERIFY ──────────────
+///
+/// A Bambu's certificate is self-signed for a name that is not its address,
+/// so there is nothing to check it against — and accepting ANY certificate
+/// meant anyone on the shop's network who answered for the printer's address
+/// received the access code in the MQTT CONNECT, which is full control of the
+/// printer. Sep 2026 scan.
+///
+/// So the printer's certificate is remembered the first time (by SHA-256,
+/// per printer, on this Mac) and a DIFFERENT one afterwards is refused, with
+/// a message saying so. A printer that really did change — replaced, reset —
+/// is re-trusted by saving its access code again on the machine sheet.
+enum BambuPin {
+    static func key(serial: String, host: String) -> String {
+        "bambu.certpin." + (serial.isEmpty ? host.lowercased() : serial)
+    }
+    static func stored(_ key: String) -> String? { UserDefaults.standard.string(forKey: key) }
+    static func remember(_ key: String, _ fingerprint: String) { UserDefaults.standard.set(fingerprint, forKey: key) }
+    static func forget(serial: String, host: String) {
+        UserDefaults.standard.removeObject(forKey: key(serial: serial, host: host))
+    }
+
+    /// Accept this fingerprint for this printer? The first one is kept.
+    static func accept(_ fingerprint: String, key: String) -> Bool {
+        if let pinned = stored(key) { return pinned == fingerprint }
+        remember(key, fingerprint)
+        return true
+    }
+
+    /// The leaf certificate's SHA-256, from the handshake's trust object.
+    static func fingerprint(_ trust: sec_trust_t) -> String? {
+        let ref = sec_trust_copy_ref(trust).takeRetainedValue()
+        guard let chain = SecTrustCopyCertificateChain(ref) as? [SecCertificate], let leaf = chain.first else { return nil }
+        let der = SecCertificateCopyData(leaf) as Data
+        return SHA256.hash(data: der).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+/// Set by the TLS verify block, read when the connection fails.
+final class PinVerdict: @unchecked Sendable {
+    private let lock = NSLock()
+    private var changed = false
+    func markChanged() { lock.withLock { changed = true } }
+    var wasChanged: Bool { lock.withLock { changed } }
 }
 
 // MARK: - The live connection
@@ -168,8 +219,8 @@ enum BambuMqtt {
 ///
 /// A Bambu printer presents a certificate it signed itself, for a name that is
 /// not its LAN address, and there is no way to obtain a real one for a device
-/// on a home network. So the certificate is not checked — the same thing the
-/// other app does, and the only thing that can be done.
+/// on a home network. So it cannot be VERIFIED — it is pinned on first use
+/// instead (`BambuPin`, Sep 2026), which the other app does not yet do.
 ///
 /// What makes that acceptable is what is sent: the access code goes only to the
 /// address the shop typed, the channel is still encrypted against a passive
@@ -231,10 +282,17 @@ actor BambuConversation {
     private func run(ask: @escaping @Sendable () -> [UInt8],
                      take: @escaping @Sendable (String) -> String?) async throws -> String {
         let options = NWProtocolTLS.Options()
-        // See the note on this type. There is no certificate to verify against.
+        // Nothing to verify the certificate AGAINST, so it is pinned on first
+        // use — see `BambuPin`.
+        let pinKey = BambuPin.key(serial: serial, host: host)
+        let verdict = PinVerdict()
         sec_protocol_options_set_verify_block(
             options.securityProtocolOptions,
-            { _, _, complete in complete(true) },
+            { _, trust, complete in
+                guard let print = BambuPin.fingerprint(trust) else { complete(false); return }
+                if BambuPin.accept(print, key: pinKey) { complete(true) }
+                else { verdict.markChanged(); complete(false) }
+            },
             DispatchQueue.global(qos: .userInitiated))
 
         let connection = NWConnection(
@@ -251,7 +309,9 @@ actor BambuConversation {
                     clientId: id, username: "bblp",
                     password: self.accessCode)), completion: .idempotent)
             case .failed(let error):
-                Task { await box.fail(BambuMqtt.Trouble.closed(error.localizedDescription)) }
+                let trouble: BambuMqtt.Trouble = verdict.wasChanged
+                    ? .certificateChanged : .closed(error.localizedDescription)
+                Task { await box.fail(trouble) }
             case .cancelled:
                 Task { await box.fail(BambuMqtt.Trouble.closed("cancelled")) }
             default:

@@ -148,7 +148,14 @@ final class Camera {
         // The credential the printer's own adapters send. It reaches the
         // printer and nowhere else — which is only true BECAUSE the host was
         // pinned above, and is why these two steps are never separated.
-        if let headers = try? await engine.webcamAuthHeaders(printerApi: api) {
+        //
+        // ONLY TO THE PRINTER ITSELF. A camera may be its own device on the
+        // shop's network, and the allow-list above lets it be — so the
+        // printer's API key or Bambu access code went to every such device on
+        // every frame, including one named by a restored or synced book.
+        // Sep 2026 scan. A separate camera is fetched without it.
+        if Self.samePrinterHost(url, printerApi: api),
+           let headers = try? await engine.webcamAuthHeaders(printerApi: api) {
             for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         }
 
@@ -292,5 +299,20 @@ final class RefuseRedirects: NSObject, URLSessionTaskDelegate, Sendable {
                     willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest) async -> URLRequest? {
         nil
+    }
+}
+
+extension Camera {
+    /// Is this address the printer's own host — `lib/webcam.js printerHost`,
+    /// compared host to host (scheme, port and path aside)?
+    nonisolated static func samePrinterHost(_ url: URL, printerApi: JSONValue) -> Bool {
+        guard case .object(let p) = printerApi, case .string(let raw0)? = p["host"] else { return false }
+        let raw = raw0.trimmingCharacters(in: .whitespaces)
+        guard !raw.isEmpty else { return false }
+        let withScheme = raw.range(of: "^https?://", options: [.regularExpression, .caseInsensitive]) != nil
+            ? raw : "http://" + raw
+        guard let printer = URL(string: withScheme)?.host?.lowercased(), !printer.isEmpty,
+              let target = url.host?.lowercased() else { return false }
+        return printer == target
     }
 }

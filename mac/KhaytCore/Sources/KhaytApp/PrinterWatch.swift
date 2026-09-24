@@ -1084,6 +1084,10 @@ final class PrinterWatch {
         switch trouble {
         case .malformed:
             return "The printer sent something this app could not read."
+        case .certificateChanged:
+            return "The printer answered with a different certificate from the one it used before, "
+                 + "so the access code was not sent. If the printer was replaced or reset, save its "
+                 + "access code again on the machine sheet to trust the new one."
         case .refused(let code):
             return "The printer refused the access code (CONNACK \(code)). It is shown on the "
                  + "printer's own screen, in the LAN-only Mode area."

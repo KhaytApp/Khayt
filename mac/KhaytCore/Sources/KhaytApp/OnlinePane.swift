@@ -41,6 +41,15 @@ struct OnlinePane: View {
 
         var portNumber: Int { Int(port.trimmingCharacters(in: .whitespaces)) ?? 3219 }
 
+        /// A NEW PIN shorter than eight characters. The PIN is the only lock on
+        /// the whole book over the network, and a four-digit one falls to the
+        /// per-address limit in a day. A PIN already stored keeps working.
+        static let minimumPin = 8
+        var pinTooShort: Bool {
+            let p = pin.trimmingCharacters(in: .whitespaces)
+            return !p.isEmpty && p.count < Self.minimumPin
+        }
+
         // ── WHAT A CUSTOMER MAY BE QUOTED ─────────────────────────────────
         //
         // Text, not numbers, for the same reason the product sheet's rates
@@ -134,6 +143,11 @@ struct OnlinePane: View {
                                     text: $draft.pin)
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 220)
+                    }
+                    if draft.pinTooShort {
+                        Label(shop.words.callIt("mac.lan_pin_short", ["n": .number(Double(Draft.minimumPin))]),
+                              systemImage: "exclamationmark.triangle")
+                            .font(.caption).foregroundStyle(Khayt.attention)
                     }
                     if draft.enabled, !draft.pinStored, draft.pin.trimmingCharacters(in: .whitespaces).isEmpty {
                         Label(shop.words.callIt("mac.lan_pin_missing"), systemImage: "exclamationmark.triangle")
@@ -345,7 +359,7 @@ struct OnlinePane: View {
                 }
             }
             .formStyle(.grouped)
-            SaveBar(shop: shop, dirty: draft != original,
+            SaveBar(shop: shop, dirty: draft != original && !draft.pinTooShort,
                     save: { Task {
                         await shop.saveLanSettings(enabled: draft.enabled, port: draft.portNumber,
                                                    pin: draft.pin, bindLan: draft.bindLan,
