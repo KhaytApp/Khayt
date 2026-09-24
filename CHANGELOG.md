@@ -4,6 +4,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Your slicer setup stays on the computer where you set it.** A slicer's
+  program and the options it runs with are this computer's, and restoring a
+  backup, importing a file or restoring from the cloud used to replace them
+  with whatever the file carried. A genuine slicer given someone else's
+  options can be made to run any command, so these never change on a restore
+  or import now; each computer sets up its slicer once. Found by the Mac
+  app's September security scan (SEC-014).
+- **Your ntfy topic and webhook addresses are no longer sent to the cloud.**
+  On public ntfy.sh the topic is the only thing between your alerts and
+  anyone who guesses it, and Slack and Discord webhook addresses carry their
+  password in the address itself. Both stay visible in Settings on this
+  computer, and are no longer included in what is uploaded to Khayt Cloud.
+  Restoring from the cloud keeps the ones this computer already has (SEC-011).
+- **(Maintainers) Nothing sealed on disk goes up to the cloud, listed or
+  not.** `cloud-outbox.js` `forCloud` masked exactly the paths in
+  `store-secret-paths.js`, so a value sealed on disk (`__enc__…`) whose path
+  was missing from that list would have been sent as its ciphertext. It now
+  masks any sealed value wherever it sits, the backstop the Mac's
+  `Export.swift` already had. `store-secret-paths.js` also gains
+  `DEVICE_PRIVATE_PATHS`/`forEachDevicePrivate` and
+  `MACHINE_LOCAL_PATHS`/`keepMachineLocal`, which the Mac's `/api/store`,
+  cloud push and restore read too (SEC-011, SEC-014).
+
 - **(Mac) A backup taken before "reset everything" is labelled as such.**
   The other app now takes a protected `pre-wipe-` copy before it resets a
   book (#1574). The Mac's Restore list marks it "taken before everything was

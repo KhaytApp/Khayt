@@ -299,3 +299,43 @@ test('a send refuses outright when the secret list is missing', () => {
     assert.throws(() => forCloud({}), /secret list is not loaded, refusing to send/);
   } finally { globalThis.KhaytStoreSecretPaths = saved; }
 });
+
+test('a value sealed on disk never goes up, even when its path is missing from the list', () => {
+  // SEC-011 (the Mac's September scan). The list decides what gets sealed, but a
+  // host that reads the store from disk — the Mac — could hold a sealed value the
+  // list has not heard of. Its ciphertext must not reach the cloud blob.
+  const store = {
+    settings: {
+      someNewIntegration: { apiKey: '__enc__AAAAciphertext' },   // not on the list
+      ntfy: { token: '__enc__BBBB', server: 'https://ntfy.sh' },  // on the list; server is plain
+    },
+    machines: [{ id: 'm1', extra: ['__enc__CCCC', 'plain'] }],
+  };
+  const out = forCloud(store);
+  const M = require('../lib/store.js').SECRET_MASK;
+  assert.notEqual(out.settings.someNewIntegration.apiKey.slice(0, 7), '__enc__', 'unlisted sealed value shipped');
+  assert.equal(out.settings.someNewIntegration.apiKey, M);
+  assert.equal(out.settings.ntfy.token, M);
+  assert.equal(out.settings.ntfy.server, 'https://ntfy.sh', 'a plain value is not a secret by accident');
+  assert.deepEqual(out.machines[0].extra, [M, 'plain'], 'sealed values inside arrays');
+  assert.equal(store.settings.someNewIntegration.apiKey, '__enc__AAAAciphertext', 'the caller\'s store is untouched');
+});
+
+test('the ntfy topic and webhook URLs are shown on this computer and never go up (SEC-011)', () => {
+  const store = { settings: {
+    ntfy: { topic: 'shop-7f3a-alerts', server: 'https://ntfy.sh' },
+    webhooks: {
+      subscriptions: [{ id: 's1', url: 'https://hooks.slack.com/services/T0/B0/secret', events: ['order_created'] }],
+      events: { order_created: 'https://discord.com/api/webhooks/1/abc', status_changed: '' },
+    },
+  } };
+  const M = require('../lib/store.js').SECRET_MASK;
+  const out = forCloud(store);
+  assert.equal(out.settings.ntfy.topic, M);
+  assert.equal(out.settings.ntfy.server, 'https://ntfy.sh');
+  assert.equal(out.settings.webhooks.subscriptions[0].url, M);
+  assert.deepEqual(out.settings.webhooks.subscriptions[0].events, ['order_created'], 'only the URL is private');
+  assert.equal(out.settings.webhooks.events.order_created, M);
+  assert.equal(out.settings.webhooks.events.status_changed, '', 'an empty slot stays empty');
+  assert.equal(store.settings.ntfy.topic, 'shop-7f3a-alerts', 'the caller keeps the real value');
+});
