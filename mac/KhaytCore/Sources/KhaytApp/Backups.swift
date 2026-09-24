@@ -94,7 +94,11 @@ enum Backups {
                          now: Date = Date(), keep: Int = 30, except: [String] = []) async throws -> URL {
         let directory = Self.directory(for: build)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // POSIX, or a Mac in Arabic names the file `…-٠٣٠٠.json`, which the
+        // rotation rule (ASCII digits) never recognises as a backup.
         let stamp = DateFormatter()
+        stamp.locale = Locale(identifier: "en_US_POSIX")
+        stamp.calendar = .book
         stamp.dateFormat = "HHmm"
         let target = directory.appending(path: Shop.today(now) + "-" + stamp.string(from: now) + ".json")
         try Data(contentsOf: build.storeURL).write(to: target, options: .atomic)

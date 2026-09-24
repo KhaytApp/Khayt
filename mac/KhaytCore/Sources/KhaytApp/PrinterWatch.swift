@@ -204,8 +204,24 @@ final class PrinterWatch {
         }
     }
 
+    /// The book this is watching for, so a reload of the same book leaves it
+    /// running.
+    private var watching: URL?
+
+    /// ── ONCE PER BOOK, NOT ONCE PER LOAD ─────────────────────────────────
+    ///
+    /// `Shop.load` calls this, and every write reloads. It used to start over
+    /// each time — clearing the last reading, the alert cooldowns and the stall
+    /// clock — so a printer sitting in an error sent a fresh "Printer error"
+    /// to the Mac, Telegram and ntfy on every edit, and a stall was never
+    /// reported for a shop that edits more often than the stall threshold.
+    /// Each sweep reads `shop.machines` afresh, so a machine added or changed
+    /// is picked up without a restart. Found by the September 2026 scan.
     func start(shop: Shop) {
+        let book = source?.storeURL
+        if task != nil, book == watching { return }
         stop()
+        watching = book
         task = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.sweep(shop: shop)
@@ -217,6 +233,7 @@ final class PrinterWatch {
     func stop() {
         task?.cancel()
         task = nil
+        watching = nil
         // The bookkeeping goes with it. A book closed and reopened has not been
         // offline for an hour, and carrying a stall clock across that would
         // raise an alert about a print that finished yesterday.

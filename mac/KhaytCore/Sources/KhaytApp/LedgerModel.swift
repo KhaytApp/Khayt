@@ -153,13 +153,13 @@ extension Shop {
     private func isLate(_ order: Order) -> Bool {
         if let resolved = order.isLateResolved { return resolved }
         guard let due = Order.day(order.dueDate ?? ""), !order.isSettled else { return false }
-        return due < Calendar.current.startOfDay(for: Date())
+        return due < Calendar.book.startOfDay(for: Date())
     }
 
     private func urgency(_ order: Order) -> Int {
         if isLate(order) { return 0 }
         if let due = Order.day(order.dueDate ?? ""),
-           Calendar.current.isDateInToday(due) { return 1 }
+           Calendar.book.isDateInToday(due) { return 1 }
         if order.isSettled { return 4 }
         return 2
     }
@@ -182,8 +182,8 @@ extension Shop {
         if state == .done || state == .cancelled {
             return words.say(due, .dateTime.day().month(.abbreviated))
         }
-        let start = Calendar.current.startOfDay(for: Date())
-        let days = Calendar.current.dateComponents([.day], from: start, to: due).day ?? 0
+        let start = Calendar.book.startOfDay(for: Date())
+        let days = Calendar.book.dateComponents([.day], from: start, to: due).day ?? 0
         if days < 0 { return "−" + String(-days) + "d" }
         if days == 0 { return words.say(due, Date.FormatStyle(date: .omitted, time: .shortened)) }
         return words.say(due, .dateTime.weekday(.abbreviated).day())

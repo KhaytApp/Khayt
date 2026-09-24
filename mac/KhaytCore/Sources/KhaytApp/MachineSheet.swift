@@ -1120,7 +1120,7 @@ struct DowntimeEditor: View {
                 Button(words.callIt("mach.downtime_add")) {
                     // Tomorrow morning to tomorrow afternoon: a shape to edit
                     // rather than four empty fields to fill.
-                    let start = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+                    let start = Calendar.book.date(byAdding: .day, value: 1, to: Date()) ?? Date()
                     blocks.append(.init(from: Self.stamp(Self.at(start, hour: 9)),
                                         to: Self.stamp(Self.at(start, hour: 13)),
                                         reason: ""))
@@ -1183,6 +1183,6 @@ struct DowntimeEditor: View {
     }
 
     private static func at(_ day: Date, hour: Int) -> Date {
-        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
+        Calendar.book.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
     }
 }

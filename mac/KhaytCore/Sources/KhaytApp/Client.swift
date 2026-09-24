@@ -367,7 +367,7 @@ struct CommEntry: Identifiable, Hashable, Sendable {
     /// ISO instant. Empty when missing, which sorts oldest.
     var at: String { str(raw["at"]) ?? "" }
     /// The day, for the screen.
-    var day: String { String(at.prefix(10)) }
+    var day: String { Calendar.localDay(ofInstant: at) }
 
     /// `type` or `channel`, whichever this line carries, as one vocabulary.
     var kind: String {

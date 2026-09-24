@@ -155,6 +155,25 @@ struct OnlineOrderReadingTests {
         #expect(order.lines.first?.productId == stocked.0)
     }
 
+    @Test("an order already in the book is found, by its reference or by its queue item")
+    func alreadyInBook() async throws {
+        let shop = await Self.shop()
+        let engine = try #require(shop.engine)
+        let order = try await Self.order("• A thing × 1", shop: shop)
+        #expect(await !Shop.alreadyInBook(order, source: "salla", orders: [], engine: engine))
+        // Recorded by this Mac before, and the drain failed: found by the queue id.
+        let byIntake: [JSONValue] = [.object(["id": .string("J1"), "intakeId": .string("12")])]
+        #expect(await Shop.alreadyInBook(order, source: "salla", orders: byIntake, engine: engine))
+        // Written by the webhook for the same platform order: found by reference.
+        let byRef: [JSONValue] = [.object(["id": .string("J2"), "source": .string("salla"),
+                                           "sourceOrderId": .string("salla:SL-4")])]
+        #expect(await Shop.alreadyInBook(order, source: "salla", orders: byRef, engine: engine))
+        // A different order is not this one.
+        let other: [JSONValue] = [.object(["id": .string("J3"), "intakeId": .string("99"), "source": .string("salla"),
+                                           "sourceOrderId": .string("salla:SL-5")])]
+        #expect(await !Shop.alreadyInBook(order, source: "salla", orders: other, engine: engine))
+    }
+
     @Test("an order for something this shop does not sell is reported, not guessed at")
     func unmatched() async throws {
         let shop = await Self.shop()

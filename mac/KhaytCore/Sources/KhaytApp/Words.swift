@@ -979,6 +979,7 @@ final class Words {
         ],
         "mac.online_record_sale": ["en": "Record the sale", "ar": "سجّل البيع"],
         "mac.online_add_to_queue": ["en": "Add to the queue", "ar": "أضف للطابور"],
+        "mac.online_already_recorded": ["en": "This order was already in the book, so no second job was made. It has been taken out of the queue.", "ar": "هذا الطلب مسجّل من قبل، فلم يُنشأ طلب ثانٍ. أُزيل من قائمة الانتظار."],
         "mac.online_kept_in_queue": [
             "en": "The order was recorded, but it could not be taken out of "
                 + "the cloud queue — it will be offered again.",

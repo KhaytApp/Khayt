@@ -97,8 +97,10 @@ struct MachineProfitPage: View {
     /// Read off an ISO day rather than from `DateComponents`, for the reason
     /// `lib/maintenance-cost.js` gives about its own bucketing: a date parsed
     /// as UTC and read back in the shop's timezone can answer with last year.
+    /// The shop's LOCAL day, not UTC's: in Riyadh the first three hours of
+    /// 1 January were still last year by `StoreWriter.iso`.
     static func thisYear() -> Int {
-        Int(StoreWriter.iso(Date()).prefix(4)) ?? 0
+        Int(Shop.localDay().prefix(4)) ?? 0
     }
 
     /// The rows, OUTSIDE the `ScrollView` that holds them.
