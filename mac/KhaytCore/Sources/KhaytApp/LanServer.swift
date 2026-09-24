@@ -152,7 +152,7 @@ final class LanServer {
     struct Request {
         let method: String
         let path: String
-        let query: [String: String]
+        var query: [String: String]
         let headers: [String: String]   // lower-cased names
         let body: Data
         let remote: String
@@ -561,7 +561,7 @@ final class LanServer {
     /// `LanEndpointsTests` asks this server for every line of it and fails if
     /// one is not routed, so the list cannot drift from the table below.
     nonisolated static let endpoints = [
-        "/", "/intake", "/manifest.json", "/sw.js",
+        "/", "/session", "/intake", "/manifest.json", "/sw.js",
         "/api/status", "/api/queue", "/api/store", "/api/store/deltas",
         "/api/intake", "/api/intake/estimate", "/api/survey",
         "/order/:id", "/order/:id/quote", "/order/:id/approve", "/status/:id",
@@ -680,11 +680,43 @@ final class LanServer {
             if case .object(let settings)? = host.store()["settings"], settings["onlineEnabled"] == .bool(true) {
                 return .redirect("/intake")
             }
-            if let refused = await pinGate(request) { return refused }
+            // ── THE PIN LEAVES THE ADDRESS BAR ────────────────────────────
+            //
+            // A browser opened the queue as `/?pin=1234`, and the page reloads
+            // itself every 30 s — so the PIN sat in the address bar, the
+            // history and every reload, in clear over plain HTTP. Now a PIN is
+            // exchanged ONCE for a session cookie (HttpOnly, SameSite=Strict,
+            // this page only) and the browser sent back to a clean address. The
+            // phone app sends the PIN in a header and is unaffected. Sep 2026.
+            if request.query["pin"] != nil {
+                if let refused = await pinGate(request) { return refused }
+                return sessionResponse(to: "/")
+            }
+            if !(Self.hostIsLocal(request.headers["host"]) && hasSession(request)) {
+                if request.headers["x-khayt-pin"] == nil { return Self.pinForm() }
+                if let refused = await pinGate(request) { return refused }
+            }
             let html = (try? await engine.lanQueuePage(store: store, now: host.nowText())) ?? ""
             return Response(status: 200,
                             headers: ["Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache"],
                             body: Data(html.utf8))
+
+        // Opened by hand, it is the queue's door.
+        case ("/session", true):
+            return .redirect("/")
+
+        // The PIN form's answer: in the body, never the address.
+        case ("/session", false) where request.method == "POST":
+            // A form posts `+` for a space; URLComponents reads it literally.
+            let body = String(decoding: request.body, as: UTF8.self).replacingOccurrences(of: "+", with: "%20")
+            let form = URLComponents(string: "http://x/?" + body)?
+                .queryItems ?? []
+            var asked = request
+            asked.query["pin"] = form.first { $0.name == "pin" }?.value ?? ""
+            if let refused = await pinGate(asked) {
+                return refused.status == 401 ? Self.pinForm(wrong: true) : refused
+            }
+            return sessionResponse(to: "/")
 
         case ("/intake", true):
             return await intakePage(request, store: store)
@@ -1544,6 +1576,60 @@ final class LanServer {
     nonisolated static func remote(of connection: NWConnection) -> String {
         if case .hostPort(let h, _) = connection.endpoint { return "\(h)" }
         return "?"
+    }
+
+    /// Browser queueSessions for the queue page: token → when it stops working.
+    private var queueSessions: [String: Date] = [:]
+    nonisolated static let sessionLife: TimeInterval = 12 * 3600
+    nonisolated static let maxSessions = 200
+
+    /// A fresh 256-bit session, set as a cookie, and the browser sent on.
+    private func sessionResponse(to location: String) -> Response {
+        let now = host.now()
+        queueSessions = queueSessions.filter { $0.value > now }
+        while queueSessions.count >= Self.maxSessions, let oldest = queueSessions.min(by: { $0.value < $1.value })?.key {
+            queueSessions.removeValue(forKey: oldest)
+        }
+        var rng = SystemRandomNumberGenerator()
+        let token = (0..<32).map { _ in String(format: "%02x", UInt8.random(in: 0...255, using: &rng)) }.joined()
+        queueSessions[token] = now.addingTimeInterval(Self.sessionLife)
+        return Response(status: 303, headers: [
+            "Location": location, "Cache-Control": "no-store",
+            "Set-Cookie": "khayt_lan=\(token); Path=/; HttpOnly; SameSite=Strict; Max-Age=\(Int(Self.sessionLife))",
+        ])
+    }
+
+    /// Does this request carry a live session?
+    private func hasSession(_ request: Request) -> Bool {
+        guard let token = Self.cookie("khayt_lan", in: request.headers["cookie"]),
+              let until = queueSessions[token] else { return false }
+        if until <= host.now() { queueSessions.removeValue(forKey: token); return false }
+        return true
+    }
+
+    nonisolated static func cookie(_ name: String, in header: String?) -> String? {
+        for part in (header ?? "").split(separator: ";") {
+            let kv = part.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1)
+            if kv.count == 2, kv[0] == name { return String(kv[1]) }
+        }
+        return nil
+    }
+
+    /// The smallest page that asks for the PIN, and posts it.
+    nonisolated static func pinForm(wrong: Bool = false) -> Response {
+        let html = """
+        <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Khayt</title><style>body{font-family:-apple-system,system-ui,sans-serif;background:#0f172a;color:#e2e8f0;
+        display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}form{display:flex;gap:8px}
+        input,button{font-size:18px;padding:10px 14px;border-radius:10px;border:1px solid #334155;background:#1e293b;color:#e2e8f0}
+        input{\(wrong ? "border-color:#f87171;" : "")width:9em}</style></head><body>
+        <form method="post" action="/session"><input type="password" name="pin" inputmode="numeric"
+        autocomplete="current-password" placeholder="PIN" autofocus><button type="submit">&rarr;</button></form>
+        </body></html>
+        """
+        return Response(status: wrong ? 401 : 200,
+                        headers: ["Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"],
+                        body: Data(html.utf8))
     }
 
     /// The whole server's wrong-PIN budget — see `KhaytEngine.lanGlobalThrottle`.

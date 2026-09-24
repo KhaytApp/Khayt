@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) The PIN no longer sits in the browser's address bar.** Opening the
+  live queue in a browser asks for the PIN once, in a form, and keeps a
+  12-hour session cookie (HttpOnly, SameSite=Strict) instead — the page
+  reloads itself every 30 seconds, so a PIN in the address was in the history
+  and every reload, in clear. An old `/?pin=` bookmark still opens it, once,
+  and is sent on to a clean address. The phone app is unaffected.
+
 - **(Mac) A product added from the library is priced.** Reported by the shop:
   "it is not calculating the price" — a 200 g, 9.5 h model went into the
   catalogue at 0. A part from the library carried the file's weight and time
