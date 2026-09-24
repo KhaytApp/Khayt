@@ -8424,6 +8424,17 @@ public actor KhaytEngine {
     /// THE STORE COMES BACK. The rule mutates the object it is handed, and what
     /// it is handed on this side of the bridge is a copy — so a merge whose
     /// result was dropped would look exactly like a merge that found nothing.
+    /// An incoming book (a restore) keeps what belongs to THIS computer:
+    /// its slicer settings always, and a device-private value (the ntfy
+    /// topic, a webhook URL) wherever the incoming one is only the mask —
+    /// `lib/store-secret-paths.js keepMachineLocal`, the shop's decision of
+    /// Sep 24 2026 (SEC-011/SEC-014).
+    public func keepMachineLocal(local: [String: JSONValue], incoming: [String: JSONValue],
+                                 mask: String = "__KHAYT_MASKED__") throws -> [String: JSONValue] {
+        try runtime.call2("globalThis.KhaytStoreSecretPaths.keepMachineLocal(ARG0, ARG1, ARG2)",
+                          [.object(local), .object(incoming), .string(mask)], as: [String: JSONValue].self)
+    }
+
     public func mergeFromCloud(local: [String: JSONValue],
                                server: [String: JSONValue]) throws -> Merged {
         try runtime.call2("KhaytCloudInbox.merge(ARG0, ARG1)",

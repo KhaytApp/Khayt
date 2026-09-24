@@ -96,6 +96,52 @@ struct RestoreTests {
         #expect(try Data(contentsOf: b.store) == before, "the book was replaced by a file that was never ours")
     }
 
+    @Test("a restore keeps THIS Mac's slicer, and a masked ntfy topic or webhook URL keeps this Mac's value")
+    func keepsWhatIsThisMacs() async throws {
+        let book = #"""
+        {"version":10,"printLog":[],"clients":[],
+         "settings":{"bizEn":"The Shop","slicers":[{"id":"s1","path":"/Applications/PrusaSlicer.app","args":"--export-gcode"}],
+                     "ntfy":{"topic":"khayt-realtopic"},
+                     "webhooks":{"subscriptions":[{"id":"w1","url":"https://hooks.example/secret-path"}]}}}
+        """#
+        let backup = #"""
+        {"version":10,"printLog":[{"id":"P-1","rev":1}],"clients":[],
+         "settings":{"bizEn":"The Shop","slicers":[{"id":"evil","path":"/Applications/PrusaSlicer.app","args":"--post-process /tmp/x.sh"}],
+                     "ntfy":{"topic":"__KHAYT_MASKED__"},
+                     "webhooks":{"subscriptions":[{"id":"w1","url":"__KHAYT_MASKED__"}]}}}
+        """#
+        let b = try Self.bench(book: book, backup: backup)
+        defer { try? FileManager.default.removeItem(at: b.dir) }
+        try await Self.run(b)
+        let after = try Self.read(b.store)
+        guard case .object(let settings)? = after["settings"] else { Issue.record("no settings"); return }
+        #expect(settings["slicers"] == .array([.object(["id": .string("s1"), "path": .string("/Applications/PrusaSlicer.app"),
+                                                       "args": .string("--export-gcode")])]),
+                "a restored book chose the program this Mac runs")
+        guard case .object(let ntfy)? = settings["ntfy"], case .object(let hooks)? = settings["webhooks"],
+              case .array(let subs)? = hooks["subscriptions"], case .object(let sub)? = subs.first else {
+            Issue.record("shape"); return
+        }
+        #expect(ntfy["topic"] == .string("khayt-realtopic"))
+        #expect(sub["url"] == .string("https://hooks.example/secret-path"))
+        #expect(after["printLog"] == .array([.object(["id": .string("P-1"), "rev": .number(1)])]), "the rest WAS restored")
+    }
+
+    @Test("the phone and the cloud never see the ntfy topic or a webhook URL")
+    func devicePrivateIsMasked() async throws {
+        let engine = try KhaytEngine()
+        let masked = try await engine.storeForCloud([
+            "settings": .object(["ntfy": .object(["topic": .string("khayt-realtopic")]),
+                                 "webhooks": .object(["subscriptions": .array([.object(["id": .string("w1"),
+                                                                                        "url": .string("https://hooks.example/x")])])])]),
+        ])
+        guard case .object(let settings)? = masked["settings"], case .object(let ntfy)? = settings["ntfy"],
+              case .object(let hooks)? = settings["webhooks"], case .array(let subs)? = hooks["subscriptions"],
+              case .object(let sub)? = subs.first else { Issue.record("shape"); return }
+        #expect(ntfy["topic"] != .string("khayt-realtopic"))
+        #expect(sub["url"] != .string("https://hooks.example/x"))
+    }
+
     @Test("a damaged backup is refused, and the book is untouched")
     func refusesDamage() async throws {
         // Recognisably ours, but a collection is a string — a truncated or

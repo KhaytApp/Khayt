@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) A restored backup no longer chooses this Mac's slicer, or blanks
+  its alert topic.** Restoring a backup keeps this Mac's own slicer settings —
+  the program and its arguments run here, and a book restored from elsewhere
+  could otherwise make a genuine slicer run any command — and where the backup
+  holds only the mask for the ntfy topic or a webhook URL, this Mac's real
+  value is kept. The phone and the cloud never receive the topic or the URLs
+  (the shared rule, #1577). The shop's decision, Sep 24 2026.
+
 - **Your slicer setup stays on the computer where you set it.** A slicer's
   program and the options it runs with are this computer's, and restoring a
   backup, importing a file or restoring from the cloud used to replace them
