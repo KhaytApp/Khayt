@@ -92,6 +92,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   it. That needs the shop's book on the phone (the LAN endpoint has no
   `converted`); without one, the card offers Dismiss alone and says why.
   Reminding and calling are a long-press away.
+- **(iOS) The Arabic the design's copy review flagged is fixed.** The heated
+  bed was "السرير" — the bed you sleep in — on four screens; it is المنصّة,
+  as the desktop says. "Owner" had been dropped from the owner-PIN label
+  (رمز المالك), which is the only word that tells it from the intake PIN. The
+  filament is الخيط, not a transliteration; the shop is a ورشة, not a محل; and
+  the one Arabic-Indic figure in the catalogue now uses the Western digits
+  every other one does. Sixty-four strings the rebuilt screens no longer use
+  are gone from both languages.
 
 - **(iOS) The companion moves to its real design (v2).** It had been built
   against an older mockup; the current design is Turki's Claude Design
