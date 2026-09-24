@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) A product added from the library is priced.** Reported by the shop:
+  "it is not calculating the price" — a 200 g, 9.5 h model went into the
+  catalogue at 0. A part from the library carried the file's weight and time
+  and nothing it is COSTED at: no filament, and none of the shop's labour,
+  power, wear and failure rates, so there was nothing to price. It now takes
+  the shop's usual rates and the spool of the material the slicer used (or the
+  first spool with a cost, said on the sheet), whichever way it came — the
+  inspector button, several models at once, or a whole folder.
+
 - **(Mac) Add to the catalogue straight from the library.** Asked for by the
   shop: "I should be able to add to the catalogue using the library". A model's
   inspector has an **Add to the catalogue** button beside Reveal and Open (it
