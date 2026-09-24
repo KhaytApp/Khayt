@@ -69,6 +69,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   (it was a sheet): its colour, what is left with −50 g / +50 g beneath it
   (taps in a row are one write, not several), the label's facts, and writing
   it to an NFC tag. The figure itself can be tapped to set it exactly.
+- **(iOS) Add spool follows the v2 design.** One card per way in — scan the
+  label (first, in blue), tap an NFC tag, the box barcode, or type it in — and
+  a form that asks for brand, material, colour and weight first, with the Add
+  button held at the bottom of the screen instead of the end of the form.
 
 - **(iOS) The companion moves to its real design (v2).** It had been built
   against an older mockup; the current design is Turki's Claude Design

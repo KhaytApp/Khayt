@@ -363,7 +363,7 @@
 "scan.photo.none" = "No text found. Try brighter light and fill the frame with the label.";
 "scan.live.hint" = "Slowly pan across the label. Captured text is kept even when it leaves the frame.";
 "scan.use_text" = "Use captured text (%d)";
-"spool.add.title" = "Add filament";
+"spool.add.title" = "Add spool";
 "spool.add.barcode_title" = "Product barcode";
 "spool.add.nfc_title" = "NFC tag";
 "spool.add.confirm" = "Confirm spool";
@@ -373,11 +373,11 @@
 "spool.add.n" = "Add %d spools";
 "spool.method.barcode" = "Scan product barcode";
 "spool.method.barcode.sub" = "The UPC/EAN on the box, looked up for you";
-"spool.method.label.sub" = "QR code or text on the spool label";
-"spool.method.nfc" = "Tap NFC tag";
-"spool.method.nfc.sub" = "OpenSpool, OpenTag3D, or Prusa OpenPrintTag";
-"spool.method.manual" = "Enter manually";
-"spool.method.manual.sub" = "Type details yourself";
+"spool.method.label.sub" = "Read the printed label with the camera";
+"spool.method.nfc" = "Tap an NFC tag";
+"spool.method.nfc.sub" = "Hold the phone against the spool tag";
+"spool.method.manual" = "Type it in";
+"spool.method.manual.sub" = "Brand, material, colour, weight";
 "spool.source.manual" = "Manual";
 "spool.source.label" = "Scanned label";
 "spool.lookup.busy" = "Looking it up…";
@@ -541,3 +541,4 @@
 "colour.yellow" = "Yellow";
 "colour.purple" = "Purple";
 "colour.cyan" = "Cyan";
+"spool.method.label" = "Scan the label";

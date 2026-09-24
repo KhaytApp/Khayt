@@ -363,7 +363,7 @@
 "scan.photo.none" = "لم يُعثر على نص. جرّب إضاءة أقوى واملأ الإطار بالملصق.";
 "scan.live.hint" = "حرّك الكاميرا ببطء على الملصق. يُحفظ النص الملتقط حتى بعد خروجه من الإطار.";
 "scan.use_text" = "استخدام النص الملتقط (%d)";
-"spool.add.title" = "إضافة خيط";
+"spool.add.title" = "إضافة بكرة";
 "spool.add.barcode_title" = "باركود المنتج";
 "spool.add.nfc_title" = "وسم NFC";
 "spool.add.confirm" = "تأكيد البكرة";
@@ -373,11 +373,11 @@
 "spool.add.n" = "إضافة %d بكرات";
 "spool.method.barcode" = "مسح باركود المنتج";
 "spool.method.barcode.sub" = "رمز UPC/EAN على العلبة، ونبحث عنه لك";
-"spool.method.label.sub" = "رمز QR أو نص على ملصق البكرة";
-"spool.method.nfc" = "المس وسم NFC";
-"spool.method.nfc.sub" = "OpenSpool أو OpenTag3D أو Prusa OpenPrintTag";
-"spool.method.manual" = "إدخال يدوي";
-"spool.method.manual.sub" = "اكتب التفاصيل بنفسك";
+"spool.method.label.sub" = "اقرأ الملصق المطبوع بالكاميرا";
+"spool.method.nfc" = "المس بطاقة NFC";
+"spool.method.nfc.sub" = "قرّب الهاتف من بطاقة البكرة";
+"spool.method.manual" = "أدخلها يدوياً";
+"spool.method.manual.sub" = "العلامة والمادة واللون والوزن";
 "spool.source.manual" = "يدوي";
 "spool.source.label" = "ملصق ممسوح";
 "spool.lookup.busy" = "جاري البحث…";
@@ -541,3 +541,4 @@
 "colour.yellow" = "أصفر";
 "colour.purple" = "بنفسجي";
 "colour.cyan" = "سماوي";
+"spool.method.label" = "امسح الملصق";
