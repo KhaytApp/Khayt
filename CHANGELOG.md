@@ -4,6 +4,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A full wipe keeps one copy of your book.** "Delete everything" used to
+  delete everything, backups included, so a wipe made by mistake could not be
+  undone. It now saves one copy of your book first and checks the copy can be
+  read. If it cannot make that copy, it stops and deletes nothing. The copy
+  stays in the backups folder after the wipe and can be restored from
+  Settings → Backups; routine backup clean-up never removes it. Photos,
+  invoices, the library and keys are still removed.
+- **"Last backup" could show the wrong thing after an update.** The backup
+  Khayt takes before installing an update sorted after every daily backup, so
+  the settings screen showed it as the last backup date and the daily backup
+  ran again on every check. Only daily backups count now.
+
 - **The root of a disk is never taken as the print library's folder.** The
   library's location, its mirror and the folders it has lived in before all
   come from settings, and settings can arrive in a restored backup or over
