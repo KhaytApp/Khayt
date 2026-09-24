@@ -3350,6 +3350,191 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.42] - 2026-09-24
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The print library goes online — a storage bucket, Google Drive or iCloud
+Drive — and importing a folder now knows which folders are projects. Beside
+it, the September security and file-safety scan: nothing the app removes is
+deleted for good, backups and saves cannot be lost, and a Mac set to the
+Islamic calendar writes Gregorian dates into the book.
+
+### Added
+
+- **(Mac) Online storage for the print library.** Settings → Preferences →
+  Online storage points the library at a bucket — Cloudflare R2, Backblaze B2,
+  Amazon S3, Wasabi and the other S3-compatible providers the desktop app
+  lists. New models are backed up as they come in, "Back up the whole library
+  now" covers the models already here, and, if the shop turns it on, models
+  nobody has used for a set number of days move to the bucket to free the
+  Mac's disk. A model that was moved says "In the cloud" in the library, with
+  "Bring back from the cloud" in its place. The bucket, its key layout and the
+  `.cloud` note left behind are the desktop app's, so one bucket serves both
+  apps and either brings back what the other moved. A model's local copy is
+  removed only after the bucket has confirmed, in a separate request, that it
+  holds the exact file (size and content hash, or a download and compare), and
+  a model brought back is checked against the hash recorded when it left.
+  Plain HTTP is refused except to this Mac or the shop's own network.
+
+- **(Mac) Google Drive as the print library's online storage.** Settings →
+  Preferences → Online storage → Keep the copy in → Google Drive: add the OAuth
+  client ID from the shop's Google Cloud project (type "Desktop app"), press
+  Connect Google Drive, sign in in the browser. Backing up, freeing space and
+  bringing models back then work exactly as with a bucket. It is the desktop
+  app's Drive design — the `drive.file` scope (Khayt sees only what it put
+  there), one folder, every file tagged with its key — so with the same client
+  ID both apps share one Drive folder. Sign-in is a one-time listener on
+  127.0.0.1 with PKCE and a checked `state`; the refresh token and client
+  secret are sealed in the book like every other credential. Disconnecting
+  forgets the account here and says where to withdraw it at Google.
+
+- **(Mac) Keep the print library in iCloud Drive, or any folder.** Settings →
+  Preferences → Where the library lives: Use iCloud Drive, Choose a folder…,
+  or Back to this Mac's own folder. The models already there move with it —
+  each copied, read back and compared by SHA-256 before its original goes to
+  the Trash; nothing is overwritten (a different file with the same name is
+  kept as "name (moved).stl"), and a file that cannot be moved stays where it
+  was and is named. The folder being left is remembered, so a model is found
+  wherever it is. In iCloud Drive with Optimize Mac Storage on, macOS keeps
+  unopened models in iCloud and brings each back when it is opened. The rules
+  are `lib/print-library-migrate.js`, ported and checked against it under Node.
+
+- **(Mac) Importing a folder knows when a folder is a project.** A folder with
+  two or more models, at any depth, becomes a folder in the library; a folder
+  holding a single model does not, and names that model instead — so
+  `Saudi Kings/King Abdulaziz/crown.stl` comes in as "King Abdulaziz" inside
+  "Saudi Kings", not as a folder of one called "crown". A zip of one model is
+  that model, named after the zip; a zip of several is a project. The file's
+  own name is kept as the model's original name. Folders in iCloud Drive or a
+  Google Drive / Dropbox folder import the same way; macOS downloads each file
+  as it is read.
+
+- **(Mac) A printer's smart plug: switch it from Khayt, and let it turn off
+  after a print.** A machine's Connection tab now takes the plug it sits on:
+  Shelly (Gen 1, and Plus/Pro), Tasmota, or a Home Assistant switch. The
+  machine's details show whether it is on and what it is drawing, with a
+  button to switch it. **Turn off after a print, once cooled** switches it off
+  a set time after a print ends. Khayt never cuts power while the printer is
+  printing, paused, not answering (it may still be printing on a bad Wi-Fi
+  link) or hot; the button says why when it refuses. A Home Assistant token or
+  a Tasmota password is sealed in the book like a printer's key, and masked
+  anywhere the book is exported or shared.
+
+- **(Mac) "Remember me on this Mac", and a way to sign out of the cloud.**
+  Keeping the unlock key between launches is a choice now: a checkbox on the
+  cloud sign-in, on unless turned off, and worth turning off on a Mac other
+  people use. **Sign out of the cloud** is in the Book menu and on the cloud
+  line at the foot of the sidebar, which now also opens the sign-in (or the
+  cloud check) when clicked and lists every cloud action when right-clicked.
+  Signing out stops syncing on this Mac and removes the kept key; the book and
+  the cloud copy both stay, and signing back in needs only the password and
+  passphrase again.
+
+### Changed
+
+- **(Mac) Files are moved to the Trash instead of deleted.** Originals brought
+  into the library, a product's photos and documents, and a model the Trash
+  would not take (which used to be deleted outright). Importing from a folder
+  the library used to live in no longer moves out files existing models still
+  use, and a conversion saved over its own source no longer risks losing both.
+
+### Fixed
+
+- **(Mac) Fixes from the September scan, third batch.**
+  - **A Mac set to the Islamic calendar wrote Hijri dates into the book.**
+    Today's date, the report periods, the month tiles and the tax year all
+    read the Mac's own calendar, so on a Mac set to Umm al-Qura a job was
+    stamped "1448-04-02". The book is always Gregorian now, whatever the Mac
+    shows.
+  - **Backups made on a Mac in Arabic were named with Arabic-Indic digits** and
+    never rotated. They are named in ASCII digits now.
+  - **Recording an online order twice made two jobs** and took the shelf down
+    twice, when taking it out of the cloud queue had failed the first time.
+    An order already in the book (by its platform reference, or the queue
+    item it came from) is not written again, and is taken out of the queue.
+  - **A job due today counted down to "3:00 AM"**, and west of UTC a job read
+    as late on its own due day: a day in the book is now the shop's local
+    day, not UTC's. The maintenance year, the comms log and the campaign log
+    read the local day too.
+  - **Every edit re-sent printer alerts.** Saving anything restarted printer
+    watching and wiped its alert memory, so a printer in an error sent a fresh
+    notification to the Mac, Telegram and ntfy each time, and a stall was
+    never reported for a shop that edits often. Watching now starts once per
+    book.
+  - **The first Undo after launch undid a change nobody made.** Reading each
+    model's designer and licence from its file no longer lands on the Undo
+    stack, runs off the main thread, and never overwrites a source typed in
+    the meantime.
+
+- **(Everyone) A day of cloud syncing could delete a month of daily backups.**
+  Backups taken before each cloud merge shared the thirty backup slots with the
+  daily ones, and a Mac syncing every fifteen minutes filled them in a working
+  day. Daily backups now keep their own thirty and snapshots their own
+  forty-eight, in both apps. A restore never deletes the backup it is restoring
+  from, and a cloud merge whose safety backup failed no longer goes ahead.
+
+- **(Mac) A save interrupted at the wrong instant could leave the book missing.**
+  The old book was moved aside before the new one was moved in; the book is
+  now replaced in one atomic step, and a book left only as its `.prev` copy is
+  put back when the app opens (a damaged one opens from `.prev`, as the other
+  app already did).
+
+- **(Mac) Two changes made at the same moment could lose one.** A change that
+  asks the business rules is worked out while other saves can land; it now
+  checks the book again before saving and redoes itself on the newer book.
+
+- **(Everyone) A test print dragged the P&L margin to −495.8%.** Marking a job
+  "Not business" (a test, a gift, something for the shop itself) is meant to
+  keep it out of revenue, order counts and reports, and ten reports honoured
+  it, but the P&L did not. It does now. When finished jobs were charged
+  nothing, the P&L also says so under the table, with how to leave them out,
+  instead of showing a margin that looks like a fault.
+
+- **(Mac) A job could not be marked "Not business".** The other app has had
+  the switch; the Mac had no way to set it. It is on the job's right-click
+  menu and in Edit job.
+
+- **(Mac) A spool's full weight could not be entered.** What a kilo costs and
+  how full a spool is drawn both need what the spool held when bought, and a
+  spool added before that was recorded had none, so "What materials cost"
+  said only "No data yet" and every spool drew as the same grey disc. Edit a
+  spool to fill in Full spool. With nothing to price, the card is now one line
+  saying what is missing instead of an empty card at the top of the screen.
+
+- **(Mac) Four small things on the real book's screens.** The P&L chart
+  labelled an empty bar "−0.00"; no figure prints a signed zero now. "By
+  quarter / By month" on Reports and "Import from Spoolman" on Inventory were
+  dark grey on the navy title bar. And the sidebar's sync line read "Syncing
+  auto…"; it wraps now.
+
+### Security
+
+- **(Mac) Text in the book could break, or run inside, the app's business
+  rules.** The Mac hands each rule its inputs by pasting them into a small
+  script, and the paste scanned text it had already pasted: a job note reading
+  "see ARG0" broke the call (and merging stopped working while that note
+  existed), and crafted text could close its own quotes and run. Inputs are
+  now handed over as values and never become script. Found by a security scan.
+
+- **(Mac) A crafted 3MF uploaded to the shop's intake page could crash the app.**
+  Offsets near the largest number the Mac can hold overflowed, and a member
+  claiming to unpack to terabytes was allocated as claimed. Both are refused.
+
+- **(Everyone) A phone could wipe the shop's settings, or its printer keys.** A
+  change sent from a phone names the collection it belongs to, and naming
+  `settings` replaced the whole settings object; a machine edited on a phone
+  came back with its key as the placeholder phones are shown, and replaced the
+  real one. Only real record collections are written now, and a placeholder
+  never overwrites a stored secret.
+
+- **(Mac) Five numbers that crashed the app when out of range:** a printer port
+  above 65535 (on every launch, once saved), a camera address with a port above
+  65535 or a reply with a negative length, a damaged lock file, a huge hourly
+  quote limit, and a tampered cloud key setting. Each is refused or clamped, and
+  the shared machine rule no longer stores an impossible port.
+
 ## [4.0.0-alpha.41] - 2026-09-24
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
