@@ -118,7 +118,7 @@ test('deleting a model also removes its sidecar', () => {
   // download it.
   const at = mainJs.indexOf("ipcMain.handle('hub:printlib-delete'");
   const body = mainJs.slice(at, at + 1400);
-  assert.match(body, /unlink\(safe \+ PLT\.SIDECAR_EXT\)/, 'a tiered file cannot be deleted at all');
+  assert.match(body, /\[safe \+ PLT\.SIDECAR_EXT, safe\]/, 'a tiered file cannot be deleted at all');
 });
 
 test('a sweep refuses to run without a bucket, or while switched off', () => {

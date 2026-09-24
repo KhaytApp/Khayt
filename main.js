@@ -76,6 +76,7 @@ const excludeObject = require('./lib/exclude-object');
 const webhookBus = require('./lib/webhook-bus');
 const { normalizeStoreSnapshot, STORE_VERSION } = require('./lib/store-validate');
 const upgradeBackup = require('./lib/upgrade-backup');
+const safeNames = require('./lib/safe-names');
 const { createStoreIo, MAX_STORE_BYTES } = require('./lib/store-io');
 const { parseGcodeText } = require('./lib/gcode-parse');
 const moonrakerHistory = require('./lib/moonraker-history');
@@ -806,7 +807,7 @@ ipcMain.handle('hub:write-icloud-backup', async (event, jsonString) => {
   if (!fs.existsSync(icloudBase)) return null;
   const backupDir = path.join(icloudBase, isBedReady ? 'Bed Ready' : 'Khayt', 'backups');
   if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-  const filename = `${new Date().toISOString().split('T')[0]}.json`;
+  const filename = `${safeNames.localDayName()}.json`;
   const fullPath = path.join(backupDir, filename);
   let parsed;
   try { parsed = safeJsonParse(jsonString); } catch (e) { return null; }
@@ -842,7 +843,10 @@ ipcMain.handle('hub:write-backup', async (event, jsonString) => {
   if (!jsonString || typeof jsonString !== 'string' || jsonString.length > MAX_STORE_BYTES) {
     return { ok: false, error: 'Backup data too large or invalid' };
   }
-  const filename = `${new Date().toISOString().split('T')[0]}.json`;
+  // The LOCAL day — the one the renderer compares against. Named by the UTC day,
+  // a shop in UTC+3 rewrote yesterday's backup on every call from midnight to
+  // 03:00 (lib/safe-names.js).
+  const filename = `${safeNames.localDayName()}.json`;
   const fullPath = path.join(backupsDir(), filename);
   let parsed;
   try { parsed = safeJsonParse(jsonString); } catch (e) { return { ok: false, error: 'Invalid JSON in backup data' }; }
@@ -1842,9 +1846,11 @@ ipcMain.handle('hub:copy-file-to-vault', async (_e, { srcPath, orderId }) => {
   const safeId = path.basename(String(orderId || '')).replace(/[^a-zA-Z0-9_-]/g, '_');
   const orderVaultDir = path.join(fileVaultDir(), safeId);
   if (!fs.existsSync(orderVaultDir)) fs.mkdirSync(orderVaultDir, { recursive: true });
-  const filename = path.basename(src);
+  // A second file of the same name is a second file, not a replacement: two
+  // `part.stl`s from different folders used to leave only the last one.
+  const filename = safeNames.uniqueName(path.basename(src), (n) => fs.existsSync(path.join(orderVaultDir, n)));
   const destPath = path.join(orderVaultDir, filename);
-  fs.copyFileSync(src, destPath);
+  fs.copyFileSync(src, destPath, fs.constants.COPYFILE_EXCL);
   const stat = await fs.promises.stat(destPath);
   return { destPath, filename, size: stat.size };
 });
@@ -3034,22 +3040,25 @@ ipcMain.handle('hub:printlib-delete', async (_e, fullPath) => {
   // the same key, so deleting it here would destroy the off-site backup of a
   // shop that runs both — and an orphaned object costs pennies where a deleted
   // backup costs the model. Settings' sweep reports what is orphaned.
-  let removedSidecar = false;
-  try {
-    await fs.promises.unlink(safe + PLT.SIDECAR_EXT);
-    removedSidecar = true;
-  } catch (_) { /* the ordinary case: there was no sidecar */ }
-
-  try {
-    const stat = await fs.promises.stat(safe);
-    if (stat.isDirectory()) await fs.promises.rm(safe, { recursive: true, force: true });
-    else await fs.promises.unlink(safe);
-  } catch (e) {
-    if (e && e.code === 'ENOENT') return true; // already gone — the desired end state
-    console.error('hub:printlib-delete:', e);
-    return removedSidecar;                     // the tiered case: the sidecar WAS the file here
+  //
+  // Both go to the Trash, not away. A model is the shop's own work and often the
+  // only copy; a delete that can be undone costs nothing, and the Mac follows
+  // the same rule (#1564). If the Trash refuses (a network drive, a Linux
+  // desktop with no trash), the file STAYS and the answer is false, which the
+  // renderer already reports as "some files could not be deleted from disk".
+  // Never a silent fallback to a permanent delete.
+  let ok = true;
+  for (const p of [safe + PLT.SIDECAR_EXT, safe]) {
+    try { await fs.promises.lstat(p); } catch (e) {
+      if (e && e.code === 'ENOENT') continue;  // the ordinary case: no sidecar, or already gone
+      ok = false; continue;
+    }
+    try { await shell.trashItem(p); } catch (e) {
+      console.error('hub:printlib-delete: could not move to the Trash, kept', p, e);
+      ok = false;
+    }
   }
-  return true;
+  return ok;
 });
 
 // Save a generated thumbnail / user photo (data URL from the renderer) into the item folder.
