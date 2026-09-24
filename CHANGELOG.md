@@ -3522,6 +3522,73 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.43] - 2026-09-24
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The rest of the September security scan: the book is guarded against web
+pages that try to reach it through the owner's browser and against PIN
+guessing, printer credentials go only to the printer, and what runs on this
+Mac — its slicer — is never chosen by a restored book.
+
+### Changed
+
+- **(Mac) A backup taken before "reset everything" is labelled as such.**
+  The other app now takes a protected `pre-wipe-` copy before it resets a
+  book (#1574). The Mac's Restore list marks it "taken before everything was
+  reset" — not "taken before an update", which is what it would otherwise
+  have been called, or nothing at all.
+
+### Security
+
+- **(Mac) Security fixes from the September scan, fourth batch.**
+  - **A web page could read the shop's book through the owner's browser**
+    (DNS rebinding). The PIN-protected routes answer only to an address,
+    `localhost` or a `.local` name — never to somebody else's domain. Webhooks
+    and the customer pages are unaffected.
+  - **The PIN could be guessed from many addresses at once.** Wrong PINs now
+    also count against the whole server (the shared 50-a-minute rule, then a
+    minute's cooldown), and an IPv6 phone or attacker is counted by its /64
+    prefix. A NEW PIN must be at least eight characters.
+  - **A small crafted upload could freeze the app.** Measuring an upload runs
+    off the main thread with its real inflated size capped at 250× what was
+    sent, and the server takes at most 64 connections (16 per address).
+  - **A camera that is not the printer was sent the printer's key** (the
+    OctoPrint/PrusaLink API key or the Bambu access code) with every frame. It
+    goes only to the printer's own address now.
+  - **A Bambu printer's certificate was never checked**, so anyone on the
+    network answering for it received the access code. The certificate is now
+    remembered the first time and a different one refused; saving the access
+    code again re-trusts a replaced or reset printer.
+  - **An ntfy access token could go over plain HTTP or follow a redirect.** It
+    is sent only to https:// servers, and never on to a redirect.
+
+- **(Mac) A restored backup no longer chooses this Mac's slicer, or blanks
+  its alert topic.** Restoring a backup keeps this Mac's own slicer settings —
+  the program and its arguments run here, and a book restored from elsewhere
+  could otherwise make a genuine slicer run any command — and where the backup
+  holds only the mask for the ntfy topic or a webhook URL, this Mac's real
+  value is kept. The phone and the cloud never receive the topic or the URLs
+  (the shared rule, #1577). The shop's decision, Sep 24 2026.
+
+- **Your ntfy topic and webhook addresses are no longer sent to the cloud.**
+  On public ntfy.sh the topic is the only thing between your alerts and
+  anyone who guesses it, and Slack and Discord webhook addresses carry their
+  password in the address itself. Both stay visible in Settings on this
+  computer, and are no longer included in what is uploaded to Khayt Cloud.
+  Restoring from the cloud keeps the ones this computer already has (SEC-011).
+
+- **(Maintainers) Nothing sealed on disk goes up to the cloud, listed or
+  not.** `cloud-outbox.js` `forCloud` masked exactly the paths in
+  `store-secret-paths.js`, so a value sealed on disk (`__enc__…`) whose path
+  was missing from that list would have been sent as its ciphertext. It now
+  masks any sealed value wherever it sits, the backstop the Mac's
+  `Export.swift` already had. `store-secret-paths.js` also gains
+  `DEVICE_PRIVATE_PATHS`/`forEachDevicePrivate` and
+  `MACHINE_LOCAL_PATHS`/`keepMachineLocal`, which the Mac's `/api/store`,
+  cloud push and restore read too (SEC-011, SEC-014).
+
 ## [4.0.0-alpha.42] - 2026-09-24
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
