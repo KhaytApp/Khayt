@@ -1503,7 +1503,7 @@ final class LanServer {
         // Webhooks and the customer pages are not gated here, so a shop that
         // forwards a public domain to them is unaffected. Sep 2026 scan.
         guard Self.hostIsLocal(request.headers["host"]) else {
-            return .json(421, #"{"error":"This address is not the shop's"}"#)
+            return .json(421, #"{"error":"host-not-local"}"#)
         }
         guard !host.pin.isEmpty else {
             return .json(401, #"{"error":"Configure a LAN PIN in Khayt settings to access this data"}"#)
