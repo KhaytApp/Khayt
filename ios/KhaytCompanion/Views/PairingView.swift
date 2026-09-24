@@ -14,6 +14,9 @@ struct PairingView: View {
     @State private var resolving: String?
     @State private var showManual = false
     @State private var showCloudSignIn = false
+    /// The shop the person tapped, once its address is known — shown, so a tap
+    /// that worked does not look exactly like one that did not.
+    @State private var chosenShopId: String?
 
     private let totalSteps = 4
 
@@ -32,6 +35,13 @@ struct PairingView: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut, value: step)
 
+                if let missing {
+                    Text(missing)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .padding(.horizontal)
+                }
                 bottomBar
                     .padding()
             }
@@ -81,6 +91,15 @@ struct PairingView: View {
         }
     }
 
+    /// Why Continue is off, in a sentence. A greyed-out button alone left a
+    /// shop tapping the Mac again and again, seen on a real phone.
+    private var missing: String? {
+        guard step == 2, !canAdvance else { return nil }
+        if !settings.isConfigured { return L10n.tr("pair.missing.shop") }
+        if settings.pin.isEmpty { return L10n.tr("pair.missing.pin") }
+        return nil
+    }
+
     private var canAdvance: Bool {
         switch step {
         case 2: return settings.isConfigured && !settings.pin.isEmpty
@@ -92,8 +111,17 @@ struct PairingView: View {
 
     private var welcomeStep: some View {
         VStack(spacing: 16) {
+            // The shop's own mark, not a stock symbol: this is the first screen
+            // anybody sees, and it should look like Khayt.
+            Image("KhaytMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 88, height: 88)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
+                .accessibilityLabel("Khayt")
             stepCard(
-                icon: "iphone.and.arrow.forward",
+                icon: nil,
                 title: L10n.tr("pair.welcome.title"),
                 body: L10n.tr("pair.welcome.body")
             )
@@ -162,8 +190,14 @@ struct PairingView: View {
                 // not discoverable, deliberately, and the Mac does not advertise
                 // whether it needs one — a stale "no PIN needed" would be the
                 // phone telling a shop something untrue.
-                SecureField(L10n.tr("pair.pin"), text: $settings.pin)
-                    .textFieldStyle(.roundedBorder)
+                // Labelled above the field: on a dark screen the field's own
+                // placeholder did not show, and the PIN box read as empty space.
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L10n.tr("pair.pin")).font(.subheadline.weight(.semibold))
+                    SecureField(L10n.tr("pair.pin.prompt"), text: $settings.pin)
+                        .textFieldStyle(.roundedBorder)
+                        .textContentType(.password)
+                }
 
             }
             .padding(.horizontal)
@@ -217,6 +251,9 @@ struct PairingView: View {
                                 .foregroundStyle(.secondary)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(shop.name).font(.body)
+                                if chosenShopId == shop.id, settings.isConfigured {
+                                    Text(settings.host).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                                }
                                 // The difference between a phone that keeps
                                 // working away from the desk and one that
                                 // empties when it loses the Mac. Worth knowing
@@ -230,6 +267,9 @@ struct PairingView: View {
                             Spacer()
                             if resolving == shop.id {
                                 ProgressView().controlSize(.small)
+                            } else if chosenShopId == shop.id {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(KhaytDesign.ok)
                             } else {
                                 Image(systemName: "chevron.right")
                                     .font(.caption).foregroundStyle(.tertiary)
@@ -290,6 +330,7 @@ struct PairingView: View {
         }
         settings.host = found.host
         settings.port = Int(found.port)
+        chosenShopId = shop.id
         if settings.shopLabel.trimmingCharacters(in: .whitespaces).isEmpty {
             settings.shopLabel = shop.name
         }
@@ -338,11 +379,13 @@ struct PairingView: View {
 
     // MARK: - Helpers
 
-    private func stepCard(icon: String, title: String, body: String) -> some View {
+    private func stepCard(icon: String?, title: String, body: String) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 44))
-                .foregroundStyle(Color.accentColor)
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 44))
+                    .foregroundStyle(Color.accentColor)
+            }
             Text(title)
                 .font(.title2.bold())
                 .multilineTextAlignment(.center)

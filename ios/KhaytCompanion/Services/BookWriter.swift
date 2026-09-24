@@ -72,9 +72,6 @@ struct BookWriter {
 
     enum Refusal: Error, LocalizedError, Equatable {
         case noSuchMachine
-        /// Declining moves the request to `waitingListHistory` and removes it
-        /// from `waitingList` — a deletion, which this phone cannot express.
-        case declineNeedsTheMac
         /// A new record the shop's rule would not make — a spool with no
         /// material, which no job can ever be matched to.
         case noMaterial
@@ -87,8 +84,6 @@ struct BookWriter {
             switch self {
             case .noSuchMachine:
                 return L10n.tr("error.no_such_machine")
-            case .declineNeedsTheMac:
-                return L10n.tr("error.decline_needs_mac")
             case .noMaterial:
                 return L10n.tr("error.material_required")
             case .noProject:
@@ -129,26 +124,59 @@ struct BookWriter {
 
     /// Triage a walk-in request.
     ///
-    /// ── DECLINING IS NOT A STATUS CHANGE ─────────────────────────────────
+    /// ── DECLINING IS A MOVE, AND THE PHONE CAN MAKE IT ───────────────────
     ///
     /// `PATCH /api/waiting-list/:id` treats `declined` differently from the
-    /// rest: it appends the request to `waitingListHistory` with a `declinedAt`
-    /// and REMOVES it from `waitingList`. That is a move between collections,
-    /// and the second half of it is a deletion.
+    /// rest: the request goes into `waitingListHistory` (same id, `status:
+    /// "declined"`, a `declinedAt`) and OUT of `waitingList`. A move between
+    /// collections, whose second half is a deletion.
     ///
-    /// This phone cannot express a deletion. Nothing here writes a tombstone,
-    /// so `changesToSend` would carry the declined record as an ordinary edit
-    /// and the Mac would fold it straight back into `waitingList` — leaving a
-    /// request the shop declined sitting in its queue, and its history without
-    /// the entry. Setting the field would look like it worked and quietly
-    /// produce a different book from the one being online produces.
-    ///
-    /// So it is refused, and the caller falls through to the desktop, which
-    /// fails honestly when the Mac is away.
-    func setWaitingStatus(id: String, to status: String) throws {
-        guard status != "declined" else { throw Refusal.declineNeedsTheMac }
-        try book.updateRecord(collection: "waitingList", id: id) { record in
-            record["status"] = .string(status)
+    /// This used to be refused, on the grounds that the phone could not
+    /// express a deletion — and without one, the Mac would fold the declined
+    /// record straight back into the queue. It can: a deletion travels as a
+    /// TOMBSTONE, which `changesToSend` sends and `applyDeltas` on the Mac (and
+    /// every other device) removes the record by, reporting a conflict if the
+    /// record had been edited there since. So the three writes the endpoint
+    /// makes are made here, in one write: the history entry, the removal, and
+    /// the tombstone that carries the removal home — carrying the rev the
+    /// phone saw, which is what the conflict check measures against.
+    func setWaitingStatus(id: String, to status: String, now: Date = Date()) throws {
+        guard status == "declined" else {
+            try book.updateRecord(collection: "waitingList", id: id) { record in
+                record["status"] = .string(status)
+            }
+            return
+        }
+        try book.update { root in
+            guard case .array(var queue)? = root["waitingList"],
+                  let at = queue.firstIndex(where: {
+                      if case .object(let o) = $0, o["id"] == .string(id) { return true }
+                      return false
+                  }),
+                  case .object(let item) = queue[at] else { return }   // gone already: nothing to decline
+            let when = StoreWriter.iso(now)
+
+            var entry = item
+            entry["status"] = .string("declined")
+            entry["declinedAt"] = .string(when)
+            // A new record in its own collection, so it starts its own history.
+            entry["rev"] = nil
+            StoreWriter.stamp(&entry)
+            var history: [JSONValue] = []
+            if case .array(let had)? = root["waitingListHistory"] { history = had }
+            history.append(.object(entry))
+            root["waitingListHistory"] = .array(history)
+
+            queue.remove(at: at)
+            root["waitingList"] = .array(queue)
+
+            var rev = 0.0
+            if case .number(let n)? = item["rev"] { rev = n }
+            var tombs: [JSONValue] = []
+            if case .array(let had)? = root["tombstones"] { tombs = had }
+            tombs.append(.object(["id": .string(id), "collection": .string("waitingList"),
+                                  "rev": .number(rev), "deletedAt": .string(when)]))
+            root["tombstones"] = .array(tombs)
         }
     }
 

@@ -455,3 +455,7 @@
 
 "pair.use_cloud" = "استخدم Khayt Cloud بدلاً من ذلك";
 "pair.use_cloud.footer" = "إن كانت الورشة تتزامن مع Khayt Cloud، يبدأ الهاتف منها ويُربط بجهاز Mac لاحقاً.";
+
+"pair.pin.prompt" = "أدخل رمز PIN المعيّن على جهاز Mac";
+"pair.missing.shop" = "اضغط على ورشتك أعلاه، أو أدخل عنوانها.";
+"pair.missing.pin" = "أدخل رمز PIN للمالك للمتابعة.";

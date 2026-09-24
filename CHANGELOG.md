@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(iOS) Decline a walk-in request with the Mac switched off.** Declining was
+  the last edit the phone refused offline, because it is a MOVE: into
+  `waitingListHistory`, out of `waitingList`. The phone now makes that move and
+  sends the removal as a tombstone, which every device's sync applies — so the
+  request does not come straight back into the Mac's queue.
+- **(iOS) Setup says what it is waiting for.** The Mac you tap shows a
+  checkmark and its address, the PIN field is labelled, and while Continue is
+  off a line says what is missing. The first screen shows the Khayt mark.
+
 
 
 - **(iOS) The phone syncs through Khayt Cloud when the Mac is out of reach.**
