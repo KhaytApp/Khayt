@@ -1742,7 +1742,6 @@ final class Words {
         "mac.cloudlib_no_sidecar": ["en": "This model is not in the cloud.", "ar": "هذا المجسّم ليس في السحابة."],
         "mac.cloudlib_bucket_lost_it": ["en": "The bucket no longer has this model.", "ar": "لم تعد الحاوية تحمل هذا المجسّم."],
         "mac.cloudlib_bad_download": ["en": "The download did not match what left this Mac:", "ar": "ما نُزّل لا يطابق ما خرج من هذا الماك:"],
-        "mac.gdrive_title": ["en": "Google Drive", "ar": "Google Drive"],
         "mac.gdrive_where": ["en": "Keep the copy in", "ar": "احفظ النسخة في"],
         "mac.gdrive_bucket": ["en": "A storage bucket", "ar": "حاوية تخزين"],
         "mac.gdrive_why": ["en": "Uses the storage you already pay Google for. Khayt sees only the files it puts there, in one folder. You need an OAuth client of type Desktop app from your Google Cloud project; use the same one on every computer, or each will see an empty folder.", "ar": "يستخدم المساحة التي تدفع لـ Google مقابلها. لا يرى خيط إلا الملفات التي يضعها هناك، في مجلد واحد. تحتاج عميل OAuth من نوع تطبيق سطح المكتب من مشروعك في Google Cloud، واستخدم العميل نفسه على كل جهاز وإلا رأى كل جهاز مجلدًا فارغًا."],

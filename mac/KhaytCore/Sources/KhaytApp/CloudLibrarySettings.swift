@@ -77,7 +77,7 @@ struct CloudLibrarySettings: View {
                 .fixedSize(horizontal: false, vertical: true)
             Picker(shop.words.callIt("mac.gdrive_where"), selection: $draft.useDrive) {
                 Text(shop.words.callIt("mac.gdrive_bucket")).tag(false)
-                Text(shop.words.callIt("mac.gdrive_title")).tag(true)
+                Text(verbatim: "Google Drive").tag(true)
             }
             .pickerStyle(.segmented)
             if draft.useDrive {
