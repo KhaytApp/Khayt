@@ -3522,6 +3522,101 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.43] - 2026-09-24
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Add to the catalogue straight from the library, with the slicer's own figures
+read from each file at last. Beside it, the rest of the September security scan: the book is guarded against web
+pages that try to reach it through the owner's browser and against PIN
+guessing, printer credentials go only to the printer, and what runs on this
+Mac — its slicer — is never chosen by a restored book.
+
+### Added
+
+- **(Mac) Add to the catalogue straight from the library.** Asked for by the
+  shop: "I should be able to add to the catalogue using the library". A model's
+  inspector has an **Add to the catalogue** button beside Reveal and Open (it
+  was only in the right-click menu, as "Make a product from this"). With
+  several models selected: **as one product** — each model a part, for a set
+  or a kit — or **one product each**, written straight to the catalogue and
+  priced. A project folder's right-click menu adds the whole folder as one
+  product, named after the folder. Every part is filled by the same rule as a
+  single model: weight and time from the file, measured from the geometry
+  where the file cannot say, and linked to the model.
+
+### Changed
+
+- **(Mac) A backup taken before "reset everything" is labelled as such.**
+  The other app now takes a protected `pre-wipe-` copy before it resets a
+  book (#1574). The Mac's Restore list marks it "taken before everything was
+  reset" — not "taken before an update", which is what it would otherwise
+  have been called, or nothing at all.
+
+### Fixed
+
+- **(Mac) A sliced file's own time, weight and material are read at last.**
+  Reported by the shop: "it didn't get the info from the file". The Mac
+  imported models without reading what the slicer wrote into them, so a
+  Snapmaker U1 3MF that says 4 h 37 min and 57 g of PLA went into the
+  catalogue at a 0.97 h geometry guess — a price almost four times too low on
+  time. A 3MF's `slice_info.config` (Bambu, Orca, Snapmaker) and a G-code's own
+  summary are now read when a model comes in, by the same shared rules the
+  desktop app uses, and every model ALREADY in the library is read once in the
+  background — only where it has nothing recorded, and without touching Undo.
+  Products already made keep their figures: open one and fill its part from
+  the file again to take the slicer's.
+
+### Security
+
+- **(Mac) Security fixes from the September scan, fourth batch.**
+  - **A web page could read the shop's book through the owner's browser**
+    (DNS rebinding). The PIN-protected routes answer only to an address,
+    `localhost` or a `.local` name — never to somebody else's domain. Webhooks
+    and the customer pages are unaffected.
+  - **The PIN could be guessed from many addresses at once.** Wrong PINs now
+    also count against the whole server (the shared 50-a-minute rule, then a
+    minute's cooldown), and an IPv6 phone or attacker is counted by its /64
+    prefix. A NEW PIN must be at least eight characters.
+  - **A small crafted upload could freeze the app.** Measuring an upload runs
+    off the main thread with its real inflated size capped at 250× what was
+    sent, and the server takes at most 64 connections (16 per address).
+  - **A camera that is not the printer was sent the printer's key** (the
+    OctoPrint/PrusaLink API key or the Bambu access code) with every frame. It
+    goes only to the printer's own address now.
+  - **A Bambu printer's certificate was never checked**, so anyone on the
+    network answering for it received the access code. The certificate is now
+    remembered the first time and a different one refused; saving the access
+    code again re-trusts a replaced or reset printer.
+  - **An ntfy access token could go over plain HTTP or follow a redirect.** It
+    is sent only to https:// servers, and never on to a redirect.
+
+- **(Mac) A restored backup no longer chooses this Mac's slicer, or blanks
+  its alert topic.** Restoring a backup keeps this Mac's own slicer settings —
+  the program and its arguments run here, and a book restored from elsewhere
+  could otherwise make a genuine slicer run any command — and where the backup
+  holds only the mask for the ntfy topic or a webhook URL, this Mac's real
+  value is kept. The phone and the cloud never receive the topic or the URLs
+  (the shared rule, #1577). The shop's decision, Sep 24 2026.
+
+- **Your ntfy topic and webhook addresses are no longer sent to the cloud.**
+  On public ntfy.sh the topic is the only thing between your alerts and
+  anyone who guesses it, and Slack and Discord webhook addresses carry their
+  password in the address itself. Both stay visible in Settings on this
+  computer, and are no longer included in what is uploaded to Khayt Cloud.
+  Restoring from the cloud keeps the ones this computer already has (SEC-011).
+
+- **(Maintainers) Nothing sealed on disk goes up to the cloud, listed or
+  not.** `cloud-outbox.js` `forCloud` masked exactly the paths in
+  `store-secret-paths.js`, so a value sealed on disk (`__enc__…`) whose path
+  was missing from that list would have been sent as its ciphertext. It now
+  masks any sealed value wherever it sits, the backstop the Mac's
+  `Export.swift` already had. `store-secret-paths.js` also gains
+  `DEVICE_PRIVATE_PATHS`/`forEachDevicePrivate` and
+  `MACHINE_LOCAL_PATHS`/`keepMachineLocal`, which the Mac's `/api/store`,
+  cloud push and restore read too (SEC-011, SEC-014).
+
 ## [4.0.0-alpha.42] - 2026-09-24
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
