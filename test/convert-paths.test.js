@@ -82,3 +82,17 @@ test('empty and junk paths are refused by both gates', () => {
     assert.equal(writeAllowed(p, ctx), false);
   }
 });
+
+test('everything is under the root of a disk', () => {
+  // `/` already ends in the separator, so `'/' + sep` was `//` and nothing was
+  // under it — print-library-migrate's sources() then failed to see that a
+  // root of `/` contains the library, and would walk the disk as a source.
+  const { under } = require('../lib/convert-paths');
+  const path = require('path');
+  const root = path.parse(process.cwd()).root;          // `/` here, `C:\` on Windows
+  assert.equal(under(path.join(root, 'lib'), root), true);
+  assert.equal(under(root, root), true);
+  // The separator rule that the fix must not loosen:
+  assert.equal(under('/home/user-data', '/home/user'), false);
+  assert.equal(under('/home/user/x', '/home/user/'), true, 'a trailing separator on dir is the same dir');
+});

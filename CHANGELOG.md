@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **The root of a disk is never taken as the print library's folder.** The
+  library's location, its mirror and the folders it has lived in before all
+  come from settings, and settings can arrive in a restored backup or over
+  cloud sync. A location of `/` (or `C:\` on Windows) would have counted every
+  file on the machine as part of the library, which is what deleting a model
+  is confined by, and moving the library would have treated the whole disk as
+  somewhere to move files out of. Such a location is now ignored, as if none
+  had been set, and the check that decides whether a folder sits inside
+  another now handles the root of a disk correctly. Found by the Mac app's
+  port of the same rule.
+
 - **Four ways Khayt could destroy a file you meant to keep.**
   - **Generating a new ZATCA key replaced the old one with no copy.** That key
     is the one your ZATCA certificate is bound to, so one click in Settings
