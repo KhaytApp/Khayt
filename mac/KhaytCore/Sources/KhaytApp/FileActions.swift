@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytCore
 import AppKit
 
 /// What a shop wants to do with a model it has just found.
@@ -152,8 +153,21 @@ struct ModelActions: View {
             Button(shop.words.callIt("mac.reveal_folder")) { FileActions.reveal(dir) }
             Divider()
         }
-        Button(shop.words.callIt("mac.product_from_model") + "\u{2026}") {
-            Task { await shop.editingProduct = shop.productFromFile(file) }
+        // To the catalogue: this model — or, when it is one of several
+        // selected, all of them, as one product or one each.
+        let chosen = shop.fileSelection.contains(file.id) ? shop.selectedFiles : []
+        if chosen.count > 1 {
+            let n: [String: JSONValue] = ["n": .number(Double(chosen.count))]
+            Button(shop.words.callIt("mac.catalogue_add_as_one", n) + "\u{2026}") {
+                Task { await shop.editingProduct = shop.productFromFiles(chosen, name: nil) }
+            }
+            Button(shop.words.callIt("mac.catalogue_add_each", n)) {
+                Task { await shop.addEachToCatalogue(chosen) }
+            }
+        } else {
+            Button(shop.words.callIt("mac.product_from_model") + "\u{2026}") {
+                Task { await shop.editingProduct = shop.productFromFile(file) }
+            }
         }
         Divider()
         Button(shop.words.callIt("mac.copy_name")) { FileActions.copy(file.title) }

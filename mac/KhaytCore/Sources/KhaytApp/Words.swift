@@ -2367,8 +2367,12 @@ final class Words {
         // Making a product FROM a model. Mac-only: the other app's catalogue
         // has no route from the library at all, only a `fileRef` field a shop
         // types a filename into.
-        "mac.product_from_model": ["en": "Make a product from this",
-                                   "ar": "أنشئ منتجًا من هذا"],
+        "mac.product_from_model": ["en": "Add to the catalogue",
+                                   "ar": "أضف إلى الكتالوج"],
+        "mac.catalogue_add_as_one": ["en": "Add {n} models to the catalogue as one product", "ar": "أضف {n} مجسّمات إلى الكتالوج كمنتج واحد"],
+        "mac.catalogue_add_each": ["en": "Add {n} models to the catalogue, one product each", "ar": "أضف {n} مجسّمات إلى الكتالوج، منتجًا لكل منها"],
+        "mac.catalogue_add_folder": ["en": "Add this folder to the catalogue as one product", "ar": "أضف هذا المجلد إلى الكتالوج كمنتج واحد"],
+        "mac.catalogue_added_each": ["en": "Added {n} products to the catalogue, each priced from its model. Open one to adjust it.", "ar": "أُضيف {n} منتجات إلى الكتالوج، سُعّر كل منها من مجسّمه. افتح أيًّا منها لتعديله."],
         // A printer that changed address. Mac-only wording: the other app
         // words this on its machines page and does not share the strings.
         "mac.moved_find": ["en": "Find it on the network",

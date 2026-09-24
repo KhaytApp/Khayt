@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Add to the catalogue straight from the library.** Asked for by the
+  shop: "I should be able to add to the catalogue using the library". A model's
+  inspector has an **Add to the catalogue** button beside Reveal and Open (it
+  was only in the right-click menu, as "Make a product from this"). With
+  several models selected: **as one product** — each model a part, for a set
+  or a kit — or **one product each**, written straight to the catalogue and
+  priced. A project folder's right-click menu adds the whole folder as one
+  product, named after the folder. Every part is filled by the same rule as a
+  single model: weight and time from the file, measured from the geometry
+  where the file cannot say, and linked to the model.
+
 - **(Mac) A restored backup no longer chooses this Mac's slicer, or blanks
   its alert topic.** Restoring a backup keeps this Mac's own slicer settings —
   the program and its arguments run here, and a book restored from elsewhere

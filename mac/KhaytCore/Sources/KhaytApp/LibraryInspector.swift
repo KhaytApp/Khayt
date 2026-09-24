@@ -116,6 +116,11 @@ struct LibraryInspector: View {
                 Button { FileActions.open(url) } label: {
                     Label(shop.words.callIt("mac.open"), systemImage: "arrow.up.forward.app")
                 }
+                // The door to the catalogue, where it can be seen — it lived
+                // only in a right-click menu, and a shop went looking for it.
+                Button { Task { await shop.editingProduct = shop.productFromFile(file) } } label: {
+                    Label(shop.words.callIt("mac.product_from_model"), systemImage: "tag")
+                }
             }
             .controlSize(.small)
             .frame(maxWidth: .infinity, alignment: .leading)

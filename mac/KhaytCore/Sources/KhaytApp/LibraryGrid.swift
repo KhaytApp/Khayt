@@ -84,6 +84,12 @@ struct LibraryGrid: View {
                                     // is a great many folders.
                                     .contextMenu {
                                         FolderMoveMenu(shop: shop, path: path)
+                                        Divider()
+                                        // A project folder is often exactly a
+                                        // product: a set, a kit, a figure in parts.
+                                        Button(shop.words.callIt("mac.catalogue_add_folder") + "\u{2026}") {
+                                            Task { await shop.productFromFolder(path) }
+                                        }
                                     }
                             case .file(let file):
                                 cell(for: file).id(file.id)
