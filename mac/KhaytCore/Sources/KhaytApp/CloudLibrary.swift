@@ -94,17 +94,16 @@ enum CloudLibrary {
         return (hex(sha.finalize()), hex(md5.finalize()), size)
     }
 
-    enum Failure: Error, LocalizedError {
-        case notVerified(String)
+    /// What went wrong, said in the shop's language by `Shop.cloudSay`.
+    enum Failure: Error, Equatable {
+        case notThere
+        case wrongSize(there: Int, here: Int)
+        case hashMismatch
+        case readBackDiffers
         case noSidecar
+        case bucketLostIt
+        /// The shared rule's own reason (`verifyRehydrate`).
         case badDownload(String)
-        var errorDescription: String? {
-            switch self {
-            case .notVerified(let why): "the bucket did not confirm the upload: \(why)"
-            case .noSidecar: "this model is not in the cloud"
-            case .badDownload(let why): "the download did not match: \(why)"
-            }
-        }
     }
 
     /// Make sure the bucket holds exactly this file under `key`: skip the
@@ -122,18 +121,18 @@ enum CloudLibrary {
         let data = try await Task.detached { try Data(contentsOf: file, options: .mappedIfSafe) }.value
         try await S3.put(c, key: key, data: data, fetch: fetch)
         guard let after = try await S3.head(c, key: key, fetch: fetch) else {
-            throw Failure.notVerified("it is not there")
+            throw Failure.notThere
         }
         guard after.size == local.size else {
-            throw Failure.notVerified("\(after.size) bytes, not \(local.size)")
+            throw Failure.wrongSize(there: after.size, here: local.size)
         }
         switch try await engine.etagVerdict(etag: after.etag, md5: local.md5) {
         case "match": break
-        case "mismatch": throw Failure.notVerified("its content hash does not match")
+        case "mismatch": throw Failure.hashMismatch
         default:
             guard let back = try await S3.get(c, key: key, fetch: fetch),
                   S3.sha256Hex(back) == local.sha256 else {
-                throw Failure.notVerified("what came back is not what went up")
+                throw Failure.readBackDiffers
             }
         }
         return (local.sha256, local.size)
@@ -156,7 +155,7 @@ enum CloudLibrary {
         guard let config else { throw S3.Failure.notConfigured }
         // The key the SIDECAR recorded, not one rebuilt from today's prefix.
         guard let data = try await S3.get(config.s3, key: side.key, fetch: fetch) else {
-            throw Failure.badDownload("the bucket no longer has it")
+            throw Failure.bucketLostIt
         }
         let verdict = try await engine.verifyRehydrate(side, size: data.count, sha256: S3.sha256Hex(data))
         guard verdict.ok else { throw Failure.badDownload(verdict.error) }
@@ -218,7 +217,7 @@ extension Shop {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
         guard let config = await cloudConfig() else {
-            cloudLibraryProblem = words.callIt("cl.not_set_up"); return
+            cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return
         }
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false }
@@ -229,10 +228,10 @@ extension Shop {
             try await S3.put(config.s3, key: key, data: probe, fetch: CloudLibrary.fetch)
             let back = try await S3.get(config.s3, key: key, fetch: CloudLibrary.fetch)
             try await S3.delete(config.s3, key: key, fetch: CloudLibrary.fetch)
-            guard back == probe else { cloudLibraryProblem = words.callIt("cl.test_mismatch"); return }
-            cloudLibraryNote = words.callIt("cl.test_ok")
+            guard back == probe else { cloudLibraryProblem = words.callIt("mac.cloudlib_test_mismatch"); return }
+            cloudLibraryNote = words.callIt("mac.cloudlib_test_ok")
         } catch {
-            cloudLibraryProblem = words.callIt("cl.test_failed") + " " + Self.cloudSay(error)
+            cloudLibraryProblem = words.callIt("mac.cloudlib_test_failed") + " " + cloudSay(error)
         }
     }
 
@@ -249,7 +248,7 @@ extension Shop {
             do { try await CloudLibrary.ensureInBucket(config.s3, key: key, file: url, engine: engine) }
             catch { failed += 1 }
         }
-        if failed > 0 { cloudLibraryProblem = words.callIt("cl.backup_some_failed", ["n": .number(Double(failed))]) }
+        if failed > 0 { cloudLibraryProblem = words.callIt("mac.cloudlib_backup_some_failed", ["n": .number(Double(failed))]) }
     }
 
     /// Every model on this Mac, into the bucket — what the other app does only
@@ -258,7 +257,7 @@ extension Shop {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
         guard let engine, let config = await cloudConfig(), let roots = libraryRoots else {
-            cloudLibraryProblem = words.callIt("cl.not_set_up"); return
+            cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return
         }
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false; cloudProgress = nil }
@@ -272,9 +271,9 @@ extension Shop {
             catch { failed += 1 }
             done += 1
         }
-        cloudLibraryNote = words.callIt("cl.backed_up_all", ["n": .number(Double(done - failed)),
+        cloudLibraryNote = words.callIt("mac.cloudlib_backed_up_all", ["n": .number(Double(done - failed)),
                                                               "total": .number(Double(all.count))])
-        if failed > 0 { cloudLibraryProblem = words.callIt("cl.backup_some_failed", ["n": .number(Double(failed))]) }
+        if failed > 0 { cloudLibraryProblem = words.callIt("mac.cloudlib_backup_some_failed", ["n": .number(Double(failed))]) }
     }
 
     /// Move the models nobody has used for a while to the cloud, freeing this
@@ -284,9 +283,9 @@ extension Shop {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
         guard let engine, let config = await cloudConfig(), let roots = libraryRoots else {
-            cloudLibraryProblem = words.callIt("cl.not_set_up"); return
+            cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return
         }
-        guard config.tierEnabled else { cloudLibraryProblem = words.callIt("cl.tier_off"); return }
+        guard config.tierEnabled else { cloudLibraryProblem = words.callIt("mac.cloudlib_tier_off"); return }
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false; cloudProgress = nil }
         let all = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value
@@ -310,11 +309,11 @@ extension Shop {
                 moved += 1
                 freed += Double(proved.size)
             } catch {
-                failures.append(file.filename + ": " + Self.cloudSay(error))
+                failures.append(file.filename + ": " + cloudSay(error))
             }
         }
-        let human = (try? await engine.formatBytes(freed)) ?? "\(Int(freed)) B"
-        cloudLibraryNote = words.callIt("cl.freed", ["n": .number(Double(moved)),
+        let human = (try? await engine.formatBytes(freed)) ?? ""
+        cloudLibraryNote = words.callIt("mac.cloudlib_freed", ["n": .number(Double(moved)),
                                                      "total": .number(Double(plan.candidates.count)),
                                                      "size": .string(human)])
         if !failures.isEmpty { cloudLibraryProblem = failures.prefix(3).joined(separator: "\n") }
@@ -333,7 +332,7 @@ extension Shop {
         for name in sidecars {
             let model = dir.appending(path: String(name.dropLast(".cloud".count)))
             do { try await CloudLibrary.bringBack(model, config: config, engine: engine) }
-            catch { cloudLibraryProblem = words.callIt("cl.bring_back_failed") + " " + Self.cloudSay(error) }
+            catch { cloudLibraryProblem = words.callIt("mac.cloudlib_bring_back_failed") + " " + cloudSay(error) }
         }
         await load(source)
     }
@@ -354,9 +353,9 @@ extension Shop {
             cloudProgress = (done: i, total: sidecars.count, name: side.filename)
             let model = URL(fileURLWithPath: String(side.fullPath.dropLast(".cloud".count)))
             do { try await CloudLibrary.bringBack(model, config: config, engine: engine); back += 1 }
-            catch { failures.append(model.lastPathComponent + ": " + Self.cloudSay(error)) }
+            catch { failures.append(model.lastPathComponent + ": " + cloudSay(error)) }
         }
-        cloudLibraryNote = words.callIt("cl.brought_back", ["n": .number(Double(back))])
+        cloudLibraryNote = words.callIt("mac.cloudlib_brought_back", ["n": .number(Double(back))])
         if !failures.isEmpty { cloudLibraryProblem = failures.prefix(3).joined(separator: "\n") }
         await load(source)
     }
@@ -383,7 +382,7 @@ extension Shop {
         var sealed: String?
         if !typedSecret.isEmpty {
             do { sealed = try await Secrets.seal(typedSecret, for: build) }
-            catch { cloudLibraryProblem = Self.cloudSay(error); return }
+            catch { cloudLibraryProblem = cloudSay(error); return }
         }
         do {
             try StoreWriter.update(build) { root in
@@ -410,13 +409,27 @@ extension Shop {
                 root["settings"] = .object(settings)
             }
             await load(source)
-            cloudLibraryNote = words.callIt("cl.saved")
+            cloudLibraryNote = words.callIt("mac.cloudlib_saved")
         } catch {
-            cloudLibraryProblem = Self.cloudSay(error)
+            cloudLibraryProblem = cloudSay(error)
         }
     }
 
-    nonisolated static func cloudSay(_ error: Error) -> String {
-        (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+    /// An error from the bucket, in the shop's language when it is one of
+    /// ours; the system's own description otherwise.
+    func cloudSay(_ error: Error) -> String {
+        guard let f = error as? CloudLibrary.Failure else {
+            return (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+        }
+        switch f {
+        case .notThere: return words.callIt("mac.cloudlib_not_there")
+        case .wrongSize(let there, let here):
+            return words.callIt("mac.cloudlib_wrong_size", ["there": .number(Double(there)), "here": .number(Double(here))])
+        case .hashMismatch: return words.callIt("mac.cloudlib_hash_mismatch")
+        case .readBackDiffers: return words.callIt("mac.cloudlib_read_back_differs")
+        case .noSidecar: return words.callIt("mac.cloudlib_no_sidecar")
+        case .bucketLostIt: return words.callIt("mac.cloudlib_bucket_lost_it")
+        case .badDownload(let why): return words.callIt("mac.cloudlib_bad_download") + " " + why
+        }
     }
 }

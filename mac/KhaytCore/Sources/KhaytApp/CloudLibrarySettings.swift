@@ -54,11 +54,11 @@ struct CloudLibrarySettings: View {
     private var saved: Bool { !original.bucket.isEmpty && !original.accessKeyId.isEmpty && storedSecret }
 
     var body: some View {
-        Section(shop.words.callIt("cl.title")) {
-            Text(shop.words.callIt("cl.why"))
+        Section(shop.words.callIt("mac.cloudlib_title")) {
+            Text(shop.words.callIt("mac.cloudlib_why"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            LabeledContent(shop.words.callIt("cl.provider")) {
+            LabeledContent(shop.words.callIt("mac.cloudlib_provider")) {
                 Picker("", selection: $draft.provider) {
                     ForEach(providers) { p in Text(verbatim: p.label).tag(p.id) }
                 }.labelsHidden().frame(width: 240)
@@ -77,63 +77,64 @@ struct CloudLibrarySettings: View {
                     }
                 }
             }
-            LabeledContent(shop.words.callIt("cl.endpoint")) {
+            LabeledContent(shop.words.callIt("mac.cloudlib_endpoint")) {
                 TextField("", text: $draft.endpoint, prompt: Text(verbatim: "https://…"))
                     .textFieldStyle(.roundedBorder).frame(width: 320)
             }
-            LabeledContent(shop.words.callIt("cl.bucket")) {
+            LabeledContent(shop.words.callIt("mac.cloudlib_bucket")) {
                 TextField("", text: $draft.bucket).textFieldStyle(.roundedBorder).frame(width: 240)
             }
-            LabeledContent(shop.words.callIt("cl.region")) {
+            LabeledContent(shop.words.callIt("mac.cloudlib_region")) {
                 TextField("", text: $draft.region, prompt: Text(verbatim: "auto"))
                     .textFieldStyle(.roundedBorder).frame(width: 240)
             }
-            LabeledContent(shop.words.callIt("cl.prefix")) {
+            LabeledContent(shop.words.callIt("mac.cloudlib_prefix")) {
                 TextField("", text: $draft.prefix, prompt: Text(verbatim: "khayt"))
                     .textFieldStyle(.roundedBorder).frame(width: 240)
             }
-            LabeledContent(shop.words.callIt("cl.key_id")) {
+            LabeledContent(shop.words.callIt("mac.cloudlib_key_id")) {
                 TextField("", text: $draft.accessKeyId).textFieldStyle(.roundedBorder).frame(width: 240)
             }
-            LabeledContent(shop.words.callIt("cl.secret")) {
+            LabeledContent(shop.words.callIt("mac.cloudlib_secret")) {
                 SecureField(storedSecret ? "••••••••" : "", text: $draft.secret)
                     .textFieldStyle(.roundedBorder).frame(width: 240)
             }
-            Toggle(shop.words.callIt("cl.back_up"), isOn: $draft.backsUp)
-            Toggle(shop.words.callIt("cl.tier"), isOn: $draft.tierOn)
+            Toggle(shop.words.callIt("mac.cloudlib_back_up"), isOn: $draft.backsUp)
+            Toggle(shop.words.callIt("mac.cloudlib_tier"), isOn: $draft.tierOn)
             if draft.tierOn {
-                LabeledContent(shop.words.callIt("cl.keep_days")) {
+                LabeledContent(shop.words.callIt("mac.cloudlib_keep_days")) {
                     HStack {
                         TextField("", value: $draft.keepDays, format: .number)
+                            .textFieldStyle(.roundedBorder)
                             .multilineTextAlignment(.trailing).frame(width: 70)
-                        Text(shop.words.callIt("cl.days"))
+                        Text(shop.words.callIt("mac.cloudlib_days"))
                     }
                 }
-                Text(shop.words.callIt("cl.safety"))
+                Text(shop.words.callIt("mac.cloudlib_safety"))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
                 Button(shop.words.callIt("common.save")) { Task { await save() } }
                     .disabled(draft == original || !shop.canMoveJobs || shop.cloudLibraryBusy)
-                Button(shop.words.callIt("cl.test")) { Task { await shop.testCloudLibrary() } }
+                Button(shop.words.callIt("mac.cloudlib_test")) { Task { await shop.testCloudLibrary() } }
                     .disabled(!saved || draft != original || shop.cloudLibraryBusy)
                 Spacer()
             }
             if saved {
                 HStack {
-                    Button(shop.words.callIt("cl.back_up_all")) { Task { await shop.backUpWholeLibrary(); await refresh() } }
+                    Button(shop.words.callIt("mac.cloudlib_back_up_all")) { Task { await shop.backUpWholeLibrary(); await refresh() } }
                     if original.tierOn {
-                        Button(shop.words.callIt("cl.free_now")) { Task { await shop.freeUpSpace(); await refresh() } }
+                        Button(shop.words.callIt("mac.cloudlib_free_now")) { Task { await shop.freeUpSpace(); await refresh() } }
                     }
                     if (summary?.inCloud ?? 0) > 0 {
-                        Button(shop.words.callIt("cl.bring_all")) { Task { await shop.bringEverythingBack(); await refresh() } }
+                        Button(shop.words.callIt("mac.cloudlib_bring_all")) { Task { await shop.bringEverythingBack(); await refresh() } }
                     }
                     Spacer()
                 }
                 .disabled(draft != original || shop.cloudLibraryBusy || !shop.canMoveJobs)
                 if let summary, original.tierOn {
-                    Text(shop.words.callIt("cl.could_move", ["n": .number(Double(summary.count)),
+                    Text(shop.words.callIt("mac.cloudlib_could_move", ["n": .number(Double(summary.count)),
                                                              "size": .string(summary.size),
                                                              "cloud": .number(Double(summary.inCloud))]))
                         .font(.caption).foregroundStyle(.secondary)
@@ -141,7 +142,7 @@ struct CloudLibrarySettings: View {
             }
             if let p = shop.cloudProgress {
                 ProgressView(value: Double(p.done), total: Double(max(p.total, 1))) {
-                    Text(shop.words.callIt("cl.progress", ["name": .string(p.name), "done": .number(Double(p.done)),
+                    Text(shop.words.callIt("mac.cloudlib_progress", ["name": .string(p.name), "done": .number(Double(p.done)),
                                                            "total": .number(Double(p.total))]))
                         .font(.caption).lineLimit(1).truncationMode(.middle)
                 }

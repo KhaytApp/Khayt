@@ -94,10 +94,10 @@ struct LibraryInspector: View {
             // Said where the missing buttons would be, so a model moved to
             // the cloud does not read as a model that was lost.
             HStack(spacing: 8) {
-                Label(shop.words.callIt("cl.in_cloud"), systemImage: "icloud")
+                Label(shop.words.callIt("mac.cloudlib_in_cloud"), systemImage: "icloud")
                     .foregroundStyle(.secondary)
                 Button { Task { await shop.bringBack(file) } } label: {
-                    Label(shop.words.callIt("cl.bring_back"), systemImage: "icloud.and.arrow.down")
+                    Label(shop.words.callIt("mac.cloudlib_bring_back"), systemImage: "icloud.and.arrow.down")
                 }
                 .disabled(shop.cloudLibraryBusy)
                 if shop.cloudLibraryBusy { ProgressView().controlSize(.small) }
@@ -478,7 +478,7 @@ struct LibraryInspector: View {
                 // that is not mounted, or a model moved to the cloud. Nothing
                 // to walk, and offering a button that cannot work is worse
                 // than saying so.
-                Text(shop.words.callIt(shop.isInCloudOnly(file) ? "cl.in_cloud" : "mac.not_found"))
+                Text(shop.words.callIt(shop.isInCloudOnly(file) ? "mac.cloudlib_in_cloud" : "mac.not_found"))
                     .foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
