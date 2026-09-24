@@ -112,6 +112,18 @@ struct LanServerTests {
         }
         let box: ClockBox
 
+        func form(_ path: String, body: String) async throws -> Reply {
+            var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
+            request.httpMethod = "POST"
+            request.httpBody = Data(body.utf8)
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            let (data, response) = try await NoRedirect.session.data(for: request)
+            let http = try #require(response as? HTTPURLResponse)
+            var out: [String: String] = [:]
+            for (k, v) in http.allHeaderFields { out[String(describing: k).lowercased()] = String(describing: v) }
+            return Reply(status: http.statusCode, headers: out, body: data)
+        }
+
         func post(_ path: String, json: String, headers: [String: String] = [:]) async throws -> Reply {
             var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
             request.httpMethod = "POST"
@@ -190,6 +202,10 @@ struct LanServerTests {
     final class NoRedirect: NSObject, URLSessionTaskDelegate, Sendable {
         static let session: URLSession = {
             let config = URLSessionConfiguration.ephemeral
+            // Cookies are passed BY HAND: a jar shared by every bench (all on
+            // 127.0.0.1) would carry one test's session into the next.
+            config.httpShouldSetCookies = false
+            config.httpCookieAcceptPolicy = .never
             // SIXTY, not ten. These requests go to a server in this same
             // process, so the only thing this timeout can measure is whether
             // the scheduler got round to it — and every suite in the bundle
@@ -473,9 +489,41 @@ struct LanServerTests {
         let expected = try await bench.engine.lanQueuePage(store: .object(bench.shop.lanBook), now: "09:16")
         #expect(reply.text == expected)
         #expect(reply.text.contains("09:16"))
-        // And behind the PIN: it shows customers' names.
+        // And behind the PIN: it shows customers' names. Without one, a
+        // browser gets the PIN form — never the queue.
         let none = try await bench.get("/")
-        #expect(none.status == 401)
+        #expect(none.status == 200)
+        #expect(none.text.contains(#"action="/session""#))
+        #expect(none.text != expected)
+    }
+
+    @Test("a browser trades the PIN for a session once, and the PIN never stays in the address")
+    func queueSession() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        // An old bookmark with ?pin= still works — once, and is sent on to a
+        // clean address carrying a cookie instead.
+        let byLink = try await bench.get("/?pin=2468")
+        #expect(byLink.status == 303)
+        #expect(byLink.headers["location"] == "/")
+        let setCookie = try #require(byLink.headers["set-cookie"])
+        #expect(setCookie.contains("HttpOnly") && setCookie.contains("SameSite=Strict"))
+        let cookie = String(setCookie.split(separator: ";").first ?? "")
+        let queue = try await bench.get("/", headers: ["Cookie": cookie])
+        #expect(queue.status == 200 && !queue.text.contains(#"action="/session""#), "the session opens the queue")
+
+        // The form posts the PIN in the body.
+        let posted = try await bench.form("/session", body: "pin=2468")
+        #expect(posted.status == 303)
+        let wrong = try await bench.form("/session", body: "pin=0000")
+        #expect(wrong.status == 401 && wrong.text.contains(#"action="/session""#))
+
+        // A forged or expired cookie is only the form again.
+        #expect(try await bench.get("/", headers: ["Cookie": "khayt_lan=forged"]).text.contains(#"action="/session""#))
+        bench.advance(seconds: LanServer.sessionLife + 1)
+        #expect(try await bench.get("/", headers: ["Cookie": cookie]).text.contains(#"action="/session""#))
+        // And a wrong ?pin= is refused like any wrong PIN.
+        #expect(try await bench.get("/?pin=1111").status == 401)
     }
 
     @Test("the manifest, the service worker and three different icons make it installable")
