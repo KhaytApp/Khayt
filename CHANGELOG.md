@@ -2342,6 +2342,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   by name, description, material and group; the shelf and the catalogue also
   stop asking for a job number when what they filter is filament and products.
 
+### Security
+
+- **(Mac) Text in the book could break, or run inside, the app's business
+  rules.** The Mac hands each rule its inputs by pasting them into a small
+  script, and the paste scanned text it had already pasted: a job note reading
+  "see ARG0" broke the call (and merging stopped working while that note
+  existed), and crafted text could close its own quotes and run. Inputs are
+  now handed over as values and never become script. Found by a security scan.
+- **(Mac) A crafted 3MF uploaded to the shop's intake page could crash the app.**
+  Offsets near the largest number the Mac can hold overflowed, and a member
+  claiming to unpack to terabytes was allocated as claimed. Both are refused.
+- **(Everyone) A phone could wipe the shop's settings, or its printer keys.** A
+  change sent from a phone names the collection it belongs to, and naming
+  `settings` replaced the whole settings object; a machine edited on a phone
+  came back with its key as the placeholder phones are shown, and replaced the
+  real one. Only real record collections are written now, and a placeholder
+  never overwrites a stored secret.
+- **(Mac) Five numbers that crashed the app when out of range:** a printer port
+  above 65535 (on every launch, once saved), a camera address with a port above
+  65535 or a reply with a negative length, a damaged lock file, a huge hourly
+  quote limit, and a tampered cloud key setting. Each is refused or clamped, and
+  the shared machine rule no longer stores an impossible port.
+
 ### Fixed
 
 - **(Everyone) A test print dragged the P&L margin to −495.8%.** Marking a job
@@ -2983,27 +3006,6 @@ The app icon is the letter خ it was always meant to be; the old one was
 missing its dot. And a Prusa can be sent binary G-code.
 
 ### Security
-
-- **(Mac) Text in the book could break, or run inside, the app's business
-  rules.** The Mac hands each rule its inputs by pasting them into a small
-  script, and the paste scanned text it had already pasted: a job note reading
-  "see ARG0" broke the call (and merging stopped working while that note
-  existed), and crafted text could close its own quotes and run. Inputs are
-  now handed over as values and never become script. Found by a security scan.
-- **(Mac) A crafted 3MF uploaded to the shop's intake page could crash the app.**
-  Offsets near the largest number the Mac can hold overflowed, and a member
-  claiming to unpack to terabytes was allocated as claimed. Both are refused.
-- **(Everyone) A phone could wipe the shop's settings, or its printer keys.** A
-  change sent from a phone names the collection it belongs to, and naming
-  `settings` replaced the whole settings object; a machine edited on a phone
-  came back with its key as the placeholder phones are shown, and replaced the
-  real one. Only real record collections are written now, and a placeholder
-  never overwrites a stored secret.
-- **(Mac) Five numbers that crashed the app when out of range:** a printer port
-  above 65535 (on every launch, once saved), a camera address with a port above
-  65535 or a reply with a negative length, a damaged lock file, a huge hourly
-  quote limit, and a tampered cloud key setting. Each is refused or clamped, and
-  the shared machine rule no longer stores an impossible port.
 
 - **A carrier's API key and webhook secret were stored in the clear.**
   `carriers.js` has always marked SMSA, Aramex and Saudi Post's `apiKey` and
