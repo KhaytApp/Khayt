@@ -12,29 +12,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   value is kept. The phone and the cloud never receive the topic or the URLs
   (the shared rule, #1577). The shop's decision, Sep 24 2026.
 
-- **Your slicer setup stays on the computer where you set it.** A slicer's
-  program and the options it runs with are this computer's, and restoring a
-  backup, importing a file or restoring from the cloud used to replace them
-  with whatever the file carried. A genuine slicer given someone else's
-  options can be made to run any command, so these never change on a restore
-  or import now; each computer sets up its slicer once. Found by the Mac
-  app's September security scan (SEC-014).
-- **Your ntfy topic and webhook addresses are no longer sent to the cloud.**
-  On public ntfy.sh the topic is the only thing between your alerts and
-  anyone who guesses it, and Slack and Discord webhook addresses carry their
-  password in the address itself. Both stay visible in Settings on this
-  computer, and are no longer included in what is uploaded to Khayt Cloud.
-  Restoring from the cloud keeps the ones this computer already has (SEC-011).
-- **(Maintainers) Nothing sealed on disk goes up to the cloud, listed or
-  not.** `cloud-outbox.js` `forCloud` masked exactly the paths in
-  `store-secret-paths.js`, so a value sealed on disk (`__enc__…`) whose path
-  was missing from that list would have been sent as its ciphertext. It now
-  masks any sealed value wherever it sits, the backstop the Mac's
-  `Export.swift` already had. `store-secret-paths.js` also gains
-  `DEVICE_PRIVATE_PATHS`/`forEachDevicePrivate` and
-  `MACHINE_LOCAL_PATHS`/`keepMachineLocal`, which the Mac's `/api/store`,
-  cloud push and restore read too (SEC-011, SEC-014).
-
 - **(Mac) A backup taken before "reset everything" is labelled as such.**
   The other app now takes a protected `pre-wipe-` copy before it resets a
   book (#1574). The Mac's Restore list marks it "taken before everything was
@@ -62,47 +39,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - **An ntfy access token could go over plain HTTP or follow a redirect.** It
     is sent only to https:// servers, and never on to a redirect.
 
-- **A full wipe keeps one copy of your book.** "Delete everything" used to
-  delete everything, backups included, so a wipe made by mistake could not be
-  undone. It now saves one copy of your book first and checks the copy can be
-  read. If it cannot make that copy, it stops and deletes nothing. The copy
-  stays in the backups folder after the wipe and can be restored from
-  Settings → Backups; routine backup clean-up never removes it. Photos,
-  invoices, the library and keys are still removed.
-- **"Last backup" could show the wrong thing after an update.** The backup
-  Khayt takes before installing an update sorted after every daily backup, so
-  the settings screen showed it as the last backup date and the daily backup
-  ran again on every check. Only daily backups count now.
-
-- **The root of a disk is never taken as the print library's folder.** The
-  library's location, its mirror and the folders it has lived in before all
-  come from settings, and settings can arrive in a restored backup or over
-  cloud sync. A location of `/` (or `C:\` on Windows) would have counted every
-  file on the machine as part of the library, which is what deleting a model
-  is confined by, and moving the library would have treated the whole disk as
-  somewhere to move files out of. Such a location is now ignored, as if none
-  had been set, and the check that decides whether a folder sits inside
-  another now handles the root of a disk correctly. Found by the Mac app's
-  port of the same rule.
-
-- **Four ways Khayt could destroy a file you meant to keep.**
-  - **Generating a new ZATCA key replaced the old one with no copy.** That key
-    is the one your ZATCA certificate is bound to, so one click in Settings
-    could make every invoice after it fail ZATCA's check until you onboarded
-    again. The old key is now kept beside the new one, and if it cannot be
-    kept, no new key is written.
-  - **Deleting a model from the library deleted it for good.** It goes to the
-    Trash (the Recycle Bin on Windows) now, so a mistake can be undone. If the
-    Trash is not available, the file stays and Khayt says it could not be
-    deleted, rather than deleting it permanently.
-  - **In Saudi Arabia, the night overwrote the previous day's backup.** The
-    daily backup was named by the date in UTC while Khayt checked it against
-    your own date, so between midnight and 3 a.m. it kept writing over
-    yesterday's backup. It is named by your own date now: one per day, as the
-    setting says.
-  - **Attaching a second file with the same name to an order replaced the
-    first.** Two `part.stl` files from different folders left only the last
-    one. The second is now kept as `part-2.stl`.
 - **(Mac) Google Drive as the print library's online storage.** Settings →
   Preferences → Online storage → Keep the copy in → Google Drive: add the OAuth
   client ID from the shop's Google Cloud project (type "Desktop app"), press
@@ -183,8 +119,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   checkmark and its address, the PIN field is labelled, and while Continue is
   off a line says what is missing. The first screen shows the Khayt mark.
 
-
-
 - **(iOS) The phone syncs through Khayt Cloud when the Mac is out of reach.**
   Settings → Khayt Cloud signs the phone in with the shop's email, password and
   passphrase; it gets a device token of its own and keeps the token and the
@@ -202,13 +136,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   books — from the Mac or the cloud — are now adopted, keeping unsent edits
   pending, and the refresh sends before it pulls.
 
-- **Cloud sync never recovered for a shop whose cloud store was gone.** If
-  the server no longer had a shop's store — a reset, or the shop moved to a
-  new cloud — the desktop kept sending changes against the version it last
-  saw. The server refused each one, the desktop checked, found nothing there,
-  and tried the same thing again, so the shop's data never went back up. It
-  now takes "nothing here" at its word and sends the whole store, which is
-  what the Mac app already did.
 - **(Mac + iOS) The cloud client moves into KhaytCore, so the phone can share
   it.** `CloudSignIn`, `CloudReader` and `CloudWriter` move from the Mac app
   into KhaytCore, unchanged apart from becoming public API. The one piece that
@@ -275,7 +202,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   that. The All / Low stock filters are on the screen with their counts
   rather than inside a menu. New labels are in English and Arabic, from the
   mockup's own strings, and the layout mirrors in Arabic.
-
 
 ### Added
 
@@ -525,12 +451,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   must not be handed models on the strength of silence.
 
 ### Changed
-
-- **(Everyone) The original app icon is back.** The redrawn khāʾ, with the dot
-  and without the nozzle (3.9.0 and the Mac alphas from 4.0.0-alpha.34), is
-  taken back at the shop's request. The Dock, the Home screen, the Windows
-  tiles and the browser tab show the nozzle and the thread again, exactly as
-  before.
 
 - **(Mac) Every save downloaded the whole book again.** Khayt checks the cloud
   before it sends, and that check asked for everything each time — the whole
@@ -2523,12 +2443,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **(Mac) A crafted 3MF uploaded to the shop's intake page could crash the app.**
   Offsets near the largest number the Mac can hold overflowed, and a member
   claiming to unpack to terabytes was allocated as claimed. Both are refused.
-- **(Everyone) A phone could wipe the shop's settings, or its printer keys.** A
-  change sent from a phone names the collection it belongs to, and naming
-  `settings` replaced the whole settings object; a machine edited on a phone
-  came back with its key as the placeholder phones are shown, and replaced the
-  real one. Only real record collections are written now, and a placeholder
-  never overwrites a stored secret.
 - **(Mac) Five numbers that crashed the app when out of range:** a printer port
   above 65535 (on every launch, once saved), a camera address with a port above
   65535 or a reply with a negative length, a damaged lock file, a huge hourly
@@ -2537,12 +2451,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
-- **(Everyone) A day of cloud syncing could delete a month of daily backups.**
-  Backups taken before each cloud merge shared the thirty backup slots with the
-  daily ones, and a Mac syncing every fifteen minutes filled them in a working
-  day. Daily backups now keep their own thirty and snapshots their own
-  forty-eight, in both apps. A restore never deletes the backup it is restoring
-  from, and a cloud merge whose safety backup failed no longer goes ahead.
 - **(Mac) A save interrupted at the wrong instant could leave the book missing.**
   The old book was moved aside before the new one was moved in; the book is
   now replaced in one atomic step, and a book left only as its `.prev` copy is
@@ -2557,12 +2465,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the library used to live in no longer moves out files existing models still
   use, and a conversion saved over its own source no longer risks losing both.
 
-- **(Everyone) A test print dragged the P&L margin to −495.8%.** Marking a job
-  "Not business" (a test, a gift, something for the shop itself) is meant to
-  keep it out of revenue, order counts and reports, and ten reports honoured
-  it, but the P&L did not. It does now. When finished jobs were charged
-  nothing, the P&L also says so under the table, with how to leave them out,
-  instead of showing a margin that looks like a fault.
 - **(Mac) A job could not be marked "Not business".** The other app has had
   the switch; the Mac had no way to set it. It is on the job's right-click
   menu and in Edit job.
@@ -2603,11 +2505,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the dashboard's shelf tinted all three as running out. Nothing was low: both
   screens counted every spool the low-stock rule had looked at, not the ones
   it said were low. They now count only those.
-- **(Everyone) A printer that was switched off was said to be "reporting a
-  fault".** When a printer stops answering, Khayt keeps its last reading and
-  notes the failed check; the rule that suggests what to run next read that
-  note as the printer reporting an error. It says "Not answering" now, and a
-  fault is only called a fault when the printer itself says so.
 - **(Mac) A printer that is not answering was shown as free.** The 48-hour
   band on Machines drew a switched-off printer as "Free", with forty-eight free
   hours counted into the shop's total, next to a dashboard saying "not
@@ -3160,6 +3057,139 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.9.1] - 2026-09-24
+
+The fixes since 3.9.0. Individual entries are kept below; this is what
+changed for you.
+
+**Files Khayt could destroy without meaning to.** Deleting a model from the
+library now moves it to the Trash (the Recycle Bin on Windows) instead of
+erasing it. Generating a new ZATCA key keeps the old one, so one click can no
+longer break e-invoicing. In Saudi Arabia, the night no longer overwrites the
+previous day's backup. A second file with the same name on an order is kept
+beside the first, not over it. And "Delete everything" now saves one copy of
+your book first, and stops without deleting anything if it cannot.
+
+**Backups.** A busy day of cloud syncing could push a month of daily backups
+out; daily backups and sync snapshots now keep separate counts. "Last
+backup" no longer shows the copy taken before an update.
+
+**Security.** A phone could overwrite the shop's settings or a printer's
+keys; it cannot now. Your slicer setup stays on the computer where you set
+it, so a restored backup or import can no longer change what runs when you
+slice. Your ntfy topic and webhook addresses are no longer uploaded to Khayt
+Cloud. And the root of a disk can never become the print library's folder.
+
+**Also.** The original app icon is back. A test print no longer drags the
+P&L margin, and a printer that is switched off says so.
+
+### Security
+
+- **(Everyone) A phone could wipe the shop's settings, or its printer keys.** A
+  change sent from a phone names the collection it belongs to, and naming
+  `settings` replaced the whole settings object; a machine edited on a phone
+  came back with its key as the placeholder phones are shown, and replaced the
+  real one. Only real record collections are written now, and a placeholder
+  never overwrites a stored secret.
+
+### Changed
+
+- **(Everyone) The original app icon is back.** The redrawn khāʾ, with the dot
+  and without the nozzle (3.9.0 and the Mac alphas from 4.0.0-alpha.34), is
+  taken back at the shop's request. The Dock, the Home screen, the Windows
+  tiles and the browser tab show the nozzle and the thread again, exactly as
+  before.
+
+### Fixed
+
+- **Your slicer setup stays on the computer where you set it.** A slicer's
+  program and the options it runs with are this computer's, and restoring a
+  backup, importing a file or restoring from the cloud used to replace them
+  with whatever the file carried. A genuine slicer given someone else's
+  options can be made to run any command, so these never change on a restore
+  or import now; each computer sets up its slicer once. Found by the Mac
+  app's September security scan (SEC-014).
+
+- **Your ntfy topic and webhook addresses are no longer sent to the cloud.**
+  On public ntfy.sh the topic is the only thing between your alerts and
+  anyone who guesses it, and Slack and Discord webhook addresses carry their
+  password in the address itself. Both stay visible in Settings on this
+  computer, and are no longer included in what is uploaded to Khayt Cloud.
+  Restoring from the cloud keeps the ones this computer already has (SEC-011).
+
+- **(Maintainers) Nothing sealed on disk goes up to the cloud, listed or
+  not.** `cloud-outbox.js` `forCloud` masked exactly the paths in
+  `store-secret-paths.js`, so a value sealed on disk (`__enc__…`) whose path
+  was missing from that list would have been sent as its ciphertext. It now
+  masks any sealed value wherever it sits, the backstop the Mac's
+  `Export.swift` already had. `store-secret-paths.js` also gains
+  `DEVICE_PRIVATE_PATHS`/`forEachDevicePrivate` and
+  `MACHINE_LOCAL_PATHS`/`keepMachineLocal`, which the Mac's `/api/store`,
+  cloud push and restore read too (SEC-011, SEC-014).
+
+- **A full wipe keeps one copy of your book.** "Delete everything" used to
+  delete everything, backups included, so a wipe made by mistake could not be
+  undone. It now saves one copy of your book first and checks the copy can be
+  read. If it cannot make that copy, it stops and deletes nothing. The copy
+  stays in the backups folder after the wipe and can be restored from
+  Settings → Backups; routine backup clean-up never removes it. Photos,
+  invoices, the library and keys are still removed.
+
+- **"Last backup" could show the wrong thing after an update.** The backup
+  Khayt takes before installing an update sorted after every daily backup, so
+  the settings screen showed it as the last backup date and the daily backup
+  ran again on every check. Only daily backups count now.
+
+- **The root of a disk is never taken as the print library's folder.** The
+  library's location, its mirror and the folders it has lived in before all
+  come from settings, and settings can arrive in a restored backup or over
+  cloud sync. A location of `/` (or `C:\` on Windows) would have counted every
+  file on the machine as part of the library, which is what deleting a model
+  is confined by, and moving the library would have treated the whole disk as
+  somewhere to move files out of. Such a location is now ignored, as if none
+  had been set, and the check that decides whether a folder sits inside
+  another now handles the root of a disk correctly. Found by the Mac app's
+  port of the same rule.
+
+- **Four ways Khayt could destroy a file you meant to keep.**
+  - **Generating a new ZATCA key replaced the old one with no copy.** That key
+    is the one your ZATCA certificate is bound to, so one click in Settings
+    could make every invoice after it fail ZATCA's check until you onboarded
+    again. The old key is now kept beside the new one, and if it cannot be
+    kept, no new key is written.
+  - **Deleting a model from the library deleted it for good.** It goes to the
+    Trash (the Recycle Bin on Windows) now, so a mistake can be undone. If the
+    Trash is not available, the file stays and Khayt says it could not be
+    deleted, rather than deleting it permanently.
+  - **In Saudi Arabia, the night overwrote the previous day's backup.** The
+    daily backup was named by the date in UTC while Khayt checked it against
+    your own date, so between midnight and 3 a.m. it kept writing over
+    yesterday's backup. It is named by your own date now: one per day, as the
+    setting says.
+  - **Attaching a second file with the same name to an order replaced the
+    first.** Two `part.stl` files from different folders left only the last
+    one. The second is now kept as `part-2.stl`.
+
+- **(Everyone) A day of cloud syncing could delete a month of daily backups.**
+  Backups taken before each cloud merge shared the thirty backup slots with the
+  daily ones, and a Mac syncing every fifteen minutes filled them in a working
+  day. Daily backups now keep their own thirty and snapshots their own
+  forty-eight, in both apps. A restore never deletes the backup it is restoring
+  from, and a cloud merge whose safety backup failed no longer goes ahead.
+
+- **(Everyone) A test print dragged the P&L margin to −495.8%.** Marking a job
+  "Not business" (a test, a gift, something for the shop itself) is meant to
+  keep it out of revenue, order counts and reports, and ten reports honoured
+  it, but the P&L did not. It does now. When finished jobs were charged
+  nothing, the P&L also says so under the table, with how to leave them out,
+  instead of showing a margin that looks like a fault.
+
+- **(Everyone) A printer that was switched off was said to be "reporting a
+  fault".** When a printer stops answering, Khayt keeps its last reading and
+  notes the failed check; the rule that suggests what to run next read that
+  note as the printer reporting an error. It says "Not answering" now, and a
+  fault is only called a fault when the printer itself says so.
 
 ## [3.9.0] - 2026-09-23
 
