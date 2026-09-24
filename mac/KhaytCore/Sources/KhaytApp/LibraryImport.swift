@@ -191,6 +191,7 @@ enum LibraryImport {
                     keepOriginal: Bool = false,
                     group: String? = nil,
                     documents: [URL] = [],
+                    title: String? = nil,
                     analyseRisk: Bool = false,
                     owns: @escaping () -> Bool,
                     whoHasIt: @escaping () -> String?) async throws -> Added {
@@ -324,8 +325,11 @@ enum LibraryImport {
             thumbFile = "thumb.png"
         }
 
-        let name = originalName.replacingOccurrences(
-            of: "\\.[^.]+$", with: "", options: .regularExpression)
+        // The folder's name when the folder named it (a model alone in
+        // `King Abdulaziz/` is "King Abdulaziz", not "crown"); the file's name
+        // otherwise. The file's own name is kept either way, as originalName.
+        let name = title.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+            ?? originalName.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
         let record = self.record(id: id, name: name, originalName: originalName,
                                  filename: filename, ext: ext, size: size,
                                  hash: hash, key: key,
@@ -427,6 +431,10 @@ enum LibraryImport {
         /// than discovered: the alternative is a guide reachable from one
         /// arbitrary model of the forty, which is the same as not having it.
         var documents: [URL] = []
+        /// What to call the model, when the folder it came in named it better
+        /// than its file does — see `ImportGrouping.placements`. Nil: the
+        /// file's name, as always.
+        var title: String? = nil
 
         /// Files with no grouping — what `--import` of a bare list means, and
         /// what most tests want. Spelled out at the call site so a caller that
@@ -457,6 +465,7 @@ enum LibraryImport {
                                           knownHashes: known, nameOfExisting: nameOfExisting,
                                           engine: engine, keepOriginal: keepOriginal,
                                           group: file.group, documents: file.documents,
+                                          title: file.title,
                                           analyseRisk: analyseRisk,
                                           owns: owns, whoHasIt: whoHasIt)
                 report.moved += 1
