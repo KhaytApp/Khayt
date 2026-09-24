@@ -1,0 +1,31 @@
+# TEMPORARY — removed before this PR merges. Runs the release step's own shell
+# against the installer under the name electron-builder actually writes.
+name: TEMP Windows gate name proof
+on: pull_request
+jobs:
+  proof:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: The release step, verbatim, on "Khayt Setup 3.9.0.exe"
+        timeout-minutes: 10
+        env:
+          GITHUB_REF_NAME: v3.9.0
+        run: |
+          mkdir -p build
+          curl -fsSL -o "build/Khayt Setup 3.9.0.exe" https://github.com/KhaytApp/Khayt/releases/download/v3.9.0/Khayt-Setup-3.9.0.exe
+          v="${GITHUB_REF_NAME#v}"
+          shopt -s nullglob
+          found=(build/*Setup*"$v".exe)
+          if [ "${#found[@]}" -ne 1 ]; then
+            echo "::error::expected one Setup installer for $v in build/, found ${#found[@]}"; ls build; exit 1
+          fi
+          node scripts/verify-release.mjs --app "${found[0]}" --version "$v"

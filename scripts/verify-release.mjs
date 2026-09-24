@@ -215,12 +215,22 @@ if (/\.AppImage$/.test(appPath)) {
  * A Windows installer is RUN, silently, into a scratch folder — the step a shop
  * takes and the one no other check here has ever taken. NSIS wants `/D=` last
  * and unquoted, so the arguments are passed verbatim.
+ *
+ * Both spellings of the name: electron-builder WRITES `Khayt Setup 3.9.1.exe`,
+ * with spaces, and only the upload renames it `Khayt-Setup-3.9.1.exe`. The
+ * first release through this gate (v3.9.1) looked for the second in build/ and
+ * found nothing. The installer is copied to a name without spaces before it
+ * runs, because with verbatim arguments its own path is not quoted either, and
+ * NSIS reads its parameters from after the program name.
  */
-if (/Setup-.*\.exe$/i.test(appPath)) {
+if (/Setup[ ._-].*\.exe$/i.test(appPath)) {
   if (!windows) fail('a Windows installer can only be checked on Windows');
+  if (!fs.existsSync(appPath)) fail(`no installer at ${appPath}`);
   const dest = path.join(work, 'installed');
+  const runnable = path.join(work, 'khayt-setup.exe');
+  fs.copyFileSync(appPath, runnable);
   try {
-    execFileSync(path.resolve(appPath), ['/S', `/D=${dest}`],
+    execFileSync(runnable, ['/S', `/D=${dest}`],
       { stdio: 'pipe', windowsVerbatimArguments: true, timeout: 300_000 });
   } catch (e) {
     fail(`the installer did not finish: ${String((e && e.stderr) || e).slice(0, 300)}`);

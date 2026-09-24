@@ -309,7 +309,14 @@ jobs:
         timeout-minutes: 10
         run: |
           v="${GITHUB_REF_NAME#v}"
-          node scripts/verify-release.mjs --app "build/Khayt-Setup-$v.exe" --version "$v"
+          # electron-builder writes "Khayt Setup X.exe" (spaces); the upload
+          # renames it with dashes. Find it by pattern, and insist on exactly one.
+          shopt -s nullglob
+          found=(build/*Setup*"$v".exe)
+          if [ "${#found[@]}" -ne 1 ]; then
+            echo "::error::expected one Setup installer for $v in build/, found ${#found[@]}"; ls build; exit 1
+          fi
+          node scripts/verify-release.mjs --app "${found[0]}" --version "$v"
 
       - name: Add Windows SDK makeAppx to PATH
         # electron-builder needs makeAppx.exe; find the latest installed SDK version
