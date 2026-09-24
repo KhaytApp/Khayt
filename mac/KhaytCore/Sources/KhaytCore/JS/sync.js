@@ -348,6 +348,39 @@
    * conflict policy: LWW by `rev` (rev authoritative); append-only collections
    * never overwrite; tombstones remove. Returns {applied, skipped, removed}.
    */
+  /* ── WHAT A DELTA MAY WRITE ─────────────────────────────────────────────
+   *
+   * A delta names its collection, and the name came from a phone, a cloud or a
+   * peer. `if (!Array.isArray(snapshot[coll])) snapshot[coll] = []` turned
+   * whatever was there into a list, so one delta naming `settings` replaced the
+   * shop's whole settings object (every sealed credential with it) and was
+   * written to disk. A security scan found it. A collection is a list of
+   * records, or a name the book does not have yet; never an object it has. */
+  const NOT_RECORDS = new Set(['settings', 'tombstones', '__proto__', 'constructor', 'prototype']);
+  function isRecordCollection(snapshot, coll) {
+    if (typeof coll !== 'string' || !/^_?[A-Za-z][A-Za-z0-9_]{0,63}$/.test(coll) || NOT_RECORDS.has(coll)) return false;
+    return snapshot[coll] === undefined || Array.isArray(snapshot[coll]);
+  }
+
+  /* ── A MASKED SECRET NEVER OVERWRITES A REAL ONE ───────────────────────
+   *
+   * Phones are sent the book with every credential replaced by the mask
+   * (lib/store.js). A phone that edits a machine and sends it back sends the
+   * mask too, and a higher rev took it over the real sealed key, so the next
+   * poll of that printer failed with a key of "__KHAYT_MASKED__". Anywhere the
+   * incoming record holds the mask, the stored value is kept. */
+  const SECRET_MASK = '__KHAYT_MASKED__';
+  function keepSecrets(existing, incoming) {
+    if (incoming === SECRET_MASK) return existing === undefined ? incoming : existing;
+    if (!incoming || typeof incoming !== 'object' || !existing || typeof existing !== 'object') return incoming;
+    if (Array.isArray(incoming)) {
+      return incoming.map((v, k) => keepSecrets(Array.isArray(existing) ? existing[k] : undefined, v));
+    }
+    const out = {};
+    for (const k of Object.keys(incoming)) out[k] = keepSecrets(existing[k], incoming[k]);
+    return out;
+  }
+
   function applyDeltas(snapshot, payload, opts) {
     opts = opts || {};
     const appendOnly = new Set(opts.appendOnly || []);
@@ -370,6 +403,7 @@
       const coll = d && d.collection;
       const incoming = d && d.record;
       if (!coll || !incoming || typeof incoming.id !== 'string') { result.skipped++; continue; }
+      if (!isRecordCollection(snapshot, coll)) { result.skipped++; continue; }
       if (!Array.isArray(snapshot[coll])) snapshot[coll] = [];
       const arr = snapshot[coll];
       const i = arr.findIndex((r) => r && r.id === incoming.id);
@@ -417,7 +451,7 @@
             discarded: arr[i], tookIncoming: true,
           });
         }
-        arr[i] = incoming; result.applied++;
+        arr[i] = keepSecrets(arr[i], incoming); result.applied++;
         noteSynced(coll, incoming, scope);
       }
       else if (inRev < curRev) { result.skipped++; }
@@ -438,7 +472,7 @@
           const takeIncoming = inT !== curT
             ? inT > curT
             : fingerprint(incoming) > fingerprint(arr[i]);
-          if (takeIncoming) { arr[i] = incoming; result.applied++; noteSynced(coll, incoming, scope); }
+          if (takeIncoming) { arr[i] = keepSecrets(arr[i], incoming); result.applied++; noteSynced(coll, incoming, scope); }
           else { result.skipped++; }
           result.conflicts.push({ collection: coll, id: incoming.id, rev: inRev, tookIncoming: takeIncoming });
         } else {

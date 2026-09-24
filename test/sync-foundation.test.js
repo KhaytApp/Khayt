@@ -258,3 +258,31 @@ test('summarizeOverwrittenEdits names the first record and counts the rest', () 
   ]);
   assert.deepEqual(some, { count: 2, firstName: 'Acme' });
 });
+
+// Security scan, Sep 2026: a delta names its own collection, and the name
+// comes from a phone or a peer.
+test('a delta cannot turn the settings object (or any non-list) into a collection', () => {
+  const S = require('../lib/sync.js');
+  const snap = { settings: { shopName: 'Athar', cloud: { token: '__enc__x' } }, clients: [] };
+  const r = S.applyDeltas(snap, { deltas: [
+    { collection: 'settings', record: { id: 'x', rev: 99 } },
+    { collection: '__proto__', record: { id: 'y', rev: 1 } },
+    { collection: 'tombstones', record: { id: 'z', rev: 1 } },
+    { collection: 'clients', record: { id: 'c1', rev: 1 } },
+    { collection: '_auditLog', record: { id: 'a1', rev: 1 } },
+  ] });
+  assert.equal(snap.settings.shopName, 'Athar', 'the settings object survived');
+  assert.equal(snap.clients.length, 1, 'an ordinary collection still takes records');
+  assert.equal(snap._auditLog.length, 1, 'a real underscore ledger still takes records');
+  assert.equal(r.applied, 2);
+  assert.equal(r.skipped, 3);
+});
+
+test('a masked secret coming back from a phone never overwrites the real one', () => {
+  const S = require('../lib/sync.js');
+  const snap = { machines: [{ id: 'm1', rev: 1, name: 'U1', printerApi: { host: 'u1.local', apiKey: '__enc__REAL' } }] };
+  S.applyDeltas(snap, { deltas: [{ collection: 'machines',
+    record: { id: 'm1', rev: 2, name: 'U1 renamed', printerApi: { host: 'u1.local', apiKey: '__KHAYT_MASKED__' } } }] });
+  assert.equal(snap.machines[0].name, 'U1 renamed', 'the edit itself is taken');
+  assert.equal(snap.machines[0].printerApi.apiKey, '__enc__REAL', 'the key is not replaced by the mask');
+});
