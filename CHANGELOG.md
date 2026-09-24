@@ -3156,6 +3156,106 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.41] - 2026-09-24
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+What the shop asked for overnight: the old icon back, the cloud remembered
+between launches, and nothing stuck at the top of the window. Beside it,
+the library says which models can start on a printer with what it has loaded,
+and five things the shop's own book showed wrong are put right.
+
+### Added
+
+- **(Mac) See what can start now, with the filament already loaded.** A
+  printer that reports its loaded spools (a Snapmaker U1 does, head by head)
+  gets a **Ready on <printer>** chip in the library, counting the models whose
+  every colour is loaded in a material that fits. Pressing it shows just
+  those, and a model's details say "Ready to start" or "Needs a spool swap" for
+  each such printer. Colours are compared the way they look rather than by hex
+  code, and materials by family, so PLA Silk goes in a PLA slot and PETG does
+  not. The count updates when a spool is swapped.
+
+- **(Mac) Say what is loaded on a printer that cannot.** Most printers do not
+  report their spools, so a machine's sheet now has **Loaded now**: one row per
+  head, a colour and a material. The library's Ready chip and a model's
+  details use it the same way as a U1's own reading, and a printer that does
+  report its spools is always read instead.
+
+### Changed
+
+- **(Everyone) The original app icon is back.** The redrawn khāʾ, with the dot
+  and without the nozzle (3.9.0 and the Mac alphas from 4.0.0-alpha.34), is
+  taken back at the shop's request. The Dock, the Home screen, the Windows
+  tiles and the browser tab show the nozzle and the thread again, exactly as
+  before.
+
+### Fixed
+
+- **(Mac) The cloud asked for the passphrase at every launch.** The unlocked
+  key lived only in memory, so each time the app opened a shop had to sign in
+  to the cloud again before anything synced. It is kept in this Mac's login
+  Keychain now, never in the book and never sent anywhere, and the next launch
+  unlocks by itself. The passphrase itself is still never stored. Locking the
+  cloud from the menu bar removes the kept key. If the shop's key changes on
+  another device, this Mac asks once rather than keep sending with the old one.
+
+- **(Mac) Confirmations stuck at the top of the window.** "Signed in", "Email
+  sent", "This shop's key is on Khayt Cloud now": each is news, and each stayed
+  pinned above every screen until a job was next moved, with no way to close
+  it, so they read like warnings. Every notice has a Close button now, and they
+  go on their own 15 seconds after the last one arrived. Problems still stay
+  until they are dealt with.
+
+- **(Mac) Every banner at the top of the window can be closed.** The green
+  ticks ("12 models were measured again", "3 repeat orders created", a
+  conversion saved) could appear at launch and stayed until the next library
+  action, and a warning that had been read could not be put away. Each has a
+  Close button now, and the ticks also go on their own after 15 seconds.
+
+- **(Mac) Preferences could not be opened.** Settings had nine tabs in a window
+  too narrow for them, so the last ones went behind a » button at the end of
+  the toolbar, and there SwiftUI shows a tab greyed out and unclickable.
+  Preferences, the last tab, was out of reach, and with it the update switches,
+  the menu bar, simple mode, language and the estimate defaults. Settings lists
+  its panes in a sidebar now, which has room for all of them in any language.
+
+- **(Mac) A storefront waited up to six hours for its prices.** The prices a
+  storefront quotes an upload from are sent to Khayt Cloud on a timer: ninety
+  seconds after the app opens, then every six hours. Switching storefront
+  pricing on, or changing a margin, therefore reached the storefront hours
+  later, and nothing said whether it had. Saving that section now sends them
+  straight away, and Settings → Online says what happened: sent, withdrawn, or
+  why not, including "sign in to the cloud" when the Mac is not signed in.
+
+- **(Mac) Every spool was called low.** With three spools at 859 g, 1,000 g and
+  1,000 g and a 200 g threshold, the sidebar showed ▼3 beside Inventory and
+  the dashboard's shelf tinted all three as running out. Nothing was low: both
+  screens counted every spool the low-stock rule had looked at, not the ones
+  it said were low. They now count only those.
+
+- **(Everyone) A printer that was switched off was said to be "reporting a
+  fault".** When a printer stops answering, Khayt keeps its last reading and
+  notes the failed check; the rule that suggests what to run next read that
+  note as the printer reporting an error. It says "Not answering" now, and a
+  fault is only called a fault when the printer itself says so.
+
+- **(Mac) A printer that is not answering was shown as free.** The 48-hour
+  band on Machines drew a switched-off printer as "Free", with forty-eight free
+  hours counted into the shop's total, next to a dashboard saying "not
+  answering". It is shown as not answering now, with its hours left out of the
+  total, after the same three missed checks the offline alert waits for. The
+  line under the band that said something was "printing something Khayt cannot
+  time" also appeared whenever any machine was simply free; it now appears
+  only when that is true. A machine in a maintenance window no longer shows
+  the raw text `mac.band_state_down`.
+
+- **(Mac) A short job on the 48-hour band read as "(n…".** A block too narrow
+  for its name (two hours of a forty-eight-hour band) was drawn with its label
+  cut to a letter and an ellipsis. It is drawn bare now; the name and time are
+  in its tooltip, as they always were.
+
 ## [4.0.0-alpha.40] - 2026-09-23
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
