@@ -30,39 +30,70 @@ import KhaytCore
 @MainActor
 enum CloudLibrary {
 
-    /// The bucket as the book describes it, with its secret opened for this
-    /// use only. Nil when none is set up.
+    /// Where the library's remote copy is, as the book describes it, with
+    /// its secrets opened for this use only. Nil when none is set up.
     struct Config {
-        var s3: S3Config
-        /// `s3.enabled`: new models are backed up to the bucket.
+        var remote: LibraryRemote
+        /// Put in front of every key — the bucket's folder; empty for Drive.
+        var prefix: String
+        /// New models are backed up as they come in (`enabled` on whichever
+        /// remote this is).
         var backsUp: Bool
+        /// What the sidecar records as where it went.
         var provider: String
         /// `settings.printLibrary.tier`, as the shared rule reads it.
         var tier: JSONValue
         var tierEnabled: Bool
+        var isDrive: Bool { if case .drive = remote { true } else { false } }
     }
 
+    /// The bucket when it is switched on, else Google Drive when that is,
+    /// else a bucket that is set up but not backing up (so moved models can
+    /// still be brought back) — `printLibRemote()` in the other app, which
+    /// prefers the bucket when both are on.
     static func config(settings: [String: JSONValue], build: StoreReader.Build?) async -> Config? {
-        guard case .object(let library)? = settings["printLibrary"],
-              case .object(let s3)? = library["s3"] else { return nil }
-        func text(_ key: String) -> String {
-            if case .string(let v)? = s3[key] { return v.trimmingCharacters(in: .whitespaces) }
-            return ""
-        }
-        var secret = text("secretAccessKey")
-        if secret.hasPrefix(SafeStorage.marker) {
-            guard let build else { return nil }
-            secret = (try? await Secrets.open(secret, for: build)) ?? ""
-        }
-        let config = S3Config(endpoint: text("endpoint"), bucket: text("bucket"), region: text("region"),
-                              accessKeyId: text("accessKeyId"), secretAccessKey: secret, prefix: text("prefix"))
-        guard config.isConfigured else { return nil }
+        guard case .object(let library)? = settings["printLibrary"] else { return nil }
         let tier = library["tier"] ?? .object([:])
         var tierOn = false
         if case .object(let t) = tier, case .bool(true)? = t["enabled"] { tierOn = true }
-        var backsUp = false
-        if case .bool(true)? = s3["enabled"] { backsUp = true }
-        return Config(s3: config, backsUp: backsUp, provider: text("provider"), tier: tier, tierEnabled: tierOn)
+
+        func open(_ value: String) async -> String? {
+            guard value.hasPrefix(SafeStorage.marker) else { return value }
+            guard let build else { return nil }
+            return try? await Secrets.open(value, for: build)
+        }
+        func reader(_ key: String) -> [String: JSONValue] {
+            if case .object(let o)? = library[key] { return o } else { return [:] }
+        }
+        func text(_ o: [String: JSONValue], _ key: String) -> String {
+            if case .string(let v)? = o[key] { return v.trimmingCharacters(in: .whitespaces) }
+            return ""
+        }
+        func on(_ o: [String: JSONValue]) -> Bool { if case .bool(true)? = o["enabled"] { true } else { false } }
+
+        let s3 = reader("s3")
+        var bucket: Config?
+        if let secret = await open(text(s3, "secretAccessKey")) {
+            let c = S3Config(endpoint: text(s3, "endpoint"), bucket: text(s3, "bucket"), region: text(s3, "region"),
+                             accessKeyId: text(s3, "accessKeyId"), secretAccessKey: secret, prefix: text(s3, "prefix"))
+            if c.isConfigured {
+                bucket = Config(remote: .bucket(c), prefix: c.prefix, backsUp: on(s3),
+                                provider: c.endpoint, tier: tier, tierEnabled: tierOn)
+            }
+        }
+        if let bucket, bucket.backsUp { return bucket }
+
+        let gd = reader("gdrive")
+        if on(gd), let refresh = await open(text(gd, "refreshToken")),
+           let secret = await open(text(gd, "clientSecret")) {
+            let d = DriveClient.Config(clientId: text(gd, "clientId"), clientSecret: secret,
+                                       refreshToken: refresh, folderName: text(gd, "folderName"))
+            if d.isConfigured {
+                return Config(remote: .drive(DriveClient(d, fetch: fetch)), prefix: text(gd, "prefix"),
+                              backsUp: true, provider: "gdrive", tier: tier, tierEnabled: tierOn)
+            }
+        }
+        return bucket
     }
 
     /// Requests to a bucket. No redirects: a signed request followed somewhere
@@ -111,16 +142,16 @@ enum CloudLibrary {
     /// separate request. `lib/print-library-tier.js etagVerdict` decides what
     /// an etag proves; an unusable one is checked by downloading and hashing.
     @discardableResult
-    static func ensureInBucket(_ c: S3Config, key: String, file: URL,
+    static func ensureInBucket(_ c: LibraryRemote, key: String, file: URL,
                                engine: KhaytEngine) async throws -> (sha256: String, size: Int) {
         let local = try await Task.detached { try Self.digests(of: file) }.value
-        if let there = try await S3.head(c, key: key, fetch: fetch), there.size == local.size,
+        if let there = try await c.head(key, fetch: fetch), there.size == local.size,
            try await engine.etagVerdict(etag: there.etag, md5: local.md5) == "match" {
             return (local.sha256, local.size)
         }
         let data = try await Task.detached { try Data(contentsOf: file, options: .mappedIfSafe) }.value
-        try await S3.put(c, key: key, data: data, fetch: fetch)
-        guard let after = try await S3.head(c, key: key, fetch: fetch) else {
+        try await c.put(key, data: data, fetch: fetch)
+        guard let after = try await c.head(key, fetch: fetch) else {
             throw Failure.notThere
         }
         guard after.size == local.size else {
@@ -130,7 +161,7 @@ enum CloudLibrary {
         case "match": break
         case "mismatch": throw Failure.hashMismatch
         default:
-            guard let back = try await S3.get(c, key: key, fetch: fetch),
+            guard let back = try await c.get(key, fetch: fetch),
                   S3.sha256Hex(back) == local.sha256 else {
                 throw Failure.readBackDiffers
             }
@@ -154,7 +185,7 @@ enum CloudLibrary {
               let side = try await engine.parseSidecar(text) else { throw Failure.noSidecar }
         guard let config else { throw S3.Failure.notConfigured }
         // The key the SIDECAR recorded, not one rebuilt from today's prefix.
-        guard let data = try await S3.get(config.s3, key: side.key, fetch: fetch) else {
+        guard let data = try await config.remote.get(side.key, fetch: fetch) else {
             throw Failure.bucketLostIt
         }
         let verdict = try await engine.verifyRehydrate(side, size: data.count, sha256: S3.sha256Hex(data))
@@ -221,13 +252,13 @@ extension Shop {
         }
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false }
-        let key = S3.objectKey(prefix: config.s3.prefix, id: "_khayt-check",
+        let key = S3.objectKey(prefix: config.prefix, id: "_khayt-check",
                                filename: "probe-\(String(Int(Date().timeIntervalSince1970 * 1000), radix: 36)).bin")
         let probe = Data((0..<64).map { _ in UInt8.random(in: 0...255) })
         do {
-            try await S3.put(config.s3, key: key, data: probe, fetch: CloudLibrary.fetch)
-            let back = try await S3.get(config.s3, key: key, fetch: CloudLibrary.fetch)
-            try await S3.delete(config.s3, key: key, fetch: CloudLibrary.fetch)
+            try await config.remote.put(key, data: probe, fetch: CloudLibrary.fetch)
+            let back = try await config.remote.get(key, fetch: CloudLibrary.fetch)
+            try await config.remote.delete(key, fetch: CloudLibrary.fetch)
             guard back == probe else { cloudLibraryProblem = words.callIt("mac.cloudlib_test_mismatch"); return }
             cloudLibraryNote = words.callIt("mac.cloudlib_test_ok")
         } catch {
@@ -243,9 +274,9 @@ extension Shop {
         var failed = 0
         for file in files where ids.contains(file.id) {
             guard let url = modelFile(for: file) else { continue }
-            let key = S3.objectKey(prefix: config.s3.prefix, id: LibraryLocation.itemDirName(file.id),
+            let key = S3.objectKey(prefix: config.prefix, id: LibraryLocation.itemDirName(file.id),
                                    filename: url.lastPathComponent)
-            do { try await CloudLibrary.ensureInBucket(config.s3, key: key, file: url, engine: engine) }
+            do { try await CloudLibrary.ensureInBucket(config.remote, key: key, file: url, engine: engine) }
             catch { failed += 1 }
         }
         if failed > 0 { cloudLibraryProblem = words.callIt("mac.cloudlib_backup_some_failed", ["n": .number(Double(failed))]) }
@@ -266,8 +297,8 @@ extension Shop {
         var done = 0, failed = 0
         for file in all {
             cloudProgress = (done: done, total: all.count, name: file.filename)
-            let key = S3.objectKey(prefix: config.s3.prefix, id: file.id ?? "", filename: file.filename)
-            do { try await CloudLibrary.ensureInBucket(config.s3, key: key, file: URL(fileURLWithPath: file.fullPath), engine: engine) }
+            let key = S3.objectKey(prefix: config.prefix, id: file.id ?? "", filename: file.filename)
+            do { try await CloudLibrary.ensureInBucket(config.remote, key: key, file: URL(fileURLWithPath: file.fullPath), engine: engine) }
             catch { failed += 1 }
             done += 1
         }
@@ -295,14 +326,14 @@ extension Shop {
         for (i, file) in plan.candidates.enumerated() {
             cloudProgress = (done: i, total: plan.candidates.count, name: file.filename)
             let url = URL(fileURLWithPath: file.fullPath)
-            let key = S3.objectKey(prefix: config.s3.prefix, id: file.id ?? "", filename: file.filename)
+            let key = S3.objectKey(prefix: config.prefix, id: file.id ?? "", filename: file.filename)
             do {
-                let proved = try await CloudLibrary.ensureInBucket(config.s3, key: key, file: url, engine: engine)
+                let proved = try await CloudLibrary.ensureInBucket(config.remote, key: key, file: url, engine: engine)
                 // The sidecar FIRST, then the file: a crash between the two
                 // leaves both, which is a model that is here and also noted as
                 // in the cloud — never one that is neither.
                 let text = try await engine.sidecarText(size: proved.size, sha256: proved.sha256, key: key,
-                                                        provider: config.s3.endpoint,
+                                                        provider: config.provider,
                                                         at: ISO8601DateFormatter().string(from: Date()))
                 try Data(text.utf8).write(to: CloudLibrary.sidecar(for: url), options: .atomic)
                 try FileManager.default.removeItem(at: url)
@@ -370,6 +401,136 @@ extension Shop {
         return (plan.candidates.count, (try? await engine.formatBytes(plan.bytes)) ?? "", inCloud)
     }
 
+    // MARK: - Google Drive
+
+    /// Write `printLibrary.gdrive`, merged over what is there — as the other
+    /// app's `savePrintLibGDrive` does. `nil` leaves a field alone; secrets are
+    /// sealed on the way in.
+    private func writeDrive(clientId: String? = nil, clientSecret: String? = nil, refreshToken: String? = nil,
+                            folderName: String? = nil, enabled: Bool? = nil, bucketOff: Bool = false) async throws {
+        guard let build = source.build else { throw S3.Failure.notConfigured }
+        var sealedSecret: String?
+        if let clientSecret { sealedSecret = clientSecret.isEmpty ? "" : try await Secrets.seal(clientSecret, for: build) }
+        var sealedToken: String?
+        if let refreshToken { sealedToken = refreshToken.isEmpty ? "" : try await Secrets.seal(refreshToken, for: build) }
+        try StoreWriter.update(build) { root in
+            var settings = Self.settings(root)
+            var library: [String: JSONValue] = [:]
+            if case .object(let l)? = settings["printLibrary"] { library = l }
+            var gd: [String: JSONValue] = [:]
+            if case .object(let o)? = library["gdrive"] { gd = o }
+            if let clientId { gd["clientId"] = .string(clientId.trimmingCharacters(in: .whitespaces)) }
+            if let sealedSecret { gd["clientSecret"] = .string(sealedSecret) }
+            if let sealedToken { gd["refreshToken"] = .string(sealedToken); gd["folderId"] = .string("") }
+            if let folderName {
+                let n = folderName.trimmingCharacters(in: .whitespaces)
+                gd["folderName"] = .string(n.isEmpty ? "Khayt print library" : n)
+            }
+            if let enabled { gd["enabled"] = .bool(enabled) }
+            library["gdrive"] = .object(gd)
+            // Drive chosen: the bucket stops backing up, or it would win.
+            if bucketOff, case .object(var s3)? = library["s3"] {
+                s3["enabled"] = .bool(false); library["s3"] = .object(s3)
+            }
+            settings["printLibrary"] = .object(library)
+            root["settings"] = .object(settings)
+        }
+        await load(source)
+    }
+
+    /// Sign in to Google in the browser and keep what comes back. The client
+    /// id is saved FIRST, as the other app does, so the sign-in is for the id
+    /// on the screen.
+    func connectGoogleDrive(clientId: String, typedSecret: String, folderName: String) async {
+        cloudLibraryProblem = nil
+        cloudLibraryNote = nil
+        let id = clientId.trimmingCharacters(in: .whitespaces)
+        guard !id.isEmpty else { cloudLibraryProblem = words.callIt("mac.gdrive_need_client"); return }
+        guard !cloudLibraryBusy else { return }
+        cloudLibraryBusy = true
+        cloudLibraryNote = words.callIt("mac.gdrive_waiting")
+        defer { cloudLibraryBusy = false }
+        do {
+            let typed = typedSecret.trimmingCharacters(in: .whitespaces)
+            try await writeDrive(clientId: id, clientSecret: typed.isEmpty ? nil : typed, folderName: folderName)
+            // The secret as stored — typed now, or kept from before.
+            var secret = typed
+            if secret.isEmpty, case .object(let l)? = settingsDict["printLibrary"],
+               case .object(let gd)? = l["gdrive"], case .string(let stored)? = gd["clientSecret"], !stored.isEmpty,
+               let build = source.build {
+                secret = (try? await Secrets.open(stored, for: build)) ?? ""
+            }
+            let refresh = try await GoogleSignIn.run(clientId: id, clientSecret: secret, words: words,
+                                                     fetch: CloudLibrary.fetch)
+            try await writeDrive(refreshToken: refresh, enabled: true, bucketOff: true)
+            cloudLibraryNote = words.callIt("mac.gdrive_connected")
+        } catch {
+            cloudLibraryNote = nil
+            cloudLibraryProblem = cloudSay(error)
+        }
+    }
+
+    /// Save Drive's folder and the free-up-space rule, with Drive as the
+    /// remote: the bucket's backing up is switched off, since the bucket wins
+    /// whenever it is on.
+    func saveDriveLibrary(folderName: String, tierOn: Bool, keepDays: Int) async {
+        cloudLibraryProblem = nil
+        cloudLibraryNote = nil
+        guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
+        do {
+            try StoreWriter.update(build) { root in
+                var settings = Self.settings(root)
+                var library: [String: JSONValue] = [:]
+                if case .object(let l)? = settings["printLibrary"] { library = l }
+                var gd: [String: JSONValue] = [:]
+                if case .object(let o)? = library["gdrive"] { gd = o }
+                let n = folderName.trimmingCharacters(in: .whitespaces)
+                gd["folderName"] = .string(n.isEmpty ? "Khayt print library" : n)
+                library["gdrive"] = .object(gd)
+                if case .object(var s3)? = library["s3"] { s3["enabled"] = .bool(false); library["s3"] = .object(s3) }
+                var tier: [String: JSONValue] = [:]
+                if case .object(let t)? = library["tier"] { tier = t }
+                tier["enabled"] = .bool(tierOn)
+                tier["keepDays"] = .number(Double(max(1, keepDays)))
+                library["tier"] = .object(tier)
+                settings["printLibrary"] = .object(library)
+                root["settings"] = .object(settings)
+            }
+            await load(source)
+            cloudLibraryNote = words.callIt("mac.cloudlib_saved")
+        } catch {
+            cloudLibraryProblem = cloudSay(error)
+        }
+    }
+
+    /// Forget the account here. Only Google can withdraw the access itself,
+    /// and the note says so rather than overstating what this did.
+    func disconnectGoogleDrive() async {
+        cloudLibraryProblem = nil
+        do {
+            try await writeDrive(refreshToken: "", enabled: false)
+            cloudLibraryNote = words.callIt("mac.gdrive_disconnected")
+        } catch {
+            cloudLibraryProblem = cloudSay(error)
+        }
+    }
+
+    /// Who is connected and how full their Drive is — asked of Google, not
+    /// read off the settings: a revoked grant looks like a working one there.
+    func googleDriveStatus() async -> (email: String, used: String, limit: String?)? {
+        guard let engine, let config = await cloudConfig(), case .drive(let drive) = config.remote else { return nil }
+        do {
+            let about = try await drive.about()
+            let used = (try? await engine.formatBytes(about.usage)) ?? ""
+            var limit: String?
+            if let l = about.limit { limit = try? await engine.formatBytes(l) }
+            return (about.email, used, limit)
+        } catch {
+            cloudLibraryProblem = cloudSay(error)
+            return nil
+        }
+    }
+
     /// Save the bucket, as the other app's settings page writes it: the whole
     /// `printLibrary.s3` and `.tier` objects, the secret sealed, a blank secret
     /// keeping the one that is stored.
@@ -418,6 +579,23 @@ extension Shop {
     /// An error from the bucket, in the shop's language when it is one of
     /// ours; the system's own description otherwise.
     func cloudSay(_ error: Error) -> String {
+        if let g = error as? GoogleSignIn.Failure {
+            switch g {
+            case .google(let said): return words.callIt("mac.gdrive_page_google_said") + " " + said
+            case .wrongState: return words.callIt("mac.gdrive_page_wrong_state")
+            case .noCode: return words.callIt("mac.gdrive_page_no_code")
+            case .noRefreshToken: return words.callIt("mac.gdrive_no_refresh")
+            case .timedOut: return words.callIt("mac.gdrive_timed_out")
+            case .listener(let why): return words.callIt("mac.gdrive_no_listener") + " " + why
+            }
+        }
+        if let d = error as? DriveClient.Failure {
+            switch d {
+            case .google(let said): return words.callIt("mac.gdrive_page_google_said") + " " + said
+            case .http(let what, let code): return words.callIt("mac.gdrive_http", ["what": .string(what), "code": .number(Double(code))])
+            case .noAccessToken, .noUploadURL, .noFolder: return words.callIt("mac.gdrive_refused")
+            }
+        }
         guard let f = error as? CloudLibrary.Failure else {
             return (error as? LocalizedError)?.errorDescription ?? String(describing: error)
         }

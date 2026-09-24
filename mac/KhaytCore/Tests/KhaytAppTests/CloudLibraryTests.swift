@@ -75,10 +75,10 @@ struct CloudLibraryTests {
         CloudLibrary.fetch = bucket.fetch
         let engine = try KhaytEngine()
         let url = try model()
-        let proved = try await CloudLibrary.ensureInBucket(config, key: "print-files/PF-1/Benchy.3mf", file: url, engine: engine)
+        let proved = try await CloudLibrary.ensureInBucket(.bucket(config), key: "print-files/PF-1/Benchy.3mf", file: url, engine: engine)
         #expect(proved.size == 4096)
         #expect(bucket.object("/lib/print-files/PF-1/Benchy.3mf") == (try Data(contentsOf: url)))
-        try await CloudLibrary.ensureInBucket(config, key: "print-files/PF-1/Benchy.3mf", file: url, engine: engine)
+        try await CloudLibrary.ensureInBucket(.bucket(config), key: "print-files/PF-1/Benchy.3mf", file: url, engine: engine)
         #expect(bucket.puts == 1, "already there with the right size and hash: skipped")
     }
 
@@ -91,7 +91,7 @@ struct CloudLibraryTests {
         let engine = try KhaytEngine()
         let url = try model()
         await #expect(throws: (any Error).self) {
-            try await CloudLibrary.ensureInBucket(config, key: "print-files/PF-1/Benchy.3mf", file: url, engine: engine)
+            try await CloudLibrary.ensureInBucket(.bucket(config), key: "print-files/PF-1/Benchy.3mf", file: url, engine: engine)
         }
         #expect(FileManager.default.fileExists(atPath: url.path), "nothing here touches the local file")
     }
@@ -104,13 +104,13 @@ struct CloudLibraryTests {
         let url = try model()
         let original = try Data(contentsOf: url)
         let key = "print-files/PF-1/Benchy.3mf"
-        let proved = try await CloudLibrary.ensureInBucket(config, key: key, file: url, engine: engine)
+        let proved = try await CloudLibrary.ensureInBucket(.bucket(config), key: key, file: url, engine: engine)
         let text = try await engine.sidecarText(size: proved.size, sha256: proved.sha256, key: key,
                                                 provider: config.endpoint, at: "2026-09-24T00:00:00.000Z")
         try Data(text.utf8).write(to: CloudLibrary.sidecar(for: url))
         try FileManager.default.removeItem(at: url)
 
-        let c = CloudLibrary.Config(s3: config, backsUp: true, provider: "r2", tier: .object([:]), tierEnabled: true)
+        let c = CloudLibrary.Config(remote: .bucket(config), prefix: "", backsUp: true, provider: "r2", tier: .object([:]), tierEnabled: true)
         // Corrupt in the bucket: refused, nothing written, the note kept.
         bucket.lie = .noEtagWrongBody
         await #expect(throws: (any Error).self) { try await CloudLibrary.bringBack(url, config: c, engine: engine) }
