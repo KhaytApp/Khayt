@@ -44,7 +44,6 @@
 /* Orders */
 "orders.active" = "Active";
 "orders.recent" = "Recent";
-"orders.history.windowed" = "Showing the newest %1$d of %2$d. Older history stays on the Mac.";
 "orders.filter.all" = "All";
 "orders.advance" = "Advance";
 "orders.overdue" = "Overdue";
@@ -491,3 +490,11 @@
 "pulse.this_year" = "This year";
 "pulse.on_the_mac" = "On the Mac";
 "pulse.move_to" = "Move to";
+
+/* Orders, as design/ios-v2 draws them */
+"orders.history" = "History";
+"orders.window.count" = "%1$@ / %2$@ orders";
+"orders.window.body" = "Every unfinished one, and the newest %@ finished. Older history stays on the Mac.";
+"order.field.filament" = "Filament";
+"order.field.quantity" = "Quantity";
+"order.detail.mark_done" = "Mark done";

@@ -44,7 +44,6 @@
 /* Orders */
 "orders.active" = "نشط";
 "orders.recent" = "الأخيرة";
-"orders.history.windowed" = "يعرض أحدث %1$d من %2$d. باقي السجل يبقى على الماك.";
 "orders.filter.all" = "الكل";
 "orders.advance" = "تقديم";
 "orders.overdue" = "متأخر";
@@ -491,3 +490,11 @@
 "pulse.this_year" = "هذه السنة";
 "pulse.on_the_mac" = "على الماك";
 "pulse.move_to" = "انقل إلى";
+
+/* Orders, as design/ios-v2 draws them */
+"orders.history" = "السجل";
+"orders.window.count" = "%1$@ / %2$@ طلب";
+"orders.window.body" = "كل غير المنتهية، وأحدث %@ منتهية. باقي السجل يبقى على الماك.";
+"order.field.filament" = "الخيط";
+"order.field.quantity" = "الكمية";
+"order.detail.mark_done" = "إنهاء";

@@ -169,6 +169,12 @@ final class KhaytAPIClient: ObservableObject {
 
     /// Shop Pulse, from this phone's book. Nil with no book: the figures are
     /// the book's, and a phone that holds none has only the live counts.
+    /// Filament and quantity per order, when this phone holds its book; empty
+    /// otherwise. See `BookReader.orderFacts()`.
+    func fetchOrderFacts() async -> [String: OrderFacts] {
+        await fromBook { try await $0.orderFacts() } ?? [:]
+    }
+
     func fetchPulse() async -> ShopPulse? {
         await fromBook { try await $0.pulse() }
     }

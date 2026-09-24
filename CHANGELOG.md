@@ -48,6 +48,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   own rules (`orderOwedBase`, the P&L's month rows), and a figure the phone's
   copy of the book cannot answer — a month or a year older than the oldest
   finished order it holds — shows an em-dash and "On the Mac", never a zero.
+- **(iOS) Orders and the order page follow the v2 design.** Active and
+  History, stage chips, and cards swiped forward to move a job on. Opening a
+  job pushes a PAGE (it was a half-height sheet): its stage, the facts a shop
+  floor needs — due, filament, quantity, printer, client — the five stages to
+  set directly, and one button that moves it on. History ends with a line
+  saying how much of it the phone holds and that the rest is on the Mac.
+  Filament and quantity are read from the phone's book rather than added to
+  `/api/queue`, which the desktop, the native Mac and the phone all share.
 
 - **(iOS) The companion moves to its real design (v2).** It had been built
   against an older mockup; the current design is Turki's Claude Design

@@ -21,6 +21,8 @@ struct DashboardView: View {
     @State private var status: ShopStatus?
     @State private var pulse: ShopPulse?
     @State private var queue: [QueueOrder] = []
+    @State private var facts: [String: OrderFacts] = [:]
+    @State private var openOrder: QueueOrder?
     @State private var lowSpools: [InventorySpool] = []
     @State private var waiting: [WaitingListItem] = []
     @State private var lane: String = "all"
@@ -65,6 +67,9 @@ struct DashboardView: View {
             .sheet(isPresented: $showWaste) { LogWasteSheet() }
             .sheet(isPresented: $showExpense) { ExpenseSheet() }
             .sheet(isPresented: $showIntake) { IntakeView() }
+            .navigationDestination(item: $openOrder) { order in
+                OrderDetailPage(order: order, facts: facts[order.id]) { await load() }
+            }
         }
     }
 
@@ -317,10 +322,10 @@ struct DashboardView: View {
         } else {
             VStack(spacing: 8) {
                 ForEach(laneJobs.prefix(5)) { order in
-                    PulseJobCard(order: order, isUpdating: updatingId == order.id) {
+                    JobCard(order: order, facts: facts[order.id], isUpdating: updatingId == order.id) {
                         Task { await advance(order) }
                     } onOpen: {
-                        ordersNav.openOrders(filter: OrderStatus(rawValue: order.status))
+                        openOrder = order
                     }
                 }
             }
@@ -354,11 +359,13 @@ struct DashboardView: View {
         async let inventoryTask = try? api.fetchInventory()
         async let waitingTask = try? api.fetchWaitingList()
         async let pulseTask = api.fetchPulse()
+        async let factsTask = api.fetchOrderFacts()
         status = await statusTask
         queue = await queueTask ?? []
         lowSpools = (await inventoryTask ?? []).filter(\.isLowStock)
         waiting = await waitingTask ?? []
         pulse = await pulseTask
+        facts = await factsTask
     }
 
     private func advance(_ order: QueueOrder) async {
@@ -372,105 +379,5 @@ struct DashboardView: View {
         } catch {
             CompanionHaptics.warning()
         }
-    }
-}
-
-/// A job on Shop Pulse. The whole card is a tap target; dragging it FORWARD —
-/// towards the end of the line, so right in English and left in Arabic — past
-/// the threshold moves it on, and says where to as it goes. The gesture is an
-/// accelerator: the detail still has the explicit button.
-private struct PulseJobCard: View {
-    let order: QueueOrder
-    let isUpdating: Bool
-    let onAdvance: () -> Void
-    let onOpen: () -> Void
-
-    @Environment(\.layoutDirection) private var direction
-    @State private var drag: CGFloat = 0
-    private static let threshold: CGFloat = 92
-
-    private var next: OrderStatus? { OrderStatus(rawValue: order.status)?.nextInQueue }
-    private var forward: CGFloat { direction == .rightToLeft ? -1 : 1 }
-    private var past: Bool { drag * forward > Self.threshold }
-
-    var body: some View {
-        ZStack(alignment: .leading) {
-            if let next, drag != 0 {
-                HStack {
-                    Text((past ? L10n.tr("stage.short.\(next.rawValue)") : L10n.tr("pulse.move_to")).uppercased())
-                        .font(.khayt(11.5, .bold, relativeTo: .caption))
-                        .tracking(0.9)
-                        .foregroundStyle(past ? KhaytDesign.brand : KhaytDesign.note)
-                    Spacer()
-                }
-                .padding(.horizontal, 18)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(past ? KhaytDesign.brand.opacity(0.22) : KhaytDesign.sunk, in: RoundedRectangle(cornerRadius: 11))
-            }
-            card
-                .offset(x: drag)
-                .gesture(
-                    DragGesture(minimumDistance: 12)
-                        .onChanged { value in
-                            guard next != nil else { return }
-                            let d = value.translation.width
-                            drag = d * forward > 0 ? min(abs(d), 150) * forward : 0
-                        }
-                        .onEnded { _ in
-                            let go = past
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) { drag = 0 }
-                            if go { onAdvance() }
-                        }
-                )
-                .onTapGesture(perform: onOpen)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityAction(named: next.map { String(format: L10n.tr("order.detail.move_to"), $0.localizedLabel) } ?? "") {
-            onAdvance()
-        }
-    }
-
-    private var card: some View {
-        let tone = KhaytDesign.statusColor(for: order.status)
-        let railed = KhaytDesign.isRailed(order.status) || order.isOverdue
-        return VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 9) {
-                Text(order.displayTitle)
-                    .font(.khayt(15, .medium, relativeTo: .body))
-                    .foregroundStyle(KhaytDesign.ink)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                Text("#\(order.id)")
-                    .font(.khayt(12, .medium, relativeTo: .caption).monospacedDigit())
-                    .foregroundStyle(KhaytDesign.note)
-                    .lineLimit(1)
-                    .environment(\.layoutDirection, .leftToRight)
-            }
-            HStack(spacing: 9) {
-                Text([order.displayClient, order.machine].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.khayt(12.5, relativeTo: .footnote))
-                    .foregroundStyle(KhaytDesign.note)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                if isUpdating {
-                    ProgressView().controlSize(.mini)
-                } else {
-                    Text(L10n.tr("stage.short.\(order.status)"))
-                        .font(.khayt(11, .semibold, relativeTo: .caption2))
-                        .padding(.horizontal, 8).padding(.vertical, 2)
-                        .foregroundStyle(tone)
-                        .background(tone.opacity(0.14), in: Capsule())
-                }
-            }
-        }
-        .padding(.vertical, 11).padding(.leading, 16).padding(.trailing, 13)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 11))
-        .overlay(alignment: .leading) {
-            if railed { Rectangle().fill(order.isOverdue ? KhaytDesign.late : tone).frame(width: 3) }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 11))
-        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
-        .contentShape(RoundedRectangle(cornerRadius: 11))
     }
 }

@@ -176,6 +176,51 @@ actor BookReader {
                          currency: currency)
     }
 
+    /// What the design's order page and rows show that the queue does not
+    /// carry: the filament and the quantity, keyed by order id.
+    ///
+    /// From the book, not the wire. `/api/queue` is a contract three products
+    /// share (`lib/lan-server.js`, `LanServer.swift`, this app), and widening it
+    /// for one screen is a change to all three; the book already holds the
+    /// record. A phone with no book simply has no facts, and the screens leave
+    /// those lines out rather than inventing them.
+    ///
+    /// `material` is `lib/order-new.js`'s joined string, which can carry a
+    /// dangling ", " for a part with no filament chosen — tidied for display
+    /// only. Quantity is the sum of the parts' `qty`, as the cart priced it; a
+    /// record from before carts has a top-level `qty` instead.
+    func orderFacts() throws -> [String: OrderFacts] {
+        let store = try book.read()
+        guard case .array(let rows)? = store["printLog"] else { return [:] }
+        var out: [String: OrderFacts] = [:]
+        for row in rows {
+            guard case .object(let o) = row, case .string(let id)? = o["id"] else { continue }
+            var material: String?
+            if case .string(let m)? = o["material"] {
+                let parts = m.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                if !parts.isEmpty { material = parts.joined(separator: " · ") }
+            }
+            func number(_ v: JSONValue?) -> Int? {
+                switch v {
+                case .number(let n)? where n > 0: return Int(n.rounded())
+                case .string(let t)?: return Int(t).flatMap { $0 > 0 ? $0 : nil }
+                default: return nil
+                }
+            }
+            var quantity: Int?
+            if case .array(let parts)? = o["parts"], !parts.isEmpty {
+                quantity = parts.reduce(0) { sum, part in
+                    guard case .object(let p) = part else { return sum }
+                    return sum + (number(p["qty"]) ?? 1)
+                }
+            } else {
+                quantity = number(o["qty"])
+            }
+            out[id] = OrderFacts(material: material, quantity: quantity)
+        }
+        return out
+    }
+
     /// Is there a book on this phone at all?
     ///
     /// `nonisolated` so a read path can ask without hopping onto the actor just
@@ -357,6 +402,12 @@ actor BookReader {
 
 /// What Shop Pulse shows. A money figure the book cannot answer is nil — the
 /// screen's em-dash, "On the Mac" — and never a zero.
+/// See `BookReader.orderFacts()`.
+struct OrderFacts: Equatable, Sendable {
+    var material: String?
+    var quantity: Int?
+}
+
 struct ShopPulse: Equatable, Sendable {
     var inQueue: Int
     var printing: Int

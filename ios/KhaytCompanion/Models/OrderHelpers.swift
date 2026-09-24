@@ -72,3 +72,21 @@ extension OrderStatus {
         }
     }
 }
+
+/// A job is the same job while its id is — so a page pushed for it survives
+/// the queue being reloaded underneath it.
+extension QueueOrder: Hashable {
+    static func == (a: QueueOrder, b: QueueOrder) -> Bool {
+        a.id == b.id && a.status == b.status && a.machineId == b.machineId && a.dueDate == b.dueDate
+    }
+    func hash(into h: inout Hasher) { h.combine(id) }
+}
+
+extension QueueOrder {
+    /// A finished job from history, as the order page reads one. The queue
+    /// shape is what the page draws; history simply has no printer to show.
+    init(entry: OrderLogEntry) {
+        self.init(id: entry.id, project: entry.project, client: entry.client, status: entry.status,
+                  machine: nil, machineId: nil, dueDate: entry.dueDate, priority: nil)
+    }
+}
