@@ -41,6 +41,44 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   background — only where it has nothing recorded, and without touching Undo.
   Products already made keep their figures: open one and fill its part from
   the file again to take the slicer's.
+- **(iOS) Home is Shop Pulse, as the v2 design draws it.** Today's counts (in
+  queue, printing, done today), the money (owed, this month, this year), the
+  pipeline lanes, alerts for late jobs, low stock and people waiting, and the
+  next five jobs — each swiped forward to move it on. The money is the shop's
+  own rules (`orderOwedBase`, the P&L's month rows), and a figure the phone's
+  copy of the book cannot answer — a month or a year older than the oldest
+  finished order it holds — shows an em-dash and "On the Mac", never a zero.
+- **(iOS) Orders and the order page follow the v2 design.** Active and
+  History, stage chips, and cards swiped forward to move a job on. Opening a
+  job pushes a PAGE (it was a half-height sheet): its stage, the facts a shop
+  floor needs — due, filament, quantity, printer, client — the five stages to
+  set directly, and one button that moves it on. History ends with a line
+  saying how much of it the phone holds and that the rest is on the Mac.
+  Filament and quantity are read from the phone's book rather than added to
+  `/api/queue`, which the desktop, the native Mac and the phone all share.
+- **(iOS) Pairing is the design's three steps.** Which shop (the Macs on
+  this Wi-Fi, each saying whether the phone can work offline with it, and a
+  quiet link to type an address instead), the owner PIN (a refused PIN is
+  said as one), and "Copying the shop's book", which itemises what landed —
+  settings, open orders, the newest finished, clients, inventory, machines —
+  and that the rest stayed on the Mac. A desktop that does not serve its book
+  skips the last step and is paired all the same.
+- **(iOS) Inventory and the spool page follow the v2 design.** The spools
+  lowest first, with an amber rail on the ones running low and a closing line
+  that says the phone holds every spool the shop has. A spool opens as a page
+  (it was a sheet): its colour, what is left with −50 g / +50 g beneath it
+  (taps in a row are one write, not several), the label's facts, and writing
+  it to an NFC tag. The figure itself can be tapped to set it exactly.
+- **(iOS) Add spool follows the v2 design.** One card per way in — scan the
+  label (first, in blue), tap an NFC tag, the box barcode, or type it in — and
+  a form that asks for brand, material, colour and weight first, with the Add
+  button held at the bottom of the screen instead of the end of the form.
+- **(iOS) Machines and Clients follow the v2 design.** A machine is a card —
+  printing in orange with its progress and temperatures, a fault in red, idle
+  with no colour — and when the Mac is out of reach the list says these are
+  the book's last readings. A client shows how many of their jobs are open
+  and, only when the phone holds the whole order history, how many they have
+  ever placed; otherwise that figure is "On the Mac", not a short count.
 
 - **(iOS) The companion moves to its real design (v2).** It had been built
   against an older mockup; the current design is Turki's Claude Design
@@ -51,6 +89,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   strip it specifies — losing the Mac while the phone holds the book is now a
   quiet "Working from the book · as of 14:32" with Refresh, and red is kept for
   a phone that holds nothing and cannot reach the Mac.
+- **(iOS) A spool typed in by hand has a colour.** The add-spool form had no
+  colour at all, so every roll entered by hand went on the shelf grey. It has
+  the design's ten swatches and a picker for any other, and a row of common
+  materials to fill the field in one tap. The four ways to add a spool are
+  the design's cards.
 
 - **(Mac) A restored backup no longer chooses this Mac's slicer, or blanks
   its alert topic.** Restoring a backup keeps this Mac's own slicer settings —

@@ -105,6 +105,147 @@ actor BookReader {
         try book.replaceBaseline(with: upstream)
     }
 
+    /// Home's figures, as `design/ios-v2/` Shop Pulse draws them.
+    ///
+    /// ── THE ONE RULE ────────────────────────────────────────────────────
+    ///
+    /// The design's: a figure bounded by recency is answerable only when the
+    /// book's window reaches PAST the period's start. The phone holds every
+    /// unfinished order and the newest finished ones, so "owed" (open orders)
+    /// is always answerable, and "this month" only if the oldest finished
+    /// order it holds is older than the 1st. The phone knows its oldest record,
+    /// so this is computed, never assumed — and an unanswerable figure is nil,
+    /// which the screen draws as an em-dash captioned "On the Mac". Never a
+    /// zero: a zero is an answer.
+    ///
+    /// The money is the shop's own rules: `owedByOrder` (credit notes, gift
+    /// cards and foreign currency taken into account) and `pnlByPeriod`, the
+    /// P&L's month rows — not arithmetic done here.
+    func pulse(now: Date = Date(), calendar: Calendar = .current) async throws -> ShopPulse {
+        let store = try book.read()
+        let status = try await status(today: Self.today())
+        let orders: [JSONValue] = { if case .array(let r)? = store["printLog"] { return r }; return [] }()
+        let clients: [JSONValue] = { if case .array(let r)? = store["clients"] { return r }; return [] }()
+        var settings: [String: JSONValue] = [:]
+        if case .object(let st)? = store["settings"] { settings = st }
+        let engine = try engine()
+        let currencies: [String: JSONValue] = ((try? await engine.currencies()) ?? [:]).mapValues {
+            .object(["symbol": .string($0.symbol), "label": .string($0.label), "pos": .string($0.pos)])
+        }
+
+        func stage(of row: JSONValue) -> String {
+            if case .object(let o) = row, case .string(let st)? = o["status"] { return st }
+            return ""
+        }
+        let finished: Set<String> = ["completed", "delivered", "shipped", "cancelled"]
+        let open = orders.filter { !finished.contains(stage(of: $0)) && stage(of: $0) != "quote" }
+        let owedBy = try await engine.owedByOrder(open, settings: settings, clients: clients, currencies: currencies)
+        let owing = owedBy.values.filter { $0 > 0.005 }
+
+        // How far back the book's finished orders reach.
+        let dayFormat = DateFormatter()
+        dayFormat.calendar = Calendar(identifier: .gregorian)
+        dayFormat.locale = Locale(identifier: "en_US_POSIX")
+        dayFormat.dateFormat = "yyyy-MM-dd"
+        let oldestFinished = orders.compactMap { row -> Date? in
+            guard finished.contains(stage(of: row)), case .object(let o) = row,
+                  case .string(let d)? = o["date"] else { return nil }
+            return dayFormat.date(from: String(d.prefix(10)))
+        }.min()
+        let whole = book.holdsAll("printLog")
+        func reaches(_ start: Date) -> Bool { whole || (oldestFinished.map { $0 <= start } ?? false) }
+
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? now
+        let yearStart = calendar.date(from: calendar.dateComponents([.year], from: now)) ?? now
+        let rows = try await engine.pnlByPeriod(orders: orders, expenses: [], settings: settings,
+                                                clients: clients, currencies: currencies, now: now,
+                                                granularity: "month")
+        let monthKey = String(format: "%04d-%02d", calendar.component(.year, from: now), calendar.component(.month, from: now))
+        let yearPrefix = String(format: "%04d-", calendar.component(.year, from: now))
+        let month = rows.first { $0.period == monthKey }?.revenue ?? 0
+        let year = rows.filter { $0.period.hasPrefix(yearPrefix) }.reduce(0) { $0 + $1.revenue }
+
+        var currency: String?
+        if case .string(let code)? = settings["currency"], !code.isEmpty { currency = code }
+
+        return ShopPulse(inQueue: status.pending, printing: status.printing, post: status.post, qc: status.qc,
+                         doneToday: status.completedToday,
+                         owed: owing.reduce(0, +), unpaid: owing.count,
+                         thisMonth: reaches(monthStart) ? month : nil,
+                         thisYear: reaches(yearStart) ? year : nil,
+                         currency: currency)
+    }
+
+    /// What the design's order page and rows show that the queue does not
+    /// carry: the filament and the quantity, keyed by order id.
+    ///
+    /// From the book, not the wire. `/api/queue` is a contract three products
+    /// share (`lib/lan-server.js`, `LanServer.swift`, this app), and widening it
+    /// for one screen is a change to all three; the book already holds the
+    /// record. A phone with no book simply has no facts, and the screens leave
+    /// those lines out rather than inventing them.
+    ///
+    /// `material` is `lib/order-new.js`'s joined string, which can carry a
+    /// dangling ", " for a part with no filament chosen — tidied for display
+    /// only. Quantity is the sum of the parts' `qty`, as the cart priced it; a
+    /// record from before carts has a top-level `qty` instead.
+    func orderFacts() throws -> [String: OrderFacts] {
+        let store = try book.read()
+        guard case .array(let rows)? = store["printLog"] else { return [:] }
+        var out: [String: OrderFacts] = [:]
+        for row in rows {
+            guard case .object(let o) = row, case .string(let id)? = o["id"] else { continue }
+            var material: String?
+            if case .string(let m)? = o["material"] {
+                let parts = m.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                if !parts.isEmpty { material = parts.joined(separator: " · ") }
+            }
+            func number(_ v: JSONValue?) -> Int? {
+                switch v {
+                case .number(let n)? where n > 0: return Int(n.rounded())
+                case .string(let t)?: return Int(t).flatMap { $0 > 0 ? $0 : nil }
+                default: return nil
+                }
+            }
+            var quantity: Int?
+            if case .array(let parts)? = o["parts"], !parts.isEmpty {
+                quantity = parts.reduce(0) { sum, part in
+                    guard case .object(let p) = part else { return sum }
+                    return sum + (number(p["qty"]) ?? 1)
+                }
+            } else {
+                quantity = number(o["qty"])
+            }
+            out[id] = OrderFacts(material: material, quantity: quantity)
+        }
+        return out
+    }
+
+    /// What landed, for pairing's last step — the design's "copying the
+    /// shop's book" list. Counted from the book as it now sits on the phone,
+    /// so it says what the phone HAS, not what the Mac said it sent.
+    func pairingSummary() throws -> PairingSummary {
+        let store = try book.read()
+        func rows(_ key: String) -> [JSONValue] {
+            if case .array(let r)? = store[key] { return r }
+            return []
+        }
+        let finished: Set<String> = ["completed", "delivered", "shipped", "cancelled"]
+        let orders = rows("printLog")
+        let done = orders.filter { row in
+            if case .object(let o) = row, case .string(let st)? = o["status"] { return finished.contains(st) }
+            return false
+        }.count
+        return PairingSummary(settings: store["settings"] != nil,
+                              openOrders: orders.count - done,
+                              newestFinished: done,
+                              finishedWindowed: !book.holdsAll("printLog"),
+                              clients: rows("clients").count,
+                              inventory: rows("inventory").count,
+                              machines: rows("machines").count,
+                              omittedAnything: !(book.scope()?.omitted.isEmpty ?? true))
+    }
+
     /// Is there a book on this phone at all?
     ///
     /// `nonisolated` so a read path can ask without hopping onto the actor just
@@ -282,4 +423,39 @@ actor BookReader {
         let data = try JSONEncoder().encode(JSONValue.array(rows))
         return try JSONDecoder().decode([T].self, from: data)
     }
+}
+
+/// What Shop Pulse shows. A money figure the book cannot answer is nil — the
+/// screen's em-dash, "On the Mac" — and never a zero.
+/// See `BookReader.pairingSummary()`.
+struct PairingSummary: Equatable, Sendable {
+    var settings: Bool
+    var openOrders: Int
+    var newestFinished: Int
+    /// Whether the finished orders are the newest few rather than all of them —
+    /// the design marks that row in amber.
+    var finishedWindowed: Bool
+    var clients: Int
+    var inventory: Int
+    var machines: Int
+    var omittedAnything: Bool
+}
+
+/// See `BookReader.orderFacts()`.
+struct OrderFacts: Equatable, Sendable {
+    var material: String?
+    var quantity: Int?
+}
+
+struct ShopPulse: Equatable, Sendable {
+    var inQueue: Int
+    var printing: Int
+    var post: Int
+    var qc: Int
+    var doneToday: Int
+    var owed: Double
+    var unpaid: Int
+    var thisMonth: Double?
+    var thisYear: Double?
+    var currency: String?
 }

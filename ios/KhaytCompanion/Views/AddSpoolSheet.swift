@@ -108,26 +108,17 @@ struct AddSpoolSheet: View {
         }
     }
 
+    /// `design/ios-v2/` add spool: one card per way in, the first — the one
+    /// most shops reach for — in brand blue, the rest quiet. Barcode lookup is
+    /// ours, not the design's; it earns its place because a roll's box barcode
+    /// is often the only thing on it the phone can read.
     private var chooseMethodView: some View {
-        List {
-            Section {
-                Text(L10n.tr("spool.add.how"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Section {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
                 methodRow(
-                    title: L10n.tr("spool.method.barcode"),
-                    subtitle: L10n.tr("spool.method.barcode.sub"),
-                    icon: "barcode"
-                ) {
-                    step = .barcode
-                    showBarcodeScanner = true
-                }
-                methodRow(
-                    title: L10n.tr("scan.title"),
+                    title: L10n.tr("spool.method.label"),
                     subtitle: L10n.tr("spool.method.label.sub"),
-                    icon: "barcode.viewfinder"
+                    icon: "camera", primary: true
                 ) {
                     step = .scanLabel
                 }
@@ -139,36 +130,55 @@ struct AddSpoolSheet: View {
                     step = .nfc
                 }
                 methodRow(
+                    title: L10n.tr("spool.method.barcode"),
+                    subtitle: L10n.tr("spool.method.barcode.sub"),
+                    icon: "barcode"
+                ) {
+                    step = .barcode
+                    showBarcodeScanner = true
+                }
+                methodRow(
                     title: L10n.tr("spool.method.manual"),
                     subtitle: L10n.tr("spool.method.manual.sub"),
-                    icon: "keyboard"
+                    icon: "pencil"
                 ) {
                     draft = SpoolDraft()
                     draft.sourceNote = L10n.tr("spool.source.manual")
                     step = .review
                 }
             }
+            .padding(16)
         }
+        .background(KhaytDesign.ground.ignoresSafeArea())
     }
 
-    private func methodRow(title: String, subtitle: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func methodRow(title: String, subtitle: String, icon: String, primary: Bool = false,
+                           action: @escaping () -> Void) -> some View {
+        let tint = primary ? KhaytDesign.brand : KhaytDesign.note
+        return Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 36)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.headline).foregroundStyle(.primary)
-                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(tint)
+                    .frame(width: 46, height: 46)
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.khayt(16.5, .semibold, relativeTo: .headline))
+                        .foregroundStyle(KhaytDesign.ink)
+                    Text(subtitle)
+                        .font(.khayt(13, relativeTo: .footnote))
+                        .foregroundStyle(KhaytDesign.note)
+                        .multilineTextAlignment(.leading)
                 }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption.bold())
-                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 0)
             }
-            .padding(.vertical, 4)
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 84, alignment: .leading)
+            .card()
+            .contentShape(RoundedRectangle(cornerRadius: 14))
         }
+        .buttonStyle(.plain)
     }
 
     private var barcodeView: some View {
@@ -321,6 +331,13 @@ struct AddSpoolSheet: View {
 // MARK: - Review form
 
 struct SpoolReviewForm: View {
+    static let materials = ["PLA", "PLA+", "PLA Matte", "PETG", "ABS", "ASA", "TPU", "Nylon", "PA-CF"]
+    /// `khayt-inventory.jsx` PRESET_COLORS.
+    static let colours: [(key: String, hex: String)] = [
+        ("black", "#1A1A1A"), ("white", "#F5F5F0"), ("grey", "#8A8A8A"), ("red", "#D13131"), ("blue", "#2563EB"),
+        ("green", "#16A34A"), ("orange", "#EA580C"), ("yellow", "#CA8A04"), ("purple", "#7C3AED"), ("cyan", "#0891B2"),
+    ]
+
     @Binding var draft: SpoolDraft
     let isUploading: Bool
     var errorMessage: String?
@@ -345,13 +362,57 @@ struct SpoolReviewForm: View {
                 }
             }
 
+            // The design's four, in its order: brand, material, colour, weight.
             Section(header: Text(L10n.tr("spool.form.required"))) {
+                TextField(L10n.tr("field.brand"), text: $draft.brand)
                 TextField(L10n.tr("spool.form.material"), text: $draft.material)
+                // The common ones, one tap each; anything else is typed.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Self.materials, id: \.self) { m in
+                            Button(m) { draft.material = m }
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 10)
+                                .frame(height: 30)
+                                .background(draft.material == m ? KhaytDesign.brandDim : KhaytDesign.surface2,
+                                            in: Capsule())
+                                .foregroundStyle(draft.material == m ? KhaytDesign.brand : KhaytDesign.textDim)
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
                 TextField(L10n.tr("spool.form.weight"), text: Binding(
                     get: { String(draft.weightGrams) },
                     set: { draft.weightGrams = Int($0) ?? draft.weightGrams }
                 ))
                 .keyboardType(.numberPad)
+            }
+
+            // A spool typed in by hand had no colour at all — every one of them
+            // went on the shelf grey. The mockup's presets, and any other.
+            Section(header: Text(L10n.tr("spool.form.colour"))) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
+                    ForEach(Self.colours, id: \.hex) { c in
+                        let picked = draft.colorHex.uppercased() == c.hex
+                        Button { draft.colorHex = c.hex } label: {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color(hex: c.hex) ?? .gray)
+                                .frame(height: 36)
+                                .overlay(RoundedRectangle(cornerRadius: 10)
+                                    .strokeBorder(picked ? KhaytDesign.brand : KhaytDesign.textFaint,
+                                                  lineWidth: picked ? 3 : 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.tr("colour.\(c.key)"))
+                        .accessibilityAddTraits(picked ? .isSelected : [])
+                    }
+                }
+                .padding(.vertical, 4)
+                ColorPicker(L10n.tr("spool.form.colour.other"), selection: Binding(
+                    get: { Color(hex: draft.colorHex) ?? .gray },
+                    set: { draft.colorHex = $0.hexString }
+                ), supportsOpacity: false)
             }
 
             Section(footer: Text(draft.quantity > 1
@@ -372,7 +433,6 @@ struct SpoolReviewForm: View {
                     footer: Text(L10n.tr("spool.form.cost.footer"))) {
                 TextField(L10n.tr("spool.form.cost"), text: $draft.cost)
                     .keyboardType(.decimalPad)
-                TextField(L10n.tr("field.brand"), text: $draft.brand)
                 TextField(L10n.tr("spool.form.sku"), text: $draft.sku)
                 TextField(L10n.tr("spool.form.barcode"), text: $draft.barcode)
                     .keyboardType(.numberPad)
@@ -383,26 +443,45 @@ struct SpoolReviewForm: View {
                     .keyboardType(.numberPad)
             }
 
-            Section {
-                Button(action: onSubmit) {
-                    if isUploading {
-                        ProgressView().frame(maxWidth: .infinity)
-                    } else {
-                        Text(draft.quantity > 1 ? L10n.count("spool.add.n", draft.quantity) : L10n.tr("spool.add.one"))
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .disabled(isUploading || draft.material.trimmingCharacters(in: .whitespaces).isEmpty)
-
-                if let onWriteNFC {
+            if let onWriteNFC {
+                Section {
                     Button(action: onWriteNFC) {
                         Label(L10n.tr("nfc.write.title"), systemImage: "wave.3.right")
                             .frame(maxWidth: .infinity)
                     }
-                    .disabled(draft.material.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(missingMaterial)
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(KhaytDesign.ground.ignoresSafeArea())
+        .scrollDismissesKeyboard(.interactively)
+        // The design's one big button, always in reach under the thumb rather
+        // than at the bottom of a form that scrolls.
+        .safeAreaInset(edge: .bottom) {
+            Button(action: onSubmit) {
+                Group {
+                    if isUploading {
+                        ProgressView().tint(KhaytDesign.onBrand)
+                    } else {
+                        Text(draft.quantity > 1 ? L10n.count("spool.add.n", draft.quantity) : L10n.tr("spool.add.one"))
+                    }
+                }
+                .font(.khayt(17, .semibold, relativeTo: .headline))
+                .foregroundStyle(KhaytDesign.onBrand)
+                .frame(maxWidth: .infinity, minHeight: 58)
+                .background(KhaytDesign.brand.opacity(missingMaterial ? 0.45 : 1), in: RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .disabled(isUploading || missingMaterial)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(KhaytDesign.ground)
+        }
+    }
+
+    private var missingMaterial: Bool {
+        draft.material.trimmingCharacters(in: .whitespaces).isEmpty
     }
 }
 
@@ -447,6 +526,14 @@ struct TagPreviewCard: View {
 }
 
 extension Color {
+    /// `#RRGGBB`, as a spool's `color` is stored.
+    var hexString: String {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a)
+        func byte(_ v: CGFloat) -> Int { Int((min(max(v, 0), 1) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", byte(r), byte(g), byte(b))
+    }
+
     init?(hex: String) {
         var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         if s.hasPrefix("#") { s.removeFirst() }

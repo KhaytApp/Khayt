@@ -63,6 +63,10 @@ final class KhaytAPIClient: ObservableObject {
     /// Does this phone hold a book at all?
     var holdsBook: Bool { reader?.holdsAnyBook ?? false }
 
+    /// Whether the book on this phone holds ALL of a collection, so a total
+    /// drawn from it is the shop's total and not the phone's.
+    func holdsAll(_ collection: String) -> Bool { reader?.holdsAll(collection) ?? false }
+
     /// How old the book is: the later of its last pull and the last sync.
     var bookAsOf: Date? {
         let pulled = book?.scope().flatMap { ISO8601DateFormatter.withFractions.date(from: $0.takenAt) }
@@ -165,6 +169,23 @@ final class KhaytAPIClient: ObservableObject {
     func shopCurrency() async -> String? {
         guard let reader, reader.holdsAnyBook else { return nil }
         return try? await reader.shopCurrency()
+    }
+
+    /// Shop Pulse, from this phone's book. Nil with no book: the figures are
+    /// the book's, and a phone that holds none has only the live counts.
+    /// Filament and quantity per order, when this phone holds its book; empty
+    /// otherwise. See `BookReader.orderFacts()`.
+    func fetchOrderFacts() async -> [String: OrderFacts] {
+        await fromBook { try await $0.orderFacts() } ?? [:]
+    }
+
+    /// What the book just copied holds, for pairing's last step.
+    func fetchPairingSummary() async -> PairingSummary? {
+        await fromBook { try await $0.pairingSummary() }
+    }
+
+    func fetchPulse() async -> ShopPulse? {
+        await fromBook { try await $0.pulse() }
     }
 
     func fetchInventory() async throws -> [InventorySpool] {

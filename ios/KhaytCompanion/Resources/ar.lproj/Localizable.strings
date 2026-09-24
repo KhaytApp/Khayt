@@ -44,7 +44,6 @@
 /* Orders */
 "orders.active" = "نشط";
 "orders.recent" = "الأخيرة";
-"orders.history.windowed" = "يعرض أحدث %1$d من %2$d. باقي السجل يبقى على الماك.";
 "orders.filter.all" = "الكل";
 "orders.advance" = "تقديم";
 "orders.overdue" = "متأخر";
@@ -232,7 +231,7 @@
 "pair.desktop.pin" = "تعيين رمز PIN للمالك (احفظه)";
 "pair.shop.title" = "اختر ورشتك";
 "pair.shop.body" = "يجب أن يكون الهاتف والكمبيوتر على **نفس شبكة الواي فاي**. يبحث Khayt عنها — لا حاجة لكتابة عنوان.";
-"pair.manual" = "إدخال العنوان يدوياً";
+"pair.manual" = "سأُدخل العنوان بنفسي";
 "pair.pin" = "رمز PIN للمالك";
 "pair.shops" = "الورش على هذه الشبكة";
 "pair.browse.failed" = "لا يستطيع Khayt البحث عن الورش على هذه الشبكة.";
@@ -242,7 +241,7 @@
 "pair.shop.offline" = "يعمل دون اتصال مع هذه الورشة";
 "pair.shop.online_only" = "يحتاج جهاز Mac في المتناول لكل شاشة";
 "pair.manual.name" = "اسم الورشة (اختياري)";
-"pair.manual.host" = "عنوان IP للكمبيوتر";
+"pair.manual.host" = "عنوان السطح";
 "pair.ip_help" = "كيف أجد عنوان IP؟";
 "pair.ip_help.terminal" = "على جهاز Mac الذي يعمل عليه Khayt، افتح **Terminal** وشغّل:";
 "pair.ip_help.result" = "استخدم الرقم الظاهر (مثلاً 192.168.1.42). إن كان فارغاً، جرّب **en1** أو راجع **إعدادات النظام ← Wi‑Fi ← التفاصيل**.";
@@ -305,7 +304,7 @@
 "spool.detail.purchased" = "تاريخ الشراء";
 "spool.detail.label_info" = "بيانات الملصق / الوسم";
 "spool.detail.lot" = "رقم الدفعة";
-"spool.detail.print_temp" = "حرارة الطباعة";
+"spool.detail.print_temp" = "حرارة الفوهة";
 "spool.detail.bed_temp" = "حرارة السرير";
 "spool.detail.adjust" = "تعديل المتبقي";
 "spool.detail.adjust.body" = "حدّد الخيط المتبقي في هذه البكرة بالغرام.";
@@ -364,7 +363,7 @@
 "scan.photo.none" = "لم يُعثر على نص. جرّب إضاءة أقوى واملأ الإطار بالملصق.";
 "scan.live.hint" = "حرّك الكاميرا ببطء على الملصق. يُحفظ النص الملتقط حتى بعد خروجه من الإطار.";
 "scan.use_text" = "استخدام النص الملتقط (%d)";
-"spool.add.title" = "إضافة خيط";
+"spool.add.title" = "إضافة بكرة";
 "spool.add.barcode_title" = "باركود المنتج";
 "spool.add.nfc_title" = "وسم NFC";
 "spool.add.confirm" = "تأكيد البكرة";
@@ -374,11 +373,11 @@
 "spool.add.n" = "إضافة %d بكرات";
 "spool.method.barcode" = "مسح باركود المنتج";
 "spool.method.barcode.sub" = "رمز UPC/EAN على العلبة، ونبحث عنه لك";
-"spool.method.label.sub" = "رمز QR أو نص على ملصق البكرة";
-"spool.method.nfc" = "المس وسم NFC";
-"spool.method.nfc.sub" = "OpenSpool أو OpenTag3D أو Prusa OpenPrintTag";
-"spool.method.manual" = "إدخال يدوي";
-"spool.method.manual.sub" = "اكتب التفاصيل بنفسك";
+"spool.method.label.sub" = "اقرأ الملصق المطبوع بالكاميرا";
+"spool.method.nfc" = "المس بطاقة NFC";
+"spool.method.nfc.sub" = "قرّب الهاتف من بطاقة البكرة";
+"spool.method.manual" = "أدخلها يدوياً";
+"spool.method.manual.sub" = "العلامة والمادة واللون والوزن";
 "spool.source.manual" = "يدوي";
 "spool.source.label" = "ملصق ممسوح";
 "spool.lookup.busy" = "جاري البحث…";
@@ -476,3 +475,87 @@
 "connection.as_of" = "يعمل من الدفتر · حتى %@";
 "connection.live_only" = "مباشر من الماك · لا يُحفظ شيء على هذا الهاتف";
 "connection.refresh" = "تحديث";
+
+/* Shop Pulse (design v2) */
+"pulse.title" = "نبض الورشة";
+"pulse.money" = "المال";
+"pulse.tap_to_filter" = "اضغط للتصفية";
+"pulse.jobs" = "%d طلبات";
+"pulse.swipe_hint" = "اسحب الطلب للأمام لتقديمه. اضغط لفتحه.";
+"pulse.printing" = "قيد الطباعة";
+"pulse.done_today" = "أُنجز اليوم";
+"pulse.owed" = "مستحق";
+"pulse.unpaid" = "%d غير مدفوع";
+"pulse.this_month" = "هذا الشهر";
+"pulse.this_year" = "هذه السنة";
+"pulse.on_the_mac" = "على الماك";
+"pulse.move_to" = "انقل إلى";
+
+/* Orders, as design/ios-v2 draws them */
+"orders.history" = "السجل";
+"orders.window.count" = "%1$@ / %2$@ طلب";
+"orders.window.body" = "كل غير المنتهية، وأحدث %@ منتهية. باقي السجل يبقى على الماك.";
+"order.field.filament" = "الخيط";
+"order.field.quantity" = "الكمية";
+"order.detail.mark_done" = "إنهاء";
+
+/* Pairing, as design/ios-v2 draws it */
+"pair.find.title" = "أي ورشة؟";
+"pair.find.body" = "أجهزة الماك التي تشغّل خيط تعلن عن نفسها على هذه الشبكة.";
+"pair.searching" = "جاري البحث";
+"pair.shop.needs_mac" = "يحتاج الماك قريباً";
+"pair.manual.why" = "لماك لا يعلن عن نفسه، أو شبكة تحجب ذلك.";
+"pair.manual.title" = "عنوان الماك";
+"pair.manual.body" = "يعرضهما خيط على السطح، في الإعدادات ← واجهة الشبكة.";
+"pair.manual.port" = "المنفذ";
+"pair.pin.title" = "رمز المالك";
+"pair.pin.body" = "أربعة أرقام من الإعدادات ← واجهة الشبكة. رمز الاستقبال لا يصلح هنا.";
+"pair.pin.foot" = "يُحفظ في سلسلة مفاتيح الآيفون، ولا يُرسل إلا لهذا الماك.";
+"pair.pin.wrong" = "رُفض هذا الرمز. راجع الإعدادات ← واجهة الشبكة على الماك.";
+"pair.connect" = "اتصال";
+"pair.finish" = "افتح اللوحة";
+"pair.pull.title" = "نسخ دفتر الورشة";
+"pair.pull.body" = "مجموعة عمل، لا الدفتر كاملاً — السجل يبقى على الماك.";
+"pair.pull.settings" = "الإعدادات";
+"pair.pull.open_orders" = "طلبات مفتوحة";
+"pair.pull.newest_finished" = "أحدث المنتهية";
+"pair.pull.foot" = "لم تُرسل المصروفات وملفات الطباعة والمنتجات وسجل التدقيق وبقية الدفتر. والهاتف يعلم أنها ليست لديه.";
+
+/* Inventory, as design/ios-v2 draws it */
+"spool.detail.g_remaining" = "غ متبقٍ";
+"spool.detail.low_warn" = "مخزون منخفض — يُستحسن طلب بديل";
+"inventory.search.v2" = "ابحث بالعلامة أو المادة أو اللون…";
+"inventory.whole.count" = "%@ بكرات";
+"inventory.whole.body" = "الهاتف يحتفظ بكل بكرات الورشة.";
+"common.clear" = "مسح";
+/* Add spool: colour */
+"spool.form.colour" = "اللون";
+"spool.form.colour.other" = "لون آخر";
+"colour.black" = "أسود";
+"colour.white" = "أبيض";
+"colour.grey" = "رمادي";
+"colour.red" = "أحمر";
+"colour.blue" = "أزرق";
+"colour.green" = "أخضر";
+"colour.orange" = "برتقالي";
+"colour.yellow" = "أصفر";
+"colour.purple" = "بنفسجي";
+"colour.cyan" = "سماوي";
+"spool.method.label" = "امسح الملصق";
+
+/* Machines, as design/ios-v2 draws them */
+"machines.idle" = "خامل";
+"machines.error" = "خطأ";
+"machines.ready" = "جاهز للمهمة التالية";
+"machines.nozzle" = "الفوهة";
+"machines.bed" = "المنصّة";
+"machines.stale" = "الحرارة الحيّة تحتاج الماك. هذه آخر قراءات يحملها الدفتر.";
+
+/* Clients, as design/ios-v2 draws them */
+"clients.open" = "%@ مفتوحة";
+"clients.orders" = "طلبات";
+"clients.window.count" = "%@ عملاء";
+"clients.window.body" = "كل العملاء يُنقلون. أما مجاميع طلباتهم فلا — تحتاج سجلاً لا يحمله الهاتف.";
+"clients.call" = "اتصال";
+"clients.whatsapp" = "واتساب";
+"clients.email" = "بريد";

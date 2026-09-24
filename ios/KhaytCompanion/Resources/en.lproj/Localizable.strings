@@ -44,7 +44,6 @@
 /* Orders */
 "orders.active" = "Active";
 "orders.recent" = "Recent";
-"orders.history.windowed" = "Showing the newest %1$d of %2$d. Older history stays on the Mac.";
 "orders.filter.all" = "All";
 "orders.advance" = "Advance";
 "orders.overdue" = "Overdue";
@@ -242,7 +241,7 @@
 "pair.shop.offline" = "Can work offline with this shop";
 "pair.shop.online_only" = "Needs the Mac in reach for every screen";
 "pair.manual.name" = "Shop name (optional label)";
-"pair.manual.host" = "Computer IP address";
+"pair.manual.host" = "Desktop IP";
 "pair.ip_help" = "How do I find the IP address?";
 "pair.ip_help.terminal" = "On the Mac running Khayt, open **Terminal** and run:";
 "pair.ip_help.result" = "Use the number shown (e.g. 192.168.1.42). If empty, try **en1** or check **System Settings → Wi‑Fi → Details**.";
@@ -305,7 +304,7 @@
 "spool.detail.purchased" = "Purchased";
 "spool.detail.label_info" = "Label / tag info";
 "spool.detail.lot" = "Batch / lot";
-"spool.detail.print_temp" = "Print temp";
+"spool.detail.print_temp" = "Nozzle temp";
 "spool.detail.bed_temp" = "Bed temp";
 "spool.detail.adjust" = "Adjust remaining";
 "spool.detail.adjust.body" = "Set the remaining filament for this spool, in grams.";
@@ -364,7 +363,7 @@
 "scan.photo.none" = "No text found. Try brighter light and fill the frame with the label.";
 "scan.live.hint" = "Slowly pan across the label. Captured text is kept even when it leaves the frame.";
 "scan.use_text" = "Use captured text (%d)";
-"spool.add.title" = "Add filament";
+"spool.add.title" = "Add spool";
 "spool.add.barcode_title" = "Product barcode";
 "spool.add.nfc_title" = "NFC tag";
 "spool.add.confirm" = "Confirm spool";
@@ -374,11 +373,11 @@
 "spool.add.n" = "Add %d spools";
 "spool.method.barcode" = "Scan product barcode";
 "spool.method.barcode.sub" = "The UPC/EAN on the box, looked up for you";
-"spool.method.label.sub" = "QR code or text on the spool label";
-"spool.method.nfc" = "Tap NFC tag";
-"spool.method.nfc.sub" = "OpenSpool, OpenTag3D, or Prusa OpenPrintTag";
-"spool.method.manual" = "Enter manually";
-"spool.method.manual.sub" = "Type details yourself";
+"spool.method.label.sub" = "Read the printed label with the camera";
+"spool.method.nfc" = "Tap an NFC tag";
+"spool.method.nfc.sub" = "Hold the phone against the spool tag";
+"spool.method.manual" = "Type it in";
+"spool.method.manual.sub" = "Brand, material, colour, weight";
 "spool.source.manual" = "Manual";
 "spool.source.label" = "Scanned label";
 "spool.lookup.busy" = "Looking it up…";
@@ -476,3 +475,87 @@
 "connection.as_of" = "Working from the book · as of %@";
 "connection.live_only" = "Live from the Mac · nothing is kept on this phone";
 "connection.refresh" = "Refresh";
+
+/* Shop Pulse (design v2) */
+"pulse.title" = "Shop Pulse";
+"pulse.money" = "Money";
+"pulse.tap_to_filter" = "tap to filter";
+"pulse.jobs" = "%d jobs";
+"pulse.swipe_hint" = "Swipe a job forward to advance it. Tap to open.";
+"pulse.printing" = "Printing";
+"pulse.done_today" = "Done today";
+"pulse.owed" = "Owed";
+"pulse.unpaid" = "%d unpaid";
+"pulse.this_month" = "This month";
+"pulse.this_year" = "This year";
+"pulse.on_the_mac" = "On the Mac";
+"pulse.move_to" = "Move to";
+
+/* Orders, as design/ios-v2 draws them */
+"orders.history" = "History";
+"orders.window.count" = "%1$@ / %2$@ orders";
+"orders.window.body" = "Every unfinished one, and the newest %@ finished. Older history stays on the Mac.";
+"order.field.filament" = "Filament";
+"order.field.quantity" = "Quantity";
+"order.detail.mark_done" = "Mark done";
+
+/* Pairing, as design/ios-v2 draws it */
+"pair.find.title" = "Which shop?";
+"pair.find.body" = "Macs running Khayt announce themselves on this Wi‑Fi.";
+"pair.searching" = "Searching";
+"pair.shop.needs_mac" = "Needs the Mac in reach";
+"pair.manual.why" = "For a Mac that does not advertise, or a network that blocks it.";
+"pair.manual.title" = "The Mac’s address";
+"pair.manual.body" = "Khayt prints both on the desktop, under Settings → LAN API.";
+"pair.manual.port" = "Port";
+"pair.pin.title" = "The owner PIN";
+"pair.pin.body" = "Four digits from Settings → LAN API. The intake PIN will not work here.";
+"pair.pin.foot" = "Kept in the iPhone Keychain, never sent anywhere but this Mac.";
+"pair.pin.wrong" = "That PIN was refused. Check Settings → LAN API on the Mac.";
+"pair.connect" = "Connect";
+"pair.finish" = "Open the board";
+"pair.pull.title" = "Copying the shop’s book";
+"pair.pull.body" = "A working set, not the whole thing — history stays on the Mac.";
+"pair.pull.settings" = "Settings";
+"pair.pull.open_orders" = "Open orders";
+"pair.pull.newest_finished" = "Newest finished";
+"pair.pull.foot" = "Expenses, print files, products, the audit log and the rest of the book were not sent. The phone knows it does not have them.";
+
+/* Inventory, as design/ios-v2 draws it */
+"spool.detail.g_remaining" = "g remaining";
+"spool.detail.low_warn" = "Low stock — worth ordering a replacement";
+"inventory.search.v2" = "Search brand, material, colour…";
+"inventory.whole.count" = "%@ spools";
+"inventory.whole.body" = "The phone holds every spool the shop has.";
+"common.clear" = "Clear";
+/* Add spool: colour */
+"spool.form.colour" = "Colour";
+"spool.form.colour.other" = "Other colour";
+"colour.black" = "Black";
+"colour.white" = "White";
+"colour.grey" = "Grey";
+"colour.red" = "Red";
+"colour.blue" = "Blue";
+"colour.green" = "Green";
+"colour.orange" = "Orange";
+"colour.yellow" = "Yellow";
+"colour.purple" = "Purple";
+"colour.cyan" = "Cyan";
+"spool.method.label" = "Scan the label";
+
+/* Machines, as design/ios-v2 draws them */
+"machines.idle" = "Idle";
+"machines.error" = "Error";
+"machines.ready" = "Ready for the next job";
+"machines.nozzle" = "Nozzle";
+"machines.bed" = "Bed";
+"machines.stale" = "Live temperatures need the Mac. These are the last readings the book holds.";
+
+/* Clients, as design/ios-v2 draws them */
+"clients.open" = "%@ open";
+"clients.orders" = "orders";
+"clients.window.count" = "%@ clients";
+"clients.window.body" = "Every client travels. Their order totals do not — those need history the phone does not hold.";
+"clients.call" = "Call";
+"clients.whatsapp" = "WhatsApp";
+"clients.email" = "Email";
