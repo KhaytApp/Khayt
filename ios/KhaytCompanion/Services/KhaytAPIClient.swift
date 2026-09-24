@@ -521,6 +521,26 @@ final class KhaytAPIClient: ObservableObject {
         try ensureOK(data, response)
     }
 
+    /// "Take it": a walk-in becomes a pending job, and the request leaves the
+    /// waiting list as `converted` — the desktop's own two writes.
+    ///
+    /// Only from the book. The LAN endpoint accepts `active`, `reminded` and
+    /// `declined`, not `converted`, so without a book the phone could make the
+    /// order but not say where the request went; a request left sitting there
+    /// would be taken twice.
+    func takeWaiting(_ item: WaitingListItem) async throws {
+        guard let book, book.exists else { throw KhaytAPIError.server(L10n.tr("intake.take.needs_book")) }
+        var draft = NewOrderDraft()
+        draft.project = item.displayTitle
+        draft.client = item.clientName ?? ""
+        draft.material = item.material ?? ""
+        if let est = item.estValue, est > 0 { draft.price = String(est) }
+        try await createOrder(draft)
+        try BookWriter(book: book).setWaitingStatus(id: item.id, to: "converted")
+        await refreshPendingCount()
+        await deliverPending()
+    }
+
     func updateOrderStatus(orderId: String, status: String) async throws {
         if try await writeLocally({ try $0.setOrderStatus(orderId: orderId, to: status) }) { return }
         let encodedId = try encodeOrderIdForPath(orderId)

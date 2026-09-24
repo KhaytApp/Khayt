@@ -572,3 +572,10 @@
 "book.collection.products" = "المنتجات";
 "book.collection.auditLog" = "سجل التدقيق";
 "book.collection.giftCards" = "بطاقات الهدايا";
+
+/* Intake, as design/ios-v2 draws it */
+"intake.foot" = "الزبائن المباشرون وقائمة الانتظار. أخذ أحدهم يضعه في الطابور كمعلّق.";
+"intake.foot.no_book" = "الزبائن المباشرون وقائمة الانتظار. أخذ طلب إلى الطابور يحتاج دفتر الورشة على هذا الهاتف؛ أما التجاهل فيعمل دائماً.";
+"intake.take" = "خذه";
+"intake.dismiss" = "تجاهل";
+"intake.take.needs_book" = "أخذ طلب إلى الطابور يحتاج دفتر الورشة على هذا الهاتف.";

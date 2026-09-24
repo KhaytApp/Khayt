@@ -572,3 +572,10 @@
 "book.collection.products" = "products";
 "book.collection.auditLog" = "the audit log";
 "book.collection.giftCards" = "gift cards";
+
+/* Intake, as design/ios-v2 draws it */
+"intake.foot" = "Walk-ins and the waiting list. Taking one puts it in the queue as pending.";
+"intake.foot.no_book" = "Walk-ins and the waiting list. Taking one into the queue needs the shop’s book on this phone; dismissing works either way.";
+"intake.take" = "Take it";
+"intake.dismiss" = "Dismiss";
+"intake.take.needs_book" = "Taking a request into the queue needs the shop’s book on this phone.";

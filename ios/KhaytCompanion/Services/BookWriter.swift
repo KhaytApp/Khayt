@@ -140,8 +140,11 @@ struct BookWriter {
     /// makes are made here, in one write: the history entry, the removal, and
     /// the tombstone that carries the removal home — carrying the rev the
     /// phone saw, which is what the conflict check measures against.
+    ///
+    /// `converted` is the same move with the other word — what the desktop's
+    /// `promoteWaitingItem` writes when a request becomes an order.
     func setWaitingStatus(id: String, to status: String, now: Date = Date()) throws {
-        guard status == "declined" else {
+        guard status == "declined" || status == "converted" else {
             try book.updateRecord(collection: "waitingList", id: id) { record in
                 record["status"] = .string(status)
             }
@@ -157,8 +160,8 @@ struct BookWriter {
             let when = StoreWriter.iso(now)
 
             var entry = item
-            entry["status"] = .string("declined")
-            entry["declinedAt"] = .string(when)
+            entry["status"] = .string(status)
+            entry[status == "declined" ? "declinedAt" : "convertedAt"] = .string(when)
             // A new record in its own collection, so it starts its own history.
             entry["rev"] = nil
             StoreWriter.stamp(&entry)
