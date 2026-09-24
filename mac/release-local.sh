@@ -34,8 +34,14 @@ fail() { printf '\nSTOPPED: %s\n' "$*" >&2; exit 1; }
 say "checking what this needs"
 command -v gh >/dev/null   || fail "needs the gh CLI, signed in"
 command -v node >/dev/null || fail "needs node"
+# notarytool keeps its profile where only an UNLOCKED Mac can read it, so a
+# run while the screen is locked reports "No Keychain password item found"
+# for a profile that is there. Seen on the first overnight release attempt:
+# the same profile had worked hours earlier with somebody at the machine.
 xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1 \
-  || fail "no notarytool profile '$PROFILE'. Run once:  xcrun notarytool store-credentials $PROFILE"
+  || fail "cannot read the notarytool profile '$PROFILE'.
+  If this Mac's screen is locked, unlock it and run this again.
+  If the profile was never saved, run once:  xcrun notarytool store-credentials $PROFILE"
 
 # Two releases racing would let the older feed land last and walk every
 # install backwards, so a CI release in flight is a hard stop.
