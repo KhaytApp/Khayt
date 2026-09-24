@@ -561,6 +561,11 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// (revenue − cogs) / revenue, blended over the period; nil where nothing
     /// was billed.
     public let marginPct: Double?
+    /// Finished jobs that were charged nothing and cost something to make —
+    /// gifts, tests, jobs nobody priced. Their material is in `cogs`, which is
+    /// why a period with a few of them can show a margin of −400%. Optional for
+    /// the same reason `cogs` is.
+    public let unpriced: Int?
     public var id: String { period }
 }
 

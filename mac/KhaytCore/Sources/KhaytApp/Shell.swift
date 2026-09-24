@@ -407,7 +407,11 @@ struct ShellSidebar: View {
         Label(text, systemImage: symbol)
             .font(TypeScale.body(9.5))
             .foregroundStyle(tint)
-            .lineLimit(1)
+            // Two lines, not one: "Syncing automatically" did not fit the
+            // sidebar and read "Syncing auto…", and a status cut off mid-word
+            // is a status nobody can read.
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
             .help(help)
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity, alignment: .leading)

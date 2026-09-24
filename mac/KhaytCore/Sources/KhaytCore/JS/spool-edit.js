@@ -150,6 +150,11 @@
       }
     }
     if (has('weight')) spool.weight = Math.max(0, num(i.weight, 0));
+    // WHAT IT HELD WHEN BOUGHT, typed by the shop for a spool that predates
+    // `spoolWeight` being recorded. The book cannot recover it (a half-used
+    // roll carries no record of its other half), but the shop can: it bought
+    // a 1 kg roll. Above zero sets it; zero or blank leaves what is stored.
+    if (has('spoolWeight') && num(i.spoolWeight, 0) > 0) spool.spoolWeight = num(i.spoolWeight, 0);
     if (has('purchasedAt')) spool.purchasedAt = i.purchasedAt || undefined;
     if (has('openedAt')) spool.openedAt = i.openedAt || undefined;
     // WHEN THIS SPOOL WAS LAST DRIED, on the spool itself.

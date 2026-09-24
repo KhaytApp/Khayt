@@ -341,7 +341,12 @@ struct JobActions: View {
             shop.pendingPayment = Shop.PendingHold(id: job.id, project: job.project)
         }
         .disabled(!shop.canMoveJobs)
-        Button(shop.words.callIt("ord.hold_btn")) {
+        // A test, a gift, something for the shop itself. A toggle, because the
+        // same menu is how a shop takes it back.
+        Toggle(shop.words.callIt("mac.not_business"), isOn: Binding(
+            get: { job.nonBusiness == true },
+            set: { on in Task { await shop.setNonBusiness(job.id, on) } }))
+                Button(shop.words.callIt("ord.hold_btn")) {
             shop.pendingHold = Shop.PendingHold(id: job.id, project: job.project)
         }
         .disabled(!shop.canMoveJobs || job.status == "on_hold")

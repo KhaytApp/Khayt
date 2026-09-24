@@ -717,9 +717,25 @@ struct Inventory: View {
                     // cards describes a different set from the one on screen.
                     if !shop.spools.isEmpty,
                        shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
-                        MaterialCostCard(shop: shop, report: prices)
-                            .card(rail: Khayt.brand, padding: 14)
-                            .padding(.bottom, 14)
+                        if let prices, prices.rows.isEmpty {
+                            // NOTHING TO PRICE is one line, not a card. An empty
+                            // card saying "No data yet" took the top of the
+                            // screen on a shop whose spools carried no full
+                            // weight, and gave no hint why.
+                            Label(shop.words.callIt("mac.mc_needs_full"), systemImage: "scalemass")
+                                .font(.callout).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                // Leading, like the cards under it: the column
+                                // centres its children, and a centred sentence
+                                // above a left-aligned shelf read as a banner.
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 14)
+                                .padding(.bottom, 14)
+                        } else {
+                            MaterialCostCard(shop: shop, report: prices)
+                                .card(rail: Khayt.brand, padding: 14)
+                                .padding(.bottom, 14)
+                        }
                     }
                     // ── WHAT WAS PAID, UNDER WHAT IT COSTS ────────────────
                     //

@@ -37,6 +37,8 @@ struct EditJobSheet: View {
     /// A new total, as typed. Empty is "leave it".
     @State private var priceText = ""
     @State private var started = false
+    /// A test, a gift, something for the shop itself. See `lib/business-scope.js`.
+    @State private var nonBusiness = false
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
 
@@ -86,6 +88,17 @@ struct EditJobSheet: View {
                 }
             }
 
+            // In the other app's words, which the shared catalogue has in every
+            // language: it leaves the money, and it does not pretend the print
+            // never ran.
+            VStack(alignment: .leading, spacing: 2) {
+                Toggle(shop.words.callIt("oe.non_business"), isOn: $nonBusiness)
+                    .toggleStyle(.checkbox)
+                Text(shop.words.callIt("oe.non_business_hint"))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack {
                 Spacer()
                 Button(shop.words.callIt("common.cancel")) { shop.clearQuestion() }
@@ -104,6 +117,7 @@ struct EditJobSheet: View {
                 dueDate = day
             }
             priority = shop.priorityOf(job)
+            nonBusiness = job?.nonBusiness == true
         }
     }
 
@@ -123,7 +137,13 @@ struct EditJobSheet: View {
         let level = priority
         let typed = priceText.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
         let price = typed.isEmpty ? nil : Double(typed).map { max(0, $0) }
+        let wasNonBusiness = job?.nonBusiness == true
+        let nowNonBusiness = nonBusiness
         shop.clearQuestion()
-        Task { await shop.editJob(id, dueDate: when, priorityLevel: level, price: price) }
+        Task {
+            await shop.editJob(id, dueDate: when, priorityLevel: level, price: price)
+            // Only when it changed: an edit that did not touch it writes nothing.
+            if nowNonBusiness != wasNonBusiness { await shop.setNonBusiness(id, nowNonBusiness) }
+        }
     }
 }

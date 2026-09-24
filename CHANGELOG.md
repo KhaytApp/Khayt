@@ -2333,6 +2333,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Everyone) A test print dragged the P&L margin to −495.8%.** Marking a job
+  "Not business" (a test, a gift, something for the shop itself) is meant to
+  keep it out of revenue, order counts and reports, and ten reports honoured
+  it, but the P&L did not. It does now. When finished jobs were charged
+  nothing, the P&L also says so under the table, with how to leave them out,
+  instead of showing a margin that looks like a fault.
+- **(Mac) A job could not be marked "Not business".** The other app has had
+  the switch; the Mac had no way to set it. It is on the job's right-click
+  menu and in Edit job.
+- **(Mac) A spool's full weight could not be entered.** What a kilo costs and
+  how full a spool is drawn both need what the spool held when bought, and a
+  spool added before that was recorded had none, so "What materials cost"
+  said only "No data yet" and every spool drew as the same grey disc. Edit a
+  spool to fill in Full spool. With nothing to price, the card is now one line
+  saying what is missing instead of an empty card at the top of the screen.
+- **(Mac) Four small things on the real book's screens.** The P&L chart
+  labelled an empty bar "−0.00"; no figure prints a signed zero now. "By
+  quarter / By month" on Reports and "Import from Spoolman" on Inventory were
+  dark grey on the navy title bar. And the sidebar's sync line read "Syncing
+  auto…"; it wraps now.
+
 - **(Mac) Confirmations stuck at the top of the window.** "Signed in", "Email
   sent", "This shop's key is on Khayt Cloud now": each is news, and each stayed
   pinned above every screen until a job was next moved, with no way to close
