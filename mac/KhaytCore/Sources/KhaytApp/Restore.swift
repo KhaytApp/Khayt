@@ -85,7 +85,23 @@ enum Restore {
         /// Taken before an app update or a schema change rather than by the
         /// clock. Worth saying: it is the copy from just before something
         /// changed, which is usually the one a shop is looking for.
-        let isInsurance: Bool
+        var isInsurance: Bool { insurance != nil }
+        /// WHY it was taken, when it was not taken by the clock — the
+        /// protected prefixes of `lib/upgrade-backup.js isProtectedBackup`.
+        let insurance: Insurance?
+    }
+
+    enum Insurance: Hashable, Sendable {
+        /// `pre-update-` / `pre-upgrade-`: before an app update.
+        case update
+        /// `pre-wipe-`: before the other app's "reset everything" (Sep 2026).
+        case wipe
+
+        static func of(_ filename: String) -> Insurance? {
+            if filename.hasPrefix("pre-wipe-") { return .wipe }
+            if filename.hasPrefix("pre-update-") || filename.hasPrefix("pre-upgrade-") { return .update }
+            return nil
+        }
     }
 
     /// The file a name refers to, inside the backups folder and nowhere else.
@@ -109,7 +125,7 @@ enum Restore {
             return Candidate(filename: name,
                              written: (attrs[.modificationDate] as? Date) ?? .distantPast,
                              bytes: size,
-                             isInsurance: name.hasPrefix("pre-update-") || name.hasPrefix("pre-upgrade-"))
+                             insurance: Insurance.of(name))
         }.sorted { $0.written > $1.written }
     }
 

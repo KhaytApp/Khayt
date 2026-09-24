@@ -22,8 +22,10 @@ struct RestoreSheet: View {
                 HStack(spacing: 8) {
                     Text(shop.words.say(subject.written, Date.FormatStyle(date: .abbreviated, time: .shortened)))
                     Text(size).monospacedDigit()
-                    if subject.isInsurance {
-                        Text(shop.words.callIt("mac.restore_insurance"))
+                    switch subject.insurance {
+                    case .update: Text(shop.words.callIt("mac.restore_insurance"))
+                    case .wipe: Text(shop.words.callIt("mac.restore_before_wipe"))
+                    case nil: EmptyView()
                     }
                 }
                 .font(.callout).foregroundStyle(.secondary)
