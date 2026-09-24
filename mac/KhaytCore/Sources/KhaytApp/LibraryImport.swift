@@ -335,7 +335,8 @@ enum LibraryImport {
                                  hash: hash, key: key,
                                  reader: try? await engine.geometryReader(), colours: colours,
                                  swapCount: swapCount, thumbFile: thumbFile, group: group,
-                                 provenance: said, riskAnalysis: riskAnalysis)
+                                 provenance: said, riskAnalysis: riskAnalysis,
+                                 parsed: await SlicerFigures.read(destination, engine: engine) ?? [:])
         do {
             try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
                 var rows: [JSONValue] = []
@@ -499,6 +500,7 @@ enum LibraryImport {
                        group: String? = nil,
                        provenance: Mesh.Provenance? = nil,
                        riskAnalysis: [String: JSONValue]? = nil,
+                       parsed: [String: JSONValue] = [:],
                        now: Double = Date().timeIntervalSince1970 * 1000)
         -> [String: JSONValue] {
         var out: [String: JSONValue] = [
@@ -519,7 +521,7 @@ enum LibraryImport {
                 // `model` or `gcode`, the same two words the other app writes.
                 "kind": .string(["stl", "3mf", "obj"].contains(ext) ? "model" : "gcode"),
             ]),
-            "parsed": .object([:]),
+            "parsed": .object(parsed),
             "colors": .array(colours),
             "swapCount": .number(Double(swapCount)),
             "thumbFile": thumbFile.map(JSONValue.string) ?? .null,

@@ -797,6 +797,7 @@ final class Shop {
             remeasureIfDue()
             createRecurringIfDue()
             readProvenanceIfDue()
+            readSlicerFiguresIfDue()
             // Beside the standing orders, which is the same kind of thing: a
             // write the shop asked to have made for it. After the book has
             // loaded, because it reads what is already on order to decide.
@@ -1065,6 +1066,59 @@ final class Shop {
     /// read per model — the part before `<resources`, not the geometry — which
     /// is why this can run again on the next launch rather than needing a
     /// marker written into the book.
+    /// The books whose slicer figures this launch has already read.
+    private var slicerFiguresReadBooks: Set<String> = []
+
+    /// Read the slicer's own time, weight and material off every sliced file
+    /// the library has none for — once per book per launch, in the background.
+    ///
+    /// ── THE DATA ALREADY ON DISK ─────────────────────────────────────────
+    ///
+    /// Until Sep 2026 the Mac imported models without these, so a shop's whole
+    /// library — 247 models in this one — carried no slicer figures, and a
+    /// product made from a U1 3MF that says 4 h 37 min was priced at a 0.97 h
+    /// geometry guess. Fixing the import alone would have left every model
+    /// already there wrong, so the ones there are read too. Only an EMPTY
+    /// `parsed` is filled; nothing the shop or the other app wrote is replaced,
+    /// no undo is registered, and products already made are left alone — a
+    /// price does not change behind the shop's back.
+    func readSlicerFiguresIfDue() {
+        guard case .store(let build) = source, let engine,
+              !slicerFiguresReadBooks.contains(build.rawValue) else { return }
+        slicerFiguresReadBooks.insert(build.rawValue)
+        let due: [(id: String, url: URL)] = files.compactMap { file in
+            guard case .object(let rec)? = row(for: file.id),
+                  { if case .object(let o)? = rec["parsed"] { return o.isEmpty } else { return true } }(),
+                  let url = modelFile(for: file),
+                  ["3mf", "gcode", "gco"].contains(url.pathExtension.lowercased()) else { return nil }
+            return (file.id, url)
+        }
+        guard !due.isEmpty else { return }
+        Task { [weak self] in
+            var found: [String: [String: JSONValue]] = [:]
+            for item in due {
+                if let parsed = await SlicerFigures.read(item.url, engine: engine) { found[item.id] = parsed }
+            }
+            guard let self, !found.isEmpty else { return }
+            do {
+                try StoreWriter.update(build) { root in
+                    guard case .array(var rows)? = root["printFiles"] else { return }
+                    for i in rows.indices {
+                        guard case .object(var r) = rows[i], case .string(let id)? = r["id"],
+                              let parsed = found[id] else { continue }
+                        if case .object(let now)? = r["parsed"], !now.isEmpty { continue }
+                        r["parsed"] = .object(parsed)
+                        StoreWriter.stamp(&r)
+                        rows[i] = .object(r)
+                    }
+                    root["printFiles"] = .array(rows)
+                }
+                await self.load(self.source)
+                FileHandle.standardError.write(Data("slicer figures: \(found.count) model(s) filled\n".utf8))
+            } catch {}
+        }
+    }
+
     func readProvenanceIfDue() {
         guard case .store(let build) = source,
               !provenanceReadBooks.contains(build.rawValue) else { return }
@@ -2665,10 +2719,69 @@ final class Shop {
         return (part, note)
     }
 
-    /// Open the product sheet on a product made from the selected model.
+    /// Open the product sheet on a product made from the selected model — or,
+    /// with several selected, one product with each of them as a part.
     func productFromSelection() async {
-        guard let one = selectedFile else { return }
-        if let product = await productFromFile(one) { editingProduct = product }
+        let chosen = selectedFiles
+        if chosen.count > 1 {
+            if let product = await productFromFiles(chosen, name: nil) { editingProduct = product }
+        } else if let one = selectedFile ?? chosen.first {
+            if let product = await productFromFile(one) { editingProduct = product }
+        }
+    }
+
+    /// ONE product made of several models, each a part — a set, a kit, a
+    /// project folder. Asked for by the shop (Sep 2026): "I should be able to
+    /// add to the catalogue using the library". Each part is filled by the
+    /// same rule as a single model (`partFields`), so a product built this way
+    /// prices the same as one built part by part on the sheet.
+    ///
+    /// `name` is the product's name; nil takes the first model's. The notes
+    /// about estimated or missing figures are kept, one per part, because a
+    /// part the file could not answer for is still a part the shop must fill.
+    func productFromFiles(_ files: [LibraryFile], name: String?) async -> Product? {
+        guard !files.isEmpty else { return nil }
+        var parts: [JSONValue] = []
+        var notes: [String] = []
+        for file in files {
+            guard let filled = await partFields(from: file) else { continue }
+            parts.append(.object(filled.part))
+            if let note = filled.note { notes.append(file.title + ": " + note) }
+        }
+        guard !parts.isEmpty else { return nil }
+        var product = newProduct()
+        let title = (name?.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 } ?? files[0].title
+        for key in await allLanguageKeys() { product.names[key.language] = title }
+        product.rest["parts"] = .array(parts)
+        productNote = notes.isEmpty ? nil : notes.joined(separator: "\n")
+        return product
+    }
+
+    /// A product for EACH of these models, written straight to the catalogue —
+    /// for a shop adding a shelf of things it already sells. Each is priced by
+    /// the shared rule as it is saved; the shop opens any of them to adjust.
+    func addEachToCatalogue(_ files: [LibraryFile]) async {
+        productProblem = nil
+        var added = 0
+        for file in files {
+            guard let product = await productFromFile(file),
+                  case .array(let parts)? = product.rest["parts"] else { continue }
+            await saveProduct(product, parts: parts)
+            if moveProblem == nil { added += 1 } else { break }
+        }
+        productNote = nil
+        importNote = words.callIt("mac.catalogue_added_each", ["n": .number(Double(added))])
+    }
+
+    /// Every model in a project folder, at any depth under it.
+    func files(inFolder path: String) -> [LibraryFile] {
+        files.filter { Self.isUnder($0.groupName, path) }
+    }
+
+    /// A project folder as one product, named after the folder.
+    func productFromFolder(_ path: String) async {
+        let name = path.components(separatedBy: ImportGrouping.separator).last ?? path
+        if let product = await productFromFiles(files(inFolder: path), name: name) { editingProduct = product }
     }
 
     /// Write it down. Follows `saveCustomer` exactly, including the undo.

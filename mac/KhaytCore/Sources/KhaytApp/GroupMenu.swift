@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytCore
 
 /// Filing models into a group.
 ///
@@ -122,6 +123,18 @@ struct ManyModels: View {
             Text(shop.words.callIt("mac.group_hint"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            // To the catalogue, together or one each.
+            VStack(alignment: .leading, spacing: 6) {
+                let n: [String: JSONValue] = ["n": .number(Double(chosen.count))]
+                Button { Task { await shop.editingProduct = shop.productFromFiles(chosen, name: nil) } } label: {
+                    Label(shop.words.callIt("mac.catalogue_add_as_one", n), systemImage: "tag")
+                }
+                Button { Task { await shop.addEachToCatalogue(chosen) } } label: {
+                    Label(shop.words.callIt("mac.catalogue_add_each", n), systemImage: "tag.circle")
+                }
+            }
+            .controlSize(.small)
+            .disabled(!shop.canWrite)
             Spacer()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
