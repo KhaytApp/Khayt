@@ -2367,6 +2367,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Fixed
 
+- **(Everyone) A day of cloud syncing could delete a month of daily backups.**
+  Backups taken before each cloud merge shared the thirty backup slots with the
+  daily ones, and a Mac syncing every fifteen minutes filled them in a working
+  day. Daily backups now keep their own thirty and snapshots their own
+  forty-eight, in both apps. A restore never deletes the backup it is restoring
+  from, and a cloud merge whose safety backup failed no longer goes ahead.
+- **(Mac) A save interrupted at the wrong instant could leave the book missing.**
+  The old book was moved aside before the new one was moved in; the book is
+  now replaced in one atomic step, and a book left only as its `.prev` copy is
+  put back when the app opens (a damaged one opens from `.prev`, as the other
+  app already did).
+- **(Mac) Two changes made at the same moment could lose one.** A change that
+  asks the business rules is worked out while other saves can land; it now
+  checks the book again before saving and redoes itself on the newer book.
+- **(Mac) Files are moved to the Trash instead of deleted.** Originals brought
+  into the library, a product's photos and documents, and a model the Trash
+  would not take (which used to be deleted outright). Importing from a folder
+  the library used to live in no longer moves out files existing models still
+  use, and a conversion saved over its own source no longer risks losing both.
+
 - **(Everyone) A test print dragged the P&L margin to −495.8%.** Marking a job
   "Not business" (a test, a gift, something for the shop itself) is meant to
   keep it out of revenue, order counts and reports, and ten reports honoured

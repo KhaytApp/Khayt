@@ -6891,6 +6891,15 @@ public actor KhaytEngine {
     /// insurance survived exactly as long as nobody needed it. The rule is
     /// `lib/upgrade-backup.js`'s, so both apps rotate the same folder the same
     /// way rather than each deleting what the other was keeping.
+    /// Which backups to delete: the newest 30 dailies and 48 snapshots are
+    /// kept, protected ones always, and `except` whatever its age. See
+    /// `lib/upgrade-backup.js backupsToDelete`.
+    public func backupsToDelete(_ filenames: [String], except: [String] = []) throws -> [String] {
+        try runtime.call2("KhaytUpgradeBackup.backupsToDelete(ARG0, { except: ARG1 })",
+                          [.array(filenames.map(JSONValue.string)), .array(except.map(JSONValue.string))],
+                          as: [String].self)
+    }
+
     public func rotatableBackups(_ filenames: [String]) throws -> [String] {
         try runtime.call2("KhaytUpgradeBackup.partitionForRotation(ARG0).rotatable",
                           [.array(filenames.map(JSONValue.string))], as: [String].self)

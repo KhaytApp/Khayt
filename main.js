@@ -854,12 +854,13 @@ ipcMain.handle('hub:write-backup', async (event, jsonString) => {
   // 30 consecutive days would otherwise have its upgrade insurance deleted by
   // routine housekeeping, so the backup would survive exactly as long as nobody
   // needed it.
-  const listed = (await fs.promises.readdir(backupsDir())).filter(f => f.endsWith('.json')).sort();
-  const { rotatable } = upgradeBackup.partitionForRotation(listed);
-  if (rotatable.length > 30) {
-    for (const f of rotatable.slice(0, rotatable.length - 30)) {
-      await fs.promises.unlink(path.join(backupsDir(), f)).catch(() => {});
-    }
+  // Two pools, one rule shared with the Mac app: the 30 newest dailies and
+  // the 48 newest snapshots. Snapshots used to share the dailies' 30 slots,
+  // and a Mac syncing every fifteen minutes pushed a month of dailies out in
+  // a day. See lib/upgrade-backup.js backupsToDelete.
+  const listed = (await fs.promises.readdir(backupsDir())).filter(f => f.endsWith('.json'));
+  for (const f of upgradeBackup.backupsToDelete(listed)) {
+    await fs.promises.unlink(path.join(backupsDir(), f)).catch(() => {});
   }
   return fullPath;
 });

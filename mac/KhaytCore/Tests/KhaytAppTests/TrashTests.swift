@@ -34,11 +34,13 @@ struct TrashTests {
         try? FileManager.default.removeItem(at: dir)
     }
 
-    @Test("a volume with no wastebasket still deletes rather than refusing")
-    func fallsBack() throws {
-        // The shop asked for it gone. A network share or an external disk with
-        // no Trash refuses `trashItem`, and a model that could not be deleted
-        // because of that would be a worse answer than the old one.
+    @Test("a volume with no wastebasket keeps the file and says the delete was partial")
+    func neverPermanently() throws {
+        // This used to fall back to deleting outright on ANY Trash error. A
+        // file-safety scan (Sep 2026) turned that round: a model the Trash
+        // will not take stays where it is, the record goes, and the shop is
+        // told the delete was partial. The Finder can still delete it by hand;
+        // nothing the app does removes a model for good.
         let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -46,10 +48,10 @@ struct TrashTests {
         guard let at = source.range(of: "static func trash(") else {
             Issue.record("trash is gone"); return
         }
-        let body = String(source[at.lowerBound...].prefix(400))
+        let body = String(source[at.lowerBound...].prefix(200))
         #expect(body.contains("trashItem"), "it deletes outright again")
-        #expect(body.contains("catch { try FileManager.default.removeItem"),
-                "a disk with no Trash now refuses to delete at all")
+        #expect(!body.contains("removeItem"), "a Trash error falls back to deleting for good again")
+        #expect(source.contains("plib.delete_partial"), "a file left behind is no longer said")
     }
 
     @Test("the library's delete goes through it")

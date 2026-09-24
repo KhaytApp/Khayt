@@ -126,21 +126,41 @@ public enum StoreWriter {
             throw Refusal.notOurs(whoHasIt() ?? "Another app owns this book")
         }
 
-        let data: Data
-        do { data = try Data(contentsOf: url) }
-        catch { throw Refusal.unreadable(error.localizedDescription) }
-        guard var root = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
-            throw Refusal.unreadable("\(url.lastPathComponent) is not JSON")
-        }
+        // ── A CHANGE IS NEVER WRITTEN OVER ONE IT DID NOT SEE ─────────────
+        //
+        // `mutate` suspends (it asks the engine), and the main actor is
+        // re-entrant: while it was suspended any other write could read, change
+        // and save the book, and this one then saved its older copy over it.
+        // Two phones syncing at once lost one phone's changes; a customer saved
+        // during a cloud pull was gone when the pull finished. Found by a bug
+        // hunt.
+        //
+        // So the book is read again just before the swap. If it moved while the
+        // change was being worked out, the change is worked out AGAIN on the
+        // book as it is now. Between that second read and the swap nothing
+        // suspends, so no other write on this actor can land in between, and
+        // an ownership check covers the other app.
+        for _ in 0..<5 {
+            let data: Data
+            do { data = try Data(contentsOf: url) }
+            catch { throw Refusal.unreadable(error.localizedDescription) }
+            guard var root = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
+                throw Refusal.unreadable("\(url.lastPathComponent) is not JSON")
+            }
 
-        try await mutate(&root)
+            try await mutate(&root)
 
-        let next = try JSONEncoder().encode(root)
-        guard next.count <= maxStoreBytes else { throw Refusal.tooLarge(next.count) }
-        guard owns() else {
-            throw Refusal.notOurs(whoHasIt() ?? "Another app took the book")
+            let next = try JSONEncoder().encode(root)
+            guard next.count <= maxStoreBytes else { throw Refusal.tooLarge(next.count) }
+            // Moved while we were away: start again from what is there now.
+            if (try? Data(contentsOf: url)) != data { continue }
+            guard owns() else {
+                throw Refusal.notOurs(whoHasIt() ?? "Another app took the book")
+            }
+            try atomicWrite(next, to: url)
+            return
         }
-        try atomicWrite(next, to: url)
+        throw Refusal.unreadable("the book kept changing while this change was being made; try again")
     }
 
     /// Temp file, fsync, then swap — the same shape as `atomicWriteStoreUnsafe`.
@@ -169,14 +189,25 @@ public enum StoreWriter {
             throw error
         }
         let prev = url.appendingPathExtension("prev")
+        // ── THE BOOK'S PATH EXISTS AT EVERY INSTANT ────────────────────────
+        //
+        // This MOVED the book to `.prev` and then moved the new file in, so
+        // between the two moves there was no book at all: a crash or a power
+        // cut there left the Mac showing the sample shop, and Electron reading
+        // at that moment got ENOENT. Found by a file-safety scan.
+        //
+        // `.prev` is a hard link to the current book now (a copy where links
+        // are not possible), and the new file replaces the book with one
+        // rename(2), which POSIX makes atomic: whoever opens the path gets the
+        // old book or the new one, never neither.
         if fm.fileExists(atPath: url.path) {
             try? fm.removeItem(at: prev)
-            try? fm.moveItem(at: url, to: prev)   // rollback copy is best-effort
+            if link(url.path, prev.path) != 0 { try? fm.copyItem(at: url, to: prev) }   // best-effort rollback
         }
-        do { try fm.moveItem(at: tmp, to: url) }
-        catch {
+        if rename(tmp.path, url.path) != 0 {
+            let code = POSIXErrorCode(rawValue: errno) ?? .EIO
             try? fm.removeItem(at: tmp)           // never leave a stray temp behind
-            throw error
+            throw POSIXError(code)
         }
         // AFTER the swap, and only on success. See `didWrite`.
         Task { @MainActor in StoreWriter.didWrite?(url) }

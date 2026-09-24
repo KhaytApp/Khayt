@@ -114,3 +114,21 @@ test('a file that merely mentions an update is not one', () => {
   assert.equal(U.isProtectedBackup(''), false);
   assert.equal(U.isProtectedBackup(null), false);
 });
+
+// File-safety scan, Sep 2026: cloud snapshots and daily backups shared one
+// pool of thirty, so a day of syncing pushed a month of dailies out.
+test('dailies and snapshots rotate in their own pools, and nothing protected or excepted goes', () => {
+  const UB = require('../lib/upgrade-backup.js');
+  const days = Array.from({ length: 35 }, (_, i) => `2026-08-${String(i + 1).padStart(2, '0')}.json`.replace('2026-08-3', '2026-09-0'));
+  const snaps = Array.from({ length: 60 }, (_, i) => `2026-09-24-${String(1000 + i)}.json`);
+  const kept = [UB.PROTECTED_PREFIX + 'v1-to-v2-x.json'];
+  const doomed = UB.backupsToDelete([...days, ...snaps, ...kept], { except: [days[0]] });
+  const dailyLeft = days.filter((d) => !doomed.includes(d));
+  const snapLeft = snaps.filter((d) => !doomed.includes(d));
+  assert.equal(snapLeft.length, 48, 'the newest 48 snapshots stay');
+  assert.equal(dailyLeft.length, 31, 'the newest 30 dailies stay, plus the excepted one');
+  assert.ok(dailyLeft.includes(days[0]), 'the backup being restored is never deleted');
+  assert.ok(!doomed.some((d) => d.includes('pre-upgrade')), 'upgrade insurance is never deleted');
+  // Sixty snapshots in one day no longer touch the dailies at all.
+  assert.ok(days.slice(-30).every((d) => !doomed.includes(d)));
+});

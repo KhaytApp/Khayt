@@ -361,8 +361,12 @@ enum LibraryImport {
         // book, and the worst case is one duplicate left in a downloads folder,
         // which is the recoverable half of the rule above.
         var movedIn = false
+        // To the TRASH, not deleted. The copy is verified and recorded by now,
+        // but the original may be in iCloud Drive or Dropbox, where deleting
+        // it deletes it on every device; the Trash is the Finder's own undo.
+        // A source the Trash will not take is simply left where it was.
         if !keepOriginal {
-            do { try FileManager.default.removeItem(at: source); movedIn = true }
+            do { try FileManager.default.trashItem(at: source, resultingItemURL: nil); movedIn = true }
             catch { movedIn = false }
         }
 

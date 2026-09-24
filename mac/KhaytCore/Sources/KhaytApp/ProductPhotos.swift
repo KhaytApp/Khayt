@@ -196,7 +196,9 @@ enum ProductPhotos {
     static func delete(_ name: String, in build: StoreReader.Build) {
         let leaf = (name as NSString).lastPathComponent
         guard !leaf.isEmpty, leaf != ".", leaf != ".." else { return }
-        try? FileManager.default.removeItem(at: folder(build).appending(path: leaf))
+        // The Trash, not deleted: Undo on the product brings the record back,
+        // and the photo can be put back from the Finder with it.
+        try? FileManager.default.trashItem(at: folder(build).appending(path: leaf), resultingItemURL: nil)
     }
 
     /// Read one back for the screen, where the stored thumbnail is not enough.

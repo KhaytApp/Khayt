@@ -123,7 +123,43 @@
     return { protectedFiles, rotatable };
   }
 
+  /**
+   * Which backups rotation deletes, oldest first — two pools, never one.
+   *
+   * ── WHY TWO ───────────────────────────────────────────────────────────
+   *
+   * Daily backups (`YYYY-MM-DD.json`) and snapshots (`YYYY-MM-DD-HHMM.json`,
+   * taken before every cloud merge, every restore and on request) shared one
+   * pool of thirty. With the cloud's delta chain shut, a Mac pushes the whole
+   * book and takes a snapshot every fifteen minutes, so thirty slots were
+   * about seven hours of a working day — and after one busy day every daily
+   * backup older than that morning was gone. A mistake noticed tomorrow had
+   * nothing to go back to. Found by a file-safety scan.
+   *
+   * So the dailies keep their own thirty and snapshots their own
+   * `snapshots` (48 by default); pre-upgrade and pre-update backups are never
+   * deleted; and anything in `except` (a restore's own source) is kept
+   * whatever its age.
+   *
+   * @param {string[]} filenames  the directory listing
+   * @param {{daily?: number, snapshots?: number, except?: string[]}} [opts]
+   * @returns {string[]} names to delete
+   */
+  function backupsToDelete(filenames, opts) {
+    const o = opts || {};
+    const daily = Number.isFinite(o.daily) ? o.daily : 30;
+    const snapshots = Number.isFinite(o.snapshots) ? o.snapshots : 48;
+    const except = new Set(Array.isArray(o.except) ? o.except : []);
+    const { rotatable } = partitionForRotation(filenames);
+    const sorted = rotatable.filter((f) => /\.json$/.test(f)).sort();
+    const days = sorted.filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f));
+    const snaps = sorted.filter((f) => !/^\d{4}-\d{2}-\d{2}\.json$/.test(f));
+    const oldest = (list, keep) => list.slice(0, Math.max(0, list.length - Math.max(0, keep)));
+    return oldest(days, daily).concat(oldest(snaps, snapshots)).filter((f) => !except.has(f));
+  }
+
   const api = {
+    backupsToDelete,
     PROTECTED_PREFIX,
     UPDATE_PREFIX,
     needsPreUpgradeBackup,
