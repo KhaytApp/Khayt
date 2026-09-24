@@ -2777,6 +2777,7 @@ final class Words {
                                           + "فمن خارج شبكة المحل يلزمه نفق."],
         "mac.lan_open":      ["en": "Open on a phone on the same Wi‑Fi:",
                               "ar": "افتحه على هاتف متصل بنفس شبكة Wi‑Fi:"],
+        "mac.lan_pin_short": ["en": "Use at least {n} characters. The PIN is the only lock on the shop\u{2019}s book over the network.", "ar": "استخدم {n} أحرف على الأقل. الرمز هو القفل الوحيد على دفتر المتجر عبر الشبكة."],
         "mac.lan_pin_missing": ["en": "Set an owner PIN — the queue shows customers' names.",
                                 "ar": "عيّن رمز PIN للمالك — فالقائمة تعرض أسماء العملاء."],
         "mac.lan_failed":    ["en": "The server could not start: {error}",

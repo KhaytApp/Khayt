@@ -110,7 +110,7 @@ final class LanServer {
         /// Measure an uploaded mesh. The bytes are written to a scratch file,
         /// read, and deleted — Khayt does not keep a stranger's model on the
         /// shop's disk, which keeps retention and consent simple.
-        var measure: (Data, String) throws -> JSONValue? = { data, ext in
+        var measure: @Sendable (Data, String) throws -> JSONValue? = { data, ext in
             try LanServer.measureUpload(data, ext: ext)
         }
         /// The listener went down AFTER it was up, and could not be brought
@@ -375,6 +375,21 @@ final class LanServer {
             listener.newConnectionHandler = { [weak self] connection in
                 Task { @MainActor [weak self] in
                     guard let self else { connection.cancel(); return }
+                    // A CAP ON CONNECTIONS, in all and per address: each one
+                    // can hold a megabyte of body, and nothing stopped a
+                    // visitor opening thousands. Sep 2026 scan.
+                    let who = Self.throttleKey(Self.remote(of: connection))
+                    guard self.open < Self.maxConnections,
+                          (self.openBy[who] ?? 0) < Self.maxConnectionsPerAddress else {
+                        connection.cancel(); return
+                    }
+                    self.open += 1
+                    self.openBy[who, default: 0] += 1
+                    defer {
+                        self.open -= 1
+                        self.openBy[who, default: 1] -= 1
+                        if self.openBy[who] == 0 { self.openBy.removeValue(forKey: who) }
+                    }
                     await self.serve(connection)
                 }
             }
@@ -1125,7 +1140,15 @@ final class LanServer {
             // there is a real answer to be had, it wins.
             intake = sliced
         } else {
-            intake = try? host.measure(request.body, ext)
+            // OFF the main actor, and with the inflate capped at 250× what
+            // was sent: a small deflate bomb measured here froze the shop's
+            // window, and `maxMeasuring` meant nothing while every
+            // measurement queued on the one thread. Sep 2026 scan.
+            let measure = host.measure
+            let body = request.body
+            intake = try? await Task.detached {
+                try Zip.$inflateBudget.withValue(max(body.count, 1) * 250) { try measure(body, ext) }
+            }.value
         }
         guard let intake else {
             return .open(400, #"{"ok":false,"reason":"no-numbers"}"#)
@@ -1473,25 +1496,83 @@ final class LanServer {
     /// Nil when the caller may pass; the refusal to send otherwise. The same
     /// answers, in the same order, as the Node server's `checkPinForGet`.
     private func pinGate(_ request: Request) async -> Response? {
+        // DNS REBINDING: a web page the owner visits can point its own name at
+        // this Mac and read the book through the owner's browser, same-origin.
+        // A phone or a browser reaching the shop's book uses an address, a
+        // `.local` name or `localhost` — never somebody else's domain.
+        // Webhooks and the customer pages are not gated here, so a shop that
+        // forwards a public domain to them is unaffected. Sep 2026 scan.
+        guard Self.hostIsLocal(request.headers["host"]) else {
+            return .json(421, #"{"error":"host-not-local"}"#)
+        }
         guard !host.pin.isEmpty else {
             return .json(401, #"{"error":"Configure a LAN PIN in Khayt settings to access this data"}"#)
         }
         let provided = (request.query["pin"] ?? request.headers["x-khayt-pin"] ?? "")
             .trimmingCharacters(in: .whitespaces)
         let now = host.now()
-        let record = failures[request.remote]
+        // One lockout per IPv6 /64: a phone — or an attacker — has billions of
+        // addresses in its prefix, and a lockout per address was none at all.
+        let key = Self.throttleKey(request.remote)
+        let record = failures[key]
         if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
+            return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
+        }
+        if let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: false), g.blocked {
             return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
         }
         guard Self.constantTimeEqual(provided, host.pin) else {
             if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
-                failures[request.remote] = bumped
+                failures[key] = bumped
+            }
+            if let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: true) {
+                throttle = g.state
             }
             sweepFailures(now: now)
             return .json(401, #"{"error":"Unauthorized"}"#)
         }
-        failures.removeValue(forKey: request.remote)
+        failures.removeValue(forKey: key)
         return nil
+    }
+
+    /// Connections open now, in all and per address (or IPv6 /64).
+    private var open = 0
+    private var openBy: [String: Int] = [:]
+    nonisolated static let maxConnections = 64
+    nonisolated static let maxConnectionsPerAddress = 16
+
+    nonisolated static func remote(of connection: NWConnection) -> String {
+        if case .hostPort(let h, _) = connection.endpoint { return "\(h)" }
+        return "?"
+    }
+
+    /// The whole server's wrong-PIN budget — see `KhaytEngine.lanGlobalThrottle`.
+    private var throttle = KhaytEngine.LanThrottle()
+
+    /// Is this `Host` header one a phone or the shop's own browser would send:
+    /// an IP address, `localhost`, or a Bonjour `.local` name? Anything else
+    /// is somebody's domain pointed at this Mac. No header at all is not a
+    /// browser (every browser sends one), and is let through.
+    nonisolated static func hostIsLocal(_ header: String?) -> Bool {
+        guard var h = header?.trimmingCharacters(in: .whitespaces).lowercased(), !h.isEmpty else { return true }
+        if h.hasPrefix("[") {                                  // [v6]:port
+            guard let close = h.firstIndex(of: "]") else { return false }
+            h = String(h[h.index(after: h.startIndex)..<close])
+            return IPv6Address(h) != nil
+        }
+        if let colon = h.lastIndex(of: ":"), h.firstIndex(of: ":") == colon { h = String(h[..<colon]) }
+        if h.hasSuffix(".") { h.removeLast() }
+        if IPv4Address(h) != nil || IPv6Address(h) != nil { return true }
+        return h == "localhost" || h.hasSuffix(".local")
+    }
+
+    /// The key a wrong PIN is counted against: the address, or for IPv6 its
+    /// /64 prefix (an IPv4-mapped address counts as its IPv4 address).
+    nonisolated static func throttleKey(_ remote: String) -> String {
+        let bare = String(remote.split(separator: "%", maxSplits: 1).first ?? "")
+        guard bare.contains(":"), let v6 = IPv6Address(bare) else { return bare }
+        if let v4 = v6.asIPv4 { return "\(v4)" }
+        return "v6/64:" + v6.rawValue.prefix(8).map { String(format: "%02x", $0) }.joined()
     }
 
     /// The map of failed addresses cannot grow without bound — an attacker

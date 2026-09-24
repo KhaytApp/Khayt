@@ -1001,7 +1001,7 @@ struct LanServerTests {
     ])
 
     /// A cube 50mm on a side, as this app's own reader measures one.
-    static let measuredCube: JSONValue = .object([
+    nonisolated static let measuredCube: JSONValue = .object([
         "source": .string("geometry"), "exact": .bool(false),
         "geometry": .object([
             "volumeMm3": .number(125_000), "areaMm2": .number(15_000),
