@@ -459,3 +459,17 @@
 "pair.pin.prompt" = "Enter the PIN set on the Mac";
 "pair.missing.shop" = "Tap your shop above, or enter its address.";
 "pair.missing.pin" = "Enter the Owner LAN PIN to continue.";
+
+/* Add spool: colour */
+"spool.form.colour" = "Colour";
+"spool.form.colour.other" = "Other colour";
+"colour.black" = "Black";
+"colour.white" = "White";
+"colour.grey" = "Grey";
+"colour.red" = "Red";
+"colour.blue" = "Blue";
+"colour.green" = "Green";
+"colour.orange" = "Orange";
+"colour.yellow" = "Yellow";
+"colour.purple" = "Purple";
+"colour.cyan" = "Cyan";

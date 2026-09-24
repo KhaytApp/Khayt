@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(iOS) A spool typed in by hand has a colour.** The add-spool form had no
+  colour at all, so every roll entered by hand went on the shelf grey. It has
+  the design's ten swatches and a picker for any other, and a row of common
+  materials to fill the field in one tap. The four ways to add a spool are
+  the design's cards.
+
 - **(Mac) A restored backup no longer chooses this Mac's slicer, or blanks
   its alert topic.** Restoring a backup keeps this Mac's own slicer settings —
   the program and its arguments run here, and a book restored from elsewhere
