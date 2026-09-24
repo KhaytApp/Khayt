@@ -79,6 +79,11 @@ final class Shop {
     /// Where this shop's models live. Resolved once per book, because it reads
     /// settings and probes the disk, and every cell asks about it.
     private(set) var libraryRoots: LibraryLocation.Roots?
+    /// Moving the library to another folder — see `LibraryMove`.
+    var libraryMoveBusy = false
+    var libraryMoveNote: String?
+    var libraryMoveProblem: String?
+    var libraryMoveProgress: (done: Int, total: Int, name: String)?
     /// The print library in the cloud — see `CloudLibrary`.
     var cloudLibraryNote: String?
     var cloudLibraryProblem: String?

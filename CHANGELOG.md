@@ -44,6 +44,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   127.0.0.1 with PKCE and a checked `state`; the refresh token and client
   secret are sealed in the book like every other credential. Disconnecting
   forgets the account here and says where to withdraw it at Google.
+- **(Mac) Keep the print library in iCloud Drive, or any folder.** Settings →
+  Preferences → Where the library lives: Use iCloud Drive, Choose a folder…,
+  or Back to this Mac's own folder. The models already there move with it —
+  each copied, read back and compared by SHA-256 before its original goes to
+  the Trash; nothing is overwritten (a different file with the same name is
+  kept as "name (moved).stl"), and a file that cannot be moved stays where it
+  was and is named. The folder being left is remembered, so a model is found
+  wherever it is. In iCloud Drive with Optimize Mac Storage on, macOS keeps
+  unopened models in iCloud and brings each back when it is opened. The rules
+  are `lib/print-library-migrate.js`, ported and checked against it under Node.
 
 - **(Mac) Online storage for the print library.** Settings → Preferences →
   Online storage points the library at a bucket — Cloudflare R2, Backblaze B2,

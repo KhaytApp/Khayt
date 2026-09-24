@@ -1152,6 +1152,7 @@ struct PreferencesPane: View {
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                LibraryLocationSettings(shop: shop)
                 CloudLibrarySettings(shop: shop)
             }
             .formStyle(.grouped)

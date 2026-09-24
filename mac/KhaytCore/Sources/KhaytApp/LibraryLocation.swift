@@ -71,19 +71,29 @@ enum LibraryLocation {
             .path
     }
 
+    /// `/` — the root of a volume path — is never a library folder.
+    static func isDriveRoot(_ p: String) -> Bool {
+        let s = p.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty else { return false }
+        return URL(fileURLWithPath: s).standardizedFileURL.path == "/"
+    }
+
     /// @param settings `settings.printLibrary`
     static func resolveRoots(settings: JSONValue?, defaultRoot: String) -> Roots {
         var s: [String: JSONValue] = [:]
         if case .object(let dict)? = settings { s = dict }
 
         let base = str(.string(defaultRoot))
-        let configured = str(s["root"])
-        let mirror = str(s["mirror"])
+        // A drive root is never a library folder, wherever it came from (a
+        // restore, a sync): as a root it would make the whole disk "inside
+        // the library" — `isDriveRoot` in the other app, Sep 2026.
+        let configured = isDriveRoot(str(s["root"])) ? "" : str(s["root"])
+        let mirror = isDriveRoot(str(s["mirror"])) ? "" : str(s["mirror"])
         let primary = configured.isEmpty ? base : configured
 
         var past: [String] = []
         if case .array(let rows)? = s["history"] {
-            past = rows.map { str($0) }.filter { !$0.isEmpty }
+            past = rows.map { str($0) }.filter { !$0.isEmpty && !isDriveRoot($0) }
         }
 
         var roots: [String] = []
