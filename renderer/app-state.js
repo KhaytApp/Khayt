@@ -567,6 +567,21 @@ function replaceStoreFromSnapshot(store) {
     console.error('replaceStoreFromSnapshot: snapshot could not be normalized — nothing replaced');
     return false;
   }
+  /* WHAT BELONGS TO THIS COMPUTER STAYS.
+   *
+   * A slicer's path and argument template run here, and a restore or import
+   * must never change them: a genuine slicer handed another shop's (or an
+   * attacker's) arguments runs any command it is told to. And a cloud
+   * snapshot carries the mask where the ntfy topic and webhook URLs were, which
+   * must not replace the real ones. lib/store-secret-paths.js keepMachineLocal
+   * — the Mac's Restore reads the same rule. */
+  if (typeof KhaytStoreSecretPaths !== 'undefined' && KhaytStoreSecretPaths.keepMachineLocal) {
+    store = KhaytStoreSecretPaths.keepMachineLocal(
+      { settings: JSON.parse(JSON.stringify(settings || {})) },
+      JSON.parse(JSON.stringify(store)),
+      (typeof KhaytStore !== 'undefined' && KhaytStore.SECRET_MASK) || '__KHAYT_MASKED__',
+    );
+  }
   printLog = [];
   inventory = [];
   templates = [];
