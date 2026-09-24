@@ -1265,6 +1265,16 @@ final class Activator: NSObject, NSApplicationDelegate {
                 captureSheet(named: "22-machine", into: dir)
                 shop.editingMachine = nil
                 await settle()
+                // And its Connection tab: the printer's address, its camera and
+                // the plug it sits on, none of which the first tab shows.
+                MachineSheet.opensOn = "connection"
+                shop.editingMachine = machine
+                await settle()
+                try? await Task.sleep(for: .milliseconds(600))
+                captureSheet(named: "22b-machine-connection", into: dir)
+                shop.editingMachine = nil
+                MachineSheet.opensOn = "printer"
+                await settle()
             }
             shop.shelf = .inventory
             await settle()

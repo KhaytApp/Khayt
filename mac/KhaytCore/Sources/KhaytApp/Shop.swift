@@ -775,6 +775,7 @@ final class Shop {
             // The shop's published delivery dates. Not for the sample book,
             // whose cloud settings belong to nobody.
             if next.build != nil { startPublishingLeadTime() } else { stopPublishingLeadTime() }
+            if next.build != nil { startWatchingPlugs() } else { stopWatchingPlugs() }
             if next.build != nil { await restoreCloudKey() }
             refreshSyncStatus()
             // Move a service log a Mac alpha wrote under the wrong key. Inside
@@ -8588,6 +8589,119 @@ final class Shop {
     ///
     /// The task holds no snapshot of the shop; it reads the current state on
     /// each tick. So the right lifetime is the book's, not the load's.
+    // MARK: - Smart plugs
+
+    /// What each machine's plug last said, by machine id.
+    private(set) var plugStates: [String: KhaytEngine.PlugState] = [:]
+    /// Why the last switch did not happen, by machine id, in the shop's words.
+    private(set) var plugProblem: [String: String] = [:]
+    /// When a print was last seen to end on each machine, for the auto-off.
+    private var printEndedAt: [String: Date] = [:]
+    /// What each machine was last seen doing, to notice a print ending.
+    private var lastPrinterState: [String: String] = [:]
+    private var plugTask: Task<Void, Never>?
+
+    /// The machine's record with its plug's secrets OPENED, for building one
+    /// request — never kept, never written back.
+    private func plugRecord(_ machineId: String) async -> JSONValue? {
+        guard let build = source.build,
+              let raw = machineRows.first(where: {
+                  if case .object(let o) = $0, case .string(let id)? = o["id"] { return id == machineId }
+                  return false
+              }),
+              case .object(var record) = raw,
+              case .object(var plug)? = record["smartPlug"] else { return nil }
+        for key in ["token", "password"] {
+            if case .string(let sealed)? = plug[key], !sealed.isEmpty {
+                plug[key] = .string((try? await Secrets.open(sealed, for: build)) ?? "")
+            }
+        }
+        record["smartPlug"] = .object(plug)
+        return .object(record)
+    }
+
+    /// Ask a plug whether it is on.
+    func readPlug(_ machine: Machine) async {
+        guard let engine, let record = await plugRecord(machine.id),
+              let request = try? await engine.plugRequest(machine: record, action: "status") else { return }
+        do {
+            let answer = try await SmartPlug.send(request)
+            plugStates[machine.id] = try await engine.plugAnswer(machine: record, answer: answer)
+        } catch {
+            plugStates[machine.id] = KhaytEngine.PlugState(on: nil, watts: nil)
+        }
+    }
+
+    /// Switch a machine's plug. Off goes through the shared rule, every time:
+    /// power is never cut while the printer is printing, paused, silent or hot.
+    func switchPlug(_ machine: Machine, on: Bool) async {
+        guard let engine, let record = await plugRecord(machine.id) else { return }
+        plugProblem[machine.id] = nil
+        if !on {
+            let verdict = try? await engine.plugCanTurnOff(live: printers.statusCache[machine.id])
+            guard verdict?.ok == true else {
+                plugProblem[machine.id] = words.callIt(verdict?.reason ?? "plug.no_reading")
+                return
+            }
+        }
+        guard let request = try? await engine.plugRequest(machine: record, action: on ? "on" : "off") else { return }
+        do {
+            let answer = try await SmartPlug.send(request)
+            let state = try await engine.plugAnswer(machine: record, answer: answer)
+            // Home Assistant answers a switch with what changed, which can be
+            // nothing yet; ask again rather than trusting an empty answer.
+            if state.on == nil { await readPlug(machine) } else { plugStates[machine.id] = state }
+        } catch {
+            plugProblem[machine.id] = words.callIt("plug.unreachable") + " "
+                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+        }
+    }
+
+    /// Every minute: what each plug says, whether a print just ended, and
+    /// whether an automatic switch-off is due.
+    func startWatchingPlugs() {
+        guard plugTask == nil else { return }
+        plugTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.plugTick()
+                try? await Task.sleep(for: .seconds(60))
+            }
+        }
+    }
+
+    func stopWatchingPlugs() {
+        plugTask?.cancel()
+        plugTask = nil
+    }
+
+    private func plugTick() async {
+        guard let engine else { return }
+        let now = Date()
+        for machine in machines where machine.smartPlug?.usable == true {
+            let live = printers.statusCache[machine.id]
+            // A print ending is the edge from printing to anything else.
+            if case .object(let o)? = live, case .string(let state)? = o["state"] {
+                // Paused is still mid-print: only leaving printing AND paused is an end.
+                let busy: (String) -> Bool = { ["printing", "paused", "pausing"].contains($0.lowercased()) }
+                let was = lastPrinterState[machine.id] ?? ""
+                if busy(was), !busy(state) { printEndedAt[machine.id] = now }
+                lastPrinterState[machine.id] = state
+            }
+            await readPlug(machine)
+            guard plugStates[machine.id]?.on == true,
+                  let record = await plugRecord(machine.id),
+                  (try? await engine.plugAutoOffDue(machine: record, live: live,
+                                                    finishedAt: printEndedAt[machine.id], now: now)) == true
+            else { continue }
+            await switchPlug(machine, on: false)
+            if plugStates[machine.id]?.on == false {
+                // Once per print: the next one sets a new end.
+                printEndedAt[machine.id] = nil
+                moveNotices.append(words.callIt("plug.auto_off_done", ["name": .string(machine.name)]))
+            }
+        }
+    }
+
     func startPublishingLeadTime() {
         guard leadTimeTask == nil else { return }
         leadTimeTask = Task { [weak self] in

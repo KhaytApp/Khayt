@@ -109,6 +109,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Mac) A printer's smart plug: switch it from Khayt, and let it turn off
+  after a print.** A machine's Connection tab now takes the plug it sits on:
+  Shelly (Gen 1, and Plus/Pro), Tasmota, or a Home Assistant switch. The
+  machine's details show whether it is on and what it is drawing, with a
+  button to switch it. **Turn off after a print, once cooled** switches it off
+  a set time after a print ends. Khayt never cuts power while the printer is
+  printing, paused, not answering (it may still be printing on a bad Wi-Fi
+  link) or hot; the button says why when it refuses. A Home Assistant token or
+  a Tasmota password is sealed in the book like a printer's key, and masked
+  anywhere the book is exported or shared.
+
 - **(Mac) "Remember me on this Mac", and a way to sign out of the cloud.**
   Keeping the unlock key between launches is a choice now: a checkbox on the
   cloud sign-in, on unless turned off, and worth turning off on a Mac other

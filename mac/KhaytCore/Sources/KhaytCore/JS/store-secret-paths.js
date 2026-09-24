@@ -58,6 +58,8 @@
     'settings.printLibrary.gdrive.clientSecret',
     'machines[].printerApi.apiKey',
     'machines[].printerApi.accessCode',
+    'machines[].smartPlug.token',
+    'machines[].smartPlug.password',
     'settings.zatcaPhase2.csid',
     'settings.zatcaPhase2.pcsid',
     'settings.bnpl.tabby.apiKey',

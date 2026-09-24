@@ -785,6 +785,9 @@ public actor KhaytEngine {
         // from the shop's own switches, and which alert types to compute so a
         // channel's choice is honoured. After `printer-alerts`.
         "alert-routes",
+        // A printer's smart plug: requests for four kinds of plug, and the rule
+        // that power is never cut while printing, silent or hot.
+        "smart-plug",
         // Whether an address is a printer on the shop's own network. Not
         // business logic — an SSRF guard — and shared for the same reason the
         // secret list is: a second, more forgiving copy in Swift is how the two
@@ -7654,6 +7657,54 @@ public actor KhaytEngine {
     public func setNonBusiness(_ order: JSONValue, on: Bool) throws -> JSONValue {
         try runtime.call2("KhaytBusinessScope.setNonBusiness(ARG0, ARG1)", [order, .bool(on)],
                           as: JSONValue.self)
+    }
+
+    /// One HTTP call to a smart plug, as `lib/smart-plug.js` builds it.
+    public struct PlugRequest: Decodable, Sendable, Equatable {
+        public let method: String
+        public let url: String
+        public let headers: [String: String]
+        public let body: String?
+    }
+
+    /// What a plug said: on, off or unknown, and its draw when it measures one.
+    public struct PlugState: Decodable, Sendable, Equatable {
+        public let on: Bool?
+        public let watts: Double?
+        public init(on: Bool?, watts: Double?) { self.on = on; self.watts = watts }
+    }
+
+    /// The request that reads (`status`) or switches (`on`/`off`) a machine's
+    /// plug, or nil when it has none usable. `machine` must carry the plug's
+    /// secrets OPENED — the caller opens them at the point of use.
+    public func plugRequest(machine: JSONValue, action: String) throws -> PlugRequest? {
+        let raw = try runtime.call2("KhaytSmartPlug.request(ARG0, ARG1)", [machine, .string(action)],
+                                    as: JSONValue.self)
+        if case .null = raw { return nil }
+        return try JSONDecoder().decode(PlugRequest.self, from: JSONEncoder().encode(raw))
+    }
+
+    public func plugAnswer(machine: JSONValue, answer: JSONValue) throws -> PlugState {
+        try runtime.call2("KhaytSmartPlug.readAnswer(ARG0, ARG1)", [machine, answer], as: PlugState.self)
+    }
+
+    public struct PlugVerdict: Decodable, Sendable, Equatable {
+        public let ok: Bool
+        /// A locale key, when refused.
+        public let reason: String?
+    }
+
+    /// May this printer's power be cut now? `live` is the poller's reading.
+    public func plugCanTurnOff(live: JSONValue?) throws -> PlugVerdict {
+        try runtime.call2("KhaytSmartPlug.canTurnOff(ARG0)", [live ?? .null], as: PlugVerdict.self)
+    }
+
+    /// Is an automatic switch-off due, a print having ended at `finishedAt`?
+    public func plugAutoOffDue(machine: JSONValue, live: JSONValue?, finishedAt: Date?, now: Date) throws -> Bool {
+        try runtime.call2("KhaytSmartPlug.autoOffDue(ARG0, ARG1, ARG2, ARG3)",
+                          [machine, live ?? .null,
+                           finishedAt.map { .number($0.timeIntervalSince1970 * 1000) } ?? .null,
+                           .number(now.timeIntervalSince1970 * 1000)], as: Bool.self)
     }
 
     public struct PrinterAlerts: Decodable, Sendable {

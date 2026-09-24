@@ -33,6 +33,28 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
     /// cosmetic; see `lib/machine-edit.js`.
     let downtimeBlocks: [Downtime]?
 
+    /// The smart plug the printer sits on, when the shop set one up. Every
+    /// field optional; the token and password are `__enc__` sealed and opened
+    /// only at the moment a request is sent. See `lib/smart-plug.js`.
+    let smartPlug: SmartPlug?
+
+    struct SmartPlug: Decodable, Hashable, Sendable {
+        let type: String?
+        let host: String?
+        let entity: String?
+        let user: String?
+        let token: String?
+        let password: String?
+        let autoOff: Bool?
+        let delayMin: Double?
+
+        /// A kind the rule speaks, with an address: something that can be asked.
+        var usable: Bool {
+            ["shelly", "shelly-rpc", "tasmota", "homeassistant"].contains(type ?? "")
+                && !(host ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        }
+    }
+
     /// What the shop says is loaded, head by head, for a printer that cannot
     /// report it. Every field optional: a row this app cannot read is skipped,
     /// never allowed to fail the whole machine list. See `lib/machine-edit.js`.

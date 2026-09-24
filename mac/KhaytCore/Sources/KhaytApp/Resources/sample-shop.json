@@ -2427,6 +2427,7 @@
   {
    "id": "MACH-u1",
    "name": "Snapmaker U1",
+   "smartPlug": { "type": "shelly-rpc", "host": "192.168.1.40", "autoOff": true, "delayMin": 10 },
    "loaded": [
     { "slot": 0, "hex": "#C8A97E", "material": "PLA" },
     { "slot": 1, "hex": "#8F5D1C", "material": "PLA" },

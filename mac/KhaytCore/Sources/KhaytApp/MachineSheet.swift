@@ -68,7 +68,11 @@ struct MachineSheet: View {
     /// Which pane is open. Not `@SceneStorage`: two machines edited in one
     /// session are two different questions, and reopening on "Upkeep" because
     /// the last machine needed a nozzle is answering the wrong one.
-    @State private var pane = "printer"
+    @State private var pane = MachineSheet.opensOn
+    /// Which tab the sheet opens on. Always the printer's, except for the
+    /// snapshot run, which photographs the Connection tab as well — the only
+    /// way the camera and plug sections there are ever seen before they ship.
+    static var opensOn = "printer"
 
     // The camera. `camSnapshot` may be typed as a path — `/webcam/?action=snapshot`
     // — and the shared rule makes it absolute against the printer's host.
@@ -84,6 +88,16 @@ struct MachineSheet: View {
     /// When this machine is out of action. Loaded from the record and written
     /// back through the shared rule, which drops a window that cannot be read.
     @State private var downtime: [Shop.DowntimeBlock] = []
+    // The smart plug. Secrets typed here are sealed on save; blank keeps what
+    // is stored, as the printer's key does.
+    @State private var plugType = "none"
+    @State private var plugHost = ""
+    @State private var plugEntity = ""
+    @State private var plugUser = ""
+    @State private var plugToken = ""
+    @State private var plugPassword = ""
+    @State private var plugAutoOff = false
+    @State private var plugDelay: Double = 10
     /// What is in each head, typed by the shop. See `LoadedRow`.
     @State private var loadedRows: [LoadedRow] = []
     @State private var hasStoredKey = false
@@ -324,11 +338,92 @@ struct MachineSheet: View {
             // normalised against the printer's host, the credential that
             // fetches a still is the printer's, and a snapshot may only be
             // fetched from that same host at all.
+            // ── AND THE PLUG IT SITS ON ──────────────────────────────
+            LayerRule()
+            plugSection
             LayerRule()
             CameraSettings(
                 shop: shop, enabled: $camEnabled, snapshot: $camSnapshot,
                 rotate: $camRotate, flipH: $camFlipH, flipV: $camFlipV,
                 note: $camNote, looking: $camLooking, find: findCamera)
+    }
+
+    /// The smart plug: which kind, where, and whether to switch it off after a
+    /// print. The rule that it never cuts a print is said under it, because
+    /// that is the question a shop has before trusting a plug with a printer.
+    @ViewBuilder private var plugSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // The Connection section's own heading style, directly above it.
+            Text(shop.words.callIt("plug.title"))
+                .font(.system(size: 11, weight: .semibold))
+                .textCase(.uppercase).tracking(0.5).foregroundStyle(.secondary)
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text(shop.words.callIt("mach.kind")).foregroundStyle(.secondary)
+                    Picker("", selection: $plugType) {
+                        Text(shop.words.callIt("plug.none")).tag("none")
+                        Text(shop.words.callIt("plug.kind_shelly")).tag("shelly")
+                        // Product names, the same in every language: shown as
+                        // they are, not run through the word table.
+                        Text(verbatim: "Shelly Plus / Pro").tag("shelly-rpc")
+                        Text(verbatim: "Tasmota").tag("tasmota")
+                        Text(verbatim: "Home Assistant").tag("homeassistant")
+                    }
+                    .labelsHidden().fixedSize()
+                }
+                if plugType != "none" {
+                    GridRow {
+                        Text(shop.words.callIt("plug.host")).foregroundStyle(.secondary)
+                        TextField(plugType == "homeassistant" ? "http://homeassistant.local:8123" : "192.168.1.40",
+                                  text: $plugHost)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    if plugType == "homeassistant" {
+                        GridRow {
+                            Text(shop.words.callIt("plug.entity")).foregroundStyle(.secondary)
+                            TextField("switch.printer", text: $plugEntity).textFieldStyle(.roundedBorder)
+                        }
+                        GridRow {
+                            Text(shop.words.callIt("plug.token")).foregroundStyle(.secondary)
+                            SecureField(existing?.smartPlug?.token?.isEmpty == false
+                                        ? shop.words.callIt("common.secret_unchanged") : "",
+                                        text: $plugToken).textFieldStyle(.roundedBorder)
+                        }
+                    }
+                    if plugType == "tasmota" {
+                        GridRow {
+                            Text(shop.words.callIt("plug.user")).foregroundStyle(.secondary)
+                            TextField("", text: $plugUser).textFieldStyle(.roundedBorder)
+                        }
+                        GridRow {
+                            Text(shop.words.callIt("plug.password")).foregroundStyle(.secondary)
+                            SecureField(existing?.smartPlug?.password?.isEmpty == false
+                                        ? shop.words.callIt("common.secret_unchanged") : "",
+                                        text: $plugPassword).textFieldStyle(.roundedBorder)
+                        }
+                    }
+                    GridRow {
+                        Toggle(shop.words.callIt("plug.auto_off"), isOn: $plugAutoOff)
+                            .gridCellColumns(2)
+                    }
+                    if plugAutoOff {
+                        GridRow {
+                            Text(shop.words.callIt("plug.delay")).foregroundStyle(.secondary)
+                            HStack(spacing: 4) {
+                                TextField("", value: $plugDelay, format: .number.precision(.fractionLength(0)))
+                                    .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 60)
+                                Text(shop.words.callIt("plug.minutes")).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            if plugType != "none" {
+                Text(shop.words.callIt("plug.why"))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     /// What the shop goes looking for when the machine needs attention.
@@ -419,6 +514,12 @@ struct MachineSheet: View {
         downtime = (machine.downtimeBlocks ?? []).map {
             .init(from: $0.from ?? "", to: $0.to ?? "", reason: $0.words)
         }
+        plugType = machine.smartPlug?.type.flatMap { $0.isEmpty ? nil : $0 } ?? "none"
+        plugHost = machine.smartPlug?.host ?? ""
+        plugEntity = machine.smartPlug?.entity ?? ""
+        plugUser = machine.smartPlug?.user ?? ""
+        plugAutoOff = machine.smartPlug?.autoOff ?? false
+        plugDelay = machine.smartPlug?.delayMin ?? 10
         camEnabled = machine.webcam?.enabled ?? false
         camSnapshot = machine.webcam?.snapshotUrl ?? ""
         camRotate = machine.webcam?.rotate ?? 0
@@ -630,6 +731,13 @@ struct MachineSheet: View {
         let mirrorH = camFlipH, mirrorV = camFlipV
         let windows = downtime
         let loadedNow = kind == "fdm" ? loadedRows.filter(\.on) : nil
+        let plugForm: [String: JSONValue] = [
+            "type": .string(plugType), "host": .string(plugHost.trimmingCharacters(in: .whitespaces)),
+            "entity": .string(plugEntity.trimmingCharacters(in: .whitespaces)),
+            "user": .string(plugUser.trimmingCharacters(in: .whitespaces)),
+            "autoOff": .bool(plugAutoOff), "delayMin": .number(plugDelay),
+        ]
+        let typedPlugToken = plugToken, typedPlugPassword = plugPassword
         let build = shop.source.build
         dismiss()
         Task {
@@ -717,6 +825,14 @@ struct MachineSheet: View {
                              "material": .string($0.material.trimmingCharacters(in: .whitespaces))])
                 })
             }
+            // The plug through the shared rule. A secret goes in SEALED, and only
+            // when one was typed: absent keeps what is stored.
+            var plug = plugForm
+            for (key, typed) in [("token", typedPlugToken), ("password", typedPlugPassword)] where !typed.isEmpty {
+                guard let build else { break }
+                if let sealed = try? await Secrets.seal(typed, for: build) { plug[key] = .string(sealed) }
+            }
+            input["smartPlug"] = .object(plug)
             await shop.saveMachine(input, id: id, catalogId: catalogId)
             shop.loadedChanged()
         }

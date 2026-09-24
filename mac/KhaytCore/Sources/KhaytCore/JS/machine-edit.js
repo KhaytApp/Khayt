@@ -281,6 +281,33 @@
       // again to plug it back in.
       m.printerApi = next;
     }
+    /* ── THE SMART PLUG ────────────────────────────────────────────────
+     *
+     * Same safety as printerApi above: everything stored is carried, a secret
+     * that is ABSENT keeps what is stored, and an empty string clears it. A
+     * kind lib/smart-plug.js does not speak is written as no plug at all, so
+     * nothing is ever switched through a guess. */
+    if (has('smartPlug')) {
+      const p = i.smartPlug || {};
+      const was = m.smartPlug || {};
+      const SP = (typeof require === 'function')
+        ? (() => { try { return require('./smart-plug.js'); } catch (e) { return null; } })()
+        : (typeof globalThis !== 'undefined' ? globalThis.KhaytSmartPlug : null);
+      const kinds = (SP && SP.KINDS) || ['shelly', 'shelly-rpc', 'tasmota', 'homeassistant'];
+      const type = kinds.includes(trim(p.type)) ? trim(p.type) : 'none';
+      const delay = num(p.delayMin, NaN);
+      m.smartPlug = {
+        ...was,
+        type,
+        host: trim(p.host),
+        entity: trim(p.entity),
+        user: trim(p.user),
+        token: p.token === undefined ? (was.token || '') : String(p.token),
+        password: p.password === undefined ? (was.password || '') : String(p.password),
+        autoOff: p.autoOff === true,
+        delayMin: Number.isFinite(delay) && delay >= 0 ? Math.min(Math.round(delay), 240) : (was.delayMin ?? 10),
+      };
+    }
     if (has('nozzle')) {
       const n = i.nozzle || {};
       const material = trim(n.material) || 'brass';
