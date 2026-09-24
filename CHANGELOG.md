@@ -18,6 +18,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   holds the exact file (size and content hash, or a download and compare), and
   a model brought back is checked against the hash recorded when it left.
   Plain HTTP is refused except to this Mac or the shop's own network.
+- **(Mac) Importing a folder knows when a folder is a project.** A folder with
+  two or more models, at any depth, becomes a folder in the library; a folder
+  holding a single model does not, and names that model instead — so
+  `Saudi Kings/King Abdulaziz/crown.stl` comes in as "King Abdulaziz" inside
+  "Saudi Kings", not as a folder of one called "crown". A zip of one model is
+  that model, named after the zip; a zip of several is a project. The file's
+  own name is kept as the model's original name. Folders in iCloud Drive or a
+  Google Drive / Dropbox folder import the same way; macOS downloads each file
+  as it is read.
 
 - **(iOS) Decline a walk-in request with the Mac switched off.** Declining was
   the last edit the phone refused offline, because it is a MOVE: into

@@ -94,27 +94,103 @@ enum ImportGrouping {
     ///     sitting in would file a model under "Downloads".
     /// - Returns: a folder name, or nil.
     static func group(for file: URL, chosen: URL) -> String? {
+        let levels = levels(for: file, chosen: chosen)
+        return levels.isEmpty ? nil : fitting(levels)
+    }
+
+    /// Every folder between what was chosen and the file that names something
+    /// — the chosen folder first — with `STL`, `presupported` and the like
+    /// dropped, so `Kings/King Abdulaziz/STL/head.stl` is
+    /// `["Kings", "King Abdulaziz"]`. Empty for a file picked directly.
+    static func levels(for file: URL, chosen: URL) -> [String] {
         let chosenPath = chosen.standardizedFileURL.resolvingSymlinksInPath().path
         let filePath = file.standardizedFileURL.resolvingSymlinksInPath().path
         // Picked directly, not found inside a folder.
-        guard filePath != chosenPath else { return nil }
+        guard filePath != chosenPath else { return [] }
 
         let chosenParts = chosenPath.split(separator: "/").map(String.init)
         let fileParts = filePath.split(separator: "/").map(String.init)
         guard fileParts.count > chosenParts.count,
-              Array(fileParts.prefix(chosenParts.count)) == chosenParts else { return nil }
+              Array(fileParts.prefix(chosenParts.count)) == chosenParts else { return [] }
 
         // Folders BELOW what was chosen, with the filename dropped.
         let below = Array(fileParts.dropFirst(chosenParts.count).dropLast())
-
-        // The chosen folder is the root of the path, then every folder under it
-        // that names something. `STL` and `presupported` fall out here, so
-        // `Kings/King Abdulaziz/STL/head.stl` is `Kings/King Abdulaziz` and not
-        // `Kings/King Abdulaziz/STL`.
         var levels: [String] = []
         if let root = meaningful(chosen.lastPathComponent) { levels.append(root) }
         levels += below.compactMap(meaningful)
-        return levels.isEmpty ? nil : fitting(levels)
+        return levels
+    }
+
+    /// Where one imported file goes: its group, and a title when the folder
+    /// it sat in named the model better than the file does.
+    struct Placement: Equatable, Sendable {
+        let group: String?
+        let title: String?
+    }
+
+    /// ── A FOLDER IS A PROJECT ONLY WHEN IT HOLDS MORE THAN ONE MODEL ──────
+    ///
+    /// Asked for by the shop (Sep 2026): "smart enough to know when to create a
+    /// folder and when not, as there would be multiple projects, some with
+    /// folders and some not, and sub folders with multiple projects in the
+    /// same situation and so on".
+    ///
+    /// Every folder that named something used to become a group, so a download
+    /// folder of forty models, each in its own folder, gave forty groups of
+    /// one. Now the whole import is looked at once:
+    ///
+    ///   * a folder with TWO OR MORE models at or below it is a project, and
+    ///     keeps its place in the path, at every depth;
+    ///   * a folder with ONE model is not a folder at all: the model goes up to
+    ///     the nearest project above it, and the folder's name becomes the
+    ///     model's title, because `Saudi Kings/King Abdulaziz/crown.stl` is
+    ///     "King Abdulaziz", not seven models called "crown". The file's own
+    ///     name is kept as its original name.
+    ///
+    /// Counts only fall as the path goes deeper, so the folders that collapse
+    /// are always the last ones in a file's path.
+    static func placements(for files: [URL], chosen: URL) -> [URL: Placement] {
+        let levelsOf = Dictionary(files.map { ($0, levels(for: $0, chosen: chosen)) },
+                                  uniquingKeysWith: { a, _ in a })
+        // How many of the files sit at or below each folder, keyed by the path
+        // to it (levels joined with a separator no folder name can hold).
+        var count: [String: Int] = [:]
+        for levels in levelsOf.values {
+            for depth in levels.indices {
+                count[levels[...depth].joined(separator: "\u{1}"), default: 0] += 1
+            }
+        }
+        var out: [URL: Placement] = [:]
+        for (file, levels) in levelsOf {
+            var kept: [String] = []
+            var collapsed: [String] = []
+            for depth in levels.indices {
+                let key = levels[...depth].joined(separator: "\u{1}")
+                if (count[key] ?? 0) >= 2 { kept.append(levels[depth]) } else { collapsed.append(levels[depth]) }
+            }
+            out[file] = Placement(group: kept.isEmpty ? nil : fitting(kept),
+                                  title: collapsed.isEmpty ? nil : collapsed.joined(separator: " – "))
+        }
+        return out
+    }
+
+    /// The files found under one chosen folder, placed by the rule above.
+    static func incoming(_ files: [URL], chosen: URL) -> [LibraryImport.Incoming] {
+        let placed = placements(for: files, chosen: chosen)
+        return files.map { url in
+            let p = placed[url]
+            return LibraryImport.Incoming(url: url, group: p?.group, title: p?.title)
+        }
+    }
+
+    /// What came out of an archive. The same rule: a zip of several models is
+    /// a project named after the zip, and a zip of ONE model is just that
+    /// model, called what the zip was called — not a folder of one.
+    static func incoming(archive models: [URL], group: String, documents: [URL]) -> [LibraryImport.Incoming] {
+        if models.count == 1 {
+            return [LibraryImport.Incoming(url: models[0], group: nil, documents: documents, title: group)]
+        }
+        return models.map { LibraryImport.Incoming(url: $0, group: group, documents: documents) }
     }
 
     /// A path short enough to survive being written down.

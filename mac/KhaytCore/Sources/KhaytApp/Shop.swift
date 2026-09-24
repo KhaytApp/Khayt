@@ -7856,15 +7856,18 @@ final class Shop {
             if isDir.boolValue {
                 let walker = fm.enumerator(at: url, includingPropertiesForKeys: [.isDirectoryKey],
                                            options: [.skipsHiddenFiles, .skipsPackageDescendants])
+                var here: [URL] = []
                 while let next = walker?.nextObject() as? URL {
                     if LibraryImport.kinds.contains(next.pathExtension.lowercased()),
                        !isInVault(next) {
-                        // Where it sat on disk IS the shop's grouping — see
-                        // `ImportGrouping` for why it is not just the parent.
-                        found.append(LibraryImport.Incoming(
-                            url: next, group: ImportGrouping.group(for: next, chosen: url)))
+                        here.append(next)
                     }
                 }
+                // Where it sat on disk IS the shop's grouping, but judged over
+                // the WHOLE folder at once: a folder of several models is a
+                // project, a folder of one names its model — see
+                // `ImportGrouping.placements`.
+                found += ImportGrouping.incoming(here, chosen: url)
             } else if LibraryImport.kinds.contains(url.pathExtension.lowercased()) {
                 // Picked on its own: no group. The shop chose one file, not a set.
                 found.append(LibraryImport.Incoming(url: url, group: nil))
@@ -7911,9 +7914,8 @@ final class Shop {
                 scratches.append(out.scratch)
                 // Grouped by the archive's own name, the way a folder of models
                 // is grouped by the folder — see `ImportGrouping`.
-                files += out.models.map {
-                    LibraryImport.Incoming(url: $0, group: out.group, documents: out.documents)
-                }
+                files += ImportGrouping.incoming(archive: out.models, group: out.group,
+                                                 documents: out.documents)
             } catch let refusal as ArchiveImport.Failure {
                 refusals.append(refusal.description)
             } catch {
