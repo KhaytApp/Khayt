@@ -90,3 +90,12 @@ extension QueueOrder {
                   machine: nil, machineId: nil, dueDate: entry.dueDate, priority: nil)
     }
 }
+
+/// A spool is the same spool while its id is, so its page survives the list
+/// being reloaded underneath it.
+extension InventorySpool: Hashable {
+    static func == (a: InventorySpool, b: InventorySpool) -> Bool {
+        a.id == b.id && a.remaining == b.remaining && a.weight == b.weight
+    }
+    func hash(into h: inout Hasher) { h.combine(id) }
+}

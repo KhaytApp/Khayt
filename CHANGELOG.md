@@ -63,6 +63,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   settings, open orders, the newest finished, clients, inventory, machines —
   and that the rest stayed on the Mac. A desktop that does not serve its book
   skips the last step and is paired all the same.
+- **(iOS) Inventory and the spool page follow the v2 design.** The spools
+  lowest first, with an amber rail on the ones running low and a closing line
+  that says the phone holds every spool the shop has. A spool opens as a page
+  (it was a sheet): its colour, what is left with −50 g / +50 g beneath it
+  (taps in a row are one write, not several), the label's facts, and writing
+  it to an NFC tag. The figure itself can be tapped to set it exactly.
 
 - **(iOS) The companion moves to its real design (v2).** It had been built
   against an older mockup; the current design is Turki's Claude Design

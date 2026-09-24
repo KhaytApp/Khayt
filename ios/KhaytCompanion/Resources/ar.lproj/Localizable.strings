@@ -304,7 +304,7 @@
 "spool.detail.purchased" = "تاريخ الشراء";
 "spool.detail.label_info" = "بيانات الملصق / الوسم";
 "spool.detail.lot" = "رقم الدفعة";
-"spool.detail.print_temp" = "حرارة الطباعة";
+"spool.detail.print_temp" = "حرارة الفوهة";
 "spool.detail.bed_temp" = "حرارة السرير";
 "spool.detail.adjust" = "تعديل المتبقي";
 "spool.detail.adjust.body" = "حدّد الخيط المتبقي في هذه البكرة بالغرام.";
@@ -520,3 +520,11 @@
 "pair.pull.open_orders" = "طلبات مفتوحة";
 "pair.pull.newest_finished" = "أحدث المنتهية";
 "pair.pull.foot" = "لم تُرسل المصروفات وملفات الطباعة والمنتجات وسجل التدقيق وبقية الدفتر. والهاتف يعلم أنها ليست لديه.";
+
+/* Inventory, as design/ios-v2 draws it */
+"spool.detail.g_remaining" = "غ متبقٍ";
+"spool.detail.low_warn" = "مخزون منخفض — يُستحسن طلب بديل";
+"inventory.search.v2" = "ابحث بالعلامة أو المادة أو اللون…";
+"inventory.whole.count" = "%@ بكرات";
+"inventory.whole.body" = "الهاتف يحتفظ بكل بكرات الورشة.";
+"common.clear" = "مسح";

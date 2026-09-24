@@ -81,7 +81,7 @@ final class LocalizationCompletenessTests: XCTestCase {
         "NewOrderSheet.swift",
         "OrderDetailPage.swift",
         "JobCard.swift",
-        "SpoolDetailSheet.swift",
+        "SpoolDetailPage.swift",
         "QueueView.swift",
         "IntakeView.swift",
         "ClientsView.swift",

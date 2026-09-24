@@ -63,6 +63,10 @@ final class KhaytAPIClient: ObservableObject {
     /// Does this phone hold a book at all?
     var holdsBook: Bool { reader?.holdsAnyBook ?? false }
 
+    /// Whether the book on this phone holds ALL of a collection, so a total
+    /// drawn from it is the shop's total and not the phone's.
+    func holdsAll(_ collection: String) -> Bool { reader?.holdsAll(collection) ?? false }
+
     /// How old the book is: the later of its last pull and the last sync.
     var bookAsOf: Date? {
         let pulled = book?.scope().flatMap { ISO8601DateFormatter.withFractions.date(from: $0.takenAt) }

@@ -304,7 +304,7 @@
 "spool.detail.purchased" = "Purchased";
 "spool.detail.label_info" = "Label / tag info";
 "spool.detail.lot" = "Batch / lot";
-"spool.detail.print_temp" = "Print temp";
+"spool.detail.print_temp" = "Nozzle temp";
 "spool.detail.bed_temp" = "Bed temp";
 "spool.detail.adjust" = "Adjust remaining";
 "spool.detail.adjust.body" = "Set the remaining filament for this spool, in grams.";
@@ -520,3 +520,11 @@
 "pair.pull.open_orders" = "Open orders";
 "pair.pull.newest_finished" = "Newest finished";
 "pair.pull.foot" = "Expenses, print files, products, the audit log and the rest of the book were not sent. The phone knows it does not have them.";
+
+/* Inventory, as design/ios-v2 draws it */
+"spool.detail.g_remaining" = "g remaining";
+"spool.detail.low_warn" = "Low stock — worth ordering a replacement";
+"inventory.search.v2" = "Search brand, material, colour…";
+"inventory.whole.count" = "%@ spools";
+"inventory.whole.body" = "The phone holds every spool the shop has.";
+"common.clear" = "Clear";

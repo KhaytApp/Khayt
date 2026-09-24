@@ -1,169 +1,173 @@
 import SwiftUI
 
+/// The shop's filament, as `design/ios-v2/` draws it: a search, two chips, and
+/// the spools lowest first — the ones about to run out are the ones worth
+/// seeing. Tapping one pushes its page.
+///
+/// Inventory travels WHOLE to the phone, so the list ends with a line saying
+/// so: this is every spool the shop has, not the newest few.
 struct InventoryView: View {
     @EnvironmentObject private var api: KhaytAPIClient
     @EnvironmentObject private var ordersNav: OrdersNavigationState
 
-    private func takeLowStockRequest() {
-        guard ordersNav.pendingLowStock else { return }
-        ordersNav.pendingLowStock = false
-        filter = .lowStock
-    }
-
-    enum Filter: String, CaseIterable, Identifiable {
-        case all = "All"
-        case lowStock = "Low stock"
-        var id: String { rawValue }
-    }
-
     @State private var spools: [InventorySpool] = []
+    @State private var loaded = false
     @State private var errorMessage: String?
     @State private var showAddSpool = false
     @State private var searchText = ""
-    @State private var filter: Filter = .all
-    @State private var selectedSpool: InventorySpool?
-    @State private var spoolToDelete: InventorySpool?
-    @State private var sortNewestFirst = true
+    @State private var lowOnly = false
+    @State private var openSpool: InventorySpool?
+
+    private func takeLowStockRequest() {
+        guard ordersNav.pendingLowStock else { return }
+        ordersNav.pendingLowStock = false
+        lowOnly = true
+    }
 
     private var displayed: [InventorySpool] {
         var list = spools
-        if filter == .lowStock {
-            list = list.filter(\.isLowStock)
-        }
+        if lowOnly { list = list.filter(\.isLowStock) }
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if !q.isEmpty {
             list = list.filter {
-                $0.displayLabel.lowercased().contains(q)
-                    || ($0.lot ?? "").lowercased().contains(q)
-                    || ($0.sku ?? "").lowercased().contains(q)
+                [$0.displayLabel, $0.brand ?? "", $0.material ?? "", $0.color ?? "", $0.lot ?? "", $0.sku ?? ""]
+                    .joined(separator: " ").lowercased().contains(q)
             }
         }
-        return list.sorted { a, b in
-            let da = a.purchasedAt ?? a.addedAt ?? ""
-            let db = b.purchasedAt ?? b.addedAt ?? ""
-            return sortNewestFirst ? da > db : da < db
-        }
+        return list.sorted { ($0.remainingGrams ?? 0) < ($1.remainingGrams ?? 0) }
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                KhaytSearchField(text: $searchText, prompt: L10n.tr("inventory.search"))
-                    .padding(.horizontal, KhaytDesign.pad)
-                    .padding(.top, 4)
-                // `khayt-inventory.jsx`: the two filters sit under the search,
-                // counted, where a shop can see there IS low stock without
-                // opening a menu to ask.
-                HStack(spacing: 8) {
-                    filterChip(.all, count: spools.count)
-                    filterChip(.lowStock, count: spools.filter(\.isLowStock).count)
-                    Spacer()
-                }
-                .padding(.horizontal, KhaytDesign.pad)
-                .padding(.vertical, 8)
-                content
-            }
-            .khaytScreen(title: L10n.tr("tab.inventory"))
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        Toggle(L10n.tr("inventory.sort.newest"), isOn: $sortNewestFirst)
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down.circle")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    search
+                    chips
+                    list
+                    if api.holdsAll("inventory"), !spools.isEmpty {
+                        wholeLine
                     }
                 }
+                .padding(.bottom, 18)
+            }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.immediately)
+            .khaytScreen(title: L10n.tr("tab.inventory"))
+            .background(KhaytDesign.ground.ignoresSafeArea())
+            .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showAddSpool = true } label: { Image(systemName: "plus") }
+                        .accessibilityLabel(L10n.tr("spool.add.title"))
                 }
             }
             .sheet(isPresented: $showAddSpool) {
                 AddSpoolSheet { Task { await load() } }
             }
-            .sheet(item: $selectedSpool) { spool in
-                SpoolDetailSheet(spool: spool) { Task { await load() } }
+            .navigationDestination(item: $openSpool) { spool in
+                SpoolDetailPage(spool: spool) { await load() }
             }
-            .alert(L10n.tr("spool.detail.remove_q"), isPresented: showDeleteAlert, presenting: spoolToDelete) { spool in
-                Button(L10n.tr("common.remove"), role: .destructive) { Task { await delete(spool) } }
-                Button(L10n.tr("common.cancel"), role: .cancel) {}
-            } message: { spool in
-                Text(String(format: L10n.tr("inventory.remove.body"), spool.displayLabel))
-            }
+            .refreshable { await load() }
             .task { await load() }
             .onAppear { takeLowStockRequest() }
             .onChange(of: ordersNav.lowStockRequest) { _, _ in takeLowStockRequest() }
         }
     }
 
-    private func filterChip(_ f: Filter, count: Int) -> some View {
-        let selected = filter == f
-        let tint = f == .lowStock ? KhaytDesign.danger : KhaytDesign.brand
-        return Button { filter = f } label: {
-            Text("\(L10n.tr(f == .all ? "inventory.filter.all" : "inventory.filter.low")) (\(count))")
-                .font(.caption.bold())
-                .monospacedDigit()
-                .padding(.horizontal, 12)
-                .frame(height: 32)
-                .background(selected ? tint.opacity(0.16) : KhaytDesign.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(selected ? tint.opacity(0.32) : KhaytDesign.sep, lineWidth: 1.5))
-                .foregroundStyle(selected ? tint : KhaytDesign.textDim)
-                .padding(.vertical, 6)
-                .contentShape(Rectangle())
+    // MARK: - Parts
+
+    private var search: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(KhaytDesign.note)
+            TextField(L10n.tr("inventory.search.v2"), text: $searchText)
+                .font(.khayt(15, relativeTo: .body))
+                .foregroundStyle(KhaytDesign.ink)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+            if !searchText.isEmpty {
+                Button { searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(KhaytDesign.note)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.tr("common.clear"))
+            }
+        }
+        .padding(.horizontal, 13)
+        .frame(minHeight: 46)
+        .card(radius: 12)
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+    }
+
+    private var chips: some View {
+        HStack(spacing: 7) {
+            chip(L10n.tr("inventory.filter.all"), on: !lowOnly) { lowOnly = false }
+            chip(L10n.tr("inventory.filter.low"), on: lowOnly) { lowOnly = true }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
+    }
+
+    private func chip(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.khayt(13, .semibold, relativeTo: .subheadline))
+                .padding(.horizontal, 16)
+                .frame(minHeight: 44)
+                .foregroundStyle(on ? KhaytDesign.brand : KhaytDesign.note)
+                .background(on ? KhaytDesign.brand.opacity(0.16) : .clear, in: Capsule())
+                .overlay(Capsule().strokeBorder(on ? KhaytDesign.brand.opacity(0.5) : KhaytDesign.hairline, lineWidth: 1))
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    private var showDeleteAlert: Binding<Bool> {
-        Binding(get: { spoolToDelete != nil }, set: { if !$0 { spoolToDelete = nil } })
-    }
-
-    private func delete(_ spool: InventorySpool) async {
-        do {
-            try await api.deleteSpool(id: spool.id)
-            CompanionHaptics.success()
-            await load()
-        } catch {
-            errorMessage = error.localizedDescription
-            CompanionHaptics.warning()
-        }
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 
     @ViewBuilder
-    private var content: some View {
-        if spools.isEmpty && errorMessage == nil {
-            Spacer()
-            ProgressView()
-            Spacer()
+    private var list: some View {
+        if !loaded && errorMessage == nil {
+            ProgressView().frame(maxWidth: .infinity).padding(.vertical, 44)
         } else if displayed.isEmpty {
-            let searching = !searchText.isEmpty || filter == .lowStock
-            ContentUnavailableView(
-                L10n.tr(searching ? "inventory.no_results" : "inventory.none"),
-                systemImage: "cylinder",
-                description: Text(errorMessage
-                    ?? L10n.tr(searching ? "inventory.no_results.sub" : "inventory.none.sub"))
-            )
+            let searching = !searchText.isEmpty || lowOnly
+            VStack(spacing: 5) {
+                Text(L10n.tr(searching ? "inventory.no_results" : "inventory.none"))
+                    .font(.khayt(15, .semibold, relativeTo: .headline))
+                    .foregroundStyle(KhaytDesign.ink)
+                Text(errorMessage ?? L10n.tr(searching ? "inventory.no_results.sub" : "inventory.none.sub"))
+                    .font(.khayt(13, relativeTo: .footnote))
+                    .foregroundStyle(KhaytDesign.note)
+            }
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 44).padding(.horizontal, 16)
         } else {
-            List(displayed) { spool in
-                Button {
-                    selectedSpool = spool
-                } label: {
-                    SpoolRow(spool: spool)
-                }
-                .buttonStyle(.plain)
-                .listRowBackground(KhaytDesign.surface)
-                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button(role: .destructive) {
-                        spoolToDelete = spool
-                    } label: {
-                        Label(L10n.tr("inventory.delete"), systemImage: "trash")
-                    }
+            LazyVStack(spacing: 8) {
+                ForEach(displayed) { spool in
+                    Button { openSpool = spool } label: { SpoolRow(spool: spool) }
+                        .buttonStyle(.plain)
                 }
             }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .refreshable { await load() }
+            .padding(.horizontal, 16)
         }
+    }
+
+    private var wholeLine: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(String(format: L10n.tr("inventory.whole.count"), spools.count.formatted()))
+                .font(.khayt(12.5, .semibold, relativeTo: .footnote).monospacedDigit())
+                .foregroundStyle(KhaytDesign.ink)
+            Text(L10n.tr("inventory.whole.body"))
+                .font(.khayt(12, relativeTo: .caption))
+                .foregroundStyle(KhaytDesign.note)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 14)
+        .overlay(alignment: .top) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
     }
 
     private func load() async {
@@ -174,122 +178,65 @@ struct InventoryView: View {
             spools = []
             errorMessage = error.localizedDescription
         }
+        loaded = true
     }
 }
 
-/// `khayt-inventory.jsx` SpoolRow: the colour, what it is, and how much is left.
+/// A spool in the list: its colour, what it is, and how much is left. A roll
+/// running low earns the amber rail — the design's only colour on this screen.
 private struct SpoolRow: View {
     let spool: InventorySpool
 
     /// What is left as a share of what it arrived with, or nil when the book
-    /// never recorded the arrival weight — a bar drawn against a guessed
-    /// kilo would read a 3 kg roll as three times full.
+    /// never recorded the arrival weight — a bar drawn against a guessed kilo
+    /// would read a 3 kg roll as three times full.
     private var fraction: Double? {
         guard let left = spool.remainingGrams, let full = spool.initialWeight, full > 0 else { return nil }
         return min(1, max(0, left / full))
     }
 
-    /// The mockup's `remainingColor`: red under 15%, amber under 30%. A roll
-    /// the shop's own low-stock rule flags is red whatever its share says.
-    private var levelColor: Color {
-        if spool.isLowStock { return KhaytDesign.danger }
-        guard let f = fraction else { return KhaytDesign.textDim }
-        if f < 0.15 { return KhaytDesign.danger }
-        if f < 0.30 { return KhaytDesign.warn }
-        return KhaytDesign.ok
-    }
-
-    private var subtitle: String {
-        var parts: [String] = []
-        if let sku = spool.sku, !sku.isEmpty { parts.append(sku) }
-        if let lot = spool.lot, !lot.isEmpty { parts.append(lot) }
-        if let p = spool.printTemp, let b = spool.bedTemp { parts.append("\(p)° / \(b)°") }
-        return parts.joined(separator: " · ")
-    }
+    private var tone: Color { spool.isLowStock ? KhaytDesign.attention : KhaytDesign.note }
 
     var body: some View {
         HStack(spacing: 12) {
-            swatch
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
+            SpoolSwatch(hex: spool.colorHex)
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
                     Text(spool.displayLabel)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(KhaytDesign.text)
+                        .font(.khayt(15, .medium, relativeTo: .body))
+                        .foregroundStyle(KhaytDesign.ink)
                         .lineLimit(1)
-                    if spool.isLowStock {
-                        Text(L10n.tr("inventory.low"))
-                            .font(.system(size: 9, weight: .bold))
-                            .tracking(0.4)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .foregroundStyle(KhaytDesign.danger)
-                            .background(KhaytDesign.dangerSoft, in: RoundedRectangle(cornerRadius: 4))
-                    }
-                }
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(KhaytDesign.textDim)
+                    Text(spool.id)
+                        .font(.khayt(11.5, .medium, relativeTo: .caption2))
+                        .foregroundStyle(KhaytDesign.note)
                         .lineLimit(1)
+                        .layoutPriority(-1)
+                        .environment(\.layoutDirection, .leftToRight)
                 }
-                HStack(spacing: 8) {
-                    if let f = fraction {
-                        LevelBar(fraction: f, color: levelColor)
+                HStack(spacing: 9) {
+                    if let fraction {
+                        LevelBar(fraction: fraction, color: tone)
                     } else {
                         Spacer(minLength: 0)
                     }
                     if let left = spool.remainingGrams {
                         Text("\(Int(left.rounded())) g")
-                            .font(.caption2.weight(.semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(levelColor)
+                            .font(.khayt(12.5, .medium, relativeTo: .caption).monospacedDigit())
+                            .foregroundStyle(tone)
+                            .environment(\.layoutDirection, .leftToRight)
                     }
                 }
             }
-            Image(systemName: "chevron.forward")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(KhaytDesign.textMuted)
         }
-        .contentShape(Rectangle())
+        .padding(.vertical, 12).padding(.leading, 16).padding(.trailing, 13)
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+        .background(KhaytDesign.surface)
+        .overlay(alignment: .leading) {
+            if spool.isLowStock { Rectangle().fill(KhaytDesign.attention).frame(width: 3) }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 11))
+        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+        .contentShape(RoundedRectangle(cornerRadius: 11))
         .accessibilityElement(children: .combine)
-    }
-
-    private var swatch: some View {
-        let fill = spool.colorHex.map { Color(hex: UInt32($0.dropFirst(), radix: 16) ?? 0x888888) }
-            ?? KhaytDesign.surface2
-        return RoundedRectangle(cornerRadius: 12)
-            .fill(fill)
-            .frame(width: 40, height: 40)
-            // A black roll on a dark card, or a white one on a light card, is
-            // otherwise a hole in the row.
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(KhaytDesign.textFaint, lineWidth: 1))
-            .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
-            .overlay(alignment: .topTrailing) {
-                if spool.isLowStock {
-                    Circle()
-                        .fill(KhaytDesign.danger)
-                        .frame(width: 12, height: 12)
-                        .overlay(Circle().stroke(KhaytDesign.surface, lineWidth: 2))
-                        .offset(x: 4, y: -4)
-                }
-            }
-            .accessibilityHidden(true)
-    }
-}
-
-/// A thin rounded level, filled from the leading edge — so it reads the right
-/// way round in Arabic too.
-private struct LevelBar: View {
-    let fraction: Double
-    let color: Color
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(KhaytDesign.surface3)
-                Capsule().fill(color).frame(width: max(4, geo.size.width * fraction))
-            }
-        }
-        .frame(height: 4)
     }
 }
