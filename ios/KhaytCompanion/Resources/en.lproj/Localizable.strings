@@ -459,3 +459,15 @@
 "pair.pin.prompt" = "Enter the PIN set on the Mac";
 "pair.missing.shop" = "Tap your shop above, or enter its address.";
 "pair.missing.pin" = "Enter the Owner LAN PIN to continue.";
+
+/* Order detail sheet (khayt-orders.jsx) */
+"order.detail.move_to" = "Move to %@";
+"order.detail.complete" = "Order complete";
+"order.detail.due_date" = "Due date";
+"order.detail.printer" = "Printer";
+
+"stage.short.pending" = "Pending";
+"stage.short.printing" = "Printing";
+"stage.short.post" = "Post";
+"stage.short.qc" = "QC";
+"stage.short.completed" = "Done";

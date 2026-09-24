@@ -459,3 +459,15 @@
 "pair.pin.prompt" = "أدخل رمز PIN المعيّن على جهاز Mac";
 "pair.missing.shop" = "اضغط على ورشتك أعلاه، أو أدخل عنوانها.";
 "pair.missing.pin" = "أدخل رمز PIN للمالك للمتابعة.";
+
+/* Order detail sheet (khayt-orders.jsx) */
+"order.detail.move_to" = "انقل إلى %@";
+"order.detail.complete" = "الطلب مكتمل";
+"order.detail.due_date" = "تاريخ التسليم";
+"order.detail.printer" = "الطابعة";
+
+"stage.short.pending" = "معلّق";
+"stage.short.printing" = "طباعة";
+"stage.short.post" = "معالجة";
+"stage.short.qc" = "فحص";
+"stage.short.completed" = "مكتمل";
