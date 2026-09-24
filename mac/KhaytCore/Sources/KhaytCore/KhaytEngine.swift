@@ -785,6 +785,12 @@ public actor KhaytEngine {
         // from the shop's own switches, and which alert types to compute so a
         // channel's choice is honoured. After `printer-alerts`.
         "alert-routes",
+        // The print library in the cloud: the buckets a shop is likely to use
+        // (endpoint built from an account id or region), and the tiering rules
+        // — what may leave this Mac, the `.cloud` sidecar, how a download is
+        // proved. The other app's own rules, so both read one bucket alike.
+        "storage-providers",
+        "print-library-tier",
         // A printer's smart plug: requests for four kinds of plug, and the rule
         // that power is never cut while printing, silent or hot.
         "smart-plug",
@@ -7714,6 +7720,118 @@ public actor KhaytEngine {
                           [machine, live ?? .null,
                            finishedAt.map { .number($0.timeIntervalSince1970 * 1000) } ?? .null,
                            .number(now.timeIntervalSince1970 * 1000)], as: Bool.self)
+    }
+
+    // MARK: - The print library in the cloud
+
+    public struct StorageProvider: Decodable, Sendable, Identifiable, Hashable {
+        public let id: String
+        public let label: String
+        /// A template like `https://{account}.r2.cloudflarestorage.com`, or
+        /// empty when the shop types the endpoint itself.
+        public let endpoint: String?
+        public let region: String?
+        public let vars: [Var]
+        public let cost: String?
+        public let egress: String?
+        public let note: String?
+        public let recommended: Bool?
+        public struct Var: Decodable, Sendable, Hashable {
+            public let key: String
+            public let label: String
+            public let hint: String?
+        }
+    }
+
+    public func storageProviders() throws -> [StorageProvider] {
+        try runtime.call2("KhaytStorageProviders.list()", [], as: [StorageProvider].self)
+    }
+
+    public struct ResolvedEndpoint: Decodable, Sendable, Equatable {
+        public let ok: Bool
+        public let endpoint: String?
+        public let region: String?
+        public let error: String?
+    }
+
+    /// The endpoint and region for a provider, from the one or two things only
+    /// the shop knows (an account id, a region).
+    public func resolveEndpoint(provider: String, vars: [String: String]) throws -> ResolvedEndpoint {
+        try runtime.call2("KhaytStorageProviders.resolveEndpoint(ARG0, ARG1)",
+                          [.string(provider), .object(vars.mapValues(JSONValue.string))],
+                          as: ResolvedEndpoint.self)
+    }
+
+    /// Which provider an endpoint belongs to, for a bucket set up elsewhere.
+    public func detectProvider(endpoint: String) throws -> String {
+        try runtime.call2("KhaytStorageProviders.detect(ARG0)", [.string(endpoint)], as: String.self)
+    }
+
+    public struct TierFile: Codable, Sendable, Equatable {
+        public let filename: String
+        public let fullPath: String
+        public let size: Double
+        public let mtimeMs: Double
+        public let id: String?
+        public init(filename: String, fullPath: String, size: Double, mtimeMs: Double, id: String?) {
+            self.filename = filename; self.fullPath = fullPath; self.size = size; self.mtimeMs = mtimeMs; self.id = id
+        }
+    }
+
+    public struct TierPlan: Decodable, Sendable {
+        public let candidates: [TierFile]
+        public let skipped: [String: Int]
+        public let bytes: Double
+    }
+
+    /// Which models may leave this Mac now, biggest first.
+    public func tierPlan(_ files: [TierFile], policy: JSONValue, now: Date) throws -> TierPlan {
+        let rows = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(files))
+        return try runtime.call2("KhaytPrintLibraryTier.plan(ARG0, ARG1, ARG2)",
+                                 [rows, policy, .number(now.timeIntervalSince1970 * 1000)], as: TierPlan.self)
+    }
+
+    /// The sidecar's TEXT, exactly as the other app writes it — the same
+    /// function and the same `JSON.stringify`, so field order and all match.
+    public func sidecarText(size: Int, sha256: String, key: String, provider: String, at: String) throws -> String {
+        try runtime.call2("JSON.stringify(KhaytPrintLibraryTier.makeSidecar({size: ARG0, sha256: ARG1, key: ARG2, provider: ARG3, at: ARG4}))",
+                          [.number(Double(size)), .string(sha256), .string(key), .string(provider), .string(at)],
+                          as: String.self)
+    }
+
+    public struct Sidecar: Codable, Sendable, Equatable {
+        public let v: Int
+        public let size: Double
+        public let sha256: String
+        public let key: String
+        public let provider: String?
+        public let at: String?
+    }
+
+    /// A sidecar's fields, or nil when it is not one this app can trust.
+    public func parseSidecar(_ text: String) throws -> Sidecar? {
+        let raw = try runtime.call2("KhaytPrintLibraryTier.parseSidecar(ARG0)", [.string(text)], as: JSONValue.self)
+        if case .null = raw { return nil }
+        return try JSONDecoder().decode(Sidecar.self, from: JSONEncoder().encode(raw))
+    }
+
+    /// `match`, `mismatch` or `unusable` (a multipart etag, which is not an MD5).
+    public func etagVerdict(etag: String?, md5: String) throws -> String {
+        try runtime.call2("KhaytPrintLibraryTier.etagVerdict(ARG0, ARG1)",
+                          [etag.map(JSONValue.string) ?? .null, .string(md5)], as: String.self)
+    }
+
+    public struct Verdict: Decodable, Sendable { public let ok: Bool; public let error: String }
+
+    /// Did the bytes that came back match what went up — size, then SHA-256?
+    public func verifyRehydrate(_ side: Sidecar, size: Int, sha256: String) throws -> Verdict {
+        let raw = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(side))
+        return try runtime.call2("KhaytPrintLibraryTier.verifyRehydrate(ARG0, ARG1, ARG2)",
+                                 [raw, .number(Double(size)), .string(sha256)], as: Verdict.self)
+    }
+
+    public func formatBytes(_ n: Double) throws -> String {
+        try runtime.call2("KhaytPrintLibraryTier.formatBytes(ARG0)", [.number(n)], as: String.self)
     }
 
     public struct PrinterAlerts: Decodable, Sendable {

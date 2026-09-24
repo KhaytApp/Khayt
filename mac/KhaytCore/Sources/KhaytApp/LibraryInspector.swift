@@ -90,7 +90,25 @@ struct LibraryInspector: View {
     /// The file, reachable. Buttons rather than only a context menu: a menu you
     /// have to know is there is a feature for the person who wrote it.
     @ViewBuilder private func actions(_ file: LibraryFile) -> some View {
-        if let url = shop.modelFile(for: file) {
+        if shop.isInCloudOnly(file) {
+            // Said where the missing buttons would be, so a model moved to
+            // the cloud does not read as a model that was lost.
+            HStack(spacing: 8) {
+                Label(shop.words.callIt("mac.cloudlib_in_cloud"), systemImage: "icloud")
+                    .foregroundStyle(.secondary)
+                Button { Task { await shop.bringBack(file) } } label: {
+                    Label(shop.words.callIt("mac.cloudlib_bring_back"), systemImage: "icloud.and.arrow.down")
+                }
+                .disabled(shop.cloudLibraryBusy)
+                if shop.cloudLibraryBusy { ProgressView().controlSize(.small) }
+            }
+            .controlSize(.small)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let problem = shop.cloudLibraryProblem {
+                Text(problem).font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } else if let url = shop.modelFile(for: file) {
             HStack(spacing: 8) {
                 Button { FileActions.reveal(url) } label: {
                     Label(shop.words.callIt("mac.reveal"), systemImage: "folder")
@@ -457,9 +475,11 @@ struct LibraryInspector: View {
                 }
             } else if shop.modelFile(for: file) == nil {
                 // The record is here and the file is not — an external library
-                // that is not mounted. Nothing to walk, and offering a button
-                // that cannot work is worse than saying so.
-                Text(shop.words.callIt("mac.not_found")).foregroundStyle(.secondary)
+                // that is not mounted, or a model moved to the cloud. Nothing
+                // to walk, and offering a button that cannot work is worse
+                // than saying so.
+                Text(shop.words.callIt(shop.isInCloudOnly(file) ? "mac.cloudlib_in_cloud" : "mac.not_found"))
+                    .foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(shop.words.callIt("risk.not_looked"))

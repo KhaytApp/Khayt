@@ -79,6 +79,11 @@ final class Shop {
     /// Where this shop's models live. Resolved once per book, because it reads
     /// settings and probes the disk, and every cell asks about it.
     private(set) var libraryRoots: LibraryLocation.Roots?
+    /// The print library in the cloud — see `CloudLibrary`.
+    var cloudLibraryNote: String?
+    var cloudLibraryProblem: String?
+    var cloudLibraryBusy = false
+    var cloudProgress: (done: Int, total: Int, name: String)?
     /// Who has this book open, when that is somebody else. Nil when nothing
     /// claims it — which is the ordinary case, and says nothing on screen.
     private(set) var owner: String?
@@ -7958,6 +7963,12 @@ final class Shop {
 
         await load(source)
         importProgress = nil
+        // Into the bucket too, when the shop backs its library up there. In
+        // the background: an import is not made to wait on the network.
+        if !report.addedIds.isEmpty {
+            let ids = report.addedIds
+            Task { [weak self] in await self?.backUpToCloud(ids: ids) }
+        }
         importNote = words.callIt("mac.import_done", [
             "moved": .number(Double(report.moved)),
             "duplicates": .number(Double(report.duplicates)),
@@ -12682,7 +12693,13 @@ final class Shop {
         }
         let contents = (try? FileManager.default.contentsOfDirectory(at: dir,
             includingPropertiesForKeys: nil)) ?? []
-        let models = contents.filter { !["jpg", "jpeg", "png"].contains($0.pathExtension.lowercased()) }
+        // Not a `.cloud` sidecar: a model moved to the cloud (by this app or
+        // the other one) leaves only that note behind, and handing the NOTE
+        // back as the model opened a few hundred bytes of JSON in the slicer.
+        let models = contents.filter {
+            !["jpg", "jpeg", "png", "cloud"].contains($0.pathExtension.lowercased())
+                && !$0.lastPathComponent.contains(".part-")
+        }
         return models.count == 1 ? models[0] : nil
     }
 
