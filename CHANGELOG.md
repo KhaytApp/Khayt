@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) A backup taken before "reset everything" is labelled as such.**
+  The other app now takes a protected `pre-wipe-` copy before it resets a
+  book (#1574). The Mac's Restore list marks it "taken before everything was
+  reset" — not "taken before an update", which is what it would otherwise
+  have been called, or nothing at all.
+
 - **A full wipe keeps one copy of your book.** "Delete everything" used to
   delete everything, backups included, so a wipe made by mistake could not be
   undone. It now saves one copy of your book first and checks the copy can be

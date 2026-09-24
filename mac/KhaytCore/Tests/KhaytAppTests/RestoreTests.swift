@@ -292,6 +292,15 @@ struct RestoreTests {
         #expect(!shelf[1].isInsurance)
     }
 
+    @Test("a copy taken before a reset is protected too, and says so rather than 'before an update'")
+    func beforeAWipe() {
+        #expect(Restore.Insurance.of("pre-wipe-2026-09-24T15-00-00-000Z.json") == .wipe)
+        #expect(Restore.Insurance.of("pre-update-v3.7.0-2026-09-02.json") == .update)
+        #expect(Restore.Insurance.of("pre-upgrade-v1-to-v2-x.json") == .update)
+        #expect(Restore.Insurance.of("2026-09-24.json") == nil)
+        #expect(Restore.Insurance.of("snap-2026-09-24-1200.json") == nil)
+    }
+
     @Test("a filename cannot name a file outside the backups folder")
     func refusesAPathTraversal() throws {
         // The only thing a restore takes is a filename. `../khayt-store.json`

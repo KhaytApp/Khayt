@@ -1921,6 +1921,7 @@ final class Words {
         "mac.restore_safety": ["en": "A copy of the book as it is now is taken first.",
                                "ar": "تُؤخذ نسخة من الدفتر كما هو الآن أولًا."],
         "mac.restore_insurance": ["en": "taken before an update", "ar": "أُخذت قبل تحديث"],
+        "mac.restore_before_wipe": ["en": "taken before everything was reset", "ar": "أُخذت قبل مسح كل شيء"],
         "mac.restore_do":    ["en": "Restore",      "ar": "استعادة"],
         "mac.restored":      ["en": "Restored from", "ar": "استُعيدت من"],
         "mac.restore_failed": ["en": "Nothing was restored:", "ar": "لم تُستعد أي بيانات:"],
