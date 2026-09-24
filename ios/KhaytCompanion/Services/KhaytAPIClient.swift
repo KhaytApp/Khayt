@@ -175,6 +175,11 @@ final class KhaytAPIClient: ObservableObject {
         await fromBook { try await $0.orderFacts() } ?? [:]
     }
 
+    /// What the book just copied holds, for pairing's last step.
+    func fetchPairingSummary() async -> PairingSummary? {
+        await fromBook { try await $0.pairingSummary() }
+    }
+
     func fetchPulse() async -> ShopPulse? {
         await fromBook { try await $0.pulse() }
     }

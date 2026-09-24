@@ -241,7 +241,7 @@
 "pair.shop.offline" = "Can work offline with this shop";
 "pair.shop.online_only" = "Needs the Mac in reach for every screen";
 "pair.manual.name" = "Shop name (optional label)";
-"pair.manual.host" = "Computer IP address";
+"pair.manual.host" = "Desktop IP";
 "pair.ip_help" = "How do I find the IP address?";
 "pair.ip_help.terminal" = "On the Mac running Khayt, open **Terminal** and run:";
 "pair.ip_help.result" = "Use the number shown (e.g. 192.168.1.42). If empty, try **en1** or check **System Settings → Wi‑Fi → Details**.";
@@ -498,3 +498,25 @@
 "order.field.filament" = "Filament";
 "order.field.quantity" = "Quantity";
 "order.detail.mark_done" = "Mark done";
+
+/* Pairing, as design/ios-v2 draws it */
+"pair.find.title" = "Which shop?";
+"pair.find.body" = "Macs running Khayt announce themselves on this Wi‑Fi.";
+"pair.searching" = "Searching";
+"pair.shop.needs_mac" = "Needs the Mac in reach";
+"pair.manual.why" = "For a Mac that does not advertise, or a network that blocks it.";
+"pair.manual.title" = "The Mac’s address";
+"pair.manual.body" = "Khayt prints both on the desktop, under Settings → LAN API.";
+"pair.manual.port" = "Port";
+"pair.pin.title" = "The owner PIN";
+"pair.pin.body" = "Four digits from Settings → LAN API. The intake PIN will not work here.";
+"pair.pin.foot" = "Kept in the iPhone Keychain, never sent anywhere but this Mac.";
+"pair.pin.wrong" = "That PIN was refused. Check Settings → LAN API on the Mac.";
+"pair.connect" = "Connect";
+"pair.finish" = "Open the board";
+"pair.pull.title" = "Copying the shop’s book";
+"pair.pull.body" = "A working set, not the whole thing — history stays on the Mac.";
+"pair.pull.settings" = "Settings";
+"pair.pull.open_orders" = "Open orders";
+"pair.pull.newest_finished" = "Newest finished";
+"pair.pull.foot" = "Expenses, print files, products, the audit log and the rest of the book were not sent. The phone knows it does not have them.";

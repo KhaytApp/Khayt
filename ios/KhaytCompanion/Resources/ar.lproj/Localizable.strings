@@ -231,7 +231,7 @@
 "pair.desktop.pin" = "تعيين رمز PIN للمالك (احفظه)";
 "pair.shop.title" = "اختر ورشتك";
 "pair.shop.body" = "يجب أن يكون الهاتف والكمبيوتر على **نفس شبكة الواي فاي**. يبحث Khayt عنها — لا حاجة لكتابة عنوان.";
-"pair.manual" = "إدخال العنوان يدوياً";
+"pair.manual" = "سأُدخل العنوان بنفسي";
 "pair.pin" = "رمز PIN للمالك";
 "pair.shops" = "الورش على هذه الشبكة";
 "pair.browse.failed" = "لا يستطيع Khayt البحث عن الورش على هذه الشبكة.";
@@ -241,7 +241,7 @@
 "pair.shop.offline" = "يعمل دون اتصال مع هذه الورشة";
 "pair.shop.online_only" = "يحتاج جهاز Mac في المتناول لكل شاشة";
 "pair.manual.name" = "اسم الورشة (اختياري)";
-"pair.manual.host" = "عنوان IP للكمبيوتر";
+"pair.manual.host" = "عنوان السطح";
 "pair.ip_help" = "كيف أجد عنوان IP؟";
 "pair.ip_help.terminal" = "على جهاز Mac الذي يعمل عليه Khayt، افتح **Terminal** وشغّل:";
 "pair.ip_help.result" = "استخدم الرقم الظاهر (مثلاً 192.168.1.42). إن كان فارغاً، جرّب **en1** أو راجع **إعدادات النظام ← Wi‑Fi ← التفاصيل**.";
@@ -498,3 +498,25 @@
 "order.field.filament" = "الخيط";
 "order.field.quantity" = "الكمية";
 "order.detail.mark_done" = "إنهاء";
+
+/* Pairing, as design/ios-v2 draws it */
+"pair.find.title" = "أي ورشة؟";
+"pair.find.body" = "أجهزة الماك التي تشغّل خيط تعلن عن نفسها على هذه الشبكة.";
+"pair.searching" = "جاري البحث";
+"pair.shop.needs_mac" = "يحتاج الماك قريباً";
+"pair.manual.why" = "لماك لا يعلن عن نفسه، أو شبكة تحجب ذلك.";
+"pair.manual.title" = "عنوان الماك";
+"pair.manual.body" = "يعرضهما خيط على السطح، في الإعدادات ← واجهة الشبكة.";
+"pair.manual.port" = "المنفذ";
+"pair.pin.title" = "رمز المالك";
+"pair.pin.body" = "أربعة أرقام من الإعدادات ← واجهة الشبكة. رمز الاستقبال لا يصلح هنا.";
+"pair.pin.foot" = "يُحفظ في سلسلة مفاتيح الآيفون، ولا يُرسل إلا لهذا الماك.";
+"pair.pin.wrong" = "رُفض هذا الرمز. راجع الإعدادات ← واجهة الشبكة على الماك.";
+"pair.connect" = "اتصال";
+"pair.finish" = "افتح اللوحة";
+"pair.pull.title" = "نسخ دفتر الورشة";
+"pair.pull.body" = "مجموعة عمل، لا الدفتر كاملاً — السجل يبقى على الماك.";
+"pair.pull.settings" = "الإعدادات";
+"pair.pull.open_orders" = "طلبات مفتوحة";
+"pair.pull.newest_finished" = "أحدث المنتهية";
+"pair.pull.foot" = "لم تُرسل المصروفات وملفات الطباعة والمنتجات وسجل التدقيق وبقية الدفتر. والهاتف يعلم أنها ليست لديه.";

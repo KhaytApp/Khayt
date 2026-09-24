@@ -39,8 +39,9 @@ struct OrderDetailPage: View {
             // The design's two-line title: the job's number and who it is for.
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 1) {
-                    Text(L10n.tr("order.detail.title"))
+                    Text(order.displayTitle)
                         .font(.khayt(16, .semibold, relativeTo: .headline))
+                        .lineLimit(1)
                         .foregroundStyle(KhaytDesign.ink)
                     Text("#\(order.id) · \(order.displayClient)")
                         .font(.khayt(11.5, relativeTo: .caption))

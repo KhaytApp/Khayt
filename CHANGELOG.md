@@ -56,6 +56,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saying how much of it the phone holds and that the rest is on the Mac.
   Filament and quantity are read from the phone's book rather than added to
   `/api/queue`, which the desktop, the native Mac and the phone all share.
+- **(iOS) Pairing is the design's three steps.** Which shop (the Macs on
+  this Wi-Fi, each saying whether the phone can work offline with it, and a
+  quiet link to type an address instead), the owner PIN (a refused PIN is
+  said as one), and "Copying the shop's book", which itemises what landed —
+  settings, open orders, the newest finished, clients, inventory, machines —
+  and that the rest stayed on the Mac. A desktop that does not serve its book
+  skips the last step and is paired all the same.
 
 - **(iOS) The companion moves to its real design (v2).** It had been built
   against an older mockup; the current design is Turki's Claude Design

@@ -221,6 +221,31 @@ actor BookReader {
         return out
     }
 
+    /// What landed, for pairing's last step — the design's "copying the
+    /// shop's book" list. Counted from the book as it now sits on the phone,
+    /// so it says what the phone HAS, not what the Mac said it sent.
+    func pairingSummary() throws -> PairingSummary {
+        let store = try book.read()
+        func rows(_ key: String) -> [JSONValue] {
+            if case .array(let r)? = store[key] { return r }
+            return []
+        }
+        let finished: Set<String> = ["completed", "delivered", "shipped", "cancelled"]
+        let orders = rows("printLog")
+        let done = orders.filter { row in
+            if case .object(let o) = row, case .string(let st)? = o["status"] { return finished.contains(st) }
+            return false
+        }.count
+        return PairingSummary(settings: store["settings"] != nil,
+                              openOrders: orders.count - done,
+                              newestFinished: done,
+                              finishedWindowed: !book.holdsAll("printLog"),
+                              clients: rows("clients").count,
+                              inventory: rows("inventory").count,
+                              machines: rows("machines").count,
+                              omittedAnything: !(book.scope()?.omitted.isEmpty ?? true))
+    }
+
     /// Is there a book on this phone at all?
     ///
     /// `nonisolated` so a read path can ask without hopping onto the actor just
@@ -402,6 +427,20 @@ actor BookReader {
 
 /// What Shop Pulse shows. A money figure the book cannot answer is nil — the
 /// screen's em-dash, "On the Mac" — and never a zero.
+/// See `BookReader.pairingSummary()`.
+struct PairingSummary: Equatable, Sendable {
+    var settings: Bool
+    var openOrders: Int
+    var newestFinished: Int
+    /// Whether the finished orders are the newest few rather than all of them —
+    /// the design marks that row in amber.
+    var finishedWindowed: Bool
+    var clients: Int
+    var inventory: Int
+    var machines: Int
+    var omittedAnything: Bool
+}
+
 /// See `BookReader.orderFacts()`.
 struct OrderFacts: Equatable, Sendable {
     var material: String?
