@@ -54,6 +54,8 @@ struct LibraryLocationParityTests {
 
     /// Each case: the settings object, and the default root.
     static let cases: [(name: String, settings: String, defaultRoot: String)] = [
+        ("a drive root as the root, the mirror and in history — never a library folder",
+         "{root:'/', mirror:' / ', history:['/', '/Volumes/old']}", "/Users/x/vault"),
         ("nothing configured — the built-in vault",
          "{}", "/Users/x/Library/Application Support/khayt/print-files-vault"),
         ("a NAS, chosen by the shop",
