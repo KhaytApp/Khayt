@@ -1571,6 +1571,45 @@ private struct Live: View {
         case nil:
             DetailSection(shop.words.callIt("mac.live")) { reading }
         }
+        // The plug the printer sits on, when there is one. Switching OFF goes
+        // through the shared rule every time; the button is refused with the
+        // reason rather than hidden, so the shop knows why it cannot.
+        if machine.smartPlug?.usable == true {
+            DetailSection(shop.words.callIt("plug.title")) { plugRow }
+        }
+    }
+
+    @ViewBuilder private var plugRow: some View {
+        let state = shop.plugStates[machine.id]
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Image(systemName: state?.on == true ? "powerplug.fill" : "powerplug")
+                    .foregroundStyle(state?.on == true ? Khayt.done : .secondary)
+                Text(shop.words.callIt(state?.on == true ? "plug.on"
+                                       : state?.on == false ? "plug.off" : "plug.unknown"))
+                    .font(.callout)
+                if let watts = state?.watts {
+                    Text("\(Money.quantity(watts)) W").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                }
+                Spacer()
+                if state?.on == true {
+                    Button(shop.words.callIt("plug.turn_off")) {
+                        Task { await shop.switchPlug(machine, on: false) }
+                    }
+                } else {
+                    Button(shop.words.callIt("plug.turn_on")) {
+                        Task { await shop.switchPlug(machine, on: true) }
+                    }
+                }
+            }
+            .buttonStyle(.bordered).controlSize(.small)
+            .disabled(!shop.canMoveJobs)
+            if let problem = shop.plugProblem[machine.id] {
+                Text(problem).font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .task(id: machine.id) { await shop.readPlug(machine) }
     }
 
     @ViewBuilder private var reading: some View {

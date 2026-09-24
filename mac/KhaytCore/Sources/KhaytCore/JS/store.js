@@ -116,11 +116,22 @@
 
   function redactMachinesForExport(arr) {
     return (arr || []).map(m => {
-      if (!m?.printerApi) return m;
-      const pa = { ...m.printerApi };
-      if (pa.apiKey) pa.apiKey = STORE_SECRET_MASK;
-      if (pa.accessCode) pa.accessCode = STORE_SECRET_MASK;
-      return { ...m, printerApi: pa };
+      if (!m?.printerApi && !m?.smartPlug) return m;
+      const out = { ...m };
+      if (m.printerApi) {
+        const pa = { ...m.printerApi };
+        if (pa.apiKey) pa.apiKey = STORE_SECRET_MASK;
+        if (pa.accessCode) pa.accessCode = STORE_SECRET_MASK;
+        out.printerApi = pa;
+      }
+      // A plug's token or password switches a printer's power: the same rule.
+      if (m.smartPlug) {
+        const sp = { ...m.smartPlug };
+        if (sp.token) sp.token = STORE_SECRET_MASK;
+        if (sp.password) sp.password = STORE_SECRET_MASK;
+        out.smartPlug = sp;
+      }
+      return out;
     });
   }
 

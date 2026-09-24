@@ -80,6 +80,10 @@ final class PrinterWatch {
             if let status = seen.status {
                 var entry: [String: JSONValue] = [
                     "state": .string(status.state),
+                    // The smart plug's rule will not cut power to a hot end.
+                    // Electron keeps the whole status object and so has always
+                    // carried this; here it was never copied across.
+                    "tempNozzle": status.tempNozzle.map(JSONValue.number) ?? .null,
                     "progress": .number(Double(status.progress)),
                     "filename": .string(status.filename),
                     "lastUpdated": .number(seen.at.timeIntervalSince1970 * 1000),
