@@ -20,6 +20,7 @@ struct LibraryInspector: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header(file)
+                    creatorAndCopies(file)
                     LayerRule()
                     theFile(file)
                     if !file.palette.isEmpty {
@@ -116,6 +117,10 @@ struct LibraryInspector: View {
                 Button { FileActions.open(url) } label: {
                     Label(shop.words.callIt("mac.open"), systemImage: "arrow.up.forward.app")
                 }
+                Button { shop.setPrintNext([file.id], on: !file.isPrintNext) } label: {
+                    Label(shop.words.callIt(file.isPrintNext ? "mac.print_next_remove" : "mac.print_next_add"),
+                          systemImage: file.isPrintNext ? "bookmark.fill" : "bookmark")
+                }
                 // The door to the catalogue, where it can be seen — it lived
                 // only in a right-click menu, and a shop went looking for it.
                 Button { Task { await shop.editingProduct = shop.productFromFile(file) } } label: {
@@ -124,6 +129,39 @@ struct LibraryInspector: View {
             }
             .controlSize(.small)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// Who made it, as a way to the rest of their models; and the copies of
+    /// it the library holds, each a way to it.
+    @ViewBuilder private func creatorAndCopies(_ file: LibraryFile) -> some View {
+        if file.isLinked, let path = file.externalPath {
+            Label(shop.words.callIt("mac.linked_where",
+                                    ["path": .string(((path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)]),
+                  systemImage: "link")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        }
+        if let creator = file.creator {
+            Button {
+                shop.libraryCreator = creator
+                shop.shelf = .library(nil)
+            } label: {
+                Label(shop.words.callIt("mac.by_creator", ["name": .string(creator)]), systemImage: "person")
+            }
+            .buttonStyle(.link)
+            .help(shop.words.callIt("mac.creator_show_all"))
+        }
+        let copies = shop.duplicates(of: file)
+        if !copies.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(shop.words.callIt("mac.duplicate_of", ["n": .number(Double(copies.count))]),
+                      systemImage: "square.on.square")
+                    .font(.callout.weight(.medium)).foregroundStyle(Khayt.attention)
+                ForEach(copies) { copy in
+                    Button(copy.title) { shop.select(copy, modifiers: .replace) }
+                        .buttonStyle(.link).lineLimit(1)
+                }
+            }
         }
     }
 

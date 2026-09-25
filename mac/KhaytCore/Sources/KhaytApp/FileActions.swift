@@ -153,6 +153,13 @@ struct ModelActions: View {
             Button(shop.words.callIt("mac.reveal_folder")) { FileActions.reveal(dir) }
             Divider()
         }
+        // On or off the Print next list — this model, or every one selected.
+        let marked = shop.fileSelection.contains(file.id) && shop.fileSelection.count > 1
+            ? shop.fileSelection : [file.id]
+        let allOn = shop.files.filter { marked.contains($0.id) }.allSatisfy(\.isPrintNext)
+        Button(shop.words.callIt(allOn ? "mac.print_next_remove" : "mac.print_next_add")) {
+            shop.setPrintNext(marked, on: !allOn)
+        }
         // To the catalogue: this model — or, when it is one of several
         // selected, all of them, as one product or one each.
         let chosen = shop.fileSelection.contains(file.id) ? shop.selectedFiles : []

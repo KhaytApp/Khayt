@@ -90,7 +90,7 @@ enum LibraryImport {
     /// STEP first, because it is what engineering customers send. Reading one
     /// properly means tessellating NURBS surfaces — a B-rep kernel, not a
     /// parser — so this app does not pretend to have measured it.
-    static let kinds: Set<String> = [
+    nonisolated static let kinds: Set<String> = [
         // Meshes it can read and measure.
         "stl", "3mf", "obj",
         // CAD a customer sends. Filed, not measured.
@@ -189,6 +189,7 @@ enum LibraryImport {
                     nameOfExisting: (String) -> String?,
                     engine: KhaytEngine,
                     keepOriginal: Bool = false,
+                    inPlace: Bool = false,
                     group: String? = nil,
                     documents: [URL] = [],
                     title: String? = nil,
@@ -228,29 +229,37 @@ enum LibraryImport {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         } catch { throw Failure.failed(error.localizedDescription) }
 
-        let filename = vaultFilename(in: dir, originalName: originalName, ext: ext)
-        let destination = dir.appending(path: filename)
-        do { try FileManager.default.copyItem(at: source, to: destination) }
-        catch {
-            try? FileManager.default.removeItem(at: dir)
-            throw Failure.failed(error.localizedDescription)
-        }
+        // ── IN PLACE: LINKED, NOT COPIED ─────────────────────────────────
+        //
+        // A model in a folder the shop LINKED (a NAS, an external drive) is
+        // indexed where it sits: measured, read and pictured from there, and
+        // the record points at it. Nothing is copied and — below — nothing is
+        // ever removed; the vault folder holds only its picture.
+        let filename = inPlace ? originalName : vaultFilename(in: dir, originalName: originalName, ext: ext)
+        let destination = inPlace ? source : dir.appending(path: filename)
+        if !inPlace {
+            do { try FileManager.default.copyItem(at: source, to: destination) }
+            catch {
+                try? FileManager.default.removeItem(at: dir)
+                throw Failure.failed(error.localizedDescription)
+            }
 
-        // COPY, READ BACK, COMPARE — never on the strength of the copy call
-        // returning. `lib/print-library-migrate.js` states the rule this
-        // follows: "a duplicate is recoverable, a deletion is not", and a short
-        // write to a share that dropped mid-transfer returns without throwing
-        // exactly like a good one does.
-        guard (try? contentHash(of: destination)) == hash else {
-            try? FileManager.default.removeItem(at: dir)
-            throw Failure.failed("\(originalName) did not arrive intact")
+            // COPY, READ BACK, COMPARE — never on the strength of the copy call
+            // returning. `lib/print-library-migrate.js` states the rule this
+            // follows: "a duplicate is recoverable, a deletion is not", and a short
+            // write to a share that dropped mid-transfer returns without throwing
+            // exactly like a good one does.
+            guard (try? contentHash(of: destination)) == hash else {
+                try? FileManager.default.removeItem(at: dir)
+                throw Failure.failed("\(originalName) did not arrive intact")
+            }
         }
 
         // THE GUIDES, beside the model. Best-effort and after the model is in
         // place: an import must not fail because a PDF would not copy, and a
         // model with no instructions is a model, while no model at all is
-        // nothing.
-        for paper in documents {
+        // nothing. A linked model's guides are already beside it.
+        for paper in documents where !inPlace {
             let into = destination.deletingLastPathComponent()
                 .appending(path: paper.lastPathComponent)
             guard !FileManager.default.fileExists(atPath: into.path) else { continue }
@@ -336,7 +345,8 @@ enum LibraryImport {
                                  reader: try? await engine.geometryReader(), colours: colours,
                                  swapCount: swapCount, thumbFile: thumbFile, group: group,
                                  provenance: said, riskAnalysis: riskAnalysis,
-                                 parsed: await SlicerFigures.read(destination, engine: engine) ?? [:])
+                                 parsed: await SlicerFigures.read(destination, engine: engine) ?? [:],
+                                 externalPath: inPlace ? source.standardizedFileURL.path : nil)
         do {
             try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
                 var rows: [JSONValue] = []
@@ -370,7 +380,8 @@ enum LibraryImport {
         // but the original may be in iCloud Drive or Dropbox, where deleting
         // it deletes it on every device; the Trash is the Finder's own undo.
         // A source the Trash will not take is simply left where it was.
-        if !keepOriginal {
+        // NEVER for a linked model: its file is the shop's, where it put it.
+        if !keepOriginal && !inPlace {
             do { try FileManager.default.trashItem(at: source, resultingItemURL: nil); movedIn = true }
             catch { movedIn = false }
         }
@@ -451,6 +462,7 @@ enum LibraryImport {
                         nameOfExisting: @escaping (String) -> String?,
                         engine: KhaytEngine,
                         keepOriginal: Bool = false,
+                        inPlace: Bool = false,
                         analyseRisk: Bool = false,
                         owns: @escaping () -> Bool,
                         whoHasIt: @escaping () -> String?,
@@ -464,7 +476,7 @@ enum LibraryImport {
             do {
                 let added = try await add(file.url, storeURL: storeURL, libraryRoot: libraryRoot,
                                           knownHashes: known, nameOfExisting: nameOfExisting,
-                                          engine: engine, keepOriginal: keepOriginal,
+                                          engine: engine, keepOriginal: keepOriginal, inPlace: inPlace,
                                           group: file.group, documents: file.documents,
                                           title: file.title,
                                           analyseRisk: analyseRisk,
@@ -501,6 +513,7 @@ enum LibraryImport {
                        provenance: Mesh.Provenance? = nil,
                        riskAnalysis: [String: JSONValue]? = nil,
                        parsed: [String: JSONValue] = [:],
+                       externalPath: String? = nil,
                        now: Double = Date().timeIntervalSince1970 * 1000)
         -> [String: JSONValue] {
         var out: [String: JSONValue] = [
@@ -522,6 +535,8 @@ enum LibraryImport {
                 "kind": .string(["stl", "3mf", "obj"].contains(ext) ? "model" : "gcode"),
             ]),
             "parsed": .object(parsed),
+            // Where a LINKED model's file is. Absent for a model in the vault.
+            "externalPath": externalPath.map(JSONValue.string) ?? .null,
             "colors": .array(colours),
             "swapCount": .number(Double(swapCount)),
             "thumbFile": thumbFile.map(JSONValue.string) ?? .null,

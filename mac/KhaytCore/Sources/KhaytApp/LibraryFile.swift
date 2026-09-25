@@ -71,6 +71,13 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let geometryReader: Int?
     /// Where the model came from — a URL, a designer, or "my own design".
     let source: String?
+    /// When the shop put this model on its Print next list; absent when it is
+    /// not on it. A date rather than a flag, so the list reads oldest first.
+    let printNextAt: String?
+    /// For a LINKED model — indexed where it sits, never copied — the file's
+    /// own path. Absent for a model that lives in the vault.
+    let externalPath: String?
+    var isLinked: Bool { !(externalPath ?? "").isEmpty }
     /// What its licence lets a shop do. `lib/model-licence.js` reads it; this
     /// only carries it.
     let licence: String?
@@ -137,6 +144,22 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
 
     var title: String { name.isEmpty ? (originalName ?? id) : name }
     var isFavourite: Bool { favorite == true }
+    var isPrintNext: Bool { !(printNextAt ?? "").isEmpty }
+
+    /// Who made it, as the library groups by: the designer the file or the
+    /// shop named, or — for a link — the site it came from. Nil when unsaid.
+    var creator: String? { Self.creator(of: source) }
+
+    static func creator(of source: String?) -> String? {
+        let s = (source ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty else { return nil }
+        if let url = URL(string: s), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+           var host = url.host?.lowercased() {
+            if host.hasPrefix("www.") { host.removeFirst(4) }
+            return host
+        }
+        return s
+    }
     var printCount: Int { timesPrinted ?? 0 }
     var swaps: Int { swapCount ?? 0 }
     var palette: [Colour] { colors ?? [] }

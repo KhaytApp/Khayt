@@ -4,6 +4,38 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Cloud sync stops retrying what retrying cannot fix, and says why.** When
+  Khayt Cloud refuses for a reason that will not pass on its own (this version
+  cannot read the shop's newer changes, the store is over the plan's size, or
+  the sign-in is rejected or read-only), the desktop kept trying on a timer for
+  as long as it was open. It now stops and shows the cloud's own explanation.
+  The next change you make, or Sync now, tries again, so updating, upgrading
+  or signing back in is enough; a network or server outage is still retried
+  on its own.
+- **(Mac) The library can be browsed by creator, keeps a Print next list, and
+  finds its own duplicates.** Asked for by the shop after looking at LayerMate.
+  - **Creators:** a chip per designer — the one the file names, or the shop
+    typed — and for a link, the site it came from; the busiest eight on the
+    row, and "by …" in the inspector opens everything by that creator.
+  - **Print next:** mark any model (right-click, or the inspector) and the
+    Print next chip lists them, oldest first. A list the shop keeps, beside
+    Never printed, which is the fact.
+  - **Duplicates:** models that are the same file (identical bytes), or the
+    same mesh re-saved, which the import could not catch because they were
+    already in the library. The chip shows the copies side by side, and a
+    model's inspector names its copies. On the shop's own book: 56 models in
+    28 pairs.
+  - **Folders indexed where they are:** Settings → Preferences → Where the
+    library lives → Link a folder… — a NAS, an external drive, a shared
+    folder. Its models appear in the library, measured, pictured, with the
+    slicer's figures and grouped into projects, and stay exactly where they
+    are: nothing is copied, moved or deleted. Deleting such a model removes it
+    from the library only; unlinking the folder takes its models out and
+    leaves every file alone; an unplugged drive shows its models as not
+    found. New files are picked up when the book opens, or with "Look for new
+    models". (The desktop app does not read linked models yet, and shows them
+    as missing.)
+
 - **(Mac) The PIN no longer sits in the browser's address bar.** Opening the
   live queue in a browser asks for the PIN once, in a form, and keeps a
   12-hour session cookie (HttpOnly, SameSite=Strict) instead — the page
