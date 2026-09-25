@@ -3728,6 +3728,52 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.47] - 2026-09-25
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The product sheet prices as you type and takes a price you set; a multi-plate
+3MF can be priced plate by plate; and the library opens without a pause.
+
+### Added
+
+- **(Mac) Choose which plates of a multi-plate 3MF to price.** Asked for by
+  the shop: "if it's a 3MF with multiple plates I should be able to pick which
+  plate to price, and whether all or specific ones". Each plate the slicer cut
+  a file into is read on its own — its time, its filament, its material — and
+  a product made from such a file starts with a part per plate; the product
+  sheet's Plates row switches any plate on or off, with its time and weight
+  beside it, and All puts them all back. The price follows at once.
+  - The file's own figures were wrong too: the time was the FIRST plate's and
+    the filament EVERY plate's — the shop's two-plate Adiletten read as
+    10.9 h and 286 g. It is now the sum of both, 21.8 h and 286 g, and every
+    3MF already in the library is read again once, plate by plate.
+
+### Fixed
+
+- **(Mac) The product sheet's price follows every change, and a typed price
+  shows.** Reported by the shop: "the price does not update when I make
+  changes to values, also I can't change any prices manually".
+  - The part being typed counts toward the price as soon as it has a weight
+    or a time, and moves it with every figure, rate, spool or quantity; Save
+    keeps it too, instead of dropping a part filled in but never added.
+  - A part already on the product — one added from the library, say — can be
+    edited: the pencil takes it back into the fields, and Update part puts it
+    back where it was. It could only be removed before.
+  - A price typed in "Or set the price" is shown even when the parts cost
+    nothing; that case used to hide the price line altogether, so the typed
+    price appeared to do nothing.
+
+- **(Mac) Opening and leaving the library no longer freezes the window.**
+  Reported by the shop: "there is a lag when choosing the library or leaving
+  it". Measured on the shop's own 247-model book: about a second each way,
+  against 10–45 ms for every other screen. The library's sort read two dates
+  per comparison and built a new date reader and calendar each time — a cost
+  introduced with the Gregorian-dates fix. Dates are now read once per sort,
+  by a reader made once; the library opens in the same time as every other
+  screen. And a folder of one model says "1 model".
+
 ## [4.0.0-alpha.46] - 2026-09-25
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
