@@ -25,6 +25,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     already in the library. The chip shows the copies side by side, and a
     model's inspector names its copies. On the shop's own book: 56 models in
     28 pairs.
+  - **Folders indexed where they are:** Settings → Preferences → Where the
+    library lives → Link a folder… — a NAS, an external drive, a shared
+    folder. Its models appear in the library, measured, pictured, with the
+    slicer's figures and grouped into projects, and stay exactly where they
+    are: nothing is copied, moved or deleted. Deleting such a model removes it
+    from the library only; unlinking the folder takes its models out and
+    leaves every file alone; an unplugged drive shows its models as not
+    found. New files are picked up when the book opens, or with "Look for new
+    models". (The desktop app does not read linked models yet, and shows them
+    as missing.)
 
 - **(Mac) The PIN no longer sits in the browser's address bar.** Opening the
   live queue in a browser asks for the PIN once, in a form, and keeps a

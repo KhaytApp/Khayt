@@ -74,6 +74,10 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// When the shop put this model on its Print next list; absent when it is
     /// not on it. A date rather than a flag, so the list reads oldest first.
     let printNextAt: String?
+    /// For a LINKED model — indexed where it sits, never copied — the file's
+    /// own path. Absent for a model that lives in the vault.
+    let externalPath: String?
+    var isLinked: Bool { !(externalPath ?? "").isEmpty }
     /// What its licence lets a shop do. `lib/model-licence.js` reads it; this
     /// only carries it.
     let licence: String?

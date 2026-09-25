@@ -798,6 +798,7 @@ final class Shop {
             createRecurringIfDue()
             readProvenanceIfDue()
             readSlicerFiguresIfDue()
+            rescanLinkedIfDue()
             // Beside the standing orders, which is the same kind of thing: a
             // write the shop asked to have made for it. After the book has
             // loaded, because it reads what is already on order to decide.
@@ -1066,6 +1067,17 @@ final class Shop {
     /// read per model — the part before `<resources`, not the geometry — which
     /// is why this can run again on the next launch rather than needing a
     /// marker written into the book.
+    /// The books whose linked folders this launch has already rescanned.
+    private var linkedScannedBooks: Set<String> = []
+
+    /// New models in the linked folders, picked up once when the book opens.
+    func rescanLinkedIfDue() {
+        guard case .store(let build) = source, !linkedScannedBooks.contains(build.rawValue),
+              !linkedFolders.isEmpty else { return }
+        linkedScannedBooks.insert(build.rawValue)
+        Task { [weak self] in await self?.rescanLinkedFolders() }
+    }
+
     /// The books whose slicer figures this launch has already read.
     private var slicerFiguresReadBooks: Set<String> = []
 
@@ -8005,7 +8017,7 @@ final class Shop {
     /// out files that existing records still point at, and they then read as
     /// missing. And by folder boundary, so `/a/lib` does not also skip
     /// `/a/library2`. Found by a file-safety scan.
-    static func modelsUnder(_ chosen: [URL], skippingAll roots: [String]) -> [LibraryImport.Incoming] {
+    nonisolated static func modelsUnder(_ chosen: [URL], skippingAll roots: [String]) -> [LibraryImport.Incoming] {
         let fm = FileManager.default
         var found: [LibraryImport.Incoming] = []
         let vaults = roots.filter { !$0.isEmpty }.map { URL(fileURLWithPath: $0).standardizedFileURL.path }
@@ -12985,6 +12997,11 @@ final class Shop {
     /// survive rather than shrug at, so a single model file in the folder is
     /// taken as the model.
     func modelFile(for file: LibraryFile) -> URL? {
+        // A linked model is where the shop keeps it, or not reachable right
+        // now (a drive unplugged, a NAS asleep) — never a vault file instead.
+        if let path = file.externalPath, !path.isEmpty {
+            return FileManager.default.fileExists(atPath: path) ? URL(fileURLWithPath: path) : nil
+        }
         guard let dir = directory(for: file) else { return nil }
         if let named = file.sourceFile?.filename, !named.isEmpty {
             let url = dir.appending(path: named)

@@ -135,6 +135,12 @@ struct LibraryInspector: View {
     /// Who made it, as a way to the rest of their models; and the copies of
     /// it the library holds, each a way to it.
     @ViewBuilder private func creatorAndCopies(_ file: LibraryFile) -> some View {
+        if file.isLinked, let path = file.externalPath {
+            Label(shop.words.callIt("mac.linked_where",
+                                    ["path": .string(((path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)]),
+                  systemImage: "link")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        }
         if let creator = file.creator {
             Button {
                 shop.libraryCreator = creator

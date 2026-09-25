@@ -48,6 +48,32 @@ struct LibraryLocationSettings: View {
             Text(shop.words.callIt("mac.libmove_hint"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            // ── FOLDERS INDEXED WHERE THEY ARE ───────────────────────────
+            LabeledContent(shop.words.callIt("mac.linked_title")) {
+                VStack(alignment: .trailing, spacing: 4) {
+                    ForEach(shop.linkedFolders, id: \.self) { path in
+                        HStack(spacing: 6) {
+                            let here = FileManager.default.fileExists(atPath: path)
+                            Image(systemName: here ? "folder" : "externaldrive.badge.exclamationmark")
+                                .foregroundStyle(here ? AnyShapeStyle(.secondary) : AnyShapeStyle(Khayt.attention))
+                            Text(verbatim: (path as NSString).abbreviatingWithTildeInPath)
+                                .font(.callout.monospaced()).lineLimit(1).truncationMode(.middle)
+                            Button(shop.words.callIt("mac.linked_unlink")) { Task { await shop.unlinkFolder(path) } }
+                                .controlSize(.small)
+                        }
+                    }
+                    HStack {
+                        Button(shop.words.callIt("mac.linked_link") + "\u{2026}") { chooseLinked() }
+                        if !shop.linkedFolders.isEmpty {
+                            Button(shop.words.callIt("mac.linked_rescan")) { Task { await shop.rescanLinkedFolders() } }
+                        }
+                    }
+                    .disabled(shop.libraryMoveBusy || !shop.canMoveJobs)
+                }
+            }
+            Text(shop.words.callIt("mac.linked_hint"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             if let p = shop.libraryMoveProgress {
                 ProgressView(value: Double(p.done), total: Double(max(p.total, 1))) {
                     Text(shop.words.callIt("mac.cloudlib_progress", ["name": .string(p.name), "done": .number(Double(p.done)),
@@ -78,6 +104,15 @@ struct LibraryLocationSettings: View {
             Text(shop.words.callIt("mac.libmove_confirm_body",
                                    ["path": .string(((pending?.path ?? "") as NSString).abbreviatingWithTildeInPath)]))
         }
+    }
+
+    private func chooseLinked() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = shop.words.callIt("mac.linked_link")
+        if panel.runModal() == .OK, let url = panel.url { Task { await shop.linkFolder(url) } }
     }
 
     private func choose() {
