@@ -52,4 +52,20 @@ struct LinkedFolderTests {
         try FileManager.default.removeItem(at: model)
         #expect(shop.modelFile(for: file) == nil, "an unplugged drive is 'not here', never another file")
     }
+
+    /// THE LINE BETWEEN "INDEXED" AND "OURS". A root is somewhere the app may
+    /// write, move and — through the Trash — remove; a linked folder is the
+    /// shop's and must never become one, in this app or the other. Both
+    /// sessions agreed this (Sep 2026): the day `linked` joins the roots is
+    /// the day a NAS original falls inside delete's reach.
+    @Test("a linked folder is never a library root")
+    func neverARoot() {
+        let roots = LibraryLocation.resolveRoots(
+            settings: .object(["root": .string("/Users/x/lib"), "linked": .array([.string("/Volumes/NAS/models")]),
+                               "history": .array([.string("/Users/x/old")])]),
+            defaultRoot: "/Users/x/vault")
+        #expect(!roots.roots.contains { LibraryMove.under($0, "/Volumes/NAS/models") })
+        #expect(LibraryMove.sources(roots: roots.roots, primary: roots.primary, mirror: roots.mirror)
+            .allSatisfy { !$0.hasPrefix("/Volumes/NAS") })
+    }
 }
