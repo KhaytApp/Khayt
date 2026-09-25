@@ -3666,6 +3666,36 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.46] - 2026-09-25
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Khayt now offers each update at launch and never installs one on its own, and
+the phone can follow a print away from the shop through Khayt Cloud.
+
+### Added
+
+- **(Mac) The phone can follow a print away from the shop.** While the cloud
+  is signed in and unlocked, the Mac publishes its printers' live status to
+  Khayt Cloud — encrypted with the shop's own key, so the service relays it
+  without reading it — whenever something a person could see changes (at most
+  every two seconds), and a heartbeat every 45 seconds when nothing does, so
+  the phone can tell an idle shop from a Mac that is off. A viewer's account
+  never publishes.
+
+### Changed
+
+- **(Mac) Khayt offers each update, and never installs one on its own.**
+  Asked for by the shop: "the app should check for updates at launch and
+  offer the user to update" — and "it should never auto update, it should
+  always ask for permission". At every launch Khayt looks for a new version
+  and, when there is one, shows the offer; nothing is shown when it is up to
+  date. It used to check, but on a Mac with "install automatically" on it
+  downloaded the update silently and installed it on quit. That switch is
+  gone, the setting is turned off at launch, and the app is built so the
+  updater refuses to install anything unasked.
+
 ## [4.0.0-alpha.45] - 2026-09-25
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
