@@ -130,7 +130,13 @@ jobs:
 
   e2e-smoke:
     name: E2E smoke (Electron)
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: GitHub moves that label to Ubuntu 26 from
+    # 2026-10-19 (done by 2026-11-19). This job runs Electron under xvfb-run
+    # on the X and GTK libraries the 24.04 image ships, and it is a REQUIRED
+    # check: if 26 drops or renames one, every PR is blocked. 24.04 is
+    # supported for two more years; moving to 26 is its own PR, with this job
+    # watched.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
