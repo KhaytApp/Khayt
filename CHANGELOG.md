@@ -4,6 +4,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Publishing to the web store says whether it worked.** Reported by
+  the shop: "there is no way to know if the publish was successful unless I
+  check the website". The outcome was a small grey line at the foot of the
+  sheet. After a publish, the Mac now reads the catalogue back from Khayt Cloud
+  and says what the store is listing, for example "Published. Khayt Cloud is
+  now listing 5 products with 5 photos", in a banner at the top of the sheet
+  with the time it was checked. If fewer arrive than were sent, it says so in
+  the attention colour. A live store's automatic republish that fails is
+  reported in the app's notices, rather than only inside the sheet.
+
 - **(Mac) Something deleted on the Mac stays deleted after the cloud syncs.**
   Reported by the shop: "I delete stuff on mac but that is never reflected on
   cloud, instead I am forced to copy cloud". The desktop writes a deletion

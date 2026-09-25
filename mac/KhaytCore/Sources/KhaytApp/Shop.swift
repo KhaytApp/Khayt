@@ -9105,6 +9105,9 @@ final class Shop {
     var webStoreAt: Date?
     /// What the last publish or check said, in the shop's words.
     var webStoreSaid: String?
+    /// When that was said, and what Khayt Cloud held when it was last read.
+    var webStoreSaidAt: Date?
+    var webStoreHeld: CatalogPublisher.Held?
     var webStoreProblem = false
     var webStoreBusy = false
     /// What the store was built from last time the book was read, so a change

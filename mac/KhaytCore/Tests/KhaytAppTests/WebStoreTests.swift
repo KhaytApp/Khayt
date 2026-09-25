@@ -66,6 +66,26 @@ struct WebStoreTests {
         #expect(on.at == (try? Date("2026-09-25T10:00:00Z", strategy: .iso8601)))
     }
 
+    @Test("the read-back counts what Khayt Cloud holds: listings and photos")
+    func heldCounts() async throws {
+        let body = #"{"catalog":{"items":[{"id":"A","photos":[{"src":"x"},{"src":"y"}]},{"id":"B"}]},"updatedAt":"2026-09-25T17:57:36Z"}"#
+        let held = try await CatalogPublisher.status(Self.connection, token: "tok", fetch: Self.reply(200, body))
+        #expect(held.live)
+        #expect(held.items == 2)
+        #expect(held.photos == 2)
+    }
+
+    @Test("a publish is confirmed by reading the store back, and the answer leads the sheet")
+    func confirmedByReadingBack() throws {
+        let src = try QuoteSheetStatusTests.source("WebStore.swift")
+        let publish = try #require(src.range(of: "func publishWebStore"))
+        let after = src[publish.lowerBound...]
+        let put = try #require(after.range(of: "CatalogPublisher.publish("))
+        let back = try #require(after.range(of: "CatalogPublisher.status("))
+        #expect(put.lowerBound < back.lowerBound, "the outcome is not read back after the PUT")
+        #expect(src.contains("accessibilityIdentifier(\"webstore-outcome\")"))
+    }
+
     @Test("the shop page link drops a trailing slash")
     func shopPage() {
         #expect(CatalogPublisher.shopPage(Self.connection)?.absoluteString
