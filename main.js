@@ -5702,13 +5702,13 @@ ipcMain.handle('hub:cloud-lock', () => { cloudBackend = null; clearOrgSession();
 ipcMain.handle('hub:cloud-push', async (_e, snapshot) => {
   if (!cloudBackend) return { ok: false, error: 'locked' };
   try { return { ok: true, ...(await cloudBackend.push(snapshot)) }; }
-  catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+  catch (e) { return { ok: false, error: String(e && e.message || e), status: (e && e.status) || null }; }
 });
 
 ipcMain.handle('hub:cloud-pull', async () => {
   if (!cloudBackend) return { ok: false, error: 'locked' };
   try { return { ok: true, ...(await cloudBackend.pull()) }; }
-  catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+  catch (e) { return { ok: false, error: String(e && e.message || e), status: (e && e.status) || null }; }
 });
 
 /**

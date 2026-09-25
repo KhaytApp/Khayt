@@ -31,6 +31,14 @@
   let statusVal = 'off';    // off | idle | syncing | synced | conflict | locked | offline | error
   let lastError = null;
   let listeners = [];
+  // A refusal no retry can fix — docs/api-contract.md in khayt-cloud: 412 is
+  // "stop syncing and tell the user to update. Do not retry"; 413 is the plan's
+  // size limit; 401/403 are a sign-in that is rejected or may not write. Each
+  // used to retry on the backoff for as long as the app was open. The next
+  // edit or an explicit Sync now still tries again, which is how a shop that
+  // updated, upgraded or signed back in gets moving without restarting.
+  const REFUSALS = new Set([401, 403, 412, 413]);
+  let refused = false;
 
   function clearRetry() { if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; } }
 
@@ -106,12 +114,17 @@
     if (timer) { clearTimeout(timer); timer = null; }
     clearRetry();
     inFlight = true;
+    refused = false;
     setStatus('syncing');
     try {
       let r = await deps.push(deps.buildSnapshot());
       if (r && r.conflict) {
         const merged = await pullMerge();
-        if (!merged.ok) { setStatus('error', { error: merged.error }); return merged; }
+        if (!merged.ok) {
+          refused = REFUSALS.has(merged.status);
+          setStatus('error', { error: merged.error, refused });
+          return merged;
+        }
         r = await deps.push(deps.buildSnapshot()); // re-push the merged result
       }
       if (r && r.ok && !r.conflict) {
@@ -128,7 +141,8 @@
       }
       if (r && r.error === 'locked') { setStatus('locked'); return { ok: false, error: 'locked' }; }
       if (r && r.conflict) { setStatus('conflict'); return { ok: false, error: 'conflict' }; }
-      setStatus('error', { error: (r && r.error) || 'push failed' });
+      refused = !!(r && REFUSALS.has(r.status));
+      setStatus('error', { error: (r && r.error) || 'push failed', refused });
       return { ok: false, error: (r && r.error) || 'push failed' };
     } catch (e) {
       // Thrown = transport/offline failure: keep the local change and auto-retry
@@ -140,7 +154,7 @@
       if (pendingAfter) { pendingAfter = false; scheduleSync(); }
       // A fresh edit (pendingAfter) already re-scheduled a push; otherwise, if
       // this attempt left us offline/errored, queue an automatic backoff retry.
-      else if (statusVal === 'offline' || statusVal === 'error') scheduleRetry();
+      else if (statusVal === 'offline' || (statusVal === 'error' && !refused)) scheduleRetry();
     }
   }
 
@@ -152,7 +166,7 @@
   async function pullMerge() {
     if (!deps) return { ok: false, error: 'off' };
     const r = await deps.pull();
-    if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'pull failed' };
+    if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'pull failed', status: (r && r.status) || null };
     if (!r.store) return { ok: true, rev: r.rev || 0, empty: true }; // nothing on the server yet
     const local = deps.buildSnapshot();
     // `lib/cloud-inbox.js`, so the native Mac app merges by the same rule

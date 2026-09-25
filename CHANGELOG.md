@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Cloud sync stops retrying what retrying cannot fix, and says why.** When
+  Khayt Cloud refuses for a reason that will not pass on its own (this version
+  cannot read the shop's newer changes, the store is over the plan's size, or
+  the sign-in is rejected or read-only), the desktop kept trying on a timer for
+  as long as it was open. It now stops and shows the cloud's own explanation.
+  The next change you make, or Sync now, tries again, so updating, upgrading
+  or signing back in is enough; a network or server outage is still retried
+  on its own.
+
 - **(Mac) The PIN no longer sits in the browser's address bar.** Opening the
   live queue in a browser asks for the PIN once, in a form, and keeps a
   12-hour session cookie (HttpOnly, SameSite=Strict) instead — the page

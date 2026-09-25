@@ -225,3 +225,15 @@ test('a refusal with no body still names the status', async () => {
   const b = createCloudBackend(refusingWith(502));
   await assert.rejects(() => b.push(STORE), /push failed: HTTP 502$/);
 });
+
+test('a failed request carries its HTTP status, so a caller can tell a refusal from an outage', async () => {
+  const sc = require('../lib/sync-crypto.js');
+  const { createCloudBackend } = require('../lib/cloud-backend.js');
+  const { keyset } = sc.createKeyset('p', { kdf: { algo: 'scrypt', N: 1024, r: 8, p: 1, keyLen: 32 } });
+  const dek = sc.unlockWithPassphrase('p', keyset);
+  const backend = createCloudBackend({
+    transport: async () => ({ status: 412, body: { error: 'Update Khayt to sync again.' } }),
+    crypto: sc, shopId: 's', getDek: () => dek,
+  });
+  await assert.rejects(backend.push({ clients: [] }), (e) => e.status === 412 && /Update Khayt/.test(e.message));
+});
