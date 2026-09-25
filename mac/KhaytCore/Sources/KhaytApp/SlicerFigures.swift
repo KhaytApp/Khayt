@@ -19,6 +19,13 @@ enum SlicerFigures {
 
     /// The `parsed` fields for this file, or nil when it carries none.
     static func read(_ url: URL, engine: KhaytEngine) async -> [String: JSONValue]? {
+        // The configs first; the embedded G-code only if they said nothing.
+        if let found = await read(url, engine: engine, wantGcode: false) { return found }
+        guard url.pathExtension.lowercased() == "3mf" else { return nil }
+        return await read(url, engine: engine, wantGcode: true)
+    }
+
+    private static func read(_ url: URL, engine: KhaytEngine, wantGcode: Bool) async -> [String: JSONValue]? {
         let ext = url.pathExtension.lowercased()
         let bits: (configs: [String: String], gcode: String?)? = await Task.detached {
             if ext == "gcode" || ext == "gco" { return ([:], ends(of: url)) }
@@ -30,8 +37,12 @@ enum SlicerFigures {
                     configs[e.name] = String(decoding: d, as: UTF8.self)
                 }
             }
-            // A 3MF that carries its sliced G-code: its summary, head and tail.
+            // A 3MF that carries its sliced G-code: its summary, head and tail —
+            // read only when the configs cannot answer (see below), because
+            // streaming a whole embedded G-code for a figure `slice_info`
+            // already holds cost every launch of a big library dearly.
             var gcode: String?
+            if !configs.isEmpty, !wantGcode { return (configs, nil) }
             if let g = entries.first(where: { $0.name.lowercased().hasSuffix(".gcode") }) {
                 var first = Data(), last = Data()
                 try? Zip.stream(g, in: url) { chunk in

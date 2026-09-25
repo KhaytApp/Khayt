@@ -1120,6 +1120,9 @@ final class Shop {
             var found: [String: [String: JSONValue]] = [:]
             for item in due {
                 if let parsed = await SlicerFigures.read(item.url, engine: engine) { found[item.id] = parsed }
+                // Nothing in it (an unsliced 3MF): said once, so it is not
+                // opened again at every launch.
+                else if item.url.pathExtension.lowercased() == "3mf" { found[item.id] = ["platesRead": .bool(true)] }
             }
             guard let self, !found.isEmpty else { return }
             do {

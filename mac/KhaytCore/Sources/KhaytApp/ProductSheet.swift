@@ -749,6 +749,9 @@ struct ProductSheet: View {
                                 .font(.caption).monospacedDigit()
                         }
                         .toggleStyle(.button)
+                        // Not the last one: with no plate on, the model — and
+                        // this row with it — would leave the product.
+                        .disabled(chosen == [plate.index])
                     }
                     Button(shop.words.callIt("mac.plates_all")) {
                         Task { await setPlates(of: file, to: Set(plates.map(\.index)), all: plates) }

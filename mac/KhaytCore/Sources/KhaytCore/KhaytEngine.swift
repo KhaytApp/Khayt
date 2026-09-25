@@ -5634,22 +5634,8 @@ public actor KhaytEngine {
         let members = JSONValue.array(configs.map { .object(["name": .string($0.key), "data": .string($0.value)]) })
         let answer = try runtime.call2(#"""
             (function (members, gtext) {
-              if (gtext) {
-                var p = globalThis.KhaytGcodeParse.parseGcodeText(gtext);
-                if (p && p.printTimeMins > 0 && p.filamentGrams > 0)
-                  return { printTimeMins: p.printTimeMins, filamentGrams: p.filamentGrams,
-                           filamentType: p.filamentType || '', filamentCost: p.filamentCost || null,
-                           slicer: p.slicer || '', source: 'slicer' };
-              }
-              for (var i = 0; i < members.length; i++) {
-                if (!/\.(config|txt)$/i.test(members[i].name)) continue;
-                var q = globalThis.KhaytGcodeParse.parseGcodeText(members[i].data);
-                if (q && q.printTimeMins > 0 && q.filamentGrams > 0)
-                  return { printTimeMins: q.printTimeMins, filamentGrams: q.filamentGrams,
-                           filamentType: q.filamentType || '', filamentCost: q.filamentCost || null,
-                           slicer: q.slicer || '', source: 'slicer' };
-              }
-              // PLATE BY PLATE. `extractMeta` takes the FIRST plate's time and
+              // PLATE BY PLATE, FIRST — before an embedded G-code, which in a Bambu
+              // print file is plate 1's alone. `extractMeta` takes the FIRST plate's time and
               // EVERY plate's filament, so a two-plate file read as one plate's
               // hours and two plates' grams. Each <plate> is read on its own
               // and the file is their sum; `plates` is kept when there are
@@ -5672,6 +5658,21 @@ public actor KhaytEngine {
                             filamentType: plates[0].filamentType, slicer: 'Bambu/Orca', source: 'slicer', platesRead: true };
                 if (plates.length > 1) out.plates = plates;
                 return out;
+              }
+              if (gtext) {
+                var p = globalThis.KhaytGcodeParse.parseGcodeText(gtext);
+                if (p && p.printTimeMins > 0 && p.filamentGrams > 0)
+                  return { printTimeMins: p.printTimeMins, filamentGrams: p.filamentGrams,
+                           filamentType: p.filamentType || '', filamentCost: p.filamentCost || null,
+                           slicer: p.slicer || '', source: 'slicer', platesRead: true };
+              }
+              for (var i = 0; i < members.length; i++) {
+                if (!/\.(config|txt)$/i.test(members[i].name)) continue;
+                var q = globalThis.KhaytGcodeParse.parseGcodeText(members[i].data);
+                if (q && q.printTimeMins > 0 && q.filamentGrams > 0)
+                  return { printTimeMins: q.printTimeMins, filamentGrams: q.filamentGrams,
+                           filamentType: q.filamentType || '', filamentCost: q.filamentCost || null,
+                           slicer: q.slicer || '', source: 'slicer', platesRead: true };
               }
               var meta = globalThis.KhaytMfConvert.extractMeta(members);
               if (!(meta && meta.totalGrams > 0 && meta.printMinutes > 0)) return null;
