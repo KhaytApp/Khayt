@@ -605,6 +605,8 @@ final class Shop {
             if case .array(let jobs)? = root["printLog"] { orderRows = jobs } else { orderRows = [] }
             if case .array(let people)? = root["clients"] { clientRows = people } else { clientRows = [] }
             if case .array(let catalog)? = root["products"] { productRows = catalog } else { productRows = [] }
+            // A live web store follows the catalogue: see `webStoreFollow`.
+            webStoreFollow(products: productRows, settings: Self.settings(root))
             catalogueRows = (try? await engine?.catalogue(
                 productRows, language: words.language, settings: Self.settings(root))) ?? []
             productCategories = Dictionary(uniqueKeysWithValues: productRows.compactMap { row in
@@ -787,6 +789,7 @@ final class Shop {
             if next.build != nil { startPublishingLeadTime() } else { stopPublishingLeadTime() }
             if next.build != nil { startWatchingPlugs() } else { stopWatchingPlugs() }
             if next.build != nil { await restoreCloudKey() }
+            if next.build != nil { Task { await self.refreshWebStore() } }
             refreshSyncStatus()
             // Move a service log a Mac alpha wrote under the wrong key. Inside
             // the write chain, because anything that reads and writes the store
@@ -9088,6 +9091,22 @@ final class Shop {
     /// What was last sent as the quote sheet — `.some(nil)` a withdrawal, `nil`
     /// never sent. A shop that never switched public pricing on is never sent a
     /// withdrawal, every six hours, for ever.
+    // ── THE WEB STORE'S CATALOGUE (WebStore.swift) ─────────────────────────
+    /// Whether Khayt Cloud holds a published catalogue: nil until asked.
+    var webStoreLive: Bool?
+    /// When the published catalogue was last replaced, by either app.
+    var webStoreAt: Date?
+    /// What the last publish or check said, in the shop's words.
+    var webStoreSaid: String?
+    var webStoreProblem = false
+    var webStoreBusy = false
+    /// What the store was built from last time the book was read, so a change
+    /// to it can be told apart from a re-read of the same book.
+    var webStoreSeen: JSONValue?
+    var webStoreRepublish: Task<Void, Never>?
+    /// Web-sized pictures already made, by file name and the file's date.
+    var webStoreHeroes: [String: (Date, String)] = [:]
+
     private(set) var quoteSheetPublished: JSONValue??
     /// What the last attempt said, in the shop's words, for the Online pane.
     private(set) var quoteSheetSaid: String?

@@ -1,0 +1,162 @@
+import Foundation
+import Testing
+import AppKit
+import KhaytCore
+@testable import KhaytApp
+
+/// The Mac publishes the catalogue to the shop's web store.
+///
+/// It could not before: only the desktop's Storefront dialog built and sent a
+/// catalogue, so a product added on the Mac never reached the store. Every case
+/// here that touches the wire runs through the `fetch` seam.
+@MainActor
+struct WebStoreTests {
+
+    static let connection = CloudReader.Connection(url: "https://cloud.khaytapp.com/",
+                                                   shopId: "shop_abc_123",
+                                                   storedToken: "__enc__whatever")
+
+    static func reply(_ code: Int, _ body: String = #"{"ok":true}"#) -> (URLRequest) -> (Data, URLResponse) {
+        { request in
+            (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: code,
+                                              httpVersion: nil, headerFields: nil)!)
+        }
+    }
+
+    @Test("it PUTs {catalog} to the shop's catalogue route, and nil takes the store offline")
+    func theRequest() async throws {
+        var seen: URLRequest?
+        let catalog: JSONValue = .object(["items": .array([.object(["id": .string("P1")])])])
+        try await CatalogPublisher.publish(Self.connection, token: "tok", catalog: catalog) {
+            seen = $0; return Self.reply(200)($0)
+        }
+        let request = try #require(seen)
+        #expect(request.httpMethod == "PUT")
+        #expect(request.url?.absoluteString == "https://cloud.khaytapp.com/v1/shops/shop_abc_123/catalog")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer tok")
+        #expect(request.value(forHTTPHeaderField: "x-delta-capable") == "1")
+        let body = try JSONDecoder().decode([String: JSONValue].self, from: try #require(request.httpBody))
+        #expect(body == ["catalog": catalog])
+
+        try await CatalogPublisher.publish(Self.connection, token: "tok", catalog: nil) {
+            seen = $0; return Self.reply(200)($0)
+        }
+        #expect(String(decoding: try #require(seen?.httpBody), as: UTF8.self) == #"{"catalog":null}"#)
+    }
+
+    @Test("the service's refusals come back as reasons, not a generic failure")
+    func refusals() async {
+        for (code, want) in [(400, CatalogPublisher.Failure.empty), (401, .unauthorised),
+                             (403, .readOnly), (413, .tooLarge)] {
+            await #expect(throws: want) {
+                try await CatalogPublisher.publish(Self.connection, token: "tok", catalog: .null,
+                                                   fetch: Self.reply(code, "{}"))
+            }
+        }
+    }
+
+    @Test("a 404 means no store is published; a 200 with a catalogue means it is live")
+    func status() async throws {
+        let off = try await CatalogPublisher.status(Self.connection, token: "tok", fetch: Self.reply(404, "{}"))
+        #expect(off.live == false)
+        let on = try await CatalogPublisher.status(
+            Self.connection, token: "tok",
+            fetch: Self.reply(200, #"{"catalog":{"items":[]},"updatedAt":"2026-09-25T10:00:00Z"}"#))
+        #expect(on.live)
+        #expect(on.at == (try? Date("2026-09-25T10:00:00Z", strategy: .iso8601)))
+    }
+
+    @Test("the shop page link drops a trailing slash")
+    func shopPage() {
+        #expect(CatalogPublisher.shopPage(Self.connection)?.absoluteString
+                == "https://cloud.khaytapp.com/shop/shop_abc_123")
+    }
+
+    /// The desktop resizes to these through `KhaytProductImages`; the two apps
+    /// send the same picture only while they agree.
+    @Test("the picture size matches the shared module's")
+    func heroSizeMatchesTheModule() throws {
+        let lib = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "lib/product-images.js"), encoding: .utf8)
+        #expect(lib.contains("const HERO_MAX_DIM = \(CatalogPublisher.heroMaxDim);"))
+        #expect(lib.contains("const HERO_QUALITY = \(CatalogPublisher.heroQuality);"))
+    }
+
+    @Test("a large picture is sent at 1000px on its long edge, as a JPEG data URI")
+    func heroIsScaled() throws {
+        let rep = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 2000, pixelsHigh: 1000,
+                                                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                                isPlanar: false, colorSpaceName: .deviceRGB,
+                                                bytesPerRow: 0, bitsPerPixel: 0))
+        let file = FileManager.default.temporaryDirectory.appending(path: "webstore-\(UUID().uuidString).png")
+        try #require(rep.representation(using: .png, properties: [:])).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let uri = try #require(CatalogPublisher.hero(file, maxDim: 1000, quality: 0.82))
+        #expect(uri.hasPrefix("data:image/jpeg;base64,"))
+        let data = try #require(Data(base64Encoded: String(uri.dropFirst("data:image/jpeg;base64,".count))))
+        let image = try #require(NSBitmapImageRep(data: data))
+        #expect(image.pixelsWide == 1000)
+        #expect(image.pixelsHigh == 500)
+        #expect(CatalogPublisher.hero(file.appending(path: "missing"), maxDim: 1000, quality: 0.82) == nil)
+    }
+
+    @Test("the catalogue is built by the shared module: price, name, and a hero over the thumbnail")
+    func theCatalogue() async throws {
+        let engine = try KhaytEngine()
+        let thumb = "data:image/jpeg;base64," + String(repeating: "A", count: 100)
+        let hero = "data:image/jpeg;base64," + String(repeating: "B", count: 4000)
+        let product: JSONValue = .object([
+            "id": .string("P1"), "nameEn": .string("Dragon"), "nameAr": .string("تنين"),
+            "price": .number(35),
+            "images": .array([.object(["id": .string("I1"), "thumbnail": .string(thumb),
+                                       "path": .string("P1-I1.jpeg"), "kind": .string("render")])]),
+        ])
+        let unnamed: JSONValue = .object(["id": .string("P2")])
+        let settings: JSONValue = .object(["contentLangs": .array([.string("en"), .string("ar")]),
+                                           "currency": .string("SAR"), "bizEn": .string("Athar")])
+
+        #expect(try await engine.storefrontCount(products: [product, unnamed], settings: settings, lang: "en") == 1)
+        #expect(try await engine.storefrontHeroPaths(products: [product, unnamed], settings: settings, lang: "en")
+                == ["P1-I1.jpeg"])
+
+        let built = try await engine.storefrontCatalog(products: [product, unnamed], settings: settings, lang: "en",
+                                                       withPhotos: true, heroes: ["P1-I1.jpeg": .string(hero)])
+        guard case .object(let o) = built, case .array(let items)? = o["items"],
+              case .object(let item)? = items.first else { Issue.record("no items"); return }
+        #expect(items.count == 1)
+        #expect(o["shopName"] == .string("Athar"))
+        #expect(item["price"] == .string("35"))
+        #expect(item["name"] == .string("Dragon"))
+        guard case .array(let photos)? = item["photos"], case .object(let first)? = photos.first else {
+            Issue.record("no photos"); return
+        }
+        #expect(first["src"] == .string(hero))
+
+        let bare = try await engine.storefrontCatalog(products: [product], settings: settings, lang: "en",
+                                                      withPhotos: false, heroes: [:])
+        guard case .object(let b) = bare, case .array(let bareItems)? = b["items"],
+              case .object(let bareItem)? = bareItems.first else { Issue.record("no items"); return }
+        #expect(bareItem["photos"] == nil)
+    }
+
+    @Test("a shop with no cloud is not told anything about a web store")
+    func noCloudSaysNothing() async {
+        let shop = Shop()
+        await shop.load(.sample)
+        await shop.refreshWebStore()
+        #expect(shop.webStoreLive == nil)
+        #expect(shop.webStoreSaid == nil)
+    }
+
+    @Test("the catalogue screen offers it, and a live store follows the catalogue")
+    func wired() throws {
+        let catalogue = try QuoteSheetStatusTests.source("Catalogue.swift")
+        #expect(catalogue.contains("WebStoreSheet(shop: shop)"))
+        let shop = try QuoteSheetStatusTests.source("Shop.swift")
+        #expect(shop.contains("webStoreFollow(products: productRows"))
+        #expect(shop.contains("await self.refreshWebStore()"))
+    }
+}

@@ -31,6 +31,7 @@ struct Catalogue: View {
     @SceneStorage("catalogue.layout") private var layout: Layout = .table
     @State private var selection: KhaytEngine.CatalogueRow.ID?
     @State private var showingOnline = false
+    @State private var showingWebStore = false
     @State private var order: [KeyPathComparator<KhaytEngine.CatalogueRow>] =
         [.init(\.final, order: .reverse)]
 
@@ -39,6 +40,7 @@ struct Catalogue: View {
     var body: some View {
         content
             .sheet(isPresented: $showingOnline) { OnlineOrdersSheet(shop: shop) }
+            .sheet(isPresented: $showingWebStore) { WebStoreSheet(shop: shop) }
             .screenToolbar {
                 ToolbarItem {
                     Picker("", selection: $layout) {
@@ -58,6 +60,21 @@ struct Catalogue: View {
                 // the row above. Shown only to a shop that has a cloud; one
                 // without a storefront should not be offered a queue it does
                 // not have.
+                // ── WHAT THE WEB STORE LISTS ───────────────────────────
+                //
+                // On the catalogue because that is what it publishes. It was
+                // only in the desktop's Storefront dialog, so a shop on the Mac
+                // had no way to put a product on its web store at all.
+                if shop.cloudConnected {
+                    ToolbarItem {
+                        Button {
+                            showingWebStore = true
+                        } label: {
+                            Label(shop.words.callIt("mac.ws_button"), systemImage: "storefront")
+                        }
+                        .help(shop.words.callIt("mac.ws_button"))
+                    }
+                }
                 if shop.cloudConnected {
                     ToolbarItem {
                         Button {
