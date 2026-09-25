@@ -5722,6 +5722,22 @@ public actor KhaytEngine {
             """, [.array(products), settings, .string(lang), .bool(withPhotos), .object(heroes)], as: JSONValue.self)
     }
 
+    /// What a customer would find wrong with each listing: `KhaytStorefrontCatalog.review`.
+    public struct StorefrontReview: Decodable, Sendable, Equatable {
+        public struct Listing: Decodable, Sendable, Equatable, Identifiable {
+            public let id: String
+            public let name: String
+            public let issues: [String]
+        }
+        public let hidden: Int
+        public let listings: [Listing]
+    }
+
+    public func storefrontReview(products: [JSONValue], settings: JSONValue, lang: String) throws -> StorefrontReview {
+        try runtime.call2("KhaytStorefrontCatalog.review(ARG0, ARG1, ARG2)",
+                          [.array(products), settings, .string(lang)], as: StorefrontReview.self)
+    }
+
     /// How many products a catalogue publish would list.
     public func storefrontCount(products: [JSONValue], settings: JSONValue, lang: String) throws -> Int {
         try runtime.call2("KhaytStorefrontCatalog.publishable(ARG0, ARG1, ARG2).length",

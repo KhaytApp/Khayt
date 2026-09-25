@@ -313,6 +313,19 @@ struct ProductSheet: View {
                         .foregroundStyle(.secondary)
                     TextField("", text: $draft.group).textFieldStyle(.roundedBorder)
                 }
+                // A category files it with the rest on the web store. It
+                // could be set in bulk from the catalogue and not here, where
+                // a product is written.
+                GridRow {
+                    Text(shop.words.callIt("mac.category")).gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    TextField("", text: $draft.category).textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.ws_state")).gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    Toggle(shop.words.callIt("mac.ws_show"), isOn: $draft.onWebStore)
+                }
             }
 
             Divider()

@@ -72,6 +72,14 @@ struct Product: Identifiable, Sendable {
     /// A product with no name in any language cannot be told from another.
     var hasAName: Bool { !anyName().isEmpty }
 
+    /// Listed on the web store. `storefrontHidden` on the record, read by
+    /// `lib/storefront-catalog.js`; absent means listed, so every product the
+    /// shop already has stays where it is.
+    var onWebStore: Bool {
+        get { rest["storefrontHidden"] != .bool(true) }
+        set { if newValue { rest.removeValue(forKey: "storefrontHidden") } else { rest["storefrontHidden"] = .bool(true) } }
+    }
+
     // MARK: - Reading and writing the record
 
     /// Read one, given the language keys the shop is using.

@@ -4,6 +4,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Choose what goes on the web store, check it before it goes, and
+  set up the store itself.** Asked for by the shop after a review of its first
+  published catalogue.
+  - **A "Show on the web store" switch in each product.** Hidden products are
+    left out of the catalogue on the Mac and the desktop alike: the rule is in
+    the shared `lib/storefront-catalog.js`. The product editor also gains the
+    Category field it never had.
+  - **"Before you publish" in the Web Store sheet** lists each product a
+    customer would find something wrong with. That covers no price, no photo, no
+    description, no category, a second language that is missing or repeats the
+    first, and names that read like file names. Each listing has **Edit…** and
+    **Hide** beside it.
+  - **Store settings** in the same sheet: shop note, lead time, minimum order,
+    deposit, tax, payment link, shipping methods and promo codes. Until now these
+    could only be set from the desktop app's Storefront dialog. They use the same
+    limits as the desktop, and the per-product prices, options and stock counts
+    beside them are left untouched.
+
 - **(Mac) Undo after a delete survives the next sync.** Found in a review of
   the tombstone fix: an undone delete came back under its old id, and the
   delete marker, usually already in the cloud, deleted it again at the next
