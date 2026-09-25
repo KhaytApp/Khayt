@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Choose which products are on your web store, and see what needs fixing
+  before you publish.** Each product in Settings → Storefront has an "On
+  store" box: untick it and the product stays in Khayt but is not published.
+  It is saved on the product, so the Mac app sees the same choice. And
+  Publish now looks at your listings first and tells you which have no price,
+  no photo, no description or no category, a second language that is missing
+  or just repeats the first, or a name that reads like a file name, and lets
+  you publish anyway or go back and fix them.
+
 - **(Mac) Choose what goes on the web store, check it before it goes, and
   set up the store itself.** Asked for by the shop after a review of its first
   published catalogue.

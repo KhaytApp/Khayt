@@ -66,7 +66,8 @@ test('the storefront publishes the labelled photos, not just one', () => {
    * grid thumbnail as its product-page picture again — which is what it did,
    * and which looks like a working publish. */
   assert.match(build, /hero: \(img\) =>/, 'the publish must offer the full-size picture');
-  assert.match(dialog, /await loadHeroPhotos\(pubProducts\)/,
+  // Only what will be PUBLISHED: the dialog's rows include hidden products.
+  assert.match(dialog, /await loadHeroPhotos\(SC\.publishable\(products, settings, sfLang\)\)/,
     'and must have read them off disk first');
   const publish = src.slice(src.indexOf("'#storePublish'"), src.indexOf("'#storeUnpublish'"));
   assert.match(publish, /await buildCatalog\(/,
