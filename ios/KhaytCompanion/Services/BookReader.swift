@@ -94,15 +94,27 @@ actor BookReader {
     /// upstream still wins), and the baseline is set to upstream's copy alone
     /// — which keeps exactly those edits pending.
     func adopt(_ upstream: [String: JSONValue], scope: BookScope.Taken?) async throws {
-        var merged = upstream
-        if book.exists, let baseline = book.baseline() {
-            let outbox = try await engine().changesToSend(local: try book.read(), server: baseline)
+        guard book.exists, let baseline = book.baseline() else {
+            try book.replace(with: upstream, scope: scope)
+            return
+        }
+        // Measured and folded from a snapshot, then swapped in only if nothing
+        // was written here meanwhile — an edit made during the await would
+        // otherwise be missing from `merged`, and gone. See `CompanionBook.swap`.
+        for _ in 1...3 {
+            let local = try book.read()
+            var merged = upstream
+            let outbox = try await engine().changesToSend(local: local, server: baseline)
             if !outbox.isEmpty {
                 merged = try await engine().foldDeltas(base: upstream, deltas: [outbox.wire]).store
             }
+            if try book.swap(from: local, to: merged) {
+                book.writeScope(scope)
+                try book.replaceBaseline(with: upstream)
+                return
+            }
         }
-        try book.replace(with: merged, scope: scope)
-        try book.replaceBaseline(with: upstream)
+        throw CompanionBook.Failure.busy
     }
 
     /// Home's figures, as `design/ios-v2/` Shop Pulse draws them.

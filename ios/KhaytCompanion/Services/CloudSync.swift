@@ -154,10 +154,16 @@ struct CloudSync {
             return (s, .changes(0))
         }
         let payloads = try reply.deltas.map { try SyncCrypto.store($0.blob, dek: s.dek) }
-        // Into the book, where edits made here win or lose by rev as usual…
-        let local = try book.read()
-        let folded = try await engine.foldDeltas(base: local, deltas: payloads)
-        try book.update { $0 = folded.store }
+        // Into the book, where edits made here win or lose by rev as usual —
+        // swapped in only if nothing was written here while the engine folded.
+        // See `CompanionBook.swap`.
+        var folded: KhaytEngine.Folded?
+        for _ in 1...3 {
+            let local = try book.read()
+            let attempt = try await engine.foldDeltas(base: local, deltas: payloads)
+            if try book.swap(from: local, to: attempt.store) { folded = attempt; break }
+        }
+        guard let folded else { throw CompanionBook.Failure.busy }
         // …and into the baseline, so none of it reads as pending.
         if let baseline = book.baseline() {
             let seen = try await engine.foldDeltas(base: baseline, deltas: payloads)

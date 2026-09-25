@@ -173,4 +173,49 @@ final class CompanionBookTests: XCTestCase {
         XCTAssertEqual(split.subtotal, 869.57, accuracy: 0.0001)
         XCTAssertEqual(split.taxTotal, 130.43, accuracy: 0.0001)
     }
+
+    // MARK: - Folding in, without losing what was written meanwhile
+
+    private func shopWith(_ ids: [String]) -> [String: JSONValue] {
+        ["settings": .object([:]),
+         "printLog": .array(ids.map { .object(["id": .string($0), "status": .string("pending"), "rev": .number(1)]) })]
+    }
+
+    /// A fold that finishes after something was written here must not land:
+    /// the record added meanwhile is not in what it folded, and landing it
+    /// would delete that record.
+    func testAFoldDoesNotLandOverAWriteMadeWhileItWasFolding() throws {
+        try book.replace(with: shopWith(["A"]), scope: nil)
+        let snapshot = try book.read()
+        // Written on the phone during the fold's await:
+        try book.update { root in root = self.shopWith(["A", "NEW"]) }
+        let foldedFromTheOldBook = shopWith(["A", "FROM-CLOUD"])
+
+        XCTAssertFalse(try book.swap(from: snapshot, to: foldedFromTheOldBook))
+        guard case .array(let rows)? = try book.read()["printLog"] else { return XCTFail() }
+        let ids = rows.compactMap { row -> String? in
+            if case .object(let o) = row, case .string(let id)? = o["id"] { return id }
+            return nil
+        }
+        XCTAssertTrue(ids.contains("NEW"), "the record written meanwhile survives")
+        XCTAssertNil(try book.read()["tombstones"], "and nothing was tombstoned")
+    }
+
+    /// What a fold removes, it removes because of a tombstone it already
+    /// carries. Recording another would be the fold inventing a delete.
+    func testAFoldThatRemovesARecordRecordsNoTombstoneOfItsOwn() throws {
+        try book.replace(with: shopWith(["A", "B"]), scope: nil)
+        let snapshot = try book.read()
+        XCTAssertTrue(try book.swap(from: snapshot, to: shopWith(["A"])))
+        XCTAssertNil(try book.read()["tombstones"])
+    }
+
+    /// An EDIT that removes a record is a delete, and says so — #1609's rule,
+    /// which the fold above opts out of and nothing else does.
+    func testAnEditThatRemovesARecordLeavesATombstone() throws {
+        try book.replace(with: shopWith(["A", "B"]), scope: nil)
+        try book.update { root in root["printLog"] = self.shopWith(["A"])["printLog"] }
+        guard case .array(let tombs)? = try book.read()["tombstones"] else { return XCTFail("no tombstone") }
+        XCTAssertEqual(tombs.count, 1)
+    }
 }
