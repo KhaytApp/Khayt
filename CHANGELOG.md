@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) The phone can follow a print away from the shop.** While the cloud
+  is signed in and unlocked, the Mac publishes its printers' live status to
+  Khayt Cloud — encrypted with the shop's own key, so the service relays it
+  without reading it — whenever something a person could see changes (at most
+  every two seconds), and a heartbeat every 45 seconds when nothing does, so
+  the phone can tell an idle shop from a Mac that is off. A viewer's account
+  never publishes.
+
 - **(Mac) The phone can follow live prints against the Mac app.** The Mac's
   network server now answers `GET /api/machines/live` — every machine with
   what its printer last said (state, progress, file, time left, temperatures,

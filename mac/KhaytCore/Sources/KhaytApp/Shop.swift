@@ -837,6 +837,7 @@ final class Shop {
     /// wear, and doing that every ten seconds to move one tile from 0/1 to 1/1
     /// would be paying for the wrong thing.
     func printersAnswered() async {
+        await publishLivePrinters()
         guard let engine, !machineRows.isEmpty else { return }
         facts = try? await engine.dashboardFacts(orders: orderRows, machines: machineRows,
                                                  settings: kpiSettings.isEmpty ? settingsDict : kpiSettings,
@@ -7198,6 +7199,22 @@ final class Shop {
     /// unwrapped key, in memory, dropped when the app quits or the shop locks
     /// it — and re-earning it costs a scrypt at N=32768, most of a minute.
     private var cloudDek: Data?
+
+    /// This Mac's printers, published to the cloud for viewers away from the
+    /// shop — see `LivePrinterPublisher`.
+    let livePublisher = LivePrinterPublisher()
+
+    func publishLivePrinters() async {
+        guard case .store(let build) = source else { return }
+        let connection = try? CloudReader.connection(settingsDict)
+        await livePublisher.publishIfDue(
+            rows: machinesLive(), connection: connection, dek: cloudDek, canWrite: cloudRoleCanWrite,
+            token: { [weak self] in
+                guard let self, let c = connection else { return nil }
+                _ = self
+                return try? await Secrets.open(c.storedToken, for: build)
+            })
+    }
 
     /// Has somebody unlocked the cloud this session?
     var cloudUnlocked: Bool { cloudDek != nil }
