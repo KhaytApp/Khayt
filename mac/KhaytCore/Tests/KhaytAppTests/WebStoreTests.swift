@@ -211,4 +211,61 @@ struct WebStoreTests {
         #expect(shop.contains("registerConsumableUndo(gone.was)"), "a consumable's undo cannot bring back a deleted row")
     }
 
+
+    @Test("store settings: read from the book, clamped like the desktop, and nothing else in settings.storefront is touched")
+    func storeSettingsRoundTrip() {
+        let settings: [String: JSONValue] = ["storefront": .object([
+            "note": .string("Riyadh pickup"), "depositPct": .number(20),
+            "shipping": .array([.object(["label": .string("Courier"), "price": .number(25)])]),
+            "prices": .object(["P1": .string("40")]),
+        ])]
+        var draft = StorefrontDraft(settings)
+        #expect(draft.note == "Riyadh pickup")
+        #expect(draft.depositPct == "20")
+        #expect(draft.shipping.map(\.label) == ["Courier"])
+
+        draft.depositPct = "150"
+        draft.shipping.append(.init(label: "  ", price: "5"))
+        draft.promos = [.init(code: "eid", fixed: false, value: "10"), .init(code: "ZERO", value: "0")]
+        guard case .object(var sf)? = settings["storefront"] else { return }
+        draft.apply(to: &sf)
+        #expect(sf["depositPct"] == .number(100))
+        guard case .array(let ship)? = sf["shipping"], case .array(let promos)? = sf["promos"] else {
+            Issue.record("lists missing"); return
+        }
+        #expect(ship.count == 1, "a method with no name is kept")
+        #expect(promos.count == 1, "a code worth nothing is kept")
+        if case .object(let p)? = promos.first { #expect(p["code"] == .string("EID")) }
+        #expect(sf["prices"] == .object(["P1": .string("40")]), "the per-product overrides were touched")
+    }
+
+    @Test("a product's web store switch is `storefrontHidden`, and absent means listed")
+    func productSwitch() {
+        var product = Product.from(["id": .string("P1"), "nameEn": .string("Lamp")], keys: [])
+        #expect(product.onWebStore)
+        product.onWebStore = false
+        #expect(product.rest["storefrontHidden"] == .bool(true))
+        product.onWebStore = true
+        #expect(product.rest["storefrontHidden"] == nil)
+    }
+
+    @Test("the review comes from the shared module, and the product sheet has the switch and a category")
+    func reviewAndSheet() async throws {
+        let engine = try KhaytEngine()
+        let settings: JSONValue = .object(["contentLangs": .array([.string("en"), .string("ar")])])
+        let review = try await engine.storefrontReview(
+            products: [.object(["id": .string("T"), "nameEn": .string("Turtle_Articulated")]),
+                       .object(["id": .string("H"), "nameEn": .string("Hidden"), "storefrontHidden": .bool(true)])],
+            settings: settings, lang: "en")
+        #expect(review.hidden == 1)
+        #expect(review.listings.first?.issues.contains("file_name") == true)
+        let sheet = try QuoteSheetStatusTests.source("ProductSheet.swift")
+        #expect(sheet.contains("$draft.onWebStore"))
+        #expect(sheet.contains("$draft.category"))
+        let words = try QuoteSheetStatusTests.source("Words.swift")
+        for issue in ["no_price", "no_photo", "no_description", "no_category", "second_language", "file_name"] {
+            #expect(words.contains("\"mac.ws_issue_\(issue)\""), "\(issue) has no words")
+        }
+    }
+
 }

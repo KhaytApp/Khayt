@@ -111,3 +111,9 @@ test('review: a storefront price or category counts, and 0 is a price', () => {
   const s = settings({ categories: { p: 'Home' } });
   assert.deepEqual(SC.review([p], s, 'en').listings, []);
 });
+
+test('a screen that lists products to edit can still see the hidden ones', () => {
+  const products = [{ id: 'a', nameEn: 'A', storefrontHidden: true }, { id: 'b', nameEn: 'B' }];
+  assert.deepEqual(SC.publishable(products, settings(), 'en').map((p) => p.id), ['b']);
+  assert.deepEqual(SC.publishable(products, settings(), 'en', { includeHidden: true }).map((p) => p.id), ['a', 'b']);
+});

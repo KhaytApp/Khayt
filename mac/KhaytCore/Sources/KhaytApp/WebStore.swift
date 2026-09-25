@@ -372,6 +372,142 @@ extension Shop {
     }
 }
 
+// MARK: - The store's own settings
+
+/// `settings.storefront`'s shop-wide fields, as the sheet edits them.
+///
+/// The desktop's Storefront dialog was the only place to set these, so a shop
+/// on the Mac could publish a catalogue but not say how it ships, what a
+/// deposit is, or which codes give a discount. The per-product maps in the
+/// same object (prices, categories, options, stock) are left exactly as they
+/// are: this writes only the keys it owns.
+struct StorefrontDraft: Equatable {
+    struct Shipping: Equatable, Identifiable {
+        var id = UUID()
+        var label = ""
+        var price = ""
+    }
+    struct Promo: Equatable, Identifiable {
+        var id = UUID()
+        var code = ""
+        var fixed = false
+        var value = ""
+        var expires = ""
+        var maxUses = ""
+    }
+    var note = ""
+    var leadTime = ""
+    var minOrder = ""
+    var depositPct = ""
+    var taxRate = ""
+    var payUrl = ""
+    var shipping: [Shipping] = []
+    var promos: [Promo] = []
+
+    static func text(_ v: JSONValue?) -> String {
+        switch v {
+        case .string(let s)?: return s
+        case .number(let n)? where n != 0: return n == n.rounded() ? String(Int(n)) : String(n)
+        default: return ""
+        }
+    }
+
+    init() {}
+
+    init(_ settings: [String: JSONValue]) {
+        guard case .object(let sf)? = settings["storefront"] else { return }
+        note = Self.text(sf["note"]); leadTime = Self.text(sf["leadTime"])
+        minOrder = Self.text(sf["minOrder"]); depositPct = Self.text(sf["depositPct"])
+        taxRate = Self.text(sf["taxRate"]); payUrl = Self.text(sf["payUrl"])
+        if case .array(let list)? = sf["shipping"] {
+            shipping = list.compactMap {
+                guard case .object(let o) = $0 else { return nil }
+                return Shipping(label: Self.text(o["label"]), price: Self.text(o["price"]))
+            }
+        }
+        if case .array(let list)? = sf["promos"] {
+            promos = list.compactMap {
+                guard case .object(let o) = $0 else { return nil }
+                return Promo(code: Self.text(o["code"]), fixed: o["type"] == .string("fixed"),
+                             value: Self.text(o["value"]), expires: Self.text(o["expires"]),
+                             maxUses: Self.text(o["maxUses"]))
+            }
+        }
+    }
+
+    private static func number(_ s: String, max upper: Double? = nil) -> Double {
+        let n = max(0, Double(s.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)) ?? 0)
+        return upper.map { min($0, n) } ?? n
+    }
+
+    /// Written over `settings.storefront`, keeping every key it does not own.
+    /// The same clamps and filters as the desktop's `captureConfig`.
+    func apply(to sf: inout [String: JSONValue]) {
+        sf["note"] = .string(note.trimmingCharacters(in: .whitespaces))
+        sf["leadTime"] = .string(leadTime.trimmingCharacters(in: .whitespaces))
+        sf["minOrder"] = .number(Self.number(minOrder))
+        sf["depositPct"] = .number(Self.number(depositPct, max: 100))
+        sf["taxRate"] = .number(Self.number(taxRate, max: 100))
+        sf["payUrl"] = .string(payUrl.trimmingCharacters(in: .whitespaces))
+        sf["shipping"] = .array(shipping
+            .filter { !$0.label.trimmingCharacters(in: .whitespaces).isEmpty }
+            .prefix(8)
+            .map { .object(["label": .string($0.label.trimmingCharacters(in: .whitespaces)),
+                            "price": .number(Self.number($0.price))]) })
+        sf["promos"] = .array(promos.compactMap { p in
+            let code = p.code.trimmingCharacters(in: .whitespaces).uppercased()
+            let value = Self.number(p.value)
+            guard !code.isEmpty, value > 0 else { return nil }
+            return .object(["code": .string(code), "type": .string(p.fixed ? "fixed" : "pct"),
+                            "value": .number(value), "expires": .string(p.expires.trimmingCharacters(in: .whitespaces)),
+                            "maxUses": .number(Double(Int(Self.number(p.maxUses))))])
+        })
+    }
+}
+
+extension Shop {
+    /// Show or hide one product on the web store.
+    func setOnWebStore(_ id: String, _ on: Bool) async {
+        guard let build = source.build else { return }
+        do {
+            try StoreWriter.updateRecord(build, collection: "products", id: id) { record in
+                if on { record.removeValue(forKey: "storefrontHidden") } else { record["storefrontHidden"] = .bool(true) }
+            }
+            await load(source)
+        } catch {
+            webStoreSaid = String(describing: error)
+            webStoreProblem = true
+        }
+    }
+
+    /// Save the store's shop-wide settings.
+    func saveStorefront(_ draft: StorefrontDraft) async {
+        guard let build = source.build else { return }
+        do {
+            try StoreWriter.update(build) { root in
+                var settings = Self.settings(root)
+                var sf: [String: JSONValue] = [:]
+                if case .object(let had)? = settings["storefront"] { sf = had }
+                draft.apply(to: &sf)
+                settings["storefront"] = .object(sf)
+                root["settings"] = .object(settings)
+            }
+            await load(source)
+            webStoreSaid = words.callIt(webStoreLive == true ? "mac.ws_settings_saved_live" : "mac.ws_settings_saved")
+            webStoreProblem = false
+            webStoreSaidAt = Date()
+        } catch {
+            webStoreSaid = String(describing: error)
+            webStoreProblem = true
+        }
+    }
+
+    /// What a customer would find wrong with each listing.
+    func webStoreReview() async -> KhaytEngine.StorefrontReview? {
+        try? await engine?.storefrontReview(products: productRows, settings: settingsValue, lang: words.language)
+    }
+}
+
 // MARK: - The sheet
 
 /// Publish, update or take down the web store, from the catalogue.
@@ -382,6 +518,10 @@ struct WebStoreSheet: View {
     @State private var count = 0
     @State private var askingOffline = false
     @State private var copied = false
+    @State private var review: KhaytEngine.StorefrontReview?
+    @State private var store = StorefrontDraft()
+    @State private var storeSaved = StorefrontDraft()
+    @State private var showSettings = false
 
     /// Whether pictures are sent; the live store's own republishes read it too.
     static var photosOn: Bool {
@@ -436,6 +576,52 @@ struct WebStoreSheet: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                // ── BEFORE YOU PUBLISH ────────────────────────────────────────
+                //
+                // What a customer would notice, per listing, with the two ways
+                // to fix it right here: edit the product, or keep it off the
+                // store. `lib/storefront-catalog.js` decides what counts.
+                if let review, !review.listings.isEmpty || review.hidden > 0 {
+                    Section(shop.words.callIt("mac.ws_review")) {
+                        ForEach(review.listings) { listing in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Image(systemName: "exclamationmark.circle").foregroundStyle(Khayt.attention)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(verbatim: listing.name).font(.callout.weight(.medium))
+                                    Text(listing.issues.map { shop.words.callIt("mac.ws_issue_" + $0) }
+                                            .formatted(.list(type: .and)))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: 8)
+                                Button(shop.words.callIt("mac.edit_product") + "\u{2026}") {
+                                    Task {
+                                        guard let product = await shop.productForEditing(listing.id) else { return }
+                                        dismiss()
+                                        shop.editingProduct = product
+                                    }
+                                }
+                                .disabled(!shop.canMoveJobs)
+                                Button(shop.words.callIt("mac.ws_hide")) {
+                                    Task { await shop.setOnWebStore(listing.id, false) }
+                                }
+                                .disabled(!shop.canMoveJobs)
+                            }
+                        }
+                        if review.hidden > 0 {
+                            Label(shop.words.counting(review.hidden, "mac.ws_hidden"), systemImage: "eye.slash")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                // ── THE STORE'S OWN SETTINGS ─────────────────────────────────
+                Section {
+                    DisclosureGroup(isExpanded: $showSettings) {
+                        storeSettings
+                    } label: {
+                        Text(shop.words.callIt("mac.ws_settings")).font(.callout)
+                    }
+                }
                 if let page = connection.flatMap(CatalogPublisher.shopPage) {
                     Section(shop.words.callIt("mac.ws_page")) {
                         Text(verbatim: page.absoluteString)
@@ -471,14 +657,99 @@ struct WebStoreSheet: View {
             }
             .padding()
         }
-        .frame(minWidth: 460, idealWidth: 520, minHeight: 360)
+        .frame(minWidth: 520, idealWidth: 600, minHeight: 420, idealHeight: 640)
         .confirmationDialog(shop.words.callIt("store.unpublish_q"), isPresented: $askingOffline) {
             Button(shop.words.callIt("store.unpublish"), role: .destructive) {
                 Task { await shop.unpublishWebStore() }
             }
         }
-        .task(id: shop.productRows.count) { count = await shop.webStoreCount() }
+        .task(id: shop.productRows) {
+            count = await shop.webStoreCount()
+            review = await shop.webStoreReview()
+        }
+        .task(id: shop.settingsValue) {
+            let now = StorefrontDraft(shop.settingsDict)
+            if store == storeSaved { store = now }
+            storeSaved = now
+        }
         .task { await shop.refreshWebStore() }
+    }
+
+    @ViewBuilder private var storeSettings: some View {
+        let w = shop.words
+        Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+            settingRow("store.note_label", $store.note, prompt: w.callIt("store.note_ph"))
+            settingRow("store.lead_time", $store.leadTime, prompt: w.callIt("store.lead_ph"))
+            settingRow("store.min_order", $store.minOrder, unit: shop.currency, width: 100)
+            settingRow("store.deposit_pct", $store.depositPct, unit: "%", width: 70)
+            settingRow("store.tax_rate", $store.taxRate, unit: "%", width: 70)
+            settingRow("store.pay_url", $store.payUrl, prompt: "https://pay…/{amount}")
+        }
+        Text(w.callIt("store.pay_url_hint"))
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+        Text(w.callIt("store.shipping_label")).font(.callout.weight(.medium)).padding(.top, 6)
+        ForEach($store.shipping) { $row in
+            HStack {
+                TextField(w.callIt("store.ship_label_ph"), text: $row.label).textFieldStyle(.roundedBorder)
+                TextField("0", text: $row.price).textFieldStyle(.roundedBorder).frame(width: 80)
+                    .multilineTextAlignment(.trailing).monospacedDigit()
+                Text(shop.currency).foregroundStyle(.secondary)
+                Button(role: .destructive) { store.shipping.removeAll { $0.id == row.id } } label: {
+                    Image(systemName: "minus.circle")
+                }
+                .buttonStyle(.borderless)
+                .help(w.callIt("common.delete"))
+            }
+        }
+        Button("+ " + w.callIt("store.add_shipping")) { store.shipping.append(.init()) }
+            .disabled(store.shipping.count >= 8)
+
+        Text(w.callIt("store.promos_label")).font(.callout.weight(.medium)).padding(.top, 6)
+        ForEach($store.promos) { $promo in
+            HStack {
+                TextField(w.callIt("store.promo_code"), text: $promo.code).textFieldStyle(.roundedBorder)
+                Picker("", selection: $promo.fixed) {
+                    Text(verbatim: "%").tag(false)
+                    Text(verbatim: shop.currency).tag(true)
+                }
+                .labelsHidden().fixedSize()
+                TextField("0", text: $promo.value).textFieldStyle(.roundedBorder).frame(width: 64)
+                    .multilineTextAlignment(.trailing).monospacedDigit()
+                TextField(w.callIt("store.promo_expires"), text: $promo.expires).textFieldStyle(.roundedBorder)
+                    .frame(width: 110)
+                TextField("∞", text: $promo.maxUses).textFieldStyle(.roundedBorder).frame(width: 50)
+                    .help(w.callIt("store.promo_max"))
+                Button(role: .destructive) { store.promos.removeAll { $0.id == promo.id } } label: {
+                    Image(systemName: "minus.circle")
+                }
+                .buttonStyle(.borderless)
+                .help(w.callIt("common.delete"))
+            }
+        }
+        Button("+ " + w.callIt("store.add_promo")) { store.promos.append(.init()) }
+
+        HStack {
+            Spacer()
+            Button(w.callIt("common.cancel")) { store = storeSaved }
+                .disabled(store == storeSaved)
+            Button(w.callIt("common.save")) { Task { await shop.saveStorefront(store) } }
+                .disabled(store == storeSaved || !shop.canMoveJobs)
+        }
+        .padding(.top, 6)
+    }
+
+    private func settingRow(_ key: String, _ text: Binding<String>, prompt: String = "",
+                            unit: String? = nil, width: CGFloat? = nil) -> some View {
+        GridRow {
+            Text(shop.words.callIt(key)).foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+            HStack {
+                TextField(prompt, text: text).textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: width ?? .infinity)
+                if let unit { Text(verbatim: unit).foregroundStyle(.secondary) }
+            }
+        }
     }
 
     private func banner(symbol: String?, tint: some ShapeStyle, text: String, at: Date?) -> some View {
