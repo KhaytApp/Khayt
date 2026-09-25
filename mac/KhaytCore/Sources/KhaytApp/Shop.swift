@@ -789,6 +789,7 @@ final class Shop {
             if next.build != nil { startPublishingLeadTime() } else { stopPublishingLeadTime() }
             if next.build != nil { startWatchingPlugs() } else { stopWatchingPlugs() }
             if next.build != nil { await restoreCloudKey() }
+            resetWebStore()
             if next.build != nil { Task { await self.refreshWebStore() } }
             refreshSyncStatus()
             // Move a service log a Mac alpha wrote under the wrong key. Inside
@@ -5370,7 +5371,6 @@ final class Shop {
                         if touched { root[collection] = .array(records) }
                     }
                 }
-                Task { await shop.deleteSupplier(id) }
             } catch {
                 shop.moveProblem = String(describing: error)
             }
@@ -9105,6 +9105,9 @@ final class Shop {
     var webStoreAt: Date?
     /// What the last publish or check said, in the shop's words.
     var webStoreSaid: String?
+    /// When that was said, and what Khayt Cloud held when it was last read.
+    var webStoreSaidAt: Date?
+    var webStoreHeld: CatalogPublisher.Held?
     var webStoreProblem = false
     var webStoreBusy = false
     /// What the store was built from last time the book was read, so a change
@@ -9430,6 +9433,28 @@ final class Shop {
         }
     }
 
+    /// Undo a consumable delete: put the row back. It returns under a new id
+    /// (see `StoreWriter.reviveUnderNewIds`), because the delete's tombstone
+    /// may already have reached the cloud, where it wins over the old one.
+    private func registerConsumableUndo(_ record: [String: JSONValue]) {
+        guard let undoManager, let build = source.build,
+              case .string(let id)? = record["id"] else { return }
+        undoManager.setActionName(words.callIt("cons.title"))
+        undoManager.registerUndo(withTarget: self) { shop in
+            do {
+                try StoreWriter.update(build) { root in
+                    var shelf = Self.rows(root, "consumables")
+                    guard !shelf.contains(where: { Self.recordId($0) == id }) else { return }
+                    shelf.append(.object(record))
+                    root["consumables"] = .array(shelf)
+                }
+                Task { await shop.load(shop.source) }
+            } catch {
+                shop.spendProblem = String(describing: error)
+            }
+        }
+    }
+
     /// Take one off the shelf.
     ///
     /// Nothing else points at a consumable the way an order points at a spool,
@@ -9453,7 +9478,9 @@ final class Shop {
                 shelf.remove(at: at)
                 root["consumables"] = .array(shelf)
             }
-            if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("cons.title")) }
+            // NOT registerMoveUndo: that puts back rows that are still there,
+            // and a deleted row is not, so Undo did nothing at all.
+            if let gone = undo.first { registerConsumableUndo(gone.was) }
             await load(source)
             spendNote = words.callIt("inv.removed")
         } catch {
@@ -9627,7 +9654,6 @@ final class Shop {
                         root["settings"] = .object(settings)
                     }
                 }
-                Task { await shop.deleteProduct(id) }   // redo
                 Task { await shop.load(shop.source) }
             } catch {
                 shop.productProblem = String(describing: error)
@@ -9651,7 +9677,6 @@ final class Shop {
                     shelf.append(.object(record))
                     root["inventory"] = .array(shelf)
                 }
-                Task { await shop.deleteSpool(id) }
             } catch {
                 shop.spendProblem = String(describing: error)
             }

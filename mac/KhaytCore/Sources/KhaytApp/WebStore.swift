@@ -61,23 +61,42 @@ enum CatalogPublisher {
         }
     }
 
-    /// Whether a catalogue is published, and when it last changed. A 404 is the
+    /// What Khayt Cloud holds: whether a catalogue is published, when it last
+    /// changed, and how many listings and photos it carries. A 404 is the
     /// answer "no", not a fault.
+    struct Held: Equatable {
+        var live: Bool
+        var at: Date?
+        var items = 0
+        var photos = 0
+    }
+
     static func status(_ connection: CloudReader.Connection, token: String,
-                       fetch: (URLRequest) async throws -> (Data, URLResponse)) async throws -> (live: Bool, at: Date?) {
-        let request = try CloudReader.request(connection, token: token, method: "GET", tail: "/catalog")
+                       fetch: (URLRequest) async throws -> (Data, URLResponse)) async throws -> Held {
+        var request = try CloudReader.request(connection, token: token, method: "GET", tail: "/catalog")
+        // The service marks this public for 60 s; a read-back must see the
+        // catalogue just sent, not a cached copy of the last one.
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         let (data, response) = try await fetch(request)
         switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
         case 200:
             let body = try? JSONDecoder().decode(JSONValue.self, from: data)
-            guard case .object(let o)? = body, let catalog = o["catalog"], catalog != .null else {
-                return (false, nil)
+            guard case .object(let o)? = body, case .object(let catalog)? = o["catalog"] else {
+                return Held(live: false)
             }
             var at: Date?
             if case .string(let s)? = o["updatedAt"] { at = try? Date(s, strategy: .iso8601) }
             if at == nil, case .number(let ms)? = o["updatedAt"] { at = Date(timeIntervalSince1970: ms / 1000) }
-            return (true, at)
-        case 404: return (false, nil)
+            var held = Held(live: true, at: at)
+            if case .array(let items)? = catalog["items"] {
+                held.items = items.count
+                for case .object(let item) in items {
+                    if case .array(let photos)? = item["photos"] { held.photos += photos.count }
+                }
+            }
+            return held
+        case 404: return Held(live: false)
         case 401: throw Failure.unauthorised
         case let code: throw Failure.http(code, CloudWriter.said(data))
         }
@@ -114,6 +133,20 @@ enum CatalogPublisher {
 
 extension Shop {
 
+    /// Forget everything about the last book's store. Called when a book is
+    /// opened, before it is asked about its own.
+    func resetWebStore() {
+        webStoreRepublish?.cancel()
+        webStoreRepublish = nil
+        webStoreLive = nil
+        webStoreAt = nil
+        webStoreHeld = nil
+        webStoreSaid = nil
+        webStoreSaidAt = nil
+        webStoreProblem = false
+        webStoreHeroes = [:]
+    }
+
     /// Ask the service whether the store is live. Quiet about a shop with no cloud.
     func refreshWebStore() async {
         guard let build = source.build, Self.cloudConnected(settingsDict) else {
@@ -127,6 +160,7 @@ extension Shop {
             let now = try await CatalogPublisher.status(connection, token: token) { try await session.data(for: $0) }
             webStoreLive = now.live
             webStoreAt = now.at
+            webStoreHeld = now
         } catch {
             // Unknown, not offline: a store that could not be asked about must
             // not stop following the catalogue because of a dropped request.
@@ -141,7 +175,7 @@ extension Shop {
     }
 
     /// Build the catalogue from the book and send it.
-    func publishWebStore(withPhotos: Bool = WebStoreSheet.photosOn) async {
+    func publishWebStore(withPhotos: Bool = WebStoreSheet.photosOn, automatic: Bool = false) async {
         guard let engine, let build = source.build else { return }
         webStoreRepublish?.cancel()
         webStoreBusy = true
@@ -158,23 +192,88 @@ extension Shop {
             let catalog = try await engine.storefrontCatalog(
                 products: products, settings: settings, lang: words.language,
                 withPhotos: withPhotos, heroes: heroes)
-            if case .object(let o) = catalog, case .array(let items)? = o["items"], items.isEmpty {
-                throw CatalogPublisher.Failure.empty
-            }
+            var sent = 0
+            if case .object(let o) = catalog, case .array(let items)? = o["items"] { sent = items.count }
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
             let session = URLSession(configuration: .ephemeral)
+
+            // ── AN AUTOMATIC PUBLISH ASKS FIRST ────────────────────────────
+            //
+            // "Live" here is what this Mac last heard. The store may have been
+            // taken offline from the desktop since, and republishing it on the
+            // next edit would put it back online without anybody asking. So a
+            // publish nobody pressed checks the store is still live, and stops
+            // following it if not.
+            if automatic {
+                let now = try await CatalogPublisher.status(connection, token: token) { try await session.data(for: $0) }
+                guard now.live else {
+                    webStoreLive = false
+                    webStoreHeld = now
+                    return
+                }
+                // EVERYTHING WAS DELETED. The service refuses an empty catalogue,
+                // so without this the old one stayed up: customers could still
+                // order what the shop had removed. An empty catalogue now means
+                // no store, and the shop is told.
+                if sent == 0 {
+                    try await CatalogPublisher.publish(connection, token: token, catalog: nil) {
+                        try await session.data(for: $0)
+                    }
+                    webStoreLive = false
+                    webStoreHeld = CatalogPublisher.Held(live: false)
+                    webStoreAt = Date()
+                    webStoreSaid = words.callIt("mac.ws_emptied")
+                    webStoreProblem = true
+                    webStoreSaidAt = Date()
+                    moveNotices.append(webStoreSaid ?? "")
+                    return
+                }
+            }
+            if sent == 0 { throw CatalogPublisher.Failure.empty }
             try await CatalogPublisher.publish(connection, token: token, catalog: catalog) {
                 try await session.data(for: $0)
             }
+            // ── READ IT BACK ───────────────────────────────────────────────
+            //
+            // A 200 says the service took the request, not what a customer
+            // will see: it sanitises the catalogue and drops what it will not
+            // store. The shop could only find out by opening the website. So
+            // the answer is read back from Khayt Cloud itself, and what is said
+            // is what it now holds.
             webStoreLive = true
             webStoreAt = Date()
-            webStoreSaid = words.callIt("store.published")
-            webStoreProblem = false
+            // Its own failure: the catalogue WAS stored, and a read-back that
+            // timed out must not say otherwise.
+            guard let held = try? await CatalogPublisher.status(connection, token: token, fetch: {
+                try await session.data(for: $0)
+            }) else {
+                webStoreSaid = words.callIt("mac.ws_sent_unchecked", ["products": .string(words.counting(sent, "mac.ws_products"))])
+                webStoreProblem = false
+                webStoreSaidAt = Date()
+                return
+            }
+            webStoreHeld = held
+            webStoreLive = held.live
+            webStoreAt = held.at ?? Date()
+            let listed = words.callIt("mac.ws_confirmed", [
+                "products": .string(words.counting(held.items, "mac.ws_products")),
+                "photos": .string(words.counting(held.photos, "mac.ws_photos")),
+            ])
+            if held.live && held.items == sent {
+                webStoreSaid = listed
+                webStoreProblem = false
+            } else {
+                webStoreSaid = words.callIt("mac.ws_short", ["sent": .string(String(sent))]) + " " + listed
+                webStoreProblem = true
+            }
         } catch {
             webStoreSaid = words.callIt("mac.ws_failed") + " " + webStoreReason(error)
             webStoreProblem = true
+            // A live store republishing on its own fails where nobody is looking.
+            if automatic { moveNotices.append(webStoreSaid ?? "") }
         }
+        webStoreSaidAt = Date()
         FileHandle.standardError.write(Data("khayt: web store — \(webStoreSaid ?? "")\n".utf8))
     }
 
@@ -216,12 +315,16 @@ extension Shop {
         ])
         defer { webStoreSeen = seen }
         guard let before = webStoreSeen, before != seen,
-              webStoreLive == true, source.build != nil else { return }
+              webStoreLive == true, let book = source.build?.storeURL,
+              cloudRoleCanWrite else { return }
         webStoreRepublish?.cancel()
         webStoreRepublish = Task { [weak self] in
             try? await Task.sleep(for: CatalogPublisher.followDelay)
-            guard !Task.isCancelled else { return }
-            await self?.publishWebStore()
+            // Still the same book, and still live: a book opened in the
+            // meantime is a different shop with a store of its own.
+            guard !Task.isCancelled, let self, self.source.build?.storeURL == book,
+                  self.webStoreLive == true else { return }
+            await self.publishWebStore(automatic: true)
         }
     }
 
@@ -289,6 +392,19 @@ struct WebStoreSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // ── THE ANSWER, WHERE IT CANNOT BE MISSED ─────────────────────────
+            //
+            // It was a caption at the foot of a section, grey, and the shop
+            // could only tell whether a publish had worked by opening the
+            // website. Now it is the first thing in the sheet, says what Khayt
+            // Cloud holds, and when it was checked.
+            if shop.webStoreBusy {
+                banner(symbol: nil, tint: .secondary, text: shop.words.callIt("mac.ws_publishing"), at: nil)
+            } else if let said = shop.webStoreSaid {
+                banner(symbol: shop.webStoreProblem ? "exclamationmark.triangle.fill" : "checkmark.circle.fill",
+                       tint: shop.webStoreProblem ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(Khayt.done),
+                       text: said, at: shop.webStoreSaidAt)
+            }
             Form {
                 Section {
                     Text(shop.words.callIt("mac.ws_desc"))
@@ -300,6 +416,10 @@ struct WebStoreSheet: View {
                                 .foregroundStyle(shop.webStoreLive == true ? AnyShapeStyle(Khayt.done) : AnyShapeStyle(.secondary))
                             Text(shop.words.callIt(shop.webStoreLive == true ? "store.published"
                                                    : shop.webStoreLive == false ? "store.unpublished" : "mac.ws_unknown"))
+                            if shop.webStoreLive == true, let held = shop.webStoreHeld {
+                                Text(shop.words.counting(held.items, "mac.ws_products"))
+                                    .foregroundStyle(.secondary)
+                            }
                             if let at = shop.webStoreAt {
                                 Text(shop.words.say(at, Date.FormatStyle(date: .abbreviated, time: .shortened)))
                                     .foregroundStyle(.tertiary).monospacedDigit()
@@ -314,13 +434,6 @@ struct WebStoreSheet: View {
                         Label(shop.words.callIt("mac.ws_follows"), systemImage: "arrow.triangle.2.circlepath")
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if let said = shop.webStoreSaid {
-                        Text(said)
-                            .font(.caption)
-                            .foregroundStyle(shop.webStoreProblem ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.secondary))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .textSelection(.enabled)
                     }
                 }
                 if let page = connection.flatMap(CatalogPublisher.shopPage) {
@@ -366,5 +479,29 @@ struct WebStoreSheet: View {
         }
         .task(id: shop.productRows.count) { count = await shop.webStoreCount() }
         .task { await shop.refreshWebStore() }
+    }
+
+    private func banner(symbol: String?, tint: some ShapeStyle, text: String, at: Date?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            if let symbol {
+                Image(systemName: symbol).foregroundStyle(tint)
+            } else {
+                ProgressView().controlSize(.small)
+            }
+            Text(text)
+                .font(.callout.weight(.medium))
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+            Spacer(minLength: 0)
+            if let at {
+                Text(shop.words.say(at, Date.FormatStyle(date: .omitted, time: .shortened)))
+                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding([.horizontal, .top])
+        .accessibilityIdentifier("webstore-outcome")
     }
 }

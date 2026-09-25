@@ -90,7 +90,10 @@ public enum StoreWriter {
 
         let before = root
         try mutate(&root)
-        if recordingDeletes { recordDeletions(before: before, after: &root) }
+        if recordingDeletes {
+            reviveUnderNewIds(before: before, after: &root)
+            recordDeletions(before: before, after: &root)
+        }
 
         let encoder = JSONEncoder()
         let next = try encoder.encode(root)
@@ -154,7 +157,10 @@ public enum StoreWriter {
 
             let before = root
             try await mutate(&root)
-            if recordingDeletes { recordDeletions(before: before, after: &root) }
+            if recordingDeletes {
+                reviveUnderNewIds(before: before, after: &root)
+                recordDeletions(before: before, after: &root)
+            }
 
             let next = try JSONEncoder().encode(root)
             guard next.count <= maxStoreBytes else { throw Refusal.tooLarge(next.count) }
@@ -281,6 +287,89 @@ public enum StoreWriter {
         }
         if tombs.count > tombstoneCap { tombs.removeFirst(tombs.count - tombstoneCap) }
         after["tombstones"] = .array(tombs)
+    }
+
+    /// A record put back after it was deleted gets a NEW id, and everything
+    /// that pointed at the old one points at the new one.
+    ///
+    /// ── AN ID THAT HAS BEEN DELETED STAYS DELETED ─────────────────────────
+    ///
+    /// The shared sync rule lets a delete win over a re-add of the same id, on
+    /// every device and in the cloud, for good: `applyDeltas` skips a record
+    /// whose tombstone it holds, and `changesToSend` never sends one. That is
+    /// right for a stale copy coming back from another device. It also meant
+    /// that Undo after a delete restored the record here and the next sync took
+    /// it away again, because the tombstone written by the delete was still
+    /// there (and had usually reached the cloud within minutes).
+    ///
+    /// So the restored record is a new record. Its content and its links are
+    /// the old one's: every string in the book equal to the old id, and every
+    /// object key equal to it (`settings.storefront.prices[id]` and the like),
+    /// is rewritten, and each record that changed is stamped so the new links
+    /// sync. Ids are long random strings, so an exact match is only ever a
+    /// reference.
+    public static func reviveUnderNewIds(before: [String: JSONValue], after: inout [String: JSONValue]) {
+        guard case .array(let tombs)? = before["tombstones"], !tombs.isEmpty else { return }
+        var dead = Set<String>()
+        for case .object(let t) in tombs {
+            if case .string(let c)? = t["collection"], case .string(let i)? = t["id"] { dead.insert(c + ":" + i) }
+        }
+        var renames: [String: String] = [:]
+        for (collection, value) in after where collection != "tombstones" {
+            guard case .array(var rows) = value else { continue }
+            var had = Set<String>()
+            if case .array(let old)? = before[collection] {
+                for case .object(let o) in old { if case .string(let id)? = o["id"] { had.insert(id) } }
+            }
+            var changed = false
+            for i in rows.indices {
+                guard case .object(var o) = rows[i], case .string(let id)? = o["id"],
+                      dead.contains(collection + ":" + id), !had.contains(id) else { continue }
+                let fresh = freshId(like: id)
+                renames[id] = fresh
+                o["id"] = .string(fresh)
+                stamp(&o)
+                rows[i] = .object(o)
+                changed = true
+            }
+            if changed { after[collection] = .array(rows) }
+        }
+        guard !renames.isEmpty else { return }
+        for (key, value) in after where key != "tombstones" {
+            if case .array(let rows) = value {
+                var out = rows
+                var touched = false
+                for i in rows.indices {
+                    let next = relink(rows[i], renames)
+                    guard next != rows[i] else { continue }
+                    if case .object(var o) = next { stamp(&o); out[i] = .object(o) } else { out[i] = next }
+                    touched = true
+                }
+                if touched { after[key] = .array(out) }
+            } else {
+                let next = relink(value, renames)
+                if next != value { after[key] = next }
+            }
+        }
+    }
+
+    private static func relink(_ value: JSONValue, _ renames: [String: String]) -> JSONValue {
+        switch value {
+        case .string(let s): return renames[s].map { .string($0) } ?? value
+        case .array(let a): return .array(a.map { relink($0, renames) })
+        case .object(let o):
+            var out: [String: JSONValue] = [:]
+            for (k, v) in o { out[renames[k] ?? k] = relink(v, renames) }
+            return .object(out)
+        default: return value
+        }
+    }
+
+    /// The old id's prefix (`PROD-`, `SUP-`, …) and a new random tail.
+    static func freshId(like old: String) -> String {
+        let prefix = old.firstIndex(of: "-").map { String(old[...$0]) } ?? ""
+        let alphabet = Array("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+        return prefix + String((0..<11).map { _ in alphabet.randomElement()! })
     }
 
     /// `TOMB_CAP` in lib/sync.js.
