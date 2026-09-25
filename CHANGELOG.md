@@ -4,15 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Cloud sync stops retrying what retrying cannot fix, and says why.** When
-  Khayt Cloud refuses for a reason that will not pass on its own (this version
-  cannot read the shop's newer changes, the store is over the plan's size, or
-  the sign-in is rejected or read-only), the desktop kept trying on a timer for
-  as long as it was open. It now stops and shows the cloud's own explanation.
-  The next change you make, or Sync now, tries again, so updating, upgrading
-  or signing back in is enough; a network or server outage is still retried
-  on its own.
-
 - **(Mac) The PIN no longer sits in the browser's address bar.** Opening the
   live queue in a browser asks for the PIN once, in a form, and keeps a
   12-hour session cookie (HttpOnly, SameSite=Strict) instead — the page
@@ -165,20 +156,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - **An ntfy access token could go over plain HTTP or follow a redirect.** It
     is sent only to https:// servers, and never on to a redirect.
 
-
-
-- **A full wipe keeps one copy of your book.** "Delete everything" used to
-  delete everything, backups included, so a wipe made by mistake could not be
-  undone. It now saves one copy of your book first and checks the copy can be
-  read. If it cannot make that copy, it stops and deletes nothing. The copy
-  stays in the backups folder after the wipe and can be restored from
-  Settings → Backups; routine backup clean-up never removes it. Photos,
-  invoices, the library and keys are still removed.
-- **"Last backup" could show the wrong thing after an update.** The backup
-  Khayt takes before installing an update sorted after every daily backup, so
-  the settings screen showed it as the last backup date and the daily backup
-  ran again on every check. Only daily backups count now.
-
 - **(iOS) A job's detail is the design's bottom sheet.** It opens half-way and
   pulls up: the job and who it is for, the five stages as a line with the
   current one ringed, the due date (red when late), the printer — tap to change
@@ -186,35 +163,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   job goes to next. Setting any status directly is still there, below it, for
   sending a job back or holding it.
 
-- **The root of a disk is never taken as the print library's folder.** The
-  library's location, its mirror and the folders it has lived in before all
-  come from settings, and settings can arrive in a restored backup or over
-  cloud sync. A location of `/` (or `C:\` on Windows) would have counted every
-  file on the machine as part of the library, which is what deleting a model
-  is confined by, and moving the library would have treated the whole disk as
-  somewhere to move files out of. Such a location is now ignored, as if none
-  had been set, and the check that decides whether a folder sits inside
-  another now handles the root of a disk correctly. Found by the Mac app's
-  port of the same rule.
-
-- **Four ways Khayt could destroy a file you meant to keep.**
-  - **Generating a new ZATCA key replaced the old one with no copy.** That key
-    is the one your ZATCA certificate is bound to, so one click in Settings
-    could make every invoice after it fail ZATCA's check until you onboarded
-    again. The old key is now kept beside the new one, and if it cannot be
-    kept, no new key is written.
-  - **Deleting a model from the library deleted it for good.** It goes to the
-    Trash (the Recycle Bin on Windows) now, so a mistake can be undone. If the
-    Trash is not available, the file stays and Khayt says it could not be
-    deleted, rather than deleting it permanently.
-  - **In Saudi Arabia, the night overwrote the previous day's backup.** The
-    daily backup was named by the date in UTC while Khayt checked it against
-    your own date, so between midnight and 3 a.m. it kept writing over
-    yesterday's backup. It is named by your own date now: one per day, as the
-    setting says.
-  - **Attaching a second file with the same name to an order replaced the
-    first.** Two `part.stl` files from different folders left only the last
-    one. The second is now kept as `part-2.stl`.
 - **(Mac) Google Drive as the print library's online storage.** Settings →
   Preferences → Online storage → Keep the copy in → Google Drive: add the OAuth
   client ID from the shop's Google Cloud project (type "Desktop app"), press
@@ -3233,6 +3181,32 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.9.2] - 2026-09-25
+
+Khayt for Mac is back on the current version. Since 3.8.0 the Electron app
+was built for Windows and Linux only, so a Mac running it stayed on 3.7.0.
+This release is built for all three, so a Mac updates straight to everything
+in 3.8.0, 3.9.0 and 3.9.1 — the report corrections, the cloud sync fixes,
+the file-safety and security fixes — in one step. Khayt for Mac will keep
+getting these releases until the new Mac app reaches beta.
+
+**Cloud sync says why it stopped.** When Khayt Cloud refuses for a reason
+that will not pass on its own (this version cannot read newer changes, the
+store is over the plan's size, or the sign-in is rejected), the app now stops
+retrying and shows the cloud's explanation. Your next change, or Sync now,
+tries again.
+
+### Fixed
+
+- **Cloud sync stops retrying what retrying cannot fix, and says why.** When
+  Khayt Cloud refuses for a reason that will not pass on its own (this version
+  cannot read the shop's newer changes, the store is over the plan's size, or
+  the sign-in is rejected or read-only), the desktop kept trying on a timer for
+  as long as it was open. It now stops and shows the cloud's own explanation.
+  The next change you make, or Sync now, tries again, so updating, upgrading
+  or signing back in is enough; a network or server outage is still retried
+  on its own.
 
 ## [3.9.1] - 2026-09-24
 
