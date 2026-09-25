@@ -335,3 +335,64 @@ test('a failure tells the listener WHY, not just that it failed', async () => {
   assert.match(String(sync.error()), /exceeds your plan/,
     'and it is retained, for a listener that subscribes after the failure');
 });
+
+test('a refusal no retry can fix (412) stops the backoff; the next edit still tries', async () => {
+  // docs/api-contract.md: 412 is "stop syncing and tell the user to update. Do not retry."
+  let attempts = 0;
+  const { deps } = makeDeps({
+    push: async () => {
+      attempts++;
+      if (attempts === 1) return { ok: false, status: 412, error: 'push failed: This shop has unsynced changes this build cannot read. Update Khayt to sync again. (HTTP 412)' };
+      return { ok: true, rev: 4 };
+    },
+  });
+  deps.retryBaseMs = 10;
+  sync.configure(deps);
+  const seen = [];
+  const off = sync.onStatus((s, d) => seen.push([s, d && d.refused]));
+  await sync.syncNow();
+  assert.equal(sync.status(), 'error');
+  assert.match(sync.error(), /Update Khayt/, 'the server\'s own sentence is what the shop sees');
+  assert.ok(seen.some(([s, refused]) => s === 'error' && refused === true), 'the badge is told this is a refusal');
+  await new Promise((res) => setTimeout(res, 60));
+  assert.equal(attempts, 1, 'retried on the backoff');
+  sync.scheduleSync();          // the shop updated and edited something
+  await new Promise((res) => setTimeout(res, 40));
+  assert.equal(attempts, 2);
+  assert.equal(sync.status(), 'synced');
+  off();
+});
+
+for (const status of [401, 403, 413]) {
+  test(`HTTP ${status} is a refusal too, and is not retried`, async () => {
+    let attempts = 0;
+    const { deps } = makeDeps({ push: async () => { attempts++; return { ok: false, status, error: `push failed (HTTP ${status})` }; } });
+    deps.retryBaseMs = 10;
+    sync.configure(deps);
+    await sync.syncNow();
+    await new Promise((res) => setTimeout(res, 60));
+    assert.equal(attempts, 1);
+  });
+}
+
+test('a server error that time may fix (503) is still retried', async () => {
+  let attempts = 0;
+  const { deps } = makeDeps({
+    push: async () => { attempts++; return attempts === 1 ? { ok: false, status: 503, error: 'push failed (HTTP 503)' } : { ok: true, rev: 2 }; },
+  });
+  deps.retryBaseMs = 10;
+  sync.configure(deps);
+  await sync.syncNow();
+  await new Promise((res) => setTimeout(res, 60));
+  assert.equal(attempts, 2);
+  assert.equal(sync.status(), 'synced');
+});
+
+test('main passes the HTTP status through both cloud IPC handlers', () => {
+  const fs = require('node:fs'); const path = require('node:path');
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  for (const h of ['hub:cloud-push', 'hub:cloud-pull']) {
+    const at = mainJs.indexOf(`ipcMain.handle('${h}'`);
+    assert.match(mainJs.slice(at, at + 400), /status: \(e && e\.status\) \|\| null/, `${h} drops the status`);
+  }
+});
