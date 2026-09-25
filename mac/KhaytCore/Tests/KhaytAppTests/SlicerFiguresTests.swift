@@ -70,4 +70,33 @@ struct SlicerFiguresTests {
         let parsed = try #require(await SlicerFigures.read(url, engine: try KhaytEngine()))
         print("REAL:", parsed)
     }
+
+    @Test("two plates: the file is their SUM, and each plate is kept to be chosen")
+    func twoPlates() async throws {
+        let info = """
+        <config>
+        <plate><metadata key="index" value="1" /><metadata key="prediction" value="39284" />
+          <filament id="1" type="PETG" used_g="143.44" /></plate>
+        <plate><metadata key="index" value="2" /><metadata key="prediction" value="39154" />
+          <filament id="1" type="PETG" used_g="100.00" /><filament id="2" type="PETG" used_g="42.95" /></plate>
+        </config>
+        """
+        let url = try zip(["Metadata/slice_info.config": info, "3D/3dmodel.model": "<model/>"])
+        let parsed = try #require(await SlicerFigures.read(url, engine: try KhaytEngine()))
+        #expect(parsed["printTimeMins"] == .number(655 + 653), "BOTH plates' time, not the first plate's")
+        #expect(parsed["filamentGrams"] == .number(286.39))
+        #expect(parsed["platesRead"] == .bool(true))
+        guard case .array(let plates)? = parsed["plates"], plates.count == 2,
+              case .object(let p2) = plates[1] else { Issue.record("no plates"); return }
+        #expect(p2["index"] == .number(2) && p2["printTimeMins"] == .number(653) && p2["filamentGrams"] == .number(142.95))
+    }
+
+    @Test("a record is read again when it has no figures, or is a 3MF read before plates were")
+    func due() {
+        #expect(Shop.slicerFiguresDue(nil, ext: "3mf"))
+        #expect(Shop.slicerFiguresDue(.object([:]), ext: "gcode"))
+        #expect(Shop.slicerFiguresDue(.object(["printTimeMins": .number(5)]), ext: "3mf"))
+        #expect(!Shop.slicerFiguresDue(.object(["printTimeMins": .number(5)]), ext: "gcode"))
+        #expect(!Shop.slicerFiguresDue(.object(["printTimeMins": .number(5), "platesRead": .bool(true)]), ext: "3mf"))
+    }
 }

@@ -5649,12 +5649,36 @@ public actor KhaytEngine {
                            filamentType: q.filamentType || '', filamentCost: q.filamentCost || null,
                            slicer: q.slicer || '', source: 'slicer' };
               }
+              // PLATE BY PLATE. `extractMeta` takes the FIRST plate's time and
+              // EVERY plate's filament, so a two-plate file read as one plate's
+              // hours and two plates' grams. Each <plate> is read on its own
+              // and the file is their sum; `plates` is kept when there are
+              // several, for choosing which to price.
+              var si = (members.find(function (m) { return /slice_info\.config$/i.test(m.name); }) || {}).data || '';
+              var blocks = si.match(/<plate>[\s\S]*?<\/plate>/gi) || [];
+              var plates = blocks.map(function (b) {
+                var idx = /key="index"\s+value="(\d+)"/i.exec(b);
+                var pr = /key="prediction"\s+value="(\d+)"/i.exec(b) || /\bprediction="(\d+)"/i.exec(b);
+                var grams = 0, re = /used_g="([\d.]+)"/gi, g;
+                while ((g = re.exec(b))) grams += parseFloat(g[1]) || 0;
+                if (!(grams > 0)) { var w = /key="weight"\s+value="([\d.]+)"/i.exec(b); grams = w ? parseFloat(w[1]) : 0; }
+                var ty = /<filament\b[^>]*\btype="([^"]+)"/i.exec(b);
+                return { index: idx ? +idx[1] : 0, printTimeMins: pr ? Math.round(+pr[1] / 60) : 0,
+                         filamentGrams: Math.round(grams * 100) / 100, filamentType: ty ? ty[1] : '' };
+              }).filter(function (p) { return p.printTimeMins > 0 && p.filamentGrams > 0; });
+              if (plates.length) {
+                var out = { printTimeMins: plates.reduce(function (a, p) { return a + p.printTimeMins; }, 0),
+                            filamentGrams: Math.round(plates.reduce(function (a, p) { return a + p.filamentGrams; }, 0) * 100) / 100,
+                            filamentType: plates[0].filamentType, slicer: 'Bambu/Orca', source: 'slicer', platesRead: true };
+                if (plates.length > 1) out.plates = plates;
+                return out;
+              }
               var meta = globalThis.KhaytMfConvert.extractMeta(members);
               if (!(meta && meta.totalGrams > 0 && meta.printMinutes > 0)) return null;
               var slice = (members.find(function (m) { return /slice_info\.config$/i.test(m.name); }) || {}).data || '';
               var t = /<filament\b[^>]*\btype="([^"]+)"/i.exec(slice);
               return { printTimeMins: meta.printMinutes, filamentGrams: meta.totalGrams,
-                       filamentType: t ? t[1] : '', slicer: 'Bambu/Orca', source: 'slicer' };
+                       filamentType: t ? t[1] : '', slicer: 'Bambu/Orca', source: 'slicer', platesRead: true };
             })(ARG0, ARG1)
             """#, [members, gcodeText.map(JSONValue.string) ?? .null], as: JSONValue.self)
         guard case .object(let o) = answer else { return nil }

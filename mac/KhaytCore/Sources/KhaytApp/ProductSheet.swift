@@ -142,6 +142,9 @@ struct ProductSheet: View {
 
         var isComplete: Bool { (Double(grams) ?? 0) > 0 || (Double(hours) ?? 0) > 0 }
 
+        /// Which plate of a multi-plate file this part is, when it is one.
+        var plate: Int? { if case .number(let n)? = raw["plate"] { Int(n) } else { nil } }
+
         /// The record shape a product's `parts` list holds: what was there,
         /// with this sheet's five fields written over it.
         func record(spools: [Spool]) -> JSONValue {
@@ -557,6 +560,7 @@ struct ProductSheet: View {
     private var partsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(shop.words.callIt("mac.parts")).font(.subheadline.weight(.semibold))
+            platesRows
 
             ForEach(parts) { part in
                 HStack(spacing: 8) {
@@ -703,6 +707,87 @@ struct ProductSheet: View {
             }
         }
         .card(padding: 10)
+    }
+
+    // ── WHICH PLATES OF A MULTI-PLATE FILE ────────────────────────────────
+    //
+    // "If it's a 3MF with multiple plates I should be able to pick which plate
+    // to price, all or specific ones" (the shop, Sep 2026). A model whose file
+    // the slicer cut into plates shows each as a switch — its time and weight
+    // beside it — and All. A plate switched on is a part of this product, priced
+    // from that plate's own figures; switched off, the part goes. A part that
+    // stood for the whole file is split into its plates the first time one is
+    // chosen, and parts already there keep whatever was edited on them.
+    private var multiPlateFiles: [LibraryFile] {
+        var seen: [String] = []
+        for part in parts { if let id = part.printFileId, !seen.contains(id) { seen.append(id) } }
+        return seen.compactMap { id in shop.files.first { $0.id == id } }
+            .filter { !shop.plates(of: $0).isEmpty }
+    }
+
+    @ViewBuilder private var platesRows: some View {
+        ForEach(multiPlateFiles) { file in
+            let plates = shop.plates(of: file)
+            let chosen = chosenPlates(of: file, among: plates)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(shop.words.callIt("mac.plates") + " — " + file.title)
+                    .font(.caption.weight(.medium)).lineLimit(1)
+                HStack(spacing: 6) {
+                    ForEach(plates, id: \.index) { plate in
+                        Toggle(isOn: Binding(
+                            get: { chosen.contains(plate.index) },
+                            set: { on in
+                                var next = chosen
+                                if on { next.insert(plate.index) } else { next.remove(plate.index) }
+                                Task { await setPlates(of: file, to: next, all: plates) }
+                            })) {
+                            Text(shop.words.callIt("mac.plate_chip", [
+                                "n": .number(Double(plate.index)),
+                                "time": .string(Money.quantity((plate.minutes / 60 * 100).rounded() / 100) + " "
+                                                + shop.words.callIt("common.hours")),
+                                "grams": .string(Money.grams(plate.grams))]))
+                                .font(.caption).monospacedDigit()
+                        }
+                        .toggleStyle(.button)
+                    }
+                    Button(shop.words.callIt("mac.plates_all")) {
+                        Task { await setPlates(of: file, to: Set(plates.map(\.index)), all: plates) }
+                    }
+                    .controlSize(.small)
+                    .disabled(chosen.count == plates.count)
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    /// The plates of this file on the product; a whole-file part counts as all.
+    private func chosenPlates(of file: LibraryFile, among plates: [Shop.Plate]) -> Set<Int> {
+        let mine = parts.filter { $0.printFileId == file.id }
+        if mine.contains(where: { $0.plate == nil }) { return Set(plates.map(\.index)) }
+        return Set(mine.compactMap(\.plate))
+    }
+
+    private func setPlates(of file: LibraryFile, to wanted: Set<Int>, all plates: [Shop.Plate]) async {
+        let at = parts.firstIndex { $0.printFileId == file.id } ?? parts.count
+        // A whole-file part becomes its plates.
+        if parts.contains(where: { $0.printFileId == file.id && $0.plate == nil }) {
+            parts.removeAll { $0.printFileId == file.id && $0.plate == nil }
+        }
+        parts.removeAll { $0.printFileId == file.id && !wanted.contains($0.plate ?? -1) }
+        let have = Set(parts.filter { $0.printFileId == file.id }.compactMap(\.plate))
+        var insertAt = min(at, parts.count)
+        for plate in plates.map(\.index).sorted() where wanted.contains(plate) {
+            if have.contains(plate) {
+                if let i = parts.firstIndex(where: { $0.printFileId == file.id && $0.plate == plate }) { insertAt = i + 1 }
+                continue
+            }
+            guard let filled = await shop.partFields(from: file, plate: plate),
+                  let row = PartRow.from(.object(filled.part)) else { continue }
+            parts.insert(row, at: min(insertAt, parts.count))
+            insertAt += 1
+        }
+        await reprice()
     }
 
     /// One rate, labelled in the other app's own words and carrying its unit.

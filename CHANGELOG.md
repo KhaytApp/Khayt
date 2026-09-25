@@ -10,6 +10,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   so the quote charged for all the plastic and a fraction of the machine
   time. Both figures now cover every plate. Found on a real two-plate file in
   a shop's library.
+- **(Mac) Choose which plates of a multi-plate 3MF to price.** Asked for by
+  the shop: "if it's a 3MF with multiple plates I should be able to pick which
+  plate to price, and whether all or specific ones". Each plate the slicer cut
+  a file into is read on its own — its time, its filament, its material — and
+  a product made from such a file starts with a part per plate; the product
+  sheet's Plates row switches any plate on or off, with its time and weight
+  beside it, and All puts them all back. The price follows at once.
+  - The file's own figures were wrong too: the time was the FIRST plate's and
+    the filament EVERY plate's — the shop's two-plate Adiletten read as
+    10.9 h and 286 g. It is now the sum of both, 21.8 h and 286 g, and every
+    3MF already in the library is read again once, plate by plate.
+
 - **(Mac) The product sheet's price follows every change, and a typed price
   shows.** Reported by the shop: "the price does not update when I make
   changes to values, also I can't change any prices manually".
