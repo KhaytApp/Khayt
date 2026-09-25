@@ -11,6 +11,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   tracks a print live instead of showing the book's last status. Read from
   what the Mac already holds; asking it never polls a printer.
 
+
+
 - **Cloud sync stops retrying what retrying cannot fix, and says why.** When
   Khayt Cloud refuses for a reason that will not pass on its own (this version
   cannot read the shop's newer changes, the store is over the plan's size, or
@@ -43,6 +45,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     models". (The desktop app does not read linked models yet, and shows them
     as missing.)
 
+
+- **(iOS) The last sheets speak the v2 design, and the typeface ships its
+  licence.** Quote, waste, expense and writing an NFC tag are built from the
+  same parts as New order: one card of labelled fields, choices as chips you
+  can all see at once, and one blue button to end on. A quote shows its total
+  first, large, with what the job costs the shop beneath it. Space Grotesk's
+  full SIL Open Font License now travels in the app beside the font files, as
+  the licence requires of every copy.
 - **(Mac) The PIN no longer sits in the browser's address bar.** Opening the
   live queue in a browser asks for the PIN once, in a form, and keeps a
   12-hour session cookie (HttpOnly, SameSite=Strict) instead — the page

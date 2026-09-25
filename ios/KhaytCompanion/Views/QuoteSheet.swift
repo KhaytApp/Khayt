@@ -36,95 +36,149 @@ struct QuoteSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section(L10n.tr("quote.part")) {
-                    field(L10n.tr("quote.weight"), text: $printWeight, unit: "g")
-                    field(L10n.tr("quote.time"), text: $printTime, unit: "h")
-                    field(L10n.tr("quote.qty"), text: $qty, unit: nil)
-                }
-                Section(L10n.tr("quote.rates")) {
-                    field(L10n.tr("quote.spool_cost"), text: $spoolCost, unit: nil)
-                    field(L10n.tr("quote.labor_rate"), text: $laborRate, unit: nil)
-                    field(L10n.tr("quote.margin"), text: $margin, unit: "%")
-                    Toggle(L10n.tr("quote.rush"), isOn: $rush)
-                }
-
-                if let result {
-                    resultSection(result)
-                }
-                if let error {
-                    Section {
-                        Text(error)
-                            .font(.system(size: 13))
-                            .foregroundStyle(KhaytDesign.danger)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if let result { resultCard(result) }
+                    eyebrow(L10n.tr("quote.part"))
+                    V2FieldCard {
+                        HStack(spacing: 0) {
+                            numberField(L10n.tr("quote.weight"), $printWeight, unit: "g")
+                            divider
+                            numberField(L10n.tr("quote.time"), $printTime, unit: "h")
+                            divider
+                            numberField(L10n.tr("quote.qty"), $qty, unit: nil, decimal: false)
+                        }
                     }
+                    eyebrow(L10n.tr("quote.rates"))
+                    V2FieldCard {
+                        V2Field(label: L10n.tr("quote.spool_cost")) {
+                            TextField("", text: $spoolCost, prompt: Text(verbatim: "0")).keyboardType(.decimalPad)
+                        }
+                        V2Field(label: L10n.tr("quote.labor_rate")) {
+                            TextField("", text: $laborRate, prompt: Text(verbatim: "0")).keyboardType(.decimalPad)
+                        }
+                        V2Field(label: L10n.tr("quote.margin")) {
+                            HStack(spacing: 6) {
+                                TextField("", text: $margin, prompt: Text(verbatim: "0")).keyboardType(.decimalPad)
+                                Text(verbatim: "%").foregroundStyle(KhaytDesign.note)
+                            }
+                        }
+                        Toggle(isOn: $rush) {
+                            Text(L10n.tr("quote.rush"))
+                                .font(.khayt(14.5, relativeTo: .subheadline))
+                                .foregroundStyle(KhaytDesign.ink)
+                        }
+                        .tint(KhaytDesign.hot)
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 52)
+                    }
+                    if let error {
+                        V2Note(text: error, tone: KhaytDesign.late)
+                    }
+                    V2PrimaryButton(title: L10n.tr("quote.calculate"), busy: isLoading) {
+                        Task { await calculate() }
+                    }
+                    .padding(.top, 4)
                 }
+                .padding(16)
             }
-            .khaytForm()
+            .scrollDismissesKeyboard(.interactively)
+            .background(KhaytDesign.ground.ignoresSafeArea())
             .navigationTitle(L10n.tr("quote.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.tr("common.close")) { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.tr("quote.calculate")) { Task { await calculate() } }
-                        .disabled(isLoading)
+            }
+        }
+    }
+
+    private var divider: some View {
+        Rectangle().fill(KhaytDesign.hairline).frame(width: 1).padding(.vertical, 10)
+    }
+
+    private func eyebrow(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.khayt(10.5, .bold, relativeTo: .caption2))
+            .tracking(1.05)
+            .foregroundStyle(KhaytDesign.note)
+            .padding(.horizontal, 2)
+            .padding(.top, 8)
+    }
+
+    /// Three short numbers abreast: weight, time, quantity are read together.
+    private func numberField(_ label: String, _ text: Binding<String>, unit: String?, decimal: Bool = true) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label.uppercased())
+                .font(.khayt(10, .bold, relativeTo: .caption2))
+                .tracking(1)
+                .foregroundStyle(KhaytDesign.note)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            HStack(spacing: 4) {
+                TextField("", text: text, prompt: Text(verbatim: "0"))
+                    .keyboardType(decimal ? .decimalPad : .numberPad)
+                    .font(.khayt(18, .semibold, relativeTo: .body).monospacedDigit())
+                    .foregroundStyle(KhaytDesign.ink)
+                if let unit {
+                    Text(verbatim: unit)
+                        .font(.khayt(13, relativeTo: .footnote))
+                        .foregroundStyle(KhaytDesign.note)
                 }
             }
         }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func field(_ label: String, text: Binding<String>, unit: String?) -> some View {
-        HStack {
-            Text(label)
-            Spacer()
-            TextField("0", text: text)
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: 110)
-            if let unit {
-                Text(unit)
-                    .font(.system(size: 13))
-                    .foregroundStyle(KhaytDesign.textMuted)
+    /// The answer, first — it is what the customer at the counter is waiting
+    /// for. What the job costs the shop sits beneath it, for the margin to be
+    /// seen rather than implied; it is not a customer-facing number.
+    private func resultCard(_ r: QuoteResult) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L10n.tr("quote.total").uppercased())
+                    .font(.khayt(10.5, .bold, relativeTo: .caption2))
+                    .tracking(1.05)
+                    .foregroundStyle(KhaytDesign.note)
+                Text(money(r.price.total))
+                    .font(.khayt(34, .semibold, relativeTo: .largeTitle).monospacedDigit())
+                    .foregroundStyle(KhaytDesign.brand)
+            }
+            .padding(16)
+            VStack(spacing: 0) {
+                if r.price.discount > 0 { row(L10n.tr("quote.discount"), "−" + money(r.price.discount)) }
+                if r.price.rushFee > 0 { row(L10n.tr("quote.rush_fee"), money(r.price.rushFee)) }
+                if let tier = r.priceTier {
+                    // A tier REPLACES cost-plus-margin, so say so rather than
+                    // leaving the shop wondering why the margin is ignored.
+                    row(L10n.tr("quote.tier").replacingOccurrences(of: "{n}", with: "\(tier.minQty)"),
+                        money(tier.pricePerUnit))
+                }
+                row(L10n.tr("quote.unit_cost"), money(r.unitCost))
+                row(L10n.tr("quote.bd.material"), money(r.breakdown.material))
+                row(L10n.tr("quote.bd.machine"), money(r.breakdown.machine))
+                row(L10n.tr("quote.bd.labor"), money(r.breakdown.labor))
+                row(L10n.tr("quote.bd.buffer"), money(r.breakdown.buffer))
             }
         }
+        .card()
     }
 
-    @ViewBuilder
-    private func resultSection(_ r: QuoteResult) -> some View {
-        Section(L10n.tr("quote.result")) {
-            row(L10n.tr("quote.total"), money(r.price.total), emphasis: true)
-            if r.price.discount > 0 { row(L10n.tr("quote.discount"), "−" + money(r.price.discount)) }
-            if r.price.rushFee > 0 { row(L10n.tr("quote.rush_fee"), money(r.price.rushFee)) }
-            if let tier = r.priceTier {
-                // A tier REPLACES cost-plus-margin, so say so rather than leaving
-                // the shop wondering why their margin appears to be ignored.
-                row(L10n.tr("quote.tier").replacingOccurrences(of: "{n}", with: "\(tier.minQty)"),
-                    money(tier.pricePerUnit))
-            }
-        }
-        Section(L10n.tr("quote.cost")) {
-            // What the job costs the shop, so the margin is visible rather than
-            // implied. Not a customer-facing number.
-            row(L10n.tr("quote.unit_cost"), money(r.unitCost))
-            row(L10n.tr("quote.bd.material"), money(r.breakdown.material))
-            row(L10n.tr("quote.bd.machine"), money(r.breakdown.machine))
-            row(L10n.tr("quote.bd.labor"), money(r.breakdown.labor))
-            row(L10n.tr("quote.bd.buffer"), money(r.breakdown.buffer))
-        }
-    }
-
-    private func row(_ label: String, _ value: String, emphasis: Bool = false) -> some View {
+    private func row(_ label: String, _ value: String) -> some View {
         HStack {
             Text(label)
-                .font(.system(size: emphasis ? 16 : 14, weight: emphasis ? .bold : .regular))
+                .font(.khayt(14, relativeTo: .subheadline))
+                .foregroundStyle(KhaytDesign.note)
             Spacer()
             Text(value)
-                .font(.system(size: emphasis ? 18 : 14, weight: emphasis ? .bold : .regular))
-                .foregroundStyle(emphasis ? KhaytDesign.brand : KhaytDesign.text)
-                .monospacedDigit()
+                .font(.khayt(14, .medium, relativeTo: .subheadline).monospacedDigit())
+                .foregroundStyle(KhaytDesign.ink)
         }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 44)
+        .overlay(alignment: .top) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
     }
 
     private func money(_ n: Double) -> String {

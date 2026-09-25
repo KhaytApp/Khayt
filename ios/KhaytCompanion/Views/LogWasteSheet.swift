@@ -38,58 +38,65 @@ struct LogWasteSheet: View {
         Array(Set(spools.compactMap { $0.material }.filter { !$0.isEmpty })).sorted()
     }
 
+    private var canSave: Bool { !material.trimmingCharacters(in: .whitespaces).isEmpty }
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section(L10n.tr("waste.what")) {
-                    if materials.isEmpty {
-                        // Falling back to free text beats blocking the log: a
-                        // record with a typo is worth more than no record.
-                        TextField(L10n.tr("waste.material"), text: $material)
-                    } else {
-                        Picker(L10n.tr("waste.material"), selection: $material) {
-                            Text("—").tag("")
-                            ForEach(materials, id: \.self) { Text($0).tag($0) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    V2FieldCard {
+                        V2Field(label: L10n.tr("waste.material")) {
+                            if materials.isEmpty {
+                                // Falling back to free text beats blocking the log:
+                                // a record with a typo is worth more than no record.
+                                TextField("", text: $material, prompt: Text(verbatim: "PLA"))
+                            } else {
+                                V2Chips(options: materials, selection: $material) { $0 }
+                                    .padding(.vertical, 4)
+                            }
+                        }
+                        V2Field(label: L10n.tr("waste.failure_type")) {
+                            V2Chips(options: failureTypes, selection: $failureType) { L10n.tr("waste.ft.\($0)") }
+                                .padding(.vertical, 4)
+                        }
+                        V2Field(label: L10n.tr("waste.weight")) {
+                            HStack(spacing: 6) {
+                                TextField("", text: $weight, prompt: Text(verbatim: "0"))
+                                    .keyboardType(.numberPad)
+                                Text(L10n.tr("unit.g")).foregroundStyle(KhaytDesign.note)
+                            }
+                        }
+                        V2Field(label: L10n.tr("waste.reason"), last: true) {
+                            TextField("", text: $reason, axis: .vertical)
+                                .lineLimit(1...3)
                         }
                     }
-                    Picker(L10n.tr("waste.failure_type"), selection: $failureType) {
-                        ForEach(failureTypes, id: \.self) { Text(L10n.tr("waste.ft.\($0)")).tag($0) }
+                    V2FieldCard {
+                        Toggle(isOn: $deduct) {
+                            Text(L10n.tr("waste.deduct"))
+                                .font(.khayt(14.5, relativeTo: .subheadline))
+                                .foregroundStyle(KhaytDesign.ink)
+                        }
+                        .tint(KhaytDesign.done)
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 52)
                     }
-                    HStack {
-                        Text(L10n.tr("waste.weight"))
-                        Spacer()
-                        TextField("0", text: $weight)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(maxWidth: 90)
-                        Text(L10n.tr("unit.g")).foregroundStyle(KhaytDesign.textMuted)
+                    V2Note(text: error ?? L10n.tr("waste.deduct.footer"),
+                           tone: error == nil ? KhaytDesign.note : KhaytDesign.late)
+                    V2PrimaryButton(title: L10n.tr("waste.save"), busy: isSaving, disabled: !canSave) {
+                        Task { await save() }
                     }
+                    .padding(.top, 4)
                 }
-                Section(L10n.tr("waste.why")) {
-                    TextField(L10n.tr("waste.reason"), text: $reason, axis: .vertical)
-                        .lineLimit(1...3)
-                }
-                Section(footer: Text(L10n.tr("waste.deduct.footer"))) {
-                    Toggle(L10n.tr("waste.deduct"), isOn: $deduct)
-                }
-                if let error {
-                    Section {
-                        Text(error)
-                            .font(.system(size: 13))
-                            .foregroundStyle(KhaytDesign.danger)
-                    }
-                }
+                .padding(16)
             }
-            .khaytForm()
+            .scrollDismissesKeyboard(.interactively)
+            .background(KhaytDesign.ground.ignoresSafeArea())
             .navigationTitle(L10n.tr("waste.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.tr("common.close")) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.tr("waste.save")) { Task { await save() } }
-                        .disabled(isSaving || material.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
             .task { await loadSpools() }
