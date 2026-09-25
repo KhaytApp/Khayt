@@ -1,0 +1,31 @@
+# TEMPORARY — removed before this PR merges. Runs the new macOS gate's own
+# steps against the published, signed v3.7.0 zip on a real macOS runner.
+name: TEMP macOS launch proof
+on: pull_request
+jobs:
+  proof:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: The gate's steps, verbatim, on v3.7.0
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          v=3.7.0
+          mkdir -p build
+          curl -fsSL -o "build/Khayt-$v-arm64-mac.zip" "https://github.com/KhaytApp/Khayt/releases/download/v$v/Khayt-$v-arm64-mac.zip"
+          zip="build/Khayt-$v-arm64-mac.zip"
+          [ -f "$zip" ] || { echo "::error::no $zip"; ls build; exit 1; }
+          dest="$RUNNER_TEMP/mac-gate"; rm -rf "$dest"; mkdir -p "$dest"
+          ditto -x -k "$zip" "$dest"
+          node scripts/verify-release.mjs --app "$dest/Khayt.app" --version "$v"
+      - name: A wrong version is refused
+        timeout-minutes: 8
+        run: |
+          if node scripts/verify-release.mjs --app "$RUNNER_TEMP/mac-gate/Khayt.app" --version 9.9.9 > v.txt 2>&1; then cat v.txt; echo "::error::passed"; exit 1; fi
+          cat v.txt
