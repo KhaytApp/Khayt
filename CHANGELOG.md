@@ -3617,6 +3617,35 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.44] - 2026-09-25
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+A product added to the catalogue from the library is priced — it had come in
+at 0 — and the queue page in a browser asks for the PIN once instead of
+carrying it in the address.
+
+### Fixed
+
+- **(Mac) A product added from the library is priced.** Reported by the shop:
+  "it is not calculating the price" — a 200 g, 9.5 h model went into the
+  catalogue at 0. A part from the library carried the file's weight and time
+  and nothing it is COSTED at: no filament, and none of the shop's labour,
+  power, wear and failure rates, so there was nothing to price. It now takes
+  the shop's usual rates and the spool of the material the slicer used (or the
+  first spool with a cost, said on the sheet), whichever way it came — the
+  inspector button, several models at once, or a whole folder.
+
+### Security
+
+- **(Mac) The PIN no longer sits in the browser's address bar.** Opening the
+  live queue in a browser asks for the PIN once, in a form, and keeps a
+  12-hour session cookie (HttpOnly, SameSite=Strict) instead — the page
+  reloads itself every 30 seconds, so a PIN in the address was in the history
+  and every reload, in clear. An old `/?pin=` bookmark still opens it, once,
+  and is sent on to a clean address. The phone app is unaffected.
+
 ## [4.0.0-alpha.43] - 2026-09-24
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
