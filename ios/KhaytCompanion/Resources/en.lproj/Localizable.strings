@@ -521,3 +521,10 @@
 "order.new.note.later" = "The Mac is away. This is saved on this phone and reaches the Mac when it is back in reach.";
 "order.new.note.live" = "Written straight to the Mac.";
 "order.new.note.blocked" = "The Mac is away, and this phone does not hold the shop’s book, so there is nowhere to save this yet.";
+
+/* Live printer tracking */
+"machines.live" = "LIVE";
+"machines.live.ago" = "%d s ago";
+"machines.left_until" = "%1$@ left · done at %2$@";
+"order.detail.print_progress" = "Print progress";
+"order.detail.no_estimate" = "No estimate yet — the machine has not reported one.";

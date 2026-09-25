@@ -7,6 +7,8 @@ struct KhaytCompanionApp: App {
     @StateObject private var health: ConnectionHealth
     @StateObject private var nfc = NFCReader()
     @StateObject private var ordersNav = OrdersNavigationState()
+    @StateObject private var live: LivePrinters
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let s = ConnectionSettings()
@@ -15,6 +17,7 @@ struct KhaytCompanionApp: App {
         _settings = StateObject(wrappedValue: s)
         _api = StateObject(wrappedValue: apiClient)
         _health = StateObject(wrappedValue: healthMonitor)
+        _live = StateObject(wrappedValue: LivePrinters { try await apiClient.fetchMachinesLive() })
         KhaytType.applyNavigationBarAppearance()
     }
 
@@ -26,6 +29,7 @@ struct KhaytCompanionApp: App {
                 .environmentObject(health)
                 .environmentObject(nfc)
                 .environmentObject(ordersNav)
+                .environmentObject(live)
                 .companionLocale(settings)
                 .tint(KhaytDesign.accent)
                 // The design's face for everything that does not choose its own.
@@ -33,6 +37,8 @@ struct KhaytCompanionApp: App {
                 .task {
                     await CompanionNotifications.shared.requestAuthorizationIfNeeded()
                 }
+                // Nothing is polled for a screen nobody can see.
+                .onChange(of: scenePhase) { _, phase in live.setActive(phase == .active) }
         }
     }
 }

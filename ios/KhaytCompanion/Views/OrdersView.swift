@@ -11,6 +11,7 @@ import SwiftUI
 /// life.
 struct OrdersView: View {
     @EnvironmentObject private var api: KhaytAPIClient
+    @EnvironmentObject private var printers: LivePrinters
     @EnvironmentObject private var ordersNav: OrdersNavigationState
 
     enum Segment: String, CaseIterable, Identifiable {
@@ -102,6 +103,8 @@ struct OrdersView: View {
             }
             .refreshable { await load() }
             .task(id: segment) { await load() }
+            .watchesPrinters(when: segment == .active
+                             && queue.contains { $0.status == "printing" && $0.machineId != nil })
             .onAppear { applyExternalFilters() }
             .onChange(of: ordersNav.pendingStatusFilter) { _, _ in applyExternalFilters() }
             .onChange(of: ordersNav.ordersTabRequest) { _, _ in applyExternalFilters() }
@@ -213,7 +216,7 @@ struct OrdersView: View {
         } else {
             LazyVStack(spacing: 8) {
                 ForEach(rows) { order in
-                    JobCard(order: order, facts: facts[order.id], layout: .full,
+                    JobCard(order: order, facts: facts[order.id], live: printers.reading(for: order.machineId), layout: .full,
                             isUpdating: updatingId == order.id) {
                         Task { await advance(order) }
                     } onOpen: {

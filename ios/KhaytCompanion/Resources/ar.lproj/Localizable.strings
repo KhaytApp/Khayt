@@ -521,3 +521,10 @@
 "order.new.note.later" = "الماك غير متاح. يُحفظ هذا على الهاتف ويصل إلى الماك حين يعود متاحاً.";
 "order.new.note.live" = "يُكتب مباشرة على الماك.";
 "order.new.note.blocked" = "الماك غير متاح، وهذا الهاتف لا يحمل دفتر الورشة، فلا مكان لحفظ هذا بعد.";
+
+/* Live printer tracking */
+"machines.live" = "مباشر";
+"machines.live.ago" = "قبل %d ث";
+"machines.left_until" = "متبقٍ %1$@ · ينتهي %2$@";
+"order.detail.print_progress" = "تقدّم الطباعة";
+"order.detail.no_estimate" = "لا تقدير بعد — الآلة لم تُبلّغ عنه.";

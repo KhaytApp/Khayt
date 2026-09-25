@@ -16,6 +16,10 @@ struct JobCard: View {
 
     let order: QueueOrder
     var facts: OrderFacts? = nil
+    /// The live reading of the machine this job is on, when there is one and
+    /// the job is printing — the design's progress row. Nil draws no row: a
+    /// bar with nothing behind it would be a figure the phone does not have.
+    var live: MachineLiveStatus? = nil
     var layout: Layout = .compact
     let isUpdating: Bool
     let onAdvance: () -> Void
@@ -124,6 +128,22 @@ struct JobCard: View {
                     Spacer(minLength: 0)
                     stageChip
                 }
+            }
+            if order.status == "printing", let live, live.isPrinting, let progress = live.progress {
+                HStack(spacing: 9) {
+                    LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.hot)
+                    Text("\(progress)%")
+                        .font(.khayt(11.5, .medium, relativeTo: .caption2).monospacedDigit())
+                        .foregroundStyle(KhaytDesign.hot)
+                        .environment(\.layoutDirection, .leftToRight)
+                    if let eta = live.etaLocalized {
+                        Text(eta)
+                            .font(.khayt(11.5, relativeTo: .caption2).monospacedDigit())
+                            .foregroundStyle(KhaytDesign.note)
+                    }
+                }
+                .padding(.top, 2)
+                .animation(.easeOut(duration: 0.45), value: progress)
             }
             if layout == .full {
                 HStack(spacing: 7) {
