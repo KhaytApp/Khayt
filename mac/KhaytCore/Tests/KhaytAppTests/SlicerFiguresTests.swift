@@ -83,12 +83,14 @@ struct SlicerFiguresTests {
         """
         let url = try zip(["Metadata/slice_info.config": info, "3D/3dmodel.model": "<model/>"])
         let parsed = try #require(await SlicerFigures.read(url, engine: try KhaytEngine()))
-        #expect(parsed["printTimeMins"] == .number(655 + 653), "BOTH plates' time, not the first plate's")
-        #expect(parsed["filamentGrams"] == .number(286.39))
+        // The shared rule (`extractMeta`, #1602): the plates' seconds summed, then
+        // rounded once — 39284 + 39154 s is 1307 min.
+        #expect(parsed["printTimeMins"] == .number(1307), "BOTH plates' time, not the first plate's")
+        #expect(parsed["filamentGrams"] == .number(286.4), "grams to 0.1 g, the shared rule's")
         #expect(parsed["platesRead"] == .bool(true))
         guard case .array(let plates)? = parsed["plates"], plates.count == 2,
               case .object(let p2) = plates[1] else { Issue.record("no plates"); return }
-        #expect(p2["index"] == .number(2) && p2["printTimeMins"] == .number(653) && p2["filamentGrams"] == .number(142.95))
+        #expect(p2["index"] == .number(2) && p2["printTimeMins"] == .number(653) && p2["filamentGrams"] == .number(143.0))
     }
 
     @Test("a record is read again when it has no figures, or is a 3MF read before plates were")
