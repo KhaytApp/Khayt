@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) The phone can follow live prints against the Mac app.** The Mac's
+  network server now answers `GET /api/machines/live` — every machine with
+  what its printer last said (state, progress, file, time left, temperatures,
+  any problem) — in exactly the shape the desktop app answers, so the phone
+  tracks a print live instead of showing the book's last status. Read from
+  what the Mac already holds; asking it never polls a printer.
+
 - **Cloud sync stops retrying what retrying cannot fix, and says why.** When
   Khayt Cloud refuses for a reason that will not pass on its own (this version
   cannot read the shop's newer changes, the store is over the plan's size, or

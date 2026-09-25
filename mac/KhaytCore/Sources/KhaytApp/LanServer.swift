@@ -143,6 +143,9 @@ final class LanServer {
         /// settings, presets, the shelf and the log. Separate from `store`,
         /// which is the phone's book and has no presets or shelf in it.
         var pricing: @MainActor () -> [String: JSONValue] = { [:] }
+        /// Every machine with its latest printer reading — `/api/machines/live`.
+        /// From memory, never a poll: the phone asks every few seconds.
+        var machinesLive: @MainActor () -> [JSONValue] = { [] }
         /// Put a carrier's event on the book, INSIDE the write. Returns the job
         /// it moved, or nil when the book as it is now had nothing to move.
         var carrierEvent: (_ event: JSONValue, _ at: String) async throws -> JSONValue?
@@ -562,7 +565,7 @@ final class LanServer {
     /// one is not routed, so the list cannot drift from the table below.
     nonisolated static let endpoints = [
         "/", "/session", "/intake", "/manifest.json", "/sw.js",
-        "/api/status", "/api/queue", "/api/store", "/api/store/deltas",
+        "/api/status", "/api/queue", "/api/machines/live", "/api/store", "/api/store/deltas",
         "/api/intake", "/api/intake/estimate", "/api/survey",
         "/order/:id", "/order/:id/quote", "/order/:id/approve", "/status/:id",
         "/calendar.ics",
@@ -599,6 +602,19 @@ final class LanServer {
             if let refused = await pinGate(request) { return refused }
             let body = (try? await engine.lanQueueBody(store: store)) ?? "[]"
             return .json(200, body)
+
+        // ── LIVE PRINTERS, FOR THE PHONE ──────────────────────────────────
+        //
+        // The shape `lib/lan-server.js` answers, which the phone's
+        // `MachineLiveStatus` decodes — so the phone tracks prints against this
+        // Mac as it does against the desktop app, instead of falling back to
+        // the book's last status. Read from what `PrinterWatch` already holds:
+        // no printer is asked anything on this path.
+        case ("/api/machines/live", true):
+            if let refused = await pinGate(request) { return refused }
+            let rows = host.machinesLive()
+            guard let data = try? JSONEncoder().encode(rows) else { return .json(500, #"{"error":"encode"}"#) }
+            return .json(200, String(decoding: data, as: UTF8.self))
 
         // ── WHAT A PHONE CARRIES, WHICH IS NOT THE WHOLE BOOK ─────────────
         //
@@ -1835,6 +1851,7 @@ extension Shop {
         }
         host.storefrontSecrets = secrets
         host.pricing = { [weak self] in self?.pricingBook ?? [:] }
+        host.machinesLive = { [weak self] in self?.machinesLive() ?? [] }
         host.failed = { [weak self] said in
             guard let self else { return }
             self.lanProblem = self.words.callIt("mac.lan_failed", ["error": .string(said)])
@@ -2229,5 +2246,41 @@ extension Shop {
         // pricing on (or changed a margin) waited up to six hours for its
         // storefront to hear about it, with nothing on screen to say so.
         if intakeQuote != nil { await publishQuoteSheet() }
+    }
+}
+
+extension LanServer {
+    /// One machine as `/api/machines/live` answers it — `lib/lan-server.js`,
+    /// field for field, integers rounded as it rounds them.
+    nonisolated static func liveRow(id: String, name: String, apiType: String?,
+                                    reading: PrinterWatch.Reading?) -> JSONValue {
+        let type = (apiType ?? "").trimmingCharacters(in: .whitespaces)
+        let s = reading?.status
+        func int(_ v: Double?) -> JSONValue { v.map { .number(($0).rounded()) } ?? .null }
+        func text(_ v: String?) -> JSONValue { (v ?? "").isEmpty ? .null : .string(v!) }
+        return .object([
+            "id": .string(id), "name": .string(name),
+            "hasPrinterApi": .bool(!type.isEmpty && type != "none"),
+            "state": text(s?.state),
+            "progress": s.map { .number(Double($0.progress)) } ?? .null,
+            "filename": text(s?.filename),
+            "timeRemaining": int(s?.timeRemaining),
+            "tempNozzle": int(s?.tempNozzle),
+            "tempBed": int(s?.tempBed),
+            "error": text(reading?.problem),
+            "lastUpdated": reading.map { .string(StoreWriter.iso($0.at)) } ?? .null,
+            // The printer's own word for itself, else the type the shop set.
+            "apiType": text((s?.type ?? "").isEmpty ? type : s?.type),
+        ])
+    }
+}
+
+extension Shop {
+    /// `/api/machines/live`: every machine, with what its printer last said.
+    func machinesLive() -> [JSONValue] {
+        machines.map { m in
+            LanServer.liveRow(id: m.id, name: m.name, apiType: m.printerApi?.type,
+                              reading: printers.readings[m.id])
+        }
     }
 }
