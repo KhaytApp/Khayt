@@ -11809,6 +11809,10 @@ final class Shop {
         /// Per machine that says what it has loaded: how many models could
         /// start on it now, without a spool swap.
         var ready: [Ready] = []
+        /// Creators, busiest first; see `LibraryFile.creator`.
+        var creators: [CreatorCount] = []
+        var printNext = 0
+        var duplicates = 0
         struct Ready: Equatable, Identifiable {
             let machineId: String
             let machineName: String
@@ -11817,6 +11821,7 @@ final class Shop {
         }
         var isEmpty: Bool {
             categories.isEmpty && tags.isEmpty && unfiled == 0 && neverPrinted == 0 && ready.isEmpty
+                && creators.isEmpty && printNext == 0 && duplicates == 0
         }
     }
 
@@ -11828,7 +11833,7 @@ final class Shop {
     /// round trip.
     private var libraryRows: [JSONValue] = []
 
-    enum LibraryAxis { case unfiled, category, tag, neverPrinted, ready }
+    enum LibraryAxis { case unfiled, category, tag, neverPrinted, ready, creator, printNext, duplicates }
 
     /// What one axis counts: the shelf, the search, and the other two chips.
     private func libraryPool(skipping axis: LibraryAxis) -> [JSONValue] {
@@ -11851,6 +11856,17 @@ final class Shop {
         if axis != .ready, let machine = libraryReadyOn {
             let ready = readyByMachine[machine] ?? []
             rows = rows.filter { ready.contains(Self.rowText($0, "id")) }
+        }
+        if axis != .creator, let creator = libraryCreator {
+            rows = rows.filter {
+                LibraryFile.creator(of: Self.rowText($0, "source"))?.lowercased() == creator.lowercased()
+            }
+        }
+        if axis != .printNext, libraryPrintNextOnly {
+            rows = rows.filter { !Self.rowText($0, "printNextAt").isEmpty }
+        }
+        if axis != .duplicates, libraryDuplicatesOnly {
+            rows = rows.filter { duplicateOf[Self.rowText($0, "id")] != nil }
         }
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return rows }
@@ -11930,8 +11946,25 @@ final class Shop {
         }
         guard mine == libraryRecount else { return }
         readyByMachine = byMachine
+        // The three counted in Swift, over the same pool: the ids the other
+        // axes leave, each skipping its own.
+        duplicateOf = Self.duplicateGroups(files)
+        func ids(_ axis: LibraryAxis) -> Set<String> {
+            Set(libraryPool(skipping: axis).map { Self.rowText($0, "id") })
+        }
+        let byId = Dictionary(files.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var creatorCounts: [String: (name: String, n: Int)] = [:]
+        for id in ids(.creator) {
+            guard let c = byId[id]?.creator else { continue }
+            creatorCounts[c.lowercased(), default: (c, 0)].n += 1
+        }
+        let creators = creatorCounts.values.map { CreatorCount(name: $0.name, count: $0.n) }
+            .sorted { $0.count != $1.count ? $0.count > $1.count : $0.name < $1.name }
+        let printNext = ids(.printNext).count { byId[$0]?.isPrintNext == true }
+        let dupes = ids(.duplicates).count { duplicateOf[$0] != nil }
         libraryFacets = LibraryFacets(categories: categories, tags: tags,
-                                      unfiled: unfiled, neverPrinted: never, ready: ready)
+                                      unfiled: unfiled, neverPrinted: never, ready: ready,
+                                      creators: creators, printNext: printNext, duplicates: dupes)
     }
 
     private var libraryRecountTask: Task<Void, Never>?
@@ -11967,6 +12000,12 @@ final class Shop {
 
     /// Models that can start on this machine now, with what it has loaded.
     var libraryReadyOn: String? { didSet { recountLibrarySoon() } }
+    /// One creator's models. See `LibraryFile.creator`.
+    var libraryCreator: String? { didSet { recountLibrarySoon() } }
+    /// The shop's Print next list.
+    var libraryPrintNextOnly = false { didSet { recountLibrarySoon() } }
+    /// Models that are the same file, or the same mesh, as another.
+    var libraryDuplicatesOnly = false { didSet { recountLibrarySoon() } }
     /// Which models are ready on which machine, from the last recount.
     private(set) var readyByMachine: [String: Set<String>] = [:]
 
@@ -11990,6 +12029,7 @@ final class Shop {
     var libraryFilterOn: Bool {
         libraryCategory != nil || libraryTag != nil || libraryUnfiledOnly
             || libraryNeverPrintedOnly || libraryReadyOn != nil
+            || libraryCreator != nil || libraryPrintNextOnly || libraryDuplicatesOnly
     }
 
     func clearLibraryFilter() {
@@ -11998,6 +12038,53 @@ final class Shop {
         libraryUnfiledOnly = false
         libraryNeverPrintedOnly = false
         libraryReadyOn = nil
+        libraryCreator = nil
+        libraryPrintNextOnly = false
+        libraryDuplicatesOnly = false
+    }
+
+    /// ── DUPLICATES, in the library already there ─────────────────────────
+    ///
+    /// An import refuses a file whose bytes are already in the library, but a
+    /// library that grew before that rule — or through the other app, or two
+    /// re-exports of one model — holds copies nobody can see. Two kinds, as
+    /// `lib/model-identity.js` draws them: the SAME FILE (`contentHash`,
+    /// certain) and the SAME MESH (`geometryKey`, a strong hint — a model
+    /// re-saved from another slicer). Each id maps to the key it shares.
+    static func duplicateGroups(_ files: [LibraryFile]) -> [String: String] {
+        var byKey: [String: [String]] = [:]
+        for f in files where !f.isArchived {
+            if let h = f.contentHash, !h.isEmpty { byKey["file:" + h, default: []].append(f.id) }
+            if let g = f.geometryKey, let tris = Int(g.split(separator: ":").first ?? ""), tris > 0 {
+                byKey["mesh:" + g, default: []].append(f.id)
+            }
+        }
+        var out: [String: String] = [:]
+        for (key, ids) in byKey where Set(ids).count > 1 {
+            for id in ids where out[id] == nil || key.hasPrefix("file:") { out[id] = key }
+        }
+        return out
+    }
+
+    /// Recomputed with the facets; the grid's filter and the inspector read it.
+    private(set) var duplicateOf: [String: String] = [:]
+
+    /// The other models this one is a duplicate of.
+    func duplicates(of file: LibraryFile) -> [LibraryFile] {
+        guard let key = duplicateOf[file.id] else { return [] }
+        return files.filter { $0.id != file.id && duplicateOf[$0.id] == key }
+    }
+
+    /// The creators in the library, busiest first.
+    struct CreatorCount: Equatable, Identifiable { let name: String; let count: Int; var id: String { name } }
+
+    /// Put these models on the Print next list, or take them off.
+    func setPrintNext(_ ids: Set<LibraryFile.ID>, on: Bool) {
+        let at = StoreWriter.iso(Date())
+        editFiles(ids, named: words.callIt(on ? "mac.print_next_add" : "mac.print_next_remove")) { record in
+            if on { if record["printNextAt"] == nil { record["printNextAt"] = .string(at) } }
+            else { record.removeValue(forKey: "printNextAt") }
+        }
     }
 
     var shownFiles: [LibraryFile] {
@@ -12023,13 +12110,27 @@ final class Shop {
         if let tag = libraryTag {
             rows = rows.filter { ($0.tags ?? []).contains { $0.lowercased() == tag.lowercased() } }
         }
+        if let creator = libraryCreator {
+            rows = rows.filter { $0.creator?.lowercased() == creator.lowercased() }
+        }
+        if libraryPrintNextOnly { rows = rows.filter(\.isPrintNext) }
+        if libraryDuplicatesOnly { rows = rows.filter { duplicateOf[$0.id] != nil } }
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
         if !q.isEmpty {
             rows = rows.filter {
                 $0.title.lowercased().contains(q)
                     || ($0.material ?? "").lowercased().contains(q)
                     || ($0.tags ?? []).contains { $0.lowercased().contains(q) }
+                    || ($0.creator ?? "").lowercased().contains(q)
             }
+        }
+        // Side by side: the copies of one model together, oldest first.
+        if libraryDuplicatesOnly {
+            return rows.sorted { (duplicateOf[$0.id] ?? "", $0.id) < (duplicateOf[$1.id] ?? "", $1.id) }
+        }
+        // The list, in the order it was made.
+        if libraryPrintNextOnly {
+            return rows.sorted { ($0.printNextAt ?? "") < ($1.printNextAt ?? "") }
         }
         return rows.sorted(by: librarySort.order)
     }

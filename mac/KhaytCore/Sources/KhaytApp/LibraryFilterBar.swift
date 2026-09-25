@@ -33,6 +33,21 @@ struct LibraryFilterBar: View {
 
     private var chips: [FilterChipModel] {
         var out: [FilterChipModel] = []
+        // THE LIST THE SHOP KEEPS of what to print next — first, because it is
+        // the one opened on purpose rather than found by narrowing.
+        if facets.printNext > 0 || shop.libraryPrintNextOnly {
+            out.append(FilterChipModel(id: "print-next", label: shop.words.callIt("mac.print_next"),
+                                       count: facets.printNext, on: shop.libraryPrintNextOnly) {
+                shop.libraryPrintNextOnly.toggle()
+            })
+        }
+        // Copies nobody could see: the same file, or the same mesh re-saved.
+        if facets.duplicates > 0 || shop.libraryDuplicatesOnly {
+            out.append(FilterChipModel(id: "duplicates", label: shop.words.callIt("mac.duplicates"),
+                                       count: facets.duplicates, on: shop.libraryDuplicatesOnly) {
+                shop.libraryDuplicatesOnly.toggle()
+            })
+        }
         // A chip that is ON stays on the row even at zero. Its count can fall to
         // nothing when another chip narrows past it, and a filter that vanishes
         // while still narrowing the screen leaves a shop looking at an empty
@@ -72,6 +87,22 @@ struct LibraryFilterBar: View {
                                        count: row.count,
                                        on: shop.libraryReadyOn == row.machineId) {
                 shop.libraryReadyOn = shop.libraryReadyOn == row.machineId ? nil : row.machineId
+            })
+        }
+        // WHO MADE IT — the busiest eight, and the one chosen whatever its count.
+        var creators = Array(facets.creators.prefix(8))
+        if let chosen = shop.libraryCreator,
+           !creators.contains(where: { $0.name.lowercased() == chosen.lowercased() }) {
+            creators.append(facets.creators.first { $0.name.lowercased() == chosen.lowercased() }
+                            ?? .init(name: chosen, count: 0))
+        }
+        for row in creators {
+            out.append(FilterChipModel(id: "creator:" + row.name,
+                                       label: shop.words.callIt("mac.by_creator", ["name": .string(row.name)]),
+                                       count: row.count,
+                                       on: shop.libraryCreator?.lowercased() == row.name.lowercased()) {
+                shop.libraryCreator =
+                    shop.libraryCreator?.lowercased() == row.name.lowercased() ? nil : row.name
             })
         }
         for row in Self.withActive(facets.categories, shop.libraryCategory) {

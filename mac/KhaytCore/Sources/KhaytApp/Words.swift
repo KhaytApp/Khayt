@@ -1735,6 +1735,13 @@ final class Words {
         "mac.new_spool":     ["en": "New Spool",    "ar": "بكرة جديدة"],
         // The storefront promise, which reported only to stderr.
         "mac.lead_time_last": ["en": "Lead time last", "ar": "آخر مدة تسليم"],
+        "mac.print_next": ["en": "Print next", "ar": "للطباعة لاحقًا"],
+        "mac.print_next_add": ["en": "Add to Print next", "ar": "أضف إلى قائمة الطباعة"],
+        "mac.print_next_remove": ["en": "Remove from Print next", "ar": "أزل من قائمة الطباعة"],
+        "mac.duplicates": ["en": "Duplicates", "ar": "المكرّرة"],
+        "mac.by_creator": ["en": "by {name}", "ar": "من تصميم {name}"],
+        "mac.creator_show_all": ["en": "Show everything by this creator", "ar": "اعرض كل أعمال هذا المصمم"],
+        "mac.duplicate_of": ["en": "The same model as {n} other in the library:", "ar": "المجسّم نفسه موجود {n} مرة أخرى في المكتبة:"],
         "mac.libmove_title": ["en": "Where the library lives", "ar": "مكان المكتبة"],
         "mac.libmove_now": ["en": "Now", "ar": "الآن"],
         "mac.libmove_in_icloud": ["en": "In iCloud Drive. With Optimize Mac Storage on, macOS keeps models you have not opened in iCloud and brings each back when it is opened.", "ar": "في iCloud Drive. مع تفعيل تحسين مساحة التخزين، يُبقي macOS المجسّمات غير المفتوحة في iCloud ويعيد كل واحد منها عند فتحه."],
