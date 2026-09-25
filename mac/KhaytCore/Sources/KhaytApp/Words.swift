@@ -1222,6 +1222,8 @@ final class Words {
         "mac.simple_hides":  ["en": "Simple hides Expenses and Reports. Nothing is deleted — switch back and they return.",
                               "ar": "يُخفي الوضع البسيط المصروفات والتقارير. لا يُحذف شيء — عُد وستظهر من جديد."],
         "mac.n_models":      ["en": "{n} models",      "ar": "{n} نماذج"],
+        "mac.n_models_one":  ["en": "1 model",         "ar": "نموذج واحد"],
+        "mac.n_models_two":  ["en": "2 models",        "ar": "نموذجان"],
         "mac.together":      ["en": "Together",        "ar": "مجتمعة"],
         "mac.on_disk":       ["en": "On disk",         "ar": "على القرص"],
         "mac.not_on_this_mac": ["en": "Not on this Mac", "ar": "ليست على هذا الماك"],
