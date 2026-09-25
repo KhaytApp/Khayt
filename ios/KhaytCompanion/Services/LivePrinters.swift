@@ -19,6 +19,21 @@ import SwiftUI
 /// from outside the shop's Wi-Fi, `isLive` is false and the screens keep
 /// showing the book's last status, labelled as such — never a progress bar
 /// frozen at whatever it last said, drawn as if it were moving.
+/// One answer about the printers, and where it came from.
+struct LiveSnapshot: Sendable {
+    enum Source: Sendable, Equatable {
+        /// Straight from the shop, on its Wi-Fi.
+        case shop
+        /// Relayed by Khayt Cloud, for a phone that is not in the shop.
+        case cloud
+    }
+    var printers: [MachineLiveStatus]
+    var source: Source
+    /// When the shop's Mac last reported, when that is known — the cloud's
+    /// `receivedAt`. Nil for an answer straight from the shop, which is now.
+    var reportedAt: Date?
+}
+
 @MainActor
 final class LivePrinters: ObservableObject {
     @Published private(set) var byMachine: [String: MachineLiveStatus] = [:]
@@ -27,20 +42,34 @@ final class LivePrinters: ObservableObject {
     /// True while answers are arriving. False when the Mac is out of reach or
     /// does not serve live readings.
     @Published private(set) var isLive = false
+    /// Where the readings are coming from.
+    @Published private(set) var source: LiveSnapshot.Source?
+    /// When the Mac last reported, for a relayed answer.
+    @Published private(set) var reportedAt: Date?
+
+    /// A relayed snapshot older than this is not live: the Mac has stopped
+    /// publishing (asleep, closed, off the network) and the cloud is holding
+    /// its last word. The PWA draws the same line at two minutes.
+    static let staleAfter: TimeInterval = 120
 
     /// How often to ask while it is answering, and how long to wait before
     /// asking again once it has not.
     private let interval: Duration
     private let backoff: Duration
+    /// Through the cloud the Mac publishes at most every two seconds and
+    /// usually far less, so asking every four would mostly fetch the same
+    /// snapshot twice.
+    private let cloudInterval: Duration
 
-    private let fetch: () async throws -> [MachineLiveStatus]
+    private let fetch: () async throws -> LiveSnapshot
     private var watchers = 0
     private var active = true
     private var loop: Task<Void, Never>?
 
-    init(interval: Duration = .seconds(4), backoff: Duration = .seconds(30),
-         fetch: @escaping () async throws -> [MachineLiveStatus]) {
+    init(interval: Duration = .seconds(4), cloudInterval: Duration = .seconds(10),
+         backoff: Duration = .seconds(30), fetch: @escaping () async throws -> LiveSnapshot) {
         self.interval = interval
+        self.cloudInterval = cloudInterval
         self.backoff = backoff
         self.fetch = fetch
     }
@@ -70,10 +99,16 @@ final class LivePrinters: ObservableObject {
     /// One answer, now — for pull-to-refresh, and for tests.
     func refresh() async {
         do {
-            let rows = try await fetch()
-            byMachine = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            let snap = try await fetch()
+            byMachine = Dictionary(snap.printers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             updatedAt = Date()
-            isLive = true
+            source = snap.source
+            reportedAt = snap.reportedAt
+            if let reported = snap.reportedAt {
+                isLive = Date().timeIntervalSince(reported) <= Self.staleAfter
+            } else {
+                isLive = true
+            }
         } catch {
             isLive = false
         }
@@ -85,7 +120,8 @@ final class LivePrinters: ObservableObject {
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.refresh()
-                let wait = self.isLive ? self.interval : self.backoff
+                let wait = !self.isLive ? self.backoff
+                    : (self.source == .cloud ? self.cloudInterval : self.interval)
                 try? await Task.sleep(for: wait)
             }
         }

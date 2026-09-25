@@ -17,7 +17,7 @@ struct KhaytCompanionApp: App {
         _settings = StateObject(wrappedValue: s)
         _api = StateObject(wrappedValue: apiClient)
         _health = StateObject(wrappedValue: healthMonitor)
-        _live = StateObject(wrappedValue: LivePrinters { try await apiClient.fetchMachinesLive() })
+        _live = StateObject(wrappedValue: LivePrinters { try await apiClient.fetchLivePrinters() })
         KhaytType.applyNavigationBarAppearance()
     }
 

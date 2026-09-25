@@ -528,3 +528,6 @@
 "machines.left_until" = "%1$@ left · done at %2$@";
 "order.detail.print_progress" = "Print progress";
 "order.detail.no_estimate" = "No estimate yet — the machine has not reported one.";
+"machines.not_published" = "The Mac has not published its printers to Khayt Cloud yet.";
+"machines.via_cloud" = "via Khayt Cloud";
+"machines.reported" = "The Mac last reported %@.";

@@ -20,6 +20,17 @@ struct MachinesView: View {
         }
     }
 
+    /// Why nothing is moving. A relayed snapshot that has gone quiet says how
+    /// long ago the Mac last spoke — "asleep for an hour" and "just dropped
+    /// off" are different things to a shop deciding whether to drive in.
+    private var staleNote: String {
+        if let reported = printers.reportedAt {
+            return String(format: L10n.tr("machines.reported"),
+                          reported.formatted(.relative(presentation: .named)))
+        }
+        return L10n.tr("machines.stale")
+    }
+
     private var statusById: [String: String] {
         Dictionary(machines.compactMap { m in m.status.map { (m.id, $0) } }, uniquingKeysWith: { a, _ in a })
     }
@@ -48,7 +59,7 @@ struct MachinesView: View {
                             MachineCard(live: m, fallbackStatus: statusById[m.id])
                         }
                         if !printers.isLive {
-                            Text(L10n.tr("machines.stale"))
+                            Text(staleNote)
                                 .font(.khayt(12, relativeTo: .caption))
                                 .foregroundStyle(KhaytDesign.note)
                                 .padding(.horizontal, 2)
@@ -103,9 +114,14 @@ struct LiveStamp: View {
                         .tracking(0.9)
                         .foregroundStyle(KhaytDesign.done)
                     Text(String(format: L10n.tr("machines.live.ago"),
-                                max(0, Int(context.date.timeIntervalSince(at)))))
+                                max(0, Int(context.date.timeIntervalSince(printers.reportedAt ?? at)))))
                         .font(.khayt(11.5, relativeTo: .caption2).monospacedDigit())
                         .foregroundStyle(KhaytDesign.note)
+                    if printers.source == .cloud {
+                        Text(L10n.tr("machines.via_cloud"))
+                            .font(.khayt(11.5, relativeTo: .caption2))
+                            .foregroundStyle(KhaytDesign.note)
+                    }
                 }
             }
             .padding(.horizontal, 2)

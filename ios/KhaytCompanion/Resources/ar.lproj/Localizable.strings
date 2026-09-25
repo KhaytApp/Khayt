@@ -528,3 +528,6 @@
 "machines.left_until" = "متبقٍ %1$@ · ينتهي %2$@";
 "order.detail.print_progress" = "تقدّم الطباعة";
 "order.detail.no_estimate" = "لا تقدير بعد — الآلة لم تُبلّغ عنه.";
+"machines.not_published" = "لم ينشر الماك حالة طابعاته على Khayt Cloud بعد.";
+"machines.via_cloud" = "عبر Khayt Cloud";
+"machines.reported" = "آخر تقرير من الماك %@.";

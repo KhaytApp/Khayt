@@ -14,11 +14,12 @@ final class LivePrintersTests: XCTestCase {
                           error: nil, lastUpdated: nil, apiType: "moonraker")
     }
 
-    private func make(_ counter: Counter) -> LivePrinters {
-        LivePrinters(interval: .milliseconds(20), backoff: .milliseconds(20)) {
+    private func make(_ counter: Counter, reportedAt: Date? = nil) -> LivePrinters {
+        LivePrinters(interval: .milliseconds(20), cloudInterval: .milliseconds(20), backoff: .milliseconds(20)) {
             counter.calls += 1
             if counter.fail { throw URLError(.cannotConnectToHost) }
-            return [self.reading("M1", progress: 42)]
+            return LiveSnapshot(printers: [self.reading("M1", progress: 42)],
+                                source: reportedAt == nil ? .shop : .cloud, reportedAt: reportedAt)
         }
     }
 
@@ -70,6 +71,40 @@ final class LivePrintersTests: XCTestCase {
         await live.refresh()
         XCTAssertFalse(live.isLive)
         XCTAssertNil(live.reading(for: "M1"), "a frozen bar drawn as if it were moving is the thing to avoid")
+    }
+
+    func testARelayedSnapshotTheMacStoppedUpdatingIsNotLive() async {
+        let fresh = make(Counter(), reportedAt: Date().addingTimeInterval(-20))
+        await fresh.refresh()
+        XCTAssertTrue(fresh.isLive)
+        XCTAssertEqual(fresh.source, .cloud)
+
+        let quiet = make(Counter(), reportedAt: Date().addingTimeInterval(-600))
+        await quiet.refresh()
+        XCTAssertFalse(quiet.isLive, "ten minutes of silence is a Mac that is asleep, not a print at 42%")
+        XCTAssertNil(quiet.reading(for: "M1"))
+        XCTAssertNotNil(quiet.reportedAt, "…and the screen can say how long ago it last spoke")
+    }
+
+    /// The cloud's plaintext spells `lastUpdated` as epoch milliseconds, the
+    /// LAN as an ISO string, and a field may be missing. None of it may empty
+    /// the list.
+    func testBothSpellingsOfTheReadingDecode() throws {
+        let json = #"""
+        [ {"id":"m1","name":"X1C","hasPrinterApi":true,"apiType":"bambu","state":"Printing","progress":42,
+           "filename":"b.3mf","timeRemaining":3600,"tempNozzle":220,"tempBed":60,"error":null,
+           "lastUpdated":1790331302000},
+          {"id":"m2","name":"Voron","hasPrinterApi":true,"state":"Operational",
+           "lastUpdated":"2026-09-25T10:15:02Z"},
+          {"id":"m3"} ]
+        """#
+        let rows = try JSONDecoder().decode([MachineLiveStatus].self, from: Data(json.utf8))
+        XCTAssertEqual(rows.count, 3)
+        XCTAssertEqual(rows[0].progress, 42)
+        XCTAssertTrue(rows[0].isPrinting, "the printer's own word, \"Printing\", capitalised")
+        XCTAssertNotNil(rows[0].lastUpdated)
+        XCTAssertEqual(rows[1].lastUpdated, "2026-09-25T10:15:02Z")
+        XCTAssertFalse(rows[2].hasPrinterApi)
     }
 
     func testTheTimeLeftIsSaidInTheReadersLanguageNotAsEnglishLetters() {

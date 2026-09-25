@@ -210,8 +210,60 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
     let tempNozzle: Int?
     let tempBed: Int?
     let error: String?
+    /// When the Mac last heard from the printer.
+    ///
+    /// ── TWO SPELLINGS, ONE FIELD ─────────────────────────────────────────
+    ///
+    /// The LAN routes send an ISO string; Khayt Cloud's printer snapshot
+    /// (`docs/api-contract.md`, "Live channel & live printers") sends epoch
+    /// MILLISECONDS. A strict `String?` would throw on the number — and a
+    /// Codable mismatch throws for the whole array, so one field would empty
+    /// every printer on the screen. It is read leniently and kept as text.
     let lastUpdated: String?
     let apiType: String?
+
+    init(id: String, name: String?, hasPrinterApi: Bool, state: String?, progress: Int?, filename: String?,
+         timeRemaining: Int?, tempNozzle: Int?, tempBed: Int?, error: String?, lastUpdated: String?,
+         apiType: String?) {
+        self.id = id; self.name = name; self.hasPrinterApi = hasPrinterApi; self.state = state
+        self.progress = progress; self.filename = filename; self.timeRemaining = timeRemaining
+        self.tempNozzle = tempNozzle; self.tempBed = tempBed; self.error = error
+        self.lastUpdated = lastUpdated; self.apiType = apiType
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, hasPrinterApi, state, progress, filename, timeRemaining, tempNozzle, tempBed, error,
+             lastUpdated, apiType
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+        // "Treat a missing field as null" — the cloud contract's rule, and a
+        // harmless one for the LAN routes, which always send it.
+        hasPrinterApi = (try? c.decodeIfPresent(Bool.self, forKey: .hasPrinterApi)) ?? false
+        state = try? c.decodeIfPresent(String.self, forKey: .state)
+        func int(_ key: CodingKeys) -> Int? {
+            if let i = try? c.decodeIfPresent(Int.self, forKey: key) { return i }
+            if let d = try? c.decodeIfPresent(Double.self, forKey: key) { return Int(d.rounded()) }
+            return nil
+        }
+        progress = int(.progress)
+        filename = try? c.decodeIfPresent(String.self, forKey: .filename)
+        timeRemaining = int(.timeRemaining)
+        tempNozzle = int(.tempNozzle)
+        tempBed = int(.tempBed)
+        error = try? c.decodeIfPresent(String.self, forKey: .error)
+        if let text = try? c.decodeIfPresent(String.self, forKey: .lastUpdated) {
+            lastUpdated = text
+        } else if let ms = try? c.decodeIfPresent(Double.self, forKey: .lastUpdated) {
+            lastUpdated = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: ms / 1000))
+        } else {
+            lastUpdated = nil
+        }
+        apiType = try? c.decodeIfPresent(String.self, forKey: .apiType)
+    }
 
     var displayName: String { name ?? id }
 

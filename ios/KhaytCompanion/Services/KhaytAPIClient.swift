@@ -26,6 +26,8 @@ final class KhaytAPIClient: ObservableObject {
 
     /// What this phone holds of the order history, when it holds only part.
     @Published private(set) var historyWindow: HeldWindow?
+    /// When to ask the shop for live printers again, after it did not answer.
+    private var lanLiveRetryAt: Date?
 
     /// This phone's own Khayt Cloud sign-in, when it has one — see `CloudSession`.
     @Published private(set) var cloud: CloudSession? = CloudSession.load()
@@ -199,6 +201,35 @@ final class KhaytAPIClient: ObservableObject {
     func fetchMachines() async throws -> [MachineInfo] {
         if let local = await fromBook({ try await $0.machines() }) { return local }
         return try await get("/api/machines", requiresPin: true, as: [MachineInfo].self)
+    }
+
+    /// Live printer status: from the shop when it is in reach, and relayed by
+    /// Khayt Cloud when it is not. Throws when neither answers.
+    ///
+    /// A LAN request that cannot reach the Mac takes its whole timeout to say
+    /// so. Away from the shop that would be fifteen seconds before every cloud
+    /// read, so once the shop has not answered, the next half-minute of polls
+    /// go straight to the cloud and only then is the shop asked again.
+    func fetchLivePrinters(now: Date = Date()) async throws -> LiveSnapshot {
+        var lanError: Error?
+        if lanLiveRetryAt.map({ now >= $0 }) ?? true {
+            do {
+                let rows = try await fetchMachinesLive()
+                lanLiveRetryAt = nil
+                return LiveSnapshot(printers: rows, source: .shop, reportedAt: nil)
+            } catch {
+                lanError = error
+                lanLiveRetryAt = now.addingTimeInterval(30)
+            }
+        }
+        guard let session = cloud, let book, let reader else {
+            throw lanError ?? KhaytAPIError.notConfigured
+        }
+        let sync = CloudSync(book: book, engine: try await reader.sharedEngine())
+        guard let snap = try await sync.livePrinters(session) else {
+            throw lanError ?? KhaytAPIError.server(L10n.tr("machines.not_published"))
+        }
+        return snap
     }
 
     func fetchMachinesLive() async throws -> [MachineLiveStatus] {
