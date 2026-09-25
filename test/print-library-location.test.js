@@ -124,3 +124,19 @@ test('the root of a disk is never a library folder, however it arrives', () => {
   assert.equal(PLL.insideLibrary(path.join(root, 'etc', 'passwd'), r.roots), false,
     'a file outside every real root counts as inside the library');
 });
+
+test('a linked folder is never a library root, so nothing the library deletes can reach it', () => {
+  // The Mac indexes folders IN PLACE (settings.printLibrary.linked, e.g. a NAS)
+  // and records each model's original as `externalPath`. insideLibrary() is what
+  // hub:printlib-delete confines itself with, so a linked folder among the roots
+  // would put the shop's originals within reach of a delete. The Mac pins the
+  // same rule in LinkedFolderTests.neverARoot.
+  const path = require('path');
+  const PLL = require('../lib/print-library-location');
+  const base = path.join(path.parse(process.cwd()).root, 'app', 'print-library');
+  const nas = path.join(path.parse(process.cwd()).root, 'Volumes', 'NAS', 'Models');
+  const r = PLL.resolveRoots({ linked: [nas], history: [] }, base);
+  assert.ok(!r.roots.includes(nas), 'a linked folder became a root');
+  assert.equal(PLL.insideLibrary(path.join(nas, 'dragon.stl'), r.roots), false,
+    'a linked original counts as inside the library');
+});
