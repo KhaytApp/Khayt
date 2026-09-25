@@ -12,6 +12,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   desktop calls it, and was checked byte-for-byte against the old builder,
   with and without photos, when it moved. Each host supplies only the shop's
   name, the interface language and its resized hero pictures.
+- **(Mac) Publish the catalogue to your web store from the Mac.** Reported by
+  the shop: "why is the app not syncing everything to the cloud … how am I
+  going to list stuff on my webstore". Only the desktop app's Storefront dialog
+  could publish a catalogue, so products added or re-priced on the Mac never
+  reached the store; it listed one product of five. The Catalogue screen now
+  has a **Web Store** button. It shows whether the store is live, how many
+  products it will list, and the shop page link, and it publishes or takes the
+  store offline. The payload comes from the same shared
+  `lib/storefront-catalog.js` the desktop uses, so prices, categories, stock,
+  options and photos come out identical. Pictures are sent at 1000px, as on the
+  desktop. While the store is live, a change to a product republishes it a few
+  seconds later.
 
 - **(Mac) Opening and leaving the library no longer freezes the window.**
   Reported by the shop: "there is a lag when choosing the library or leaving

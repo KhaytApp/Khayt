@@ -921,6 +921,10 @@ public actor KhaytEngine {
         // the shop's delivery dates offline with it.
         "lead-time",
         "lead-time-publish",
+        // The web store's catalogue. Only the Electron Storefront dialog could
+        // publish one, so a product added on the Mac never reached the store.
+        "product-specs",
+        "storefront-catalog",
     ]
 
     /// The languages whose strings are bundled.
@@ -5706,6 +5710,40 @@ public actor KhaytEngine {
     /// when public pricing is off or unconfigured, which is how it is
     /// withdrawn. The estimator is resolved EXACTLY as `publicQuote` above
     /// resolves it, calibration included, so the web and the LAN quote alike.
+    /// The web store's catalogue: `lib/storefront-catalog.js`, the payload
+    /// `PUT /catalog` takes. `heroes` maps a picture's file name to a web-sized
+    /// data URI; a file missing from it publishes as its thumbnail. The shop's
+    /// name is read the way the desktop's `shopField('biz')` reads it.
+    public func storefrontCatalog(products: [JSONValue], settings: JSONValue, lang: String,
+                                  withPhotos: Bool, heroes: [String: JSONValue]) throws -> JSONValue {
+        try runtime.call2("""
+            KhaytStorefrontCatalog.build({ products: ARG0, settings: ARG1, lang: ARG2, withPhotos: ARG3, heroes: ARG4,
+              shopName: KhaytContentLanguages.read(ARG1 || {}, 'biz', ARG2, ARG1 || null) })
+            """, [.array(products), settings, .string(lang), .bool(withPhotos), .object(heroes)], as: JSONValue.self)
+    }
+
+    /// How many products a catalogue publish would list.
+    public func storefrontCount(products: [JSONValue], settings: JSONValue, lang: String) throws -> Int {
+        try runtime.call2("KhaytStorefrontCatalog.publishable(ARG0, ARG1, ARG2).length",
+                          [.array(products), settings, .string(lang)], as: Int.self)
+    }
+
+    /// The picture files a catalogue publish would send, once each, for the
+    /// caller to resize.
+    public func storefrontHeroPaths(products: [JSONValue], settings: JSONValue, lang: String) throws -> [String] {
+        try runtime.call2("""
+            (function (products, settings, lang) {
+              var out = [];
+              KhaytStorefrontCatalog.publishable(products, settings, lang).forEach(function (p) {
+                KhaytProductImages.normalise(p).images.forEach(function (img) {
+                  if (img.path && out.indexOf(img.path) < 0) out.push(img.path);
+                });
+              });
+              return out;
+            })(ARG0, ARG1, ARG2)
+            """, [.array(products), settings, .string(lang)], as: [String].self)
+    }
+
     public func quoteSheet(store: JSONValue, now: Date, staleAfterHours: Double) throws -> JSONValue? {
         let sheet = try runtime.call2("""
             (function (store, nowMs, stale) {
