@@ -65,6 +65,9 @@ final class ConnectionHealth: ObservableObject {
 
     func refresh() async {
         macInReach = await api.macAnswers()
+        if !macInReach, await followTheMac() {
+            macInReach = await api.macAnswers()
+        }
         guard api.canSync else {
             state = .unreachable
             lastStatus = nil
@@ -110,6 +113,26 @@ final class ConnectionHealth: ObservableObject {
     private func notifyConnectionChange() {
         guard let settings else { return }
         CompanionNotifications.shared.handleHealthUpdate(state: state, status: lastStatus, settings: settings)
+    }
+
+    /// The Mac did not answer at its stored address. If it is on this network
+    /// under the name it was paired with, somewhere else, move there.
+    ///
+    /// At most once a minute: a Mac that is simply switched off answers no
+    /// lookup either, and browsing every thirty seconds for a machine that is
+    /// not there would be a phone doing work to be told nothing.
+    private var lastLookup: Date?
+
+    private func followTheMac(now: Date = Date()) async -> Bool {
+        guard let settings, settings.isPaired, let name = settings.bonjourName else { return false }
+        if let last = lastLookup, now.timeIntervalSince(last) < 60 { return false }
+        lastLookup = now
+        guard let found = await MacFinder.find(named: name) else { return false }
+        guard found.host != settings.host || found.port != settings.port else { return false }
+        settings.host = found.host
+        settings.port = found.port
+        if settings.serviceName.isEmpty { settings.serviceName = name }
+        return true
     }
 
     private func refreshWidgetsAndAlerts(status: ShopStatus, queue: [QueueOrder]) async {
