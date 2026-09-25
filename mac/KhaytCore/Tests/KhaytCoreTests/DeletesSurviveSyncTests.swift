@@ -123,4 +123,69 @@ struct DeletesSurviveSyncTests {
         let outbox = try await engine.changesToSend(local: merged.store, server: cloud)
         #expect(outbox.tombstones.count == 1)
     }
+
+    /// Undo after a delete. The tombstone has usually reached the cloud by then,
+    /// and a delete there wins over the same id for good.
+    @Test("a record put back after a delete comes back under a new id, with its links, and survives the merge")
+    func undoSurvivesTheSync() async throws {
+        var root = Self.book(["A", "B"])
+        root["printLog"] = .array([.object(["id": .string("J1"), "productId": .string("B"), "rev": .number(1)])])
+        root["settings"] = .object(["storefront": .object(["prices": .object(["B": .string("40")])])])
+        let url = try Self.tempBook(root)
+
+        // Delete B: the job loses its link, as deleteProduct does.
+        try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { r in
+            r["products"] = .array([Self.product("A", rev: 3)])
+            r["printLog"] = .array([.object(["id": .string("J1"), "productId": .null, "rev": .number(2)])])
+        }
+        let deleted = try Self.read(url)
+        #expect(Self.tombs(deleted).map { $0["id"] } == [.string("B")])
+
+        // Undo: B and the job's link come back under the old id.
+        try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { r in
+            r["products"] = .array([Self.product("A", rev: 3), Self.product("B", rev: 3)])
+            r["printLog"] = .array([.object(["id": .string("J1"), "productId": .string("B"), "rev": .number(2)])])
+        }
+        let undone = try Self.read(url)
+        guard case .array(let products)? = undone["products"],
+              case .object(let revived)? = products.last,
+              case .string(let newId)? = revived["id"] else { Issue.record("no revived record"); return }
+        #expect(newId != "B")
+        if case .number(let rev)? = revived["rev"] { #expect(rev > 3) } else { Issue.record("not stamped") }
+        guard case .array(let log)? = undone["printLog"], case .object(let job)? = log.first else { Issue.record("no job"); return }
+        #expect(job["productId"] == .string(newId), "the job still points at the deleted id")
+        if case .number(let rev)? = job["rev"] { #expect(rev > 2) } else { Issue.record("job not stamped") }
+        guard case .object(let settings)? = undone["settings"], case .object(let sf)? = settings["storefront"],
+              case .object(let prices)? = sf["prices"] else { Issue.record("no prices"); return }
+        #expect(prices[newId] == .string("40"))
+        #expect(prices["B"] == nil)
+
+        // The cloud already holds B's tombstone. The revived record survives it.
+        let engine = try KhaytEngine()
+        var cloud = Self.book(["A"])
+        cloud["tombstones"] = deleted["tombstones"]
+        let merged = try await engine.mergeFromCloud(local: undone, server: cloud)
+        guard case .array(let after)? = merged.store["products"] else { Issue.record("no products"); return }
+        #expect(after.contains { if case .object(let o) = $0 { return o["id"] == .string(newId) } else { return false } })
+        let outbox = try await engine.changesToSend(local: merged.store, server: cloud)
+        #expect(outbox.deltas.contains { if case .object(let d) = $0, case .object(let r)? = d["record"] { return r["id"] == .string(newId) } else { return false } })
+    }
+
+    @Test("a record removed and re-added in ONE write keeps its id")
+    func sameWriteKeepsId() {
+        var root = Self.book(["A"])
+        root["tombstones"] = .array([])
+        var after = root
+        after["products"] = .array([Self.product("A", rev: 4)])
+        StoreWriter.reviveUnderNewIds(before: root, after: &after)
+        guard case .array(let p)? = after["products"], case .object(let a)? = p.first else { return }
+        #expect(a["id"] == .string("A"))
+    }
+
+    @Test("a fresh id keeps the old prefix")
+    func freshIdPrefix() {
+        let id = StoreWriter.freshId(like: "PROD-mth8nqkoVJC")
+        #expect(id.hasPrefix("PROD-"))
+        #expect(id != "PROD-mth8nqkoVJC")
+    }
 }

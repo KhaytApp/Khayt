@@ -1858,6 +1858,8 @@ final class Words {
         "mac.ws_photos":     ["en": "{n} photos", "ar": "{n} صور"],
         "mac.ws_photos_one": ["en": "{n} photo", "ar": "صورة واحدة"],
         "mac.ws_photos_two": ["en": "{n} photos", "ar": "صورتين"],
+        "mac.ws_emptied":    ["en": "Your web store was taken offline: no product in the catalogue can be listed.", "ar": "أُوقف متجرك الإلكتروني: لا يوجد في الكتالوج منتج يمكن عرضه."],
+        "mac.ws_sent_unchecked": ["en": "Published {products}. Khayt Cloud could not be asked to confirm just now; open this again in a minute to check.", "ar": "نُشر {products}. تعذّر التأكد من سحابة خيط الآن؛ افتح هذا مجددًا بعد دقيقة للتحقق."],
         "mac.ws_update":     ["en": "Publish Changes", "ar": "نشر التغييرات"],
         "mac.ws_page":       ["en": "Shop page", "ar": "صفحة المتجر"],
         "mac.ws_open_page":  ["en": "Open", "ar": "فتح"],

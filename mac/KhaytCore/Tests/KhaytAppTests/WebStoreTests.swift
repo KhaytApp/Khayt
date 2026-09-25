@@ -80,9 +80,8 @@ struct WebStoreTests {
         let src = try QuoteSheetStatusTests.source("WebStore.swift")
         let publish = try #require(src.range(of: "func publishWebStore"))
         let after = src[publish.lowerBound...]
-        let put = try #require(after.range(of: "CatalogPublisher.publish("))
-        let back = try #require(after.range(of: "CatalogPublisher.status("))
-        #expect(put.lowerBound < back.lowerBound, "the outcome is not read back after the PUT")
+        let put = try #require(after.range(of: "CatalogPublisher.publish(connection, token: token, catalog: catalog)"))
+        #expect(after[put.upperBound...].contains("CatalogPublisher.status("), "the outcome is not read back after the PUT")
         #expect(src.contains("accessibilityIdentifier(\"webstore-outcome\")"))
     }
 
@@ -183,4 +182,33 @@ struct WebStoreTests {
         #expect(shop.contains("webStoreFollow(products: productRows"))
         #expect(shop.contains("await self.refreshWebStore()"))
     }
+    @Test("an automatic publish checks the store is still live, empties it rather than leave deleted products up, and a book change forgets the last store")
+    func automaticGuards() throws {
+        let src = try QuoteSheetStatusTests.source("WebStore.swift")
+        #expect(src.contains("if automatic {"))
+        #expect(src.contains("guard now.live else"))
+        #expect(src.contains("mac.ws_emptied"))
+        #expect(src.contains("cloudRoleCanWrite"), "a viewer's Mac follows a store it cannot publish")
+        #expect(src.contains("self.source.build?.storeURL == book"))
+        let shop = try QuoteSheetStatusTests.source("Shop.swift")
+        #expect(shop.contains("resetWebStore()"))
+    }
+
+    @Test("the read-back asks past the service's 60-second cache")
+    func readBackIsNotCached() async throws {
+        var seen: URLRequest?
+        _ = try await CatalogPublisher.status(Self.connection, token: "tok") { seen = $0; return Self.reply(404, "{}")($0) }
+        #expect(seen?.value(forHTTPHeaderField: "Cache-Control") == "no-cache")
+    }
+
+
+    @Test("undoing a delete restores the record and does not delete it again")
+    func undoDoesNotDeleteAgain() throws {
+        let shop = try QuoteSheetStatusTests.source("Shop.swift")
+        for name in ["deleteSupplier", "deleteProduct", "deleteSpool"] {
+            #expect(!shop.contains("Task { await shop.\(name)(id) }"), "\(name)'s undo deletes the record again")
+        }
+        #expect(shop.contains("registerConsumableUndo(gone.was)"), "a consumable's undo cannot bring back a deleted row")
+    }
+
 }
