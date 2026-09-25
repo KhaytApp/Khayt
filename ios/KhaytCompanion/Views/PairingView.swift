@@ -164,6 +164,7 @@ struct PairingView: View {
         settings.host = found.host
         settings.port = Int(found.port)
         settings.shopLabel = shop.name
+        settings.serviceName = shop.id
         goToPin()
     }
 
@@ -199,6 +200,7 @@ struct PairingView: View {
                 if settings.shopLabel.trimmingCharacters(in: .whitespaces).isEmpty {
                     settings.shopLabel = settings.host
                 }
+                settings.serviceName = ""
                 goToPin()
             }
             secondary(L10n.tr("pair.back")) { step = .find }

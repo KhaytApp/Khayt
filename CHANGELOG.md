@@ -51,6 +51,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   signed out and puts **Sign in again** under it; a busy cloud (429) reads
   as "trying again shortly", never as signed out; and every other cloud
   failure is said with its status code and reason.
+- **(iOS) The phone follows its Mac to a new address.** Pairing stored the
+  Mac's IP, and a router hands IPs out on a lease: after a restart the Mac
+  came back somewhere else and the phone went on calling the old one,
+  reporting the shop as away. Now, when the stored address stops answering,
+  the phone looks the Mac up by the Bonjour name it was paired with and moves
+  to wherever that name now is — never to a different Mac, and at most once a
+  minute while the Mac stays silent. A Mac paired by typing its address has
+  no name to look up and keeps its address.
 
 - **(Mac) The phone can follow a print away from the shop.** While the cloud
   is signed in and unlocked, the Mac publishes its printers' live status to

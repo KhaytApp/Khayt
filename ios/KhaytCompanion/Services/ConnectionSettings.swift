@@ -122,6 +122,22 @@ final class ConnectionSettings: ObservableObject {
     @Published var shopLabel: String {
         didSet { UserDefaults.standard.set(shopLabel, forKey: Keys.shopLabel) }
     }
+    /// The Mac's Bonjour name, as pairing found it — kept apart from
+    /// `shopLabel`, which the person can rename, because this is what the
+    /// phone looks the Mac up by when its address changes. Empty for a Mac
+    /// typed in by address, which has no name to look up.
+    @Published var serviceName: String {
+        didSet { UserDefaults.standard.set(serviceName, forKey: Keys.serviceName) }
+    }
+
+    /// The name to look the Mac up by. A phone paired before `serviceName`
+    /// existed set `shopLabel` from the Bonjour name, so that is the fallback.
+    var bonjourName: String? {
+        let own = serviceName.trimmingCharacters(in: .whitespaces)
+        if !own.isEmpty { return own }
+        let label = shopLabel.trimmingCharacters(in: .whitespaces)
+        return label.isEmpty || label == "My Shop" || label == host ? nil : label
+    }
     @Published var appLanguage: AppLanguage {
         didSet {
             UserDefaults.standard.set(appLanguage.rawValue, forKey: Keys.language)
@@ -145,6 +161,7 @@ final class ConnectionSettings: ObservableObject {
         static let host = "khayt.host"
         static let port = "khayt.port"
         static let shopLabel = "khayt.shopLabel"
+        static let serviceName = "khayt.serviceName"
         static let pinKeychain = "khayt.lanPin"
         static let paired = "khayt.paired"
         static let language = "khayt.language"
@@ -159,6 +176,7 @@ final class ConnectionSettings: ObservableObject {
         host = defaults.string(forKey: Keys.host) ?? ""
         port = defaults.object(forKey: Keys.port) as? Int ?? 3219
         shopLabel = defaults.string(forKey: Keys.shopLabel) ?? "My Shop"
+        serviceName = defaults.string(forKey: Keys.serviceName) ?? ""
         isPaired = defaults.bool(forKey: Keys.paired)
         pin = KeychainHelper.get(Keys.pinKeychain) ?? ""
         let langRaw = defaults.string(forKey: Keys.language) ?? AppLanguage.system.rawValue
@@ -210,6 +228,7 @@ final class ConnectionSettings: ObservableObject {
 
     func unpair() {
         isPaired = false
+        serviceName = ""
         pin = ""
         KeychainHelper.delete(Keys.pinKeychain)
         // The offline cache holds the shop's client list, orders and inventory.
