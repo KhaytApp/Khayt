@@ -1467,10 +1467,19 @@ async function openStorefrontModal() {
   // Mac app publishes through as well; this dialog only reads the form.
   const SC = KhaytStorefrontCatalog;
   const cur = settings.currency || 'SAR';
-  const pubProducts = SC.publishable(products, settings, (typeof i18n !== 'undefined' && i18n.current) || 'en');
+  const sfLang = (typeof i18n !== 'undefined' && i18n.current) || 'en';
+  /* Every product the shop can put on the store is a ROW here, including the
+   * ones it has hidden — otherwise a product hidden on the Mac could never be
+   * shown again from this computer. What is PUBLISHED is decided by
+   * SC.publishable without the flag, which leaves hidden products out. */
+  const pubProducts = SC.publishable(products, settings, sfLang, { includeHidden: true });
+  const listedCount = () => SC.publishable(products, settings, sfLang).length;
   const priceRows = pubProducts.map((p) => {
     const nm = (p.nameEn || (typeof localName === 'function' ? localName(p) : '') || '').trim();
     return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+      <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:3px;cursor:pointer;" title="${escapeHtml(t('store.on_store_hint'))}">
+        <input class="sfShow" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(t('store.on_store'))}" type="checkbox" style="width:auto;margin:0;" ${p.storefrontHidden ? '' : 'checked'}>${escapeHtml(t('store.on_store'))}
+      </label>
       <span style="flex:1;min-width:90px;font-size:12.5px;">${escapeHtml(nm)}</span>
       <input class="sfPrice" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(cur)}" type="number" min="0" step="0.01" inputmode="decimal" placeholder="${escapeHtml(p.price != null ? String(p.price) : (p.basePrice != null ? String(p.basePrice) : '0'))}" value="${escapeHtml(sf.prices[p.id] != null ? String(sf.prices[p.id]) : '')}" style="width:72px;font-size:12.5px;text-align:right;" title="${escapeHtml(cur)}">
       <input class="sfCat" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(t('store.category_ph') || 'category')}" type="text" maxlength="60" placeholder="${escapeHtml((typeof productCategoryOf === 'function' ? productCategoryOf(p) : (p.category || '')) || t('store.category_ph') || 'category')}" value="${escapeHtml(sf.categories[p.id] || '')}" list="sfCatList" style="width:96px;font-size:12px;">
@@ -1536,7 +1545,7 @@ async function openStorefrontModal() {
         <input type="checkbox" id="storePhotos" checked style="width:auto;"> ${escapeHtml(t('store.include_photos') || 'Include product photos')}
       </label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">
-        <button id="storePublish" class="btn primary small" type="button">${escapeHtml(t('store.publish') || 'Publish')} (${pubProducts.length})</button>
+        <button id="storePublish" class="btn primary small" type="button">${escapeHtml(t('store.publish') || 'Publish')} (${listedCount()})</button>
         <button id="storeCopy" class="btn ghost small" type="button">${escapeHtml(t('store.copy_link') || 'Copy link')}</button>
         <button id="storeUnpublish" class="btn danger small" type="button">${escapeHtml(t('store.unpublish') || 'Unpublish')}</button>
       </div>
@@ -1651,6 +1660,15 @@ async function openStorefrontModal() {
             : sf.stockCountedAt[pid];
         });
 
+        /* "On store" lives on the PRODUCT, not in settings.storefront, so it
+         * travels with the record through sync (lib/storefront-catalog.js).
+         * Absent means listed; the field is removed rather than set false, so
+         * a book nobody ever hid anything in stays byte-for-byte the same. */
+        modal.querySelectorAll('.sfShow').forEach((inp) => {
+          const p = (products || []).find((x) => x && x.id === inp.dataset.pid);
+          if (!p) return;
+          if (inp.checked) delete p.storefrontHidden; else p.storefrontHidden = true;
+        });
         sf.prices = prices; sf.categories = categories; sf.soldOut = soldOut; sf.options = options;
         sf.stockQty = stockQty; sf.stockCountedAt = stockCountedAt;
         sf.depositPct = Math.max(0, Math.min(100, num(modal.querySelector('#storeDeposit').value, 0)));
@@ -1664,12 +1682,13 @@ async function openStorefrontModal() {
         settings.storefront = sf;
         saveAll();
       };
-      const buildCatalog = async (withPhotos) => {
+      const buildCatalog = async (withPhotos, { captured = false } = {}) => {
         /* Read the form BEFORE the await. Resizing every picture takes long
          * enough to type in, and a field edited during it would otherwise be
          * captured into a catalogue the shop thought it had already described. */
-        captureConfig();
-        const heroes = withPhotos ? await loadHeroPhotos(pubProducts) : null;
+        if (!captured) captureConfig();
+        // Only what will be published needs its full picture read off disk.
+        const heroes = withPhotos ? await loadHeroPhotos(SC.publishable(products, settings, sfLang)) : null;
         return SC.build({
           products,
           settings,
@@ -1751,12 +1770,36 @@ async function openStorefrontModal() {
           .map((it) => `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${escapeHtml(it.name || it.id)}</span><span class="muted">${it.orders || 0} ${escapeHtml(t('store.ins_orders') || 'orders')} · ${it.carts || 0} ${escapeHtml(t('store.ins_carts') || 'carts')}</span></div>`).join('');
         insEl.innerHTML = `<div style="margin-bottom:6px;">${funnel}</div>` + (top ? `<div style="margin-top:6px;border-top:1px solid var(--border-soft);padding-top:6px;">${top}</div>` : '');
       }).catch(() => { if (insEl) insEl.textContent = t('store.insights_empty') || 'No storefront activity yet.'; });
+      // The Publish button counts what will go up, as the boxes are ticked.
+      const pubBtn = modal.querySelector('#storePublish');
+      modal.querySelectorAll('.sfShow').forEach((box) => box.addEventListener('change', () => {
+        const n = Math.min(SC.MAX_PRODUCTS, modal.querySelectorAll('.sfShow:checked').length);
+        if (pubBtn) pubBtn.textContent = `${t('store.publish') || 'Publish'} (${n})`;
+      }));
       modal.querySelector('#storePublish')?.addEventListener('click', async () => {
         /* Say something BEFORE the build, not after it. Building now reads every
          * picture off disk and resizes it, which on a photo-rich catalogue is
          * seconds of a button that looks like it did nothing. */
+        /* LOOK BEFORE IT GOES PUBLIC. The first catalogue published from the Mac
+         * put a test description, listings with no picture and file names in
+         * front of customers, and nothing said so until someone opened the
+         * website. SC.review asks the questions a shop would ask by eye; the
+         * shop decides. */
+        captureConfig();
+        const rv = SC.review(products, settings, sfLang);
+        if (rv.listings.length) {
+          const label = {
+            no_price: t('store.issue_no_price'), no_photo: t('store.issue_no_photo'),
+            no_description: t('store.issue_no_description'), no_category: t('store.issue_no_category'),
+            second_language: t('store.issue_second_language'), file_name: t('store.issue_file_name'),
+          };
+          const lines = rv.listings.slice(0, 12).map((l) => `• ${l.name || l.id}: ${l.issues.map((k) => label[k] || k).join(', ')}`);
+          if (rv.listings.length > 12) lines.push(`… +${rv.listings.length - 12}`);
+          if (rv.hidden) lines.push(t('store.hidden_n', { n: String(rv.hidden) }));
+          if (!(await confirmModal(`${t('store.review_q')}\n\n${lines.join('\n')}`))) { setRes('', true); return; }
+        }
         setRes(t('store.publishing') || 'Publishing…', true);
-        const cat = await buildCatalog(modal.querySelector('#storePhotos').checked);
+        const cat = await buildCatalog(modal.querySelector('#storePhotos').checked, { captured: true });
         if (!cat.items.length) { setRes('✗ ' + (t('store.no_products') || 'Add products to your catalog first'), false); return; }
         try {
           const r = await window.hubAPI.cloudCatalogPublish({ url: c.url, shopId: c.shopId, token: c.token, catalog: cat });
