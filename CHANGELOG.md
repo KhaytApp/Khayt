@@ -51,6 +51,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the attention colour. A live store's automatic republish that fails is
   reported in the app's notices, rather than only inside the sheet.
 
+- **(iOS) A sync can no longer delete a record added on the phone while it
+  ran.** A pull through Khayt Cloud, or from the Mac, read the phone's book,
+  waited for the shop's rules to fold the incoming changes in, and wrote the
+  result — so a job, spool or request added on the phone during that wait was
+  missing from what was written, and lost. Since every write now records a
+  tombstone for what it removes (#1609), that loss would also have synced, and
+  removed the record from every device. A fold now lands only if the book is
+  still the one it started from, and folds again when it is not; and a fold
+  records no deletes of its own, as the Mac's folds do not. Found by the Mac
+  lane's review of #1609.
+
 - **(Mac) Something deleted on the Mac stays deleted after the cloud syncs.**
   Reported by the shop: "I delete stuff on mac but that is never reflected on
   cloud, instead I am forced to copy cloud". The desktop writes a deletion

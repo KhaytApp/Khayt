@@ -73,6 +73,8 @@ struct CompanionBook {
     enum Failure: Error, CustomStringConvertible {
         case noContainer
         case notYetPulled
+        /// The book kept changing under a fold, three times running.
+        case busy
 
         var description: String {
             switch self {
@@ -82,6 +84,9 @@ struct CompanionBook {
             case .notYetPulled:
                 return "This phone has not been given the shop's book yet. Pair with the Mac, "
                      + "which is what fills it the first time."
+            case .busy:
+                return "The book was being changed on this phone while changes arrived. "
+                     + "They will be folded in on the next sync."
             }
         }
     }
@@ -219,6 +224,41 @@ struct CompanionBook {
                                owns: { true },
                                whoHasIt: { nil },
                                mutate: mutate)
+    }
+
+    /// Put a FOLDED book in place — but only if the book is still the one the
+    /// fold started from. Returns false, and changes nothing, if it is not.
+    ///
+    /// ── WHY A FOLD NEEDS THIS AND AN EDIT DOES NOT ─────────────────────────
+    ///
+    /// A fold reads the book, hands it to the engine — which is async — and
+    /// writes what comes back. A record added on this phone during that await
+    /// is not in what comes back, so writing it would delete the record. And
+    /// since `StoreWriter.update` began recording a tombstone for everything a
+    /// write removes (#1609), that silent local loss became a delete that
+    /// SYNCS, and takes the record off every device. Found by the Mac lane's
+    /// review of that change.
+    ///
+    /// So the swap happens only while the book still equals `expected`; a
+    /// caller that is told otherwise folds again from the book as it now is.
+    /// And it passes `recordingDeletes: false`, as the Mac's own folds do: what
+    /// a merge removes, it removes because of a tombstone it already carries.
+    func swap(from expected: [String: JSONValue], to next: [String: JSONValue]) throws -> Bool {
+        var current = true
+        try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil },
+                               recordingDeletes: false) { root in
+            guard root == expected else { current = false; return }
+            root = next
+        }
+        return current
+    }
+
+    /// Record which part of the shop this book holds — after a swap that
+    /// changed which part that is.
+    func writeScope(_ scope: BookScope.Taken?) {
+        if let scope, let described = try? JSONEncoder().encode(scope) {
+            try? described.write(to: scopeURL, options: [.atomic])
+        }
     }
 
     /// Change one record of one collection, stamping `rev` and `updatedAt`.
