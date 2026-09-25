@@ -11,6 +11,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   time. Both figures now cover every plate. Found on a real two-plate file in
   a shop's library.
 
+- **(iOS) A phone signed out of Khayt Cloud says so, and offers to sign in
+  again.** Revoking a device from the shop's device list answers that phone
+  with a plain 401, and the phone used to show "The operation couldn't be
+  completed (KhaytCore.CloudReader.Failure error 2)". It now says it was
+  signed out and puts **Sign in again** under it; a busy cloud (429) reads
+  as "trying again shortly", never as signed out; and every other cloud
+  failure is said with its status code and reason.
+
 - **(Mac) The phone can follow a print away from the shop.** While the cloud
   is signed in and unlocked, the Mac publishes its printers' live status to
   Khayt Cloud — encrypted with the shop's own key, so the service relays it

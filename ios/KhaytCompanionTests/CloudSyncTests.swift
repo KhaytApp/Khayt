@@ -277,3 +277,12 @@ final class CloudSyncTests: XCTestCase {
         XCTAssertNil(snap)
     }
 }
+
+/// A cloud failure is said with its reason, not as "error 4".
+final class CloudErrorWordingTests: XCTestCase {
+    func testACloudFailureSaysItsStatusCode() {
+        let said = KhaytAPIClient.say(CloudReader.Failure.http(409, "compact"))
+        XCTAssertTrue(said.contains("409"), said)
+        XCTAssertFalse(said.contains("error 4"), said)
+    }
+}

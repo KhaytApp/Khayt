@@ -531,3 +531,6 @@
 "machines.not_published" = "The Mac has not published its printers to Khayt Cloud yet.";
 "machines.via_cloud" = "via Khayt Cloud";
 "machines.reported" = "The Mac last reported %@.";
+"cloud.signed_out" = "This phone was signed out of Khayt Cloud — from the shop’s device list, most likely. Sign in again to keep syncing away from the shop.";
+"cloud.sign_in_again" = "Sign in again";
+"cloud.busy" = "Khayt Cloud is busy. The phone will try again shortly.";
