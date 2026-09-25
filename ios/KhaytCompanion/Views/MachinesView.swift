@@ -2,23 +2,46 @@ import SwiftUI
 
 struct MachinesView: View {
     @EnvironmentObject private var api: KhaytAPIClient
+    @EnvironmentObject private var printers: LivePrinters
 
-    @State private var live: [MachineLiveStatus] = []
-    @State private var statusById: [String: String] = [:]
+    @State private var machines: [MachineInfo] = []
     @State private var errorMessage: String?
     @State private var didLoad = false
 
-    /// The live endpoint did not answer, so what is shown is what the book
-    /// last held — said once, under the list, as the design does.
-    @State private var stale = false
+    /// Each machine as the book has it, with the live reading laid over it
+    /// when there is one. The book decides WHICH machines there are — a
+    /// machine the live endpoint forgot to mention is still the shop's.
+    private var rows: [MachineLiveStatus] {
+        machines.map { m in
+            printers.reading(for: m.id) ?? MachineLiveStatus(
+                id: m.id, name: m.name, hasPrinterApi: m.hasPrinterApi ?? false,
+                state: nil, progress: nil, filename: nil, timeRemaining: nil,
+                tempNozzle: nil, tempBed: nil, error: nil, lastUpdated: nil, apiType: nil)
+        }
+    }
+
+    /// Why nothing is moving. A relayed snapshot that has gone quiet says how
+    /// long ago the Mac last spoke — "asleep for an hour" and "just dropped
+    /// off" are different things to a shop deciding whether to drive in.
+    private var staleNote: String {
+        if let reported = printers.reportedAt {
+            return String(format: L10n.tr("machines.reported"),
+                          reported.formatted(.relative(presentation: .named)))
+        }
+        return L10n.tr("machines.stale")
+    }
+
+    private var statusById: [String: String] {
+        Dictionary(machines.compactMap { m in m.status.map { (m.id, $0) } }, uniquingKeysWith: { a, _ in a })
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    if live.isEmpty && !didLoad && errorMessage == nil {
+                    if machines.isEmpty && !didLoad && errorMessage == nil {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 44)
-                    } else if live.isEmpty {
+                    } else if machines.isEmpty {
                         VStack(spacing: 5) {
                             Text(L10n.tr("machines.none"))
                                 .font(.khayt(15, .semibold, relativeTo: .headline))
@@ -31,11 +54,12 @@ struct MachinesView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 44)
                     } else {
-                        ForEach(live) { m in
+                        LiveStamp()
+                        ForEach(rows) { m in
                             MachineCard(live: m, fallbackStatus: statusById[m.id])
                         }
-                        if stale {
-                            Text(L10n.tr("machines.stale"))
+                        if !printers.isLive {
+                            Text(staleNote)
                                 .font(.khayt(12, relativeTo: .caption))
                                 .foregroundStyle(KhaytDesign.note)
                                 .padding(.horizontal, 2)
@@ -46,44 +70,62 @@ struct MachinesView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 .padding(.bottom, 18)
+                .animation(.easeOut(duration: 0.45), value: printers.updatedAt)
             }
             .scrollIndicators(.hidden)
-            .refreshable { await load() }
+            .refreshable {
+                await load()
+                await printers.refresh()
+            }
             .khaytScreen(title: L10n.tr("tab.machines"))
             .background(KhaytDesign.ground.ignoresSafeArea())
             .task {
                 await load()
                 didLoad = true
             }
+            .onAppear { printers.watch() }
+            .onDisappear { printers.unwatch() }
         }
     }
 
     private func load() async {
         errorMessage = nil
         do {
-            async let liveTask = api.fetchMachinesLive()
-            async let machinesTask = api.fetchMachines()
-            let (liveData, machineData) = try await (liveTask, machinesTask)
-            live = liveData
-            stale = false
-            statusById = Dictionary(machineData.compactMap { m in m.status.map { (m.id, $0) } },
-                                    uniquingKeysWith: { a, _ in a })
+            machines = try await api.fetchMachines()
         } catch {
-            // Live endpoint may be unavailable on older desktops, or the Mac
-            // out of reach — fall back to what the book holds.
-            stale = true
-            if let basic = try? await api.fetchMachines() {
-                live = basic.map {
-                    MachineLiveStatus(id: $0.id, name: $0.name, hasPrinterApi: $0.hasPrinterApi ?? false,
-                                      state: nil, progress: nil, filename: nil, timeRemaining: nil,
-                                      tempNozzle: nil, tempBed: nil, error: nil, lastUpdated: nil, apiType: nil)
+            machines = []
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+/// "● Live · 3 s ago" while readings are arriving; nothing when they are not
+/// (the stale note under the list says that instead).
+struct LiveStamp: View {
+    @EnvironmentObject private var printers: LivePrinters
+
+    var body: some View {
+        if printers.isLive, let at = printers.updatedAt {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                HStack(spacing: 7) {
+                    Circle().fill(KhaytDesign.done).frame(width: 7, height: 7)
+                    Text(L10n.tr("machines.live"))
+                        .font(.khayt(11, .bold, relativeTo: .caption2))
+                        .tracking(0.9)
+                        .foregroundStyle(KhaytDesign.done)
+                    Text(String(format: L10n.tr("machines.live.ago"),
+                                max(0, Int(context.date.timeIntervalSince(printers.reportedAt ?? at)))))
+                        .font(.khayt(11.5, relativeTo: .caption2).monospacedDigit())
+                        .foregroundStyle(KhaytDesign.note)
+                    if printers.source == .cloud {
+                        Text(L10n.tr("machines.via_cloud"))
+                            .font(.khayt(11.5, relativeTo: .caption2))
+                            .foregroundStyle(KhaytDesign.note)
+                    }
                 }
-                statusById = Dictionary(basic.compactMap { m in m.status.map { (m.id, $0) } }, uniquingKeysWith: { a, _ in a })
-                if live.isEmpty { errorMessage = error.localizedDescription }
-            } else {
-                live = []
-                errorMessage = error.localizedDescription
             }
+            .padding(.horizontal, 2)
+            .accessibilityElement(children: .combine)
         }
     }
 }
@@ -158,13 +200,16 @@ private struct MachineCard: View {
                         .font(.khayt(13, .medium, relativeTo: .footnote).monospacedDigit())
                         .foregroundStyle(KhaytDesign.hot)
                         .environment(\.layoutDirection, .leftToRight)
-                    if let eta = live.etaText {
-                        Text(eta)
-                            .font(.khayt(12, relativeTo: .caption).monospacedDigit())
-                            .foregroundStyle(KhaytDesign.note)
-                    }
                 }
                 .padding(.top, 11)
+                // What a shop plans by: how long, and what time on the clock.
+                if let eta = live.etaLocalized, let done = live.finishesAt() {
+                    Text(String(format: L10n.tr("machines.left_until"), eta,
+                                done.formatted(date: .omitted, time: .shortened)))
+                        .font(.khayt(12.5, relativeTo: .caption).monospacedDigit())
+                        .foregroundStyle(KhaytDesign.note)
+                        .padding(.top, 7)
+                }
             }
             if mode == .printing, live.tempNozzle != nil || live.tempBed != nil {
                 HStack(spacing: 16) {

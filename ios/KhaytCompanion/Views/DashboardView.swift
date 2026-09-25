@@ -15,6 +15,7 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject private var settings: ConnectionSettings
     @EnvironmentObject private var api: KhaytAPIClient
+    @EnvironmentObject private var printers: LivePrinters
     @EnvironmentObject private var health: ConnectionHealth
     @EnvironmentObject private var ordersNav: OrdersNavigationState
 
@@ -62,6 +63,7 @@ struct DashboardView: View {
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await load() }
             .task { await load() }
+            .watchesPrinters(when: queue.contains { $0.status == "printing" && $0.machineId != nil })
             .sheet(isPresented: $showAddSpool) { AddSpoolSheet { Task { await load() } } }
             .sheet(isPresented: $showQuote) { QuoteSheet() }
             .sheet(isPresented: $showWaste) { LogWasteSheet() }
@@ -322,7 +324,7 @@ struct DashboardView: View {
         } else {
             VStack(spacing: 8) {
                 ForEach(laneJobs.prefix(5)) { order in
-                    JobCard(order: order, facts: facts[order.id], isUpdating: updatingId == order.id) {
+                    JobCard(order: order, facts: facts[order.id], live: printers.reading(for: order.machineId), isUpdating: updatingId == order.id) {
                         Task { await advance(order) }
                     } onOpen: {
                         openOrder = order

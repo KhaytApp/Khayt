@@ -235,4 +235,45 @@ final class CloudSyncTests: XCTestCase {
         XCTAssertEqual(pushed, .readOnly)
         XCTAssertTrue(cloud.requests.isEmpty)
     }
+
+    // MARK: - Live printers
+
+    /// The snapshot opens with the shop's DEK in the store's own envelope, and
+    /// its age is the SERVER's `receivedAt`.
+    func testLivePrintersOpenWithTheShopsKey() async throws {
+        let plain: [String: JSONValue] = [
+            "v": .number(1), "at": .string("2026-09-25T10:15:02Z"),
+            "printers": .array([.object(["id": .string("m1"), "name": .string("X1C"),
+                                         "hasPrinterApi": .bool(true), "state": .string("Printing"),
+                                         "progress": .number(42), "lastUpdated": .number(1790331302000)])]),
+        ]
+        let blob = try SyncCrypto.seal(plain, dek: session.dek)
+        let body = try JSONEncoder().encode(["at": "2026-09-25T10:15:02Z", "receivedAt": "2026-09-25T10:15:03Z"])
+        var object = try JSONSerialization.jsonObject(with: body) as! [String: Any]
+        object["ciphertext"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(blob))
+        let reply = try JSONSerialization.data(withJSONObject: object)
+
+        var s = CloudSync(book: book, engine: engine)
+        s.fetch = { request in
+            XCTAssertTrue(request.url!.path.hasSuffix("/live/printers"))
+            return (reply, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        let fetched = try await s.livePrinters(session)
+        let snap = try XCTUnwrap(fetched)
+        XCTAssertEqual(snap.source, .cloud)
+        XCTAssertEqual(snap.printers.first?.progress, 42)
+        XCTAssertEqual(snap.reportedAt, ISO8601DateFormatter().date(from: "2026-09-25T10:15:03Z"))
+    }
+
+    /// Never published is a 404, and the phone says "not published" rather
+    /// than showing a shop with no printers.
+    func testLivePrintersNeverPublishedIsNil() async throws {
+        var s = CloudSync(book: book, engine: engine)
+        s.fetch = { request in
+            (Data(#"{"error":"No printer status published"}"#.utf8),
+             HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!)
+        }
+        let snap = try await s.livePrinters(session)
+        XCTAssertNil(snap)
+    }
 }

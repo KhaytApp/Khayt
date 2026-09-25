@@ -8,6 +8,7 @@ import SwiftUI
 /// holding a job is the Mac's.
 struct OrderDetailPage: View {
     @EnvironmentObject private var api: KhaytAPIClient
+    @EnvironmentObject private var printers: LivePrinters
 
     @State private var order: QueueOrder
     let facts: OrderFacts?
@@ -27,7 +28,9 @@ struct OrderDetailPage: View {
 
     var body: some View {
         ScrollView {
-            OrderDetailContent(order: order, facts: facts, isUpdating: isUpdating, machines: machines,
+            OrderDetailContent(order: order, facts: facts,
+                               live: order.status == "printing" ? printers.reading(for: order.machineId) : nil,
+                               isUpdating: isUpdating, machines: machines,
                                errorMessage: errorMessage,
                                onAdvance: { Task { await advance() } },
                                onSetStatus: { st in Task { await setStatus(st) } },
@@ -52,6 +55,7 @@ struct OrderDetailPage: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .task { machines = (try? await api.fetchMachines()) ?? [] }
+        .watchesPrinters(when: order.status == "printing" && order.machineId != nil)
     }
 
     private func advance() async {
@@ -109,6 +113,8 @@ struct OrderDetailPage: View {
 struct OrderDetailContent: View {
     let order: QueueOrder
     var facts: OrderFacts? = nil
+    /// The printer's live reading, while this job is printing on it.
+    var live: MachineLiveStatus? = nil
     let isUpdating: Bool
     var machines: [MachineInfo] = []
     var errorMessage: String? = nil
@@ -165,6 +171,9 @@ struct OrderDetailContent: View {
                 .font(.khayt(14.5, relativeTo: .subheadline))
                 .foregroundStyle(KhaytDesign.note)
                 .padding(.top, 6)
+            if let live, live.isPrinting, let progress = live.progress {
+                printProgress(live, progress)
+            }
         }
         .padding(.vertical, 16).padding(.leading, 19).padding(.trailing, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -176,6 +185,38 @@ struct OrderDetailContent: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+    }
+
+    /// The design's print progress: the figure, a bar, and how long is left —
+    /// or, for a print that has only just started, that there is no estimate
+    /// yet. "— left" would be the same lie as a zero, one step quieter.
+    private func printProgress(_ live: MachineLiveStatus, _ progress: Int) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(L10n.tr("order.detail.print_progress").uppercased())
+                    .font(.khayt(10.5, .bold, relativeTo: .caption2))
+                    .tracking(1.05)
+                    .foregroundStyle(KhaytDesign.note)
+                Spacer()
+                Text("\(progress)%")
+                    .font(.khayt(17, .semibold, relativeTo: .headline).monospacedDigit())
+                    .foregroundStyle(KhaytDesign.hot)
+                    .environment(\.layoutDirection, .leftToRight)
+            }
+            LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.hot, height: 7)
+                .animation(.easeOut(duration: 0.45), value: progress)
+            if let eta = live.etaLocalized, let done = live.finishesAt() {
+                Text(String(format: L10n.tr("machines.left_until"), eta,
+                            done.formatted(date: .omitted, time: .shortened)))
+                    .font(.khayt(12.5, relativeTo: .footnote).monospacedDigit())
+                    .foregroundStyle(KhaytDesign.note)
+            } else {
+                Text(L10n.tr("order.detail.no_estimate"))
+                    .font(.khayt(12.5, relativeTo: .footnote))
+                    .foregroundStyle(KhaytDesign.note)
+            }
+        }
+        .padding(.top, 18)
     }
 
     /// Due, Filament, Quantity, Printer, Client — the design's five, less any

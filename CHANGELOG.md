@@ -29,6 +29,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   what the Mac already holds; asking it never polls a printer.
 
 
+- **(iOS) Printers are tracked live.** While a screen that shows a printer is
+  open — Machines, a printing job on Home or in Orders, or that job's page —
+  the phone asks the shop what its machines are doing every four seconds: the
+  progress bar moves, the temperatures change, and the time left is said in
+  the reader's language along with the clock time it will finish. Nothing is
+  asked with the app in the background or no such screen open. When the
+  machine or the Mac does not answer, the screens go back to the book's last
+  status and say so, rather than leaving a bar frozen mid-print. (Live
+  readings come from `/api/machines/live`: the Electron desktop serves it;
+  the native Mac is being taught to.) Away from the shop, the same screens
+  read the printers through Khayt Cloud, which relays what the Mac publishes,
+  sealed with the shop's key. A relayed status the Mac stopped updating more
+  than two minutes ago is not shown as live: the screen says when the Mac last
+  reported instead.
 
 - **Cloud sync stops retrying what retrying cannot fix, and says why.** When
   Khayt Cloud refuses for a reason that will not pass on its own (this version

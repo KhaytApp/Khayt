@@ -89,6 +89,43 @@ struct CloudSync {
         CloudReader.Connection(url: s.url, shopId: s.shopId, storedToken: "")
     }
 
+    // MARK: - Live printers
+
+    /// The printers' latest status as the Mac published it to Khayt Cloud
+    /// (`GET /v1/shops/{id}/live/printers`, "Live channel & live printers" in
+    /// khayt-cloud's `docs/api-contract.md`).
+    ///
+    /// Sealed with the shop's DEK in the store's own envelope, so it opens
+    /// with the store's own `SyncCrypto` — no second cipher on this phone.
+    /// `receivedAt` is the SERVER's clock: how stale a snapshot is does not
+    /// depend on whether the Mac's clock is right.
+    ///
+    /// Nil when the Mac has never published (404) — the contract promises a
+    /// 404 there, never an empty list, and an empty list would read as a shop
+    /// with no printers.
+    func livePrinters(_ session: CloudSession) async throws -> LiveSnapshot? {
+        let request = try CloudReader.request(connection(session), token: session.token,
+                                              method: "GET", tail: "/live/printers")
+        let (data, response) = try await fetch(request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if status == 404 { return nil }
+        guard status == 200 else { throw URLError(.badServerResponse) }
+
+        struct Envelope: Decodable {
+            let at: String?
+            let receivedAt: String
+            let ciphertext: SyncCrypto.Blob
+        }
+        struct Plain: Decodable {
+            let printers: [MachineLiveStatus]
+        }
+        let envelope = try JSONDecoder().decode(Envelope.self, from: data)
+        let plain = try SyncCrypto.openStore(envelope.ciphertext, dek: session.dek)
+        let snapshot = try JSONDecoder().decode(Plain.self, from: plain)
+        let received = ISO8601DateFormatter().date(from: envelope.receivedAt)
+        return LiveSnapshot(printers: snapshot.printers, source: .cloud, reportedAt: received)
+    }
+
     // MARK: - Pulling
 
     func pull(_ session: CloudSession, now: Date = Date()) async throws -> (CloudSession, Pulled) {
