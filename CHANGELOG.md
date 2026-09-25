@@ -3773,6 +3773,33 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.49] - 2026-09-25
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+What you delete on the Mac stays deleted after the cloud syncs, and the Web
+Store button is where you can reach it.
+
+### Fixed
+
+- **(Mac) Something deleted on the Mac stays deleted after the cloud syncs.**
+  Reported by the shop: "I delete stuff on mac but that is never reflected on
+  cloud, instead I am forced to copy cloud". The desktop writes a deletion
+  marker (a tombstone) for every record a save removes, and the Mac wrote none.
+  So the merge the Mac runs before every send found the record still in the
+  cloud's copy, with nothing saying it had been deleted, and put it back. Every
+  write the Mac makes now leaves one for each record it removes. That covers
+  products, jobs, customers, spools, library files and the rest, carrying the
+  deleted revision as the desktop does. A merge from the cloud or a phone
+  leaves none of its own. Something deleted before this update and since
+  brought back by a sync needs deleting once more.
+
+- **(Mac) The Web Store and Online Orders buttons are on the Catalogue
+  screen.** Both were added only to the old window toolbar, which the current
+  window does not draw, so neither could be reached. Reported by the shop:
+  "there is no webstore".
+
 ## [4.0.0-alpha.48] - 2026-09-25
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
