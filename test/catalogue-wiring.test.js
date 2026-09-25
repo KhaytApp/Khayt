@@ -55,7 +55,10 @@ test('the catalog grid says which listings show no real photo', () => {
 
 test('the storefront publishes the labelled photos, not just one', () => {
   const src = read('renderer/settings.js');
-  const build = src.slice(src.indexOf('const buildCatalog = '), src.indexOf('#storeCopy'));
+  // The payload is built in lib/storefront-catalog.js now (the Mac publishes
+  // through it too); the dialog's own part is reading the heroes off disk.
+  const build = read('lib/storefront-catalog.js');
+  const dialog = src.slice(src.indexOf('const buildCatalog = '), src.indexOf('#storeCopy'));
   assert.match(build, /KhaytProductImages\.storefrontPhotos\(p, \{/,
     'the storefront asks the module, so the selection is testable rather than sealed in a modal');
   assert.match(build, /it\.photos = photos/, 'more than one picture reaches the storefront');
@@ -63,7 +66,7 @@ test('the storefront publishes the labelled photos, not just one', () => {
    * grid thumbnail as its product-page picture again — which is what it did,
    * and which looks like a working publish. */
   assert.match(build, /hero: \(img\) =>/, 'the publish must offer the full-size picture');
-  assert.match(build, /await loadHeroPhotos\(pubProducts\)/,
+  assert.match(dialog, /await loadHeroPhotos\(pubProducts\)/,
     'and must have read them off disk first');
   const publish = src.slice(src.indexOf("'#storePublish'"), src.indexOf("'#storeUnpublish'"));
   assert.match(publish, /await buildCatalog\(/,

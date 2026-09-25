@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Maintainers) The storefront catalogue is built in one place.** The
+  payload a shop publishes to its online store was assembled inside the
+  desktop's Storefront dialog, so the native Mac app could not publish at all
+  without a second builder in Swift that would drift. It is
+  `lib/storefront-catalog.js` now (`KhaytStorefrontCatalog.build`); the
+  desktop calls it, and was checked byte-for-byte against the old builder,
+  with and without photos, when it moved. Each host supplies only the shop's
+  name, the interface language and its resized hero pictures.
+
 - **(Mac) Opening and leaving the library no longer freezes the window.**
   Reported by the shop: "there is a lag when choosing the library or leaving
   it". Measured on the shop's own 247-model book: about a second each way,

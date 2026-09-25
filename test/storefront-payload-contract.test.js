@@ -25,6 +25,9 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const SETTINGS = fs.readFileSync(path.join(ROOT, 'renderer', 'settings.js'), 'utf8');
+// The catalogue payload is built in lib/storefront-catalog.js, which the
+// native Mac app publishes through as well; the rules below pin that builder.
+const BUILDER = fs.readFileSync(path.join(ROOT, 'lib', 'storefront-catalog.js'), 'utf8');
 const STOREFRONT = path.join(ROOT, 'khayt-cloud', 'mobile', 'storefront.js');
 
 /** Fields the publish payload carries that the page has to understand. */
@@ -37,7 +40,7 @@ const CONTRACT = {
 };
 
 test('the publish payload still carries every field the storefront needs', () => {
-  const build = SETTINGS.slice(SETTINGS.indexOf('const buildCatalog = '), SETTINGS.indexOf('#storeCopy'));
+  const build = BUILDER;
   for (const [field, re] of Object.entries(CONTRACT)) {
     assert.match(build, re, `the catalogue publish must send ${field}`);
   }
@@ -53,7 +56,7 @@ test('`photo` still exists for older pages, derived rather than duplicated', () 
    * The page-side half of this contract is asserted below: storefront.js reads
    * `photos` first and `photo` only as a fallback, so a stored catalogue with
    * both keeps rendering either way. */
-  const build = SETTINGS.slice(SETTINGS.indexOf('const buildCatalog = '), SETTINGS.indexOf('#storeCopy'));
+  const build = BUILDER;
   assert.equal(/it\.photo\s*=/.test(build), false, 'the app must not send the duplicate');
 
   const php = path.join(ROOT, 'khayt-cloud', 'index.php');
@@ -73,7 +76,7 @@ test('a published item is priced from the catalogue, not from a second form', ()
    * Reported as: "the price should be from the catalogue, I just want to sync
    * the catalogue, I don't want to enter the info again."
    */
-  const build = SETTINGS.slice(SETTINGS.indexOf('const buildCatalog = '), SETTINGS.indexOf('#storeCopy'));
+  const build = BUILDER;
   assert.match(build, /p\.price != null \? p\.price : p\.basePrice/,
     'the catalogue price is the default; a storefront entry is only an override');
   // `!= null`, never a truthy test: 0 is a price. A giveaway or a sample priced
@@ -118,7 +121,7 @@ test('a batch count of zero survives every hop, because zero is a state', () => 
    * pinned here rather than trusted to review: the app's publish, the server's
    * whitelist, and the feed the storefront actually reads.
    */
-  const build = SETTINGS.slice(SETTINGS.indexOf('const buildCatalog = '), SETTINGS.indexOf('#storeCopy'));
+  const build = BUILDER;
   assert.match(build, /sf\.stockQty\[p\.id\] != null/,
     'a truthy check would publish a sold-out batch as made to order');
 
@@ -144,7 +147,7 @@ test('the count and the moment it was taken travel together', () => {
    * NOT re-date one it did not: opening this dialog to edit a price would
    * otherwise re-assert every count and undo the sales in between.
    */
-  const build = SETTINGS.slice(SETTINGS.indexOf('const buildCatalog = '), SETTINGS.indexOf('#storeCopy'));
+  const build = BUILDER;
   assert.match(build, /it\.stockCountedAt = sf\.stockCountedAt\[p\.id\]/,
     'a count with no date cannot be told from one the shop never re-took');
 
