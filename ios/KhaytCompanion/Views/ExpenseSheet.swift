@@ -29,69 +29,85 @@ struct ExpenseSheet: View {
     // appears in a report.
     private let categories = ["filament", "resin", "parts", "tools", "rent", "power", "shipping", "other"]
 
+    private var canSave: Bool { (Double(amount.trimmingCharacters(in: .whitespaces)) ?? 0) > 0 }
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section(L10n.tr("exp.what")) {
-                    HStack {
-                        Text(L10n.tr("exp.amount"))
-                        Spacer()
-                        TextField("0.00", text: $amount)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(maxWidth: 120)
-                    }
-                    Picker(L10n.tr("exp.category"), selection: $category) {
-                        ForEach(categories, id: \.self) { Text(L10n.tr("exp.cat.\($0)")).tag($0) }
-                    }
-                    TextField(L10n.tr("exp.note"), text: $note, axis: .vertical)
-                        .lineLimit(1...3)
-                }
-
-                Section(L10n.tr("exp.receipt")) {
-                    if let receipt {
-                        Image(uiImage: receipt)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: 220)
-                            .clipShape(RoundedRectangle(cornerRadius: KhaytDesign.radiusLG))
-                        Button(L10n.tr("exp.retake"), role: .destructive) { self.receipt = nil }
-                    } else if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                        Button {
-                            showCamera = true
-                        } label: {
-                            Label(L10n.tr("exp.photograph"), systemImage: "camera.fill")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    V2FieldCard {
+                        V2Field(label: L10n.tr("exp.amount")) {
+                            TextField("", text: $amount, prompt: Text(verbatim: "0.00"))
+                                .keyboardType(.decimalPad)
+                                .font(.khayt(26, .semibold, relativeTo: .title).monospacedDigit())
                         }
-                    } else {
-                        // The simulator, and any device without a camera. An
-                        // expense with no receipt is still worth recording.
-                        Text(L10n.tr("exp.no_camera"))
-                            .font(.system(size: 13))
-                            .foregroundStyle(KhaytDesign.textMuted)
+                        V2Field(label: L10n.tr("exp.category")) {
+                            V2Chips(options: categories, selection: $category) { L10n.tr("exp.cat.\($0)") }
+                                .padding(.vertical, 4)
+                        }
+                        V2Field(label: L10n.tr("exp.note"), last: true) {
+                            TextField("", text: $note, axis: .vertical)
+                                .lineLimit(1...3)
+                        }
                     }
-                }
-
-                if let error {
-                    Section {
-                        Text(error)
-                            .font(.system(size: 13))
-                            .foregroundStyle(KhaytDesign.danger)
+                    receiptCard
+                    if let error {
+                        V2Note(text: error, tone: KhaytDesign.late)
                     }
+                    V2PrimaryButton(title: L10n.tr("exp.save"), busy: isSaving, disabled: !canSave) {
+                        Task { await save() }
+                    }
+                    .padding(.top, 4)
                 }
+                .padding(16)
             }
-            .khaytForm()
+            .scrollDismissesKeyboard(.interactively)
+            .background(KhaytDesign.ground.ignoresSafeArea())
             .navigationTitle(L10n.tr("exp.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.tr("common.close")) { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.tr("exp.save")) { Task { await save() } }
-                        .disabled(isSaving || (Double(amount.trimmingCharacters(in: .whitespaces)) ?? 0) <= 0)
-                }
             }
             .sheet(isPresented: $showCamera) { LabelCameraPicker(image: $receipt) }
+        }
+    }
+
+    @ViewBuilder
+    private var receiptCard: some View {
+        if let receipt {
+            VStack(spacing: 0) {
+                Image(uiImage: receipt)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 220)
+                    .frame(maxWidth: .infinity)
+                    .padding(12)
+                Button(role: .destructive) { self.receipt = nil } label: {
+                    Text(L10n.tr("exp.retake"))
+                        .font(.khayt(14.5, .medium, relativeTo: .subheadline))
+                        .foregroundStyle(KhaytDesign.late)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .overlay(alignment: .top) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
+                }
+                .buttonStyle(.plain)
+            }
+            .card()
+        } else if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            Button { showCamera = true } label: {
+                Label(L10n.tr("exp.photograph"), systemImage: "camera")
+                    .font(.khayt(15.5, .semibold, relativeTo: .body))
+                    .foregroundStyle(KhaytDesign.brand)
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .background(KhaytDesign.brand.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(KhaytDesign.brand, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+        } else {
+            // The simulator, and any device without a camera. An expense with
+            // no receipt is still worth recording.
+            V2Note(text: L10n.tr("exp.no_camera"))
         }
     }
 
