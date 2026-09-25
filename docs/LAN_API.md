@@ -572,9 +572,22 @@ Machine list glance. **Requires owner PIN.**
 
 ### `GET /api/machines/live`
 
-Live printer telemetry from desktop API polling (OctoPrint, Moonraker, PrusaLink, Bambu). **Requires owner PIN.**
+> **Served by both apps.** `lib/lan-server.js` and the native Mac's
+> `LanServer.swift` (since Sep 2026) answer the same shape; the Mac builds it
+> from `PrinterWatch.readings` in memory, so a request never polls a printer.
 
-**Response 200** — array per machine with `state`, `progress`, `tempNozzle`, `tempBed`, `timeRemaining`, `filename`, `error`, `lastUpdated`.
+Live printer telemetry from the app's own printer polling (OctoPrint, Moonraker, PrusaLink, Bambu, …). **Requires owner PIN.** Cheap enough for a phone to poll every few seconds.
+
+**Response 200** — one entry per `store.machines` row:
+
+```json
+[{ "id": "M-1", "name": "U1", "hasPrinterApi": true,
+   "state": "printing", "progress": 42, "filename": "dragon.gcode",
+   "timeRemaining": 3600, "tempNozzle": 215, "tempBed": 59,
+   "error": null, "lastUpdated": "2026-09-25T04:20:00.000Z", "apiType": "moonraker" }]
+```
+
+`progress`, `timeRemaining` (seconds) and the temperatures are rounded integers. A machine never heard from has its `id`, `name` and `hasPrinterApi`, and `null` for the rest.
 
 ### `POST /api/webhook/salla` and `POST /api/webhook/zid`
 

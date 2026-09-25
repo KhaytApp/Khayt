@@ -75,8 +75,10 @@ struct LanEndpointsTests {
         defer { bench.stop() }
         let reply = try await bench.get("/api/definitely-not-a-route")
         #expect(reply.status == 404)
+        // As whole entries: `/api/machines/live` IS served here, and it must
+        // not read as the other app's `/api/machines` by sharing a prefix.
         for route in foreign {
-            #expect(!reply.text.contains(route),
+            #expect(!reply.text.contains("\"" + route + "\""),
                     Comment(rawValue: "the 404 body still names \(route)"))
         }
         // It still says what IS here — an empty list would pass every check above.
