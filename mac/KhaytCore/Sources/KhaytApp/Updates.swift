@@ -56,18 +56,29 @@ final class Updates {
         guard ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"] == nil else { return }
 
         let controller = SPUStandardUpdaterController(startingUpdater: false,
-                                                      updaterDelegate: nil,
+                                                      updaterDelegate: launchProbe,
                                                       userDriverDelegate: nil)
+        // Never install without asking — see the note on `checksAutomatically`.
+        controller.updater.automaticallyDownloadsUpdates = false
         do {
             try controller.updater.start()
             self.controller = controller
-            // AT LAUNCH, as well as on Sparkle's hourly schedule — when the
-            // shop has left automatic checks on. Sparkle's own scheduler waits
-            // out the interval from the LAST check, so a Mac opened each
-            // morning could run yesterday's build until lunchtime. In the
-            // background: a found update is offered, nothing interrupts.
+            // ── AT LAUNCH: ASK, AND OFFER WHAT IS FOUND ───────────────────
+            //
+            // The shop (Sep 2026): "the app should check for updates at launch
+            // and offer the user to update if an update exists". It did check
+            // — `checkForUpdatesInBackground` — but with "install
+            // automatically" on (as this shop's Mac has it), Sparkle's
+            // background check downloads SILENTLY and installs on quit, and
+            // nothing is ever offered. So launch PROBES instead
+            // (`checkForUpdateInformation`, no UI), and only when it finds a
+            // version does it open the standard offer — once the probe's cycle
+            // has ended, since Sparkle ignores a check while one is running.
+            // Nothing new: nothing shown, not a "you're up to date" every
+            // launch. Sparkle's hourly schedule carries on as it was.
             if controller.updater.automaticallyChecksForUpdates {
-                controller.updater.checkForUpdatesInBackground()
+                launchProbe.armed = true
+                controller.updater.checkForUpdateInformation()
             }
         } catch {
             // A shop cannot act on this and the app works without it, so it is
@@ -77,6 +88,9 @@ final class Updates {
                 "updates: Sparkle would not start — \(error.localizedDescription)\n".utf8))
         }
     }
+
+    /// The launch probe's delegate — see `init`.
+    private let launchProbe = LaunchProbe()
 
     /// Can this build check at all? Drives whether the menu item is enabled,
     /// so a local build says so by being greyed out rather than by failing.
@@ -91,33 +105,29 @@ final class Updates {
         set { controller?.updater.automaticallyChecksForUpdates = newValue }
     }
 
-    /// Whether a found update is downloaded and installed on quit without
-    /// asking. Off unless the shop turns it on.
-    var installsAutomatically: Bool {
-        get { controller?.updater.automaticallyDownloadsUpdates ?? false }
-        set { controller?.updater.automaticallyDownloadsUpdates = newValue }
-    }
+    // NO "install automatically". The shop (Sep 2026): "should never auto
+    // update, should always ask for permission". Sparkle is told so twice:
+    // `SUAllowsAutomaticUpdates` is NO in the bundle (make-app.sh), which makes
+    // it refuse silent installs whatever a Mac has stored, and the stored
+    // setting is switched off at every launch below, for a Mac that had it on.
 }
 
-/// The two switches, in Settings → App Preferences → On this Mac.
+/// The switch, in Settings → App Preferences → On this Mac.
 ///
 /// This Mac's choice, applied the moment it is flipped — not part of the pane's
 /// Save, which writes the shop's book to every device.
 struct UpdateToggles: View {
     let shop: Shop
     @State private var checks = Updates.shared.checksAutomatically
-    @State private var installs = Updates.shared.installsAutomatically
 
     var body: some View {
         Toggle(shop.words.callIt("mac.updates_auto_check"), isOn: $checks)
             .disabled(!Updates.shared.isAvailable)
-            .onChange(of: checks) { _, on in
-                Updates.shared.checksAutomatically = on
-                if !on { installs = false }
-            }
-        Toggle(shop.words.callIt("mac.updates_auto_install"), isOn: $installs)
-            .disabled(!Updates.shared.isAvailable || !checks)
-            .onChange(of: installs) { _, on in Updates.shared.installsAutomatically = on }
+            .onChange(of: checks) { _, on in Updates.shared.checksAutomatically = on }
+        // Said, because the switch that installed silently is gone: the app
+        // asks before every update.
+        Text(shop.words.callIt("mac.updates_always_ask"))
+            .font(.caption).foregroundStyle(.secondary)
         if !Updates.shared.isAvailable {
             // A local build has no feed; say so rather than show dead switches.
             Text(shop.words.callIt("mac.updates_unavailable"))
@@ -139,5 +149,28 @@ struct CheckForUpdatesCommand: View {
             Updates.shared.checkForUpdates()
         }
         .disabled(!Updates.shared.isAvailable)
+    }
+}
+
+/// Hears the launch probe, and opens the offer when it found a version.
+final class LaunchProbe: NSObject, SPUUpdaterDelegate {
+    /// Only the probe made at launch opens the offer; Sparkle's own scheduled
+    /// checks keep their own behaviour.
+    @MainActor var armed = false
+    @MainActor private var found = false
+
+    nonisolated func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        MainActor.assumeIsolated { if armed { found = true } }
+    }
+
+    nonisolated func updater(_ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: (any Error)?) {
+        MainActor.assumeIsolated {
+            guard armed, updateCheck == .updateInformation else { return }
+            armed = false
+            guard found else { return }
+            found = false
+            // The next run-loop turn: the probe's session has ended by then.
+            DispatchQueue.main.async { updater.checkForUpdates() }
+        }
     }
 }

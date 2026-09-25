@@ -457,7 +457,10 @@ if [ -n "${KHAYT_APPCAST:-}" ] && [ "$SPARKLE_EMBEDDED" = "1" ]; then
        one hour, and the app also looks once at every launch (Updates.swift).
        A shop can turn it off in Settings → App Preferences → On this Mac. -->
   <key>SUEnableAutomaticChecks</key><true/>
-  <key>SUScheduledCheckInterval</key><integer>3600</integer>"
+  <key>SUScheduledCheckInterval</key><integer>3600</integer>
+  <!-- NEVER installed without asking (the shop, Sep 2026). NO here makes
+       Sparkle refuse automatic installs whatever this Mac's defaults say. -->
+  <key>SUAllowsAutomaticUpdates</key><false/>"
 fi
 
 cat > "$APP/Contents/Info.plist" <<PLIST

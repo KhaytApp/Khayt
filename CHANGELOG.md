@@ -11,6 +11,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   every two seconds), and a heartbeat every 45 seconds when nothing does, so
   the phone can tell an idle shop from a Mac that is off. A viewer's account
   never publishes.
+- **(Mac) Khayt offers each update, and never installs one on its own.**
+  Asked for by the shop: "the app should check for updates at launch and
+  offer the user to update" — and "it should never auto update, it should
+  always ask for permission". At every launch Khayt looks for a new version
+  and, when there is one, shows the offer; nothing is shown when it is up to
+  date. It used to check, but on a Mac with "install automatically" on it
+  downloaded the update silently and installed it on quit. That switch is
+  gone, the setting is turned off at launch, and the app is built so the
+  updater refuses to install anything unasked.
 
 - **(Mac) The phone can follow live prints against the Mac app.** The Mac's
   network server now answers `GET /api/machines/live` — every machine with
