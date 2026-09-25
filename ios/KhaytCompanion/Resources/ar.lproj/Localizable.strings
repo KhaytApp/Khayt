@@ -531,3 +531,6 @@
 "machines.not_published" = "لم ينشر الماك حالة طابعاته على Khayt Cloud بعد.";
 "machines.via_cloud" = "عبر Khayt Cloud";
 "machines.reported" = "آخر تقرير من الماك %@.";
+"cloud.signed_out" = "سُجّل خروج هذا الهاتف من Khayt Cloud — من قائمة أجهزة الورشة على الأرجح. سجّل الدخول مجدداً لتستمر المزامنة بعيداً عن الورشة.";
+"cloud.sign_in_again" = "سجّل الدخول مجدداً";
+"cloud.busy" = "Khayt Cloud مشغول. سيحاول الهاتف مجدداً بعد قليل.";

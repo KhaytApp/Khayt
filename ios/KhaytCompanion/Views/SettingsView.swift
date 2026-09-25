@@ -309,6 +309,15 @@ struct SettingsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
                 }
+                if api.cloudNeedsSignIn {
+                    Button { showCloudSignIn = true } label: {
+                        settingRow(L10n.tr("cloud.sign_in_again")) {
+                            Image(systemName: "chevron.forward").font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(KhaytDesign.brand)
+                    }
+                    .buttonStyle(.plain)
+                }
                 Button {
                     Task {
                         cloudSyncing = true

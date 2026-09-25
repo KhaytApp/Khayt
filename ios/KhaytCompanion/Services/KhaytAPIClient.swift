@@ -37,6 +37,11 @@ final class KhaytAPIClient: ObservableObject {
     @Published private(set) var lastSync: SyncMark?
     /// Why the last cloud sync did not finish, in a sentence, or nil.
     @Published private(set) var cloudProblem: String?
+    /// Khayt Cloud has refused this phone's token — revoked from the shop's
+    /// device list, most often, which the cloud answers with the same plain
+    /// 401 as any bad token (khayt-cloud `docs/api-contract.md`). Nothing but
+    /// signing in again fixes it, so Settings offers exactly that.
+    @Published private(set) var cloudNeedsSignIn = false
 
     struct SyncMark: Equatable {
         enum Route: Equatable { case mac, cloud }
@@ -407,12 +412,31 @@ final class KhaytAPIClient: ObservableObject {
             cloud = next
             lastSync = SyncMark(route: .cloud, at: Date())
             cloudProblem = pushed == .needsTheMac ? L10n.tr("cloud.needs_mac") : nil
+            cloudNeedsSignIn = false
             await refreshPendingCount()
             return pushed
+        } catch CloudReader.Failure.unauthorised {
+            cloudNeedsSignIn = true
+            cloudProblem = L10n.tr("cloud.signed_out")
+            return nil
+        } catch CloudReader.Failure.http(429, _) {
+            // Back off and try again — never "signed out".
+            cloudProblem = L10n.tr("cloud.busy")
+            return nil
         } catch {
-            cloudProblem = error.localizedDescription
+            cloudProblem = Self.say(error)
             return nil
         }
+    }
+
+    /// An error as a sentence. `CloudReader.Failure` explains itself through
+    /// `description`, and `localizedDescription` ignores that: the screen said
+    /// "The operation couldn't be completed. (KhaytCore.CloudReader.Failure
+    /// error 4.)", which named neither the status code nor the reason.
+    nonisolated static func say(_ error: Error) -> String {
+        if error is LocalizedError { return error.localizedDescription }
+        if let told = error as? CustomStringConvertible { return told.description }
+        return error.localizedDescription
     }
 
     /// Sign this phone in to the shop's cloud, and take its first pull.
@@ -423,6 +447,8 @@ final class KhaytAPIClient: ObservableObject {
                                                  passphrase: passphrase, engine: engine)
         session.save()
         cloud = session
+        cloudNeedsSignIn = false
+        cloudProblem = nil
         await syncThroughCloud()
     }
 
@@ -430,6 +456,7 @@ final class KhaytAPIClient: ObservableObject {
         CloudSession.forget()
         cloud = nil
         cloudProblem = nil
+        cloudNeedsSignIn = false
         if lastSync?.route == .cloud { lastSync = nil }
     }
 
