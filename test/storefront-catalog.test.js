@@ -81,3 +81,33 @@ test('the desktop publishes through the module, and both pages load it', () => {
       /<script src="\.\.\/lib\/storefront-catalog\.js"><\/script>/, html);
   }
 });
+
+test('a product the shop hides is not published, and does not cost a real one its place', () => {
+  const many = Array.from({ length: 61 }, (_, i) => ({ id: 'p' + i, nameEn: 'P' + i }));
+  many[0].storefrontHidden = true;
+  const out = SC.build({ settings: settings(), products: many });
+  assert.equal(out.items.length, 60);
+  assert.equal(out.items.some((i) => i.id === 'p0'), false);
+  assert.equal(out.items[59].id, 'p60');
+});
+
+test('review: what a customer would find wrong, per listing, hidden ones left out', () => {
+  const thumb = 'data:image/jpeg;base64,AAAA';
+  const good = { id: 'g', nameEn: 'Desk lamp', nameAr: 'مصباح مكتب', descriptionEn: 'A lamp', price: 10, category: 'Home',
+    images: [{ id: 'i', thumbnail: thumb, kind: 'print' }] };
+  const bad = { id: 'b', nameEn: 'Turtle_Articulated', nameAr: 'Turtle_Articulated' };
+  const run = { id: 'r', nameEn: 'Dragon', nameAr: 'AquaticFlexiDragon-U1', price: 5, category: 'Toys',
+    descriptionEn: 'x', images: [{ id: 'i', thumbnail: thumb, kind: 'render' }] };
+  const hidden = { id: 'h', nameEn: '3+color+AMS', storefrontHidden: true };
+  const r = SC.review([good, bad, run, hidden], settings(), 'en');
+  assert.equal(r.hidden, 1);
+  assert.deepEqual(r.listings.map((l) => l.id), ['b', 'r']);
+  assert.deepEqual(r.listings[0].issues, ['no_price', 'no_photo', 'no_description', 'no_category', 'second_language', 'file_name']);
+  assert.deepEqual(r.listings[1].issues, ['file_name']);
+});
+
+test('review: a storefront price or category counts, and 0 is a price', () => {
+  const p = { id: 'p', nameEn: 'Vase', nameAr: 'مزهرية', descriptionEn: 'd', price: 0, images: [{ id: 'i', thumbnail: 'data:image/png;base64,AA' }] };
+  const s = settings({ categories: { p: 'Home' } });
+  assert.deepEqual(SC.review([p], s, 'en').listings, []);
+});
