@@ -1309,10 +1309,9 @@ final class Words {
         "mac.mpl_not_net":      ["en": "What each job consumed — its filament, expenses filed against it, and the machine's servicing. Your labour, power and rent are in the Profit & Loss, not here.",
                                  "ar": "ما استهلكه كل عمل — خيطه، والمصروفات المسجّلة عليه، وصيانة الآلة. أما العمالة والكهرباء والإيجار فهي في الأرباح والخسائر، لا هنا."],
         "mac.check_updates": ["en": "Check for Updates…", "ar": "التحقق من التحديثات…"],
+        "mac.updates_always_ask": ["en": "Khayt looks for a new version when it opens and asks before installing it — never on its own.", "ar": "يبحث خيط عن إصدار جديد عند فتحه ويستأذنك قبل تثبيته — لا يثبّت شيئًا من تلقاء نفسه."],
         "mac.updates_auto_check": ["en": "Check for updates when Khayt opens, and every hour",
                                    "ar": "التحقق من التحديثات عند فتح خيط وكل ساعة"],
-        "mac.updates_auto_install": ["en": "Download updates and install them when Khayt quits",
-                                     "ar": "تنزيل التحديثات وتثبيتها عند إغلاق خيط"],
         "mac.updates_unavailable": ["en": "This build cannot update itself.",
                                     "ar": "هذه النسخة لا تستطيع تحديث نفسها."],
         // Counted, because "From 1 measured prints" is what a {n} placeholder
