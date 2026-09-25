@@ -326,14 +326,8 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         return dayFormatter.date(from: String(s.prefix(10)))
     }
 
-    /// A full ISO timestamp, with or without fractional seconds.
-    private static func instant(_ s: String) -> Date? {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: s) { return d }
-        f.formatOptions = [.withInternetDateTime]
-        return f.date(from: s)
-    }
+    /// A full ISO timestamp — the shared, made-once formatters.
+    private static func instant(_ s: String) -> Date? { Calendar.instant(s) }
 }
 
 /// The statuses Khayt uses, in the order a job moves through them.

@@ -1068,6 +1068,13 @@ final class Shop {
     /// read per model — the part before `<resources`, not the geometry — which
     /// is why this can run again on the next launch rather than needing a
     /// marker written into the book.
+    /// Should this record's slicer figures be (re)read? When it has none; or,
+    /// for a 3MF, when they were read before plates were read one by one.
+    nonisolated static func slicerFiguresDue(_ parsed: JSONValue?, ext: String) -> Bool {
+        guard case .object(let o)? = parsed, !o.isEmpty else { return true }
+        return ext == "3mf" && o["platesRead"] == nil
+    }
+
     /// The books whose linked folders this launch has already rescanned.
     private var linkedScannedBooks: Set<String> = []
 
@@ -1099,18 +1106,25 @@ final class Shop {
         guard case .store(let build) = source, let engine,
               !slicerFiguresReadBooks.contains(build.rawValue) else { return }
         slicerFiguresReadBooks.insert(build.rawValue)
-        let due: [(id: String, url: URL)] = files.compactMap { file in
-            guard case .object(let rec)? = row(for: file.id),
-                  { if case .object(let o)? = rec["parsed"] { return o.isEmpty } else { return true } }(),
-                  let url = modelFile(for: file),
-                  ["3mf", "gcode", "gco"].contains(url.pathExtension.lowercased()) else { return nil }
-            return (file.id, url)
+        let due: [(id: String, url: URL, ext: String)] = files.compactMap { file in
+            guard case .object(let rec)? = row(for: file.id), let url = modelFile(for: file) else { return nil }
+            let ext = url.pathExtension.lowercased()
+            guard ["3mf", "gcode", "gco"].contains(ext) else { return nil }
+            // Empty, or a 3MF read before plates were read one by one (its
+            // time was one plate's and its grams every plate's).
+            guard Self.slicerFiguresDue(rec["parsed"], ext: ext) else { return nil }
+            return (file.id, url, ext)
         }
         guard !due.isEmpty else { return }
         Task { [weak self] in
             var found: [String: [String: JSONValue]] = [:]
+            let extOf = Dictionary(due.map { ($0.id, $0.ext) }, uniquingKeysWith: { a, _ in a })
             for item in due {
                 if let parsed = await SlicerFigures.read(item.url, engine: engine) { found[item.id] = parsed }
+                // Nothing read (an unsliced 3MF, or a file this reader cannot
+                // open): only the mark, so it is not opened again every launch
+                // — merged below, so figures already there are KEPT.
+                else if item.ext == "3mf" { found[item.id] = ["platesRead": .bool(true)] }
             }
             guard let self, !found.isEmpty else { return }
             do {
@@ -1119,8 +1133,18 @@ final class Shop {
                     for i in rows.indices {
                         guard case .object(var r) = rows[i], case .string(let id)? = r["id"],
                               let parsed = found[id] else { continue }
-                        if case .object(let now)? = r["parsed"], !now.isEmpty { continue }
-                        r["parsed"] = .object(parsed)
+                        guard Self.slicerFiguresDue(r["parsed"], ext: extOf[id] ?? "") else { continue }
+                        // MERGED, never replaced. A re-read that found figures
+                        // wins where it has them; one that found nothing adds
+                        // only its mark. Keys this reader does not write (a
+                        // cost another app recorded) stay as they were.
+                        var merged: [String: JSONValue] = [:]
+                        if case .object(let had)? = r["parsed"] { merged = had }
+                        let readSomething = (Self.plainNumber(parsed["printTimeMins"]) ?? 0) > 0
+                            || (Self.plainNumber(parsed["filamentGrams"]) ?? 0) > 0
+                        if readSomething { for (k, v) in parsed { merged[k] = v } }
+                        else { merged["platesRead"] = .bool(true) }
+                        r["parsed"] = .object(merged)
                         StoreWriter.stamp(&r)
                         rows[i] = .object(r)
                     }
@@ -2628,15 +2652,33 @@ final class Shop {
     /// not answer for leaves fields at zero, and a zero that looks typed is
     /// worse than a blank somebody was told about.
     func productFromFile(_ file: LibraryFile) async -> Product? {
-        guard let filled = await partFields(from: file) else { return nil }
+        // A MULTI-PLATE FILE is a part per plate, every plate to start with —
+        // the sheet's Plates row takes any of them off. "If it's a 3MF with
+        // multiple plates I should be able to pick which plate to price, all
+        // or specific ones" (the shop, Sep 2026).
+        let plateList = plates(of: file)
+        var parts: [JSONValue] = []
+        var note: String?
+        if plateList.isEmpty {
+            guard let filled = await partFields(from: file) else { return nil }
+            parts = [.object(filled.part)]
+            note = filled.note
+        } else {
+            for p in plateList {
+                guard let filled = await partFields(from: file, plate: p.index) else { continue }
+                parts.append(.object(filled.part))
+                if note == nil { note = filled.note }
+            }
+            guard !parts.isEmpty else { return nil }
+        }
         var product = newProduct()
         // The model's name in every language the catalogue carries — the same
         // name, because a model has one and a shop can correct it on the sheet.
         for key in await allLanguageKeys() {
             product.names[key.language] = file.title
         }
-        product.rest["parts"] = .array([.object(filled.part)])
-        productNote = filled.note
+        product.rest["parts"] = .array(parts)
+        productNote = note
         return product
     }
 
@@ -2654,10 +2696,52 @@ final class Shop {
     /// from the geometry rather than measurements, and which are still blank.
     /// The two are different claims and are said separately. Nil when the
     /// file answered for everything.
-    func partFields(from file: LibraryFile) async -> (part: [String: JSONValue], note: String?)? {
+    /// One plate of a sliced multi-plate 3MF, as the slicer recorded it.
+    struct Plate: Equatable, Sendable {
+        let index: Int
+        let minutes: Double
+        let grams: Double
+        let material: String
+    }
+
+    /// The plates a model's file carries — two or more, or none.
+    func plates(of file: LibraryFile) -> [Plate] {
+        guard case .object(let r)? = row(for: file.id), case .object(let parsed)? = r["parsed"],
+              case .array(let rows)? = parsed["plates"] else { return [] }
+        let out = rows.compactMap { v -> Plate? in
+            guard case .object(let o) = v, let i = Self.plainNumber(o["index"]) else { return nil }
+            return Plate(index: Int(i), minutes: Self.plainNumber(o["printTimeMins"]) ?? 0,
+                         grams: Self.plainNumber(o["filamentGrams"]) ?? 0,
+                         material: Self.plainString(o["filamentType"]) ?? "")
+        }
+        guard out.count > 1 else { return [] }
+        // Only while they add up to the file's own totals: a file re-read by
+        // the other app (totals rewritten, `plates` kept) or re-sliced since
+        // is priced as a whole rather than from plates that no longer match.
+        let mins = Self.plainNumber(parsed["printTimeMins"]) ?? 0
+        let grams = Self.plainNumber(parsed["filamentGrams"]) ?? 0
+        let sumMins = out.reduce(0) { $0 + $1.minutes }, sumGrams = out.reduce(0) { $0 + $1.grams }
+        guard abs(sumMins - mins) <= Double(out.count), abs(sumGrams - grams) <= Double(out.count) * 0.2 else { return [] }
+        return out
+    }
+
+    func partFields(from file: LibraryFile, plate: Int? = nil) async -> (part: [String: JSONValue], note: String?)? {
         productProblem = nil
-        guard let engine, let rec = row(for: file.id) else {
+        guard let engine, var rec = row(for: file.id) else {
             productProblem = words.callIt("mac.not_found"); return nil
+        }
+        // ONE PLATE: the record as the shared rule reads it, with that plate's
+        // own figures in place of the whole file's.
+        if let plate, let p = plates(of: file).first(where: { $0.index == plate }),
+           case .object(var r) = rec {
+            var parsed: [String: JSONValue] = [:]
+            if case .object(let o)? = r["parsed"] { parsed = o }
+            parsed["printTimeMins"] = .number(p.minutes)
+            parsed["filamentGrams"] = .number(p.grams)
+            if !p.material.isEmpty { parsed["filamentType"] = .string(p.material) }
+            parsed.removeValue(forKey: "plates")
+            r["parsed"] = .object(parsed)
+            rec = .object(r)
         }
         guard let patch = try? await engine.partFieldsFromFile(rec) else {
             productProblem = words.callIt("mac.product_from_file_failed"); return nil
@@ -2667,6 +2751,10 @@ final class Shop {
         // The part's name is the model's, which is what a shop would have
         // typed. Everything else on it came from the file.
         part["name"] = .string(file.title)
+        if let plate {
+            part["name"] = .string(words.callIt("mac.plate_part", ["name": .string(file.title), "n": .number(Double(plate))]))
+            part["plate"] = .number(Double(plate))
+        }
         // `qty`, NOT `quantity`. Every consumer reads `qty` — the calculator's
         // per-part cost, the packaging split, the price tiers, the specs the
         // catalogue row shows — so `quantity` is a field nothing reads, with
@@ -12161,7 +12249,7 @@ final class Shop {
         if libraryPrintNextOnly {
             return rows.sorted { ($0.printNextAt ?? "") < ($1.printNextAt ?? "") }
         }
-        return rows.sorted(by: librarySort.order)
+        return librarySort.sorted(rows)
     }
 
     /// The inspector shows one model. More than one selected is a different

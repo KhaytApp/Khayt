@@ -291,6 +291,22 @@ enum LibrarySort: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// The files in this order, each one's dates read ONCE rather than on
+    /// every comparison — the comparator form re-parsed two dates per compare,
+    /// thousands of times per draw of a 250-model library (Sep 2026).
+    func sorted(_ files: [LibraryFile]) -> [LibraryFile] {
+        switch self {
+        case .khayt, .lastPrinted:
+            let keyed = files.map { f in (f, self == .khayt ? f.updatedAtDate : f.lastPrintedDate) }
+            return keyed.sorted { a, b in
+                if self == .khayt, a.0.isFavourite != b.0.isFavourite { return a.0.isFavourite }
+                return (a.1 ?? .distantPast) > (b.1 ?? .distantPast)
+            }.map(\.0)
+        default:
+            return files.sorted(by: order)
+        }
+    }
+
     func order(_ a: LibraryFile, _ b: LibraryFile) -> Bool {
         switch self {
         case .khayt:

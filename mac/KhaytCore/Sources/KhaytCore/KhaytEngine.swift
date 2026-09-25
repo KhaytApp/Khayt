@@ -5634,27 +5634,37 @@ public actor KhaytEngine {
         let members = JSONValue.array(configs.map { .object(["name": .string($0.key), "data": .string($0.value)]) })
         let answer = try runtime.call2(#"""
             (function (members, gtext) {
+              var mark = function (o) { o.source = 'slicer'; o.platesRead = true; return o; };
+              // THE SHARED RULE FIRST: `KhaytMfConvert.extractMeta` reads a
+              // Bambu/Orca/Snapmaker slice_info plate by plate (#1602) — every
+              // plate's time and filament, and the plates themselves when there
+              // are several. Before an embedded G-code, which in a Bambu print
+              // file is plate 1's alone.
+              var meta = globalThis.KhaytMfConvert.extractMeta(members);
+              if (meta && meta.totalGrams > 0 && meta.printMinutes > 0) {
+                var slice = (members.find(function (m) { return /slice_info\.config$/i.test(m.name); }) || {}).data || '';
+                var t = /<filament\b[^>]*\btype="([^"]+)"/i.exec(slice);
+                var out = { printTimeMins: meta.printMinutes, filamentGrams: meta.totalGrams,
+                            filamentType: t ? t[1] : '', slicer: 'Bambu/Orca' };
+                if (Array.isArray(meta.plates) && meta.plates.length >= 2) out.plates = meta.plates;
+                return mark(out);
+              }
               if (gtext) {
                 var p = globalThis.KhaytGcodeParse.parseGcodeText(gtext);
                 if (p && p.printTimeMins > 0 && p.filamentGrams > 0)
-                  return { printTimeMins: p.printTimeMins, filamentGrams: p.filamentGrams,
-                           filamentType: p.filamentType || '', filamentCost: p.filamentCost || null,
-                           slicer: p.slicer || '', source: 'slicer' };
+                  return mark({ printTimeMins: p.printTimeMins, filamentGrams: p.filamentGrams,
+                                filamentType: p.filamentType || '', filamentCost: p.filamentCost || null,
+                                slicer: p.slicer || '' });
               }
               for (var i = 0; i < members.length; i++) {
                 if (!/\.(config|txt)$/i.test(members[i].name)) continue;
                 var q = globalThis.KhaytGcodeParse.parseGcodeText(members[i].data);
                 if (q && q.printTimeMins > 0 && q.filamentGrams > 0)
-                  return { printTimeMins: q.printTimeMins, filamentGrams: q.filamentGrams,
-                           filamentType: q.filamentType || '', filamentCost: q.filamentCost || null,
-                           slicer: q.slicer || '', source: 'slicer' };
+                  return mark({ printTimeMins: q.printTimeMins, filamentGrams: q.filamentGrams,
+                                filamentType: q.filamentType || '', filamentCost: q.filamentCost || null,
+                                slicer: q.slicer || '' });
               }
-              var meta = globalThis.KhaytMfConvert.extractMeta(members);
-              if (!(meta && meta.totalGrams > 0 && meta.printMinutes > 0)) return null;
-              var slice = (members.find(function (m) { return /slice_info\.config$/i.test(m.name); }) || {}).data || '';
-              var t = /<filament\b[^>]*\btype="([^"]+)"/i.exec(slice);
-              return { printTimeMins: meta.printMinutes, filamentGrams: meta.totalGrams,
-                       filamentType: t ? t[1] : '', slicer: 'Bambu/Orca', source: 'slicer' };
+              return null;
             })(ARG0, ARG1)
             """#, [members, gcodeText.map(JSONValue.string) ?? .null], as: JSONValue.self)
         guard case .object(let o) = answer else { return nil }

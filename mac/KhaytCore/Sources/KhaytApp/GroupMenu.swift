@@ -105,7 +105,7 @@ struct ManyModels: View {
     var body: some View {
         let chosen = shop.selectedFiles
         VStack(alignment: .leading, spacing: 16) {
-            Text(shop.words.callIt("mac.n_models", ["n": .number(Double(chosen.count))]))
+            Text(shop.words.counting(chosen.count, "mac.n_models"))
                 .font(.title3.weight(.semibold))
             DetailSection(shop.words.callIt("mac.together")) {
                 DetailLine(shop.words.callIt("mac.on_disk"), Format.bytes(chosen.compactMap(\.size).reduce(0, +)))

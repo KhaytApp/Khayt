@@ -329,7 +329,8 @@ private struct FolderCell: View {
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(2, reservesSpace: true)
                     .multilineTextAlignment(.leading)
-                Text(words.callIt("mac.n_models", ["n": .number(Double(count))]))
+                // "1 model", not "1 models"; Arabic's one and two are words.
+                Text(words.counting(count, "mac.n_models"))
                     .font(.caption2)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
