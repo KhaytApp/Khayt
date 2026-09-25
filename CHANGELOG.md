@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A model with more than one plate was priced at one plate's hours.** For
+  a Bambu Studio or OrcaSlicer file sliced onto several plates, Khayt read
+  the print time of the first plate only, but the filament of every plate,
+  so the quote charged for all the plastic and a fraction of the machine
+  time. Both figures now cover every plate. Found on a real two-plate file in
+  a shop's library.
+
 - **(Mac) The phone can follow a print away from the shop.** While the cloud
   is signed in and unlocked, the Mac publishes its printers' live status to
   Khayt Cloud — encrypted with the shop's own key, so the service relays it
