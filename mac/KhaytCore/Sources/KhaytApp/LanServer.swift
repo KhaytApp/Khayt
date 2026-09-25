@@ -1926,7 +1926,8 @@ extension Shop {
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
-            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
+            recordingDeletes: false
         ) { root in
             let folded = try await engine.foldDeltas(base: root, deltas: [payload])
             root = folded.store

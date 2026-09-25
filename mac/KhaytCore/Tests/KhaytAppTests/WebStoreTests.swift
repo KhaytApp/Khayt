@@ -155,6 +155,10 @@ struct WebStoreTests {
     func wired() throws {
         let catalogue = try QuoteSheetStatusTests.source("Catalogue.swift")
         #expect(catalogue.contains("WebStoreSheet(shop: shop)"))
+        // The new shell draws no toolbar: the button has to be in its strip.
+        let strip = try QuoteSheetStatusTests.source("ScreenActions.swift")
+        #expect(strip.contains("shop.showingWebStore = true"))
+        #expect(strip.contains("shop.showingOnlineOrders = true"))
         let shop = try QuoteSheetStatusTests.source("Shop.swift")
         #expect(shop.contains("webStoreFollow(products: productRows"))
         #expect(shop.contains("await self.refreshWebStore()"))

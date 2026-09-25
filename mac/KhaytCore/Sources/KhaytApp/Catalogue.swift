@@ -30,8 +30,6 @@ struct Catalogue: View {
     /// margin and weight side by side, which is what pricing work needs.
     @SceneStorage("catalogue.layout") private var layout: Layout = .table
     @State private var selection: KhaytEngine.CatalogueRow.ID?
-    @State private var showingOnline = false
-    @State private var showingWebStore = false
     @State private var order: [KeyPathComparator<KhaytEngine.CatalogueRow>] =
         [.init(\.final, order: .reverse)]
 
@@ -39,8 +37,8 @@ struct Catalogue: View {
 
     var body: some View {
         content
-            .sheet(isPresented: $showingOnline) { OnlineOrdersSheet(shop: shop) }
-            .sheet(isPresented: $showingWebStore) { WebStoreSheet(shop: shop) }
+            .sheet(isPresented: $shop.showingOnlineOrders) { OnlineOrdersSheet(shop: shop) }
+            .sheet(isPresented: $shop.showingWebStore) { WebStoreSheet(shop: shop) }
             .screenToolbar {
                 ToolbarItem {
                     Picker("", selection: $layout) {
@@ -68,7 +66,7 @@ struct Catalogue: View {
                 if shop.cloudConnected {
                     ToolbarItem {
                         Button {
-                            showingWebStore = true
+                            shop.showingWebStore = true
                         } label: {
                             Label(shop.words.callIt("mac.ws_button"), systemImage: "storefront")
                         }
@@ -78,7 +76,7 @@ struct Catalogue: View {
                 if shop.cloudConnected {
                     ToolbarItem {
                         Button {
-                            showingOnline = true
+                            shop.showingOnlineOrders = true
                         } label: {
                             Label(shop.words.callIt("mac.online_orders"),
                                   systemImage: "tray.and.arrow.down")

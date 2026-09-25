@@ -7882,7 +7882,8 @@ final class Shop {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },
-                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
+                recordingDeletes: false
             ) { root in
                 let merged = try await engine.mergeFromCloud(local: root, server: folded.store)
                 root = merged.store
@@ -7933,7 +7934,8 @@ final class Shop {
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
-            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
+            recordingDeletes: false
         ) { root in
             let out = try await engine.mergeFromCloud(local: root, server: server)
             root = out.store
@@ -9092,6 +9094,11 @@ final class Shop {
     /// never sent. A shop that never switched public pricing on is never sent a
     /// withdrawal, every six hours, for ever.
     // ── THE WEB STORE'S CATALOGUE (WebStore.swift) ─────────────────────────
+    /// The catalogue's two cloud sheets. On the shop rather than the screen,
+    /// because the new shell draws the screen's buttons in its own strip
+    /// (ScreenActions) and the old toolbar is only drawn in the classic one.
+    var showingWebStore = false
+    var showingOnlineOrders = false
     /// Whether Khayt Cloud holds a published catalogue: nil until asked.
     var webStoreLive: Bool?
     /// When the published catalogue was last replaced, by either app.

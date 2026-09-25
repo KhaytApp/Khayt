@@ -75,6 +75,7 @@ public enum StoreWriter {
     public static func update(storeURL url: URL,
                        owns: () -> Bool,
                        whoHasIt: () -> String?,
+                       recordingDeletes: Bool = true,
                        mutate: (inout [String: JSONValue]) throws -> Void) throws {
         guard owns() else {
             throw Refusal.notOurs(whoHasIt() ?? "Another app owns this book")
@@ -87,7 +88,9 @@ public enum StoreWriter {
             throw Refusal.unreadable("\(url.lastPathComponent) is not JSON")
         }
 
+        let before = root
         try mutate(&root)
+        if recordingDeletes { recordDeletions(before: before, after: &root) }
 
         let encoder = JSONEncoder()
         let next = try encoder.encode(root)
@@ -121,6 +124,7 @@ public enum StoreWriter {
     public static func update(storeURL url: URL,
                        owns: () -> Bool,
                        whoHasIt: () -> String?,
+                       recordingDeletes: Bool = true,
                        mutate: (inout [String: JSONValue]) async throws -> Void) async throws {
         guard owns() else {
             throw Refusal.notOurs(whoHasIt() ?? "Another app owns this book")
@@ -148,7 +152,9 @@ public enum StoreWriter {
                 throw Refusal.unreadable("\(url.lastPathComponent) is not JSON")
             }
 
+            let before = root
             try await mutate(&root)
+            if recordingDeletes { recordDeletions(before: before, after: &root) }
 
             let next = try JSONEncoder().encode(root)
             guard next.count <= maxStoreBytes else { throw Refusal.tooLarge(next.count) }
@@ -212,6 +218,73 @@ public enum StoreWriter {
         // AFTER the swap, and only on success. See `didWrite`.
         Task { @MainActor in StoreWriter.didWrite?(url) }
     }
+
+    // MARK: - Deleting
+
+    /// Leave a tombstone for every record a write took out of the book.
+    ///
+    /// ── WITHOUT ONE, A DELETE IS UNDONE BY THE NEXT SYNC ─────────────────
+    ///
+    /// The desktop's `stampChanges` (lib/sync.js) compares each save against
+    /// the book as it was loaded and writes `{id, collection, rev, deletedAt}`
+    /// for whatever disappeared. That tombstone is the only thing that tells
+    /// another copy of the book, the cloud's included, that the record went on
+    /// purpose. This app wrote none. Every sync then merged the cloud's copy
+    /// in, found the record there and nothing saying it was deleted, and put it
+    /// back. A shop deleting on the Mac saw its deletes come back, and could
+    /// only make them stick by taking the cloud's copy. Reported by the shop.
+    ///
+    /// Done here, in the one place every write passes through, rather than in
+    /// each delete: a delete that forgets to leave one is the bug, and there
+    /// are dozens of them.
+    ///
+    /// The rev is the one deleted, as the desktop records it, so a stale
+    /// delete cannot outrank a newer edit made on another device. A record
+    /// already tombstoned is not tombstoned twice, and the list keeps the most
+    /// recent 5,000, as `capTombstones` does.
+    ///
+    /// Writes that FOLD another copy in pass `recordingDeletes: false`. What a
+    /// merge removes it removes because of a tombstone it already carries.
+    public static func recordDeletions(before: [String: JSONValue], after: inout [String: JSONValue],
+                                       now: Date = Date()) {
+        var gone: [(collection: String, id: String, rev: Double)] = []
+        for (collection, value) in before where collection != "tombstones" {
+            guard case .array(let was) = value else { continue }
+            var kept = Set<String>()
+            if case .array(let now)? = after[collection] {
+                for row in now {
+                    if case .object(let o) = row, case .string(let id)? = o["id"] { kept.insert(id) }
+                }
+            }
+            for row in was {
+                guard case .object(let o) = row, case .string(let id)? = o["id"], !id.isEmpty,
+                      !kept.contains(id) else { continue }
+                var rev: Double = 0
+                if case .number(let n)? = o["rev"], n > 0 { rev = n }
+                gone.append((collection, id, rev))
+            }
+        }
+        guard !gone.isEmpty else { return }
+        var tombs: [JSONValue] = []
+        if case .array(let held)? = after["tombstones"] { tombs = held }
+        var known = Set<String>()
+        for t in tombs {
+            if case .object(let o) = t, case .string(let c)? = o["collection"], case .string(let i)? = o["id"] {
+                known.insert(c + ":" + i)
+            }
+        }
+        let at = iso(now)
+        for g in gone.sorted(by: { ($0.collection, $0.id) < ($1.collection, $1.id) })
+        where !known.contains(g.collection + ":" + g.id) {
+            tombs.append(.object(["id": .string(g.id), "collection": .string(g.collection),
+                                  "rev": .number(g.rev), "deletedAt": .string(at)]))
+        }
+        if tombs.count > tombstoneCap { tombs.removeFirst(tombs.count - tombstoneCap) }
+        after["tombstones"] = .array(tombs)
+    }
+
+    /// `TOMB_CAP` in lib/sync.js.
+    public static let tombstoneCap = 5000
 
     // MARK: - Stamping
 
