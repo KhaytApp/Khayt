@@ -4,6 +4,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Something deleted on the Mac stays deleted after the cloud syncs.**
+  Reported by the shop: "I delete stuff on mac but that is never reflected on
+  cloud, instead I am forced to copy cloud". The desktop writes a deletion
+  marker (a tombstone) for every record a save removes, and the Mac wrote none.
+  So the merge the Mac runs before every send found the record still in the
+  cloud's copy, with nothing saying it had been deleted, and put it back. Every
+  write the Mac makes now leaves one for each record it removes. That covers
+  products, jobs, customers, spools, library files and the rest, carrying the
+  deleted revision as the desktop does. A merge from the cloud or a phone
+  leaves none of its own. Something deleted before this update and since
+  brought back by a sync needs deleting once more.
+- **(Mac) The Web Store and Online Orders buttons are on the Catalogue
+  screen.** Both were added only to the old window toolbar, which the current
+  window does not draw, so neither could be reached. Reported by the shop:
+  "there is no webstore".
+
 - **(Maintainers) The storefront catalogue is built in one place.** The
   payload a shop publishes to its online store was assembled inside the
   desktop's Storefront dialog, so the native Mac app could not publish at all

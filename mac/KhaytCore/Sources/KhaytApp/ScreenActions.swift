@@ -79,6 +79,15 @@ struct ScreenActions: View {
                 }
             } else if shop.showingCatalogue {
                 layoutSwitch
+                // THE CLOUD'S TWO WAYS IN. They were declared as toolbar items
+                // only, and this shell draws no toolbar — so a shop could not
+                // reach its web store or its storefront orders at all.
+                if shop.cloudConnected {
+                    NavyAction(label: shop.words.callIt("mac.online_orders"),
+                               symbol: "tray.and.arrow.down") { shop.showingOnlineOrders = true }
+                    NavyAction(label: shop.words.callIt("mac.ws_button"),
+                               symbol: "storefront") { shop.showingWebStore = true }
+                }
                 plus("mac.new_product", enabled: shop.canMoveJobs) {
                     shop.editingProduct = shop.newProduct()
                 }
