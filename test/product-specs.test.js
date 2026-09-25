@@ -81,7 +81,8 @@ test('the publish sends them, and the module is loaded to compute them', () => {
   const path = require('path');
   const root = path.join(__dirname, '..');
   const settings = fs.readFileSync(path.join(root, 'renderer', 'settings.js'), 'utf8');
-  const build = settings.slice(settings.indexOf('const buildCatalog = '), settings.indexOf('#storeCopy'));
+  // The payload is built in lib/storefront-catalog.js (shared with the Mac).
+  const build = fs.readFileSync(path.join(root, 'lib', 'storefront-catalog.js'), 'utf8');
   assert.match(build, /KhaytProductSpecs\.productSpecs\(p\)/);
   for (const f of ['printHours', 'weightGrams', 'material']) {
     assert.match(build, new RegExp(`it\\.${f} = spec\\.`), `the publish must send ${f}`);

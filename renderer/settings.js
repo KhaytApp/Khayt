@@ -1463,16 +1463,11 @@ async function openStorefrontModal() {
    * timestamp attached to it. */
   if (!sf.stockQty) sf.stockQty = {};
   if (!sf.stockCountedAt) sf.stockCountedAt = {};
-  // Parse "Color: Black, White; Size: S, M" → [{name, values}]; ≤5 groups, ≤12 vals.
-  const parseOptionGroups = (raw) => String(raw || '').split(';').map((seg) => {
-    const ci = seg.indexOf(':');
-    if (ci < 0) return null;
-    const name = seg.slice(0, ci).trim().slice(0, 40);
-    const values = seg.slice(ci + 1).split(',').map((v) => v.trim().slice(0, 40)).filter(Boolean).slice(0, 12);
-    return (name && values.length) ? { name, values } : null;
-  }).filter(Boolean).slice(0, 5);
+  // The catalogue's rules live in lib/storefront-catalog.js, which the native
+  // Mac app publishes through as well; this dialog only reads the form.
+  const SC = KhaytStorefrontCatalog;
   const cur = settings.currency || 'SAR';
-  const pubProducts = (products || []).slice(0, 60).filter((p) => (p.nameEn || (typeof localName === 'function' ? localName(p) : '') || '').trim());
+  const pubProducts = SC.publishable(products, settings, (typeof i18n !== 'undefined' && i18n.current) || 'en');
   const priceRows = pubProducts.map((p) => {
     const nm = (p.nameEn || (typeof localName === 'function' ? localName(p) : '') || '').trim();
     return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
@@ -1675,145 +1670,15 @@ async function openStorefrontModal() {
          * captured into a catalogue the shop thought it had already described. */
         captureConfig();
         const heroes = withPhotos ? await loadHeroPhotos(pubProducts) : null;
-        const payload = {
-          shopName: (shopField('biz') || 'Khayt').trim(),
-          currency: cur,
+        return SC.build({
+          products,
+          settings,
+          storefront: sf,
+          shopName: shopField('biz') || 'Khayt',
           lang: (typeof i18n !== 'undefined' && i18n.current) || 'en',
-          /* The languages this catalogue is WRITTEN in, so the storefront page
-           * can offer them. It used to be able to show English or Arabic and
-           * nothing else — hard-coded, with `lang === 'ar' ? nameAr : name` —
-           * so a German-and-French shop published a catalogue its own customers
-           * could only read half of. */
-          langs: KhaytContentLanguages.contentLangs(settings),
-          note: sf.note,
-          leadTime: sf.leadTime || '',
-          minOrder: sf.minOrder || 0,
-          depositPct: sf.depositPct || 0,
-          taxRate: sf.taxRate || 0,
-          shipping: sf.shipping || [],
-          payUrl: /^https?:\/\//i.test(sf.payUrl) ? sf.payUrl : '',
-          promos: sf.promos || [],
-          items: pubProducts.map((p) => {
-            /* Read through the content-language model rather than the two
-             * hard-coded fields: a shop writing Turkish or German published a
-             * blank name and no description at all, because the storefront only
-             * knew about `nameEn`, `nameAr` and a single unsuffixed
-             * `description`. `name`/`nameAr` stay in the payload because the
-             * published storefront page reads exactly those. */
-            const CL = KhaytContentLanguages;
-            const langs = CL.contentLangs(settings);
-            const it = {
-              id: p.id,
-              name: CL.read(p, 'name', langs[0], settings).trim(),
-              nameAr: (p.nameAr || '').trim(),
-              desc: CL.read(p, 'description', langs[0], settings).trim(),
-            };
-            // The second language, where the shop keeps one, so a storefront
-            // can show a customer the listing in their own.
-            if (langs[1]) {
-              const alt = CL.read(p, 'name', langs[1], settings).trim();
-              const altDesc = CL.read(p, 'description', langs[1], settings).trim();
-              if (alt || altDesc) it.alt = { lang: langs[1], name: alt, desc: altDesc };
-            }
-            /* The catalogue's own price is the price. A storefront entry is an
-             * OVERRIDE, not the only source.
-             *
-             * This read `sf.prices[p.id]` and nothing else, so a shop that had
-             * already priced every product in the catalogue — cost, margin,
-             * rounding, the lot — published a storefront where every item cost
-             * nothing, and had to type all of it a second time into a different
-             * form. The product feeds other platforms import from are built from
-             * this same payload, so they inherited the blank too.
-             *
-             * `!= null` rather than a truthy test, because 0 is a price: a
-             * giveaway or a sample priced at nothing is a decision, and a truthy
-             * check silently replaces it with the catalogue figure. */
-            const sfPrice = sf.prices[p.id];
-            const price = (sfPrice != null && String(sfPrice).trim() !== '')
-              ? sfPrice
-              : (p.price != null ? p.price : p.basePrice);
-            if (price != null && String(price).trim() !== '') it.price = String(price);
-            /* THE SAME OVERRIDE-NOT-ONLY-SOURCE FIX THE PRICE ABOVE GOT.
-             *
-             * `sf.categories[p.id]` is a map typed into a 96px box inside the
-             * Storefront dialog, and it was the ONLY source — so a shop that had
-             * categorised its whole catalogue on the catalogue screen published
-             * a storefront where nothing had a category, and had to type all of
-             * it a second time into a different form. The product feeds other
-             * platforms import from are built from this same payload, so they
-             * inherited the blank too.
-             *
-             * The override still wins where it is set; the product's own record
-             * is what fills the rest. */
-            const sfCat = sf.categories[p.id];
-            const cat = (sfCat && String(sfCat).trim()) || (typeof productCategoryOf === 'function' ? productCategoryOf(p) : (p.category || ''));
-            if (cat) it.category = cat;
-            /* The collection this belongs to, so a storefront can show the seven
-             * Saudi Kings together rather than scattered through one long grid.
-             * Khayt has always known it and never published it. */
-            const grp = (typeof productGroupOf === 'function' ? productGroupOf(p) : (p.group || p.folder || ''));
-            if (grp) it.group = grp;
-            if (sf.soldOut[p.id]) it.soldOut = true;
-            /* The batch on the shelf, for a storefront that can ship it today.
-             *
-             * != null rather than a truthiness check: 0 is a sold-out batch and
-             * has to be published as 0, or the piece reads as made to order and
-             * is quoted a print lead time it does not need once restocked. */
-            if (sf.stockQty[p.id] != null) {
-              it.stockQty = sf.stockQty[p.id];
-              if (sf.stockCountedAt[p.id]) it.stockCountedAt = sf.stockCountedAt[p.id];
-            }
-            /* What the thing is, for a storefront that has to reason about it.
-             *
-             * Khayt already knows all three and had never published them, so a
-             * shop typed each one again into its storefront's admin — and a
-             * hand-typed number that drifts from the shop's own record is worse
-             * than none, because both look authoritative.
-             *
-             * printHours is MACHINE time only. Finishing is published separately
-             * as part of the lead-time snapshot's handlingDays; adding prep and
-             * post here would have a consumer count finishing twice. */
-            const spec = KhaytProductSpecs.productSpecs(p);
-            if (spec.printHours != null) it.printHours = spec.printHours;
-            if (spec.weightGrams != null) it.weightGrams = spec.weightGrams;
-            if (spec.material) it.material = spec.material;
-            const og = parseOptionGroups(sf.options[p.id]);
-            if (og.length) it.options = og;
-            /* PHOTOS: more than one now, and each says what it is.
-             *
-             * A listing used to carry a single picture and no indication of
-             * whether it was a render or the real thing — the one question a
-             * customer is actually asking, and the one whose wrong answer is a
-             * refund.
-             *
-             * The selection and the budget live in lib/product-images.js so
-             * they can be tested: this modal is unreachable from an automation
-             * context, so anything decided in here ships unverified. `photo`
-             * stays as the first one, so a storefront page that has not been
-             * updated still renders.
-             */
-            if (withPhotos) {
-              const photos = KhaytProductImages.storefrontPhotos(p, {
-                hero: (img) => (heroes && heroes.get(img.path)) || '',
-              });
-              /* `photo` is NOT set here. It is a view of photos[0] and the
-               * server derives it from the gallery, so sending it put every
-               * listing's primary photo on the wire twice — half a payload,
-               * for a field the other end computes anyway. */
-              if (photos.length) it.photos = photos;
-            }
-            return it;
-          }).filter((it) => it.name),
-        };
-        /* Trim the pictures to what the server will accept, rather than letting
-         * the whole publish fail.
-         *
-         * The per-listing budget in storefrontPhotos() says nothing about the
-         * total, and the server caps a sanitised catalogue at 8 MB — so a shop
-         * with about fourteen photo-rich products got 413 and no storefront at
-         * all. Extra photos go before anyone's only photo. */
-        KhaytProductImages.fitCatalogPhotos(payload.items);
-        return payload;
+          withPhotos,
+          heroes,
+        });
       };
       modal.querySelector('#storeCopy')?.addEventListener('click', async () => {
         // On failure show the link itself, so it can still be selected by hand.
