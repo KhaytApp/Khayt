@@ -263,6 +263,22 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
 
+      # Open what a macOS shop's updater downloads — the signed, notarized zip —
+      # before anything goes public, as build-linux and build-windows do. Needed
+      # because macOS is built again (BUILD_MAC) until the native Mac app reaches
+      # beta, and the last Electron macOS build before that was v3.7.0. Extracted
+      # with ditto, not unzip, so the signature and its symlinks survive.
+      - name: Launch the packaged app before it goes public
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          v="${GITHUB_REF_NAME#v}"
+          zip="build/Khayt-$v-arm64-mac.zip"
+          [ -f "$zip" ] || { echo "::error::no $zip"; ls build; exit 1; }
+          dest="$RUNNER_TEMP/mac-gate"; rm -rf "$dest"; mkdir -p "$dest"
+          ditto -x -k "$zip" "$dest"
+          node scripts/verify-release.mjs --app "$dest/Khayt.app" --version "$v"
+
       # Runners are ephemeral, so this is hygiene rather than a fix — but a
       # keychain left in the search list confuses anything that runs after it
       # in the same job, and `always()` means a failed build still tidies up.
