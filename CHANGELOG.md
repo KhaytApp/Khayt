@@ -3757,6 +3757,38 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.48] - 2026-09-25
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The Mac publishes your catalogue to your web store, and a multi-plate file is
+priced for every plate's time.
+
+### Added
+
+- **(Mac) Publish the catalogue to your web store from the Mac.** Reported by
+  the shop: "why is the app not syncing everything to the cloud … how am I
+  going to list stuff on my webstore". Only the desktop app's Storefront dialog
+  could publish a catalogue, so products added or re-priced on the Mac never
+  reached the store; it listed one product of five. The Catalogue screen now
+  has a **Web Store** button. It shows whether the store is live, how many
+  products it will list, and the shop page link, and it publishes or takes the
+  store offline. The payload comes from the same shared
+  `lib/storefront-catalog.js` the desktop uses, so prices, categories, stock,
+  options and photos come out identical. Pictures are sent at 1000px, as on the
+  desktop. While the store is live, a change to a product republishes it a few
+  seconds later.
+
+### Fixed
+
+- **A model with more than one plate was priced at one plate's hours.** For
+  a Bambu Studio or OrcaSlicer file sliced onto several plates, Khayt read
+  the print time of the first plate only, but the filament of every plate,
+  so the quote charged for all the plastic and a fraction of the machine
+  time. Both figures now cover every plate. Found on a real two-plate file in
+  a shop's library.
+
 ## [4.0.0-alpha.47] - 2026-09-25
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
