@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Opening and leaving the library no longer freezes the window.**
+  Reported by the shop: "there is a lag when choosing the library or leaving
+  it". Measured on the shop's own 247-model book: about a second each way,
+  against 10–45 ms for every other screen. The library's sort read two dates
+  per comparison and built a new date reader and calendar each time — a cost
+  introduced with the Gregorian-dates fix. Dates are now read once per sort,
+  by a reader made once; the library opens in the same time as every other
+  screen. And a folder of one model says "1 model".
+
 - **A model with more than one plate was priced at one plate's hours.** For
   a Bambu Studio or OrcaSlicer file sliced onto several plates, Khayt read
   the print time of the first plate only, but the filament of every plate,
