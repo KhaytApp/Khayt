@@ -480,6 +480,7 @@ final class Words {
         "mac.walk_in":       ["en": "No customer",    "ar": "بلا عميل"],
         "mac.a_part":        ["en": "A part",         "ar": "قطعة"],
         "mac.add_part":      ["en": "Add part",       "ar": "إضافة قطعة"],
+        "mac.update_part": ["en": "Update part", "ar": "حدّث الجزء"],
         "mac.take_the_job":  ["en": "Take the job",   "ar": "استلام العمل"],
         "mac.save_quote":    ["en": "Save as quote",  "ar": "حفظ كعرض سعر"],
         "mac.grams":         ["en": "grams",          "ar": "غرام"],

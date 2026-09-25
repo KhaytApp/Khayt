@@ -10,6 +10,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   so the quote charged for all the plastic and a fraction of the machine
   time. Both figures now cover every plate. Found on a real two-plate file in
   a shop's library.
+- **(Mac) The product sheet's price follows every change, and a typed price
+  shows.** Reported by the shop: "the price does not update when I make
+  changes to values, also I can't change any prices manually".
+  - The part being typed counts toward the price as soon as it has a weight
+    or a time, and moves it with every figure, rate, spool or quantity; Save
+    keeps it too, instead of dropping a part filled in but never added.
+  - A part already on the product — one added from the library, say — can be
+    edited: the pencil takes it back into the fields, and Update part puts it
+    back where it was. It could only be removed before.
+  - A price typed in "Or set the price" is shown even when the parts cost
+    nothing; that case used to hide the price line altogether, so the typed
+    price appeared to do nothing.
 
 - **(iOS) A phone signed out of Khayt Cloud says so, and offers to sign in
   again.** Revoking a device from the shop's device list answers that phone

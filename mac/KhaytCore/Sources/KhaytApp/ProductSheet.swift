@@ -44,6 +44,9 @@ struct ProductSheet: View {
     @State private var removedDocs: [String] = []
     @State private var docProblem: String?
     @State private var newPart = PartRow()
+    /// The list position of a part taken back into the fields to be changed,
+    /// or nil when the fields hold a new part.
+    @State private var editingAt: Int?
     /// `lib/print-rates.js`'s own starting figures, so a part added here
     /// arrives costed the way the other app's calculator would cost it.
     @State private var rateDefaults: [String: String] = [:]
@@ -330,7 +333,7 @@ struct ProductSheet: View {
                     let saving = draft
                     let staged = pictures
                     let unlink = removedPictures
-                    let rows = parts.map { $0.record(spools: shop.spools) }
+                    let rows = effectiveParts.map { $0.record(spools: shop.spools) }
                     let tierRows = tiers.compactMap { $0.record }
                     let docRows = docs.map { $0.record }
                     let dropped = removedDocs
@@ -382,6 +385,9 @@ struct ProductSheet: View {
         // Re-priced when the margin changes, because the margin is above the
         // parts on this sheet and a shop typing one is watching the total.
         .task(id: draft.margin) { await reprice() }
+        // As the shop types — a weight, a time, a rate, a spool, a quantity.
+        .onChange(of: newPart) { Task { await reprice() } }
+        .onChange(of: parts) { Task { await reprice() } }
         // And when the rounding or the typed price changes — written into the
         // record at the same moment, so what the preview says is what saves.
         .task(id: rule) {
@@ -560,6 +566,17 @@ struct ProductSheet: View {
                     Spacer()
                     Text(partSummary(part)).font(.caption)
                         .foregroundStyle(.secondary).monospacedDigit()
+                    // Back into the fields to be changed — a part that came from
+                    // the library could only be removed, never corrected.
+                    Button {
+                        guard let at = parts.firstIndex(where: { $0.id == part.id }) else { return }
+                        newPart = parts.remove(at: at)
+                        editingAt = at
+                        showRates = true
+                    } label: { Image(systemName: "pencil") }
+                        .buttonStyle(.plain)
+                        .help(shop.words.callIt("common.edit"))
+                        .disabled(editingAt != nil || newPart.isComplete)
                     Button {
                         parts.removeAll { $0.id == part.id }
                         Task { await reprice() }
@@ -593,8 +610,9 @@ struct ProductSheet: View {
                 // typing what the library already knows. See `PickModelSheet`.
                 Button(shop.words.callIt("link.from_library") + "\u{2026}") { pickingModel = true }
                     .disabled(shop.files.isEmpty)
-                Button(shop.words.callIt("mac.add_part")) {
-                    parts.append(newPart)
+                Button(shop.words.callIt(editingAt == nil ? "mac.add_part" : "mac.update_part")) {
+                    parts.insert(newPart, at: min(editingAt ?? parts.count, parts.count))
+                    editingAt = nil
                     var next = PartRow()
                     next.rates = rateDefaults
                     newPart = next
@@ -652,7 +670,7 @@ struct ProductSheet: View {
                     Text(shop.words.callIt("mac.no_parts_no_price"))
                         .font(.caption).foregroundStyle(Khayt.attention)
                         .fixedSize(horizontal: false, vertical: true)
-                } else if pricing.cost == 0 {
+                } else if pricing.cost == 0 && rule.override == nil {
                     // ── THE ONE THAT COULD COST A SHOP ITS PRICE ──────────
                     //
                     // A part with no filament bound costs nothing, so this
@@ -711,9 +729,27 @@ struct ProductSheet: View {
         return bits.joined(separator: " · ")
     }
 
+    /// What prices and what saves: the list, and the part in the fields once
+    /// it has a weight or a time. "The price does not update when I make
+    /// changes" (the shop, Sep 2026): the fields were counted only after Add
+    /// part, so every figure typed there moved nothing — and a part filled in
+    /// but never added was dropped by Save. What the sheet shows is what saves.
+    private var effectiveParts: [PartRow] {
+        Self.pricedParts(parts, pending: newPart, editingAt: editingAt)
+    }
+
+    /// The list, with the part in the fields put back where it came from (or
+    /// at the end, for a new one) once it has a weight or a time.
+    static func pricedParts(_ parts: [PartRow], pending: PartRow, editingAt: Int?) -> [PartRow] {
+        guard pending.isComplete else { return parts }
+        var out = parts
+        out.insert(pending, at: min(editingAt ?? out.count, out.count))
+        return out
+    }
+
     /// Price what is in the list, through the shared rule.
     private func reprice() async {
-        pricing = await shop.priceProduct(parts: parts.map { $0.record(spools: shop.spools) },
+        pricing = await shop.priceProduct(parts: effectiveParts.map { $0.record(spools: shop.spools) },
                                           margin: draft.margin,
                                           components: draft.rest["components"],
                                           rule: rule)
