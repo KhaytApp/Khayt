@@ -1106,23 +1106,25 @@ final class Shop {
         guard case .store(let build) = source, let engine,
               !slicerFiguresReadBooks.contains(build.rawValue) else { return }
         slicerFiguresReadBooks.insert(build.rawValue)
-        let due: [(id: String, url: URL)] = files.compactMap { file in
+        let due: [(id: String, url: URL, ext: String)] = files.compactMap { file in
             guard case .object(let rec)? = row(for: file.id), let url = modelFile(for: file) else { return nil }
             let ext = url.pathExtension.lowercased()
             guard ["3mf", "gcode", "gco"].contains(ext) else { return nil }
             // Empty, or a 3MF read before plates were read one by one (its
             // time was one plate's and its grams every plate's).
             guard Self.slicerFiguresDue(rec["parsed"], ext: ext) else { return nil }
-            return (file.id, url)
+            return (file.id, url, ext)
         }
         guard !due.isEmpty else { return }
         Task { [weak self] in
             var found: [String: [String: JSONValue]] = [:]
+            let extOf = Dictionary(due.map { ($0.id, $0.ext) }, uniquingKeysWith: { a, _ in a })
             for item in due {
                 if let parsed = await SlicerFigures.read(item.url, engine: engine) { found[item.id] = parsed }
-                // Nothing in it (an unsliced 3MF): said once, so it is not
-                // opened again at every launch.
-                else if item.url.pathExtension.lowercased() == "3mf" { found[item.id] = ["platesRead": .bool(true)] }
+                // Nothing read (an unsliced 3MF, or a file this reader cannot
+                // open): only the mark, so it is not opened again every launch
+                // — merged below, so figures already there are KEPT.
+                else if item.ext == "3mf" { found[item.id] = ["platesRead": .bool(true)] }
             }
             guard let self, !found.isEmpty else { return }
             do {
@@ -1131,10 +1133,18 @@ final class Shop {
                     for i in rows.indices {
                         guard case .object(var r) = rows[i], case .string(let id)? = r["id"],
                               let parsed = found[id] else { continue }
-                        let ext = (Self.plainString(r["sourceFile"].flatMap {
-                            if case .object(let sf) = $0 { sf["ext"] } else { nil } }) ?? "").lowercased()
-                        guard Self.slicerFiguresDue(r["parsed"], ext: ext) else { continue }
-                        r["parsed"] = .object(parsed)
+                        guard Self.slicerFiguresDue(r["parsed"], ext: extOf[id] ?? "") else { continue }
+                        // MERGED, never replaced. A re-read that found figures
+                        // wins where it has them; one that found nothing adds
+                        // only its mark. Keys this reader does not write (a
+                        // cost another app recorded) stay as they were.
+                        var merged: [String: JSONValue] = [:]
+                        if case .object(let had)? = r["parsed"] { merged = had }
+                        let readSomething = (Self.plainNumber(parsed["printTimeMins"]) ?? 0) > 0
+                            || (Self.plainNumber(parsed["filamentGrams"]) ?? 0) > 0
+                        if readSomething { for (k, v) in parsed { merged[k] = v } }
+                        else { merged["platesRead"] = .bool(true) }
+                        r["parsed"] = .object(merged)
                         StoreWriter.stamp(&r)
                         rows[i] = .object(r)
                     }
@@ -2704,7 +2714,15 @@ final class Shop {
                          grams: Self.plainNumber(o["filamentGrams"]) ?? 0,
                          material: Self.plainString(o["filamentType"]) ?? "")
         }
-        return out.count > 1 ? out : []
+        guard out.count > 1 else { return [] }
+        // Only while they add up to the file's own totals: a file re-read by
+        // the other app (totals rewritten, `plates` kept) or re-sliced since
+        // is priced as a whole rather than from plates that no longer match.
+        let mins = Self.plainNumber(parsed["printTimeMins"]) ?? 0
+        let grams = Self.plainNumber(parsed["filamentGrams"]) ?? 0
+        let sumMins = out.reduce(0) { $0 + $1.minutes }, sumGrams = out.reduce(0) { $0 + $1.grams }
+        guard abs(sumMins - mins) <= Double(out.count), abs(sumGrams - grams) <= Double(out.count) * 0.2 else { return [] }
+        return out
     }
 
     func partFields(from file: LibraryFile, plate: Int? = nil) async -> (part: [String: JSONValue], note: String?)? {
@@ -12231,7 +12249,7 @@ final class Shop {
         if libraryPrintNextOnly {
             return rows.sorted { ($0.printNextAt ?? "") < ($1.printNextAt ?? "") }
         }
-        return rows.sorted(by: librarySort.order)
+        return librarySort.sorted(rows)
     }
 
     /// The inspector shows one model. More than one selected is a different

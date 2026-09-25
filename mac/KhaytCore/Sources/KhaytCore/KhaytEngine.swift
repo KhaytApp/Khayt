@@ -5642,14 +5642,14 @@ public actor KhaytEngine {
               // several, for choosing which to price.
               var si = (members.find(function (m) { return /slice_info\.config$/i.test(m.name); }) || {}).data || '';
               var blocks = si.match(/<plate>[\s\S]*?<\/plate>/gi) || [];
-              var plates = blocks.map(function (b) {
+              var plates = blocks.map(function (b, position) {
                 var idx = /key="index"\s+value="(\d+)"/i.exec(b);
                 var pr = /key="prediction"\s+value="(\d+)"/i.exec(b) || /\bprediction="(\d+)"/i.exec(b);
                 var grams = 0, re = /used_g="([\d.]+)"/gi, g;
                 while ((g = re.exec(b))) grams += parseFloat(g[1]) || 0;
                 if (!(grams > 0)) { var w = /key="weight"\s+value="([\d.]+)"/i.exec(b); grams = w ? parseFloat(w[1]) : 0; }
                 var ty = /<filament\b[^>]*\btype="([^"]+)"/i.exec(b);
-                return { index: idx ? +idx[1] : 0, printTimeMins: pr ? Math.round(+pr[1] / 60) : 0,
+                return { index: idx ? +idx[1] : position + 1, printTimeMins: pr ? Math.round(+pr[1] / 60) : 0,
                          filamentGrams: Math.round(grams * 100) / 100, filamentType: ty ? ty[1] : '' };
               }).filter(function (p) { return p.printTimeMins > 0 && p.filamentGrams > 0; });
               if (plates.length) {

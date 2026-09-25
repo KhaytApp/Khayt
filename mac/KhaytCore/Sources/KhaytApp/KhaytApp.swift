@@ -645,8 +645,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                     ("gift-cards", .giftCards), ("calculator", .calculator), ("colour", .colour),
                 ]
                 for (name, shelf) in shelves {
+                    // How long the window takes to arrive at each screen — the
+                    // shop felt the library "lag" (Sep 2026); this says where.
+                    let began = Date()
                     shop.shelf = shelf
                     await settle()
+                    FileHandle.standardError.write(Data(String(format: "shelf %@: %.0f ms\n",
+                        name, Date().timeIntervalSince(began) * 1000).utf8))
                     try? await Task.sleep(for: .milliseconds(600))
                     capture(named: "real-" + name, into: dir)
                 }

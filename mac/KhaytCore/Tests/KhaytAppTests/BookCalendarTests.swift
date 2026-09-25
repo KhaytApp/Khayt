@@ -49,4 +49,39 @@ struct BookCalendarTests {
         #expect(Calendar.localDay(ofInstant: "2026-09-24") == "2026-09-24")
         #expect(Order.day("") == nil && Order.day("soon") == nil)
     }
+
+    @Test("every timestamp shape the book holds is read, the same as the old per-call formatter")
+    func timestamps() {
+        let old = { (iso: String) -> Date? in
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let d = f.date(from: iso) { return d }
+            f.formatOptions = [.withInternetDateTime]
+            return f.date(from: iso)
+        }
+        for iso in ["2026-09-24T09:15:00.000Z", "2026-09-24T09:15:00Z", "2026-09-24T12:15:00+03:00",
+                    "2026-09-24T12:15:00.123+03:00", "2026-09-24T09:15:00.5Z"] {
+            #expect(Calendar.instant(iso) != nil, "\(iso)")
+            // To the millisecond: the two parsers round a fraction's last
+            // binary digit differently, which is not a different moment.
+            #expect(abs((Calendar.instant(iso) ?? .distantPast).timeIntervalSince(old(iso) ?? .distantFuture)) < 0.001,
+                    "\(iso) reads differently")
+        }
+        #expect(Calendar.instant("2026-09-24") == nil && Calendar.instant("soon") == nil)
+    }
+
+    @Test("sorting a big library reads each date once, not per comparison")
+    @MainActor
+    func sortCost() throws {
+        let files = try (0..<400).map { i -> LibraryFile in
+            let json: [String: Any] = ["id": "PF-\(i)", "name": "m\(i)", "favorite": i % 17 == 0,
+                                       "updatedAt": String(format: "2026-09-%02dT10:00:00.000Z", i % 28 + 1)]
+            return try JSONDecoder().decode(LibraryFile.self, from: JSONSerialization.data(withJSONObject: json))
+        }
+        let began = Date()
+        let sorted = LibrarySort.khayt.sorted(files)
+        #expect(Date().timeIntervalSince(began) < 0.2, "sorting 400 models took over 200 ms")
+        #expect(sorted.first?.isFavourite == true, "favourites first")
+        #expect(sorted == files.sorted(by: LibrarySort.khayt.order), "the same order as the comparator")
+    }
 }

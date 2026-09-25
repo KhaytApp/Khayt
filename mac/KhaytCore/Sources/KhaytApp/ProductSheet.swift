@@ -47,6 +47,10 @@ struct ProductSheet: View {
     /// The list position of a part taken back into the fields to be changed,
     /// or nil when the fields hold a new part.
     @State private var editingAt: Int?
+    /// The part as it was before the pencil took it, for Cancel.
+    @State private var editingOriginal: PartRow?
+    /// A Plates change is under way; the row waits for it.
+    @State private var platesBusy = false
     /// `lib/print-rates.js`'s own starting figures, so a part added here
     /// arrives costed the way the other app's calculator would cost it.
     @State private var rateDefaults: [String: String] = [:]
@@ -407,6 +411,9 @@ struct ProductSheet: View {
             PickModelSheet(shop: shop) { file in
                 Task {
                     guard let filled = await shop.partFields(from: file) else { return }
+                    // A different model: nothing of the part it replaces
+                    // (its plate, its setup, its file reference) comes along.
+                    newPart.raw = [:]
                     newPart.name = Shop.plainString(filled.part["name"]) ?? file.title
                     newPart.grams = Money.fieldValue(Shop.plainNumber(filled.part["printWeight"]))
                     newPart.hours = Money.fieldValue(Shop.plainNumber(filled.part["printTime"]))
@@ -575,12 +582,15 @@ struct ProductSheet: View {
                     Button {
                         guard let at = parts.firstIndex(where: { $0.id == part.id }) else { return }
                         newPart = parts.remove(at: at)
+                        editingOriginal = newPart
                         editingAt = at
                         showRates = true
                     } label: { Image(systemName: "pencil") }
                         .buttonStyle(.plain)
                         .help(shop.words.callIt("common.edit"))
-                        .disabled(editingAt != nil || newPart.isComplete)
+                        // Not over a part being typed — it would be overwritten.
+                        .disabled(editingAt != nil || newPart.isComplete || !newPart.name.isEmpty
+                                  || newPart.spoolId != nil)
                     Button {
                         parts.removeAll { $0.id == part.id }
                         Task { await reprice() }
@@ -614,16 +624,29 @@ struct ProductSheet: View {
                 // typing what the library already knows. See `PickModelSheet`.
                 Button(shop.words.callIt("link.from_library") + "\u{2026}") { pickingModel = true }
                     .disabled(shop.files.isEmpty)
+                if editingAt != nil {
+                    Button(shop.words.callIt("common.cancel")) {
+                        if let original = editingOriginal {
+                            parts.insert(original, at: min(editingAt ?? parts.count, parts.count))
+                        }
+                        editingAt = nil
+                        editingOriginal = nil
+                        var next = PartRow()
+                        next.rates = rateDefaults
+                        newPart = next
+                    }
+                }
                 Button(shop.words.callIt(editingAt == nil ? "mac.add_part" : "mac.update_part")) {
                     parts.insert(newPart, at: min(editingAt ?? parts.count, parts.count))
                     editingAt = nil
+                    editingOriginal = nil
                     var next = PartRow()
                     next.rates = rateDefaults
                     newPart = next
                     pickNote = nil
                     Task { await reprice() }
                 }
-                .disabled(!newPart.isComplete)
+                .disabled(!newPart.isComplete && editingAt == nil)
             }
             // ── WHAT THE PART COSTS BESIDES ITS FILAMENT ──────────────────
             //
@@ -737,7 +760,9 @@ struct ProductSheet: View {
                         Toggle(isOn: Binding(
                             get: { chosen.contains(plate.index) },
                             set: { on in
-                                var next = chosen
+                                // From the parts as they are NOW, not as they
+                                // were when this row was last drawn.
+                                var next = chosenPlates(of: file, among: plates)
                                 if on { next.insert(plate.index) } else { next.remove(plate.index) }
                                 Task { await setPlates(of: file, to: next, all: plates) }
                             })) {
@@ -760,6 +785,9 @@ struct ProductSheet: View {
                     .disabled(chosen.count == plates.count)
                     Spacer()
                 }
+                // One change at a time, and none while a part is being edited
+                // (it is out of the list then, and would be added twice).
+                .disabled(platesBusy || editingAt != nil)
             }
         }
     }
@@ -772,9 +800,15 @@ struct ProductSheet: View {
     }
 
     private func setPlates(of file: LibraryFile, to wanted: Set<Int>, all plates: [Shop.Plate]) async {
+        guard !platesBusy, !wanted.isEmpty else { return }
+        platesBusy = true
+        defer { platesBusy = false }
         let at = parts.firstIndex { $0.printFileId == file.id } ?? parts.count
-        // A whole-file part becomes its plates.
-        if parts.contains(where: { $0.printFileId == file.id && $0.plate == nil }) {
+        // A whole-file part becomes its plates — CARRYING what the shop set on
+        // it: quantity, spool, rates and anything else it holds. Only the
+        // name and the plate's own figures are the plate's.
+        let whole = parts.first { $0.printFileId == file.id && $0.plate == nil }
+        if whole != nil {
             parts.removeAll { $0.printFileId == file.id && $0.plate == nil }
         }
         parts.removeAll { $0.printFileId == file.id && !wanted.contains($0.plate ?? -1) }
@@ -786,7 +820,18 @@ struct ProductSheet: View {
                 continue
             }
             guard let filled = await shop.partFields(from: file, plate: plate),
-                  let row = PartRow.from(.object(filled.part)) else { continue }
+                  var row = PartRow.from(.object(filled.part)) else { continue }
+            if let whole {
+                var carried = whole
+                carried.id = UUID()
+                carried.raw = whole.raw.merging(filled.part) { $1 }
+                carried.name = row.name
+                carried.grams = row.grams
+                carried.hours = row.hours
+                row = carried
+            }
+            // Never twice: another change may have put it back meanwhile.
+            guard !parts.contains(where: { $0.printFileId == file.id && $0.plate == plate }) else { continue }
             parts.insert(row, at: min(insertAt, parts.count))
             insertAt += 1
         }
@@ -829,7 +874,9 @@ struct ProductSheet: View {
     /// The list, with the part in the fields put back where it came from (or
     /// at the end, for a new one) once it has a weight or a time.
     static func pricedParts(_ parts: [PartRow], pending: PartRow, editingAt: Int?) -> [PartRow] {
-        guard pending.isComplete else { return parts }
+        // A part taken back to be edited is still the product's, figures or
+        // not: clearing its grams to retype them must not drop it on Save.
+        guard pending.isComplete || editingAt != nil else { return parts }
         var out = parts
         out.insert(pending, at: min(editingAt ?? out.count, out.count))
         return out
