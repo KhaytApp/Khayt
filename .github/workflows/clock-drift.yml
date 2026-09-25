@@ -31,7 +31,11 @@ on:
 jobs:
   future:
     name: Suites with the clock advanced
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: GitHub moves that label to Ubuntu 26 from
+    # 2026-10-19 (done by 2026-11-19). This job runs Electron under xvfb-run
+    # on the libraries the 24.04 image ships. 24.04 is supported for two more
+    # years; moving to 26 is its own PR, with this job watched.
+    runs-on: ubuntu-24.04
     env:
       # 400 days clears every window in the codebase and crosses a year boundary,
       # which a 90-day offset would not.

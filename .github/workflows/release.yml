@@ -587,7 +587,12 @@ jobs:
   build-linux:
     name: Linux (x64)
     needs: create-release
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: GitHub moves that label to Ubuntu 26 from
+    # 2026-10-19 (done by 2026-11-19). This job builds the AppImage and .deb
+    # on the runner and launches them under xvfb-run; a newer host can quietly
+    # raise the glibc floor of what ships to shops. 24.04 is supported for two
+    # more years; moving to 26 is its own PR, with this job watched.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -1017,7 +1022,11 @@ jobs:
   bedready-linux:
     name: Bed Ready — Linux (x64)
     needs: bedready-release
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: GitHub moves that label to Ubuntu 26 from
+    # 2026-10-19 (done by 2026-11-19). Bed Ready's Linux build: a newer host
+    # can quietly raise the glibc floor of what ships. 24.04 is supported for
+    # two more years; moving to 26 is its own PR, with this job watched.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
