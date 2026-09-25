@@ -3639,6 +3639,48 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.45] - 2026-09-25
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The library grows up: browse it by creator, keep a Print next list, find the
+copies it already holds, and index a NAS or a drive where it is without
+copying a file. And the phone can follow a print live against this Mac.
+
+### Added
+
+- **(Mac) The library can be browsed by creator, keeps a Print next list, and
+  finds its own duplicates.** Asked for by the shop after looking at LayerMate.
+  - **Creators:** a chip per designer — the one the file names, or the shop
+    typed — and for a link, the site it came from; the busiest eight on the
+    row, and "by …" in the inspector opens everything by that creator.
+  - **Print next:** mark any model (right-click, or the inspector) and the
+    Print next chip lists them, oldest first. A list the shop keeps, beside
+    Never printed, which is the fact.
+  - **Duplicates:** models that are the same file (identical bytes), or the
+    same mesh re-saved, which the import could not catch because they were
+    already in the library. The chip shows the copies side by side, and a
+    model's inspector names its copies. On the shop's own book: 56 models in
+    28 pairs.
+  - **Folders indexed where they are:** Settings → Preferences → Where the
+    library lives → Link a folder… — a NAS, an external drive, a shared
+    folder. Its models appear in the library, measured, pictured, with the
+    slicer's figures and grouped into projects, and stay exactly where they
+    are: nothing is copied, moved or deleted. Deleting such a model removes it
+    from the library only; unlinking the folder takes its models out and
+    leaves every file alone; an unplugged drive shows its models as not
+    found. New files are picked up when the book opens, or with "Look for new
+    models". (The desktop app does not read linked models yet, and shows them
+    as missing.)
+
+- **(Mac) The phone can follow live prints against the Mac app.** The Mac's
+  network server now answers `GET /api/machines/live` — every machine with
+  what its printer last said (state, progress, file, time left, temperatures,
+  any problem) — in exactly the shape the desktop app answers, so the phone
+  tracks a print live instead of showing the book's last status. Read from
+  what the Mac already holds; asking it never polls a printer.
+
 ## [4.0.0-alpha.44] - 2026-09-25
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
