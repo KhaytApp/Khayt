@@ -24,6 +24,14 @@ Khayt uses [Semantic Versioning 2.0.0](https://semver.org/) as `MAJOR.MINOR.PATC
   > history from the closed 3.6.0 line. It had to go because nothing could
   > install it and it sorted above the candidate that replaced it. See
   > [docs/BETA-RELEASE.md](./docs/BETA-RELEASE.md)
+- **`BUILD_MAC` IS ON FOR EVERY ELECTRON CUT UNTIL THE NATIVE MAC APP REACHES BETA.**
+  The maintainer's decision, 2026-09-25. `v3.8.0`, `v3.9.0` and `v3.9.1` shipped
+  Windows/Linux only, so a macOS shop on the Electron app was held at `v3.7.0`.
+  Khayt for macOS (the native app, `mac/`, on its own `4.0.0-alpha.N` line) is
+  meant to replace it — but not before it is a beta. So: set `BUILD_MAC` to
+  `true` for every Khayt Electron cut, and turn it off only once a
+  `4.0.0-beta.N` of the native app has shipped. The Mac session knows to say so.
+  `build-mac` launches the notarized zip before publish, like the other two.
 - **macOS MAY run behind, and right now does not — `v3.7.0` carries a real mac build, verified 2026-09-11 (4m43s, its own `latest-mac.yml`).** A mac build bills at roughly 10× the others, so `BUILD_MAC` is set per cut rather than always. **As of `v3.7.0-beta.16` macOS is CURRENT** — verified 2026-08-31 against the published assets: `beta.13`, `beta.14`, `beta.15` and `beta.16` each carry a real `arm64.dmg` (~161 MB) and their own `latest-mac.yml`, not a carried one. This bullet said macOS was on `beta.8`, two cuts back, for six cuts after it stopped being true; it is the claim most likely to be read at cut time when deciding whether to set `BUILD_MAC`, so **check the assets on the last release rather than this line**. When mac IS skipped, `carry-mac-manifest` republishes the last built release's `latest-mac.yml` under each newer tag — in the **relative** `../v3.7.0-beta.N/` form, so the assets it names resolve from the newer feed. A verbatim copy would name files the newer release does not contain.
 - **The `beta.4` trap is resolved, and the lesson is not.** `main` carried version `3.7.0-beta.4` for most of 2026-08-23 with no `v3.7.0-beta.4` tag on the remote, so release CI never ran and no installer existed while `package.json` looked finished. It was tagged from `11ef165` and published the same day. **A merged version bump is evidence the *cut* landed and nothing more** — check with `git ls-remote --tags origin` or `gh release list`, never by reading `package.json`.
 - **Bed Ready:** a different app from the same repo, on its **own** version line
@@ -122,22 +130,22 @@ Each command updates `package.json` and `package-lock.json`. Edit `CHANGELOG.md`
    builds nothing at all.
 6. CI **Build & Release** builds installers from the tag (`on: push: tags: v*`).
 
-7. Verify the published build. **Windows and Linux are launched for you**:
+7. Verify the published build. **All three platforms are launched for you**:
    `build-linux` runs `scripts/verify-release.mjs` against the AppImage it just
-   built, under xvfb, and `build-windows` INSTALLS the Setup exe it just built
-   (silently, into a scratch folder) and launches what it installed. `publish`
-   waits on both, and `submit-store` on the Windows one — so a build that does
-   not open, or an installer that does not install, stays a draft. Read both
-   steps' logs before announcing.
+   built, under xvfb; `build-windows` INSTALLS the Setup exe it just built
+   (silently, into a scratch folder) and launches what it installed; and
+   `build-mac` extracts the notarized zip with `ditto` and launches it. `publish`
+   waits on all three, and `submit-store` on the Windows one — so a build that
+   does not open, or an installer that does not install, stays a draft. Read
+   the steps' logs before announcing.
    It exists because `v3.8.0` shipped with no launch check at all: the script
    was macOS-only, asked for `Khayt-<version>-arm64-mac.zip`, and a cut with
    `BUILD_MAC` unset has no such asset (404).
 
    `npm run verify:release <tag>` checks the published build for the platform
    it runs on — the arm64 .app on a Mac, the AppImage on Linux, the installed
-   Setup exe on Windows — and is worth running on a Mac whenever `BUILD_MAC`
-   was on, since no CI step launches the macOS build. Signing is still
-   unchecked: the Windows build is unsigned today (see `WIN_CSC_LINK`).
+   Setup exe on Windows. Windows signing is still unchecked: that build is
+   unsigned today (see `WIN_CSC_LINK`).
 
    The manifests are what `electron-updater` actually reads. Worth checking by
    hand:
