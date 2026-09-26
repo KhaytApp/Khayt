@@ -4,6 +4,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) The library's filters are a few menus instead of a row of
+  bubbles, and it opens as one grid of every model.** Reported by the shop:
+  "the library filter and grouping is not practical, too many bubbles to go
+  through". Every creator, category and tag was its own chip in one row, which
+  ran off the window. Now there are five menus (Show, Ready on, Creator,
+  Category, Tag). Each says what it is set to and lists its choices with counts.
+  The library also opens on **All models**, newest first, with **Groups** one
+  click away, so a model just added is on screen at once rather than inside a
+  folder.
+
 - **(Mac) Layout, dark-mode and wording fixes from a review of the shop's real
   book.**
   - **Board:** the lanes sit at the top of the window instead of floating in

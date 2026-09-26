@@ -12002,6 +12002,11 @@ final class Shop {
         guard case .library(let group) = shelf else {
             return shownFiles.map { LibraryEntry.file($0) }
         }
+        // Every model, flat, at the top of the library. Inside a folder the
+        // folder's own levels still show.
+        if libraryFlat, group == nil {
+            return shownFiles.map { LibraryEntry.file($0) }
+        }
         // INSIDE a folder as well as at the top. A project with levels shows
         // its sub-folders when it is opened; before this it showed a flat list
         // of everything beneath it, which is the same flattening the import
@@ -12263,6 +12268,10 @@ final class Shop {
     var libraryReadyOn: String? { didSet { recountLibrarySoon() } }
     /// One creator's models. See `LibraryFile.creator`.
     var libraryCreator: String? { didSet { recountLibrarySoon() } }
+    /// The library as one flat grid of models (true, the default) or as
+    /// folders. Flat by default so a model just added is on screen at once,
+    /// newest first, rather than inside a folder named after a sub-folder.
+    var libraryFlat = true
     /// The shop's Print next list.
     var libraryPrintNextOnly = false { didSet { recountLibrarySoon() } }
     /// Models that are the same file, or the same mesh, as another.
