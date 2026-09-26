@@ -244,3 +244,46 @@ struct StagedPicture: Identifiable, Sendable {
                  "caption": .string(caption)])
     }
 }
+
+extension ProductPhotos {
+
+    /// A job's photo, as a `print`-kind picture on its product.
+    ///
+    /// Everything about what the picture MEANS is `product-images.addImage`'s:
+    /// appended rather than made primary, an id nobody else on the product
+    /// has, and the same picture twice is one picture. What is here is the
+    /// order of the two writes: the id is minted first, because the filename
+    /// is built from it, then `writeFile` puts the bytes down, and only then
+    /// are the record's fields returned for the caller to write.
+    ///
+    /// Nil when that exact picture is already on the product — nothing was
+    /// written and there is nothing to write.
+    @MainActor
+    static func addPrintPhoto(_ made: (thumb: String, full: Data), to product: JSONValue,
+                              productId: String, engine: KhaytEngine,
+                              writeFile: (_ imageId: String) throws -> String) async throws -> [String: JSONValue]? {
+        let out = try await engine.addProductImage(product, image: .object([
+            "thumbnail": .string(made.thumb), "path": .string(""),
+            "kind": .string("print"), "caption": .string(""),
+        ]))
+        guard out.added else { return nil }
+        let path = try writeFile(out.image.id)
+        guard case .object(var record) = out.product, case .array(var images)? = record["images"] else {
+            throw Failure.couldNotEncode
+        }
+        for i in images.indices {
+            guard case .object(var image) = images[i], image["id"] == .string(out.image.id) else { continue }
+            image["path"] = .string(path)
+            images[i] = .object(image)
+        }
+        record["images"] = .array(images)
+        // The legacy view (`imagePath`, `thumbnail`) is the rule's to mirror,
+        // not a Swift copy's — the storefront, portal and labels still read it.
+        guard case .object(let applied) = try await engine.applyProductPictures(.object(record)) else {
+            throw Failure.couldNotEncode
+        }
+        var fields: [String: JSONValue] = [:]
+        for key in ["images", "imagePath", "thumbnail"] { fields[key] = applied[key] ?? .string("") }
+        return fields
+    }
+}

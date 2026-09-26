@@ -137,6 +137,14 @@ struct Portfolio: View {
                 .disabled(snap.file == nil)
             Button(shop.words.callIt("mac.reveal")) { shop.revealPhoto(snap) }
                 .disabled(snap.file == nil)
+            // The same action the job offers, where the good photos are seen
+            // side by side.
+            if let job = shop.orders.first(where: { $0.id == snap.orderId }),
+               shop.canUseAsProductPhoto(job) {
+                Button(shop.words.callIt("mac.use_as_product_photo")) {
+                    Task { await shop.useAsProductPhoto(snap) }
+                }
+            }
             Divider()
             // In the menu rather than the toolbar: the toolbar belongs to the
             // window, and a screen that adds to it is a screen that can rebuild

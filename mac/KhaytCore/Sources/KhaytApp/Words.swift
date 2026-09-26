@@ -880,6 +880,15 @@ final class Words {
         "mac.photo_where": ["en": "Open a finished job and choose “Add a photo of the print”.",
                             "ar": "افتح طلبًا منتهيًا واختر «إضافة صورة للطباعة»."],
         "mac.show_finished_jobs": ["en": "Show finished jobs", "ar": "عرض الطلبات المنتهية"],
+        // The job's photos — the printer's own at the end of a print, or the
+        // shop's — and putting one on the product as the real thing.
+        "mac.print_photos": ["en": "Photos of the print", "ar": "صور الطباعة"],
+        "mac.use_as_product_photo": ["en": "Use as product photo",
+                                     "ar": "استخدامها صورةً للمنتج"],
+        "mac.product_photo_added": ["en": "Added to the product as a photo of the real print.",
+                                    "ar": "أُضيفت إلى المنتج كصورة للقطعة المطبوعة فعلًا."],
+        "mac.product_photo_already": ["en": "This photo is already on the product.",
+                                      "ar": "هذه الصورة موجودة في المنتج بالفعل."],
 
         // The shop's own saved messages.
         "mac.send_a_message": ["en": "Send a message", "ar": "إرسال رسالة"],

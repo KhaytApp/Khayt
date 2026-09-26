@@ -113,6 +113,13 @@ private struct Detail: View {
                     Divider()
                     AddPrintPhoto(shop: shop, job: job)
                 }
+                // The photos already on it — the printer's own, taken at the
+                // end of the print, or the shop's — and the one thing worth
+                // doing with a good one: putting it on the product.
+                if !shop.photos(of: job).isEmpty {
+                    Divider()
+                    JobPhotos(shop: shop, job: job)
+                }
                 if shop.kit(of: job.id) != nil || !shop.kits.isEmpty || shop.canWrite {
                     Divider()
                     KitSection(shop: shop, job: job)
@@ -423,6 +430,58 @@ struct ZatcaLine: View {
         case "accepted": "checkmark.seal.fill"
         case "rejected", "error": "exclamationmark.triangle.fill"
         default: "clock.badge.exclamationmark"
+        }
+    }
+}
+
+/// A job's photos, each with "Use as product photo" when the job was made
+/// from a catalogue product.
+///
+/// Rows of fixed size rather than a grid: an inspector column is narrow, and a
+/// thumbnail whose height follows its width is the shape `Portfolio` records
+/// fighting a layout loop over.
+struct JobPhotos: View {
+    let shop: Shop
+    let job: Order
+
+    @State private var working: String?
+    @State private var said: [String: Shop.ProductPhotoResult] = [:]
+
+    var body: some View {
+        DetailSection(shop.words.callIt("mac.print_photos")) {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                ForEach(shop.photos(of: job)) { snap in
+                    HStack(spacing: Space.xs) {
+                        Thumbnail(source: snap.thumb.map(ThumbnailSource.inlineData))
+                            .frame(width: 64, height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .onTapGesture(count: 2) { shop.openPhoto(snap) }
+                        VStack(alignment: .leading, spacing: 2) {
+                            if shop.canUseAsProductPhoto(job) {
+                                Button(shop.words.callIt("mac.use_as_product_photo")) {
+                                    working = snap.id
+                                    Task {
+                                        said[snap.id] = await shop.useAsProductPhoto(snap)
+                                        working = nil
+                                    }
+                                }
+                                .buttonStyle(.link)
+                                .font(.callout)
+                                .disabled(working != nil)
+                            }
+                            if let result = said[snap.id], result != .failed {
+                                Text(shop.words.callIt(result == .added
+                                                       ? "mac.product_photo_added"
+                                                       : "mac.product_photo_already"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        if working == snap.id { ProgressView().controlSize(.small) }
+                    }
+                }
+            }
         }
     }
 }

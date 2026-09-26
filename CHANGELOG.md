@@ -101,6 +101,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   along the way: a job made from an online order used to lose the store's order
   number, so a repeat of that order could not be recognised.
 
+- **(Mac) The printer takes its own photo when a print finishes.** When a
+  watched printer with a camera finishes a job, Khayt grabs one picture from
+  its camera and puts it on the job that was printing, so it appears in the job
+  and in Portfolio. It happens once per print, and never for a print that was
+  cancelled or failed. If the camera does not answer, nothing else is held up;
+  you can still add a photo by hand. On the job (or from Portfolio), **Use as
+  product photo** adds that picture to the product the job was made from,
+  labelled as a photo of the actual print, which the web store shows right
+  after your main picture. Your main picture stays the main one.
+
 - **Security: a store or carrier notification could be replayed.** Salla,
   Zid, SMSA, Aramex and Saudi Post sign each notification's content but not
   when it was sent, so a copy captured once stays valid. Khayt remembered what

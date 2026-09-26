@@ -239,7 +239,11 @@ final class PrinterWatch {
         // raise an alert about a print that finished yesterday.
         previous = [:]
         alertState = .object([:])
+        finishCamera.reset()
     }
+
+    /// The edge into a finished print, for the printer's own photo.
+    let finishCamera = FinishCamera()
 
 
     // ── FREEZING WHAT A FINISHED JOB USED ────────────────────────────────────
@@ -264,6 +268,16 @@ final class PrinterWatch {
         // whatever somebody adds to it next without anything saying so.
         guard let data = try? JSONEncoder().encode(status),
               let row = try? JSONDecoder().decode(JSONValue.self, from: data) else { return }
+        // THE END OF A PRINT, and the printer's own photo of it. Its own
+        // memory and its own rule (`print-finish-photo`), because a completion
+        // is frozen for a cancelled print too and a photo must not be — the
+        // rule says how it ended. Handed off rather than awaited: a camera
+        // five seconds from timing out must not hold the next machine's poll,
+        // and nothing it does can fail the poll.
+        if let edge = await finishCamera.observe(machineId, status: row, engine: engine),
+           let machine = shop.machines.first(where: { $0.id == machineId }) {
+            Task { await shop.printEnded(machine, edge: edge) }
+        }
         let before = pollCache[machineId] ?? .object([:])
         guard let after = try? await engine.mergePoll(previous: before, status: row, now: Date())
         else { return }
