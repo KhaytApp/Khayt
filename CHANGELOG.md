@@ -4,21 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **(Maintainers) Two Mac tests stopped failing with the calendar.** They
-  loaded the sample book as of today, which moves every date in it, and then
-  measured it at a fixed date. On 2026-09-26 the refund quarter and the
-  break-even month slid out from under them, and "Mac app tests" went red on
-  every PR. Both now load the book as of the day it was written for.
-
-- **Choose which products are on your web store, and see what needs fixing
-  before you publish.** Each product in Settings → Storefront has an "On
-  store" box: untick it and the product stays in Khayt but is not published.
-  It is saved on the product, so the Mac app sees the same choice. And
-  Publish now looks at your listings first and tells you which have no price,
-  no photo, no description or no category, a second language that is missing
-  or just repeats the first, or a name that reads like a file name, and lets
-  you publish anyway or go back and fix them.
-
 - **(Mac) Choose what goes on the web store, check it before it goes, and
   set up the store itself.** Asked for by the shop after a review of its first
   published catalogue.
@@ -93,14 +78,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   window does not draw, so neither could be reached. Reported by the shop:
   "there is no webstore".
 
-- **(Maintainers) The storefront catalogue is built in one place.** The
-  payload a shop publishes to its online store was assembled inside the
-  desktop's Storefront dialog, so the native Mac app could not publish at all
-  without a second builder in Swift that would drift. It is
-  `lib/storefront-catalog.js` now (`KhaytStorefrontCatalog.build`); the
-  desktop calls it, and was checked byte-for-byte against the old builder,
-  with and without photos, when it moved. Each host supplies only the shop's
-  name, the interface language and its resized hero pictures.
 - **(Mac) Publish the catalogue to your web store from the Mac.** Reported by
   the shop: "why is the app not syncing everything to the cloud … how am I
   going to list stuff on my webstore". Only the desktop app's Storefront dialog
@@ -123,12 +100,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   by a reader made once; the library opens in the same time as every other
   screen. And a folder of one model says "1 model".
 
-- **A model with more than one plate was priced at one plate's hours.** For
-  a Bambu Studio or OrcaSlicer file sliced onto several plates, Khayt read
-  the print time of the first plate only, but the filament of every plate,
-  so the quote charged for all the plastic and a fraction of the machine
-  time. Both figures now cover every plate. Found on a real two-plate file in
-  a shop's library.
 - **(Mac) Choose which plates of a multi-plate 3MF to price.** Asked for by
   the shop: "if it's a 3MF with multiple plates I should be able to pick which
   plate to price, and whether all or specific ones". Each plate the slicer cut
@@ -194,7 +165,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   tracks a print live instead of showing the book's last status. Read from
   what the Mac already holds; asking it never polls a printer.
 
-
 - **(iOS) Printers are tracked live.** While a screen that shows a printer is
   open — Machines, a printing job on Home or in Orders, or that job's page —
   the phone asks the shop what its machines are doing every four seconds: the
@@ -210,14 +180,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   than two minutes ago is not shown as live: the screen says when the Mac last
   reported instead.
 
-- **Cloud sync stops retrying what retrying cannot fix, and says why.** When
-  Khayt Cloud refuses for a reason that will not pass on its own (this version
-  cannot read the shop's newer changes, the store is over the plan's size, or
-  the sign-in is rejected or read-only), the desktop kept trying on a timer for
-  as long as it was open. It now stops and shows the cloud's own explanation.
-  The next change you make, or Sync now, tries again, so updating, upgrading
-  or signing back in is enough; a network or server outage is still retried
-  on its own.
 - **(Mac) The library can be browsed by creator, keeps a Print next list, and
   finds its own duplicates.** Asked for by the shop after looking at LayerMate.
   - **Creators:** a chip per designer — the one the file names, or the shop
@@ -241,7 +203,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     found. New files are picked up when the book opens, or with "Look for new
     models". (The desktop app does not read linked models yet, and shows them
     as missing.)
-
 
 - **(iOS) The last sheets speak the v2 design, and the typeface ships its
   licence.** Quote, waste, expense and writing an NFC tag are built from the
@@ -3427,6 +3388,62 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.10.0] - 2026-09-26
+
+The work since 3.9.2. Individual entries are kept below; this is what
+changed for you.
+
+**Choose what goes on your web store, and see what needs fixing first.**
+Each product in Settings → Storefront has an "On store" box, so a test
+piece or a product you are not selling yet can stay in Khayt without being
+published. The choice is saved on the product, so the Mac app sees it too.
+And before anything goes public, Publish now tells you which listings have
+no price, no photo, no description or no category, a second language that
+is missing or repeats the first, or a name that reads like a file name —
+and lets you publish anyway or fix them first.
+
+**A model with several plates is priced as all of them.** A Bambu Studio or
+OrcaSlicer file sliced onto more than one plate was quoted every plate's
+filament but only the first plate's print time. Both now cover every plate.
+
+**Built for Mac, Windows and Linux**, and each one opened before it was
+published.
+
+### Added
+
+- **Choose which products are on your web store, and see what needs fixing
+  before you publish.** Each product in Settings → Storefront has an "On
+  store" box: untick it and the product stays in Khayt but is not published.
+  It is saved on the product, so the Mac app sees the same choice. And
+  Publish now looks at your listings first and tells you which have no price,
+  no photo, no description or no category, a second language that is missing
+  or just repeats the first, or a name that reads like a file name, and lets
+  you publish anyway or go back and fix them.
+
+### Fixed
+
+- **(Maintainers) Two Mac tests stopped failing with the calendar.** They
+  loaded the sample book as of today, which moves every date in it, and then
+  measured it at a fixed date. On 2026-09-26 the refund quarter and the
+  break-even month slid out from under them, and "Mac app tests" went red on
+  every PR. Both now load the book as of the day it was written for.
+
+- **(Maintainers) The storefront catalogue is built in one place.** The
+  payload a shop publishes to its online store was assembled inside the
+  desktop's Storefront dialog, so the native Mac app could not publish at all
+  without a second builder in Swift that would drift. It is
+  `lib/storefront-catalog.js` now (`KhaytStorefrontCatalog.build`); the
+  desktop calls it, and was checked byte-for-byte against the old builder,
+  with and without photos, when it moved. Each host supplies only the shop's
+  name, the interface language and its resized hero pictures.
+
+- **A model with more than one plate was priced at one plate's hours.** For
+  a Bambu Studio or OrcaSlicer file sliced onto several plates, Khayt read
+  the print time of the first plate only, but the filament of every plate,
+  so the quote charged for all the plastic and a fraction of the machine
+  time. Both figures now cover every plate. Found on a real two-plate file in
+  a shop's library.
 
 ## [3.9.2] - 2026-09-25
 
