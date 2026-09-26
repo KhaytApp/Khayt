@@ -552,3 +552,4 @@
    (loc-key), never text, so the alert is in the phone's language. */
 "PUSH_TITLE" = "Khayt";
 "PUSH_PRINT_FINISHED" = "A print finished";
+"PUSH_INTAKE" = "New order request";

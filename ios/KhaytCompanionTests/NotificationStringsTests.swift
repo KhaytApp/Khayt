@@ -23,3 +23,13 @@ final class NotificationStringsTests: XCTestCase {
         }
     }
 }
+
+/// The extension leaves a push it does not open exactly as Apple delivered it.
+final class NotificationPassThroughTests: XCTestCase {
+    func testTheExtensionOnlyReadsPrintFinished() {
+        // `intake` has no `k.ct`; nothing here may try to open or fetch it.
+        let src = try? String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "KhaytAlerts/NotificationService.swift"), encoding: .utf8)
+        XCTAssertTrue(src?.contains(#"kind == "print-finished""#) ?? false)
+    }
+}

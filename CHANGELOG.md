@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(iOS) "New order request" on the lock screen.** Khayt Cloud now alerts a
+  shop's phones when a customer submits an order request — from the public
+  form, the storefront or a platform import — even with the Mac off. The
+  phone carries the words for it in English and Arabic; the alert holds no
+  customer details, and the notification extension shows it as it arrives.
+
 - **(Mac) Reports shows the filament bought in the period.** Filament is now
   counted as stock and costed when a job uses it, so it is no longer in
   expenses. The Mac's Reports lists "Filament bought" beside the P&L, as the

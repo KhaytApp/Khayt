@@ -40,6 +40,10 @@ final class NotificationService: UNNotificationServiceExtension {
         deliver = nil
     }
 
+    /// Only `print-finished` is opened. Every other kind is shown as Apple
+    /// delivered it — `intake`, the cloud's own "New order request", carries
+    /// no sealed details at all (the cloud holds no shop key), so there is
+    /// nothing to open and nothing to fetch.
     static func rewrite(_ info: [AnyHashable: Any]) async -> UNMutableNotificationContent? {
         guard let k = info["k"] as? [String: Any],
               let kind = k["kind"] as? String, kind == "print-finished",
