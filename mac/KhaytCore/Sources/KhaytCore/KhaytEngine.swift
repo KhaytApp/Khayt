@@ -169,6 +169,10 @@ public actor KhaytEngine {
         // colours against a machine's heads, perceptually and by material
         // family. Needs `color-mix` above it.
         "loaded-colours",
+        // One machine's waiting jobs in an order that changes spools less
+        // often, without making any of them late or jumping a priority. Needs
+        // `loaded-colours` above it.
+        "swap-queue",
         // Groups and categories. Pure, and bundled rather than ported because
         // the rule that matters is not the reading — it is that a name matching
         // one already in use IS that name and adopts its spelling. "Saudi Kings"
@@ -7789,6 +7793,67 @@ public actor KhaytEngine {
         ARG0.filter(function (m) { return m && m.id && KhaytLoadedColours.fit(m, ARG1).fits; })
              .map(function (m) { return String(m.id); })
         """, [.array(rows), slots], as: [String].self)
+    }
+
+    /// One machine's waiting jobs, grouped by colour: `lib/swap-queue.js`.
+    ///
+    /// A PROPOSAL, like the scheduler's: it returns an order and what it saves
+    /// against the order given, and writes nothing. `jobs` are in the current
+    /// order, each `{ id, colors: [{hex}], material, printTime (hours),
+    /// dueDate, priorityLevel, priority }`.
+    public func swapQueue(jobs: [JSONValue], loaded: [LoadedSlot], heads: Int,
+                          swapMinutes: Double, startHours: Double,
+                          now: Date = Date()) throws -> SwapQueue {
+        let slots = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(loaded))
+        return try runtime.call2(
+            "KhaytSwapQueue.plan(ARG0, { loaded: ARG1, heads: ARG2, swapMinutes: ARG3, startHours: ARG4, now: ARG5 })",
+            [.array(jobs), slots, .number(Double(heads)), .number(swapMinutes), .number(startHours),
+             .number(now.timeIntervalSince1970 * 1000)],
+            as: SwapQueue.self)
+    }
+
+    /// The shop's minutes per spool change, or the rule's own default — read
+    /// from the rule rather than copied, so the two cannot disagree.
+    public func swapMinutes(settings: [String: JSONValue]) throws -> Double {
+        try runtime.call2("KhaytSwapQueue.swapMinutesFrom(ARG0)", [.object(settings)], as: Double.self)
+    }
+
+    /// What grouping one machine's queue by colour would do.
+    public struct SwapQueue: Decodable, Sendable, Equatable {
+        /// Job ids in the proposed order. The current order when nothing
+        /// better keeps every promise.
+        public let order: [String]
+        public let changed: Bool
+        public let swapMinutes: Double
+        public let heads: Int
+        /// False when the machine reports nothing loaded and nobody typed it:
+        /// every colour then counts as a load, in both orders alike.
+        public let loadedKnown: Bool
+        public let current: Tally
+        public let proposed: Tally
+        public let saved: Tally
+        public let jobs: [Job]
+
+        public struct Tally: Decodable, Sendable, Equatable {
+            public let swaps: Int
+            public let minutes: Double
+        }
+
+        public struct Job: Decodable, Sendable, Equatable {
+            public let id: String
+            public let position: Int
+            public let was: Int
+            /// False when the job's models carry no colours: nothing counted.
+            public let known: Bool
+            public let swapsNow: Int
+            public let swapsPlanned: Int
+            public let delta: Int
+            public let minutesDelta: Double
+            /// Hours from now until it comes off, swap time included — in
+            /// the current order, and in the proposed one.
+            public let finishHoursNow: Double
+            public let finishHours: Double
+        }
     }
 
     /// One model against what is loaded.

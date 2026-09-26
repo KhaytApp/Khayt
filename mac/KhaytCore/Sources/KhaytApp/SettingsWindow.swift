@@ -744,6 +744,9 @@ struct OperationsPane: View {
         var autoDraftPo = false
         var payReminderEnabled = false, payReminderGrace = 3.0
         var quoteFollowUpEnabled = false, quoteFollowUpWindow = 2.0
+        /// Minutes one spool change takes — an ESTIMATE, used only to say what
+        /// grouping the queue by colour saves (`lib/swap-queue.js`).
+        var swapMinutes = OperationsPane.swapMinutesDefault
 
         static let days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
         static let columns = ["pending", "printing", "post", "qc"]
@@ -771,7 +774,8 @@ struct OperationsPane: View {
                 autoDraftPo: r.flag("autoDraftPo"),
                 payReminderEnabled: pay.flag("enabled"), payReminderGrace: pay.number("graceDays", 3),
                 quoteFollowUpEnabled: follow.flag("enabled"),
-                quoteFollowUpWindow: follow.number("windowDays", 2))
+                quoteFollowUpWindow: follow.number("windowDays", 2),
+                swapMinutes: r.number("swapMinutes", OperationsPane.swapMinutesDefault))
             for category in Shop.expenseCategories {
                 d.budgets[category] = Shop.plainNumber(budgets[category]) ?? 0
             }
@@ -803,9 +807,14 @@ struct OperationsPane: View {
              "paymentReminder": .object(["enabled": .bool(payReminderEnabled),
                                          "graceDays": .number(payReminderGrace)]),
              "quoteFollowUp": .object(["enabled": .bool(quoteFollowUpEnabled),
-                                       "windowDays": .number(quoteFollowUpWindow)])]
+                                       "windowDays": .number(quoteFollowUpWindow)]),
+             "swapMinutes": .number(swapMinutes)]
         }
     }
+
+    /// What the field shows for a shop that never set it. The rule's own
+    /// `DEFAULT_SWAP_MINUTES`; `SwapPlanningTests` holds the two together.
+    nonisolated static let swapMinutesDefault = 3.0
 
     @State private var draft = Draft()
     @State private var original = Draft()
@@ -918,6 +927,11 @@ struct OperationsPane: View {
                 // Beside the other two opt-in automations, which is what it is.
                 // The words are the other app's — it has had this switch all
                 // along — so they arrive in nine languages rather than two.
+                Section {
+                    numberRow("mac.swap_minutes", $draft.swapMinutes)
+                } footer: {
+                    Text(shop.words.callIt("mac.swap_minutes_hint"))
+                }
                 Section {
                     Toggle(shop.words.callIt("reorder.auto_toggle"), isOn: $draft.autoDraftPo)
                 } footer: {
