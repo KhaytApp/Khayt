@@ -489,11 +489,22 @@ extension Shop {
     /// Save Drive's folder and the free-up-space rule, with Drive as the
     /// remote: the bucket's backing up is switched off, since the bucket wins
     /// whenever it is on.
-    func saveDriveLibrary(folderName: String, tierOn: Bool, keepDays: Int) async {
+    func saveDriveLibrary(folderName: String, tierOn: Bool, keepDays: Int,
+                          clientId: String = "", typedSecret: String = "") async {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
         do {
+            // THE CLIENT ID IS KEPT. Save used to write only the folder and the
+            // tier rule, then reload the form from the book — so the client id
+            // and secret the shop had just typed vanished, Connect (which needs
+            // an id) went grey, and the only answer on screen was "Saved".
+            // Reported by the shop: "all I got was saved and nothing else".
+            let id = clientId.trimmingCharacters(in: .whitespaces)
+            if !id.isEmpty {
+                let typed = typedSecret.trimmingCharacters(in: .whitespaces)
+                try await writeDrive(clientId: id, clientSecret: typed.isEmpty ? nil : typed, folderName: folderName)
+            }
             try StoreWriter.update(build) { root in
                 var settings = Self.settings(root)
                 var library: [String: JSONValue] = [:]
@@ -513,7 +524,11 @@ extension Shop {
                 root["settings"] = .object(settings)
             }
             await load(source)
-            cloudLibraryNote = words.callIt("mac.cloudlib_saved")
+            // Saved is not connected: say what is left to do.
+            var connected = false
+            if case .object(let l)? = settingsDict["printLibrary"], case .object(let gd)? = l["gdrive"],
+               case .string(let t)? = gd["refreshToken"] { connected = !t.isEmpty }
+            cloudLibraryNote = words.callIt(connected ? "mac.cloudlib_saved" : "mac.gdrive_saved_connect")
         } catch {
             cloudLibraryProblem = cloudSay(error)
         }
