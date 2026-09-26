@@ -21,14 +21,13 @@ test('computePnl totals revenue, cogs, gross, expenses-by-category, net', () => 
   assert.equal(s.cogs, 60);
   assert.equal(s.grossProfit, 100);
   assert.equal(s.grossMargin, 62.5);
-  assert.equal(s.expensesTotal, 65);
-  assert.equal(s.netProfit, 35); // 100 gross - 65 opex
+  // Filament is stock (accrual, 2026-09-26): the 40 bought is in cogs as it is
+  // used, so it is not an operating expense as well.
+  assert.equal(s.expensesTotal, 25);
+  assert.equal(s.inventoryPurchases, 40);
+  assert.equal(s.netProfit, 75); // 100 gross - 25 opex
   assert.equal(s.vatCollected, 20.87);
-  // categories sorted by amount desc
-  assert.deepEqual(s.expensesByCategory, [
-    { category: 'Filament', amount: 40 },
-    { category: 'Rent', amount: 25 },
-  ]);
+  assert.deepEqual(s.expensesByCategory, [{ category: 'Rent', amount: 25 }]);
 });
 
 test('computePnl handles empties + blank category', () => {

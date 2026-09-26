@@ -1965,6 +1965,8 @@
   "pnl.item": "項目",
   "pnl.amount": "金額",
   "pnl.cogs": "売上原価",
+  "pnl.inventory": "購入したフィラメント（在庫、使用時に計上）",
+  "pnl.inventory_note": "この期間に購入したフィラメント：{amount}。在庫として扱い、注文で使用したときに売上原価に計上するため、上の経費には含まれません。",
   "pnl.gross": "売上総利益",
   "pnl.gross_margin": "売上総利益率 %",
   "pnl.opex": "営業費用",
