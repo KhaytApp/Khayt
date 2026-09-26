@@ -4122,6 +4122,211 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.51] - 2026-09-26
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Web-store orders become jobs, WhatsApp updates, a nightly off-site backup,
+print-finished alerts on the iPhone, profit per printer hour, and a library
+that opens on your newest models without freezing.
+
+### Added
+
+- **(Mac) Paid web-store orders now become jobs on their own.** Every couple of
+  minutes the Mac collects paid orders from your web store and makes each one a
+  job. The job is priced from your catalogue, filed under the right customer
+  (found by email or phone, or added as a new online customer) and marked paid.
+  Anything you already have on the shelf is taken off your stock count. The same
+  order never becomes two jobs, even if the store sends it twice. A notice tells
+  you what arrived, and Online orders now shows which order became which job.
+  Orders the store has not marked as paid wait there for you, with the reason
+  shown. The Mac is also ready to send each job's progress back to the store:
+  printing, shipped with tracking number, and delivered. That starts once Khayt
+  Cloud adds the route for it (docs/handoffs/webstore-order-status.md). Fixed
+  along the way: a job made from an online order used to lose the store's order
+  number, so a repeat of that order could not be recognised.
+
+- **(Mac) WhatsApp updates to customers.** When a job is received, ready,
+  shipped or delivered, the job now offers "Send on WhatsApp". WhatsApp opens
+  on the customer's number with the message already typed, in the customer's
+  language (Arabic or English), and you press send there. Shipped updates
+  include the carrier and tracking number. Numbers typed as `05…`, `9665…`,
+  `+966…` or in Arabic digits all work, and a number WhatsApp can't use is
+  explained instead of opening an empty chat. You can change the words for
+  each step in Settings › Integrations (WhatsApp templates now have "Sent when"
+  and a language). Each message you open is written to the customer's
+  communications log, and the job then shows when it was sent. Customers have
+  a WhatsApp button and a "Messages in" language choice, and the customer
+  sheet shows the number WhatsApp will use as you type it. Also fixed: ticking
+  "no marketing" on the customer sheet did not stick, because saving the sheet
+  wrote it back as unticked. No WhatsApp Business account is needed.
+
+- **(Mac) An off-site backup of the book, every night.** Until now the only
+  backups sat beside the book on the same Mac, so a lost or broken Mac took
+  them with it. Settings → Preferences → Off-site backup now sends an
+  encrypted copy each night to a folder such as iCloud Drive, to the bucket
+  or Google Drive already set up for the print library (no second set of
+  keys), and keeps the last 30 days plus one a month for the year before.
+  The copy is locked with your Khayt Cloud key, so on a new Mac you sign in
+  with your passphrase and choose **Restore from Off-site…** to bring it
+  back; the book you have is copied first, as with any restore. Without
+  Khayt Cloud signed in and unlocked nothing is sent, and the pane says so.
+  It shows when the last copy went and how big it was, and a banner appears
+  if it has been failing for more than two days. Nothing is switched on for
+  you: the old bucket details left in the book from August are not used
+  unless you pick them.
+
+- **(Mac) When a print ends, the shop's iPhones are told.** The Mac sends a
+  sealed "print finished" event to Khayt Cloud, which passes it to any open
+  Khayt screen and as a notification to the shop's iPhones. The event says
+  which printer, which job, how long it took and whether it finished, failed
+  or was cancelled. The iPhone decrypts it and offers the next step. Only the
+  kind of event is readable in the cloud; the details are sealed with the
+  shop's key. It is best-effort: a notification that cannot be sent never holds
+  up the printer or the job.
+  Settings › Online has a **Send a test alert** button to check the phone
+  receives it without waiting for a print.
+
+- **(Mac) The printer takes its own photo when a print finishes.** When a
+  watched printer with a camera finishes a job, Khayt grabs one picture from
+  its camera and puts it on the job that was printing, so it appears in the job
+  and in Portfolio. It happens once per print, and never for a print that was
+  cancelled or failed. If the camera does not answer, nothing else is held up;
+  you can still add a photo by hand. On the job (or from Portfolio), **Use as
+  product photo** adds that picture to the product the job was made from,
+  labelled as a photo of the actual print, which the web store shows right
+  after your main picture. Your main picture stays the main one.
+
+- **(Mac) See which products earn the most for each hour on the printer.**
+  With one printer, machine time runs out before anything else, so two
+  products that make the same profit per sale are not equal if one takes ten
+  times as long. The Catalogue has a new "Per hour" column you can sort by:
+  (price − cost) ÷ print hours. Reports has a "Best use of the printer" card
+  ranking the catalogue that way, showing what finished jobs actually earned
+  per hour next to the planned figure, and pointing out products that earn
+  well below your own average with a price that would bring them level. The
+  Web Store sheet quietly suggests which listed products to feature and which
+  may be underpriced. Products with no print hours or no price show a dash
+  instead of a made-up number, and jobs marked Not business are left out.
+
+- **(Mac) The schedule suggestion now groups work by colour.** On a
+  toolchanger like the Snapmaker U1, every job that needs a spool that is not
+  loaded means somebody changing it by hand. Suggest Assignments now also
+  works out an order for each printer that runs the jobs sharing the loaded
+  colours together, starting with what is on the heads now, and says what that
+  saves: "Grouped by colour saves 10 colour changes (~30 min)". Each job shows
+  how many changes it adds, and a switch goes back to the plain order. Due
+  dates and priority come first: no job is made late, and no urgent job falls
+  behind a normal one, to save a change. The minutes are an estimate: 3 per
+  spool change by default, which you can change under Settings › Operations.
+  Khayt does not store a queue order, so the grouped order is a suggestion for
+  the order to print in. Applying still assigns printers only.
+
+- **(Mac) The library's filters are a few menus instead of a row of
+  bubbles, and it opens as one grid of every model.** Reported by the shop:
+  "the library filter and grouping is not practical, too many bubbles to go
+  through". Every creator, category and tag was its own chip in one row, which
+  ran off the window. Now there are five menus (Show, Ready on, Creator,
+  Category, Tag). Each says what it is set to and lists its choices with counts.
+  The library also opens on **All models**, newest first, with **Groups** one
+  click away, so a model just added is on screen at once rather than inside a
+  folder.
+
+- **(Mac) The library opens newest-added first, and can be sorted from the
+  Library screen.** Asked for by the shop: "after adding files I have to look
+  for them, I want to see them immediately". **Date added** is the new default.
+  The sort choice (date added, favourites first, name, size, last printed,
+  times printed) is now a button beside Import, not only in the View menu.
+
+### Fixed
+
+- **(Mac) Adding a large model no longer freezes the window.** Reported by
+  the shop: "I tried adding a file and it is stuck with a loading ball". The
+  import measured the model on the main thread, so a large 3MF took the whole
+  window with it. The file is now read, hashed, copied and measured in the
+  background. Measuring is also faster: the reader was rebuilding a small text
+  pattern for every tag in the file, and a 55 MB model has millions of tags.
+
+- **(Mac) Four screens that contradicted themselves on the shop's real book now
+  agree.** Reports printed a -495.8% margin beside a net income of 50.00: net
+  income now takes the cost of goods off as well (`lib/pnl-report.js`, so the
+  desktop P&L table and its "Net profit" headline agree too), and both apps show
+  a Cost of goods line so the figures add up. The dashboard said "0 things need
+  you" over 19 finished jobs charged nothing; it now says so, with one button
+  that marks them all Not business in a single undoable write. The machine band
+  said "Free · 48:00" (96:00 in total) for printers that were not answering; a
+  connected printer that has never answered is now "Not answering" with its
+  hours unknown. And money is written one way: the masthead put the Riyal mark
+  before the figure while every other screen put it after, and the Jobs Total
+  column had no currency at all.
+
+- **Net profit counted your filament twice.** Filament you record as bought —
+  from a purchase order or typed in as an expense — was taken off your
+  profit the day it arrived, and again as the cost of each job that used it,
+  so net profit read lower than it was. Filament is now counted once, when it
+  is used: the P&L treats what you buy as stock, shows it on its own line,
+  and takes it off profit as the cost of goods of the work that uses it. The
+  tax you paid on it is still counted as reclaimable. **Net profit figures
+  you have looked at before will be higher**, by what the filament had been
+  counted a second time.
+
+- **(Mac) Reports shows the filament bought in the period.** Filament is now
+  counted as stock and costed when a job uses it, so it is no longer in
+  expenses. The Mac's Reports lists "Filament bought" beside the P&L, as the
+  desktop does, so the money spent is still visible.
+
+- **(Mac) Products costed on a spool's grams left are repaired and
+  re-priced.** The shop chose to have them corrected rather than wait for
+  each one to be edited. When a book opens, a product part whose stored spool
+  size differs from its spool's real size (1000 g when none is recorded) is
+  corrected, and the product is priced by the same rule the product editor
+  uses. A product changed in the meantime is left alone. On the shop's book
+  this re-priced four products by one or two riyals.
+
+- **(Mac) Layout, dark-mode and wording fixes from a review of the shop's real
+  book.**
+  - **Board:** the lanes sit at the top of the window instead of floating in
+    the middle, and the edge where more lanes wait fades so the cut-off columns
+    read as "scroll for more". When jobs have left the board by being delivered
+    or cancelled, a line above the lanes says how many and opens Jobs.
+  - **Library:** file and group names with no spaces (`Kimba_gleam_stardemy`)
+    wrap after their `_`, `+`, `-` and `.` rather than mid-word, end in an
+    ellipsis when still too long, and show the full name on hover. Filter chip
+    rows (library and catalogue) fade at whichever end has more chips.
+  - **Clipping:** the Expenses order column is headed "Order" rather than the
+    form's clipped "Link to order (optional)". The Reports tab is now "Profit
+    & Loss", so it no longer repeats (or, on By month, contradicts) the By
+    quarter / By month switch beside it.
+  - **Dark mode:** "Record a payment" draws a legible outline when the book is
+    read-only instead of brown text on a brown fill. Search placeholders use
+    the strip's secondary ink in dark mode too (a styled prompt is ignored
+    there, so the placeholder is drawn by the app). Spool prices on the
+    Inventory shelf use the secondary ink rather than the tertiary.
+  - **Wording:** "Issue gift card", "Gift card code", "Failure category",
+    "Add supplier" and "Edit supplier" are sentence case on the Mac, and an
+    empty waste log says "No waste logged yet." without the "great job!".
+  - **Spool colours** written as `#RGB` or `RRGGBBAA` (as a Bambu AMS reports
+    them) are drawn instead of falling back to the unknown grey.
+
+- **Arabic review fixes, from screenshots of the shop's own book** (shared
+  Arabic catalogue and the Mac app).
+  - "Hex colour" no longer reads as "hexagonal" (سداسي): it is «رمز لون (hex)».
+  - One Arabic gram, **غ** (and **كغ**), everywhere. It was spelled جم, غم,
+    غرام and a Latin "g" on different screens; the Mac's shelf, figure strip,
+    waste card, variance and quote fields now take the unit from the catalogue.
+  - One word for Expenses (المصروفات, not المصاريف).
+  - Portfolio is «معرض الأعمال», so it no longer reads as a second "Jobs"
+    (الأعمال). On the Mac, Dashboard is «نظرة عامة» and Board is «لوحة المهام»,
+    no longer اللوحة beside اللوح.
+  - Eleven Arabic strings that dropped the instruction the English gives
+    (capacity targets, expense budgets, supplier price tags, retention data,
+    custom fields, BNPL links, three help paragraphs, packaging, part colours)
+    now say the whole sentence.
+  - (Mac) The machines timeline names midnight's day in the shop's language
+    instead of a fixed English "Mon"/"Sun", and the Reports quarter title keeps
+    "2026-Q3" as one left-to-right unit, matching its table.
+
 ## [4.0.0-alpha.50] - 2026-09-26
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
