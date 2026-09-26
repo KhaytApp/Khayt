@@ -4390,6 +4390,57 @@ final class Shop {
         }
     }
 
+    /// Mark many finished jobs Not business in ONE write and one undo — the
+    /// Triage card "19 finished jobs were charged nothing".
+    ///
+    /// The ids are checked again inside the write against the rule that
+    /// chose them (`selectUnpricedFinished`), so a job priced or voided on
+    /// another machine since the card was drawn is left alone.
+    func markNotBusiness(_ ids: [Order.ID]) async {
+        moveProblem = nil
+        guard !ids.isEmpty else { return }
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        guard let engine else {
+            moveProblem = words.callIt("mac.move_no_engine"); return
+        }
+        let actionName = words.callIt("mac.not_business")
+        var undo: [ChangedRecord] = []
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                let orders = Self.rows(root, "printLog")
+                let changed = try await Self.markedNotBusiness(orders, ids: ids, engine: engine)
+                Self.write(&root, "printLog", changed: changed, before: orders, into: &undo)
+            }
+            registerMoveUndo(undo, named: actionName)
+            await load(source)
+        } catch let refusal as MoveRefused {
+            moveProblem = refusal.sentence
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
+    /// The patch `markNotBusiness` writes, with no store in it: the asked-for
+    /// jobs that the rule STILL counts as finished and charged nothing, each
+    /// marked by the shared setter. Anything else is left out.
+    static func markedNotBusiness(_ orders: [JSONValue], ids: [Order.ID],
+                                  engine: KhaytEngine) async throws -> [JSONValue] {
+        let still = Set(try await engine.unpricedFinished(orders: orders).ids)
+        let wanted = Set(ids).intersection(still)
+        var changed: [JSONValue] = []
+        for order in orders {
+            guard let id = recordId(order), wanted.contains(id) else { continue }
+            changed.append(try await engine.setNonBusiness(order, on: true))
+        }
+        return changed
+    }
+
     /// Change one part of a job, and re-cost it.
     ///
     /// ── WHY THE RATES ARE WRITTEN BACK, NOT JUST THE COST ──────────────────
@@ -13219,6 +13270,35 @@ final class Shop {
     ///
     /// Copies the shop's own machines and the jobs on them, so the picture is of
     /// this app drawing real rows rather than of a fixture.
+    /// Give one of the book's machines a printer connection, for a test that
+    /// needs a WATCHED machine — the sample shop's machines have none. Decoded
+    /// the way `standUpFarmForSnapshot` decodes, for the same reason.
+    func connectMachineForTesting(_ id: String, type: String) {
+        guard let i = machineRows.firstIndex(where: { Self.recordId($0) == id }),
+              case .object(var row) = machineRows[i] else { return }
+        row["printerApi"] = .object(["type": .string(type), "host": .string("192.0.2.1")])
+        let copy = JSONValue.object(row)
+        guard let data = try? JSONEncoder().encode(copy),
+              let machine = try? JSONDecoder().decode(Machine.self, from: data),
+              let j = machines.firstIndex(where: { $0.id == id }) else { return }
+        machines[j] = machine
+        machineRows[i] = copy
+    }
+
+    /// Take the book's printing jobs off one machine, in memory only, so a
+    /// test can reach the band's IDLE path — every filament printer in the
+    /// sample shop has a job on it.
+    func clearPrintingForTesting(on machineId: String) {
+        orderRows = orderRows.map { row in
+            guard case .object(var o) = row,
+                  case .string(let m)? = o["machineId"], m == machineId,
+                  case .string("printing")? = o["status"] else { return row }
+            o["status"] = .string("pending")
+            o["machineId"] = .null
+            return .object(o)
+        }
+    }
+
     func standUpFarmForSnapshot(_ n: Int) {
         guard !machines.isEmpty, machines.count < n else { return }
         var grown = machines
@@ -13274,6 +13354,19 @@ final class Shop {
             var seen: [String: JSONValue] = ["progress": .number(Double(status.progress))]
             if let left = status.timeRemaining { seen["timeRemaining"] = .number(left) }
             live[id] = .object(seen)
+        }
+        // A PRINTER THAT HAS NEVER ANSWERED is not a free printer. The shop's
+        // real book: "Next up" and the dashboard said "Not answering" while
+        // the band said "Free · 48:00" for each and "96:00 free" in total —
+        // there was no reading at all, so nothing above marked it, and the
+        // rule drew an unread machine as idle. `quiet` is the same test those
+        // two screens use, so the three now say one thing. A machine Khayt
+        // has no protocol for, or one not set up, is still counted as free:
+        // the shop plans those by hand.
+        for machine in machines where printers.readings[machine.id] == nil && live[machine.id] == nil {
+            if quiet(machine) == .notAnswering {
+                live[machine.id] = .object(["error": .string(words.callIt("mac.attn_state_offline"))])
+            }
         }
         return try? await engine.machineBand(machines: machineRows, orders: orderRows,
                                              inventory: inventoryRows, live: live,

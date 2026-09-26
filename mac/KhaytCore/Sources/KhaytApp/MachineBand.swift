@@ -59,6 +59,9 @@ struct MachineBandView: View {
     /// sentence, with what to do about it.
     private var hasSomethingToShow: Bool { band.countedMachines > 0 }
 
+    /// Nothing can be timed and at least one printer is simply not answering.
+    private var noneAnswering: Bool { band.rows.contains { $0.state == "offline" } }
+
     var body: some View {
         if hasSomethingToShow { full } else { nothingYet }
     }
@@ -69,9 +72,12 @@ struct MachineBandView: View {
             Image(systemName: "clock.badge.questionmark")
                 .font(.title3).foregroundStyle(Khayt.attention)
             VStack(alignment: .leading, spacing: 3) {
-                Text(shop.words.callIt("mac.band_none"))
+                // Printers that are set up and silent are not printers waiting
+                // to be connected. "Connect a printer" under two connected
+                // printers sends the shop to a setting that is already right.
+                Text(shop.words.callIt(noneAnswering ? "mac.band_none_answering" : "mac.band_none"))
                     .font(.callout.weight(.semibold))
-                Text(shop.words.callIt("mac.band_none_why"))
+                Text(shop.words.callIt(noneAnswering ? "mac.band_none_answering_why" : "mac.band_none_why"))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

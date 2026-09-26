@@ -48,6 +48,16 @@ test('THE FLOW BUG: selectAttention returns an object, and iterating it threw', 
   assert.deepEqual([...ids], ['o1']);
 });
 
+test('dashboardFacts carries the finished jobs charged nothing, beside attn and not in it', () => {
+  const f = base();
+  assert.deepEqual(f.unpriced, { count: 1, ids: ['o4'] }, 'Done has no price and is not marked');
+  assert.ok(!f.attn.items.some((i) => i.id === 'o4'));
+  const marked = base({ orders: ORDERS.map((o) => (o.id === 'o4' ? { ...o, nonBusiness: true } : o)) });
+  assert.equal(marked.unpriced.count, 0);
+  const noModule = dashboardFacts({ orders: ORDERS, now: NOW });
+  assert.deepEqual(noModule.unpriced, { count: 0, ids: [] });
+});
+
 test('lateOrderIds takes both shapes, and never throws', () => {
   const input = { machines: MACHINES, orders: ORDERS, statusCache: CACHE, now: NOW };
   // Documented shape.

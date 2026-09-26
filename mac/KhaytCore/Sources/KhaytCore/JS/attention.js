@@ -245,10 +245,44 @@ function selectAttention(input) {
   return { count: items.length, items };
 }
 
+/**
+ * Finished work that was charged nothing and is still counted as trade.
+ *
+ * The shop's real book, Sep 2026: nineteen test prints finished at price 0,
+ * each still counted as business, so the P&L read -495.8% while the dashboard
+ * said "0 things need you". Either the jobs are a test, a gift or something for
+ * the shop itself (so they are Not business), or somebody forgot to price
+ * them. The shop has to decide which, so the dashboard asks.
+ *
+ * Kept OUT of `selectAttention` on purpose. Six desktop themes render that
+ * list line by line and would print each of these as an overdue job. This is
+ * one question about many jobs, and it is answered in one go.
+ *
+ * Counted: `completed` or legacy `delivered`, price 0 or missing, not voided,
+ * not already `nonBusiness`. A quote or a split parent is never finished work.
+ *
+ * @param {object[]} orders
+ * @returns {{count:number, ids:string[]}}
+ */
+function selectUnpricedFinished(orders) {
+  const ids = [];
+  for (const o of Array.isArray(orders) ? orders : []) {
+    if (!o || o.id == null) continue;
+    if (o.status !== 'completed' && o.status !== 'delivered') continue;
+    if (o.voidedAt) continue;
+    if (o.nonBusiness === true) continue;
+    const price = Number(o.price);
+    if (Number.isFinite(price) && price > 0) continue;
+    ids.push(String(o.id));
+  }
+  return { count: ids.length, ids };
+}
+
 const api = {
   OFFLINE_AFTER_MISSED_POLLS,
   machineState,
   selectAttention,
+  selectUnpricedFinished,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = api;

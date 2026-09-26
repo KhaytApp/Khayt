@@ -342,7 +342,7 @@ test('by month: the same arithmetic per calendar month, with a month of overhead
   const months = pnlByPeriod(orders, [{ date: '2026-08-20', amount: 90 }], { settings, now, granularity: 'month' });
   assert.deepEqual(months.map((r) => r.period), ['2026-08', '2026-07'], 'newest first, YYYY-MM');
   assert.equal(months[0].fixed, 300, 'a month of overhead, not a quarter');
-  assert.equal(months[0].net, 1000 - 90 - 300);
+  assert.equal(months[0].net, 1000 - 400 - 90 - 300, 'net takes the cost of goods out as well');
   assert.equal(months[1].fixed, 300);
   // The quarters are what they always were.
   const quarters = pnlByPeriod(orders, [], { settings, now });
@@ -410,4 +410,23 @@ test('a job marked not for the business is out of the P&L, and unpriced work is 
   assert.equal(after.orders, 1, 'marked not for the business, they are not trade');
   assert.equal(after.unpriced, 0);
   assert.equal(after.marginPct, 28.2);
+});
+
+// The shop's real book, Sep 2026: Q3 printed a -495.8% margin beside a net
+// income of 50.00. The margin took the cost of goods out; the net did not.
+test('net income takes out the cost of goods, and agrees with computePnl', () => {
+  const { computePnl } = require('../lib/pnl-report.js');
+  const job = (id, price, costBasis) => ({ id, status: 'completed', date: '2026-09-10', price, costBasis });
+  const orders = [job('paid', 50, 35.91)];
+  for (let i = 0; i < 19; i++) orders.push(job('test' + i, 0, 13.79));
+  const expenses = [{ date: '2026-09-12', amount: 20 }];
+  const [q] = pnlByPeriod(orders, expenses, { settings: {}, now: new Date('2026-09-24T12:00:00') });
+  assert.equal(q.cogs, 297.92);
+  assert.equal(q.net, Math.round((50 - 297.92 - 20) * 100) / 100, 'revenue - cogs - expenses');
+  assert.ok(q.net < 0 && q.marginPct < 0, 'a negative margin cannot sit beside a positive net');
+  const summary = computePnl({
+    orders: orders.map((o) => ({ revenue: o.price, cogs: o.costBasis })),
+    expenses: expenses.map((e) => ({ amount: e.amount })),
+  });
+  assert.equal(q.net, summary.netProfit, 'the table and the desktop headline are one rule');
 });

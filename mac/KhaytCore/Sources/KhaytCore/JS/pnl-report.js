@@ -122,6 +122,9 @@
    * Returns rows newest first: `{ period, orders, revenue, shipping, expenses,
    * fixed, vatCollected, vatReclaimable, vatDue, net, cogs, marginPct }`.
    *
+   * `net` = revenue − cogs − expenses − fixed, the same arithmetic as
+   * `computePnl`'s `netProfit`.
+   *
    * `cogs` is what the finished work cost to make — each job's `costBasis`,
    * which `order-new` freezes from its parts — in the shop's currency, and
    * `marginPct` is (revenue − cogs) / revenue × 100, or null where nothing was
@@ -266,7 +269,13 @@
         // charged, less the tax it paid. Negative means a refund is due, which
         // is a real position for a quarter that bought a printer.
         vatDue: round2(row.vatCollected - row.vatReclaimable),
-        net: round2(row.revenue - row.expenses - fixed),
+        // NET IS WHAT WAS LEFT AFTER EVERYTHING, the cost of making the work
+        // included. This was `revenue - expenses - fixed`, while the margin
+        // beside it and `computePnl` (the desktop's own "Net profit" headline)
+        // both took the cost of goods out — so the shop's real book printed a
+        // -495.8% margin beside a 50.00 net income for the same quarter, and
+        // the two figures could not both be true.
+        net: round2(row.revenue - row.cogs - row.expenses - fixed),
         cogs: round2(row.cogs),
         unpriced: row.unpriced,
         marginPct: row.revenue > 0 ? Math.round(((row.revenue - row.cogs) / row.revenue) * 1000) / 10 : null,
