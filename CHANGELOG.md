@@ -80,6 +80,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   before the figure while every other screen put it after, and the Jobs Total
   column had no currency at all.
 
+- **(iOS) The phone listens to Khayt Cloud instead of asking it on a timer.**
+  While the app is open and signed in to the cloud, it holds the cloud's live
+  stream: a change to the shop's book anywhere is pulled the moment it is
+  made, and away from the shop a printer's new status arrives as it happens
+  rather than on the next ten-second poll. The stream reconnects on its own
+  when the cloud closes it; a busy cloud means wait, never signed out; and
+  while the stream is up, the printer poll falls back to once a minute.
+
 - **(Mac) Choose what goes on the web store, check it before it goes, and
   set up the store itself.** Asked for by the shop after a review of its first
   published catalogue.

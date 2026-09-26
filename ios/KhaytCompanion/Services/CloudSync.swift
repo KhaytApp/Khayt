@@ -111,6 +111,13 @@ struct CloudSync {
         if status == 404 { return nil }
         guard status == 200 else { throw URLError(.badServerResponse) }
 
+        return try Self.liveSnapshot(from: data, dek: session.dek)
+    }
+
+    /// `{ at, receivedAt, ciphertext }` — the body `GET /live/printers`
+    /// answers AND the data of a `printers` event on the live stream, which
+    /// the contract makes the same shape so one reader serves both.
+    nonisolated static func liveSnapshot(from data: Data, dek: Data) throws -> LiveSnapshot {
         struct Envelope: Decodable {
             let at: String?
             let receivedAt: String
@@ -120,7 +127,7 @@ struct CloudSync {
             let printers: [MachineLiveStatus]
         }
         let envelope = try JSONDecoder().decode(Envelope.self, from: data)
-        let plain = try SyncCrypto.openStore(envelope.ciphertext, dek: session.dek)
+        let plain = try SyncCrypto.openStore(envelope.ciphertext, dek: dek)
         let snapshot = try JSONDecoder().decode(Plain.self, from: plain)
         let received = ISO8601DateFormatter().date(from: envelope.receivedAt)
         return LiveSnapshot(printers: snapshot.printers, source: .cloud, reportedAt: received)

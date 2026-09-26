@@ -96,21 +96,41 @@ final class LivePrinters: ObservableObject {
         if isActive { startIfNeeded() } else { stop() }
     }
 
+    /// Whether Khayt Cloud's live stream is open. While it is, a relayed
+    /// snapshot ARRIVES as an event (`ingest`), so asking the cloud for it
+    /// every ten seconds would fetch what the stream already delivered — the
+    /// poll drops to a once-a-minute fallback.
+    var streamOpen = false
+    private let streamFallback: Duration = .seconds(60)
+
     /// One answer, now — for pull-to-refresh, and for tests.
     func refresh() async {
         do {
-            let snap = try await fetch()
-            byMachine = Dictionary(snap.printers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-            updatedAt = Date()
-            source = snap.source
-            reportedAt = snap.reportedAt
-            if let reported = snap.reportedAt {
-                isLive = Date().timeIntervalSince(reported) <= Self.staleAfter
-            } else {
-                isLive = true
-            }
+            take(try await fetch())
         } catch {
             isLive = false
+        }
+    }
+
+    /// A snapshot pushed by the live stream.
+    ///
+    /// Never over the shop's own answer: straight from the Mac on this Wi-Fi
+    /// is fresher than anything relayed, so a relayed snapshot is taken only
+    /// when the shop has not answered in the last poll or two.
+    func ingest(_ snap: LiveSnapshot, now: Date = Date()) {
+        if source == .shop, isLive, let at = updatedAt, now.timeIntervalSince(at) < 12 { return }
+        take(snap, now: now)
+    }
+
+    private func take(_ snap: LiveSnapshot, now: Date = Date()) {
+        byMachine = Dictionary(snap.printers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        updatedAt = now
+        source = snap.source
+        reportedAt = snap.reportedAt
+        if let reported = snap.reportedAt {
+            isLive = now.timeIntervalSince(reported) <= Self.staleAfter
+        } else {
+            isLive = true
         }
     }
 
@@ -121,7 +141,8 @@ final class LivePrinters: ObservableObject {
                 guard let self else { return }
                 await self.refresh()
                 let wait = !self.isLive ? self.backoff
-                    : (self.source == .cloud ? self.cloudInterval : self.interval)
+                    : (self.source == .cloud ? (self.streamOpen ? self.streamFallback : self.cloudInterval)
+                                             : self.interval)
                 try? await Task.sleep(for: wait)
             }
         }
