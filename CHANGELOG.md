@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(iOS) Notifications, as the v2 design draws them.** A bell on Home, with
+  how many are unread, opens everything the phone has been told about the
+  shop, newest first: finished and failed prints, late jobs, low filament,
+  the shop going out of reach, and new order requests — including the ones
+  that arrived while the phone was off, from Khayt Cloud's last day of
+  events. A line about a job opens the job; an order request opens Intake.
+  And with the app open, a new order request now says so at once, instead of
+  waiting for the Mac to import it.
+
 - **(Mac) Saving the Google Drive settings keeps your client ID.** Reported by
   the shop: "I did the gdrive and all I got was saved and nothing else". Save
   stored only the folder name and threw away the OAuth client ID and secret

@@ -75,9 +75,30 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
 
     /// A shop event off Khayt Cloud's stream: opened with the shop's key,
     /// and said if it is one this phone knows. Unknown kinds are ignored.
-    func receive(kind: String, ciphertext: Data, dek: Data) async {
-        guard let event = Self.open(kind: kind, ciphertext: ciphertext, dek: dek) else { return }
+    func receive(kind: String, ciphertext: Data?, dek: Data, at: String = "") async {
+        if kind == "intake" {
+            await announceIntake(at: at)
+            return
+        }
+        guard let ciphertext, let event = Self.open(kind: kind, ciphertext: ciphertext, dek: dek) else { return }
         await announce([event])
+    }
+
+    /// A customer's order request, told by the cloud's stream while the app
+    /// is open — the same words Apple would show on a locked phone (Apple's
+    /// own copy is held back while the stream is open, so it is said once).
+    func announceIntake(at: String) async {
+        let id = "intake." + (at.isEmpty ? ISO8601DateFormatter().string(from: Date()) : at)
+        ShopFeed.shared.add(FeedItem(id: id, kind: "intake", title: L10n.tr("PUSH_INTAKE"),
+                                     at: ISO8601DateFormatter().date(from: at) ?? Date(), tone: .attention,
+                                     unread: true, orderId: nil))
+        let c = UNMutableNotificationContent()
+        c.title = L10n.tr("PUSH_TITLE")
+        c.body = L10n.tr("PUSH_INTAKE")
+        c.sound = .default
+        c.threadIdentifier = "khayt.intake"
+        try? await UNUserNotificationCenter.current()
+            .add(UNNotificationRequest(identifier: id, content: c, trigger: nil))
     }
 
     /// A sealed `print-finished` event, opened — nil for any other kind, or
@@ -112,6 +133,7 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
             let status = queue.first { $0.id == event.orderId }?.status
             let content = Self.content(for: event, orderStatus: status)
             let id = "print.\(event.machineId).\(event.at)"
+            ShopFeed.shared.add(ShopFeed.item(for: event, id: id, tr: L10n.tr))
             try? await UNUserNotificationCenter.current()
                 .add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
         }

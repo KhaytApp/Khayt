@@ -307,3 +307,20 @@ final class ShopEventTests: XCTestCase {
         XCTAssertNil(PrintAlertCenter.open(kind: "print-finished", ciphertext: sealed, dek: other))
     }
 }
+
+/// `GET /events`: sealed details when the Mac raised it, `null` when the cloud did.
+final class ShopEventsFetchTests: XCTestCase {
+    @MainActor
+    func testEventsParseWithAndWithoutSealedDetails() async throws {
+        let session = CloudSession(url: "https://cloud.test", shopId: "shop_1", token: "tok",
+                                   dek: Data(count: 32), role: "owner", seenRev: nil)
+        let body = #"{"events":[{"id":"7","kind":"intake","at":"2026-09-26T10:00:00Z","ciphertext":null},{"id":"8","kind":"print-finished","at":"2026-09-26T10:05:00Z","ciphertext":{"v":1,"iv":"a","ct":"b","tag":"c"}}]}"#
+        let events = try await CloudSync.events(session, since: "2026-09-25T10:00:00Z") { request in
+            XCTAssertTrue(request.url!.absoluteString.contains("/events?since="))
+            return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        XCTAssertEqual(events.map(\.kind), ["intake", "print-finished"])
+        XCTAssertNil(events[0].ciphertext)
+        XCTAssertNotNil(events[1].ciphertext)
+    }
+}
