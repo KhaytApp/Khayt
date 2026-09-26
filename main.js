@@ -3894,6 +3894,9 @@ registerLanServer({
   // Injected rather than derived inside lan-server, which has no access to
   // Electron's app paths — and so tests can point it at a temp directory.
   receiptsDir,
+  // Signed webhooks already accepted, kept 30 days so a replay is refused
+  // after a restart too (lib/webhook-replay.js, SEC-010).
+  webhookSeenPath: () => path.join(app.getPath('userData'), 'khayt-webhook-seen.json'),
 });
 
 /**

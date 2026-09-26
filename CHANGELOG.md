@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Security: a store or carrier notification could be replayed.** Salla,
+  Zid, SMSA, Aramex and Saudi Post sign each notification's content but not
+  when it was sent, so a copy captured once stays valid. Khayt remembered what
+  it had already accepted for only ten minutes, and forgot everything when it
+  restarted. It now remembers for thirty days, across restarts, so a copy sent
+  again is refused. The Mac app has the same fix (SEC-010).
+
 - **(Mac) Choose what goes on the web store, check it before it goes, and
   set up the store itself.** Asked for by the shop after a review of its first
   published catalogue.
