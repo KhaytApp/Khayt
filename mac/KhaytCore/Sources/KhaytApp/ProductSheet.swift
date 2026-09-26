@@ -162,7 +162,7 @@ struct ProductSheet: View {
                 o["filamentId"] = .string(spool.id)
                 o["material"] = .string(spool.material)
                 o["spoolCost"] = .number(spool.cost ?? 0)
-                o["spoolWeight"] = .number(max(1, spool.weight ?? 1000))
+                o["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
             } else if spoolId == nil {
                 // The shop took the filament off: the part is not made of it any more.
                 for key in ["filamentId", "material", "spoolCost", "spoolWeight"] { o.removeValue(forKey: key) }
@@ -251,7 +251,7 @@ struct ProductSheet: View {
                         .environment(\.layoutDirection, language == "ar" ? .rightToLeft : .leftToRight)
                 }
                 GridRow {
-                    Text(shop.words.callIt("mac.margin")).gridColumnAlignment(.trailing)
+                    Text(shop.words.callIt("mac.markup")).gridColumnAlignment(.trailing)
                         .foregroundStyle(.secondary)
                     HStack(spacing: 6) {
                         // EMPTY IS NOT ZERO. A product with no margin takes the

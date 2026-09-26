@@ -1009,7 +1009,9 @@ private struct MoneyTiles: View {
                         Text(shop.words.callIt("mac.gross").lowercased())
                             .foregroundStyle(.secondary)
                         Text("·").foregroundStyle(.tertiary)
-                        Text("\(Money.figure(k.grossMargin))%")
+                        // No revenue, no margin: the rule answers 0 there, and
+                        // "0% margin" beside a loss reads as breaking even.
+                        Text(k.revenue > 0 ? "\(Money.figure(k.grossMargin))%" : "—")
                             .monospacedDigit()
                         Text(shop.words.callIt("mac.margin").lowercased())
                             .foregroundStyle(.secondary)

@@ -700,6 +700,8 @@ final class Words {
         "mac.last_job":      ["en": "Last job",      "ar": "آخر عمل"],
         "mac.billed":        ["en": "Billed",        "ar": "المفوتر"],
         // Provenance
+        "mac.markup":        ["en": "Markup", "ar": "نسبة الإضافة"],
+        "mac.lock_lost":     ["en": "Another app has this book open now, so this Mac has stopped changing it. Close the book there, then reopen it here to make changes.", "ar": "دفترك مفتوح الآن في تطبيق آخر، لذا توقّف هذا الماك عن تعديله. أغلق الدفتر هناك ثم افتحه هنا من جديد لتجري تغييرات."],
         "mac.read_only":     ["en": "Opened read-only",          "ar": "مفتوح للقراءة فقط"],
         "mac.writable":      ["en": "This book is yours to change", "ar": "هذا الدفتر تحت تصرفك"],
         "mac.sample":        ["en": "Sample data",   "ar": "بيانات تجريبية"],

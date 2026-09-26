@@ -118,7 +118,7 @@ enum StoreLock {
     static func verdict(for build: StoreReader.Build) -> Verdict {
         let record = read(for: build)
         let host = ProcessInfo.processInfo.hostName
-        let sameHost = record.map { ($0.host ?? "") == host } ?? false
+        let sameHost = record.map { Self.sameHost($0.host, host) } ?? false
         let alive: Bool? = (sameHost && (record?.pid ?? 0) != 0)
             ? pidIsAlive(record!.pid!) : nil
         return decide(record, pid: Int(ProcessInfo.processInfo.processIdentifier),
@@ -140,11 +140,26 @@ enum StoreLock {
         return record
     }
 
-    static func beat(_ record: Record, for build: StoreReader.Build) -> Record {
+    /// Keep the claim fresh — ONLY while it is still ours.
+    ///
+    /// Electron takes the book unconditionally when it starts. This used to
+    /// write our record back every thirty seconds regardless, so the lock
+    /// flipped between the two apps, both believed they owned the book, and
+    /// Electron's next save of its in-memory copy erased whatever the Mac had
+    /// written. Found by a review. Now a beat first reads the file: somebody
+    /// else's record there means we have lost the book, and nil says so.
+    static func beat(_ record: Record, for build: StoreReader.Build) -> Record? {
+        guard let current = read(for: build), current.pid == record.pid,
+              sameHost(current.host, record.host) else { return nil }
         var next = record
         next.heartbeat = Date().timeIntervalSince1970 * 1000
         if let data = try? JSONEncoder().encode(next) { try? data.write(to: lockURL(for: build)) }
         return next
+    }
+
+    /// Host names compared the way Electron writes them (lowercased).
+    static func sameHost(_ a: String?, _ b: String?) -> Bool {
+        (a ?? "").lowercased() == (b ?? "").lowercased()
     }
 
     /// Give it up. Only ever removes a record that is ours — Electron takes

@@ -139,6 +139,11 @@ final class LanServer {
         /// The carriers' webhook secrets, opened, by carrier id —
         /// `settings.shipping.<id>.webhookSecret`. None configured is 403.
         var carrierSecrets: [String: String] = [:]
+        /// Where the webhook signatures already accepted are remembered, so a
+        /// replay is refused across a restart. Nil keeps them in memory only
+        /// (tests). This Mac's own file beside the book, never in the book:
+        /// what one machine has received is not something to sync.
+        var replayFile: URL?
         /// What a customer's upload is priced from — `Shop.pricingBook`:
         /// settings, presets, the shelf and the log. Separate from `store`,
         /// which is the phone's book and has no presets or shelf in it.
@@ -212,11 +217,27 @@ final class LanServer {
     /// hammering a wrong secret cannot lock the owner out of the queue, and a
     /// guessed PIN cannot lock a storefront out of delivering.
     private var webhookFailures: [String: KhaytEngine.LanFailures] = [:]
-    /// Signatures seen lately, oldest first, with when each stops counting —
-    /// the Node server's `isReplayedWebhook` LRU.
+    /// Signatures accepted lately, oldest first, with when each stops counting.
+    ///
+    /// ── SEC-010: TEN MINUTES WAS THE WHOLE DEFENCE ────────────────────────
+    ///
+    /// Salla, Zid and the carriers sign the BODY and nothing else: no
+    /// timestamp, no nonce, so a captured delivery stays validly signed for
+    /// ever. This was the Node server's `isReplayedWebhook` LRU: 500 entries,
+    /// ten minutes, in memory. So the same delivery was accepted again ten
+    /// minutes later, after 500 newer ones, or after any restart of the app.
+    /// The book limits the damage (an order is recorded once per platform id,
+    /// and a carrier event never moves a parcel backwards), but it should not
+    /// be the only thing standing there.
+    ///
+    /// Now thirty days and 10,000 entries, written to disk. The senders
+    /// retry for hours, not weeks, so nothing genuine is refused; a stored
+    /// entry is a SHA-256 of the signature, so the file holds nothing that
+    /// could be replayed itself.
     private var seenSignatures: [(signature: String, until: Date)] = []
-    nonisolated static let seenSignatureMax = 500
-    nonisolated static let seenSignatureTTL: TimeInterval = 10 * 60
+    private var seenLoaded = false
+    nonisolated static let seenSignatureMax = 10_000
+    nonisolated static let seenSignatureTTL: TimeInterval = 30 * 24 * 60 * 60
     /// Meshes being measured right now. Reading a 32 MB model is not free, and
     /// three at once is a shop's machine given over to strangers.
     private var measuring = 0
@@ -1514,13 +1535,42 @@ final class LanServer {
     /// refused; a genuine retry past the window is caught by the book instead.
     private func replayed(_ signature: String, now: Date) -> Bool {
         guard !signature.isEmpty else { return false }
+        loadSeen()
+        let key = Self.seenKey(signature)
         seenSignatures.removeAll { $0.until <= now }
-        if seenSignatures.contains(where: { $0.signature == signature }) { return true }
-        seenSignatures.append((signature, now.addingTimeInterval(Self.seenSignatureTTL)))
+        if seenSignatures.contains(where: { $0.signature == key }) { return true }
+        seenSignatures.append((key, now.addingTimeInterval(Self.seenSignatureTTL)))
         if seenSignatures.count > Self.seenSignatureMax {
             seenSignatures.removeFirst(seenSignatures.count - Self.seenSignatureMax)
         }
+        saveSeen()
         return false
+    }
+
+    /// What is stored for a signature: its SHA-256, hex.
+    nonisolated static func seenKey(_ signature: String) -> String {
+        SHA256.hash(data: Data(signature.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private struct SeenEntry: Codable { let k: String; let u: Double }
+
+    private func loadSeen() {
+        guard !seenLoaded else { return }
+        seenLoaded = true
+        guard let file = host.replayFile, let data = try? Data(contentsOf: file),
+              let rows = try? JSONDecoder().decode([SeenEntry].self, from: data) else { return }
+        let kept = Set(seenSignatures.map(\.signature))
+        seenSignatures = rows.filter { !kept.contains($0.k) }
+            .map { ($0.k, Date(timeIntervalSince1970: $0.u)) } + seenSignatures
+    }
+
+    private func saveSeen() {
+        guard let file = host.replayFile else { return }
+        let rows = seenSignatures.map { SeenEntry(k: $0.signature, u: $0.until.timeIntervalSince1970) }
+        guard let data = try? JSONEncoder().encode(rows) else { return }
+        // Not fatal: a Mac that cannot write here still refuses replays in
+        // memory, as it always did.
+        try? data.write(to: file, options: .atomic)
     }
 
     private func sweepWebhookFailures(now: Date) {
@@ -1861,6 +1911,8 @@ extension Shop {
             carrierSecrets[carrier] = (try? await Secrets.open(sealed, for: source)) ?? ""
         }
         host.carrierSecrets = carrierSecrets
+        host.replayFile = source.build?.storeURL.deletingLastPathComponent()
+            .appending(path: "khayt-mac-webhook-seen.json")
         host.carrierEvent = { [weak self] event, at in
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             return try await self.recordCarrierEvent(event, at: at)

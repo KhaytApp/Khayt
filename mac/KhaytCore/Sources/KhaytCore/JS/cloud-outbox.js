@@ -211,8 +211,11 @@
    * on disk, because a secret on one list and not the other is exactly the bug
    * that list was made to end.
    *
-   * Deltas do not need this: `extractDeltas` carries array collections and
-   * tombstones, and every secret in the store is under `settings` or `machines`.
+   * Deltas need it too. `machines` IS an array collection, so its printer
+   * access codes and smart-plug passwords travel in deltas. The desktop's
+   * in-memory store already holds masks there; a host that reads the book from
+   * disk (the Mac) holds the sealed values and must pass its store through
+   * this before `changesToSend`.
    */
   function forCloud(store) {
     const paths = global.KhaytStoreSecretPaths;

@@ -276,7 +276,10 @@ struct Catalogue: View {
             .width(min: 110, ideal: 140)
             .alignment(.trailing)
 
-            TableColumn(shop.words.callIt("mac.margin"), value: \.marginSort) { row in
+            // MARKUP, not margin: `defaultMargin` is the percentage added ON
+            // COST. Called "Margin", a product priced at 30% on cost read as
+            // 30% of its price when it was 23%.
+            TableColumn(shop.words.callIt("mac.markup"), value: \.marginSort) { row in
                 Text(row.margin.map { "\(Int($0))%" } ?? "—")
                     .moneyStyle().foregroundStyle(.secondary)
             }
