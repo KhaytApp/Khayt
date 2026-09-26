@@ -10085,44 +10085,154 @@ final class Shop {
             writeProblem = words.callIt("pe.upload_failed"); return
         }
         guard let folder = photoFolder else { return }
-
-        // The index the other app uses is the position in the job's own list,
-        // so it is read from the record rather than counted from the screen.
-        let index = orderRow(job.id).flatMap { row -> Int? in
-            guard case .object(let o) = row, case .array(let had)? = o["printPhotos"]
-            else { return 0 }
-            return had.count
-        } ?? 0
-        let name = OrderPhoto.filename(orderId: job.id, index: index)
-        do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            try made.full.write(to: folder.appending(path: name))
-        } catch {
-            writeProblem = String(describing: error); return
+        if let problem = attachJobPhoto(made, jobId: job.id, build: build, folder: folder) {
+            writeProblem = problem; return
         }
+        writeProblem = nil
+        await load(source)
+    }
 
+    /// The one path a job photo is written by, whoever took it — the shop by
+    /// hand, or the printer's own camera at the end of a print.
+    ///
+    /// The file goes down BEFORE the record, and the record only if the file
+    /// was written (`OrderPhoto.attach`). `updateRecord` stamps the job:
+    /// without the stamp the other machine's older copy wins the next merge
+    /// and the photograph disappears again. Nil when it worked, else why not.
+    private func attachJobPhoto(_ made: (thumb: String, full: Data), jobId: String,
+                                build: StoreReader.Build, folder: URL) -> String? {
         do {
-            try StoreWriter.update(build) { root in
-                guard case .array(var jobs)? = root["printLog"] else { return }
-                for i in jobs.indices {
-                    guard case .object(var record) = jobs[i],
-                          Self.recordId(jobs[i]) == job.id else { continue }
-                    var photos: [JSONValue] = []
-                    if case .array(let had)? = record["printPhotos"] { photos = had }
-                    photos.append(OrderPhoto.record(thumb: made.thumb, filename: name))
-                    record["printPhotos"] = .array(photos)
-                    // Without the stamp the other machine's older copy wins the
-                    // next merge and the photograph disappears again.
-                    StoreWriter.stamp(&record)
-                    jobs[i] = .object(record)
-                }
-                root["printLog"] = .array(jobs)
+            // The index the other app uses is the position in the job's own
+            // list, so it is read from the record rather than counted from the
+            // screen.
+            _ = try OrderPhoto.attach(made, jobId: jobId, job: orderRow(jobId), folder: folder) { change in
+                try StoreWriter.updateRecord(build, collection: "printLog", id: jobId, change: change)
             }
+            return nil
+        } catch {
+            return String(describing: error)
+        }
+    }
+
+    // MARK: - The printer's own photo at the end of a print
+
+    /// Called by `PrinterWatch` on EVERY edge out of a print — finished,
+    /// failed or cancelled — once per print (`lib/print-finish-photo.js`).
+    ///
+    /// Takes the printer's photo when the print finished, then hands the
+    /// event to `printFinished`. Best-effort in every step, and silent about
+    /// it: no camera, no frame, no job the book can name without guessing, or
+    /// a book this Mac does not hold are all ordinary, and none of them is the
+    /// shop's to fix at the moment a print ends. The photo can always be added
+    /// by hand.
+    func printEnded(_ machine: Machine, edge: KhaytEngine.FinishTrack) async {
+        let (ended, photo) = await FinishCamera.finish(machine, edge: edge, printLog: orderRows,
+                                                       shop: self) { jobId, data in
+            await self.attachFinishPhoto(jobId: jobId, data: data)
+        }
+        FinishCamera.lastOutcome[machine.id] = photo
+        await printFinished(ended)
+    }
+
+    /// ── THE FINISH SEAM ───────────────────────────────────────────────────
+    ///
+    /// The ONE function called when a print ends, with everything known about
+    /// it: the machine, the job (only when the book names it unambiguously),
+    /// how it ended ("finished" | "failed" | "cancelled"), how long it ran by
+    /// the printer's own counter, and whether the printer's photo was put on
+    /// the job. Called once per print, after the photo step has finished, on
+    /// the main actor, off the poll loop.
+    ///
+    /// Deliberately empty today. Posting a print-finished event to Khayt
+    /// Cloud belongs HERE, as does anything else that wants to react to the
+    /// end of a print — rather than a second edge detector somewhere else
+    /// that disagrees with this one about what "finished" means.
+    func printFinished(_ ended: FinishCamera.Ended) async {
+        lastPrintEnded[ended.machineId] = ended
+    }
+
+    /// The last print that ended on each machine, as `printFinished` saw it.
+    private(set) var lastPrintEnded: [String: FinishCamera.Ended] = [:]
+
+    /// Put a camera frame on a job, whatever the job's status.
+    ///
+    /// NOT `canPhotograph`: that asks for a finished JOB, and at the edge of a
+    /// print the job is usually still `printing` in the book — the frame is a
+    /// picture of what came off the bed, which is the whole point of it.
+    func attachFinishPhoto(jobId: String, data: Data) async -> Bool {
+        guard let build = source.build, canWrite, let folder = photoFolder,
+              data.count <= OrderPhoto.maxBytes, let made = OrderPhoto.encode(data) else { return false }
+        guard attachJobPhoto(made, jobId: jobId, build: build, folder: folder) == nil else { return false }
+        await load(source)
+        return true
+    }
+
+    // MARK: - A job's photo, on its product
+
+    /// The product a job was made from, when it is still in the catalogue.
+    func productOf(_ job: Order) -> JSONValue? {
+        guard let id = job.productId, !id.isEmpty else { return nil }
+        return productRows.first { Self.recordId($0) == id }
+    }
+
+    /// Whether "Use as product photo" is offered on this job at all.
+    func canUseAsProductPhoto(_ job: Order) -> Bool {
+        canWrite && productOf(job) != nil
+    }
+
+    /// The job's photos, newest last, as Portfolio flattened them.
+    func photos(of job: Order) -> [Snapshot] {
+        snapshots.filter { $0.orderId == job.id }
+    }
+
+    enum ProductPhotoResult: Equatable { case added, already, failed }
+
+    /// Put one of a job's photos on the product it was made from, as a picture
+    /// of kind `print` — "the real thing", which the web store carries straight
+    /// after the primary (`storefrontPhotos`).
+    ///
+    /// Appended, never made primary: which picture leads a listing is the
+    /// shop's decision (`addImage` in `lib/product-images.js`). The picture is
+    /// re-made at the product sizes from the full file when it is on this Mac,
+    /// and from the inline thumbnail when it is not — a small real photo beats
+    /// none. The file goes down before the record, as everywhere else.
+    @discardableResult
+    func useAsProductPhoto(_ snap: Snapshot) async -> ProductPhotoResult {
+        guard let build = source.build, canWrite, let engine,
+              let job = orders.first(where: { $0.id == snap.orderId }),
+              let productId = job.productId, let row = productOf(job) else {
+            writeProblem = words.callIt("mac.move_sample"); return .failed
+        }
+        let bytes = snap.file.flatMap { try? Data(contentsOf: $0) }
+            ?? snap.thumb.flatMap(Self.dataURIBytes)
+        guard let bytes, let made = OrderPhoto.encode(bytes) else {
+            writeProblem = words.callIt("pe.upload_failed"); return .failed
+        }
+        do {
+            let fields = try await ProductPhotos.addPrintPhoto(
+                made, to: row, productId: productId, engine: engine) { imageId in
+                try ProductPhotos.write(made.full, productId: productId, imageId: imageId, in: build)
+            }
+            guard let fields else { writeProblem = nil; return .already }
+            guard case .object(let was) = row else { return .failed }
+            try StoreWriter.updateRecord(build, collection: "products", id: productId) { record in
+                for (key, value) in fields { record[key] = value }
+            }
+            registerMoveUndo([ChangedRecord(collection: "products", id: productId, was: was)],
+                             named: words.callIt("mac.edit_product"))
             writeProblem = nil
             await load(source)
+            return .added
         } catch {
             writeProblem = String(describing: error)
+            return .failed
         }
+    }
+
+    /// The bytes inside a `data:…;base64,` URI.
+    static func dataURIBytes(_ uri: String) -> Data? {
+        guard uri.hasPrefix("data:"), let comma = uri.firstIndex(of: ",") else { return nil }
+        return Data(base64Encoded: String(uri[uri.index(after: comma)...]))
     }
 
     /// Who else has this book open, in the shop's own language.

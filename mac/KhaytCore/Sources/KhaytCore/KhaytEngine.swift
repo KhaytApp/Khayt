@@ -306,6 +306,10 @@ public actor KhaytEngine {
         // not choose the host at fetch time. Nothing here may fetch a snapshot
         // without asking it first.
         "webcam",
+        // …and what the camera is FOR at the end of a print: whether a job just
+        // finished (not cancelled, not failed — a photo of a failure is not a
+        // photo of the work), once per print, and which job it belongs to.
+        "print-finish-photo",
         // What each machine earned, and what it cost to keep earning it —
         // lifted out of `renderer/analytics.js`, where it was one screen's
         // arithmetic. This is the figure an owner retires a machine on, so two
@@ -3891,6 +3895,53 @@ public actor KhaytEngine {
     public func webcamAuthHeaders(printerApi: JSONValue) throws -> [String: String] {
         try runtime.call2("globalThis.KhaytWebcam.authHeadersFor(ARG0)",
                           [printerApi], as: [String: String].self)
+    }
+
+
+    // MARK: - The printer's own photo at the end of a print
+
+    /// One poll folded into the finish memory, and whether to take the photo.
+    public struct FinishTrack: Decodable, Sendable {
+        public let memo: JSONValue
+        /// True only on the edge into a FINISHED print — once per print.
+        public let capture: Bool
+        /// 'finished' | 'failed' | 'cancelled', or nil when nothing ended.
+        public let outcome: String?
+        /// The file that was printing, as the printer knew it.
+        public let filename: String
+        /// How long the job ran by the printer's own counter, on an edge; nil
+        /// when there is no edge or the printer never said.
+        public let durationS: Double?
+    }
+
+    /// `print-finish-photo.track`: the edge, the outcome and the memory are
+    /// all the module's, so a finish is decided the same way in both apps.
+    public func printFinishTrack(memo: JSONValue, machineId: String,
+                                 status: JSONValue) throws -> FinishTrack {
+        try runtime.call2("globalThis.KhaytPrintFinishPhoto.track(ARG0, ARG1, ARG2)",
+                          [memo, .string(machineId), status], as: FinishTrack.self)
+    }
+
+    /// The job a finished print belongs to, or nil when the book cannot say
+    /// without guessing.
+    public func printFinishJob(printLog: [JSONValue], machineId: String,
+                               filename: String) throws -> String? {
+        try runtime.call2("globalThis.KhaytPrintFinishPhoto.jobFor(ARG0, ARG1, ARG2)",
+                          [.array(printLog), .string(machineId), .string(filename)],
+                          as: String?.self)
+    }
+
+    /// A picture appended to a product through `product-images.addImage`.
+    public struct ProductImageAdded: Decodable, Sendable {
+        public let product: JSONValue
+        public let image: ProductImage
+        /// False when that exact picture was already on the product.
+        public let added: Bool
+    }
+
+    public func addProductImage(_ product: JSONValue, image: JSONValue) throws -> ProductImageAdded {
+        try runtime.call2("globalThis.KhaytProductImages.addImage(ARG0, ARG1)",
+                          [product, image], as: ProductImageAdded.self)
     }
 
 

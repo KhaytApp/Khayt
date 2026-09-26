@@ -80,4 +80,35 @@ enum OrderPhoto {
     static func record(thumb: String, filename: String) -> JSONValue {
         .object(["thumb": .string(thumb), "filename": .string(filename)])
     }
+
+    /// The index the next photo on this job gets: its position in the job's
+    /// own list, which is what the other app's filename carries.
+    static func nextIndex(_ job: JSONValue?) -> Int {
+        guard case .object(let o)? = job, case .array(let had)? = o["printPhotos"] else { return 0 }
+        return had.count
+    }
+
+    /// Append one photo record to a job record. The stamp is the caller's
+    /// (`StoreWriter.updateRecord` does it), so this stays a plain edit.
+    static func append(_ photo: JSONValue, to record: inout [String: JSONValue]) {
+        var photos: [JSONValue] = []
+        if case .array(let had)? = record["printPhotos"] { photos = had }
+        photos.append(photo)
+        record["printPhotos"] = .array(photos)
+    }
+
+    /// Write the full-size file, then the record — in that order, and the
+    /// record only if the file is there. A row naming a missing file draws an
+    /// empty cell nobody can fix; a file with no row is invisible and harmless.
+    ///
+    /// Addressed by path so the tests can run it against a copy of a store.
+    static func attach(_ made: (thumb: String, full: Data), jobId: String, job: JSONValue?,
+                       folder: URL, write: (_ change: (inout [String: JSONValue]) -> Void) throws -> Void,
+                       at: Date = Date()) throws -> String {
+        let name = filename(orderId: jobId, index: nextIndex(job), at: at)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try made.full.write(to: folder.appending(path: name))
+        try write { record in append(Self.record(thumb: made.thumb, filename: name), to: &record) }
+        return name
+    }
 }

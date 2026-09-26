@@ -163,6 +163,47 @@
   }
 
   /**
+   * Add one picture to the END of a product's list, and hand back its record.
+   *
+   * The end, not the front: which picture is primary is a decision the shop
+   * makes (makePrimary), and a photo arriving from somewhere else — the
+   * printer's own camera, at the end of a print — must not quietly replace
+   * the one the storefront leads with. A product with no pictures at all is
+   * the exception by construction: its first picture IS the primary.
+   *
+   * The id is minted here so both apps name the file the same way, and it
+   * skips any index already in use — `imageId(p.id, images.length)` collides
+   * the moment a middle picture has been deleted.
+   *
+   * The SAME thumbnail twice is one picture: pressing "use as product photo"
+   * again hands back the one already there with `added: false`, rather than
+   * a second copy on the listing.
+   *
+   * @returns {{ product: object, image: object, added: boolean }}
+   */
+  function addImage(product, img) {
+    const p = apply(product || {});
+    const i = img || {};
+    const thumbnail = typeof i.thumbnail === 'string' ? i.thumbnail : '';
+    const already = thumbnail && p.images.find((x) => x.thumbnail === thumbnail);
+    if (already) return { product: p, image: already, added: false };
+    const used = new Set(p.images.map((x) => x.id));
+    let n = p.images.length;
+    let id = i.id && !used.has(i.id) ? i.id : imageId(p.id, n);
+    while (used.has(id)) id = imageId(p.id, ++n);
+    const image = {
+      id,
+      path: typeof i.path === 'string' ? i.path : '',
+      thumbnail,
+      kind: KIND_KEYS.includes(i.kind) ? i.kind : DEFAULT_KIND,
+      caption: typeof i.caption === 'string' ? i.caption : '',
+    };
+    p.images.push(image);
+    syncView(p);
+    return { product: p, image, added: true };
+  }
+
+  /**
    * Does this listing show the real thing?
    *
    * The question a customer is actually asking, and the one a shop should be
@@ -366,7 +407,7 @@
     return { dropped, downgraded, bytes: total, fits: total <= budget };
   }
 
-  const api = { KINDS, KIND_KEYS, DEFAULT_KIND, normalise, apply, syncView, makePrimary, remove, setKind, hasRealPhoto, storefrontPhotos, fitCatalogPhotos, CATALOG_PHOTO_BUDGET, HERO_MAX_DIM, HERO_QUALITY, PUBLISH_PHOTO_BYTES, imageId };
+  const api = { KINDS, KIND_KEYS, DEFAULT_KIND, normalise, apply, syncView, makePrimary, remove, setKind, addImage, hasRealPhoto, storefrontPhotos, fitCatalogPhotos, CATALOG_PHOTO_BUDGET, HERO_MAX_DIM, HERO_QUALITY, PUBLISH_PHOTO_BYTES, imageId };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytProductImages = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
