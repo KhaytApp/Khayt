@@ -534,3 +534,21 @@
 "cloud.signed_out" = "سُجّل خروج هذا الهاتف من Khayt Cloud — من قائمة أجهزة الورشة على الأرجح. سجّل الدخول مجدداً لتستمر المزامنة بعيداً عن الورشة.";
 "cloud.sign_in_again" = "سجّل الدخول مجدداً";
 "cloud.busy" = "Khayt Cloud مشغول. سيحاول الهاتف مجدداً بعد قليل.";
+
+/* Print alerts */
+"settings.notify.print_done" = "انتهاء الطباعة";
+"alert.print.finished" = "انتهت الطباعة";
+"alert.print.failed" = "فشلت الطباعة";
+"alert.print.cancelled" = "أُلغيت الطباعة";
+"alert.print.a_job" = "مهمة";
+"alert.print.move_post" = "انقل إلى ما بعد الطباعة";
+"alert.print.reprint" = "أعدها إلى الطابور";
+"alert.print.mark_shipped" = "علّمها مشحونة";
+"alert.print.needs_book" = "تعليم مهمة كمشحونة يحتاج دفتر الورشة على هذا الهاتف.";
+"alert.print.no_order" = "هذه المهمة ليست في دفتر هذا الهاتف.";
+"alert.print.not_shippable" = "لا تُعلَّم كمشحونة إلا مهمة منتهية لم تُسلَّم بعد.";
+
+/* Push alerts relayed by Khayt Cloud: the server sends these KEYS
+   (loc-key), never text, so the alert is in the phone's language. */
+"PUSH_TITLE" = "خيط";
+"PUSH_PRINT_FINISHED" = "انتهت طباعة";

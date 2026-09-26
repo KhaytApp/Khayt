@@ -10,6 +10,9 @@ struct KhaytCompanionApp: App {
     @StateObject private var live: LivePrinters
     @StateObject private var channel: LiveChannel
     @Environment(\.scenePhase) private var scenePhase
+    /// Held for the life of the app: it is the notification centre's delegate,
+    /// which must be in place before a tapped alert launches the app.
+    private let alerts: PrintAlertCenter
 
     init() {
         let s = ConnectionSettings()
@@ -21,6 +24,7 @@ struct KhaytCompanionApp: App {
         let printers = LivePrinters { try await apiClient.fetchLivePrinters() }
         _live = StateObject(wrappedValue: printers)
         _channel = StateObject(wrappedValue: LiveChannel(api: apiClient, printers: printers))
+        alerts = PrintAlertCenter(api: apiClient, settings: s, printers: printers)
         KhaytType.applyNavigationBarAppearance()
     }
 

@@ -606,6 +606,35 @@ final class KhaytAPIClient: ObservableObject {
         await deliverPending()
     }
 
+    /// Mark a finished job as sent: `shippedAt`, by the shop's own
+    /// `KhaytOrderStatus.markShipped`, which leaves the status `completed` and
+    /// refuses a job that is not finished or has already arrived.
+    ///
+    /// From the book only. No LAN route takes this, and a rule this phone
+    /// cannot run is a move it does not make.
+    func markShipped(orderId: String, now: Date = Date()) async throws {
+        guard let book, book.exists, let reader else {
+            throw KhaytAPIError.server(L10n.tr("alert.print.needs_book"))
+        }
+        guard case .array(let rows)? = try book.read()["printLog"],
+              let order = rows.first(where: {
+                  if case .object(let o) = $0, o["id"] == .string(orderId) { return true }
+                  return false
+              }) else {
+            throw KhaytAPIError.server(L10n.tr("alert.print.no_order"))
+        }
+        let handover = try await reader.sharedEngine().markShipped(order: order, now: now)
+        guard handover.ok, case .object(let shipped)? = handover.order else {
+            throw KhaytAPIError.server(L10n.tr("alert.print.not_shippable"))
+        }
+        try book.updateRecord(collection: "printLog", id: orderId) { record in
+            record["shippedAt"] = shipped["shippedAt"]
+            if let history = shipped["statusHistory"] { record["statusHistory"] = history }
+        }
+        await refreshPendingCount()
+        await deliverPending()
+    }
+
     func updateOrderStatus(orderId: String, status: String) async throws {
         if try await writeLocally({ try $0.setOrderStatus(orderId: orderId, to: status) }) { return }
         let encodedId = try encodeOrderIdForPath(orderId)
