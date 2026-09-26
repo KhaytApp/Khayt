@@ -60,10 +60,10 @@ struct TrashTests {
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
-        guard let at = source.range(of: "func deleteLibraryFile(") else {
-            Issue.record("deleteLibraryFile is gone"); return
+        guard let at = source.range(of: "func deleteLibraryFiles(") else {
+            Issue.record("deleteLibraryFiles is gone"); return
         }
-        let body = String(source[at.lowerBound...].prefix(900))
+        let body = String(source[at.lowerBound...].prefix(1600))
         #expect(body.contains("Self.trash(url)"), "a deleted model is gone for good again")
         #expect(!body.contains("FileManager.default.removeItem(at: url)"),
                 "the permanent delete is back beside the recoverable one")
