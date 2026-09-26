@@ -9,3 +9,4 @@
 "alert.print.mark_shipped" = "Mark shipped";
 "PUSH_TITLE" = "Khayt";
 "PUSH_PRINT_FINISHED" = "A print finished";
+"PUSH_INTAKE" = "New order request";
