@@ -10169,7 +10169,38 @@ final class Shop {
     /// that disagrees with this one about what "finished" means.
     func printFinished(_ ended: FinishCamera.Ended) async {
         lastPrintEnded[ended.machineId] = ended
+        await sendPrintFinishedEvent(ended)
     }
+
+    /// Tell the shop's iPhones (and any open `/live` stream) that a print
+    /// ended, sealed with the shop's key. Only a signed-in owner or member Mac
+    /// with the key open sends it; everything else is a quiet no.
+    func sendPrintFinishedEvent(_ ended: FinishCamera.Ended, now: Date = Date()) async {
+        guard let build = source.build, let dek = cloudDek,
+              Self.cloudConnected(settingsDict), cloudRoleCanWrite, !eventsNotOffered else { return }
+        let order = ended.orderId.flatMap { id in orders.first { $0.id == id } }
+        let at = ShopEventPublisher.stamp(now)
+        let payload = ShopEventPublisher.printFinishedPayload(
+            ended, at: at, project: order?.project, client: order?.client)
+        do {
+            let connection = try CloudReader.connection(settingsDict)
+            let token = try await Secrets.open(connection.storedToken, for: build)
+            guard !token.isEmpty else { return }
+            let session = URLSession(configuration: .ephemeral)
+            let outcome = try await ShopEventPublisher.send(
+                connection, token: token, dek: dek, kind: "print-finished", at: at, payload: payload) {
+                try await session.data(for: $0)
+            }
+            if outcome == .notOffered { eventsNotOffered = true }
+            FileHandle.standardError.write(Data("khayt: print-finished event — \(outcome)\n".utf8))
+        } catch {
+            FileHandle.standardError.write(Data("khayt: print-finished event — \(error)\n".utf8))
+        }
+    }
+
+    /// Set when this Khayt Cloud answers 404 to events, so a shop on an older
+    /// server is not asked again at every print until the app restarts.
+    private var eventsNotOffered = false
 
     /// The last print that ended on each machine, as `printFinished` saw it.
     private(set) var lastPrintEnded: [String: FinishCamera.Ended] = [:]
