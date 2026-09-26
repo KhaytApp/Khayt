@@ -283,7 +283,7 @@ final class Shop {
         }
     }
     /// Opens the way Khayt opens. See `LibrarySort`.
-    var librarySort: LibrarySort = .khayt
+    var librarySort: LibrarySort = .added
     /// Typed into the search box. The chips count what the search leaves, so
     /// they follow it — the other app's catalogue does the same, and a chip
     /// saying seven over a searched list of two is the bug its note describes.

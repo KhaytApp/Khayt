@@ -1531,6 +1531,7 @@ final class Words {
         "mac.name":          ["en": "Name",          "ar": "الاسم"],
         "mac.late":          ["en": "late",          "ar": "متأخرة"],
         "mac.owed_caps":     ["en": "OWED",          "ar": "المستحق"],
+        "mac.sort_added":    ["en": "Date added", "ar": "تاريخ الإضافة"],
         "mac.sort_default":  ["en": "Favourites first", "ar": "المفضّلة أولاً"],
         "mac.sort_by":       ["en": "Sort Library By",  "ar": "ترتيب المكتبة حسب"],
         "mac.dashboard":     ["en": "Dashboard",       "ar": "نظرة عامة"],

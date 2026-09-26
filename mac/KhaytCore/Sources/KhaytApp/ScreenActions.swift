@@ -72,6 +72,23 @@ struct ScreenActions: View {
                 // toolbar grew this item. It exists in the Book menu as well,
                 // and a shop with a folder of models that has not read the
                 // menus has no way in that it can see.
+                // THE ORDER, WHERE IT CAN BE SEEN. It was only in the View
+                // menu, so a shop asked for a way to sort that already existed.
+                Menu {
+                    Picker(shop.words.callIt("mac.sort_by"), selection: $shop.librarySort) {
+                        ForEach(LibrarySort.allCases) { sort in
+                            Text(shop.words.callIt(sort.key)).tag(sort)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                } label: {
+                    Label(shop.words.callIt(shop.librarySort.key), systemImage: "arrow.up.arrow.down")
+                        .font(TypeScale.body(11.5))
+                        .foregroundStyle(Role.onNavy2)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help(shop.words.callIt("mac.sort_by"))
                 NavyAction(label: shop.words.callIt("mac.import_models"),
                            symbol: "square.and.arrow.down",
                            enabled: shop.canMoveJobs && !shop.importing) {

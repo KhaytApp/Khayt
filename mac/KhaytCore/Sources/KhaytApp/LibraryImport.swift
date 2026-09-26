@@ -137,7 +137,12 @@ enum LibraryImport {
     /// `lib/model-identity.js` calls this the certain claim — "the bytes are
     /// identical. Same file." — so it has to be over the whole file, and the
     /// whole file is up to a gigabyte. Nothing is held.
-    static func contentHash(of url: URL) throws -> String? {
+    /// Run a file-reading step on a background thread and wait for it.
+    nonisolated static func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await Task.detached(priority: .userInitiated, operation: work).value
+    }
+
+    nonisolated static func contentHash(of url: URL) throws -> String? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         var digest = SHA256()
@@ -211,7 +216,7 @@ enum LibraryImport {
         //
         // So: know the bytes, refuse duplicates while the file is still sitting
         // untouched where its owner put it, and only then begin.
-        guard let hash = try? contentHash(of: source) else {
+        guard let hash = await offMain({ try? LibraryImport.contentHash(of: source) }) ?? nil else {
             throw Failure.failed("could not read \(originalName)")
         }
         if knownHashes.contains(hash) {
@@ -238,10 +243,13 @@ enum LibraryImport {
         let filename = inPlace ? originalName : vaultFilename(in: dir, originalName: originalName, ext: ext)
         let destination = inPlace ? source : dir.appending(path: filename)
         if !inPlace {
-            do { try FileManager.default.copyItem(at: source, to: destination) }
-            catch {
+            let copied: String? = await offMain {
+                do { try FileManager.default.copyItem(at: source, to: destination); return nil }
+                catch { return error.localizedDescription }
+            }
+            if let copied {
                 try? FileManager.default.removeItem(at: dir)
-                throw Failure.failed(error.localizedDescription)
+                throw Failure.failed(copied)
             }
 
             // COPY, READ BACK, COMPARE — never on the strength of the copy call
@@ -249,7 +257,7 @@ enum LibraryImport {
             // follows: "a duplicate is recoverable, a deletion is not", and a short
             // write to a share that dropped mid-transfer returns without throwing
             // exactly like a good one does.
-            guard (try? contentHash(of: destination)) == hash else {
+            guard await offMain({ try? LibraryImport.contentHash(of: destination) }) == hash else {
                 try? FileManager.default.removeItem(at: dir)
                 throw Failure.failed("\(originalName) did not arrive intact")
             }
@@ -277,14 +285,22 @@ enum LibraryImport {
         // on any book: a licence was recorded only when somebody opened a
         // menu and chose one. Twenty-one of this shop's ninety models name a
         // designer in the file, and three of those are non-commercial.
-        let said = Mesh.provenance(of: destination)
+        // ── OFF THE MAIN THREAD ───────────────────────────────────────────
+        //
+        // Everything below that reads the whole file. This type is
+        // @MainActor, so these ran on the main thread: a large 3MF took the
+        // window with it, and the shop saw a spinning ball over a frozen
+        // library ("I tried adding a file and it is stuck with a loading
+        // ball"). The book is still written on the main actor, afterwards.
+        let said = await offMain { Mesh.provenance(of: destination) }
 
-        var geometry: Mesh.Measurement?
-        switch ext {
-        case "3mf": geometry = try? Mesh.measure3MF(destination)
-        case "stl": geometry = try? Mesh.measureSTL(destination)
-        case "obj": geometry = try? Mesh.measureOBJ(destination)
-        default: geometry = nil          // gcode carries no mesh this reads
+        let geometry: Mesh.Measurement? = await offMain {
+            switch ext {
+            case "3mf": return try? Mesh.measure3MF(destination)
+            case "stl": return try? Mesh.measureSTL(destination)
+            case "obj": return try? Mesh.measureOBJ(destination)
+            default: return nil          // gcode carries no mesh this reads
+            }
         }
 
         // THE OVERHANG WALK, when the shop has asked for it at import.
@@ -299,7 +315,7 @@ enum LibraryImport {
         // import must not fail over a warning.
         var riskAnalysis: [String: JSONValue]?
         if analyseRisk, geometry != nil {
-            riskAnalysis = try? Mesh.overhangs(of: destination)
+            riskAnalysis = await offMain { try? Mesh.overhangs(of: destination) }
         }
 
         var key: String?
@@ -329,7 +345,7 @@ enum LibraryImport {
         // Best effort: a model that will not draw is still a model, and an
         // import must not fail over a picture.
         if thumbFile == nil, ext == "stl" || ext == "obj",
-           let drawn = try? MeshPreview.png(of: destination),
+           let drawn = await offMain({ try? MeshPreview.png(of: destination) }),
            (try? drawn.write(to: dir.appending(path: "thumb.png"))) != nil {
             thumbFile = "thumb.png"
         }
