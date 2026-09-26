@@ -781,8 +781,12 @@ enum Mesh {
             || b == UInt8(ascii: "\n") || b == UInt8(ascii: "\r")
     }
 
-    private static func starts(_ tag: ArraySlice<UInt8>, with text: String) -> Bool {
-        let want = Array(text.utf8)
+    private static func starts(_ tag: ArraySlice<UInt8>, with text: StaticString) -> Bool {
+        // A StaticString's bytes, read in place. This used to build an Array
+        // from a String for every tag it was asked about (several per tag,
+        // millions of tags in a large 3MF), and that allocation was most of
+        // the time an import spent measuring — sampled on the shop's Mac.
+        let want = UnsafeBufferPointer(start: text.utf8Start, count: text.utf8CodeUnitCount)
         guard tag.count > want.count else { return false }
         var i = tag.startIndex
         for w in want {

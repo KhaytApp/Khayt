@@ -8,9 +8,11 @@ import KhaytCore
 /// loose in its own right — `timesPrinted` and `lastPrinted` are absent on a
 /// model that has never run, `setups` on most, `slicerProfileId` is null
 /// throughout, and `createdAt` is a number on some records and a string on
-/// others, which is why nothing here reads it.
+/// others — read through `LenientInstant`, which takes either.
 struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let id: String
+    /// When the model was added to the library.
+    let createdAt: LenientInstant?
     let name: String
     let originalName: String?
     let updatedAt: String?
@@ -276,6 +278,10 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
 /// two apps and finds its models in a different order has been given two
 /// libraries. This app opens the same way round and offers the rest.
 enum LibrarySort: String, CaseIterable, Identifiable, Sendable {
+    /// Newest first: what was just added is at the top. The shop asked for this
+    /// to be the default, because after an import it had to go looking for the
+    /// file it had just added.
+    case added
     case khayt, name, size, lastPrinted, timesPrinted
 
     var id: String { rawValue }
@@ -283,6 +289,7 @@ enum LibrarySort: String, CaseIterable, Identifiable, Sendable {
     /// The key each one is named by, so the menu speaks the shop's language.
     var key: String {
         switch self {
+        case .added: "mac.sort_added"
         case .khayt: "mac.sort_default"
         case .name: "mac.name"
         case .size: "set.store_size"
@@ -296,6 +303,9 @@ enum LibrarySort: String, CaseIterable, Identifiable, Sendable {
     /// thousands of times per draw of a 250-model library (Sep 2026).
     func sorted(_ files: [LibraryFile]) -> [LibraryFile] {
         switch self {
+        case .added:
+            let keyed = files.map { ($0, $0.createdAt?.date ?? .distantPast) }
+            return keyed.sorted { $0.1 > $1.1 }.map(\.0)
         case .khayt, .lastPrinted:
             let keyed = files.map { f in (f, self == .khayt ? f.updatedAtDate : f.lastPrintedDate) }
             return keyed.sorted { a, b in
@@ -309,6 +319,8 @@ enum LibrarySort: String, CaseIterable, Identifiable, Sendable {
 
     func order(_ a: LibraryFile, _ b: LibraryFile) -> Bool {
         switch self {
+        case .added:
+            return (a.createdAt?.date ?? .distantPast) > (b.createdAt?.date ?? .distantPast)
         case .khayt:
             if a.isFavourite != b.isFavourite { return a.isFavourite }
             return (a.updatedAtDate ?? .distantPast) > (b.updatedAtDate ?? .distantPast)
@@ -323,6 +335,27 @@ enum LibrarySort: String, CaseIterable, Identifiable, Sendable {
         case .timesPrinted:
             if a.printCount != b.printCount { return a.printCount > b.printCount }
             return a.title.localizedStandardCompare(b.title) == .orderedAscending
+        }
+    }
+}
+
+/// A moment written either as epoch milliseconds (`Date.now()`, what both
+/// apps write today) or as an ISO string (older records). Never throws: an
+/// unreadable value is simply no date.
+struct LenientInstant: Decodable, Hashable, Sendable {
+    let date: Date?
+
+    init(_ date: Date?) { self.date = date }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if let n = try? c.decode(Double.self), n > 0 {
+            // Seconds or milliseconds: anything past 1e11 is milliseconds.
+            date = Date(timeIntervalSince1970: n > 1e11 ? n / 1000 : n)
+        } else if let s = try? c.decode(String.self) {
+            date = Calendar.instant(s) ?? Order.day(s)
+        } else {
+            date = nil
         }
     }
 }

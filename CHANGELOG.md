@@ -28,6 +28,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     empty waste log says "No waste logged yet." without the "great job!".
   - **Spool colours** written as `#RGB` or `RRGGBBAA` (as a Bambu AMS reports
     them) are drawn instead of falling back to the unknown grey.
+- **(Mac) Adding a large model no longer freezes the window.** Reported by
+  the shop: "I tried adding a file and it is stuck with a loading ball". The
+  import measured the model on the main thread, so a large 3MF took the whole
+  window with it. The file is now read, hashed, copied and measured in the
+  background. Measuring is also faster: the reader was rebuilding a small text
+  pattern for every tag in the file, and a 55 MB model has millions of tags.
+- **(Mac) The library opens newest-added first, and can be sorted from the
+  Library screen.** Asked for by the shop: "after adding files I have to look
+  for them, I want to see them immediately". **Date added** is the new default.
+  The sort choice (date added, favourites first, name, size, last printed,
+  times printed) is now a button beside Import, not only in the View menu.
+
 - **Security: a store or carrier notification could be replayed.** Salla,
   Zid, SMSA, Aramex and Saudi Post sign each notification's content but not
   when it was sent, so a copy captured once stays valid. Khayt remembered what
