@@ -25,7 +25,7 @@ struct SuppliersCard: View {
             HStack {
                 CapsLabel(shop.words.callIt("sup.title"), tint: Role.text3, size: 9)
                 Spacer()
-                Button(shop.words.callIt("sup.add")) {
+                Button(shop.words.callIt("mac.add_supplier")) {
                     shop.editingSupplier = Supplier.blank()
                 }
                 .disabled(!shop.canMoveJobs)
@@ -164,7 +164,7 @@ struct SupplierSheet: View {
 
     var body: some View {
         SheetFrame(width: Self.width) {
-            Text(shop.words.callIt(existing ? "sup.edit" : "sup.add"))
+            Text(shop.words.callIt(existing ? "mac.edit_supplier" : "mac.add_supplier"))
                 .font(.headline)
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {

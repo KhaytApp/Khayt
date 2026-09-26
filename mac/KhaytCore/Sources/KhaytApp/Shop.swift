@@ -1960,7 +1960,7 @@ final class Shop {
     /// On the book rather than in the window because both shells ask for it:
     /// the old one for its toolbar field, the new one for the strip's.
     @MainActor var searchPrompt: String {
-        if shelf == .giftCards { return words.callIt("giftCardCode") }
+        if shelf == .giftCards { return words.callIt("mac.gift_card_code") }
         if shelf == .portfolio { return words.callIt("pf.search_ph") }
         if showingLibrary { return words.callIt("mac.search_models") }
         if showingCustomers { return words.callIt("mac.search_people") }

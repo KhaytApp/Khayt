@@ -215,7 +215,7 @@ struct WasteSheet: View {
                     .labelsHidden()
                 }
                 GridRow {
-                    Text(shop.words.callIt("waste.failure_type")).foregroundStyle(.secondary)
+                    Text(shop.words.callIt("mac.failure_category")).foregroundStyle(.secondary)
                     Picker("", selection: $failureType) {
                         ForEach(Shop.failureTypes, id: \.self) { ft in
                             Text(shop.words.callIt("waste.ft." + ft)).tag(ft)

@@ -78,20 +78,13 @@ struct MoneyMasthead: View {
 
             ModeSwitch(mode: $mode, words: shop.words)
 
-            Button {
+            Button(shop.words.callIt("mac.record_a_payment")) {
                 shop.shelf = .jobs(nil)
-            } label: {
-                CapsLabel(shop.words.callIt("mac.record_a_payment"), tint: Role.onAcc, size: 11)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, Space.sm)
-                    // `accInk`, never `acc` — this one carries white text.
-                    .background(Role.accInk, in: RoundedRectangle(cornerRadius: 5,
-                                                                  style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(MastheadButtonStyle())
             .disabled(!shop.canMoveJobs)
+            // Why it will not press, on a book this Mac may only read.
+            .help(shop.canMoveJobs ? "" : shop.words.callIt("mac.read_only"))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -303,5 +296,41 @@ struct ActionButton: View {
         case .outward:  Role.lateLine
         default:        .clear
         }
+    }
+}
+
+/// The masthead's one filled button, and what it looks like when it cannot be
+/// pressed.
+///
+/// A plain-style button dims its whole label when disabled, and this label is
+/// its own fill: `onAcc` on `accInk`, both halved, came out brown on brown —
+/// in dark mode the near-black label on a dimmed orange was unreadable, and in
+/// light the white one was barely better. So the style draws the disabled
+/// state itself, as an OUTLINE in the navy's own quiet ink: plainly there,
+/// plainly not the live orange, and legible on the navy it sits on in both
+/// appearances (the navy does not change with the theme).
+struct MastheadButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+        return HStack(spacing: 0) { configuration.label }
+            .font(TypeScale.label(11))
+            .tracking(TypeScale.tracking(.label, size: 11))
+            .textCase(.uppercase)
+            .lineLimit(1)
+            .fixedSize()
+            .foregroundStyle(enabled ? Role.onAcc : Role.onNavy2)
+            .padding(.horizontal, 12)
+            .padding(.vertical, Space.sm)
+            .background {
+                // `accInk`, never `acc` — this one carries a label.
+                if enabled { shape.fill(Role.accInk) }
+            }
+            .overlay {
+                if !enabled { shape.strokeBorder(Role.navyLine, lineWidth: 1) }
+            }
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .contentShape(shape)
     }
 }

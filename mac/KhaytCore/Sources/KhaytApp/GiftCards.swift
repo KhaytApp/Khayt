@@ -68,7 +68,7 @@ struct GiftCards: View {
         Group {
             if shop.giftCards.isEmpty {
                 EmptyHere(title: shop.words.callIt("giftCardEmpty"), mark: .giftCards) {
-                    Button(shop.words.callIt("issueGiftCard")) { shop.issuingGiftCard = true }
+                    Button(shop.words.callIt("mac.issue_gift_card")) { shop.issuingGiftCard = true }
                         .buttonStyle(.borderedProminent)
                 }
             } else if shown.isEmpty {
@@ -77,7 +77,7 @@ struct GiftCards: View {
                 VStack(spacing: 0) {
                 GiftCardFilterBar(shop: shop)
                 Table(shown) {
-                    TableColumn(shop.words.callIt("giftCardCode")) { card in
+                    TableColumn(shop.words.callIt("mac.gift_card_code")) { card in
                         Text(card.code).monospaced()
                             .opacity(closed(card) ? 0.55 : 1)
                             // THE ONLY PLACE THE STATE IS STILL SAID IN WORDS.
@@ -137,9 +137,9 @@ struct GiftCards: View {
                 Button {
                     shop.issuingGiftCard = true
                 } label: {
-                    Label(shop.words.callIt("issueGiftCard"), systemImage: "plus")
+                    Label(shop.words.callIt("mac.issue_gift_card"), systemImage: "plus")
                 }
-                .help(shop.words.callIt("issueGiftCard"))
+                .help(shop.words.callIt("mac.issue_gift_card"))
             }
         }
     }

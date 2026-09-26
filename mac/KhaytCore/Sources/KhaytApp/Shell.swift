@@ -188,13 +188,30 @@ struct CommandField: View {
 
     @ViewBuilder private var field: some View {
         if shop.canSearch {
-            TextField("", text: $shop.search, prompt:
-                        Text(shop.searchPrompt).foregroundStyle(Role.onNavy3))
-                .textFieldStyle(.plain)
-                .font(TypeScale.body(11.5))
-                .foregroundStyle(Role.onNavy)
-                .focused($focused)
-                .lineLimit(1)
+            // THE PLACEHOLDER IS DRAWN HERE, not handed to the field as a
+            // prompt. A styled `prompt:` is honoured in light appearance and
+            // IGNORED in dark — measured, not guessed: the same red prompt drew
+            // red on aqua and system grey on darkAqua — and on this navy strip
+            // the system's dark placeholder came out near-white, so "Job,
+            // customer or number" read as something already typed. An overlay
+            // in the strip's own secondary ink says the same in both.
+            ZStack(alignment: .leading) {
+                if shop.search.isEmpty {
+                    Text(shop.searchPrompt)
+                        .font(TypeScale.body(11.5))
+                        .foregroundStyle(Role.onNavy3)
+                        .lineLimit(1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+                TextField("", text: $shop.search)
+                    .textFieldStyle(.plain)
+                    .font(TypeScale.body(11.5))
+                    .foregroundStyle(Role.onNavy)
+                    .focused($focused)
+                    .lineLimit(1)
+                    .accessibilityLabel(shop.searchPrompt)
+            }
         } else {
             // A screen with nothing to narrow says so by not offering to. The
             // words stay because the strip is the same width either way.

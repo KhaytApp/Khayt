@@ -27,9 +27,21 @@ struct Swatch: View {
     /// to show a colour the other calls unknown. An unparseable or absent value
     /// is nil rather than black — black is a real filament choice and must not
     /// be what "nobody said" looks like.
+    ///
+    /// `#RGB` and `#RRGGBBAA` are read too. A Bambu AMS reports its trays as
+    /// `RRGGBBAA` and Spoolman allows the alpha, so a spool that came in that
+    /// way HAD a colour and the shelf drew it as the grey disc of "nobody
+    /// said" — the one thing this reading exists to prevent. The alpha is
+    /// dropped: a filament is not see-through on a shelf card.
     static func rgb(fromHex hex: String?) -> (r: Double, g: Double, b: Double)? {
         guard var s = hex?.trimmingCharacters(in: .whitespaces), !s.isEmpty else { return nil }
         if s.hasPrefix("#") { s.removeFirst() }
+        guard s.allSatisfy(\.isHexDigit) else { return nil }
+        switch s.count {
+        case 3: s = s.map { "\($0)\($0)" }.joined()
+        case 8: s = String(s.prefix(6))
+        default: break
+        }
         guard s.count == 6, let v = Int(s, radix: 16) else { return nil }
         return (Double((v >> 16) & 0xFF) / 255, Double((v >> 8) & 0xFF) / 255, Double(v & 0xFF) / 255)
     }

@@ -57,7 +57,10 @@ struct Expenses: View {
                 }
             }
             .width(min: 140, ideal: 260)
-            TableColumn(shop.words.callIt("exp.order_ref")) { e in
+            // A COLUMN HEAD, not the form's label. The shared "Link to order
+            // (optional)" is the expense sheet's field and was clipped here to
+            // "Link to order (" — a column says what is in it, in a word.
+            TableColumn(shop.words.callIt("mac.expense_order_col")) { e in
                 Text(e.orderId ?? "—").monospacedDigit()
                     .foregroundStyle(e.orderId == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
             }
@@ -202,7 +205,7 @@ struct Waste: View {
                 Text(Money.grams(w.weight)).monospacedDigit()
             }
             .width(min: 110, ideal: 130)
-            TableColumn(shop.words.callIt("waste.failure_type"), value: \.failureType) { w in
+            TableColumn(shop.words.callIt("mac.failure_category"), value: \.failureType) { w in
                 Text(shop.words.callIt("waste.ft." + w.failureType))
             }
             .width(min: 110, ideal: 150)
@@ -230,7 +233,7 @@ struct Waste: View {
         }
         .overlay {
             if rows.isEmpty {
-                EmptyHere(title: shop.words.callIt("waste.empty"), mark: .waste)
+                EmptyHere(title: shop.words.callIt("mac.waste_empty"), mark: .waste)
             }
         }
     }

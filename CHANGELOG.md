@@ -4,6 +4,30 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Layout, dark-mode and wording fixes from a review of the shop's real
+  book.**
+  - **Board:** the lanes sit at the top of the window instead of floating in
+    the middle, and the edge where more lanes wait fades so the cut-off columns
+    read as "scroll for more". When jobs have left the board by being delivered
+    or cancelled, a line above the lanes says how many and opens Jobs.
+  - **Library:** file and group names with no spaces (`Kimba_gleam_stardemy`)
+    wrap after their `_`, `+`, `-` and `.` rather than mid-word, end in an
+    ellipsis when still too long, and show the full name on hover. Filter chip
+    rows (library and catalogue) fade at whichever end has more chips.
+  - **Clipping:** the Expenses order column is headed "Order" rather than the
+    form's clipped "Link to order (optional)". The Reports tab is now "Profit
+    & Loss", so it no longer repeats (or, on By month, contradicts) the By
+    quarter / By month switch beside it.
+  - **Dark mode:** "Record a payment" draws a legible outline when the book is
+    read-only instead of brown text on a brown fill. Search placeholders use
+    the strip's secondary ink in dark mode too (a styled prompt is ignored
+    there, so the placeholder is drawn by the app). Spool prices on the
+    Inventory shelf use the secondary ink rather than the tertiary.
+  - **Wording:** "Issue gift card", "Gift card code", "Failure category",
+    "Add supplier" and "Edit supplier" are sentence case on the Mac, and an
+    empty waste log says "No waste logged yet." without the "great job!".
+  - **Spool colours** written as `#RGB` or `RRGGBBAA` (as a Bambu AMS reports
+    them) are drawn instead of falling back to the unknown grey.
 - **Security: a store or carrier notification could be replayed.** Salla,
   Zid, SMSA, Aramex and Saudi Post sign each notification's content but not
   when it was sent, so a copy captured once stays valid. Khayt remembered what

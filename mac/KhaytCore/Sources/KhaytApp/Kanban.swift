@@ -43,8 +43,29 @@ struct Kanban: View {
     /// the jobs somebody is waiting on is worse than no board.
     private var columns: [Stage] { Stage.boardColumns }
 
+    /// Jobs that matched the search but left the board by being delivered or
+    /// cancelled — the ones a shop would otherwise think had vanished.
+    private var finished: Int {
+        shop.matching(shop.orders).filter {
+            guard let stage = Stage.of($0) else { return false }
+            return !Stage.boardColumns.contains(stage)
+        }.count
+    }
+
     var body: some View {
         VStack(spacing: 0) {
+            // WHERE THE FINISHED WORK WENT. Delivered and cancelled jobs have no
+            // column — see `Stage.boardColumns` — and a shop whose every job
+            // has been handed over opened this screen to eight empty lanes and
+            // no word about its twenty jobs. Said above the lanes, where it is
+            // read first, with the way to them beside it.
+            if finished > 0 {
+                Banner(text: shop.words.callIt("mac.board_finished_elsewhere",
+                                               ["n": .number(Double(finished))]),
+                       symbol: "checkmark.circle", tint: .secondary) {
+                    Button(shop.words.callIt("mac.board_open_jobs")) { shop.shelf = .jobs(nil) }
+                }
+            }
             ScrollView([.horizontal, .vertical]) {
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(columns) { stage in
@@ -54,6 +75,14 @@ struct Kanban: View {
                 }
                 .padding(Metric.screen)
             }
+            // TOP-ALIGNED. A scroll view on both axes centres content smaller
+            // than itself, so eight short lanes floated in the middle of the
+            // window under 450 points of nothing. `.topLeading` mirrors in
+            // Arabic, so the first lane still sits at the leading edge there.
+            .defaultScrollAnchor(.topLeading, for: .alignment)
+            // Eight lanes do not fit a laptop window, and the sixth was cut at
+            // the window edge with nothing to say the rest were there.
+            .horizontalScrollCue()
             // ── THE BOARD ANSWERS THE KEYBOARD ────────────────────────────
             //
             // It had none. The library was the only screen in this app with

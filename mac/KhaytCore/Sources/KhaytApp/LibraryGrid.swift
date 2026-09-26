@@ -325,10 +325,13 @@ private struct FolderCell: View {
                 }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(name)
+                Text(TitleBreaks.soften(name))
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(2, reservesSpace: true)
+                    .truncationMode(.tail)
                     .multilineTextAlignment(.leading)
+                    .help(name)
+                    .accessibilityLabel(name)
                 // "1 model", not "1 models"; Arabic's one and two are words.
                 Text(words.counting(count, "mac.n_models"))
                     .font(.caption2)
@@ -390,10 +393,13 @@ private struct Cell: View {
                 }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(file.title)
+                Text(TitleBreaks.soften(file.title))
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(2, reservesSpace: true)
+                    .truncationMode(.tail)
                     .multilineTextAlignment(.leading)
+                    .help(file.title)
+                    .accessibilityLabel(file.title)
                 Text(subtitle)
                     .font(.caption2)
                     .monospacedDigit()
@@ -540,5 +546,36 @@ private struct FolderMoveMenu: View {
             }
         }
         .disabled(!shop.canMoveJobs)
+    }
+}
+
+/// Where a file name may wrap.
+///
+/// A shop's files are named by slicers and download sites, not by people:
+/// `Kimba_gleam_stardemy`, `Modular+Filament+Storage+Organizer`. There is no
+/// space in either, so the text system had no word to wrap at and broke the
+/// tile's title wherever the line ran out — "Kimba_gleam_stardem / y",
+/// "Modular+Filament+Sto / rage". A zero-width space after each separator
+/// gives it the boundaries a person would have typed, and a name still too
+/// long for two lines ends in an ellipsis with the whole of it on hover.
+///
+/// Display only. The name the book holds, searches and exports is untouched.
+enum TitleBreaks {
+    static let separators: Set<Character> = ["_", "+", "-", ".", "/"]
+
+    static func soften(_ name: String) -> String {
+        guard name.contains(where: separators.contains) else { return name }
+        var out = ""
+        out.reserveCapacity(name.count + 8)
+        for (i, ch) in zip(name.indices, name) {
+            out.append(ch)
+            // Not after the last character, and not inside a run of separators
+            // ("a__b" breaks once, after the run).
+            let next = name.index(after: i)
+            if separators.contains(ch), next < name.endIndex, !separators.contains(name[next]) {
+                out.append("\u{200B}")
+            }
+        }
+        return out
     }
 }

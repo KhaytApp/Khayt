@@ -1068,7 +1068,7 @@ struct Reports: View {
                                  + "\(Money.figure(rows.reduce(0) { $0 + $1.expenses + $1.fixed }))")
                                 .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
                         }
-                        Text(shop.words.callIt("an.pnl_title"))
+                        Text(shop.words.callIt("mac.pnl_title"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .card(rail: net < 0 ? Khayt.late : Khayt.brand, padding: 14)
@@ -1087,7 +1087,7 @@ struct Reports: View {
                     // repeated here — it is the card above, and one figure
                     // under one word twice on one pane is how two answers to
                     // the same question get to disagree.
-                    DetailSection(shop.words.callIt("an.pnl_title")) {
+                    DetailSection(shop.words.callIt("mac.pnl_title")) {
                         VStack(spacing: 6) {
                             DetailLine(shop.words.callIt("an.revenue"),
                                        Money.text(rows.reduce(0) { $0 + $1.revenue }, shop.currency))

@@ -26,11 +26,11 @@ struct GiftCardSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(shop.words.callIt("issueGiftCard"))
+            Text(shop.words.callIt("mac.issue_gift_card"))
                 .font(.headline).padding(.bottom, 12)
 
             Form {
-                LabeledContent(shop.words.callIt("giftCardCode")) {
+                LabeledContent(shop.words.callIt("mac.gift_card_code")) {
                     TextField("", text: $code)
                         .textFieldStyle(.roundedBorder).monospaced()
                         .focused($focused)

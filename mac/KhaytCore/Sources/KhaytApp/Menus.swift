@@ -278,7 +278,7 @@ private struct GoMenu: View {
         }
         Button(Words.upfront("waste.title")) { shop.shelf = .waste }
         if shop.canShow(.reports) {
-            Button(Words.upfront("an.pnl_title")) { shop.shelf = .reports }
+            Button(Words.upfront("mac.pnl_title")) { shop.shelf = .reports }
                 .keyboardShortcut("0", modifiers: .command)
         }
     }
