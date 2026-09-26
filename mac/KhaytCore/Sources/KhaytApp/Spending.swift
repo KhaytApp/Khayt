@@ -256,7 +256,7 @@ struct Waste: View {
                     DetailSection(shop.words.callIt("exp.summary")) {
                         DetailLine(shop.words.callIt("waste.total_entries"), "\(shown.count)")
                         DetailLine(shop.words.callIt("waste.total_weight"),
-                                   "\(Money.grams(grams)) \(shop.words.callIt("mac.grams"))")
+                                   "\(Money.grams(grams)) \(shop.words.callIt("common.grams"))")
                         DetailLine(shop.words.callIt("waste.total_cost"),
                                    Money.text(cost, shop.currency), strong: true)
                     }

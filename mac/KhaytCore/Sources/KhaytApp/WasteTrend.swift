@@ -44,13 +44,14 @@ struct WasteTrendCard: View {
                     .foregroundStyle(Khayt.brand)
                 Spacer()
                 if let trend, trend.total > 0 {
-                    Text(Money.grams(month?.total ?? trend.total) + " " + words.callIt("mac.grams"))
+                    Text(Money.grams(month?.total ?? trend.total) + " " + words.callIt("common.grams"))
                         .font(.callout.weight(.medium)).monospacedDigit()
                         .contentTransition(.numericText())
                 }
             }
             if let trend, trend.total > 0 {
-                Columns(trend: trend, language: words.language, pointingAt: $pointingAt)
+                Columns(trend: trend, language: words.language,
+                        gram: words.callIt("common.grams"), pointingAt: $pointingAt)
                     .frame(height: 84)
                 // WHAT THE FIGURES BELOW ARE ABOUT. The card never said which
                 // months it covered, so the total in the corner was six months
@@ -79,7 +80,7 @@ struct WasteTrendCard: View {
                             // a stripe missing from one column is exactly the
                             // fact a reader is hunting for.
                             Text(Money.grams((month?.byType ?? trend.byType)[type] ?? 0)
-                                 + " " + words.callIt("mac.grams"))
+                                 + " " + words.callIt("common.grams"))
                                 .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                                 .contentTransition(.numericText())
                         }
@@ -95,6 +96,8 @@ struct WasteTrendCard: View {
     private struct Columns: View {
         let trend: KhaytEngine.WasteTrend
         let language: String
+        /// The gram in the shop's language — never a Latin "g" on an Arabic card.
+        let gram: String
         @Binding var pointingAt: String?
         @Environment(\.accessibilityReduceMotion) private var reduced
 
@@ -148,7 +151,7 @@ struct WasteTrendCard: View {
                         else if pointingAt == month.key { pointingAt = nil }
                     }
                     .help(MonthLabel.long(month.key, language: language)
-                          + " · " + Money.grams(month.total) + " g")
+                          + " · " + Money.grams(month.total) + " " + gram)
                 }
             }
             .onHover { inside in if !inside { pointingAt = nil } }

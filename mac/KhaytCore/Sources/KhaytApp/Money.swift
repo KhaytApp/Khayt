@@ -240,7 +240,7 @@ enum Quantity {
         f.minimumFractionDigits = 0
         f.maximumFractionDigits = places
         let n = f.string(from: amount as NSNumber) ?? "\(amount)"
-        // `common.grams` is where Khayt already keeps the gram, and it is `جم`
+        // `common.grams` is where Khayt already keeps the gram, and it is `غ`
         // in Arabic — a `g` written here would be an English letter in an
         // Arabic list. The other units are this app's own.
         let word = words.callIt(unit?.unitKey ?? "common.grams")

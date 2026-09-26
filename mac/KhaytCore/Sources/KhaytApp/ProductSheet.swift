@@ -735,7 +735,7 @@ struct ProductSheet: View {
                         Spacer()
                         Text(Money.quantity(pricing.hours) + " "
                              + shop.words.callIt("common.hours")
-                             + " · " + Money.grams(pricing.grams) + " g")
+                             + " · " + Money.grams(pricing.grams) + " " + shop.words.callIt("common.grams"))
                             .foregroundStyle(.secondary)
                     }
                     .font(.caption).monospacedDigit()
@@ -870,7 +870,7 @@ struct ProductSheet: View {
     private func partSummary(_ part: PartRow) -> String {
         let g = Double(part.grams) ?? 0, h = Double(part.hours) ?? 0
         var bits: [String] = []
-        if g > 0 { bits.append(Money.grams(g) + " g") }
+        if g > 0 { bits.append(Money.grams(g) + " " + shop.words.callIt("common.grams")) }
         if h > 0 { bits.append(Money.quantity(h) + " " + shop.words.callIt("common.hours")) }
         return bits.joined(separator: " · ")
     }

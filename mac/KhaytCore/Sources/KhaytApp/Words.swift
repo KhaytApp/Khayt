@@ -333,7 +333,7 @@ final class Words {
         // Shelves
         "mac.all_jobs":      ["en": "Jobs",          "ar": "الأعمال"],
         "mac.pipeline":      ["en": "Pipeline",      "ar": "المسار"],
-        "mac.board":         ["en": "Board",         "ar": "اللوح"],
+        "mac.board":         ["en": "Board",         "ar": "لوحة المهام"],
         "mac.nothing_here":  ["en": "nothing here",  "ar": "لا شيء هنا"],
         // A catalogue chip, and the one worth interrupting for: a product a
         // shop cannot sell sitting among ones it can.
@@ -401,6 +401,8 @@ final class Words {
         "mach.wear_bit":       ["en": "Cutting bit", "ar": "لقمة القطع"],
         // Units an item is counted in, and what a price is quoted per.
         "unit.g":      ["en": "g",      "ar": "غ"],
+        // An hour after a figure, as short as the gram beside it.
+        "mac.unit_h":  ["en": "h",      "ar": "س"],
         // What a price is quoted PER. Singular, and a separate key from the
         // word after a quantity — "6 sheets" but "24.00 / sheet".
         "unit.per_kg":    ["en": "kg",    "ar": "كغ"],
@@ -534,17 +536,19 @@ final class Words {
         "mac.write_them_down": ["en": "Write them down",
                                 "ar": "تسجيل العميل"],
         "mac.what_went_wrong": ["en": "What went wrong?", "ar": "ما الذي حدث؟"],
-        // (جم) and not (غم): the shared catalogue's `common.grams` is جم, and
-        // that is the abbreviation every weight in this app now prints. Two
-        // spellings of the gram on one screen is a typo with a rationale.
-        "mac.wasted":        ["en": "Filament wasted (g)", "ar": "الخيط المهدور (جم)"],
+        // (غ), the ONE Arabic gram: the shared catalogue's `common.grams` is غ
+        // (it was جم until Sep 2026, beside غ, غرام and a Latin g on other
+        // screens), and that is the abbreviation every weight in this app
+        // prints. Two spellings of the gram in one app is a typo with a
+        // rationale.
+        "mac.wasted":        ["en": "Filament wasted (g)", "ar": "الخيط المهدور (غ)"],
         "mac.board_unplaced": ["en": "{n} job(s) are in a stage this board has no column for.",
-                               "ar": "{n} من الأعمال في مرحلة لا عمود لها في هذا اللوح."],
+                               "ar": "{n} من الأعمال في مرحلة لا عمود لها في لوحة المهام."],
         // The board draws work in flight; delivered and cancelled jobs leave it.
         // Said, so a shop whose every job is finished is not shown eight empty
         // lanes and left to wonder where its jobs went.
         "mac.board_finished_elsewhere": ["en": "{n} finished job(s) left the board when delivered or cancelled. They are all in Jobs.",
-                                         "ar": "{n} من الأعمال المنتهية خرجت من اللوح بعد التسليم أو الإلغاء، وكلها في قائمة الأعمال."],
+                                         "ar": "{n} من الأعمال المنتهية خرجت من لوحة المهام بعد التسليم أو الإلغاء، وكلها في قائمة الأعمال."],
         "mac.board_open_jobs": ["en": "Show in Jobs", "ar": "اعرضها في الأعمال"],
         // SENTENCE CASE, as the rest of the Mac app is. Khayt's shared locale
         // says "Issue Gift Card", "Gift Card Code", "Failure Category" and
@@ -919,7 +923,7 @@ final class Words {
         "mac.days_over": ["en": "{n} days over", "ar": "متأخر {n} أيام"],
         "mac.days_over_one": ["en": "{n} day over", "ar": "متأخر يومًا"],
         "mac.past_its_date": ["en": "Past its due date", "ar": "تجاوز تاريخ التسليم"],
-        "mac.grams_left": ["en": "{n} g left", "ar": "بقي {n} جم"],
+        "mac.grams_left": ["en": "{n} g left", "ar": "بقي {n} غ"],
         "mac.out_of_stock": ["en": "None left on the shelf", "ar": "لا شيء على الرف"],
         "mac.needs_a_look": ["en": "Needs a look", "ar": "يحتاج فحصًا"],
         "mac.untitled": ["en": "Untitled", "ar": "بلا عنوان"],
@@ -1529,7 +1533,7 @@ final class Words {
         "mac.owed_caps":     ["en": "OWED",          "ar": "المستحق"],
         "mac.sort_default":  ["en": "Favourites first", "ar": "المفضّلة أولاً"],
         "mac.sort_by":       ["en": "Sort Library By",  "ar": "ترتيب المكتبة حسب"],
-        "mac.dashboard":     ["en": "Dashboard",       "ar": "اللوحة"],
+        "mac.dashboard":     ["en": "Dashboard",       "ar": "نظرة عامة"],
         "mac.late_tile":     ["en": "Late",            "ar": "متأخرة"],
         "mac.the_machine":   ["en": "The machine",     "ar": "الطابعة"],
         "mac.bed":           ["en": "Bed",             "ar": "المنصة"],
@@ -2487,7 +2491,7 @@ final class Words {
         // WHERE THE RATE CAME FROM, because a number a shop cannot attribute is
         // a number it cannot check.
         "mac.est_learned": ["en": "From your own printers — {rate} g/hour, measured across {jobs} jobs.",
-                            "ar": "من طابعاتك — {rate} غرام/ساعة، مقيسة على {jobs} أعمال."],
+                            "ar": "من طابعاتك — {rate} غ/ساعة، مقيسة على {jobs} أعمال."],
         "mac.est_default": ["en": "Using Khayt's default rate. Record what a few prints actually took and this learns your own.",
                             "ar": "باستخدام معدّل خيط الافتراضي. سجّل ما استغرقته بعض الطبعات فعليًا وسيتعلّم معدّلك."],
         "mac.est_filament": ["en": "Filament", "ar": "الخيط"],
@@ -2504,7 +2508,7 @@ final class Words {
                                 "ar": "معظمه جدار، فالوزن تقديري — راجعه قبل التسعير."],
         // The estimator's own settings.
         "mac.est_section": ["en": "Estimating from a model", "ar": "التقدير من مجسّم"],
-        "mac.est_density": ["en": "Filament density (g/cm³)", "ar": "كثافة الخيط (غرام/سم³)"],
+        "mac.est_density": ["en": "Filament density (g/cm³)", "ar": "كثافة الخيط (غ/سم³)"],
         "mac.est_infill": ["en": "Default infill (%)", "ar": "التعبئة الافتراضية (%)"],
         "mac.est_wall": ["en": "Wall thickness (mm)", "ar": "سماكة الجدار (مم)"],
         "mac.est_waste": ["en": "Waste (%)", "ar": "الهدر (%)"],

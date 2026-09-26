@@ -489,7 +489,7 @@ struct MachineSheet: View {
                     HStack(spacing: 4) {
                         TextField("", value: $nozzleThreshold, format: .number.precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 90)
-                        Text(shop.words.callIt("mac.grams")).foregroundStyle(.secondary)
+                        Text(shop.words.callIt("common.grams")).foregroundStyle(.secondary)
                     }
                 }
             }

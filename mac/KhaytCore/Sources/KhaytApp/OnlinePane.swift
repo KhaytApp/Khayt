@@ -246,7 +246,7 @@ struct OnlinePane: View {
                         }
                         Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
                             quoteRow("lan.iq_spool_cost", $draft.spoolCost, unit: shop.currency)
-                            quoteRow("lan.iq_spool_weight", $draft.spoolWeight, unit: "g")
+                            quoteRow("lan.iq_spool_weight", $draft.spoolWeight, unit: shop.words.callIt("common.grams"))
                             quoteRow("lan.iq_margin", $draft.margin, unit: "%")
                             quoteRow("lan.iq_min", $draft.minPrice, unit: shop.currency)
                             quoteRow("lan.iq_waste", $draft.waste, unit: "%")

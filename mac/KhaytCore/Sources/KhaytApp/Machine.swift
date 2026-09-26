@@ -265,7 +265,7 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
     /// How a shop picks this spool out of a list: what it is, and where — the
     /// two things that tell one 1kg PLA apart from another on the same shelf.
     ///
-    /// Takes the catalogue because the unit is in it — `common.grams` is `جم`
+    /// Takes the catalogue because the unit is in it — `common.grams` is `غ`
     /// in Arabic, so a `g` written here would be an English letter in an Arabic
     /// list — and takes the item's UNIT, because a stack of plywood picked out
     /// of a list read "Birch ply · 6g · Rack by the laser".
