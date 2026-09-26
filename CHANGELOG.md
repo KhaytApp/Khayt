@@ -27,6 +27,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   The library also opens on **All models**, newest first, with **Groups** one
   click away, so a model just added is on screen at once rather than inside a
   folder.
+- **(Mac) When a print ends, the shop's iPhones are told.** The Mac sends a
+  sealed "print finished" event to Khayt Cloud, which passes it to any open
+  Khayt screen and as a notification to the shop's iPhones. The event says
+  which printer, which job, how long it took and whether it finished, failed
+  or was cancelled. The iPhone decrypts it and offers the next step. Only the
+  kind of event is readable in the cloud; the details are sealed with the
+  shop's key. It is best-effort: a notification that cannot be sent never holds
+  up the printer or the job.
+  Settings › Online has a **Send a test alert** button to check the phone
+  receives it without waiting for a print.
 
 - **(Mac) Layout, dark-mode and wording fixes from a review of the shop's real
   book.**
