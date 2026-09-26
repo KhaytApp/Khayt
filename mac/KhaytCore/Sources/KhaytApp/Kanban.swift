@@ -60,8 +60,7 @@ struct Kanban: View {
             // no word about its twenty jobs. Said above the lanes, where it is
             // read first, with the way to them beside it.
             if finished > 0 {
-                Banner(text: shop.words.callIt("mac.board_finished_elsewhere",
-                                               ["n": .number(Double(finished))]),
+                Banner(text: shop.words.counting(finished, "mac.board_finished_elsewhere"),
                        symbol: "checkmark.circle", tint: .secondary) {
                     Button(shop.words.callIt("mac.board_open_jobs")) { shop.shelf = .jobs(nil) }
                 }
@@ -124,8 +123,7 @@ struct Kanban: View {
             // column is not on this board, and the board saying so is the
             // difference between a gap and a lie.
             if !shop.unplaced.isEmpty {
-                Banner(text: shop.words.callIt("mac.board_unplaced",
-                                               ["n": .number(Double(shop.unplaced.count))]),
+                Banner(text: shop.words.counting(shop.unplaced.count, "mac.board_unplaced"),
                        symbol: "questionmark.circle", tint: .secondary)
             }
         }

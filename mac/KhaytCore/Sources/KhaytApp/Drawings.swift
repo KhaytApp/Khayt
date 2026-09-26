@@ -297,12 +297,19 @@ struct Waterfall: View {
                     at: CGPoint(x: centre, y: bar.step.amount >= 0 ? top - 8 : top + tall + 8),
                     anchor: .center)
 
-                context.draw(
+                // INSIDE ITS OWN SLOT, wrapped to two lines. Drawn at a point
+                // it had no width, and with the waste step added the Arabic
+                // "خيوط مهدرة (طباعات فاشلة)" ran into the cost of goods beside
+                // it. A rect wraps it; the slot is the bar's share of the row.
+                let name = context.resolve(
                     Text(bar.step.label)
                         .font(.system(size: 10.5, weight: bar.step.anchored ? .semibold : .regular))
-                        .foregroundStyle(bar.step.anchored ? Color.primary : Color.secondary),
-                    at: CGPoint(x: centre, y: plot + 16),
-                    anchor: .center)
+                        .foregroundStyle(bar.step.anchored ? Color.primary : Color.secondary))
+                let room = CGSize(width: max(step - 6, 20), height: 29)
+                let fits = name.measure(in: room)
+                context.draw(name, in: CGRect(x: centre - fits.width / 2,
+                                              y: plot + 16 - min(fits.height, room.height) / 2,
+                                              width: fits.width, height: min(fits.height, room.height)))
             }
         }
         .frame(height: height)

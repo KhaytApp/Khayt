@@ -267,7 +267,13 @@ extension Shop {
         // it is doing, nothing read off the settings can contradict it — and
         // this test was third at first, so a machine that had answered was
         // still reported as not set up because its record was thin.
-        if printers.readings[machine.id]?.status != nil { return .idle }
+        // `heard` rather than the raw reading: it carries the grace a printer
+        // that has answered before gets for a missed poll or two, and it is the
+        // same test the band and Next up read, so the three cannot disagree.
+        if printers.heard(machine.id) != nil { return .idle }
+        // Asked, and silent past its grace (or never answered at all): that is
+        // a fact about THIS machine, whatever its kind or setup says.
+        if printers.readings[machine.id] != nil { return .notAnswering }
         // Is this KIND askable at all? `lib/machine-kinds.js` answers it, and
         // it is a fact about the kind rather than about the setup.
         guard kind(of: machine)?.polled ?? true else { return .noProtocol }
@@ -280,7 +286,7 @@ extension Shop {
         if let status = printers.readings[machine.id]?.status,
            PrinterWatch.isPrinting(status.state) {
             return TileReading(percent: Double(status.progress) / 100, state: .running,
-                               line: status.timeRemaining.map(PrinterWatch.spell)
+                               line: status.timeRemaining.map { PrinterWatch.spell($0, words) }
                                      ?? words.callIt("mac.printing"),
                                filename: status.filename)
         }

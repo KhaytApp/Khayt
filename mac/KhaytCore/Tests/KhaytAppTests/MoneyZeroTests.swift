@@ -13,6 +13,8 @@ struct MoneyZeroTests {
         #expect(Money.quantity(-0.0) == "0")
         #expect(Money.quantity(-0.04, decimals: 1) == "0.0")
         // A real negative keeps its sign.
-        #expect(Money.figure(-12.5) == "-12.50")
+        // Held left-to-right so the minus stays in front in Arabic — see
+        // `Money.held`.
+        #expect(Money.figure(-12.5) == "\u{2066}-12.50\u{2069}")
     }
 }

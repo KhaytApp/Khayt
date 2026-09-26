@@ -58,7 +58,9 @@ struct CashFlowChart: View {
             if let flow, flow.totals.anyMovement {
                 Bars(rows: flow.rows, currency: shop.currency,
                      language: words.language, pointingAt: $pointingAt)
-                    .frame(height: 150)
+                    // 120, not 150: with the totals under it the card has to
+                    // fit a laptop window below the P&L (alpha.51 review).
+                    .frame(height: 120)
 
                 // WHICH MONTHS THIS IS, which the card never said. The window
                 // is chosen elsewhere on the screen and the axis under the

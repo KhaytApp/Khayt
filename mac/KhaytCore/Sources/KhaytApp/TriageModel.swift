@@ -204,10 +204,13 @@ extension Shop {
     /// lies by omission.
     var monthNetLabel: String {
         let month = words.say(Date(), .dateTime.month(.wide)).uppercased()
-        return month + " · " + words.callIt("mac.net")
+        return month + " · " + words.callIt("mac.net_income")
     }
 
-    /// Revenue this month, net of tax.
+    /// The month's NET INCOME, as Reports prints it: revenue less cost of
+    /// goods, expenses and overhead (`PnlPeriod.net`). It was revenue net of
+    /// tax, which read 50.00 beside Reports' 14.09 for the same month.
+    ///
     ///
     /// ── THIS WAS A PERMANENT DASH, AND WHAT CHANGED ───────────────────────
     ///
@@ -232,13 +235,13 @@ extension Shop {
     /// Still nil before the book is read, and for a month with no row of its
     /// own. The dash is then what it always should have meant: nothing to
     /// show yet, rather than nothing we are willing to say.
-    var monthNet: Double? { monthNetRevenue }
+    var monthNet: Double? { monthNetIncome }
     var monthGross: Double? { monthGrossRevenue }
 
     /// Only while there is no figure. A note explaining an absence, printed
     /// under a number that is present, reads as a warning about that number.
     var monthNetNote: String? {
-        monthNetRevenue == nil ? words.callIt("mac.net_in_reports") : nil
+        monthNetIncome == nil ? words.callIt("mac.net_in_reports") : nil
     }
 
     /// What the month's material cost is KNOWN to be.

@@ -215,8 +215,13 @@ struct CommandField: View {
         } else {
             // A screen with nothing to narrow says so by not offering to. The
             // words stay because the strip is the same width either way.
+            //
+            // In the placeholder's ink, not the strip's: it inherited
+            // `onNavy2` from the row and read near-white in dark mode, as if
+            // something had been typed (alpha.51 review).
             Text(shop.words.callIt("mac.search_the_book"))
                 .font(TypeScale.body(11.5))
+                .foregroundStyle(Role.onNavy3)
                 .lineLimit(1)
         }
     }

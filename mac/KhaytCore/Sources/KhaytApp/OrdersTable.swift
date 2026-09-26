@@ -45,7 +45,24 @@ struct OrdersTable: View {
         if !shop.anyJobHasADueDate { columns[visibility: "due"] = .hidden }
     }
 
+    /// False until the restored column widths have been dropped. The `Table`
+    /// is not built before then, because one built with stale widths keeps
+    /// them however narrow its slot — see `ColumnWidths`, where that was
+    /// measured.
+    @State private var widthsFresh = false
+
     var body: some View {
+        if widthsFresh {
+            table
+        } else {
+            Color.clear.onAppear {
+                ColumnWidths.forget(&columns)
+                widthsFresh = true
+            }
+        }
+    }
+
+    private var table: some View {
         Table(rows, selection: $shop.selection, sortOrder: $order,
               columnCustomization: $columns) {
             TableColumn(shop.words.callIt("mac.job"), value: \.project) { job in
@@ -93,7 +110,18 @@ struct OrdersTable: View {
                     }
                 }
             }
-            .width(min: 200, ideal: 280)
+            // ── IDEALS THAT FIT, BECAUSE THEY ARE A FLOOR ────────────────────
+            //
+            // Measured in the running app (alpha.51 review): a SwiftUI `Table`
+            // grows its columns past their ideal widths to fill the row, but
+            // never shrinks them BELOW their ideals. The ideals were 280 / 180 /
+            // 130 / 96 / 100 / 120 — 1,023pt with the spacing — in an 887pt slot
+            // beside the detail panel, so the row ran on under the panel and the
+            // far column was drawn and covered. The far column is Owed; in
+            // Arabic it is on the left. The ideals now sit near the minimums
+            // (about 810pt with every column shown) and the table grows them
+            // into whatever room the window has.
+            .width(min: 200, ideal: 220)
 
             // A COLUMN OF DASHES IS NOT A COLUMN.
             //
@@ -108,18 +136,18 @@ struct OrdersTable: View {
                     .foregroundStyle(job.client.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
                     .lineLimit(1)
             }
-            .width(min: 120, ideal: 180)
+            .width(min: 120, ideal: 130)
             .customizationID("client")
 
             TableColumn(shop.words.callIt("mac.stage"), value: \.status) { job in
                 StageCell(shop: shop, job: job)
             }
-            .width(min: 100, ideal: 130)
+            .width(min: 100, ideal: 100)
 
             TableColumn(shop.words.callIt("doc.due")) { job in
                 DueDate(words: shop.words, job: job)
             }
-            .width(min: 78, ideal: 96)
+            .width(min: 78, ideal: 80)
             .customizationID("due")
 
             TableColumn(shop.words.callIt("common.total"), value: \.price) { job in
@@ -141,13 +169,13 @@ struct OrdersTable: View {
                     Text("—").foregroundStyle(.quaternary)
                 }
             }
-            .width(min: 80, ideal: 100)
+            .width(min: 80, ideal: 84)
             .alignment(.trailing)
 
             TableColumn(shop.words.callIt("flow.owed"), value: \.owed) { job in
                 Owed(job: job, words: shop.words)
             }
-            .width(min: 96, ideal: 120)
+            .width(min: 96, ideal: 96)
             .alignment(.trailing)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: false))
@@ -262,7 +290,7 @@ private struct StageCell: View {
     private func tooltip(stage: Stage, live: KhaytEngine.PrinterStatus) -> String {
         var said = shop.words.callIt(stage.key) + " · \(live.progress)%"
         if let left = live.timeRemaining, left > 0 {
-            said += " · " + PrinterWatch.spell(left)
+            said += " · " + PrinterWatch.spell(left, shop.words)
         }
         if !live.filename.isEmpty { said += " · " + live.filename }
         return said
@@ -512,5 +540,63 @@ private struct EmptyBook: View {
         } else {
             EmptyHere(title: shop.words.callIt("mac.no_jobs"), mark: .jobs)
         }
+    }
+}
+
+/// Keep which columns are shown and in what order; forget how wide they were.
+///
+/// ── THE OWED COLUMN THAT WAS THERE AND COULD NOT BE SEEN ─────────────────
+///
+/// `TableColumnCustomization` stores each column's `currentWidth` alongside
+/// its visibility and order (measured: its encoding carries
+/// `"currentWidth": 319.5`), and `@SceneStorage` brings those widths back on the
+/// next launch. A table last laid out wider — the panel closed, a bigger
+/// window — came back at those widths into a narrower slot, and a SwiftUI
+/// `Table` does not shrink restored columns to fit: the row ran past the
+/// edge and the far column went under the detail panel. In Arabic the far
+/// column is on the left, and the alpha.51 review saw Arabic Jobs without
+/// Owed at a window size where English showed it.
+///
+/// Measured in a probe: a customization carrying widths for a 1190pt row,
+/// restored into an 879pt slot, drew a 1190pt table — in both directions —
+/// and clearing the widths after the table was built changed nothing. Built
+/// AFTER they were cleared, the same table laid out at 879.
+///
+/// So the widths are dropped each time the table appears, before it is
+/// built, and it lays itself out to the space it has. What the shop chose — a
+/// column hidden, columns reordered — is kept. A column dragged wider by hand
+/// lasts until the screen is left; that is the price of never losing a
+/// column off the edge.
+///
+/// Through the type's own Codable form, because there is no API to clear a
+/// width. If the form ever changes and the round trip fails, nothing is
+/// touched.
+enum ColumnWidths {
+    static func forgotten<T>(_ c: TableColumnCustomization<T>) -> TableColumnCustomization<T>? {
+        guard let data = try? JSONEncoder().encode(c),
+              let json = try? JSONSerialization.jsonObject(with: data) else { return nil }
+        func strip(_ any: Any) -> Any {
+            if let dict = any as? [String: Any] {
+                var out: [String: Any] = [:]
+                for (k, v) in dict where k != "currentWidth" { out[k] = strip(v) }
+                return out
+            }
+            if let list = any as? [Any] { return list.map(strip) }
+            return any
+        }
+        let stripped = strip(json)
+        guard let back = try? JSONSerialization.data(withJSONObject: stripped),
+              let restored = try? JSONDecoder().decode(TableColumnCustomization<T>.self, from: back)
+        else { return nil }
+        return restored
+    }
+
+    /// In place, and only when there was a width to forget — a write to the
+    /// binding is a SceneStorage write and a redraw.
+    static func forget<T>(_ c: inout TableColumnCustomization<T>) {
+        guard let data = try? JSONEncoder().encode(c),
+              String(decoding: data, as: UTF8.self).contains("currentWidth"),
+              let fresh = forgotten(c) else { return }
+        c = fresh
     }
 }

@@ -47,9 +47,9 @@ struct MastheadNetTests {
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), now: Date(),
-            granularity: "month")
+            granularity: "month", wasteLog: shop.wasteRows)
         let key = DateRange.localMonth(Date())
-        let reports = rows.first { $0.period == key }?.revenue
+        let reports = rows.first { $0.period == key }?.net
         // Hoisted, and stringified with an explicit closure: `String.init` on
         // an optional Double picks an overload the diagnostic engine chokes
         // on, and the same mistake once made `Number("0x10")` come out as
@@ -72,6 +72,29 @@ struct MastheadNetTests {
                 Comment(rawValue: "net \(net) is above gross \(gross)"))
     }
 
+    @Test("NET is net income: revenue less cost of goods, expenses and overhead")
+    func netIsNetIncome() async throws {
+        // The alpha.51 review: the masthead read "SEPTEMBER · NET 50.00" with
+        // "at least 35.91" of material beside it, while Reports read NET
+        // INCOME 14.09 (50.00 − 35.91 − 0.00). The header was revenue net of
+        // tax. It is the P&L's net income now, off the same row.
+        let shop = await Self.loaded()
+        let engine = try #require(shop.engine)
+        let rows = try await engine.pnlByPeriod(
+            orders: shop.orderRows, expenses: shop.expenseRows,
+            settings: shop.settingsDict, clients: shop.clientRows,
+            currencies: Invoice.currencyTable(shop), now: Date(),
+            granularity: "month", wasteLog: shop.wasteRows)
+        let row = try #require(rows.first { $0.period == DateRange.localMonth(Date()) })
+        let net = try #require(shop.monthNet)
+        let expected = row.revenue - (row.cogs ?? 0) - (row.waste ?? 0) - row.expenses - row.fixed
+        #expect(abs(net - expected) < 0.011,
+                Comment(rawValue: "masthead \(net) vs revenue−cogs−expenses−overhead \(expected)"))
+        if (row.cogs ?? 0) > 0 {
+            #expect(net < row.revenue, "cost of goods was not taken off the masthead's net")
+        }
+    }
+
     @Test("the gross is the same jobs as the net, before the tax comes out")
     func grossIsTheSameJobs() async throws {
         // It summed the month's PAID-UP jobs while the net beside it summed the
@@ -89,7 +112,7 @@ struct MastheadNetTests {
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), now: Date(),
-            granularity: "month")
+            granularity: "month", wasteLog: shop.wasteRows)
         let row = rows.first { $0.period == DateRange.localMonth(Date()) }
         let expected = row.map { $0.revenue + $0.vatCollected }
         let said = shop.monthGross.map { "\($0)" } ?? "nil"
@@ -149,7 +172,7 @@ struct MastheadNetTests {
         let rows = try await engine.pnlByPeriod(
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
-            currencies: Invoice.currencyTable(shop), now: Date(), granularity: "month")
+            currencies: Invoice.currencyTable(shop), now: Date(), granularity: "month", wasteLog: shop.wasteRows)
         #expect(!rows.isEmpty, "no periods at all, so the lookup proves nothing")
         for row in rows {
             #expect(row.period.count == 7 && row.period.contains("-"),

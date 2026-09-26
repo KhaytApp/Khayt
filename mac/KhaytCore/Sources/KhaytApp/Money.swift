@@ -84,6 +84,24 @@ enum Money {
     }
 
 
+    /// A negative figure, held left-to-right.
+    ///
+    /// ── THE MINUS WENT TO THE WRONG END IN ARABIC ────────────────────────
+    ///
+    /// A leading "-" is a neutral to the bidi algorithm, and in a right-to-left
+    /// paragraph a neutral before digits takes the paragraph's direction — so
+    /// the Arabic Reports chart and table printed "35.91-" and "⃁ 35.91-"
+    /// (alpha.51 review). The figure is wrapped in a LEFT-TO-RIGHT ISOLATE
+    /// (U+2066 … U+2069): inside it the minus sits before the digits in any
+    /// paragraph, and outside it the figure is one unit, so the currency mark
+    /// still falls where the language puts it. Invisible in English.
+    ///
+    /// Only negatives. A positive figure has no neutral to move, and leaving it
+    /// bare keeps every string a test or a pasteboard compares unchanged.
+    static func held(_ figure: String) -> String {
+        figure.hasPrefix("-") || figure.hasPrefix("\u{2212}") ? "\u{2066}" + figure + "\u{2069}" : figure
+    }
+
     /// A quantity that is NOT money — grams, hours, millilitres.
     ///
     /// Here rather than in the screen that wanted it, because the one thing it
@@ -103,7 +121,7 @@ enum Money {
         f.minimumFractionDigits = decimals
         f.maximumFractionDigits = decimals
         let value = unsignedZero(value, decimals: decimals)
-        return f.string(from: value as NSNumber) ?? "\(value)"
+        return held(f.string(from: value as NSNumber) ?? "\(value)")
     }
 
     static func text(_ amount: Double, _ currency: String) -> String {
@@ -113,8 +131,22 @@ enum Money {
         f.minimumFractionDigits = 2
         f.maximumFractionDigits = 2
         let amount = unsignedZero(amount, decimals: 2)
-        let n = f.string(from: amount as NSNumber) ?? "\(amount)"
+        let n = held(f.string(from: amount as NSNumber) ?? "\(amount)")
         return "\(n) \(mark(currency))"
+    }
+
+    /// A COST LINE in Reports, written the way it acts on the net: negative.
+    ///
+    /// ── ONE CONVENTION, NOT TWO ──────────────────────────────────────────
+    ///
+    /// The alpha.51 review found "Cost of goods sold -35.91" in the P&L table
+    /// and "35.91" for the same figure in the side panel beside it. The
+    /// waterfall already draws a cost as a signed step down, and the table
+    /// already signed it, so the panel follows them: every cost line on the
+    /// Reports screen goes through here and reads negative. `amount` is the
+    /// cost as the rule reports it (positive); zero stays an unsigned zero.
+    static func cost(_ amount: Double, _ currency: String) -> String {
+        text(-amount, currency)
     }
 
     /// Just the figure, for columns where the currency is stated once at the top
@@ -126,7 +158,7 @@ enum Money {
         f.minimumFractionDigits = 2
         f.maximumFractionDigits = 2
         let amount = unsignedZero(amount, decimals: 2)
-        return f.string(from: amount as NSNumber) ?? "\(amount)"
+        return held(f.string(from: amount as NSNumber) ?? "\(amount)")
     }
 
     /// Grams, as a shop says them: whole numbers, and a half when there is one.
@@ -155,7 +187,7 @@ enum Money {
         f.minimumFractionDigits = 0
         f.maximumFractionDigits = 1
         let n = unsignedZero(n, decimals: 1)
-        return f.string(from: n as NSNumber) ?? "\(n)"
+        return held(f.string(from: n as NSNumber) ?? "\(n)")
     }
 
     /// A figure on its way INTO a text field, not onto a screen.
@@ -207,7 +239,7 @@ enum Money {
         let places = amount >= 10_000 ? 0 : 2
         f.maximumFractionDigits = places
         f.minimumFractionDigits = places
-        let n = f.string(from: amount as NSNumber) ?? "\(amount)"
+        let n = held(f.string(from: amount as NSNumber) ?? "\(amount)")
         return "\(n) \(mark(currency))"
     }
 }

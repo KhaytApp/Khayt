@@ -140,7 +140,7 @@ struct MachineTileTests {
         let reading = shop.tileReading(for: machine)
         #expect(reading.percent == 0.48)
         #expect(reading.state == .running)
-        #expect(reading.line == PrinterWatch.spell(9360), "the line is not the time left")
+        #expect(reading.line == PrinterWatch.spell(9360, shop.words), "the line is not the time left")
         #expect(!reading.line.contains(".gcode"), "the filename is back on the tile")
         #expect(reading.filename == "falcon-hood-v4.gcode")
     }

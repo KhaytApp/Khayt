@@ -137,7 +137,9 @@ struct ScreenActions: View {
                     // ON NAVY. A system button draws its text for a light
                     // surface, and on this strip that was dark grey on navy —
                     // readable only by someone who already knew it was there.
-                    .environment(\.colorScheme, .dark)
+                    // Forcing the dark scheme then left it faint in dark mode,
+                    // so the ink is the strip's own — see `WellButtonStyle`.
+                    .buttonStyle(WellButtonStyle(onNavy: true))
                 plus("mac.new_spool", enabled: shop.canMoveJobs) { shop.addingSpool = true }
             } else if shop.showingExpenses {
                 period
@@ -233,6 +235,44 @@ struct ScreenActions: View {
         .help(shop.words.callIt(key))
         .accessibilityLabel(shop.words.callIt(key))
         .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// A worded action in a soft well, in the app's own ink — on navy or on a card.
+///
+/// ── WHY NOT THE SYSTEM BUTTON ────────────────────────────────────────────
+///
+/// "Import from Spoolman…" on the navy strip and "Add supplier" on the
+/// suppliers card were system push buttons, and in dark mode both drew as
+/// faint grey text that read as switched off whether or not they were (alpha.51
+/// review). The system's ink is chosen for its own grounds, not for navy or
+/// `Role.surf`. So the ink is ours: full `onNavy` / `text` when the action can
+/// be taken, the third ink when it cannot — the disabled state still says so,
+/// and an enabled one can no longer be mistaken for it.
+struct WellButtonStyle: ButtonStyle {
+    var onNavy = false
+    @Environment(\.isEnabled) private var enabled
+
+    static func ink(onNavy: Bool, enabled: Bool) -> Color {
+        switch (onNavy, enabled) {
+        case (true, true):   Role.onNavy
+        case (true, false):  Role.onNavy3
+        case (false, true):  Role.text
+        case (false, false): Role.text3
+        }
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(TypeScale.body(11.5))
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .foregroundStyle(Self.ink(onNavy: onNavy, enabled: enabled))
+            .background(onNavy ? AnyShapeStyle(Color.white.opacity(configuration.isPressed ? 0.18 : 0.1))
+                               : AnyShapeStyle(configuration.isPressed ? Role.line2 : Role.surf3),
+                        in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+            .contentShape(Rectangle())
     }
 }
 

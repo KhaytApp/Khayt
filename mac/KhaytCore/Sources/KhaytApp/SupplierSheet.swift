@@ -28,6 +28,8 @@ struct SuppliersCard: View {
                 Button(shop.words.callIt("mac.add_supplier")) {
                     shop.editingSupplier = Supplier.blank()
                 }
+                // Legible when it can be pressed, in dark mode too.
+                .buttonStyle(WellButtonStyle())
                 .disabled(!shop.canMoveJobs)
             }
             if rows.isEmpty {

@@ -41,6 +41,48 @@ final class PrinterWatch {
         /// printer unreachable all day stayed "reconnecting" for ever and the
         /// one screen a shop leaves open never mentioned it.
         var consecutiveFailures: Int = 0
+        /// The last status this printer DID give, carried through failed
+        /// polls. Nil for a printer that has never answered — which is the
+        /// whole difference between a wifi hiccup and a printer that is off.
+        var lastGood: KhaytEngine.PrinterStatus? = nil
+    }
+
+    /// How many failed polls in a row a printer that has answered before is
+    /// given before it is called not answering. One is a wifi hiccup; three
+    /// is the offline alert's own threshold.
+    static let graceMisses = 3
+
+    /// What this printer is believed to be doing, or nil when it is not
+    /// answering.
+    ///
+    /// ── ONE ANSWER FOR EVERY SCREEN ────────────────────────────────────────
+    ///
+    /// The alpha.51 review: the band said the CORE One was "Free · 48:00",
+    /// counted it into the capacity total, and "Next up" beside it said "Not
+    /// answering". The band gave a silent printer a three-poll grace whether
+    /// or not it had EVER answered; Next up gave none at all. Both now ask
+    /// this: its status if it answered, its last status while inside the
+    /// grace, and nil otherwise — so a printer that has never answered is
+    /// not answering from the first miss, and one that has answered keeps
+    /// its last word for two more.
+    func heard(_ id: Machine.ID) -> KhaytEngine.PrinterStatus? {
+        guard let seen = readings[id] else { return nil }
+        if let status = seen.status { return status }
+        guard seen.consecutiveFailures < Self.graceMisses else { return nil }
+        return seen.lastGood
+    }
+
+    /// The `statusCache` entry for one status: the shape the shared rules read.
+    static func cacheEntry(_ status: KhaytEngine.PrinterStatus, at: Date) -> [String: JSONValue] {
+        var entry: [String: JSONValue] = [
+            "state": .string(status.state),
+            "tempNozzle": status.tempNozzle.map(JSONValue.number) ?? .null,
+            "progress": .number(Double(status.progress)),
+            "filename": .string(status.filename),
+            "lastUpdated": .number(at.timeIntervalSince1970 * 1000),
+        ]
+        if let left = status.timeRemaining { entry["timeRemaining"] = .number(left) }
+        return entry
     }
 
     /// Is this printer laying plastic right now?
@@ -444,7 +486,7 @@ final class PrinterWatch {
             }
             let loadedBefore = readings[machine.id]?.status?.loaded ?? []
             readings[machine.id] = Reading(status: status, problem: nil, at: Date(),
-                                           consecutiveFailures: 0)
+                                           consecutiveFailures: 0, lastGood: status)
             // A spool swapped on the machine changes what the library can call
             // ready on it. Only then: a recount on every poll would be every
             // few seconds for nothing.
@@ -455,8 +497,9 @@ final class PrinterWatch {
             await capture(machine.id, status: status, shop: shop)
         } catch {
             let before = readings[machine.id]?.consecutiveFailures ?? 0
+            let last = readings[machine.id]?.status ?? readings[machine.id]?.lastGood
             readings[machine.id] = Reading(status: nil, problem: Self.say(error), at: Date(),
-                                           consecutiveFailures: before + 1)
+                                           consecutiveFailures: before + 1, lastGood: last)
         }
     }
 
@@ -995,13 +1038,21 @@ final class PrinterWatch {
 
     /// `2h 14m`, or `14m`. Not a countdown to the second: the estimate is
     /// extrapolated from progress and does not deserve that much precision.
-    static func spell(_ seconds: Double) -> String {
+    ///
+    /// In the shop's language. It was "33m" on the Arabic dashboard (alpha.51
+    /// review): the units were English letters built here, so the one figure
+    /// on a machine card that changes every minute was the one not translated.
+    /// The shape of it now comes from `Words`; the numerals stay Western.
+    @MainActor
+    static func spell(_ seconds: Double, _ words: Words) -> String {
         let total = Int(seconds.rounded())
         let hours = total / 3600
         let minutes = (total % 3600) / 60
-        if hours > 0 { return "\(hours)h \(minutes)m" }
-        if minutes > 0 { return "\(minutes)m" }
-        return "<1m"
+        if hours > 0 {
+            return words.callIt("mac.dur_hm", ["h": .string(String(hours)), "m": .string(String(minutes))])
+        }
+        if minutes > 0 { return words.callIt("mac.dur_m", ["m": .string(String(minutes))]) }
+        return words.callIt("mac.dur_under_1m")
     }
 
     /// Which signal a percentage came from, as a word key — or nothing.
