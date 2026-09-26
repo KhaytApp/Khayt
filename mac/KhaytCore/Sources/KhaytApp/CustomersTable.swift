@@ -147,6 +147,8 @@ struct CustomerInspector: View {
     /// The line being written in the communications log.
     @State private var newKind = "call"
     @State private var newNote = ""
+    /// Why WhatsApp could not be opened on this customer's number, or nil.
+    @State private var whatsAppProblem: (id: String, text: String)?
 
     /// Where this customer stands in the rewards programme. Held in state
     /// because the sum runs in the engine, which is an actor — a view cannot
@@ -200,6 +202,20 @@ struct CustomerInspector: View {
                         DetailSection(shop.words.callIt("doc.client")) {
                             if !record.phone.isEmpty {
                                 DetailLine(shop.words.callIt("ce.phone"), record.phone)
+                                // Opens a chat with nothing typed — the number
+                                // normalised the way `wa.me` needs it, or the
+                                // reason it cannot be, said under the button.
+                                Button {
+                                    Task { whatsAppProblem = await shop.openWhatsAppChat(with: record).map { (record.id, $0) } }
+                                } label: {
+                                    Label(shop.words.callIt("mac.whatsapp"), systemImage: "bubble.left")
+                                }
+                                .buttonStyle(.link)
+                                .font(.callout)
+                                if let whatsAppProblem, whatsAppProblem.id == record.id {
+                                    Text(whatsAppProblem.text).font(.caption).foregroundStyle(Khayt.attention)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
                             if !record.email.isEmpty {
                                 DetailLine(shop.words.callIt("ce.email"), record.email)

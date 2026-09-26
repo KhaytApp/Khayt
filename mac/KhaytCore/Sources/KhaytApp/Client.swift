@@ -57,10 +57,15 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
     /// open the other one to honour it. Sending from here and recording
     /// consent there is the wrong way round.
     let marketingOptOut: Bool
+    /// The language this customer is written to in — `ar`, `en`, or empty
+    /// for "work it out" (`lib/whatsapp-message.js:customerLanguage`, which
+    /// reads the names and then the shop's language). A shop working in
+    /// English still writes to most of its customers in Arabic.
+    let messageLang: String
 
     private enum CodingKeys: String, CodingKey {
         case id, nameEn, nameAr, phone, email, cr, vat, notes, defaultDiscount, createdAt
-        case priceList, recurring, commLog, source, marketingOptOut
+        case priceList, recurring, commLog, source, marketingOptOut, messageLang
     }
 
     /// Is there anything under the heading?
@@ -112,6 +117,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         // Absent means not opted out, which is the only safe default to read
         // — but note that it is NOT the safe default to WRITE. See `record`.
         marketingOptOut = ((try? c.decodeIfPresent(Bool.self, forKey: .marketingOptOut)) ?? nil) ?? false
+        messageLang = ((try? c.decodeIfPresent(String.self, forKey: .messageLang)) ?? nil) ?? ""
         let log = (try? c.decodeIfPresent([JSONValue].self, forKey: .commLog)) ?? nil
         commLog = (log ?? []).compactMap {
             if case .object(let o) = $0 { return CommEntry(raw: o) } else { return nil }
@@ -122,13 +128,14 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
          email: String = "", cr: String = "", vat: String = "", notes: String = "",
          source: String = "", defaultDiscount: Double = 0, createdAt: String? = nil,
          priceList: [PriceAgreement] = [], recurring: Recurring? = nil,
-         commLog: [CommEntry] = [], marketingOptOut: Bool = false) {
+         commLog: [CommEntry] = [], marketingOptOut: Bool = false, messageLang: String = "") {
         self.id = id; self.nameEn = nameEn; self.nameAr = nameAr
         self.phone = phone; self.email = email; self.cr = cr; self.vat = vat
         self.notes = notes; self.source = source
         self.defaultDiscount = defaultDiscount; self.createdAt = createdAt
         self.priceList = priceList; self.recurring = recurring; self.commLog = commLog
         self.marketingOptOut = marketingOptOut
+        self.messageLang = messageLang
     }
 
     /// The record, as `clients` holds it — what the customer sheet saves.
@@ -158,6 +165,9 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             // app, then reopened the sheet and unticked it, would be unable to
             // undo it. Consent has to be writable in both directions.
             "marketingOptOut": .bool(marketingOptOut),
+            // Always written, for the same reason: going back to "automatic"
+            // has to be able to clear a language chosen earlier.
+            "messageLang": .string(messageLang),
         ]
         if let recurring { out["recurring"] = .object(recurring.raw) }
         return out
@@ -190,7 +200,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             defaultDiscount: defaultDiscount,
             createdAt: createdAt,
             priceList: priceList, recurring: recurring, commLog: commLog,
-            marketingOptOut: marketingOptOut)
+            marketingOptOut: marketingOptOut,
+            messageLang: key == \Client.messageLang ? value : messageLang)
     }
 
     /// The same customer, marketed to or not.
@@ -199,15 +210,21 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                cr: cr, vat: vat, notes: notes, source: source,
                defaultDiscount: defaultDiscount, createdAt: createdAt,
                priceList: priceList, recurring: recurring, commLog: commLog,
-               marketingOptOut: !wanted)
+               marketingOptOut: !wanted, messageLang: messageLang)
     }
 
     /// The same customer with a different price list.
+    ///
+    /// `marketingOptOut` IS PASSED. It was not, and the initialiser defaults
+    /// it to false — so the customer sheet, which saves through this, wrote
+    /// "may be marketed to" over every opt-out ticked on it, because `record`
+    /// always writes the flag. Found while adding `messageLang` here.
     func replacing(priceList next: [PriceAgreement]) -> Client {
         Client(id: id, nameEn: nameEn, nameAr: nameAr, phone: phone, email: email, cr: cr,
                vat: vat, notes: notes, source: source,
                defaultDiscount: defaultDiscount, createdAt: createdAt,
-               priceList: next, recurring: recurring, commLog: commLog)
+               priceList: next, recurring: recurring, commLog: commLog,
+               marketingOptOut: marketingOptOut, messageLang: messageLang)
     }
 
     /// The same customer with a different standing order.
@@ -215,7 +232,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         Client(id: id, nameEn: nameEn, nameAr: nameAr, phone: phone, email: email, cr: cr,
                vat: vat, notes: notes, source: source,
                defaultDiscount: defaultDiscount, createdAt: createdAt,
-               priceList: priceList, recurring: next, commLog: commLog)
+               priceList: priceList, recurring: next, commLog: commLog,
+               marketingOptOut: marketingOptOut, messageLang: messageLang)
     }
 }
 

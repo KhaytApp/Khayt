@@ -23,6 +23,13 @@ struct TemplateSheet: View {
     /// Not `body` — that is the view.
     @State private var message = ""
     @State private var loaded = false
+    /// The WhatsApp milestone this template speaks for, or empty.
+    @State private var milestone = ""
+    @State private var lang = ""
+    @State private var milestones: [String] = []
+    /// The default words last put in the box, so they can be swapped for
+    /// another milestone's without asking — they are not the shop's edit.
+    @State private var defaults = ""
 
     private var isNew: Bool { template.id.isEmpty }
 
@@ -35,6 +42,32 @@ struct TemplateSheet: View {
                 TextField(shop.words.callIt("wa.tpl_name_ph"), text: $name)
                     .textFieldStyle(.roundedBorder)
             }
+
+            // ── WHEN IT IS SENT ───────────────────────────────────────────
+            //
+            // A template for a milestone replaces Khayt's default words for
+            // that WhatsApp update — for customers in its language, or for all
+            // of them when it has none. Choosing one with an empty box starts
+            // from the default words, so a shop edits rather than writes.
+            HStack(spacing: 12) {
+                Picker(shop.words.callIt("mac.wa_milestone"), selection: $milestone) {
+                    Text(shop.words.callIt("mac.wa_milestone_none")).tag("")
+                    ForEach(milestones, id: \.self) { m in
+                        Text(shop.whatsAppMilestoneName(m)).tag(m)
+                    }
+                }
+                .fixedSize()
+                if !milestone.isEmpty {
+                    Picker(shop.words.callIt("mac.wa_language"), selection: $lang) {
+                        Text(shop.words.callIt("mac.wa_any_language")).tag("")
+                        Text(shop.words.callIt("mac.wa_lang_ar")).tag("ar")
+                        Text(shop.words.callIt("mac.wa_lang_en")).tag("en")
+                    }
+                    .fixedSize()
+                }
+            }
+            .onChange(of: milestone) { _, _ in startFromDefault() }
+            .onChange(of: lang) { _, _ in startFromDefault() }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(shop.words.callIt("wa.tpl_body")).font(.callout)
@@ -74,7 +107,8 @@ struct TemplateSheet: View {
                 Button(shop.words.callIt("common.cancel")) { shop.editingTemplate = nil }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save")) {
-                    shop.saveTemplate(id: isNew ? nil : template.id, name: name, body: message)
+                    shop.saveTemplate(id: isNew ? nil : template.id, name: name, body: message,
+                                      milestone: milestone, lang: milestone.isEmpty ? "" : lang)
                     if shop.writeProblem == nil { shop.editingTemplate = nil }
                 }
                 .keyboardShortcut(.defaultAction)
@@ -89,6 +123,24 @@ struct TemplateSheet: View {
             loaded = true
             name = template.name
             message = template.body
+            milestone = template.milestone
+            lang = template.lang
+            milestones = (try? await shop.engine?.whatsAppMilestones()) ?? []
+        }
+    }
+
+    /// Put the default words in the box — only when the shop has not written
+    /// anything of its own there, so changing the milestone never throws an
+    /// edit away.
+    private func startFromDefault() {
+        guard loaded, message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || message == defaults else { return }
+        guard !milestone.isEmpty else { return }
+        let wanted = lang.isEmpty ? (shop.words.language == "en" ? "en" : "ar") : lang
+        Task {
+            let words = (try? await shop.engine?.whatsAppDefaultBody(milestone: milestone, lang: wanted)) ?? ""
+            message = words
+            defaults = words
         }
     }
 }

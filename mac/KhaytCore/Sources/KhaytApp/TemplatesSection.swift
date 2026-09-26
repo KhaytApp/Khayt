@@ -29,6 +29,13 @@ struct TemplatesSection: View {
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(template.name)
+                            // Which WhatsApp update it replaces the words of.
+                            if !template.milestone.isEmpty {
+                                Text(shop.whatsAppMilestoneName(template.milestone)
+                                     + (template.lang.isEmpty ? ""
+                                        : " · " + shop.words.callIt("mac.wa_lang_" + template.lang)))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                             Text(template.body).font(.caption).foregroundStyle(.secondary)
                                 .lineLimit(1).truncationMode(.tail)
                         }

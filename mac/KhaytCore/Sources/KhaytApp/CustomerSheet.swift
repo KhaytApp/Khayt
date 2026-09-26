@@ -33,6 +33,8 @@ struct CustomerSheet: View {
     @State private var started = false
     /// The sources the picker offers, asked of the shared rule on appear.
     @State private var sources: [String] = []
+    /// The phone number as WhatsApp would take it, or why it would not.
+    @State private var phoneCheck: WhatsAppChat?
     @FocusState private var focused: Bool
 
     /// A price agreement as the sheet holds it while it is being typed.
@@ -146,8 +148,39 @@ struct CustomerSheet: View {
             GridRow {
                 Text(shop.words.callIt("ce.phone")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
-                TextField("+966 5x xxx xxxx", text: binding(\.phone))
-                    .textFieldStyle(.roundedBorder)
+                VStack(alignment: .leading, spacing: 2) {
+                    TextField("+966 5x xxx xxxx", text: binding(\.phone))
+                        .textFieldStyle(.roundedBorder)
+                    // What WhatsApp will dial, worked out as it is typed — so
+                    // `0712345678` from abroad is caught here, not at the
+                    // moment a customer is waiting for their update.
+                    if let phoneCheck, !draft.phone.trimmingCharacters(in: .whitespaces).isEmpty {
+                        Text(phoneCheck.ok
+                             ? shop.words.callIt("mac.wa_number_ok",
+                                                 ["number": .string("\u{2066}" + phoneCheck.e164 + "\u{2069}")])
+                             : shop.whatsAppReason(phoneCheck.reason))
+                            .font(.caption)
+                            .foregroundStyle(phoneCheck.ok ? AnyShapeStyle(.secondary)
+                                                           : AnyShapeStyle(Khayt.attention))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .task(id: draft.phone) {
+                    phoneCheck = await shop.whatsAppRecipient(phone: draft.phone)
+                }
+            }
+            GridRow {
+                // The language WhatsApp updates go out in. Automatic reads the
+                // names and then the shop's language.
+                Text(shop.words.callIt("mac.wa_messages_in")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: binding(\.messageLang)) {
+                    Text(shop.words.callIt("mac.wa_lang_auto")).tag("")
+                    Text(shop.words.callIt("mac.wa_lang_ar")).tag("ar")
+                    Text(shop.words.callIt("mac.wa_lang_en")).tag("en")
+                }
+                .labelsHidden()
+                .fixedSize()
             }
             GridRow {
                 Text(shop.words.callIt("ce.email")).gridColumnAlignment(.trailing)

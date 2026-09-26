@@ -11189,7 +11189,8 @@ final class Shop {
     /// Both fields are required, exactly as the other app requires them: a
     /// template with no name cannot be picked off a list, and one with no body
     /// sends nothing.
-    func saveTemplate(id: String?, name: String, body: String) {
+    func saveTemplate(id: String?, name: String, body: String,
+                      milestone: String = "", lang: String = "") {
         writeProblem = nil
         // THE FIELDS BEFORE THE BOOK. What is wrong with the two strings is a
         // fact about the arguments, true whichever book is open, so the answer
@@ -11206,13 +11207,25 @@ final class Shop {
         let wanted = id ?? Self.uid("WATPL")
         write { root in
             var rows = Self.rows(root, MessageTemplate.collection)
-            let row: JSONValue = .object(["id": .string(wanted), "name": .string(name),
-                                          "body": .string(body)])
+            // `milestone` and `lang` only when set: the WhatsApp milestone
+            // updates read them (`lib/whatsapp-message.js:templateFor`), and a
+            // plain saved message stays the shape the other app writes.
+            let row = MessageTemplate(id: wanted, name: name, body: body,
+                                      milestone: milestone, lang: lang).row
             if let at = rows.firstIndex(where: { Self.recordId($0) == wanted }) {
                 // REPLACED IN PLACE, keeping its position. A corrected template
                 // that jumps to the bottom of the list is one a shop has to
                 // find again every time it fixes a typo.
-                rows[at] = row
+                //
+                // Any other field the stored row carries is kept — a field this
+                // app does not edit is not this app's to drop.
+                if case .object(let was) = rows[at], case .object(var next) = row {
+                    for (key, value) in was where next[key] == nil
+                        && key != "milestone" && key != "lang" { next[key] = value }
+                    rows[at] = .object(next)
+                } else {
+                    rows[at] = row
+                }
             } else {
                 rows.append(row)
             }

@@ -254,6 +254,12 @@ public actor KhaytEngine {
         "portal-trial",
         "cloud-plans",
         "order-email",
+        // WhatsApp updates to customers: the Saudi number in the one shape
+        // `wa.me` takes, which milestone a job is at, the customer's
+        // language, and the message. `wa-template` is the placeholder rule
+        // it fills with — the same one `WaTemplate.swift` ports.
+        "wa-template",
+        "whatsapp-message",
         "order-status",
         // ── HOW WRONG THE SHOP'S OWN ESTIMATES ARE ────────────────────────
         //
@@ -6886,6 +6892,78 @@ public actor KhaytEngine {
             [order, .string(newStatus), .object(settings), .array(clients),
              .string(shopName), .string(clientName), .string(statusLabel)],
             as: OrderEmail?.self)
+    }
+
+    // MARK: - WhatsApp updates to customers
+
+    /// The update a job is due on WhatsApp — `lib/whatsapp-message.js`.
+    ///
+    /// `milestone` and `lang` are optional: nil means where the job is now and
+    /// the customer's own language. `values` carries what only this app can
+    /// format — `price`, `currency`, `due` — the same split `WaTemplate` makes.
+    /// The text comes back even when the number is unusable, so the shop can
+    /// still read and copy it; `ok` says whether WhatsApp can be opened.
+    public func whatsAppUpdate(order: JSONValue, client: JSONValue?,
+                               settings: [String: JSONValue], templates: [JSONValue],
+                               milestone: String?, lang: String?, shopLang: String,
+                               values: [String: String]) throws -> WhatsAppUpdate {
+        try runtime.call2("""
+            KhaytWhatsappMessage.buildUpdate({
+              order: ARG0, client: ARG1, settings: ARG2, templates: ARG3,
+              milestone: ARG4, lang: ARG5, shopLang: ARG6, values: ARG7
+            })
+            """,
+            [order, client ?? .null, .object(settings), .array(templates),
+             milestone.map(JSONValue.string) ?? .null, lang.map(JSONValue.string) ?? .null,
+             .string(shopLang), .object(values.mapValues(JSONValue.string))],
+            as: WhatsAppUpdate.self)
+    }
+
+    /// A number made ready for `wa.me`, and the link with this text in it —
+    /// or why the number cannot be used. Asked again at the moment of sending,
+    /// because the shop may have edited the message.
+    public func whatsAppChat(phone: String, text: String) throws -> WhatsAppChat {
+        try runtime.call2("KhaytWhatsappMessage.chatLink(ARG0, ARG1)",
+                          [.string(phone), .string(text)], as: WhatsAppChat.self)
+    }
+
+    /// Which milestone a job is at, or nil when it owes the customer none.
+    public func whatsAppMilestone(order: JSONValue) throws -> String? {
+        try runtime.call2("KhaytWhatsappMessage.milestoneOf(ARG0)", [order], as: String?.self)
+    }
+
+    /// When this job's update for this milestone was last opened in WhatsApp.
+    public func whatsAppSentAt(commLog: [JSONValue], orderId: String,
+                               milestone: String) throws -> String? {
+        try runtime.call2("KhaytWhatsappMessage.sentAt(ARG0, ARG1, ARG2)",
+                          [.array(commLog), .string(orderId), .string(milestone)],
+                          as: String?.self)
+    }
+
+    /// The line a sent update writes to the customer's log.
+    public func whatsAppCommEntry(id: String, at: Date, text: String, orderId: String?,
+                                  milestone: String?, lang: String?) throws -> JSONValue {
+        try runtime.call2("""
+            KhaytWhatsappMessage.commEntry({
+              id: ARG0, at: ARG1, text: ARG2, orderId: ARG3, milestone: ARG4, lang: ARG5
+            })
+            """,
+            [.string(id), .string(StoreWriter.iso(at)), .string(text),
+             orderId.map(JSONValue.string) ?? .null, milestone.map(JSONValue.string) ?? .null,
+             lang.map(JSONValue.string) ?? .null],
+            as: JSONValue.self)
+    }
+
+    /// What a milestone says when the shop has not written its own — the
+    /// starting text the template editor offers.
+    public func whatsAppDefaultBody(milestone: String, lang: String) throws -> String {
+        try runtime.call2("KhaytWhatsappMessage.defaultBody(ARG0, ARG1)",
+                          [.string(milestone), .string(lang)], as: String.self)
+    }
+
+    /// The milestones, in the order a job passes them.
+    public func whatsAppMilestones() throws -> [String] {
+        try runtime.call2("KhaytWhatsappMessage.MILESTONES", [], as: [String].self)
     }
 
     /// The republish a move owes the customer's link, or nil when it owes none.
