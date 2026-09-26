@@ -33,6 +33,20 @@ struct MoveBanners: View {
                 Button(shop.words.callIt("common.close")) { shop.autoDrafted = 0 }
             }
         }
+        // WEB-STORE ORDERS THAT BECAME JOBS BY THEMSELVES. The same reason as
+        // the drafts above: the book changed with nobody at the keyboard, so
+        // the window says so until somebody has looked — and offers the look.
+        let arrived = shop.webStoreArrived.filter(\.automatic)
+        if !arrived.isEmpty {
+            Banner(text: shop.words.callIt("mac.webstore_arrived",
+                                           ["n": .number(Double(arrived.count))]),
+                   symbol: "bag.badge.plus", tint: Khayt.brand) {
+                Button(shop.words.callIt("mac.review") + "\u{2026}") {
+                    shop.showingOnlineOrders = true
+                }
+                BannerClose(words: shop.words) { shop.webStoreArrived.removeAll() }
+            }
+        }
         // MONEY THE BOOK IS UNDERSTATING. Not a move's answer like the rest of
         // these, and it sits at the top for that reason: it is true until
         // somebody acts on it, on every screen, and what it is about is the

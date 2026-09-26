@@ -788,6 +788,9 @@ final class Shop {
             // whose cloud settings belong to nobody.
             if next.build != nil { startPublishingLeadTime() } else { stopPublishingLeadTime() }
             if next.build != nil { startWatchingPlugs() } else { stopWatchingPlugs() }
+            // The web store's paid orders in, and their progress back out.
+            // Not for the sample, whose cloud belongs to nobody.
+            if next.build != nil { startWatchingWebStoreOrders() } else { stopWatchingWebStoreOrders() }
             if next.build != nil { await restoreCloudKey() }
             // After the key: the launch check seals with it. Never for the
             // sample shop, which is not a book anybody wants back.
@@ -7349,6 +7352,23 @@ final class Shop {
     /// Why the last look or the last write did not work.
     var onlineProblem: String?
 
+    // ── WEB-STORE ORDERS THAT BECAME JOBS BY THEMSELVES (WebStoreOrders.swift)
+    /// What arrived since the shop last dismissed the notice, newest last.
+    var webStoreArrived: [WebStoreArrival] = []
+    /// Queue items this session could not record, so a failing one is not
+    /// tried again every couple of minutes. Pressing its button still works.
+    var webStoreGaveUp: Set<String> = []
+    /// Why the last automatic pass did not work, for the Online orders sheet.
+    var webStoreAutoProblem: String?
+    /// True while a pass is running, so two timers cannot overlap.
+    var webStoreAutoBusy = false
+    var webStoreOrdersTask: Task<Void, Never>?
+    /// What the last status publish said, for the Online orders sheet.
+    var webStoreStatusSaid: String?
+    /// Khayt Cloud answered 404: it does not take order statuses yet. Quiet
+    /// until the app next starts, as the quote sheet is.
+    var webStoreStatusNotOffered = false
+
     /// The shop's data key, held for as long as this app runs.
     ///
     /// ── IT USED TO GO WHEN THE SHEET DID, AND THAT IS WHY NOTHING SYNCED ──
@@ -10494,7 +10514,7 @@ final class Shop {
     /// IS moved and the book says so. Undoing a correct write because a
     /// consumer was down would be the wrong trade. The shop is TOLD, which is
     /// the whole point of the app having refused these moves before.
-    private func fire(_ deliveries: [KhaytEngine.WebhookDelivery]) async {
+    func fire(_ deliveries: [KhaytEngine.WebhookDelivery]) async {
         guard let engine else { return }
         var sent = 0
         for one in deliveries {
