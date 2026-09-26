@@ -18,6 +18,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   iPad offers every orientation, which iPad multitasking requires; and the
   NFC entitlement asks only for `TAG` — the app reads spool tags with a tag
   session, and the current SDK refuses the old `NDEF` value outright.
+- **(Mac) Connect Google Drive with one click.** Asked for by the shop, after
+  the setup proved to be a workaround: every shop had to create its own OAuth
+  client in Google Cloud and publish it. Khayt now carries its own Google
+  client, verified by Khayt. **Settings › Preferences › Online storage › Google
+  Drive › Connect** signs in and is done. A shop that wants its own client can
+  still use one, under "advanced". It asks only for the files Khayt itself puts
+  in the shop's Drive.
 
 - **(Mac) Saving the Google Drive settings keeps your client ID.** Reported by
   the shop: "I did the gdrive and all I got was saved and nothing else". Save

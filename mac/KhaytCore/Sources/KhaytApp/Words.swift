@@ -1976,6 +1976,8 @@ final class Words {
         "mac.gdrive_folder": ["en": "Folder in your Drive", "ar": "المجلد في Drive"],
         "mac.gdrive_not_connected": ["en": "Not connected yet. Click Connect Google Drive and finish the sign-in in your browser.", "ar": "غير مرتبط بعد. اضغط «اربط Google Drive» وأكمل تسجيل الدخول في المتصفح."],
         "mac.gdrive_saved_connect": ["en": "Saved. Now click Connect Google Drive to sign in.", "ar": "حُفظ. اضغط الآن «اربط Google Drive» لتسجيل الدخول."],
+        "mac.gdrive_own_client": ["en": "Use my own Google client (advanced)", "ar": "استخدم عميل Google الخاص بي (متقدم)"],
+        "mac.gdrive_why_builtin": ["en": "Uses the storage you already pay Google for. Click Connect and sign in: Khayt sees only the files it puts there, in one folder.", "ar": "يستخدم المساحة التي تدفع لـ Google مقابلها. اضغط «اربط» وسجّل الدخول: لا يرى خيط إلا الملفات التي يضعها هناك، في مجلد واحد."],
         "mac.gdrive_connect": ["en": "Connect Google Drive", "ar": "اربط Google Drive"],
         "mac.gdrive_disconnect": ["en": "Disconnect", "ar": "افصل"],
         "mac.gdrive_connected_as": ["en": "Connected as {email} — {used} used", "ar": "مرتبط بحساب {email} — مستخدم {used}"],
