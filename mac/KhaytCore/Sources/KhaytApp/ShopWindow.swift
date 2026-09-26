@@ -621,6 +621,26 @@ struct WindowSheets: ViewModifier {
                 Text(shop.words.callIt("plib.delete_confirm",
                                        ["name": .string(shop.pendingLibraryDelete?.title ?? "")]))
             }
+            // Several at once: one question naming how many.
+            .confirmationDialog(
+                shop.words.callIt("plib.delete_title"),
+                isPresented: Binding(get: { !shop.pendingLibraryDeletes.isEmpty },
+                                     set: { if !$0 { shop.pendingLibraryDeletes = [] } }),
+                titleVisibility: .visible
+            ) {
+                Button(shop.words.callIt("mac.delete_n_models",
+                                         ["n": .number(Double(shop.pendingLibraryDeletes.count))]),
+                       role: .destructive) {
+                    let files = shop.pendingLibraryDeletes
+                    Task { await shop.deleteLibraryFiles(files) }
+                }
+                Button(shop.words.callIt("common.cancel"), role: .cancel) {
+                    shop.pendingLibraryDeletes = []
+                }
+            } message: {
+                Text(shop.words.callIt("mac.delete_n_confirm",
+                                       ["n": .number(Double(shop.pendingLibraryDeletes.count))]))
+            }
             .sheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
             .sheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
             .sheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }

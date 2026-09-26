@@ -267,6 +267,8 @@ final class Shop {
     /// The model the shop has asked to delete, until it confirms or backs out.
     /// A question in the window's `WindowSheets`, so both shells can ask it.
     var pendingLibraryDelete: LibraryFile?
+    /// Several models chosen for deletion at once; asked about in one go.
+    var pendingLibraryDeletes: [LibraryFile] = []
     var customerSelection: Customer.ID?
     /// Which screen, and for the library which folder.
     ///
@@ -13407,34 +13409,53 @@ final class Shop {
     }
 
     func deleteLibraryFile(_ file: LibraryFile) async {
+        await deleteLibraryFiles([file])
+    }
+
+    /// Delete several models at once: every folder to the Trash, then ONE
+    /// write that takes all their records out of the book.
+    ///
+    /// The shop could select many models and group or tag them together, but
+    /// delete took one at a time ("I tried to delete multiple files from the
+    /// library but can't, only one at a time"). One write rather than one per
+    /// model, so a delete of fifty is one change to sync and one undo-free
+    /// moment rather than fifty.
+    func deleteLibraryFiles(_ files: [LibraryFile]) async {
         clearLastOutcome()
         pendingLibraryDelete = nil
+        pendingLibraryDeletes = []
+        guard !files.isEmpty else { return }
         guard let build = source.build else {
             importProblem = words.callIt("mac.move_sample"); return
         }
         var allGone = true
-        if let dir = directory(for: file) {
+        for file in files {
+            guard let dir = directory(for: file) else { continue }
+            var thisGone = true
             let contents = (try? FileManager.default.contentsOfDirectory(at: dir,
                 includingPropertiesForKeys: nil)) ?? []
             for url in contents {
-                do { try Self.trash(url) } catch { allGone = false }
+                do { try Self.trash(url) } catch { thisGone = false }
             }
-            if allGone { try? Self.trash(dir) }
+            if thisGone { try? Self.trash(dir) } else { allGone = false }
         }
+        let ids = Set(files.map(\.id))
         do {
             try StoreWriter.update(build) { root in
                 var rows = Self.rows(root, "printFiles")
-                rows.removeAll { Self.recordId($0) == file.id }
+                rows.removeAll { Self.recordId($0).map(ids.contains) ?? false }
                 root["printFiles"] = .array(rows)
             }
             // Out of the selection too, or the inspector keeps describing a
             // model that is gone.
-            fileSelection.remove(file.id)
+            fileSelection.subtract(ids)
             await load(source)
-            if allGone {
+            if !allGone {
+                importProblem = words.callIt("plib.delete_partial")
+            } else if files.count == 1 {
                 importNote = words.callIt("plib.deleted")
             } else {
-                importProblem = words.callIt("plib.delete_partial")
+                importNote = words.counting(files.count, "mac.deleted_n_models")
             }
         } catch {
             importProblem = String(describing: error)
