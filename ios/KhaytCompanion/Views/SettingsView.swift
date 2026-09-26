@@ -157,6 +157,7 @@ struct SettingsView: View {
 
     private var notificationsCard: some View {
         VStack(spacing: 0) {
+            toggleRow(L10n.tr("settings.notify.print_done"), $settings.notifyPrintDone)
             toggleRow(L10n.tr("settings.notify.queue"), $settings.notifyQueueChanges)
             toggleRow(L10n.tr("settings.notify.low_stock"), $settings.notifyLowStock)
             toggleRow(L10n.tr("settings.notify.overdue"), $settings.notifyOverdue)

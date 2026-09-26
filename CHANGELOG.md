@@ -151,6 +151,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   may be underpriced. Products with no print hours or no price show a dash
   instead of a made-up number, and jobs marked Not business are left out.
 
+- **(iOS) The phone says when a print finishes, with the next step on the
+  alert.** "Print finished — Bracket · X1C · 3 hr 12 min", with **Move to
+  post-processing**; a failed or cancelled print offers **Put back in the
+  queue**; a completed order, **Mark shipped** (by the shop's own
+  `markShipped`). Each button checks the job as it is when tapped, so an old
+  alert cannot move a job someone has since moved, and each writes into the
+  book like the same move made in the app. This version notices the end of a
+  print while the app is running, from the live readings; with the app closed
+  it will come as a push relayed by Khayt Cloud, which needs the shop's
+  Apple push key. On by default under Settings → Notifications.
+
 - **Security: a store or carrier notification could be replayed.** Salla,
   Zid, SMSA, Aramex and Saudi Post sign each notification's content but not
   when it was sent, so a copy captured once stays valid. Khayt remembered what

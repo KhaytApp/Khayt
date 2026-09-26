@@ -156,6 +156,9 @@ final class ConnectionSettings: ObservableObject {
     @Published var notifyLowStock: Bool {
         didSet { UserDefaults.standard.set(notifyLowStock, forKey: Keys.notifyLowStock) }
     }
+    @Published var notifyPrintDone: Bool {
+        didSet { UserDefaults.standard.set(notifyPrintDone, forKey: Keys.notifyPrintDone) }
+    }
 
     enum Keys {
         static let host = "khayt.host"
@@ -169,6 +172,7 @@ final class ConnectionSettings: ObservableObject {
         static let notifyConnection = "khayt.notify.connection"
         static let notifyOverdue = "khayt.notify.overdue"
         static let notifyLowStock = "khayt.notify.lowstock"
+        static let notifyPrintDone = "khayt.notify.printdone"
     }
 
     init() {
@@ -185,6 +189,7 @@ final class ConnectionSettings: ObservableObject {
         notifyConnection = defaults.object(forKey: Keys.notifyConnection) as? Bool ?? true
         notifyOverdue = defaults.object(forKey: Keys.notifyOverdue) as? Bool ?? true
         notifyLowStock = defaults.object(forKey: Keys.notifyLowStock) as? Bool ?? true
+        notifyPrintDone = defaults.object(forKey: Keys.notifyPrintDone) as? Bool ?? true
         L10n.setLanguage(appLanguage)
     }
 
