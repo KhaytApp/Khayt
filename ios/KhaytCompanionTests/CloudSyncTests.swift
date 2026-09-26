@@ -286,3 +286,24 @@ final class CloudErrorWordingTests: XCTestCase {
         XCTAssertFalse(said.contains("error 4"), said)
     }
 }
+
+/// A `print-finished` event from the Mac, as it arrives on the stream or in a
+/// push: sealed with the shop's key.
+final class ShopEventTests: XCTestCase {
+    func testAPrintFinishedEventOpensWithTheShopsKeyAndOtherKindsAreIgnored() throws {
+        var key = Data(count: 32)
+        _ = key.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 32, $0.baseAddress!) }
+        let payload: [String: JSONValue] = [
+            "v": .number(1), "kind": .string("print-finished"), "at": .string("2026-09-26T10:00:00Z"),
+            "machineId": .string("M1"), "machineName": .string("X1C"), "orderId": .string("INV-1"),
+            "outcome": .string("finished"), "photo": .bool(false), "advancedTo": .null,
+        ]
+        let sealed = try JSONEncoder().encode(SyncCrypto.seal(payload, dek: key))
+        let event = PrintAlertCenter.open(kind: "print-finished", ciphertext: sealed, dek: key)
+        XCTAssertEqual(event?.orderId, "INV-1")
+        XCTAssertEqual(event?.outcome, .finished)
+        XCTAssertNil(PrintAlertCenter.open(kind: "intake", ciphertext: sealed, dek: key), "a kind not yet read is ignored")
+        var other = Data(count: 32); other[0] = 1
+        XCTAssertNil(PrintAlertCenter.open(kind: "print-finished", ciphertext: sealed, dek: other))
+    }
+}

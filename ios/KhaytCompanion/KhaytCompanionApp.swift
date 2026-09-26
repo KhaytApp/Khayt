@@ -1,7 +1,30 @@
 import SwiftUI
 
+/// For the one thing SwiftUI has no hook for: the APNs device token.
+final class PushTokenDelegate: NSObject, UIApplicationDelegate {
+    static var api: KhaytAPIClient?
+
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        application.registerForRemoteNotifications()
+        return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        Task { @MainActor in await Self.api?.didReceivePushToken(deviceToken) }
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        // No push on this build — the simulator, or a build signed without
+        // the `aps-environment` entitlement, which waits on Push being turned
+        // on for com.khaytapp.companion in the developer portal. Alerts still
+        // come from the live readings and the stream while the app is open.
+    }
+}
+
 @main
 struct KhaytCompanionApp: App {
+    @UIApplicationDelegateAdaptor(PushTokenDelegate.self) private var pushDelegate
     @StateObject private var settings: ConnectionSettings
     @StateObject private var api: KhaytAPIClient
     @StateObject private var health: ConnectionHealth
@@ -23,8 +46,14 @@ struct KhaytCompanionApp: App {
         _health = StateObject(wrappedValue: healthMonitor)
         let printers = LivePrinters { try await apiClient.fetchLivePrinters() }
         _live = StateObject(wrappedValue: printers)
-        _channel = StateObject(wrappedValue: LiveChannel(api: apiClient, printers: printers))
-        alerts = PrintAlertCenter(api: apiClient, settings: s, printers: printers)
+        let channel = LiveChannel(api: apiClient, printers: printers)
+        _channel = StateObject(wrappedValue: channel)
+        let center = PrintAlertCenter(api: apiClient, settings: s, printers: printers)
+        alerts = center
+        channel.onEvent = { kind, ciphertext, session in
+            await center.receive(kind: kind, ciphertext: ciphertext, dek: session.dek)
+        }
+        PushTokenDelegate.api = apiClient
         KhaytType.applyNavigationBarAppearance()
     }
 

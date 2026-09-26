@@ -429,6 +429,56 @@ final class KhaytAPIClient: ObservableObject {
         }
     }
 
+    // MARK: - Push (APNs), relayed by Khayt Cloud
+
+    /// This phone's APNs device token, once iOS has handed it over.
+    private var pushToken: Data?
+
+    /// "sandbox" for a build run from Xcode, "production" for TestFlight and
+    /// the App Store — the APNs environment the token belongs to.
+    nonisolated static var pushEnvironment: String {
+        #if DEBUG
+        return "sandbox"
+        #else
+        return "production"
+        #endif
+    }
+
+    /// iOS gave us a token: tell the shop's cloud where to reach this phone.
+    func didReceivePushToken(_ token: Data) async {
+        pushToken = token
+        await registerForPush()
+    }
+
+    /// `POST /v1/shops/{id}/push/apns` (khayt-cloud "Push: APNs"). Owner,
+    /// manager and operator; a viewer has nothing to be alerted about and is
+    /// not registered. Registering again is harmless — it makes the token the
+    /// newest — so it is done on every launch and after every sign-in: a
+    /// sign-out drops the registrations made with that sign-in.
+    func registerForPush() async {
+        guard let session = cloud, session.canWrite, let token = pushToken else { return }
+        let hex = token.map { String(format: "%02x", $0) }.joined()
+        guard var request = try? CloudReader.request(
+            CloudReader.Connection(url: session.url, shopId: session.shopId, storedToken: ""),
+            token: session.token, method: "POST", tail: "/push/apns") else { return }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "token": hex, "bundleId": Bundle.main.bundleIdentifier ?? "com.khaytapp.companion",
+            "env": Self.pushEnvironment])
+        _ = try? await URLSession.shared.data(for: request)
+    }
+
+    /// Stop the shop's alerts reaching this phone — before signing out, while
+    /// the credential that registered it still works.
+    private func unregisterForPush(_ session: CloudSession) async {
+        guard let token = pushToken else { return }
+        let hex = token.map { String(format: "%02x", $0) }.joined()
+        guard let request = try? CloudReader.request(
+            CloudReader.Connection(url: session.url, shopId: session.shopId, storedToken: ""),
+            token: session.token, method: "DELETE", tail: "/push/apns/" + hex) else { return }
+        _ = try? await URLSession.shared.data(for: request)
+    }
+
     /// The live stream was refused as signed out — the same answer a sync
     /// gets, reached from the other side.
     func cloudSaysSignedOut() {
@@ -456,10 +506,12 @@ final class KhaytAPIClient: ObservableObject {
         cloud = session
         cloudNeedsSignIn = false
         cloudProblem = nil
+        await registerForPush()
         await syncThroughCloud()
     }
 
     func signOutOfCloud() {
+        if let session = cloud { Task { await unregisterForPush(session) } }
         CloudSession.forget()
         cloud = nil
         cloudProblem = nil

@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import UserNotifications
+import KhaytCore
 
 /// A print that has just stopped, as the Mac's `print-finished` event
 /// describes it (payload v1, agreed with the Mac and Cloud lanes). The same
@@ -129,10 +130,17 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
     private let settings: ConnectionSettings
     private var detector = FinishDetector()
     private var watching: AnyCancellable?
+    private weak var printers: LivePrinters?
+    /// When each machine last had an alert. One ending can be noticed three
+    /// ways — the phone's own readings, the stream's event, Apple's push —
+    /// and is said once.
+    private var said: [String: Date] = [:]
+    private static let sameEnding: TimeInterval = 10 * 60
 
     init(api: KhaytAPIClient, settings: ConnectionSettings, printers: LivePrinters) {
         self.api = api
         self.settings = settings
+        self.printers = printers
         super.init()
         let center = UNUserNotificationCenter.current()
         center.setNotificationCategories(PrintAlertAction.categories)
@@ -145,9 +153,31 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    /// A shop event off Khayt Cloud's stream: opened with the shop's key,
+    /// and said if it is one this phone knows. Unknown kinds are ignored.
+    func receive(kind: String, ciphertext: Data, dek: Data) async {
+        guard let event = Self.open(kind: kind, ciphertext: ciphertext, dek: dek) else { return }
+        await announce([event])
+    }
+
+    /// A sealed `print-finished` event, opened — nil for any other kind, or
+    /// for one this phone cannot open (a different shop's key).
+    nonisolated static func open(kind: String, ciphertext: Data, dek: Data) -> PrintFinished? {
+        guard kind == "print-finished",
+              let blob = try? JSONDecoder().decode(SyncCrypto.Blob.self, from: ciphertext),
+              let plain = try? SyncCrypto.openStore(blob, dek: dek) else { return nil }
+        return try? JSONDecoder().decode(PrintFinished.self, from: plain)
+    }
+
     /// Say that a print ended, with the one button that makes sense for it.
-    func announce(_ events: [PrintFinished]) async {
+    func announce(_ events: [PrintFinished], now: Date = Date()) async {
         guard settings.notifyPrintDone else { return }
+        let events = events.filter { e in
+            if let last = said[e.machineId], now.timeIntervalSince(last) < Self.sameEnding { return false }
+            said[e.machineId] = now
+            return true
+        }
+        guard !events.isEmpty else { return }
         let queue = (try? await api.fetchQueue()) ?? []
         for var event in events {
             // The job on that machine — only when there is exactly one, as
@@ -198,11 +228,14 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
 
     // MARK: - UNUserNotificationCenterDelegate
 
-    /// Shown even with the app open: a print ending is worth a banner.
+    /// Shown even with the app open: a print ending is worth a banner —
+    /// except Apple's copy of an ending the open stream has already said.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             willPresent notification: UNNotification) async
         -> UNNotificationPresentationOptions {
-        [.banner, .sound, .list]
+        let fromApple = notification.request.trigger is UNPushNotificationTrigger
+        if fromApple, await MainActor.run(body: { self.printers?.streamOpen ?? false }) { return [] }
+        return [.banner, .sound, .list]
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
