@@ -40,6 +40,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   The sort choice (date added, favourites first, name, size, last printed,
   times printed) is now a button beside Import, not only in the View menu.
 
+
+- **(Mac) The schedule suggestion now groups work by colour.** On a
+  toolchanger like the Snapmaker U1, every job that needs a spool that is not
+  loaded means somebody changing it by hand. Suggest Assignments now also
+  works out an order for each printer that runs the jobs sharing the loaded
+  colours together, starting with what is on the heads now, and says what that
+  saves: "Grouped by colour saves 10 colour changes (~30 min)". Each job shows
+  how many changes it adds, and a switch goes back to the plain order. Due
+  dates and priority come first: no job is made late, and no urgent job falls
+  behind a normal one, to save a change. The minutes are an estimate: 3 per
+  spool change by default, which you can change under Settings › Operations.
+  Khayt does not store a queue order, so the grouped order is a suggestion for
+  the order to print in. Applying still assigns printers only.
 - **Security: a store or carrier notification could be replayed.** Salla,
   Zid, SMSA, Aramex and Saudi Post sign each notification's content but not
   when it was sent, so a copy captured once stays valid. Khayt remembered what

@@ -716,3 +716,12 @@ test('ntfy settings merge over what is stored, and a token absent from the form 
   assert.equal(apply(stored, { ntfy: { token: '' } }).ntfy.token, '', 'empty is the forget switch');
   assert.deepEqual(apply(stored, { shopName: 'x' }).ntfy, stored.ntfy, 'a form without it leaves it');
 });
+
+test('minutes per spool change is saved, clamped, and left alone when absent', () => {
+  assert.equal(apply({}, { swapMinutes: 4 }, { year: 2026 }).swapMinutes, 4);
+  assert.equal(apply({}, { swapMinutes: 500 }, { year: 2026 }).swapMinutes, 60);
+  assert.equal(apply({}, { swapMinutes: -1 }, { year: 2026 }).swapMinutes, 0);
+  assert.equal(apply({}, { swapMinutes: 'x' }, { year: 2026 }).swapMinutes, 3);
+  assert.equal(apply({ swapMinutes: 7 }, {}, { year: 2026 }).swapMinutes, 7);
+  assert.equal('swapMinutes' in apply({}, {}, { year: 2026 }), false);
+});

@@ -799,6 +799,24 @@ final class Words {
         "mac.paid":          ["en": "Paid",           "ar": "مدفوع"],
         "mac.overdue_jobs":  ["en": "{n} unpaid jobs past their due date",
                               "ar": "{n} أعمال غير مدفوعة تجاوزت موعدها"],
+        // ── GROUPING THE QUEUE BY COLOUR (lib/swap-queue.js) ─────────────
+        //
+        // A "colour change" here is one spool taken off one head and another
+        // put on, between two jobs. Counted, so each has its one and two.
+        "mac.swap_changes":     ["en": "{n} colour changes", "ar": "{n} تبديلات ألوان"],
+        "mac.swap_changes_one": ["en": "{n} colour change", "ar": "تبديل لون واحد"],
+        "mac.swap_changes_two": ["en": "{n} colour changes", "ar": "تبديلا لون"],
+        "mac.swap_saves":       ["en": "Grouped by colour saves {changes} (~{min} min)",
+                                 "ar": "التجميع حسب اللون يوفّر {changes} (~{min} دقيقة)"],
+        "mac.swap_adds":        ["en": "adds {n} colour changes", "ar": "يضيف {n} تبديلات ألوان"],
+        "mac.swap_adds_one":    ["en": "adds {n} colour change", "ar": "يضيف تبديل لون واحد"],
+        "mac.swap_adds_two":    ["en": "adds {n} colour changes", "ar": "يضيف تبديلَي لون"],
+        "mac.swap_group":       ["en": "Group by colour", "ar": "التجميع حسب اللون"],
+        "mac.swap_estimate":    ["en": "An estimate at {min} min per spool change (Settings › Operations). Due dates and priority come first: no job is made late to save a change.",
+                                 "ar": "تقدير على أساس {min} دقيقة لكل تبديل بكرة (الإعدادات › العمليات). المواعيد والأولوية أولًا: لا يتأخر أي عمل لتوفير تبديل."],
+        "mac.swap_minutes":     ["en": "Minutes per spool change (estimate)", "ar": "دقائق تبديل البكرة (تقدير)"],
+        "mac.swap_minutes_hint": ["en": "How long it takes to take one spool off a head and load another. Used only to estimate the time saved by running jobs grouped by colour. 3 minutes suits a Snapmaker U1 with someone already at the machine; walking over to it is not counted.",
+                                  "ar": "المدة اللازمة لإخراج بكرة من رأس وتحميل أخرى. تُستخدم فقط لتقدير الوقت الموفَّر عند تجميع الأعمال حسب اللون. ٣ دقائق تناسب Snapmaker U1 بوجود شخص عند الطابعة؛ ولا يُحتسب وقت الوصول إليها."],
         "mac.jobs_word":     ["en": "jobs",           "ar": "أعمال"],
         "mac.jobs_word_one": ["en": "job",            "ar": "عمل"],
         // Nominative: these stand alone as a label rather than after a

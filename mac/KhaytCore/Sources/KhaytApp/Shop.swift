@@ -6654,6 +6654,14 @@ final class Shop {
     private(set) var scheduleIdle = false
     /// How many jobs the last apply moved.
     private(set) var scheduleApplied: Int?
+    /// Per machine, what running its proposed jobs grouped by colour would do
+    /// (`lib/swap-queue.js`). Worked out with the proposal and held with it,
+    /// for the same reason. See `SwapPlanning.swift`.
+    var swapPlans: [String: KhaytEngine.SwapQueue] = [:]
+    /// Whether the proposal is shown in the colour-grouped order. On by
+    /// default: the rule only reorders when it saves a change and breaks no
+    /// promise, so there is nothing to lose by showing it.
+    var groupByColour = true
 
     /// The jobs a scheduler is allowed to place: waiting, and on no machine yet.
     ///
@@ -6806,6 +6814,7 @@ final class Shop {
         scheduleIdle = false
         scheduleApplied = nil
         schedulePlan = nil
+        swapPlans = [:]
         guard let engine else {
             scheduleProblem = words.callIt("mac.move_no_engine"); return
         }
@@ -6828,8 +6837,10 @@ final class Shop {
             // Everything still to happen — see `stillToHappen`. Not just the
             // waiting jobs, or every printer looks empty and every proposal
             // comes back finishing in minutes.
-            schedulePlan = try await engine.proposeSchedule(
+            let plan = try await engine.proposeSchedule(
                 machines: machineRows, orders: Self.stillToHappen(orderRows), now: Date())
+            schedulePlan = plan
+            await planSwaps(plan)
         } catch {
             scheduleProblem = String(describing: error)
         }
@@ -6875,6 +6886,7 @@ final class Shop {
             }
             scheduleApplied = moved
             schedulePlan = nil
+            swapPlans = [:]
             await load(source)
         } catch let refusal as StoreWriter.Refusal {
             scheduleProblem = refusal.description
@@ -6886,6 +6898,7 @@ final class Shop {
     /// Put the proposal out of mind.
     func forgetSchedule() {
         schedulePlan = nil
+        swapPlans = [:]
         scheduleProblem = nil
         scheduleApplied = nil
     }

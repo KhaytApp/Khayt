@@ -73,10 +73,12 @@ struct ScheduleSheet: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 24)
                     } else {
+                        colourSaving
+                        let shown = shop.scheduleRowsShown
                         VStack(spacing: 0) {
-                            ForEach(Array(plan.assignments.enumerated()), id: \.offset) { _, a in
+                            ForEach(Array(shown.enumerated()), id: \.offset) { _, a in
                                 row(a)
-                                if a.orderId != plan.assignments.last?.orderId { Divider() }
+                                if a.orderId != shown.last?.orderId { Divider() }
                             }
                         }
                         .card(padding: 0)
@@ -106,20 +108,59 @@ struct ScheduleSheet: View {
         return HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(said.job).fontWeight(.medium).lineLimit(1)
-                if !said.why.isEmpty {
-                    Text(said.why).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                HStack(spacing: 6) {
+                    if !said.why.isEmpty {
+                        Text(said.why).lineLimit(1)
+                    }
+                    // The spools somebody has to change before this one can
+                    // start, in the order on screen.
+                    if let n = shop.swapsAdded(a) {
+                        Label(shop.words.counting(n, "mac.swap_adds"), systemImage: "arrow.triangle.swap")
+                            .lineLimit(1)
+                    }
                 }
+                .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
             // How long until it would come off, which is the figure a shop
             // actually schedules around.
-            Text(finish(a.projectedFinishMins))
+            Text(finish(shop.finishShown(a)))
                 .font(.caption).monospacedDigit().foregroundStyle(.tertiary)
             Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(.tertiary)
             Text(said.machine).fontWeight(.semibold).lineLimit(1)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
+    }
+
+    /// What grouping by colour saves, and the switch between the two orders.
+    ///
+    /// Only drawn when it saves something: a line saying "saves 0" on every
+    /// proposal would teach a shop to stop reading it. The minutes are said to
+    /// be an estimate, with the figure they were worked at, because they are.
+    @ViewBuilder private var colourSaving: some View {
+        let saving = shop.swapSaving
+        if saving.swaps > 0, let per = shop.swapMinutesUsed {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "swatchpalette").foregroundStyle(Khayt.brand)
+                    Text(shop.words.callIt("mac.swap_saves", [
+                        "changes": .string(shop.words.counting(saving.swaps, "mac.swap_changes")),
+                        "min": .number(saving.minutes.rounded()),
+                    ]))
+                    .fontWeight(.medium)
+                    .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Toggle(shop.words.callIt("mac.swap_group"), isOn: $shop.groupByColour)
+                        .toggleStyle(.switch).controlSize(.small).font(.caption)
+                        .fixedSize()
+                }
+                Text(shop.words.callIt("mac.swap_estimate", ["min": .number(per)]))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .card(rail: Khayt.brand)
+        }
     }
 
     private func refused(_ u: KhaytEngine.SchedulePlan.Unplaceable) -> some View {
