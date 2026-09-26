@@ -154,6 +154,26 @@ struct OnlinePane: View {
                             .font(.caption).foregroundStyle(Khayt.attention)
                     }
                 }
+                // ── ALERTS ON THE SHOP'S IPHONES ───────────────────────
+                //
+                // A finished print is sent to the shop's iPhones through
+                // Khayt Cloud. This sends a sample from here, the one app the
+                // Keychain gives the shop's sign-in to, so the whole chain can
+                // be checked without waiting for a print.
+                if Shop.cloudConnected(shop.settingsDict) {
+                    Section(shop.words.callIt("mac.alert_title")) {
+                        Text(shop.words.callIt("mac.alert_desc"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack {
+                            Button(shop.words.callIt("mac.alert_test")) { Task { await shop.sendTestAlert() } }
+                            if let said = shop.testAlertSaid {
+                                Text(said).font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
                 // ── ORDERS FROM A STOREFRONT ──────────────────────────
                 //
                 // Salla and Zid sign every order they send with a secret the

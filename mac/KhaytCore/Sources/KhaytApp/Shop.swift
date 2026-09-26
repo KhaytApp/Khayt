@@ -10175,9 +10175,10 @@ final class Shop {
     /// Tell the shop's iPhones (and any open `/live` stream) that a print
     /// ended, sealed with the shop's key. Only a signed-in owner or member Mac
     /// with the key open sends it; everything else is a quiet no.
-    func sendPrintFinishedEvent(_ ended: FinishCamera.Ended, now: Date = Date()) async {
+    @discardableResult
+    func sendPrintFinishedEvent(_ ended: FinishCamera.Ended, now: Date = Date()) async -> ShopEventPublisher.Outcome? {
         guard let build = source.build, let dek = cloudDek,
-              Self.cloudConnected(settingsDict), cloudRoleCanWrite, !eventsNotOffered else { return }
+              Self.cloudConnected(settingsDict), cloudRoleCanWrite, !eventsNotOffered else { return nil }
         let order = ended.orderId.flatMap { id in orders.first { $0.id == id } }
         let at = ShopEventPublisher.stamp(now)
         let payload = ShopEventPublisher.printFinishedPayload(
@@ -10185,7 +10186,7 @@ final class Shop {
         do {
             let connection = try CloudReader.connection(settingsDict)
             let token = try await Secrets.open(connection.storedToken, for: build)
-            guard !token.isEmpty else { return }
+            guard !token.isEmpty else { return nil }
             let session = URLSession(configuration: .ephemeral)
             let outcome = try await ShopEventPublisher.send(
                 connection, token: token, dek: dek, kind: "print-finished", at: at, payload: payload) {
@@ -10193,8 +10194,33 @@ final class Shop {
             }
             if outcome == .notOffered { eventsNotOffered = true }
             FileHandle.standardError.write(Data("khayt: print-finished event — \(outcome)\n".utf8))
+            return outcome
         } catch {
             FileHandle.standardError.write(Data("khayt: print-finished event — \(error)\n".utf8))
+            return .failed(0)
+        }
+    }
+
+    /// What the last test alert said, for Settings › Online.
+    var testAlertSaid: String?
+
+    /// Send a sample print-finished alert to the shop's iPhones, from THIS
+    /// app — the only one the Keychain releases the shop's sign-in to. Linked
+    /// to no job, so nothing on the phone can move a real order.
+    func sendTestAlert() async {
+        guard cloudDek != nil else { testAlertSaid = words.callIt("mac.alert_test_locked"); return }
+        let machine = machines.first
+        let ended = FinishCamera.Ended(machineId: machine?.id ?? "test", machineName: machine?.name ?? "Khayt",
+                                       orderId: nil, outcome: "finished", durationS: 3720,
+                                       photoTaken: false, filename: "test.gcode")
+        let outcome = await sendPrintFinishedEvent(ended)
+        switch outcome {
+        case .sent?: testAlertSaid = words.callIt("mac.alert_test_sent")
+        case .rateLimited?: testAlertSaid = words.callIt("mac.alert_test_limit")
+        case .notOffered?: testAlertSaid = words.callIt("mac.alert_test_not_offered")
+        case .readOnly?: testAlertSaid = words.callIt("mac.ws_err_readonly")
+        case nil: testAlertSaid = words.callIt("mac.qs_needs_cloud")
+        default: testAlertSaid = words.callIt("mac.alert_test_failed")
         }
     }
 

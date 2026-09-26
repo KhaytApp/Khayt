@@ -35,6 +35,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   kind of event is readable in the cloud; the details are sealed with the
   shop's key. It is best-effort: a notification that cannot be sent never holds
   up the printer or the job.
+  Settings › Online has a **Send a test alert** button to check the phone
+  receives it without waiting for a print.
 
 - **(Mac) Layout, dark-mode and wording fixes from a review of the shop's real
   book.**

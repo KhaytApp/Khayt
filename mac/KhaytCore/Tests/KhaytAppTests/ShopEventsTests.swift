@@ -74,6 +74,9 @@ struct ShopEventsTests {
     func wired() throws {
         let shop = try QuoteSheetStatusTests.source("Shop.swift")
         #expect(shop.contains("await sendPrintFinishedEvent(ended)"))
+        #expect(shop.contains("func sendTestAlert()"))
+        let pane = try QuoteSheetStatusTests.source("OnlinePane.swift")
+        #expect(pane.contains("shop.sendTestAlert()"))
         #expect(ShopEventPublisher.stamp(Date(timeIntervalSince1970: 1_790_000_000)) == "2026-09-21T14:13:20Z")
     }
 }
