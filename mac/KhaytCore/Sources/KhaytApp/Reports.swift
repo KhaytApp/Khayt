@@ -1109,6 +1109,15 @@ struct Reports: View {
                             LayerRule()
                             DetailLine(shop.words.callIt("an.pnl_vat"),
                                        Money.text(rows.reduce(0) { $0 + $1.vatCollected }, shop.currency), dim: true)
+                            // FILAMENT BOUGHT, beside the arithmetic and not in
+                            // it: it is stock, and reaches net only as cost of
+                            // goods when a job uses it. Shown so a purchase is
+                            // not simply missing from the report.
+                            let bought = rows.reduce(0) { $0 + ($1.inventory ?? 0) }
+                            if bought > 0 {
+                                DetailLine(shop.words.callIt("pnl.inventory"),
+                                           Money.text(bought, shop.currency), dim: true)
+                            }
                         }
                         .card()
                     }

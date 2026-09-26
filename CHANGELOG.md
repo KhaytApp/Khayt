@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Reports shows the filament bought in the period.** Filament is now
+  counted as stock and costed when a job uses it, so it is no longer in
+  expenses. The Mac's Reports lists "Filament bought" beside the P&L, as the
+  desktop does, so the money spent is still visible.
+
 - **Net profit counted your filament twice.** Filament you record as bought —
   from a purchase order or typed in as an expense — was taken off your
   profit the day it arrived, and again as the cost of each job that used it,
