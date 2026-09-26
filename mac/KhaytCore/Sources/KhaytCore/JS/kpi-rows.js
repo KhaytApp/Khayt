@@ -73,7 +73,16 @@
    * open quotes has not earned anything.
    */
   function counts(o) {
-    return !!o && !o.voidedAt && o.status !== 'quote';
+    if (!o || o.voidedAt || o.status === 'quote') return false;
+    /* NOR IS WORK THAT IS NOT THE SHOP'S TRADE. The P&L and product profit
+     * already leave out a job marked Not business (lib/business-scope.js),
+     * and these tiles did not: a shop that marked its nineteen test prints
+     * saw the P&L go to 28% while the dashboard kept its cost, its count and
+     * a −495% margin. Read through the global so a host that has not loaded
+     * business-scope counts as before rather than failing. */
+    const scope = global.KhaytBusinessScope;
+    if (scope && typeof scope.countsForBusiness === 'function' && !scope.countsForBusiness(o)) return false;
+    return true;
   }
 
   /** Completed means the work is out of the shop, by either route. */

@@ -212,3 +212,16 @@ test('the totals carry the hours, so a screen never re-adds them', () => {
   assert.equal(totals.hours, 6);
   assert.equal(totals.measured, 1);
 });
+
+test('a job marked Not business keeps its machine hours but not its money', () => {
+  require('../lib/business-scope.js');
+  const S = globalThis.KhaytBusinessScope;
+  const test1 = job('t', 'M1', 0, [{ cost: 14 }]);
+  S.setNonBusiness(test1, true);
+  const real = job('r', 'M1', 50, [{ cost: 36 }]);
+  const { rows } = machineProfit({ machines: [{ id: 'M1', name: 'U1' }], completed: [test1, real] }, deps);
+  const u1 = rows.find(r => r.machineId === 'M1');
+  assert.equal(u1.jobs, 2, 'the machine still did the work');
+  assert.equal(u1.revenue, 50);
+  assert.equal(u1.materialCost, 36, 'a test print is not a cost of sales');
+});

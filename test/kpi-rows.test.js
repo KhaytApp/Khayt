@@ -129,3 +129,13 @@ test('a location filter with no way to read a location does not empty the book',
   const rows = R.kpiRows({ orders: ORDERS, locationId: 'LOC-1', locationOf: null, money, clientName });
   assert.ok(rows.length > 0, 'filtering by a location it cannot read must not hide everything');
 });
+
+test('a job marked Not business is not counted, as the P&L does not count it', () => {
+  require('../lib/business-scope.js');
+  const S = globalThis.KhaytBusinessScope;
+  const personal = { id: 'N1', status: 'completed', date: '2026-09-10', price: 0, parts: [] };
+  S.setNonBusiness(personal, true);
+  const sale = { id: 'S1', status: 'completed', date: '2026-09-10', price: 50, parts: [] };
+  const rows = R.kpiRows({ orders: [personal, sale], from: '', to: '', money, clientName });
+  assert.equal(rows.length, 1, 'the personal print is still in the tiles');
+});

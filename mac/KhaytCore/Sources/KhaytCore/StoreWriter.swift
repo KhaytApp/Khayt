@@ -93,6 +93,7 @@ public enum StoreWriter {
         if recordingDeletes {
             reviveUnderNewIds(before: before, after: &root)
             recordDeletions(before: before, after: &root)
+            stampChanged(before: before, after: &root)
         }
 
         let encoder = JSONEncoder()
@@ -160,6 +161,7 @@ public enum StoreWriter {
             if recordingDeletes {
                 reviveUnderNewIds(before: before, after: &root)
                 recordDeletions(before: before, after: &root)
+                stampChanged(before: before, after: &root)
             }
 
             let next = try JSONEncoder().encode(root)
@@ -370,6 +372,57 @@ public enum StoreWriter {
         let prefix = old.firstIndex(of: "-").map { String(old[...$0]) } ?? ""
         let alphabet = Array("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
         return prefix + String((0..<11).map { _ in alphabet.randomElement()! })
+    }
+
+    /// Bump every record whose content a write changed without bumping it.
+    ///
+    /// ── AN UNSTAMPED EDIT DOES NOT SYNC, AND CAN BE UNDONE ───────────────
+    ///
+    /// The desktop never relies on each save remembering to stamp: its
+    /// `stampChanges` compares every record with the book as loaded and bumps
+    /// what moved. This app relied on each write calling `stamp`, and a
+    /// review found several that did not — a customer's quote approval, a
+    /// survey answer, receiving a purchase order (the stock added), applying a
+    /// schedule, and a message template whose edit dropped its `rev`
+    /// altogether. `changesToSend` sends only a rev higher than the cloud's,
+    /// so none of those left this Mac, and the next merge had an even chance
+    /// of putting the old record back.
+    ///
+    /// So the rule is here, where every write passes. A record whose content
+    /// (everything but `rev` and `updatedAt`) differs from before, and whose
+    /// rev did not go up, is set above BOTH the old and the new rev. Writes
+    /// that fold another copy in (`recordingDeletes: false`) are left alone:
+    /// a merged record keeps the rev it arrived with.
+    public static func stampChanged(before: [String: JSONValue], after: inout [String: JSONValue]) {
+        func content(_ o: [String: JSONValue]) -> [String: JSONValue] {
+            var c = o; c.removeValue(forKey: "rev"); c.removeValue(forKey: "updatedAt"); return c
+        }
+        func revOf(_ o: [String: JSONValue]?) -> Double {
+            if case .number(let n)? = o?["rev"], n > 0 { return n }
+            return 0
+        }
+        for (collection, value) in after where collection != "tombstones" {
+            guard case .array(var rows) = value else { continue }
+            var was: [String: [String: JSONValue]] = [:]
+            if case .array(let old)? = before[collection] {
+                for case .object(let o) in old { if case .string(let id)? = o["id"] { was[id] = o } }
+            }
+            var changed = false
+            for i in rows.indices {
+                guard case .object(var o) = rows[i], case .string(let id)? = o["id"] else { continue }
+                let prior = was[id]
+                let oldRev = revOf(prior), newRev = revOf(o)
+                // New here: not an edit. It is sent because the cloud does not
+                // have it, whatever its rev, and the Mac has always left it
+                // unstamped.
+                guard let prior, newRev <= oldRev, content(prior) != content(o) else { continue }
+                o["rev"] = .number(max(oldRev, newRev) + 1)
+                o["updatedAt"] = .string(iso(Date()))
+                rows[i] = .object(o)
+                changed = true
+            }
+            if changed { after[collection] = .array(rows) }
+        }
     }
 
     /// `TOMB_CAP` in lib/sync.js.

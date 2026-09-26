@@ -1000,7 +1000,15 @@ final class Shop {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
                 guard !Task.isCancelled, let self, let held = self.ownership else { return }
-                self.ownership = StoreLock.beat(held, for: build)
+                guard let kept = StoreLock.beat(held, for: build) else {
+                    // The other app took the book. Stop writing and say so,
+                    // rather than take it back and have two apps save over
+                    // each other.
+                    self.ownership = nil
+                    self.moveNotices.append(self.words.callIt("mac.lock_lost"))
+                    return
+                }
+                self.ownership = kept
             }
         }
     }
@@ -2828,7 +2836,7 @@ final class Shop {
             part["filamentId"] = .string(spool.id)
             part["material"] = .string(spool.material)
             part["spoolCost"] = .number(spool.cost ?? 0)
-            part["spoolWeight"] = .number(max(1, spool.weight ?? 1000))
+            part["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
             costedWith = spool.material
         }
 
@@ -3488,7 +3496,7 @@ final class Shop {
             part["material"] = .string(spool.material)
             part["spoolCost"] = .number(spool.cost ?? 0)
             // At least one gram: the cost model divides by this.
-            part["spoolWeight"] = .number(max(1, spool.weight ?? 1000))
+            part["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
         }
         return .object(part)
     }
@@ -3850,7 +3858,7 @@ final class Shop {
                 row["filamentId"] = .string(spool.id)
                 row["material"] = .string(spool.material)
                 row["spoolCost"] = .number(spool.cost ?? 0)
-                row["spoolWeight"] = .number(max(1, spool.weight ?? 1000))
+                row["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
             }
             rows.append(.object(row))
         }
@@ -4433,7 +4441,7 @@ final class Shop {
                 part["material"] = .string(spool.material)
                 part["spoolCost"] = .number(spool.cost ?? 0)
                 // At least one gram: the cost model divides by this.
-                part["spoolWeight"] = .number(max(1, spool.weight ?? 1000))
+                part["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
             }
             if let costed {
                 part["unitCost"] = .number(costed.cost)
@@ -7724,7 +7732,15 @@ final class Shop {
             // gone.
             let mine = (try? Data(contentsOf: build.storeURL))
                 .flatMap { try? JSONDecoder().decode([String: JSONValue].self, from: $0) } ?? [:]
-            let outbox = try await engine.changesToSend(local: mine, server: folded.store)
+            // MASKED FIRST, like the whole-book push. `machines` is an array
+            // collection, so deltas carry it, and its printer access codes and
+            // smart-plug passwords are sealed on disk with THIS Mac's key. Sent
+            // as they were, another computer took the higher-rev copy, replaced
+            // its own sealed value with one it cannot open, and lost its
+            // printer — and the ciphertext sat in the cloud. A mask is what
+            // `keepSecrets` knows to leave alone on the other side.
+            let outbox = try await engine.changesToSend(local: try await engine.storeForCloud(mine),
+                                                        server: folded.store)
             cloudSettingsStay = outbox.settingsDiffer
 
             let collections = (try? await engine.storeCollections()) ?? []

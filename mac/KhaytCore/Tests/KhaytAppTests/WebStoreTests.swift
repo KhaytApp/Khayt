@@ -268,4 +268,20 @@ struct WebStoreTests {
         }
     }
 
+
+    @Test("the lock heartbeat gives the book up when another app has taken it")
+    func heartbeatYields() throws {
+        let src = try QuoteSheetStatusTests.source("StoreLock.swift")
+        #expect(src.contains("static func beat(_ record: Record, for build: StoreReader.Build) -> Record?"))
+        #expect(src.contains("current.pid == record.pid"))
+        let shop = try QuoteSheetStatusTests.source("Shop.swift")
+        #expect(shop.contains("mac.lock_lost"))
+    }
+
+    @Test("changes sent to the cloud are masked first, like the whole book")
+    func deltasMasked() throws {
+        let shop = try QuoteSheetStatusTests.source("Shop.swift")
+        #expect(shop.contains("changesToSend(local: try await engine.storeForCloud(mine)"))
+    }
+
 }
