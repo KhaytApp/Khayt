@@ -575,6 +575,11 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// why a period with a few of them can show a margin of −400%. Optional for
     /// the same reason `cogs` is.
     public let unpriced: Int?
+    /// Filament bought in the period, net of reclaimable tax. STOCK, not an
+    /// expense: it is in neither `expenses` nor `net`, and reaches the P&L as
+    /// `cogs` when a job uses it (lib/pnl-report.js, the shop's choice of
+    /// accrual). Optional because an older bundle has no such field.
+    public let inventory: Double?
     public var id: String { period }
 }
 
