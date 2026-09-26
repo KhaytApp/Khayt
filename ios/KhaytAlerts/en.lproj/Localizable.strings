@@ -1,0 +1,11 @@
+/* The notification service extension's own copy of the alert words.
+   Held to the app's by NotificationStringsTests. */
+"alert.print.finished" = "Print finished";
+"alert.print.failed" = "Print failed";
+"alert.print.cancelled" = "Print cancelled";
+"alert.print.a_job" = "A job";
+"alert.print.move_post" = "Move to post-processing";
+"alert.print.reprint" = "Put back in the queue";
+"alert.print.mark_shipped" = "Mark shipped";
+"PUSH_TITLE" = "Khayt";
+"PUSH_PRINT_FINISHED" = "A print finished";

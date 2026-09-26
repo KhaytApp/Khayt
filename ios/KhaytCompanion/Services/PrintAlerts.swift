@@ -3,86 +3,6 @@ import Combine
 import UserNotifications
 import KhaytCore
 
-/// A print that has just stopped, as the Mac's `print-finished` event
-/// describes it (payload v1, agreed with the Mac and Cloud lanes). The same
-/// shape is built on the phone from the live readings, so there is one kind
-/// of alert whichever way it was noticed.
-struct PrintFinished: Codable, Equatable, Sendable {
-    enum Outcome: String, Codable, Sendable { case finished, failed, cancelled }
-
-    var v: Int = 1
-    var kind: String = "print-finished"
-    var at: String
-    var machineId: String
-    var machineName: String?
-    var orderId: String?
-    var project: String?
-    var client: String?
-    var filename: String?
-    var durationS: Double?
-    var outcome: Outcome
-    var photo: Bool = false
-    /// The stage the Mac moved the job to on this edge, if it did — so the
-    /// phone never moves it a second time. Nil today: the Mac records the
-    /// end, it does not advance the job.
-    var advancedTo: String?
-}
-
-/// What an alert offers, and the one move each makes.
-///
-/// Agreed with the Mac lane, and deliberately narrow:
-/// - a print that FINISHED can go on to post-processing — the next stage;
-/// - one that FAILED or was CANCELLED can be re-queued (back to pending);
-/// - an order already COMPLETED can be marked shipped — `markShipped` works
-///   from completed only, and a print that has just finished is not that.
-/// A reprint of a print that came out fine is another copy of the job, not a
-/// move of this one, and is not offered.
-enum PrintAlertAction: String, CaseIterable {
-    case moveToPost = "khayt.print.post"
-    case reprint = "khayt.print.reprint"
-    case markShipped = "khayt.print.shipped"
-
-    var title: String {
-        switch self {
-        case .moveToPost: return L10n.tr("alert.print.move_post")
-        case .reprint: return L10n.tr("alert.print.reprint")
-        case .markShipped: return L10n.tr("alert.print.mark_shipped")
-        }
-    }
-
-    /// The category an alert carries decides its buttons.
-    var category: String { rawValue + ".category" }
-
-    static let infoCategory = "khayt.print.info"
-
-    /// Which button, if any, for this ending of this job.
-    static func offered(for event: PrintFinished, orderStatus: String?) -> PrintAlertAction? {
-        guard event.orderId != nil, let status = orderStatus else { return nil }
-        switch event.outcome {
-        case .finished:
-            if status == "completed" { return .markShipped }
-            // Already moved (by the Mac, or by hand since): nothing to offer.
-            if let advanced = event.advancedTo, advanced != "printing" { return nil }
-            return status == "printing" ? .moveToPost : nil
-        case .failed, .cancelled:
-            return status == "printing" ? .reprint : nil
-        }
-    }
-
-    static var categories: Set<UNNotificationCategory> {
-        var out = Set(allCases.map { action in
-            UNNotificationCategory(
-                identifier: action.category,
-                actions: [UNNotificationAction(identifier: action.rawValue, title: action.title,
-                                               // It writes to the shop's book: not from a locked phone.
-                                               options: [.authenticationRequired])],
-                intentIdentifiers: [])
-        })
-        out.insert(UNNotificationCategory(identifier: infoCategory, actions: [], intentIdentifiers: []))
-        return out
-    }
-}
-
 /// Notices a print ending in successive live readings.
 ///
 /// Only a machine SEEN printing and then seen not printing counts. A machine
@@ -143,7 +63,7 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
         self.printers = printers
         super.init()
         let center = UNUserNotificationCenter.current()
-        center.setNotificationCategories(PrintAlertAction.categories)
+        center.setNotificationCategories(PrintAlertAction.categories(tr: L10n.tr))
         center.delegate = self
         watching = printers.$byMachine.dropFirst().sink { [weak self] readings in
             guard let self, printers.isLive else { return }
@@ -197,33 +117,10 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// The alert itself — shared with the push path, which will build the
-    /// same content from the Mac's decrypted event.
+    /// The alert itself — the same builder the notification service
+    /// extension uses for a push, so an ending reads the same however it came.
     nonisolated static func content(for event: PrintFinished, orderStatus: String?) -> UNMutableNotificationContent {
-        let c = UNMutableNotificationContent()
-        switch event.outcome {
-        case .finished: c.title = L10n.tr("alert.print.finished")
-        case .failed: c.title = L10n.tr("alert.print.failed")
-        case .cancelled: c.title = L10n.tr("alert.print.cancelled")
-        }
-        let what = event.project ?? event.filename ?? L10n.tr("alert.print.a_job")
-        var parts = [what]
-        if let machine = event.machineName, !machine.isEmpty { parts.append(machine) }
-        if let s = event.durationS, s >= 60 {
-            let f = DateComponentsFormatter()
-            f.allowedUnits = s >= 3600 ? [.hour, .minute] : [.minute]
-            f.unitsStyle = .abbreviated
-            if let t = f.string(from: s) { parts.append(t) }
-        }
-        c.body = parts.joined(separator: " · ")
-        c.sound = .default
-        c.threadIdentifier = "khayt.prints"
-        let action = PrintAlertAction.offered(for: event, orderStatus: orderStatus)
-        c.categoryIdentifier = action?.category ?? PrintAlertAction.infoCategory
-        var info: [String: Any] = ["machineId": event.machineId, "outcome": event.outcome.rawValue]
-        if let order = event.orderId { info["orderId"] = order }
-        c.userInfo = info
-        return c
+        PrintAlertText.content(for: event, orderStatus: orderStatus, tr: L10n.tr)
     }
 
     // MARK: - UNUserNotificationCenterDelegate

@@ -1,0 +1,11 @@
+/* The notification service extension's own copy of the alert words.
+   Held to the app's by NotificationStringsTests. */
+"alert.print.finished" = "انتهت الطباعة";
+"alert.print.failed" = "فشلت الطباعة";
+"alert.print.cancelled" = "أُلغيت الطباعة";
+"alert.print.a_job" = "مهمة";
+"alert.print.move_post" = "انقل إلى ما بعد الطباعة";
+"alert.print.reprint" = "أعدها إلى الطابور";
+"alert.print.mark_shipped" = "علّمها مشحونة";
+"PUSH_TITLE" = "خيط";
+"PUSH_PRINT_FINISHED" = "انتهت طباعة";

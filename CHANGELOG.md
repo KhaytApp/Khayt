@@ -8,6 +8,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   counted as stock and costed when a job uses it, so it is no longer in
   expenses. The Mac's Reports lists "Filament bought" beside the P&L, as the
   desktop does, so the money spent is still visible.
+- **(iOS) A print alert reaches a locked phone with the job on it.** Push is
+  on, and a new notification service extension opens the Mac's sealed
+  `print-finished` event with the shop's key on the phone — the cloud and
+  Apple never read it — so the lock screen says "Print finished — Bracket ·
+  X1C · 3 hr 12 min" with its one button, not just "A print finished". The
+  alert's words and its button rule are one shared file for the app and the
+  extension, and the extension's copy of the text is held to the app's by a
+  test.
 
 - **Net profit counted your filament twice.** Filament you record as bought —
   from a purchase order or typed in as an expense — was taken off your
