@@ -10,6 +10,8 @@
 		KCP000000000000000000003 /* KhaytCore in Frameworks */ = {isa = PBXBuildFile; productRef = KCP000000000000000000002 /* KhaytCore */; };
 		KCP000000000000000000005 /* KhaytCore in Frameworks */ = {isa = PBXBuildFile; productRef = KCP000000000000000000004 /* KhaytCore */; };
 		WGT000000000000000000012 /* KhaytWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = WGT000000000000000000001 /* KhaytWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		NSE000000000000000000012 /* KhaytAlerts.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = NSE000000000000000000001 /* KhaytAlerts.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		KCP000000000000000000007 /* KhaytCore in Frameworks */ = {isa = PBXBuildFile; productRef = KCP000000000000000000006 /* KhaytCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -27,6 +29,13 @@
 			remoteGlobalIDString = WGT000000000000000000007;
 			remoteInfo = KhaytWidgetExtension;
 		};
+		NSE000000000000000000013 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = PR1000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = NSE000000000000000000007;
+			remoteInfo = KhaytAlerts;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -37,6 +46,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				WGT000000000000000000012 /* KhaytWidgetExtension.appex in Embed Foundation Extensions */,
+				NSE000000000000000000012 /* KhaytAlerts.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -47,9 +57,28 @@
 		TST000000000000000000010 /* KhaytCompanionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KhaytCompanionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		P10000000000000000000001 /* KhaytCompanion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KhaytCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		WGT000000000000000000001 /* KhaytWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KhaytWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		NSE000000000000000000001 /* KhaytAlerts.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KhaytAlerts.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		NSE000000000000000000003 /* Exceptions for "KhaytAlerts" folder in "KhaytAlerts" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				KhaytAlerts.entitlements,
+			);
+			target = NSE000000000000000000007 /* KhaytAlerts */;
+		};
+		NSE000000000000000000015 /* Exceptions for "KhaytAlerts" folder in "KhaytCompanion" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"/Localized: Localizable.strings",
+				Info.plist,
+				KhaytAlerts.entitlements,
+				NotificationService.swift,
+			);
+			target = T10000000000000000000001 /* KhaytCompanion */;
+		};
 		EX1000000000000000000001 /* Exceptions for "KhaytCompanion" folder in "KhaytCompanion" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -68,6 +97,15 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		NSE000000000000000000002 /* KhaytAlerts */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				NSE000000000000000000003 /* Exceptions for "KhaytAlerts" folder in "KhaytAlerts" target */,
+				NSE000000000000000000015 /* Exceptions for "KhaytAlerts" folder in "KhaytCompanion" target */,
+			);
+			path = KhaytAlerts;
+			sourceTree = "<group>";
+		};
 		TST000000000000000000001 /* KhaytCompanionTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = KhaytCompanionTests;
@@ -92,6 +130,14 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		NSE000000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				KCP000000000000000000007 /* KhaytCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		TST000000000000000000004 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -123,6 +169,7 @@
 			children = (
 				SR1000000000000000000001 /* KhaytCompanion */,
 				WGT000000000000000000002 /* KhaytWidget */,
+				NSE000000000000000000002 /* KhaytAlerts */,
 				TST000000000000000000001 /* KhaytCompanionTests */,
 				G10000000000000000000003 /* Products */,
 			);
@@ -133,6 +180,7 @@
 			children = (
 				P10000000000000000000001 /* KhaytCompanion.app */,
 				WGT000000000000000000001 /* KhaytWidgetExtension.appex */,
+				NSE000000000000000000001 /* KhaytAlerts.appex */,
 				TST000000000000000000010 /* KhaytCompanionTests.xctest */,
 			);
 			name = Products;
@@ -177,9 +225,11 @@
 			);
 			dependencies = (
 				WGT000000000000000000014 /* PBXTargetDependency */,
+				NSE000000000000000000014 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				SR1000000000000000000001 /* KhaytCompanion */,
+				NSE000000000000000000002 /* KhaytAlerts */,
 			);
 			name = KhaytCompanion;
 			packageProductDependencies = (
@@ -209,6 +259,29 @@
 			productReference = WGT000000000000000000001 /* KhaytWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		NSE000000000000000000007 /* KhaytAlerts */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = NSE000000000000000000010 /* Build configuration list for PBXNativeTarget "KhaytAlerts" */;
+			buildPhases = (
+				NSE000000000000000000005 /* Sources */,
+				NSE000000000000000000004 /* Frameworks */,
+				NSE000000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				NSE000000000000000000002 /* KhaytAlerts */,
+			);
+			name = KhaytAlerts;
+			packageProductDependencies = (
+				KCP000000000000000000006 /* KhaytCore */,
+			);
+			productName = KhaytAlerts;
+			productReference = NSE000000000000000000001 /* KhaytAlerts.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -224,6 +297,9 @@
 					};
 					WGT000000000000000000007 = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					NSE000000000000000000007 = {
+						CreatedOnToolsVersion = 26.0;
 					};
 				};
 			};
@@ -246,12 +322,20 @@
 			targets = (
 				T10000000000000000000001 /* KhaytCompanion */,
 				WGT000000000000000000007 /* KhaytWidgetExtension */,
+				NSE000000000000000000007 /* KhaytAlerts */,
 				TST000000000000000000002 /* KhaytCompanionTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		NSE000000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		R10000000000000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -269,6 +353,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		NSE000000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		TST000000000000000000003 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -293,6 +384,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		NSE000000000000000000014 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = NSE000000000000000000007 /* KhaytAlerts */;
+			targetProxy = NSE000000000000000000013 /* PBXContainerItemProxy */;
+		};
 		TST000000000000000000008 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = T10000000000000000000001 /* KhaytCompanion */;
@@ -313,6 +409,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		KCP000000000000000000006 /* KhaytCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = KhaytCore;
+		};
 		KCP000000000000000000002 /* KhaytCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = KhaytCore;
@@ -514,6 +614,60 @@
 			};
 			name = Release;
 		};
+		NSE000000000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = KhaytAlerts/KhaytAlerts.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = KhaytAlerts/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.khaytapp.companion.KhaytAlerts;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		NSE000000000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = KhaytAlerts/KhaytAlerts.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = KhaytAlerts/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.khaytapp.companion.KhaytAlerts;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -549,6 +703,15 @@
 			buildConfigurations = (
 				WGT000000000000000000008 /* Debug */,
 				WGT000000000000000000009 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		NSE000000000000000000010 /* Build configuration list for PBXNativeTarget "KhaytAlerts" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				NSE000000000000000000008 /* Debug */,
+				NSE000000000000000000009 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
