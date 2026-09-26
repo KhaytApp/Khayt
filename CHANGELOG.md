@@ -12,6 +12,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   events. A line about a job opens the job; an order request opens Intake.
   And with the app open, a new order request now says so at once, instead of
   waiting for the Mac to import it.
+- **(iOS) The companion can be uploaded to TestFlight.** Its version and build
+  numbers now come from the build settings in the app and both extensions
+  (they were fixed at 1, which App Store Connect refuses a second time); the
+  iPad offers every orientation, which iPad multitasking requires; and the
+  NFC entitlement asks only for `TAG` — the app reads spool tags with a tag
+  session, and the current SDK refuses the old `NDEF` value outright.
 
 - **(Mac) Saving the Google Drive settings keeps your client ID.** Reported by
   the shop: "I did the gdrive and all I got was saved and nothing else". Save
