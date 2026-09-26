@@ -133,6 +133,37 @@ struct CloudSync {
         return LiveSnapshot(printers: snapshot.printers, source: .cloud, reportedAt: received)
     }
 
+    // MARK: - Shop events
+
+    struct ShopEvent: Sendable {
+        let id: String
+        let kind: String
+        let at: String
+        /// The sealed details; nil for a kind the cloud raises itself.
+        let ciphertext: Data?
+    }
+
+    /// `GET /v1/shops/{id}/events?since=` — the cloud keeps a shop's newest
+    /// fifty for a day ("Shop events" in khayt-cloud's contract).
+    static func events(_ session: CloudSession, since: String,
+                       fetch: (URLRequest) async throws -> (Data, URLResponse) = { try await URLSession.shared.data(for: $0) })
+        async throws -> [ShopEvent] {
+        let tail = "/events?since=" + (since.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? since)
+        let request = try CloudReader.request(CloudReader.Connection(url: session.url, shopId: session.shopId, storedToken: ""),
+                                              token: session.token, method: "GET", tail: tail)
+        let (data, response) = try await fetch(request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        guard case .object(let root) = try JSONDecoder().decode(JSONValue.self, from: data),
+              case .array(let rows)? = root["events"] else { return [] }
+        return rows.compactMap { row in
+            guard case .object(let e) = row, case .string(let id)? = e["id"],
+                  case .string(let kind)? = e["kind"], case .string(let at)? = e["at"] else { return nil }
+            var sealed: Data?
+            if let ct = e["ciphertext"], ct != .null { sealed = try? JSONEncoder().encode(ct) }
+            return ShopEvent(id: id, kind: kind, at: at, ciphertext: sealed)
+        }
+    }
+
     // MARK: - Pulling
 
     func pull(_ session: CloudSession, now: Date = Date()) async throws -> (CloudSession, Pulled) {

@@ -553,3 +553,10 @@
 "PUSH_TITLE" = "Khayt";
 "PUSH_PRINT_FINISHED" = "A print finished";
 "PUSH_INTAKE" = "New order request";
+
+/* Notifications feed */
+"feed.title" = "Notifications";
+"feed.empty" = "Nothing yet";
+"feed.empty.sub" = "Finished prints, late jobs, low filament and new order requests land here.";
+"feed.unread" = "Unread";
+"feed.unread_count" = "%d unread";

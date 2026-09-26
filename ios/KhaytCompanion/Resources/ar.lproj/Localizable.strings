@@ -553,3 +553,10 @@
 "PUSH_TITLE" = "خيط";
 "PUSH_PRINT_FINISHED" = "انتهت طباعة";
 "PUSH_INTAKE" = "طلب جديد";
+
+/* Notifications feed */
+"feed.title" = "الإشعارات";
+"feed.empty" = "لا شيء بعد";
+"feed.empty.sub" = "الطباعات المنتهية والمهام المتأخرة ونقص الخيط وطلبات الطلب الجديدة تظهر هنا.";
+"feed.unread" = "غير مقروء";
+"feed.unread_count" = "%d غير مقروء";

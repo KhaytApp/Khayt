@@ -121,6 +121,12 @@ final class CompanionNotifications: ObservableObject {
     }
 
     private func post(id: String, title: String, body: String) {
+        let tone: FeedItem.Tone = id == "khayt.overdue" || id == "khayt.offline" ? .late
+            : id == "khayt.lowstock" ? .attention : .none
+        let now = Date()
+        ShopFeed.shared.add(FeedItem(id: id + "." + String(Int(now.timeIntervalSince1970)), kind: id,
+                                     title: body.isEmpty ? title : title + " — " + body, at: now,
+                                     tone: tone, unread: true, orderId: nil))
         guard isAuthorized else { return }
         let content = UNMutableNotificationContent()
         content.title = title

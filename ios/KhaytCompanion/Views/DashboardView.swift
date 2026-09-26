@@ -24,6 +24,7 @@ struct DashboardView: View {
     @State private var queue: [QueueOrder] = []
     @State private var facts: [String: OrderFacts] = [:]
     @State private var openOrder: QueueOrder?
+    @ObservedObject private var feed = ShopFeed.shared
     @State private var lowSpools: [InventorySpool] = []
     @State private var waiting: [WaitingListItem] = []
     @State private var lane: String = "all"
@@ -97,6 +98,30 @@ struct DashboardView: View {
                 }
             }
             Spacer(minLength: 8)
+            // The design's bell, with how many are unread.
+            NavigationLink {
+                NotificationsView()
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bell")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(KhaytDesign.ink)
+                        .frame(width: 44, height: 44)
+                        .background(KhaytDesign.surface, in: Circle())
+                        .overlay(Circle().strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+                    if feed.unreadCount > 0 {
+                        Text("\(min(feed.unreadCount, 99))")
+                            .font(.khayt(10, .bold, relativeTo: .caption2).monospacedDigit())
+                            .foregroundStyle(KhaytDesign.ground)
+                            .padding(.horizontal, 4)
+                            .frame(minWidth: 17, minHeight: 17)
+                            .background(KhaytDesign.late, in: Capsule())
+                            .offset(x: 2, y: -2)
+                    }
+                }
+            }
+            .accessibilityLabel(L10n.tr("feed.title"))
+            .accessibilityValue(feed.unreadCount > 0 ? String(format: L10n.tr("feed.unread_count"), feed.unreadCount) : "")
             Menu {
                 Button { showQuote = true } label: { Label(L10n.tr("home.action.quote"), systemImage: "tag") }
                 Button { showWaste = true } label: { Label(L10n.tr("home.action.waste"), systemImage: "trash") }

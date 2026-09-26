@@ -74,7 +74,7 @@ final class LiveChannel: ObservableObject {
     private var task: Task<Void, Never>?
     private var pulling = false
     /// Where a shop event off the stream goes — the print alerts.
-    var onEvent: ((_ kind: String, _ ciphertext: Data, _ session: CloudSession) async -> Void)?
+    var onEvent: ((_ kind: String, _ at: String, _ ciphertext: Data?, _ session: CloudSession) async -> Void)?
 
     init(api: KhaytAPIClient, printers: LivePrinters) {
         self.api = api
@@ -173,10 +173,15 @@ final class LiveChannel: ObservableObject {
         case "event":
             // `{ kind, at, ciphertext }` — "Shop events" in the contract. The
             // kind is read here; what is inside is the alert's business.
+            // `intake` carries `ciphertext: null` — the cloud raises it and
+            // holds no key to seal anything with.
             if case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: body),
-               case .string(let kind)? = o["kind"], let sealed = o["ciphertext"],
-               let data = try? JSONEncoder().encode(sealed) {
-                await onEvent?(kind, data, session)
+               case .string(let kind)? = o["kind"] {
+                var sealed: Data?
+                if let ct = o["ciphertext"], ct != .null { sealed = try? JSONEncoder().encode(ct) }
+                var at = ""
+                if case .string(let a)? = o["at"] { at = a }
+                await onEvent?(kind, at, sealed, session)
             }
         default:
             break                                   // `intake` and whatever comes next
