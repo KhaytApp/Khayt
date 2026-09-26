@@ -232,6 +232,12 @@ struct CloudLibrarySettings: View {
         if let driveStatus {
             Label(driveStatus, systemImage: "person.crop.circle.badge.checkmark")
                 .font(.caption).foregroundStyle(.secondary)
+        } else if !driveConnected {
+            // NOT CONNECTED, said in words. The pane looked the same connected
+            // or not, and a shop that had pressed Save had no way to tell.
+            Label(shop.words.callIt("mac.gdrive_not_connected"), systemImage: "exclamationmark.circle")
+                .font(.caption).foregroundStyle(Khayt.attention)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -270,7 +276,8 @@ struct CloudLibrarySettings: View {
 
     private func save() async {
         if draft.useDrive {
-            await shop.saveDriveLibrary(folderName: draft.driveFolder, tierOn: draft.tierOn, keepDays: draft.keepDays)
+            await shop.saveDriveLibrary(folderName: draft.driveFolder, tierOn: draft.tierOn, keepDays: draft.keepDays,
+                                        clientId: draft.driveClientId, typedSecret: draft.driveSecret)
             reload(); await refresh(); return
         }
         await shop.saveCloudLibrary(provider: draft.provider, endpoint: draft.endpoint, bucket: draft.bucket,

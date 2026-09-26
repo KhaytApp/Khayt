@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Saving the Google Drive settings keeps your client ID.** Reported by
+  the shop: "I did the gdrive and all I got was saved and nothing else". Save
+  stored only the folder name and threw away the OAuth client ID and secret
+  just typed, which also greyed out **Connect Google Drive**. They are kept now.
+  The pane says plainly when Drive is not connected yet, and what to click.
+
 - **(iOS) "New order request" on the lock screen.** Khayt Cloud now alerts a
   shop's phones when a customer submits an order request — from the public
   form, the storefront or a platform import — even with the Mac off. The
