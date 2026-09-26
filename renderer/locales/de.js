@@ -1967,6 +1967,7 @@
   "pnl.cogs": "Herstellungskosten des Umsatzes",
   "pnl.inventory": "Gekauftes Filament (Lager, bei Verbrauch verbucht)",
   "pnl.inventory_note": "In diesem Zeitraum gekauftes Filament: {amount}. Es ist Lagerbestand und wird als Wareneinsatz verbucht, wenn ein Auftrag es verbraucht – deshalb steht es nicht bei den Ausgaben oben.",
+  "pnl.waste": "Verschwendetes Filament (Fehldrucke)",
   "pnl.gross": "Bruttogewinn",
   "pnl.gross_margin": "Bruttomarge %",
   "pnl.opex": "Betriebskosten",

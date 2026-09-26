@@ -1967,6 +1967,7 @@
   "pnl.cogs": "销售成本",
   "pnl.inventory": "购入的耗材（库存，使用时计入）",
   "pnl.inventory_note": "本期购入的耗材：{amount}。它属于库存，在订单使用时计入销售成本，因此不在上方的支出中。",
+  "pnl.waste": "浪费的耗材（打印失败）",
   "pnl.gross": "毛利",
   "pnl.gross_margin": "毛利率%",
   "pnl.opex": "运营费用",

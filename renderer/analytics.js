@@ -713,12 +713,12 @@ function renderMonthlyTrendChart() {
   // reclaims, without the fixed overhead — the bar is spending, not the P&L.
   const rows = KhaytPnl.pnlByPeriod(printLog, expenses, {
     settings, clients, currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
-    now: today, granularity: 'month',
+    now: today, granularity: 'month', wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
   });
   const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
   const revByMonth = {};
   const expByMonth = {};
-  months.forEach(m => { revByMonth[m] = byKey[m] ? byKey[m].revenue : 0; expByMonth[m] = byKey[m] ? byKey[m].expenses : 0; });
+  months.forEach(m => { revByMonth[m] = byKey[m] ? byKey[m].revenue : 0; expByMonth[m] = byKey[m] ? byKey[m].expenses + (byKey[m].waste || 0) : 0; });
 
   const maxVal = Math.max(...months.map(m => Math.max(revByMonth[m], expByMonth[m])), 1);
 
@@ -905,7 +905,7 @@ function renderProfitMarginChart() {
   // job counts — three things this function used to do differently.
   const rows = KhaytPnl.pnlByPeriod(printLog, expenses, {
     settings, clients, currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
-    now: today, granularity: 'month',
+    now: today, granularity: 'month', wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
   });
   const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
   const vals = months.map(m => (byKey[m] && byKey[m].marginPct != null) ? byKey[m].marginPct : null);
@@ -1651,9 +1651,12 @@ function renderPnLSection() {
     || require('../lib/pnl-report.js');
   const rows = Pnl.pnlByPeriod(printLog, expenses, {
     settings, clients, currencies: CURRENCIES, now: new Date(),
+    wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
   });
   if (rows.length === 0) { el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.pnl_empty'))}</p>`; return; }
   const hasFixed = rows.some((r) => r.fixed > 0);
+  // Filament lost to failed prints: its own column, where there is any.
+  const hasWaste = rows.some((r) => (r.waste || 0) > 0);
 
   const cur = currencySymbol();
   el.innerHTML = `
@@ -1667,6 +1670,7 @@ function renderPnLSection() {
             <th style="padding:4px 8px;">${escapeHtml(t('an.revenue'))} (${cur})</th>
             <th style="padding:4px 8px;">${escapeHtml(t('pnl.cogs'))} (${cur})</th>
             <th style="padding:4px 8px;">${escapeHtml(t('an.pnl_expenses'))} (${cur})</th>
+            ${hasWaste ? `<th style="padding:4px 8px;">${escapeHtml(t('pnl.waste'))} (${cur})</th>` : ''}
             <th style="padding:4px 8px;">${escapeHtml(t('an.pnl_vat'))} (${cur})</th>
             <th style="padding:4px 8px; font-weight:700;">${escapeHtml(t('an.pnl_net'))} (${cur})</th>
           </tr>
@@ -1680,6 +1684,7 @@ function renderPnLSection() {
               <td style="padding:6px 8px; text-align:right; font-variant-numeric:tabular-nums;">${fmtMoney(r.revenue)}</td>
               <td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.cogs || 0)}</td>
               <td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.expenses + r.fixed)}</td>
+              ${hasWaste ? `<td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">${r.waste > 0 ? '−' + fmtMoney(r.waste) : '—'}</td>` : ''}
               <td style="padding:6px 8px; text-align:right; color:var(--text-muted); font-variant-numeric:tabular-nums;">${fmtMoney(r.vatCollected)}</td>
               <td style="padding:6px 8px; text-align:right; font-weight:700; color:${netCol}; font-variant-numeric:tabular-nums;">${fmtMoney(r.net)}</td>
             </tr>`;
@@ -1994,8 +1999,8 @@ function renderLocationPL() {
     if (m.locationId) { machLocById[m.id] = m.locationId; machLocByName[m.name] = m.locationId; }
   });
 
-  const locTotals = {}; // locationId | '__none__' → { revenue, matCost, expenses, orders }
-  const getD = id => { if (!locTotals[id]) locTotals[id] = { revenue: 0, matCost: 0, expenses: 0, orders: 0 }; return locTotals[id]; };
+  const locTotals = {}; // locationId | '__none__' → { revenue, matCost, expenses, waste, orders }
+  const getD = id => { if (!locTotals[id]) locTotals[id] = { revenue: 0, matCost: 0, expenses: 0, waste: 0, orders: 0 }; return locTotals[id]; };
 
   // Orders
   printLog.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && inRange(o.date || (o.timestamp || '').slice(0,10), analyticsRange, 'analytics')).forEach(o => {
@@ -2012,13 +2017,17 @@ function renderLocationPL() {
   expenses.filter(e => inRange(e.date, analyticsRange, 'analytics') && !KhaytPnl.isInventoryPurchase(e)).forEach(e => {
     getD(e.locationId || '__none__').expenses += +e.amount || 0;
   });
+  // Filament lost to failed prints, at the location of the machine it failed on.
+  (typeof wasteLog !== 'undefined' ? wasteLog : []).filter(w => w && inRange(w.date, analyticsRange, 'analytics')).forEach(w => {
+    getD((w.machineId && machLocById[w.machineId]) || '__none__').waste += Math.max(0, +w.cost || 0);
+  });
 
   // Build rows
   const nameMap = { '__none__': t('an.unassigned_location') };
   locations.forEach(l => { nameMap[l.id] = l.name; });
 
   const rows = Object.entries(locTotals)
-    .map(([lid, d]) => ({ lid, name: nameMap[lid] || lid, ...d, net: d.revenue - d.matCost - d.expenses }))
+    .map(([lid, d]) => ({ lid, name: nameMap[lid] || lid, ...d, net: d.revenue - d.matCost - d.expenses - d.waste }))
     .sort((a, b) => b.revenue - a.revenue);
 
   if (!rows.length) {
@@ -2064,7 +2073,7 @@ function renderLocationPL() {
       <td><strong>${escapeHtml(r.name)}</strong></td>
       <td style="text-align:right;">${r.orders}</td>
       <td style="text-align:right;">${cur}${fmtMoney(r.revenue)}</td>
-      <td style="text-align:right;">${cur}${fmtMoney(r.matCost + r.expenses)}</td>
+      <td style="text-align:right;">${cur}${fmtMoney(r.matCost + r.expenses + r.waste)}</td>
       <td style="text-align:right;">${netCol}</td>
       <td style="text-align:right;">${margin}</td>
     </tr>`;
@@ -2807,7 +2816,11 @@ function pnlInputsForRange() {
   const expenseRows = (expenses || [])
     .filter(e => inRange(e.date, analyticsRange, 'analytics'))
     .map(e => ({ amount: +e.amount || 0, category: e.category || '' }));
-  return { orders, expenses: expenseRows };
+  // Filament lost to failed prints — its own P&L line (lib/pnl-report.js).
+  const wasteRows = (typeof wasteLog !== 'undefined' ? wasteLog : [])
+    .filter(w => w && inRange(w.date, analyticsRange, 'analytics'))
+    .map(w => ({ cost: +w.cost || 0 }));
+  return { orders, expenses: expenseRows, waste: wasteRows };
 }
 
 function exportPnlCsv() {
@@ -2817,16 +2830,16 @@ function exportPnlCsv() {
     const f = customRangeFrom.analytics || '', tt = customRangeTo.analytics || '';
     if (f || tt) label = `${f || '…'} → ${tt || '…'}`;
   }
-  const { orders, expenses: exps } = pnlInputsForRange();
+  const { orders, expenses: exps, waste } = pnlInputsForRange();
 
   if (!orders.length && !exps.length) { toast(t('an.pnl_empty') || 'No data for this period', 'error'); return; }
 
-  const summary = KhaytPnl.computePnl({ orders, expenses: exps, label });
+  const summary = KhaytPnl.computePnl({ orders, expenses: exps, waste, label });
   const labels = {
     title: t('pnl.title'), item: t('pnl.item'), amount: t('pnl.amount'), orders: t('an.pnl_orders'),
     revenue: t('an.revenue'), cogs: t('pnl.cogs'), gross: t('pnl.gross'), gross_margin: t('pnl.gross_margin'),
     opex: t('pnl.opex'), vat: t('an.pnl_vat'), net: t('an.pnl_net'),
-    inventory: t('pnl.inventory'),
+    inventory: t('pnl.inventory'), waste: t('pnl.waste'),
   };
   const csv = KhaytPnl.pnlToCsv(summary, { currency: currencySymbol(), labels });
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }),

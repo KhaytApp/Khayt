@@ -29,15 +29,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   extension, and the extension's copy of the text is held to the app's by a
   test.
 
-- **Net profit counted your filament twice.** Filament you record as bought —
-  from a purchase order or typed in as an expense — was taken off your
-  profit the day it arrived, and again as the cost of each job that used it,
-  so net profit read lower than it was. Filament is now counted once, when it
-  is used: the P&L treats what you buy as stock, shows it on its own line,
-  and takes it off profit as the cost of goods of the work that uses it. The
-  tax you paid on it is still counted as reclaimable. **Net profit figures
-  you have looked at before will be higher**, by what the filament had been
-  counted a second time.
 - **(Mac) The library's filters are a few menus instead of a row of
   bubbles, and it opens as one grid of every model.** Reported by the shop:
   "the library filter and grouping is not practical, too many bubbles to go
@@ -93,7 +84,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   for them, I want to see them immediately". **Date added** is the new default.
   The sort choice (date added, favourites first, name, size, last printed,
   times printed) is now a button beside Import, not only in the View menu.
-
 
 - **(Mac) The schedule suggestion now groups work by colour.** On a
   toolchanger like the Snapmaker U1, every job that needs a spool that is not
@@ -182,12 +172,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   it will come as a push relayed by Khayt Cloud, which needs the shop's
   Apple push key. On by default under Settings → Notifications.
 
-- **Security: a store or carrier notification could be replayed.** Salla,
-  Zid, SMSA, Aramex and Saudi Post sign each notification's content but not
-  when it was sent, so a copy captured once stays valid. Khayt remembered what
-  it had already accepted for only ten minutes, and forgot everything when it
-  restarted. It now remembers for thirty days, across restarts, so a copy sent
-  again is refused. The Mac app has the same fix (SEC-010).
 - **(Mac) Products costed on a spool's grams left are repaired and
   re-priced.** The shop chose to have them corrected rather than wait for
   each one to be edited. When a book opens, a product part whose stored spool
@@ -196,11 +180,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   uses. A product changed in the meantime is left alone. On the shop's book
   this re-priced four products by one or two riyals.
 
-- **(Maintainers) Two Mac tests stopped failing with the calendar.** They
-  loaded the sample book as of today, which moves every date in it, and then
-  measured it at a fixed date. On 2026-09-26 the refund quarter and the
-  break-even month slid out from under them, and "Mac app tests" went red on
-  every PR. Both now load the book as of the day it was written for.
 - **(Mac) Fixes from a review of the whole app's data and money.**
   - **Material was costed on the grams LEFT on a spool, not its size.** A
     product priced from a spool with 859 g left paid 75/859 per gram instead of
@@ -237,14 +216,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   signature, never the signature itself. The book already limited the damage:
   an order is recorded once, and a parcel never moves backwards.
 
-- **Choose which products are on your web store, and see what needs fixing
-  before you publish.** Each product in Settings → Storefront has an "On
-  store" box: untick it and the product stays in Khayt but is not published.
-  It is saved on the product, so the Mac app sees the same choice. And
-  Publish now looks at your listings first and tells you which have no price,
-  no photo, no description or no category, a second language that is missing
-  or just repeats the first, or a name that reads like a file name, and lets
-  you publish anyway or go back and fix them.
 - **(Mac) Four screens that contradicted themselves on the shop's real book now
   agree.** Reports printed a -495.8% margin beside a net income of 50.00: net
   income now takes the cost of goods off as well (`lib/pnl-report.js`, so the
@@ -265,24 +236,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rather than on the next ten-second poll. The stream reconnects on its own
   when the cloud closes it; a busy cloud means wait, never signed out; and
   while the stream is up, the printer poll falls back to once a minute.
-- **Arabic review fixes, from screenshots of the shop's own book** (shared
-  Arabic catalogue and the Mac app).
-  - "Hex colour" no longer reads as "hexagonal" (سداسي): it is «رمز لون (hex)».
-  - One Arabic gram, **غ** (and **كغ**), everywhere. It was spelled جم, غم,
-    غرام and a Latin "g" on different screens; the Mac's shelf, figure strip,
-    waste card, variance and quote fields now take the unit from the catalogue.
-  - One word for Expenses (المصروفات, not المصاريف).
-  - Portfolio is «معرض الأعمال», so it no longer reads as a second "Jobs"
-    (الأعمال). On the Mac, Dashboard is «نظرة عامة» and Board is «لوحة المهام»,
-    no longer اللوحة beside اللوح.
-  - Eleven Arabic strings that dropped the instruction the English gives
-    (capacity targets, expense budgets, supplier price tags, retention data,
-    custom fields, BNPL links, three help paragraphs, packaging, part colours)
-    now say the whole sentence.
-  - (Mac) The machines timeline names midnight's day in the shop's language
-    instead of a fixed English "Mon"/"Sun", and the Reports quarter title keeps
-    "2026-Q3" as one left-to-right unit, matching its table.
-
 - **(Mac) Choose what goes on the web store, check it before it goes, and
   set up the store itself.** Asked for by the shop after a review of its first
   published catalogue.
@@ -3667,6 +3620,75 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.10.1] - 2026-09-26
+
+Fixes since 3.10.0. Individual entries are kept below; this is what changed
+for you.
+
+**Your net profit was too low, and now it is right.** Filament you record as
+bought was taken off your profit twice: once the day it arrived, and again
+as the cost of the jobs that used it. It is counted once now, when it is
+used; what you buy shows as stock, on its own line. **Net profit figures you
+have seen before will go up.** And the plastic lost to failed prints — which
+that change would otherwise have left out entirely — is its own line in the
+P&L, so a failure still costs what it cost.
+
+**A store or carrier notification can't be sent to Khayt twice.** Salla, Zid
+and the shipping carriers sign what they send but not when, so a captured
+copy stayed valid; Khayt forgot what it had accepted after ten minutes or a
+restart. It remembers for thirty days now.
+
+**Arabic reads better** — grams as «غ», المصروفات, and several screens and
+messages that had lost part of their meaning in translation.
+
+### Security
+
+- **Security: a store or carrier notification could be replayed.** Salla,
+  Zid, SMSA, Aramex and Saudi Post sign each notification's content but not
+  when it was sent, so a copy captured once stays valid. Khayt remembered what
+  it had already accepted for only ten minutes, and forgot everything when it
+  restarted. It now remembers for thirty days, across restarts, so a copy sent
+  again is refused. The Mac app has the same fix (SEC-010).
+
+### Changed
+
+- **Arabic review fixes, from screenshots of the shop's own book** (shared
+  Arabic catalogue and the Mac app).
+  - "Hex colour" no longer reads as "hexagonal" (سداسي): it is «رمز لون (hex)».
+  - One Arabic gram, **غ** (and **كغ**), everywhere. It was spelled جم, غم,
+    غرام and a Latin "g" on different screens; the Mac's shelf, figure strip,
+    waste card, variance and quote fields now take the unit from the catalogue.
+  - One word for Expenses (المصروفات, not المصاريف).
+  - Portfolio is «معرض الأعمال», so it no longer reads as a second "Jobs"
+    (الأعمال). On the Mac, Dashboard is «نظرة عامة» and Board is «لوحة المهام»,
+    no longer اللوحة beside اللوح.
+  - Eleven Arabic strings that dropped the instruction the English gives
+    (capacity targets, expense budgets, supplier price tags, retention data,
+    custom fields, BNPL links, three help paragraphs, packaging, part colours)
+    now say the whole sentence.
+  - (Mac) The machines timeline names midnight's day in the shop's language
+    instead of a fixed English "Mon"/"Sun", and the Reports quarter title keeps
+    "2026-Q3" as one left-to-right unit, matching its table.
+
+### Fixed
+
+- **Filament wasted on failed prints is its own line in your P&L.** Now that
+  filament is counted when a job uses it, plastic lost to a failed print was
+  not counted anywhere, so net profit would have read higher than it was. The
+  cost of every failed print you log is now its own line in the P&L, the
+  quarterly table (a "Filament wasted" column, when there is any), the
+  export and the per-location view, in the period the print failed.
+
+- **Net profit counted your filament twice.** Filament you record as bought —
+  from a purchase order or typed in as an expense — was taken off your
+  profit the day it arrived, and again as the cost of each job that used it,
+  so net profit read lower than it was. Filament is now counted once, when it
+  is used: the P&L treats what you buy as stock, shows it on its own line,
+  and takes it off profit as the cost of goods of the work that uses it. The
+  tax you paid on it is still counted as reclaimable. **Net profit figures
+  you have looked at before will be higher**, by what the filament had been
+  counted a second time.
 
 ## [3.10.0] - 2026-09-26
 
