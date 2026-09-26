@@ -3980,6 +3980,43 @@ after a delete now survives the next sync.
   - A publish whose confirmation could not be read back is no longer reported
     as a failure.
 
+- **(Mac) Fixes from a review of the whole app's data and money.**
+  - **Material was costed on the grams LEFT on a spool, not its size.** A
+    product priced from a spool with 859 g left paid 75/859 per gram instead of
+    75/1000, 16% too much for the plastic, and it grows as the spool runs down
+    (ten times too much at 100 g). The desktop already divides by the spool's
+    size. Products priced before this keep their stored figure until the spool
+    is chosen again in the product editor.
+  - **Test prints marked Not business still counted on the dashboard and in a
+    machine's P&L.** Their cost and count kept the dashboard's margin at −495%
+    after the P&L had left them out. A machine still counts their hours.
+  - **The Catalogue's "Margin" column, and the product editor's field, are
+    markup** (added on cost), and now say so. A month with no revenue shows
+    "—" instead of "0% margin".
+  - **Opening the book in the desktop app while the Mac had it no longer lets
+    both apps write.** The Mac's heartbeat wrote its lock back every thirty
+    seconds without checking. Now it gives the book up, stops changing it, and
+    says so.
+  - **Printer access codes and smart-plug passwords no longer go to the cloud
+    sealed with this Mac's key** inside individual changes. On another computer
+    they replaced that computer's own working copy and broke its printer
+    connection.
+  - **Every edit now syncs.** A customer's quote approval, a survey answer,
+    receiving a purchase order, applying a schedule and editing a message
+    template did not mark themselves changed. They never left this Mac, and a
+    merge could put the old version back. Every write the Mac makes now bumps
+    whatever it changed.
+
+- **(Mac) A storefront or carrier webhook cannot be replayed later
+  (SEC-010).** Salla, Zid and the carriers sign only the body, so a captured
+  delivery stays validly signed forever. The Mac remembered accepted
+  signatures for ten minutes, in memory, and at most 500 of them. The same
+  delivery could therefore be sent again later, after 500 newer ones, or after
+  the app restarted. It now remembers them for thirty days, up to 10,000, in a
+  file beside the book that only this Mac uses. That file keeps a hash of each
+  signature, never the signature itself. The book already limited the damage:
+  an order is recorded once, and a parcel never moves backwards.
+
 ## [4.0.0-alpha.49] - 2026-09-25
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
