@@ -580,6 +580,10 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// `cogs` when a job uses it (lib/pnl-report.js, the shop's choice of
     /// accrual). Optional because an older bundle has no such field.
     public let inventory: Double?
+    /// Filament lost to failed prints in the period, at what it cost — a cost
+    /// line of its own, and `net` already has it taken off. Optional because a
+    /// bundle older than the waste line has no such field.
+    public let waste: Double?
     public var id: String { period }
 }
 

@@ -940,8 +940,15 @@ final class Shop {
         // per redraw.
         let month = await Self.thisMonthsRow(
             engine: engine, orders: orders, expenses: expenses,
-            settings: settings, clients: clients, currencies: Invoice.currencyTable(self))
+            settings: settings, clients: clients, currencies: Invoice.currencyTable(self),
+            wasteLog: Self.rows(root, "wasteLog"))
         monthNetRevenue = month?.revenue
+        // The masthead's NET is the P&L's net income for the month — revenue
+        // less cost of goods, expenses and overhead, filament bought counted
+        // as stock — read off the SAME row Reports prints. It was the revenue
+        // net of tax, which on a month of 50.00 billed and 35.91 of material
+        // put "NET 50.00" beside Reports' "NET INCOME 14.09".
+        monthNetIncome = month?.net
         monthGrossRevenue = month.map { $0.revenue + $0.vatCollected }
         var perMachine: [String: NozzleWear] = [:]
         for machine in machines {
@@ -2382,11 +2389,37 @@ final class Shop {
     /// several minutes old is an answer about a shop that has moved on.
     func planDispatch() async {
         guard let engine else { dispatch = nil; return }
-        let live = printers.statusCache
+        let live = dispatchLive()
         dispatch = try? await engine.dispatchPlan(
             orders: orderRows, machines: machineRows, live: live,
             lastMaterialByMachine: lastMaterialByMachine(),
             paused: Dictionary(uniqueKeysWithValues: dispatchHeld.map { ($0, JSONValue.bool(true)) }))
+    }
+
+    /// What the dispatcher is told about each printer — decided by `quiet` and
+    /// `heard`, the same answer the band and the dashboard draw.
+    ///
+    /// The raw `statusCache` carries an `error` from the FIRST failed poll,
+    /// and the rule reads any error as "not answering"; the band gave the same
+    /// printer three misses. So one CORE One was "Free · 48:00" on the band
+    /// and "Not answering" in Next up, on the same screen. Here a printer in
+    /// its grace is handed its last good status, and one that is not answering
+    /// always carries an error, whether or not it was ever polled.
+    func dispatchLive() -> [String: JSONValue] {
+        var live = printers.statusCache
+        for machine in machines {
+            let seen = printers.readings[machine.id]
+            if seen?.status == nil, let status = printers.heard(machine.id) {
+                live[machine.id] = .object(PrinterWatch.cacheEntry(status, at: seen?.at ?? Date()))
+            } else if printers.heard(machine.id) == nil, quiet(machine) == .notAnswering,
+                      live[machine.id] == nil {
+                live[machine.id] = .object([
+                    "state": .string("offline"),
+                    "error": .string(words.callIt("mac.attn_state_offline")),
+                ])
+            }
+        }
+        return live
     }
 
     /// What each machine printed last, so the rule can prefer the one that
@@ -12825,6 +12858,10 @@ final class Shop {
     /// rather than a confident zero.
     private(set) var monthNetRevenue: Double?
 
+    /// The month's net income — `PnlPeriod.net`, the figure Reports prints as
+    /// NET INCOME. This, not `monthNetRevenue`, is what the masthead's NET is.
+    private(set) var monthNetIncome: Double?
+
     /// The same jobs as `monthNetRevenue`, before the tax is taken out.
     ///
     /// ── IT WAS A DIFFERENT SET OF JOBS ──────────────────────────────────
@@ -12852,10 +12889,11 @@ final class Shop {
                               expenses: [JSONValue], settings: [String: JSONValue],
                               clients: [JSONValue],
                               currencies: [String: JSONValue],
+                              wasteLog: [JSONValue] = [],
                               now: Date = Date()) async -> Double? {
         await thisMonthsRow(engine: engine, orders: orders, expenses: expenses,
                             settings: settings, clients: clients,
-                            currencies: currencies, now: now)?.revenue
+                            currencies: currencies, wasteLog: wasteLog, now: now)?.revenue
     }
 
     /// The current month's whole P&L row — the net and the gross come from it
@@ -12864,11 +12902,16 @@ final class Shop {
                               expenses: [JSONValue], settings: [String: JSONValue],
                               clients: [JSONValue],
                               currencies: [String: JSONValue],
+                              wasteLog: [JSONValue] = [],
                               now: Date = Date()) async -> PnlPeriod? {
         guard let engine else { return nil }
+        // The waste log goes in, as it does for Reports: failed prints are a
+        // cost line of the P&L, and a masthead net without them would be the
+        // Reports net plus the month's waste.
         let periods = (try? await engine.pnlByPeriod(
             orders: orders, expenses: expenses, settings: settings, clients: clients,
-            currencies: currencies, now: now, granularity: "month")) ?? []
+            currencies: currencies, now: now, granularity: "month",
+            wasteLog: wasteLog)) ?? []
         return periods.first { $0.period == DateRange.localMonth(now) }
     }
 
@@ -13616,31 +13659,27 @@ final class Shop {
     /// unknown, which is true and is what a shop should go and look at.
     func machineBand(hours: Double = 48) async -> KhaytEngine.MachineBand? {
         guard let engine else { return nil }
+        // ── ONE STATUS SOURCE ─────────────────────────────────────────────
+        //
+        // Every machine is asked `quiet` — the test the dashboard tile and
+        // Next up read — and nothing else. It went wrong twice: first a
+        // printer with NO reading was drawn free while the other screens said
+        // not answering; then (alpha.51) one with a failed reading and fewer
+        // than three misses was drawn "Free · 48:00" and counted into the
+        // total, because the band granted the three-poll grace to a printer
+        // that had never answered at all. `heard` decides the grace now, for
+        // all three. A machine Khayt has no protocol for, or one not set up,
+        // is still counted as free: the shop plans those by hand.
         var live: [String: JSONValue] = [:]
-        for (id, reading) in printers.readings {
-            // A printer that has stopped answering, after the same three misses
-            // the offline alert waits for (one is a wifi hiccup). The band
-            // leaves it out of the free hours rather than calling it free.
-            if reading.status == nil, let problem = reading.problem, reading.consecutiveFailures >= 3 {
-                live[id] = .object(["error": .string(problem)])
-                continue
-            }
-            guard let status = reading.status, PrinterWatch.isPrinting(status.state) else { continue }
-            var seen: [String: JSONValue] = ["progress": .number(Double(status.progress))]
-            if let left = status.timeRemaining { seen["timeRemaining"] = .number(left) }
-            live[id] = .object(seen)
-        }
-        // A PRINTER THAT HAS NEVER ANSWERED is not a free printer. The shop's
-        // real book: "Next up" and the dashboard said "Not answering" while
-        // the band said "Free · 48:00" for each and "96:00 free" in total —
-        // there was no reading at all, so nothing above marked it, and the
-        // rule drew an unread machine as idle. `quiet` is the same test those
-        // two screens use, so the three now say one thing. A machine Khayt
-        // has no protocol for, or one not set up, is still counted as free:
-        // the shop plans those by hand.
-        for machine in machines where printers.readings[machine.id] == nil && live[machine.id] == nil {
-            if quiet(machine) == .notAnswering {
-                live[machine.id] = .object(["error": .string(words.callIt("mac.attn_state_offline"))])
+        for machine in machines {
+            if let status = printers.heard(machine.id) {
+                guard PrinterWatch.isPrinting(status.state) else { continue }
+                var seen: [String: JSONValue] = ["progress": .number(Double(status.progress))]
+                if let left = status.timeRemaining { seen["timeRemaining"] = .number(left) }
+                live[machine.id] = .object(seen)
+            } else if quiet(machine) == .notAnswering {
+                let why = printers.readings[machine.id]?.problem ?? words.callIt("mac.attn_state_offline")
+                live[machine.id] = .object(["error": .string(why)])
             }
         }
         return try? await engine.machineBand(machines: machineRows, orders: orderRows,

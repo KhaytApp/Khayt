@@ -205,7 +205,7 @@ struct FloorPanel: View {
             return shop.words.counting(printing, "mac.printing_count")
         }
         return shop.words.counting(printing, "mac.printing_count")
-             + " · " + shop.words.callIt("mac.next_free") + " " + PrinterWatch.spell(soonest)
+             + " · " + shop.words.callIt("mac.next_free") + " " + PrinterWatch.spell(soonest, shop.words)
     }
 }
 
@@ -234,7 +234,7 @@ private struct MachineLine: View {
                     ProgressView(value: Double(status.progress) / 100).controlSize(.small)
                 }
                 if let left = status.timeRemaining, left > 0 {
-                    Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left))
+                    Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left, shop.words))
                         .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
                 }
             } else {

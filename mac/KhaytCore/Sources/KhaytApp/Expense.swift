@@ -123,4 +123,6 @@ extension PnlPeriod {
     /// field. The net income is worked out with it taken off, so every screen
     /// that prints the net prints this beside it.
     var cogsValue: Double { cogs ?? 0 }
+    /// Filament lost to failed prints, zero for a bundle older than the field.
+    var wasteValue: Double { waste ?? 0 }
 }

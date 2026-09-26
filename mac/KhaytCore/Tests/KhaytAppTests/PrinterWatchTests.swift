@@ -188,10 +188,25 @@ struct PrinterWatchTests {
     }
 
     @Test("time left is rounded to something worth reading")
-    func spellsTheEta() {
+    @MainActor func spellsTheEta() {
         // Extrapolated from progress, so it does not deserve seconds.
-        #expect(PrinterWatch.spell(18_420) == "5h 7m")
-        #expect(PrinterWatch.spell(840) == "14m")
-        #expect(PrinterWatch.spell(20) == "<1m")
+        let words = Words()
+        #expect(PrinterWatch.spell(18_420, words) == "5h 7m")
+        #expect(PrinterWatch.spell(840, words) == "14m")
+        #expect(PrinterWatch.spell(20, words) == "<1m")
+    }
+
+    /// "33m" on the Arabic dashboard's machine card (alpha.51 review).
+    @Test("time left is said in the shop's language")
+    @MainActor func spellsTheEtaInArabic() async throws {
+        let words = Words()
+        await words.load("ar", engine: try KhaytEngine())
+        #expect(PrinterWatch.spell(1_980, words) == "33 د")
+        #expect(PrinterWatch.spell(18_420, words) == "5 س 7 د")
+        for s in [20.0, 840, 18_420] {
+            let said = PrinterWatch.spell(s, words)
+            #expect(!said.contains("m") && !said.contains("h"),
+                    Comment(rawValue: "an English unit in Arabic: \(said)"))
+        }
     }
 }

@@ -296,7 +296,7 @@ private struct FloorStrip: View {
                             // around, so it is beside the figure rather than
                             // on a line of its own to be read.
                             if let left = status?.timeRemaining, left > 0 {
-                                Text(PrinterWatch.spell(left))
+                                Text(PrinterWatch.spell(left, shop.words))
                                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                             }
                         }
@@ -863,7 +863,7 @@ private struct RunningNow: View {
                     }
                     Spacer(minLength: 12)
                     if let left = status.timeRemaining, left > 0 {
-                        Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left))
+                        Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left, shop.words))
                             .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                     }
                     Text("\(status.progress)%")

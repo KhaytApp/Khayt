@@ -6795,11 +6795,15 @@ public actor KhaytEngine {
     public func pnlByPeriod(orders: [JSONValue], expenses: [JSONValue],
                             settings: [String: JSONValue], clients: [JSONValue],
                             currencies: [String: JSONValue], now: Date,
-                            granularity: String = "quarter") throws -> [PnlPeriod] {
+                            granularity: String = "quarter",
+                            wasteLog: [JSONValue] = []) throws -> [PnlPeriod] {
+        // `wasteLog` is the book's failed-print log: the rule charges each
+        // entry's `cost` to its period as a WASTE line, and net takes it off.
         try runtime.call2(
-            "KhaytPnl.pnlByPeriod(ARG0, ARG1, {settings: ARG2, clients: ARG3, currencies: ARG4, now: new Date(ARG5), granularity: ARG6})",
+            "KhaytPnl.pnlByPeriod(ARG0, ARG1, {settings: ARG2, clients: ARG3, currencies: ARG4, now: new Date(ARG5), granularity: ARG6, wasteLog: ARG7})",
             [.array(orders), .array(expenses), .object(settings), .array(clients),
-             .object(currencies), .number(now.timeIntervalSince1970 * 1000), .string(granularity)],
+             .object(currencies), .number(now.timeIntervalSince1970 * 1000), .string(granularity),
+             .array(wasteLog)],
             as: [PnlPeriod].self)
     }
 

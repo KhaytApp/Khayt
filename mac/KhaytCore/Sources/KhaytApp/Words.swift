@@ -542,13 +542,24 @@ final class Words {
         // prints. Two spellings of the gram in one app is a typo with a
         // rationale.
         "mac.wasted":        ["en": "Filament wasted (g)", "ar": "الخيط المهدور (غ)"],
-        "mac.board_unplaced": ["en": "{n} job(s) are in a stage this board has no column for.",
+        // COUNTED through `Words.counting`, with a `_one` and an Arabic `_two`:
+        // "20 finished job(s)" was the board's banner on the shop's own book
+        // (alpha.51 review), and an "(s)" is a sentence that did not decide.
+        "mac.board_unplaced": ["en": "{n} jobs are in a stage this board has no column for.",
                                "ar": "{n} من الأعمال في مرحلة لا عمود لها في لوحة المهام."],
+        "mac.board_unplaced_one": ["en": "{n} job is in a stage this board has no column for.",
+                                   "ar": "عمل واحد في مرحلة لا عمود لها في لوحة المهام."],
+        "mac.board_unplaced_two": ["en": "{n} jobs are in a stage this board has no column for.",
+                                   "ar": "عملان في مرحلة لا عمود لها في لوحة المهام."],
         // The board draws work in flight; delivered and cancelled jobs leave it.
         // Said, so a shop whose every job is finished is not shown eight empty
         // lanes and left to wonder where its jobs went.
-        "mac.board_finished_elsewhere": ["en": "{n} finished job(s) left the board when delivered or cancelled. They are all in Jobs.",
+        "mac.board_finished_elsewhere": ["en": "{n} finished jobs left the board when delivered or cancelled. They are all in Jobs.",
                                          "ar": "{n} من الأعمال المنتهية خرجت من لوحة المهام بعد التسليم أو الإلغاء، وكلها في قائمة الأعمال."],
+        "mac.board_finished_elsewhere_one": ["en": "{n} finished job left the board when it was delivered or cancelled. It is in Jobs.",
+                                             "ar": "عمل منتهٍ واحد خرج من لوحة المهام بعد التسليم أو الإلغاء، وهو في قائمة الأعمال."],
+        "mac.board_finished_elsewhere_two": ["en": "{n} finished jobs left the board when delivered or cancelled. They are both in Jobs.",
+                                             "ar": "عملان منتهيان خرجا من لوحة المهام بعد التسليم أو الإلغاء، وكلاهما في قائمة الأعمال."],
         "mac.board_open_jobs": ["en": "Show in Jobs", "ar": "اعرضها في الأعمال"],
         // SENTENCE CASE, as the rest of the Mac app is. Khayt's shared locale
         // says "Issue Gift Card", "Gift Card Code", "Failure Category" and
@@ -992,7 +1003,11 @@ final class Words {
         "mac.file_it":       ["en": "File",            "ar": "احفظ"],
         // ── THE DASHBOARD THE DESIGN SPEC DESCRIBES ──────────────────────
         "mac.owed": ["en": "Owed", "ar": "مستحق"],
-        "mac.net": ["en": "Net", "ar": "صافي"],
+        "mac.net_income": ["en": "Net income", "ar": "صافي الدخل"],
+        // A print's time left, in the shop's language (was "33m" in Arabic).
+        "mac.dur_hm":        ["en": "{h}h {m}m", "ar": "{h} س {m} د"],
+        "mac.dur_m":         ["en": "{m}m",      "ar": "{m} د"],
+        "mac.dur_under_1m":  ["en": "<1m",       "ar": "أقل من دقيقة"],
         "mac.material_cost": ["en": "Material cost", "ar": "تكلفة الخامة"],
         "mac.record_a_payment": ["en": "Record a payment", "ar": "تسجيل دفعة"],
         "mac.triage": ["en": "Triage", "ar": "الفرز"],

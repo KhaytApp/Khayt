@@ -25,6 +25,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Drive › Connect** signs in and is done. A shop that wants its own client can
   still use one, under "advanced". It asks only for the files Khayt itself puts
   in the shop's Drive.
+- **(Mac) The dashboard's net agrees with Reports, and failed prints count.**
+  The header's "September · Net" was your sales before tax; it is now the same
+  net income Reports shows — sales less the material the work used, failed
+  prints, expenses and overhead. Failed-print waste is its own line in Reports
+  too. Every cost line in Reports now reads as a minus, in the table and the
+  side panel alike, and in Arabic the minus sign sits in front of the number.
+  A printer that has never answered is "not answering" everywhere on Machines
+  (it was "Free" on the timeline beside "Not answering" in Next up), while one
+  that answered before still gets two missed checks of grace. Also: the time
+  left on a machine card is in Arabic in Arabic, the Board says "1 finished job"
+  / "20 finished jobs" instead of "job(s)", the cash-flow totals fit under a
+  one-quarter P&L, and the Spoolman import, Add supplier and search box are
+  legible in dark mode.
 
 - **(Mac) Saving the Google Drive settings keeps your client ID.** Reported by
   the shop: "I did the gdrive and all I got was saved and nothing else". Save

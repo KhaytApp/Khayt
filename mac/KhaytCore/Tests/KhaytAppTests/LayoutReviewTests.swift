@@ -78,7 +78,7 @@ struct LayoutReviewTests {
     @Test("the board says where delivered work went, rather than showing empty lanes")
     func boardNamesFinishedWork() {
         let shop = Shop()
-        let said = shop.words.callIt("mac.board_finished_elsewhere", ["n": .number(20)])
+        let said = shop.words.counting(20, "mac.board_finished_elsewhere")
         #expect(said.contains("20"))
         #expect(!said.contains("{n}"))
         // Delivered and cancelled are the only stages the board leaves out, and

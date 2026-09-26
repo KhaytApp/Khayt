@@ -1690,7 +1690,7 @@ private struct Live: View {
                 Text(state(status.state)).font(.callout.weight(.semibold))
                 Spacer()
                 if let left = status.timeRemaining, left > 0 {
-                    Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left))
+                    Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left, shop.words))
                         .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                 }
             }
