@@ -86,6 +86,12 @@
    */
   function lines(payload) {
     const p = payload || {};
+    // THE BASKET ITSELF, when the queue carries one. The bullet block below is
+    // lossy — no product id, no chosen colour — and a cloud that files the
+    // structured lines as well (docs/handoffs/webstore-order-status.md) lets
+    // a line name its product by id rather than by a name that has to match.
+    const structured = structuredLines(p.lines);
+    if (structured.length) return structured;
     const out = [];
     for (const raw of str(p.description).split('\n')) {
       // A BASKET HAS AN END. khayt-cloud caps a description at 4000
@@ -104,6 +110,49 @@
     const title = str(p.title).trim();
     if (!title) return [];
     return [{ name: title, qty: Math.max(1, int(p.qty) || 1) }];
+  }
+
+  /**
+   * `payload.lines`, when the queue carries the basket as data.
+   *
+   * Each line is `{ name, qty, productId?, options? }`. `productId` is the
+   * catalogue item id Khayt published — a Medusa storefront keeps it as the
+   * product's `external_id` — and is honoured by `readLines` ONLY when it is a
+   * product this shop has; an id it does not know falls back to the name.
+   * `options` is the customer's choice (`{ Colour: 'Red' }`), carried through so
+   * the job says what to print; it never decides which shelf a line comes off.
+   */
+  function structuredLines(raw) {
+    const out = [];
+    for (const l of Array.isArray(raw) ? raw : []) {
+      if (out.length >= MAX_LINES) break;
+      if (!l || typeof l !== 'object') continue;
+      const name = str(l.name || l.title).trim();
+      if (!name) continue;
+      const qty = int(l.qty != null ? l.qty : l.quantity);
+      const line = { name, qty: qty > 0 ? qty : 1 };
+      const productId = str(l.productId).trim();
+      if (productId) line.productId = productId;
+      const options = optionsOf(l.options);
+      if (options) line.options = options;
+      out.push(line);
+    }
+    return out;
+  }
+
+  /** A line's chosen options as `{ name: value }` strings, or null. */
+  function optionsOf(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const out = {};
+    const pairs = Array.isArray(raw)
+      ? raw.map((o) => [o && (o.name || o.option), o && o.value])
+      : Object.entries(raw);
+    for (const [k, v] of pairs) {
+      const key = str(k).trim().slice(0, 60);
+      const value = str(v).trim().slice(0, 120);
+      if (key && value && Object.keys(out).length < 12) out[key] = value;
+    }
+    return Object.keys(out).length ? out : null;
   }
 
   /**
@@ -178,18 +227,24 @@
     const stock = (book && book.stock) || {};
     const left = {};
     const match = matcher(products);
+    const known = new Set((Array.isArray(products) ? products : [])
+      .filter((p) => p && p.id).map((p) => str(p.id)));
     const rows = (Array.isArray(basket) ? basket : []).map((line) => {
-      const productId = match(line.name);
+      // An id the basket names is taken over the name only when this shop
+      // really has that product — never trusted into a deduction blind.
+      const given = line.productId && known.has(str(line.productId)) ? str(line.productId) : null;
+      const productId = given || match(line.name);
+      const extra = line.options ? { options: line.options } : {};
       if (!productId) {
         return { name: line.name, qty: line.qty, productId: null,
-                 onShelf: 0, fromShelf: 0, toPrint: line.qty };
+                 onShelf: 0, fromShelf: 0, toPrint: line.qty, ...extra };
       }
       if (!(productId in left)) left[productId] = Math.max(0, int(stock[productId]));
       const onShelf = left[productId];
       const fromShelf = Math.min(line.qty, onShelf);
       left[productId] = onShelf - fromShelf;
       return { name: line.name, qty: line.qty, productId,
-               onShelf, fromShelf, toPrint: line.qty - fromShelf };
+               onShelf, fromShelf, toPrint: line.qty - fromShelf, ...extra };
     });
     const sum = (k) => rows.reduce((a, r) => a + r[k], 0);
     return {
@@ -256,7 +311,7 @@
     return out;
   }
 
-  const api = { key, lines, itemLines, matchLine, matcher, read, readLines, effects, MAX_LINES };
+  const api = { key, lines, structuredLines, itemLines, matchLine, matcher, read, readLines, effects, MAX_LINES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytShelfSale = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

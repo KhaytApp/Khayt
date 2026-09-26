@@ -929,6 +929,11 @@ public actor KhaytEngine {
         // publish one, so a product added on the Mac never reached the store.
         "product-specs",
         "storefront-catalog",
+        // A web-store order both ways: whether a queue item may become a job
+        // with nobody pressing a button, which customer it is, and what the
+        // store is told as the job moves. After `carriers`, whose tracking
+        // links it reads, and `shelf-sale`, which reads the basket.
+        "webstore-order",
     ]
 
     /// The languages whose strings are bundled.
@@ -9597,6 +9602,73 @@ public actor KhaytEngine {
     public func shelfSaleEffects(_ reading: JSONValue, at: Date) throws -> [JSONValue] {
         try runtime.call("KhaytShelfSale", "effects",
                          [reading, .string(StoreWriter.iso(at))], as: [JSONValue].self)
+    }
+
+    // MARK: - Web-store orders, both ways (lib/webstore-order.js)
+    //
+    // Through `call2`, not `call`: these carry a stranger's order — the name
+    // and contact a storefront customer typed — and `call2` binds arguments
+    // as values rather than as source text.
+
+    /// Whether a queue item may become a job by itself, and why not.
+    public struct WebStoreDecision: Decodable, Sendable, Equatable {
+        public let auto: Bool
+        public let platform: String
+        public let paid: Bool
+        /// `ok`, `hand_request`, `no_reference`, `unpaid` or `payment_unknown`.
+        public let reason: String
+    }
+
+    public func webStoreDecision(_ payload: JSONValue) throws -> WebStoreDecision {
+        try runtime.call2("KhaytWebstoreOrder.decide(ARG0)", [payload], as: WebStoreDecision.self)
+    }
+
+    /// Which customer a queue item is: one in the book, or one to create.
+    public struct WebStoreCustomer: Decodable, Sendable, Equatable {
+        public let clientId: String?
+        public let name: String
+        /// `email`, `phone`, or nil for a new customer.
+        public let matched: String?
+        /// The record to add when nobody matched — without an id or a date,
+        /// which are the caller's.
+        public let create: JSONValue?
+    }
+
+    /// Nil when the order names nobody at all.
+    public func webStoreCustomer(_ payload: JSONValue, clients: [JSONValue]) throws -> WebStoreCustomer? {
+        try runtime.call2("KhaytWebstoreOrder.customerFor(ARG0, ARG1)", [payload, .array(clients)],
+                          as: WebStoreCustomer?.self)
+    }
+
+    /// One job's progress as the store is told it — the body
+    /// docs/handoffs/webstore-order-status.md specifies.
+    public struct WebStoreStatus: Codable, Sendable, Equatable {
+        public let ref: String
+        public let platform: String
+        public let jobId: String
+        public let status: String
+        public let trackingNumber: String?
+        public let carrier: String?
+        public let carrierName: String?
+        public let trackingUrl: String?
+        public let shippedAt: String?
+        public let deliveredAt: String?
+        public let updatedAt: String?
+    }
+
+    /// The updates a store has not been told. `sent` is ref to fingerprint.
+    public func webStoreStatusesOwed(printLog: [JSONValue], sent: [String: String],
+                                     notBefore: String, max: Int = 100) throws -> [WebStoreStatus] {
+        try runtime.call2("KhaytWebstoreOrder.pending(ARG0, ARG1, ARG2)",
+                          [.array(printLog), .object(sent.mapValues(JSONValue.string)),
+                           .object(["notBefore": .string(notBefore), "max": .number(Double(max))])],
+                          as: [WebStoreStatus].self)
+    }
+
+    /// What makes two updates the same one — what a host remembers it sent.
+    public func webStoreFingerprint(_ update: WebStoreStatus) throws -> String {
+        let value = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(update))
+        return try runtime.call2("KhaytWebstoreOrder.fingerprint(ARG0)", [value], as: String.self)
     }
 
     public func medusaSubscriberPath() throws -> String {

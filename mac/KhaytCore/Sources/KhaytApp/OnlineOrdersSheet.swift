@@ -25,7 +25,7 @@ struct OnlineOrdersSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if let problem = shop.onlineProblem {
+            if let problem = shop.onlineProblem ?? shop.webStoreAutoProblem {
                 Text(problem).font(.caption).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -44,6 +44,26 @@ struct OnlineOrdersSheet: View {
                     if order.id != shop.onlineOrders.last?.id { Divider() }
                 }
             }
+
+            // ── WHICH ORDERS BECAME WHICH JOBS ─────────────────────────────
+            //
+            // A paid web-store order is recorded by itself and leaves the
+            // queue above, so without this the shop would see it vanish and
+            // have to go looking. Read from the book, so it survives a restart
+            // and shows what another Mac recorded as well.
+            let jobs = shop.webStoreJobs()
+            if !jobs.isEmpty {
+                Divider().padding(.vertical, 4)
+                Text(shop.words.callIt("mac.webstore_became_jobs")).font(.subheadline.weight(.medium))
+                ForEach(jobs) { job in
+                    WebStoreJobRow(shop: shop, job: job,
+                                   isNew: shop.webStoreArrived.contains { $0.jobId == job.jobId })
+                }
+            }
+            if let said = shop.webStoreStatusSaid {
+                Text(said).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         } footer: {
             HStack {
                 Button(shop.words.callIt("mac.online_refresh")) {
@@ -56,6 +76,43 @@ struct OnlineOrdersSheet: View {
             }
         }
         .task { await shop.readOnlineOrders() }
+    }
+}
+
+/// One web-store order that became a job: the store's reference, the job it
+/// became, and where that job has got to.
+private struct WebStoreJobRow: View {
+    let shop: Shop
+    let job: Shop.WebStoreJob
+    /// Arrived since the notice was last dismissed.
+    let isNew: Bool
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            // A reference and a job number are identifiers, not words: kept
+            // left-to-right inside an Arabic line so `#1042` does not read
+            // back to front.
+            Text(Figure.isolated(job.reference)).font(TypeScale.figure(11))
+                .foregroundStyle(.secondary)
+            Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(.tertiary)
+                .flipsForRightToLeftLayoutDirection(true)
+            Text(Figure.isolated(job.jobId)).font(TypeScale.figure(11))
+            if !job.customer.isEmpty {
+                Text(job.customer).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 6)
+            if isNew {
+                Text(shop.words.callIt("mac.webstore_new")).font(.caption2.weight(.semibold))
+                    .foregroundStyle(Khayt.brand)
+            }
+            if let stage = job.stage {
+                Text(shop.words.callIt(stage.key)).font(.caption).foregroundStyle(.secondary)
+            }
+            if job.paid {
+                Text(shop.words.callIt("mac.webstore_paid")).font(.caption)
+                    .foregroundStyle(Khayt.done)
+            }
+        }
     }
 }
 
@@ -104,6 +161,22 @@ private struct OnlineOrderCard: View {
                     Text(reading(line)).font(.caption)
                         .foregroundStyle(line.unmatched ? Khayt.attention : .secondary)
                 }
+                // What the customer chose. The storefront's own words, so
+                // they are shown as sent rather than translated.
+                if !line.options.isEmpty {
+                    Text(verbatim: line.optionText).font(.caption).foregroundStyle(.secondary)
+                        .padding(.leading, 36)
+                }
+            }
+
+            // WHY THIS ONE IS WAITING. A paid web-store order becomes a job by
+            // itself; anything still here was left for a person on purpose,
+            // and the card says which reason rather than leaving the shop to
+            // wonder why the others went and this did not.
+            if let key = waitingKey {
+                Text(shop.words.callIt(key))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             // ── THE BUTTON IS IN THE FLOW, NOT OVER IT ───────────────────
@@ -119,6 +192,18 @@ private struct OnlineOrderCard: View {
             .padding(.top, 2)
         }
         .padding(.vertical, 6)
+    }
+
+    /// Why this order was not made into a job by itself, as a key — nil for a
+    /// typed request, which was never going to be, and needs no explaining.
+    private var waitingKey: String? {
+        guard let decision = order.decision, !decision.auto else { return nil }
+        switch decision.reason {
+        case "unpaid": return "mac.webstore_wait_unpaid"
+        case "payment_unknown": return "mac.webstore_wait_payment_unknown"
+        case "no_reference": return "mac.webstore_wait_no_reference"
+        default: return nil
+        }
     }
 
     /// The platform's name, when the title has not already said it.

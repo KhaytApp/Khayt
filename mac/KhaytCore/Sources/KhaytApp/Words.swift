@@ -1022,9 +1022,11 @@ final class Words {
         "mac.online_orders_hint": [
             "en": "Orders your storefront has sent to Khayt. Each one is "
                 + "checked against the shelf first — anything already printed "
-                + "is a sale, not a job.",
+                + "is a sale, not a job. Paid web-store orders become jobs by "
+                + "themselves; what is left here is waiting for you.",
             "ar": "الطلبات التي أرسلها متجرك إلى خيط. يُقارن كل طلب بالرف "
-                + "أولًا — فما هو مطبوع مسبقًا بيعٌ لا عملٌ جديد.",
+                + "أولًا — فما هو مطبوع مسبقًا بيعٌ لا عملٌ جديد. طلبات المتجر "
+                + "المدفوعة تصبح أعمالًا تلقائيًا، وما بقي هنا ينتظرك.",
         ],
         "mac.online_none": [
             "en": "Nothing new from your storefront.",
@@ -1041,6 +1043,38 @@ final class Words {
         ],
         "mac.online_unmatched": [
             "en": "Not in your catalogue", "ar": "ليس في كتالوجك",
+        ],
+        // Web-store orders that become jobs by themselves (WebStoreOrders.swift).
+        "mac.webstore_arrived": [
+            "en": "Paid web-store orders that became jobs by themselves: {n}",
+            "ar": "طلبات المتجر المدفوعة التي أصبحت أعمالًا تلقائيًا: {n}",
+        ],
+        "mac.webstore_became_jobs": ["en": "Became jobs", "ar": "أصبحت أعمالًا"],
+        "mac.webstore_new": ["en": "New", "ar": "جديد"],
+        "mac.webstore_paid": ["en": "Paid", "ar": "مدفوع"],
+        "mac.webstore_wait_unpaid": [
+            "en": "Waiting for you: the store says this order has not been paid.",
+            "ar": "بانتظارك: يقول المتجر إن هذا الطلب لم يُدفع.",
+        ],
+        "mac.webstore_wait_payment_unknown": [
+            "en": "Waiting for you: the store did not say whether this order was paid.",
+            "ar": "بانتظارك: لم يذكر المتجر هل دُفع هذا الطلب.",
+        ],
+        "mac.webstore_wait_no_reference": [
+            "en": "Waiting for you: the store sent no order number, so Khayt cannot tell it from a repeat.",
+            "ar": "بانتظارك: لم يرسل المتجر رقم الطلب، فلا يستطيع خيط تمييزه عن طلب مكرر.",
+        ],
+        "mac.webstore_status_sent": [
+            "en": "Told the web store where {n} orders have got to.",
+            "ar": "أُبلغ المتجر بحالة {n} من الطلبات.",
+        ],
+        "mac.webstore_status_not_offered": [
+            "en": "Khayt Cloud cannot pass order progress to the web store yet.",
+            "ar": "لا تستطيع سحابة خيط بعدُ نقل تقدّم الطلبات إلى المتجر.",
+        ],
+        "mac.webstore_status_failed": [
+            "en": "Could not tell the web store where its orders have got to.",
+            "ar": "تعذّر إبلاغ المتجر بتقدّم طلباته.",
         ],
         "mac.online_record_sale": ["en": "Record the sale", "ar": "سجّل البيع"],
         "mac.online_add_to_queue": ["en": "Add to the queue", "ar": "أضف للطابور"],

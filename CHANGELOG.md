@@ -87,6 +87,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   if it has been failing for more than two days. Nothing is switched on for
   you: the old bucket details left in the book from August are not used
   unless you pick them.
+- **(Mac) Paid web-store orders now become jobs on their own.** Every couple of
+  minutes the Mac collects paid orders from your web store and makes each one a
+  job. The job is priced from your catalogue, filed under the right customer
+  (found by email or phone, or added as a new online customer) and marked paid.
+  Anything you already have on the shelf is taken off your stock count. The same
+  order never becomes two jobs, even if the store sends it twice. A notice tells
+  you what arrived, and Online orders now shows which order became which job.
+  Orders the store has not marked as paid wait there for you, with the reason
+  shown. The Mac is also ready to send each job's progress back to the store:
+  printing, shipped with tracking number, and delivered. That starts once Khayt
+  Cloud adds the route for it (docs/handoffs/webstore-order-status.md). Fixed
+  along the way: a job made from an online order used to lose the store's order
+  number, so a repeat of that order could not be recognised.
 
 - **Security: a store or carrier notification could be replayed.** Salla,
   Zid, SMSA, Aramex and Saudi Post sign each notification's content but not
