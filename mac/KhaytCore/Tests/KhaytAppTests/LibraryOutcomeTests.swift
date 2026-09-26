@@ -48,7 +48,7 @@ struct LibraryOutcomeTests {
                         "func addModelsToLibrary(_ chosen: [URL]) async {",
                         "func convertModel(_ file: LibraryFile, targetId: String?) async {",
                         "func openInSlicer(_ url: URL, slicer: KhaytEngine.Slicer) async {",
-                        "func deleteLibraryFile(_ file: LibraryFile) async {"] {
+                        "func deleteLibraryFiles(_ files: [LibraryFile]) async {"] {
             let start = try? #require(shop.range(of: gesture), "\(gesture) moved or was renamed")
             guard let start else { continue }
             // The FIRST thing it does. A clear further down would run after an

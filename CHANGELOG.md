@@ -24,6 +24,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   stored only the folder name and threw away the OAuth client ID and secret
   just typed, which also greyed out **Connect Google Drive**. They are kept now.
   The pane says plainly when Drive is not connected yet, and what to click.
+- **(Mac) Several models can be deleted from the library at once.** Reported
+  by the shop: "I tried to delete multiple files from the library but can't,
+  only one at a time". Select the models (Shift or Command click), right-click
+  one of them and choose **Delete N Models…**. One question, then all of them
+  go to the Trash and out of the library in a single change.
 
 - **(iOS) "New order request" on the lock screen.** Khayt Cloud now alerts a
   shop's phones when a customer submits an order request — from the public

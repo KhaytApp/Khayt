@@ -184,8 +184,19 @@ struct ModelActions: View {
         Divider()
         // Last, alone, and marked: the one item here that cannot be undone.
         // The ellipsis is the promise that it asks first — see `WindowSheets`.
-        Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
-            shop.pendingLibraryDelete = file
+        // Every selected model when this one is part of a selection, as the
+        // group, tag and catalogue items above already do.
+        let chosenForDelete = shop.fileSelection.contains(file.id) ? shop.selectedFiles : []
+        if chosenForDelete.count > 1 {
+            Button(shop.words.callIt("mac.delete_n_models",
+                                     ["n": .number(Double(chosenForDelete.count))]) + "\u{2026}",
+                   role: .destructive) {
+                shop.pendingLibraryDeletes = chosenForDelete
+            }
+        } else {
+            Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                shop.pendingLibraryDelete = file
+            }
         }
     }
 }
