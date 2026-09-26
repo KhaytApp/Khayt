@@ -129,7 +129,7 @@ struct ScreenActions: View {
                 period
                 plus("waste.add", enabled: shop.canMoveJobs) { shop.loggingWaste = true }
             } else if shop.showingGiftCards {
-                plus("issueGiftCard", enabled: true) { shop.issuingGiftCard = true }
+                plus("mac.issue_gift_card", enabled: true) { shop.issuingGiftCard = true }
             } else if shop.showingReports, shop.reportPage == .best {
                 period
             } else if shop.showingReports, shop.reportPage == .profit {

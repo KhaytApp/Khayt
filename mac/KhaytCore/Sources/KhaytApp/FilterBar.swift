@@ -46,6 +46,11 @@ struct FilterBar: View {
                     .padding(.vertical, 6)
                 }
                 .scrollIndicators(.never)
+                // The scroller is hidden, so the row said nothing about the
+                // chips past the window edge — the library's ran off mid-chip
+                // after the eighth creator. The far edge fades while there is
+                // more to see. See `HorizontalScrollCue`.
+                .horizontalScrollCue()
                 Divider()
             }
         }

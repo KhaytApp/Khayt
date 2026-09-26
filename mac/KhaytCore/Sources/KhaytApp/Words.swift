@@ -522,6 +522,10 @@ final class Words {
         "mac.standing_order": ["en": "Standing order", "ar": "طلب دوري"],
         // The P&L's grain. Khayt's own title names the quarter and has no
         // word for the other choice.
+        // The P&L's name WITHOUT its grain. The shared "Profit & Loss by
+        // Quarter" sat as a tab beside a By quarter / By month switch, so the
+        // tab repeated the switch and contradicted it once Month was chosen.
+        "mac.pnl_title":      ["en": "Profit & Loss", "ar": "الأرباح والخسائر"],
         "mac.by_quarter":     ["en": "By quarter", "ar": "بالربع"],
         "mac.by_month":       ["en": "By month",   "ar": "بالشهر"],
         "mac.edit_customer": ["en": "Edit Customer",  "ar": "تعديل العميل"],
@@ -536,6 +540,27 @@ final class Words {
         "mac.wasted":        ["en": "Filament wasted (g)", "ar": "الخيط المهدور (جم)"],
         "mac.board_unplaced": ["en": "{n} job(s) are in a stage this board has no column for.",
                                "ar": "{n} من الأعمال في مرحلة لا عمود لها في هذا اللوح."],
+        // The board draws work in flight; delivered and cancelled jobs leave it.
+        // Said, so a shop whose every job is finished is not shown eight empty
+        // lanes and left to wonder where its jobs went.
+        "mac.board_finished_elsewhere": ["en": "{n} finished job(s) left the board when delivered or cancelled. They are all in Jobs.",
+                                         "ar": "{n} من الأعمال المنتهية خرجت من اللوح بعد التسليم أو الإلغاء، وكلها في قائمة الأعمال."],
+        "mac.board_open_jobs": ["en": "Show in Jobs", "ar": "اعرضها في الأعمال"],
+        // SENTENCE CASE, as the rest of the Mac app is. Khayt's shared locale
+        // says "Issue Gift Card", "Gift Card Code", "Failure Category" and
+        // "+ Add Supplier"; those strings are the Electron app's, so the Mac
+        // asks for its own rather than recasing nine languages under it.
+        "mac.issue_gift_card": ["en": "Issue gift card", "ar": "إصدار بطاقة هدية"],
+        "mac.gift_card_code":  ["en": "Gift card code",  "ar": "رمز بطاقة الهدية"],
+        "mac.failure_category": ["en": "Failure category", "ar": "فئة الفشل"],
+        "mac.add_supplier":    ["en": "Add supplier",    "ar": "إضافة مورد"],
+        "mac.edit_supplier":   ["en": "Edit supplier",   "ar": "تعديل المورد"],
+        // A shop that has never logged waste has not done a great job — it has
+        // not started. The shared "great job!" praised an empty book.
+        // The expenses table's order column. The shared `exp.order_ref` is the
+        // sheet's field label, "(optional)" and all, and did not fit a column.
+        "mac.expense_order_col": ["en": "Order", "ar": "الطلب"],
+        "mac.waste_empty":     ["en": "No waste logged yet.", "ar": "لم يُسجَّل أي هدر بعد."],
         "mac.library":       ["en": "Library",       "ar": "المكتبة"],
         "mac.all_models":    ["en": "Library",       "ar": "المكتبة"],
         "mac.people":        ["en": "People",        "ar": "الأشخاص"],
@@ -2977,7 +3002,7 @@ final class Words {
         // Reports
         "an.aged_receivables",
         "an.aged_bucket_days", "an.aged_col_client", "an.aged_col_days", "an.aged_col_order", "an.aged_col_owed", "an.aged_col_project", "an.aged_none", "an.aged_orders_n",
-        "an.pnl_empty", "an.pnl_expenses", "an.pnl_net", "an.pnl_orders", "an.pnl_period", "an.pnl_title", "an.pnl_vat", "an.revenue",
+        "an.pnl_empty", "an.pnl_expenses", "an.pnl_net", "an.pnl_orders", "an.pnl_period", "an.pnl_vat", "an.revenue",
         // Expenses and waste
         "common.cancel", "common.delete", "exp.add_btn", "exp.add_title", "exp.amount",
         "exp.budget_title", "exp.cat.electricity", "exp.cat.filament",
@@ -2986,8 +3011,8 @@ final class Words {
         "exp.order_ref", "exp.order_ref_ph", "exp.over_budget", "exp.recurring",
         "exp.recurring_annually", "exp.recurring_monthly",
         "exp.recurring_quarterly", "exp.sum.expenses", "exp.summary", "exp.title",
-        "mach.unassigned", "waste.add", "waste.date", "waste.deduct_inv", "waste.empty",
-        "waste.est_cost", "waste.failure_breakdown", "waste.failure_type",
+        "mach.unassigned", "waste.add", "waste.date", "waste.deduct_inv",
+        "waste.est_cost", "waste.failure_breakdown",
         "waste.ft.bed_adhesion", "waste.ft.design_issue", "waste.ft.material_quality",
         "waste.ft.nozzle_jam", "waste.ft.operator_error", "waste.ft.other",
         "waste.ft.power_failure", "waste.ft.stringing", "waste.ft.warping",

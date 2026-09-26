@@ -1313,13 +1313,17 @@ struct SpoolCard: View {
             // rather than cosmetic: a 500 ml bottle at 180 came out as "360.00
             // / kg", which is a figure about a different quantity wearing the
             // wrong name.
+            //
+            // SECONDARY, not tertiary. Tertiary is for labels (see `Role.text3`)
+            // and a price is a figure a shop reads; on the dark card it sank to
+            // a texture, "75.00" barely there under the weight above it.
             if let rate = unit?.rate {
                 Text(Money.text(rate, shop.currency) + " / "
                      + shop.words.callIt(unit?.rateKey ?? "unit.per_kg"))
-                    .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             } else if let cost = spool.cost {
                 Text(Money.text(cost, shop.currency))
-                    .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             }
             // How long it has got. Amber only once it is inside a fortnight —
             // the colour is the app's "wants a person", and a spool with six

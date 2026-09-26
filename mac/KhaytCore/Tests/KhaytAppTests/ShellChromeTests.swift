@@ -84,7 +84,7 @@ struct ShellChromeTests {
         // toolbar is gated and its key is not in the strip, the action is
         // unreachable in the shell that ships on by default.
         let moved = ["mac.new_job", "mac.new_product", "mac.view_list", "mac.view_grid",
-                     "sched.suggest_btn", "mach.add", "issueGiftCard",
+                     "sched.suggest_btn", "mach.add", "mac.issue_gift_card",
                      "exp.add_title", "waste.add", "mac.import_models"]
         for key in moved {
             #expect(actions.contains("\"\(key)\""), Comment(rawValue: """

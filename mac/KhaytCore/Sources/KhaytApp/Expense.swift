@@ -101,7 +101,7 @@ enum ReportPage: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var key: String {
         switch self {
-        case .profit:   return "an.pnl_title"
+        case .profit:   return "mac.pnl_title"
         case .owing:    return "an.aged_receivables"
         case .best:     return "mac.best"
         case .quoting:  return "mac.quoting"
