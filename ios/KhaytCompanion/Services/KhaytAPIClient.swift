@@ -429,6 +429,13 @@ final class KhaytAPIClient: ObservableObject {
         }
     }
 
+    /// The live stream was refused as signed out — the same answer a sync
+    /// gets, reached from the other side.
+    func cloudSaysSignedOut() {
+        cloudNeedsSignIn = true
+        cloudProblem = L10n.tr("cloud.signed_out")
+    }
+
     /// An error as a sentence. `CloudReader.Failure` explains itself through
     /// `description`, and `localizedDescription` ignores that: the screen said
     /// "The operation couldn't be completed. (KhaytCore.CloudReader.Failure
