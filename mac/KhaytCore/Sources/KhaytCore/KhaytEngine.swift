@@ -7800,6 +7800,13 @@ public actor KhaytEngine {
     /// Mark a job as not business, or as business again, through the shared
     /// setter (`lib/business-scope.js`), which removes the field rather than
     /// writing `false` — the shape the other app writes.
+    /// Finished jobs charged nothing that still count as trade —
+    /// `lib/attention.js`'s `selectUnpricedFinished`.
+    public func unpricedFinished(orders: [JSONValue]) throws -> DashboardFacts.Unpriced {
+        try runtime.call2("KhaytAttention.selectUnpricedFinished(ARG0)", [.array(orders)],
+                          as: DashboardFacts.Unpriced.self)
+    }
+
     public func setNonBusiness(_ order: JSONValue, on: Bool) throws -> JSONValue {
         try runtime.call2("KhaytBusinessScope.setNonBusiness(ARG0, ARG1)", [order, .bool(on)],
                           as: JSONValue.self)

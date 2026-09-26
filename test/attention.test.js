@@ -219,3 +219,36 @@ test('a legacy `delivered` job cannot be overdue', () => {
   assert.ok(!flagged.includes('"O1"'), 'the delivered job is not a problem');
   assert.ok(flagged.includes('"O2"'), 'the printing one still is');
 });
+
+/* ── Finished work charged nothing (Sep 2026) ─────────────────────────────── */
+
+test('selectUnpricedFinished: finished, charged nothing, still counted as trade', () => {
+  const { selectUnpricedFinished } = require('../lib/attention');
+  const r = selectUnpricedFinished([
+    { id: 'zero', status: 'completed', price: 0 },
+    { id: 'missing', status: 'completed' },
+    { id: 'legacy', status: 'delivered', price: 0 },
+    { id: 'paid', status: 'completed', price: 50 },
+    { id: 'marked', status: 'completed', price: 0, nonBusiness: true },
+    { id: 'voided', status: 'completed', price: 0, voidedAt: '2026-09-01' },
+    { id: 'quote', status: 'quote', price: 0 },
+    { id: 'open', status: 'printing', price: 0 },
+    { id: 'split', status: 'split', price: 0, splitInto: ['a'] },
+    null,
+  ]);
+  assert.deepEqual(r.ids, ['zero', 'missing', 'legacy']);
+  assert.equal(r.count, 3);
+});
+
+test('selectUnpricedFinished: the shop\'s real book, nineteen tests beside one paid job', () => {
+  const { selectUnpricedFinished } = require('../lib/attention');
+  const orders = [{ id: 'paid', status: 'completed', price: 50 }];
+  for (let i = 0; i < 19; i++) orders.push({ id: 'T' + i, status: 'completed', price: 0, costBasis: 13.47 });
+  assert.equal(selectUnpricedFinished(orders).count, 19);
+  assert.deepEqual(selectUnpricedFinished(undefined), { count: 0, ids: [] });
+});
+
+test('selectUnpricedFinished stays out of selectAttention, which the desktop themes list line by line', () => {
+  const r = selectAttention({ orders: [{ id: 'zero', status: 'completed', price: 0 }], now: NOW });
+  assert.equal(r.count, 0);
+});

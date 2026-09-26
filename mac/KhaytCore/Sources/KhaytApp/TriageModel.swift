@@ -42,8 +42,16 @@ extension Shop {
         /// ellipsis, and confirms before it sends.
         var reachesCustomer = false
         let go: Shelf?
+        /// Something done to the book rather than a place to go. Undoable,
+        /// like every other write this app makes.
+        var run: Run? = nil
 
         enum Weight { case primary, brand, ordinary, outward }
+
+        enum Run {
+            /// Mark these finished jobs Not business, in one write.
+            case markNotBusiness([String])
+        }
     }
 
     /// At most three, worst first.
@@ -52,7 +60,10 @@ extension Shop {
     /// because a triage list of nine is a list, not a triage. The rest are one
     /// click away in the Ledger, which is exactly what the mode switch is for.
     var triageCards: [TriageItem] {
-        guard let items = attention?.items, !items.isEmpty else { return [] }
+        // The rule's own list first, then the finished work charged nothing —
+        // a question about the book, so it goes after anything on the floor.
+        let unpricedCard = self.unpricedCard.map { [$0] } ?? []
+        guard let items = attention?.items, !items.isEmpty else { return unpricedCard }
         var byKind: [String: [DashboardFacts.Item]] = [:]
         for item in items { byKind[item.kind, default: []].append(item) }
 
@@ -62,7 +73,38 @@ extension Shop {
         let kinds = byKind.keys.sorted {
             (order.firstIndex(of: $0) ?? order.count) < (order.firstIndex(of: $1) ?? order.count)
         }
-        return kinds.prefix(3).compactMap { kind in card(kind: kind, items: byKind[kind] ?? []) }
+        let cards = kinds.compactMap { kind in card(kind: kind, items: byKind[kind] ?? []) }
+        return Array((cards + unpricedCard).prefix(3))
+    }
+
+    /// "19 finished jobs were charged nothing", from `selectUnpricedFinished`
+    /// in `lib/attention.js`. The shop's real book had nineteen test prints at
+    /// price 0 counted as trade — a -495.8% margin in Reports — while this
+    /// board said nothing needed it.
+    ///
+    /// One button marks them all Not business, which is what a test, a gift
+    /// or a print for the shop itself is. A job that should have been priced
+    /// is one click away in Jobs instead.
+    private var unpricedCard: TriageItem? {
+        guard let unpriced = facts?.unpriced, unpriced.count > 0 else { return nil }
+        let names = unpriced.ids.prefix(2).map { id in
+            orders.first { $0.id == id }?.project ?? words.callIt("mac.untitled")
+        }
+        let lines = names.map {
+            TriageItem.Line(subject: $0.isEmpty ? words.callIt("mac.untitled") : $0,
+                            because: words.callIt("mac.charged_nothing"))
+        }
+        return TriageItem(
+            id: "unpriced",
+            // A warning about jobs, not a fault: the triangle, in warn.
+            state: .orderToday,
+            title: words.counting(unpriced.count, "mac.attn_unpriced"),
+            lines: lines,
+            actions: [
+                .init(id: "notBusiness", titleKey: "mac.mark_all_not_business",
+                      weight: .primary, go: nil, run: .markNotBusiness(unpriced.ids)),
+                .init(id: "jobs", titleKey: "mac.all_jobs", go: .jobs(nil)),
+            ])
     }
 
     private func card(kind: String, items: [DashboardFacts.Item]) -> TriageItem? {
@@ -140,6 +182,12 @@ extension Shop {
     /// jobs looked like nine things due this afternoon.
     func perform(_ action: TriageAction) {
         if let go = action.go { shelf = go }
+        switch action.run {
+        case .markNotBusiness(let ids)?:
+            Task { await markNotBusiness(ids) }
+        case nil:
+            break
+        }
     }
 
     // MARK: - The masthead's four figures

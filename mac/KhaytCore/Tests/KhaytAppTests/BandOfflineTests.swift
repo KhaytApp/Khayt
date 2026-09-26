@@ -37,6 +37,37 @@ struct BandOfflineTests {
         #expect(band.rows.first { $0.machineId == core.id }?.state != "offline")
     }
 
+    /// The shop's real book, Sep 2026: both printers set up, neither had ever
+    /// answered. "Next up" said "Not answering"; the band said "Free · 48:00"
+    /// for each and "96:00 free" in total.
+    @Test("a connected printer that has never answered is not free on the band")
+    func neverAnsweredIsNotFree() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        // A filament printer with nothing printing in the book, so the row
+        // goes through the idle path — the one that used to say "Free".
+        let core = try #require(shop.machines.first { $0.id == "MACH-u1" })
+        shop.connectMachineForTesting(core.id, type: "moonraker")
+        shop.clearPrintingForTesting(on: core.id)
+        let watched = try #require(shop.machines.first { $0.id == core.id })
+        #expect(shop.quiet(watched) == .notAnswering, "the other screens call it not answering")
+        let band = try #require(await shop.machineBand())
+        let row = try #require(band.rows.first { $0.machineId == core.id })
+        #expect(row.state == "offline")
+        #expect(!row.known, "its 48 hours were counted into the free total")
+        #expect(row.freeMinutes == 0)
+    }
+
+    @Test("a machine with no printer connection is still planned by hand, and free")
+    func notSetUpStaysFree() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let core = try #require(shop.machines.first { $0.id == "MACH-x1c" })
+        #expect(shop.quiet(core) == .notSetUp)
+        let band = try #require(await shop.machineBand())
+        #expect(band.rows.first { $0.machineId == core.id }?.state != "offline")
+    }
+
     @Test("every band state has words, and the footnote counts only unknown rows")
     func wordsAndFootnote() throws {
         let words = try String(contentsOf: URL(fileURLWithPath: #filePath)

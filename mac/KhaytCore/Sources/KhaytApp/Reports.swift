@@ -265,6 +265,17 @@ struct Reports: View {
                 Text(Money.text(r.revenue, shop.currency)).monospacedDigit()
             }
             .width(min: 110, ideal: 140, max: 220)
+            // WHAT THE WORK COST TO MAKE, the figure the margin and the net
+            // both take off. Without it on the row the net could not be worked
+            // out from the columns beside it, and a -495.8% margin sat next to
+            // a positive net income with nothing to say how.
+            TableColumn(shop.words.callIt("pnl.cogs"), value: \.cogsValue) { r in
+                Text(r.cogsValue > 0 ? Money.text(-r.cogsValue, shop.currency) : "—")
+                    .monospacedDigit()
+                    .foregroundStyle(r.cogsValue > 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .width(min: 110, ideal: 140, max: 220)
             TableColumn(shop.words.callIt("an.pnl_expenses"), value: \.expenses) { r in
                 // What was spent AND the overhead charged to the period, which
                 // is the figure the net is worked out from. Two numbers in one
@@ -970,8 +981,13 @@ struct Reports: View {
             var out: [WaterfallStep] = [
                 WaterfallStep(label: shop.words.callIt("an.revenue"),
                               amount: row.revenue, anchored: true),
-                WaterfallStep(label: shop.words.callIt("an.pnl_expenses"), amount: -row.expenses),
             ]
+            // The cost of making the work comes off first, as it does in the
+            // rule's `net`.
+            if row.cogsValue != 0 {
+                out.append(WaterfallStep(label: shop.words.callIt("pnl.cogs"), amount: -row.cogsValue))
+            }
+            out.append(WaterfallStep(label: shop.words.callIt("an.pnl_expenses"), amount: -row.expenses))
             // Only when there is any. A bar of zero height under a label is a
             // row of the table that wandered onto the chart.
             if row.fixed != 0 {
@@ -1048,6 +1064,7 @@ struct Reports: View {
                         HStack(spacing: 5) {
                             Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
                             Text("\(Money.figure(rows.reduce(0) { $0 + $1.revenue })) − "
+                                 + "\(Money.figure(rows.reduce(0) { $0 + $1.cogsValue })) − "
                                  + "\(Money.figure(rows.reduce(0) { $0 + $1.expenses + $1.fixed }))")
                                 .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
                         }
@@ -1074,6 +1091,8 @@ struct Reports: View {
                         VStack(spacing: 6) {
                             DetailLine(shop.words.callIt("an.revenue"),
                                        Money.text(rows.reduce(0) { $0 + $1.revenue }, shop.currency))
+                            DetailLine(shop.words.callIt("pnl.cogs"),
+                                       Money.text(rows.reduce(0) { $0 + $1.cogsValue }, shop.currency), dim: true)
                             DetailLine(shop.words.callIt("an.pnl_expenses"),
                                        Money.text(rows.reduce(0) { $0 + $1.expenses + $1.fixed }, shop.currency), dim: true)
                             // Ruled off from the two above it, because it is

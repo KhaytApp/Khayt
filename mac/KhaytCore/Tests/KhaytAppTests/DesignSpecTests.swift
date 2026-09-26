@@ -128,7 +128,7 @@ struct DesignSpecTests {
             """)
     }
 
-    @Test("money is a mark and digits in different faces, in that order")
+    @Test("money is digits and a mark in different faces, in that order")
     func riyalIsComposed() throws {
         // §5, rewritten: the mark is U+20C1 — NOT U+FDFC, which is the Iranian
         // rial — it is set in a face that has it rather than the figure face,
@@ -166,6 +166,26 @@ struct DesignSpecTests {
         #expect(!parts.digits.contains("\u{20C1}") && !parts.digits.contains("\u{FDFC}"), """
             the digits leaf carries the currency too, so the formatter is still             placing it — and the locale decides where, not the design
             """)
+    }
+
+    /// The shop's real book, Sep 2026: the masthead said "⃁50.00", Reports and
+    /// the figure summary said "50.00 ⃁". One shop, one currency, two sides.
+    @Test("the mark sits on the same side of the digits in every formatter")
+    func markSideAgrees() {
+        #expect(Figure.markFollowsDigits, "the figure leaf puts the mark first again")
+        let text = Money.text(50, "SAR")
+        #expect(text.hasSuffix(Money.mark("SAR")), Comment(rawValue: text))
+        #expect(Money.short(50, "SAR").hasSuffix(Money.mark("SAR")))
+        #expect(Figure.markLeaf.hasPrefix("\u{00A0}"), "the gap belongs between the digits and the mark")
+    }
+
+    @Test("the jobs table's Total carries its currency")
+    func jobsTotalHasItsCurrency() throws {
+        let src = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/OrdersTable.swift"), encoding: .utf8)
+        #expect(!src.contains("Text(Money.figure(job.price))"),
+                "the Total column is a bare figure again, with no currency")
     }
 
     @Test("a currency Khayt draws no mark for is left to the formatter")

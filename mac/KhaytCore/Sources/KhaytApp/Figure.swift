@@ -102,20 +102,25 @@ struct Figure: View {
                 // digits. `RiyalMark` is the outline the invoice already
                 // prints, so the mark is now the same mark on paper and on
                 // screen, at the digits' own colour and size.
+                // DIGITS FIRST, THEN THE MARK — where `Money.text` puts it and
+                // where the shared currency table (`lib/currencies.js`, SAR
+                // `pos: 'after'`) puts it for the other app. This leaf alone
+                // drew the mark first, so the masthead said "⃁50.00" above a
+                // Reports screen and a jobs table saying "50.00 ⃁".
+                Text(renderedText)
+                    .font(TypeScale.figure(size, weight: weight))
+                    .monospacedDigit()
                 if Self.drawnMark(code) {
                     // The binding space is the glyph's own padding rather than
                     // a leaf of its own: a non-breaking space set in the FIGURE
                     // face is wider than the gap this mark wants, and a third
                     // leaf is a third thing the layout can squeeze.
                     RiyalGlyph(size: size)
-                        .padding(.trailing, size * 0.15)
+                        .padding(.leading, size * 0.15)
                 } else {
                     Text(Self.markLeaf)
                         .font(Self.markFont(size))
                 }
-                Text(renderedText)
-                    .font(TypeScale.figure(size, weight: weight))
-                    .monospacedDigit()
             }
             .foregroundStyle(tint)
             .environment(\.layoutDirection, .leftToRight)
@@ -231,8 +236,13 @@ struct Figure: View {
     static func drawnMark(_ code: String) -> Bool { code.uppercased() == "SAR" }
 
     static var markLeaf: String {
-        isolated(hasMarkFont ? mark : "SAR") + "\u{00A0}"
+        "\u{00A0}" + isolated(hasMarkFont ? mark : "SAR")
     }
+
+    /// Which side of the digits the mark sits on: after, as `Money.text` and
+    /// the shared currency table both write it. Readable so a test can hold
+    /// the two formatters to one answer.
+    static let markFollowsDigits = true
 
     /// Whether anything on this Mac can draw the mark: Khayt's own face if it
     /// is registered, the system's if it is not.

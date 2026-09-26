@@ -255,7 +255,9 @@ struct DayInTheShopTests {
                 "revenue is the price without the tax the shop is holding")
         #expect(abs(quarter.revenue + quarter.vatCollected - price) < 0.01,
                 "and the two together are still what the customer paid")
-        #expect(abs(quarter.net - (price - held - 90)) < 0.01)
+        // Net takes what the job cost to make off as well (Sep 2026), the way
+        // the margin beside it always did.
+        #expect(abs(quarter.net - (price - held - (quarter.cogs ?? 0) - 90)) < 0.01)
         // The day recorded no tax on its own purchases, so there is none to
         // reclaim and the whole of what was charged is owed.
         #expect(quarter.vatReclaimable == 0)

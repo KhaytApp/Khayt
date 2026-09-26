@@ -115,6 +115,15 @@ public struct DashboardFacts: Decodable, Sendable {
     public let owed: Double?
     public let fleet: Fleet
     public let attn: Attention
+    /// Finished jobs charged nothing that still count as trade —
+    /// `selectUnpricedFinished` in `lib/attention.js`. Optional so an older
+    /// bundle without it still decodes.
+    public let unpriced: Unpriced?
+
+    public struct Unpriced: Decodable, Sendable, Equatable {
+        public let count: Int
+        public let ids: [String]
+    }
 
     public struct Fleet: Decodable, Sendable {
         public let total: Int

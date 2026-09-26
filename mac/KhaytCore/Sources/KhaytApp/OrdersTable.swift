@@ -130,8 +130,13 @@ struct OrdersTable: View {
                 // never set, and 0 is a figure a shop can genuinely charge.
                 // The dash is what every other column here draws when there
                 // is nothing to say.
+                // WITH ITS CURRENCY. A bare "50.00" in the one column a shop
+                // reads money from, beside a figure summary and a dashboard
+                // that both carry the mark, read as a count of something. The
+                // job's own currency, since a book can price in more than one.
                 if job.price > 0 {
-                    Text(Money.figure(job.price)).moneyStyle()
+                    Text(Money.text(job.price, job.currency.isEmpty ? shop.currency : job.currency))
+                        .moneyStyle()
                 } else {
                     Text("—").foregroundStyle(.quaternary)
                 }

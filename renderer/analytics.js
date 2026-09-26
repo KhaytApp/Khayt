@@ -1665,6 +1665,7 @@ function renderPnLSection() {
             <th style="text-align:left; padding:4px 8px;">${escapeHtml(t('an.pnl_period'))}</th>
             <th style="padding:4px 8px;">${escapeHtml(t('an.pnl_orders'))}</th>
             <th style="padding:4px 8px;">${escapeHtml(t('an.revenue'))} (${cur})</th>
+            <th style="padding:4px 8px;">${escapeHtml(t('pnl.cogs'))} (${cur})</th>
             <th style="padding:4px 8px;">${escapeHtml(t('an.pnl_expenses'))} (${cur})</th>
             <th style="padding:4px 8px;">${escapeHtml(t('an.pnl_vat'))} (${cur})</th>
             <th style="padding:4px 8px; font-weight:700;">${escapeHtml(t('an.pnl_net'))} (${cur})</th>
@@ -1677,6 +1678,7 @@ function renderPnLSection() {
               <td style="padding:6px 8px; font-weight:600;">${escapeHtml(r.period)}</td>
               <td style="padding:6px 8px; text-align:right;">${r.orders}</td>
               <td style="padding:6px 8px; text-align:right; font-variant-numeric:tabular-nums;">${fmtMoney(r.revenue)}</td>
+              <td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.cogs || 0)}</td>
               <td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.expenses + r.fixed)}</td>
               <td style="padding:6px 8px; text-align:right; color:var(--text-muted); font-variant-numeric:tabular-nums;">${fmtMoney(r.vatCollected)}</td>
               <td style="padding:6px 8px; text-align:right; font-weight:700; color:${netCol}; font-variant-numeric:tabular-nums;">${fmtMoney(r.net)}</td>

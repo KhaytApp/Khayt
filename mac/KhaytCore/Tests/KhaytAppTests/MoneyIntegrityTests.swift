@@ -27,13 +27,17 @@ struct PnlAddsUpTests {
             currencies: [:], now: Date(timeIntervalSince1970: 1_788_000_000.0))
     }
 
-    @Test("net income is revenue less expenses, which is what the pane now shows")
+    /// Cost of goods included since Sep 2026: the shop's real book showed a
+    /// -495.8% margin beside a positive net, because only the margin took it
+    /// off. The pane now prints revenue − cost of goods − expenses.
+    @Test("net income is revenue less cost of goods and expenses, which is what the pane now shows")
     func theSumOnTheScreen() async throws {
         let rows = try await Self.rows()
         #expect(!rows.isEmpty, "no periods in the sample book")
 
         let revenue = rows.reduce(0) { $0 + $1.revenue }
-        let costs = rows.reduce(0) { $0 + $1.expenses + $1.fixed }
+        #expect(rows.contains { $0.cogsValue > 0 }, "the sample book has no cost of goods to test with")
+        let costs = rows.reduce(0) { $0 + $1.cogsValue + $1.expenses + $1.fixed }
         let net = rows.reduce(0) { $0 + $1.net }
         #expect(abs(revenue - costs - net) < 0.01,
                 "working reads \(Money.figure(revenue)) minus \(Money.figure(costs)); hero says \(Money.figure(net))")
@@ -46,7 +50,7 @@ struct PnlAddsUpTests {
     func vatIsNotAThirdSubtraction() async throws {
         let rows = try await Self.rows()
         let revenue = rows.reduce(0) { $0 + $1.revenue }
-        let costs = rows.reduce(0) { $0 + $1.expenses + $1.fixed }
+        let costs = rows.reduce(0) { $0 + $1.cogsValue + $1.expenses + $1.fixed }
         let vat = rows.reduce(0) { $0 + $1.vatCollected }
         let net = rows.reduce(0) { $0 + $1.net }
 

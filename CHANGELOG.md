@@ -67,6 +67,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   no photo, no description or no category, a second language that is missing
   or just repeats the first, or a name that reads like a file name, and lets
   you publish anyway or go back and fix them.
+- **(Mac) Four screens that contradicted themselves on the shop's real book now
+  agree.** Reports printed a -495.8% margin beside a net income of 50.00: net
+  income now takes the cost of goods off as well (`lib/pnl-report.js`, so the
+  desktop P&L table and its "Net profit" headline agree too), and both apps show
+  a Cost of goods line so the figures add up. The dashboard said "0 things need
+  you" over 19 finished jobs charged nothing; it now says so, with one button
+  that marks them all Not business in a single undoable write. The machine band
+  said "Free · 48:00" (96:00 in total) for printers that were not answering; a
+  connected printer that has never answered is now "Not answering" with its
+  hours unknown. And money is written one way: the masthead put the Riyal mark
+  before the figure while every other screen put it after, and the Jobs Total
+  column had no currency at all.
 
 - **(Mac) Choose what goes on the web store, check it before it goes, and
   set up the store itself.** Asked for by the shop after a review of its first

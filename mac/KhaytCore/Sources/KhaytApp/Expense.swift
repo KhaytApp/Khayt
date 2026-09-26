@@ -117,3 +117,10 @@ extension PnlPeriod {
     /// with nothing billed sorts below every real margin.
     var marginSort: Double { marginPct ?? -.infinity }
 }
+
+extension PnlPeriod {
+    /// What the finished work cost to make, zero for a bundle older than the
+    /// field. The net income is worked out with it taken off, so every screen
+    /// that prints the net prints this beside it.
+    var cogsValue: Double { cogs ?? 0 }
+}
