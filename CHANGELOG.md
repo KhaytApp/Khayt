@@ -110,6 +110,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   product photo** adds that picture to the product the job was made from,
   labelled as a photo of the actual print, which the web store shows right
   after your main picture. Your main picture stays the main one.
+- **(Mac) WhatsApp updates to customers.** When a job is received, ready,
+  shipped or delivered, the job now offers "Send on WhatsApp". WhatsApp opens
+  on the customer's number with the message already typed, in the customer's
+  language (Arabic or English), and you press send there. Shipped updates
+  include the carrier and tracking number. Numbers typed as `05…`, `9665…`,
+  `+966…` or in Arabic digits all work, and a number WhatsApp can't use is
+  explained instead of opening an empty chat. You can change the words for
+  each step in Settings › Integrations (WhatsApp templates now have "Sent when"
+  and a language). Each message you open is written to the customer's
+  communications log, and the job then shows when it was sent. Customers have
+  a WhatsApp button and a "Messages in" language choice, and the customer
+  sheet shows the number WhatsApp will use as you type it. Also fixed: ticking
+  "no marketing" on the customer sheet did not stick, because saving the sheet
+  wrote it back as unticked. No WhatsApp Business account is needed.
 
 - **Security: a store or carrier notification could be replayed.** Salla,
   Zid, SMSA, Aramex and Saudi Post sign each notification's content but not

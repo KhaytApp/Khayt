@@ -4301,6 +4301,13 @@
  ],
  "waTemplates": [
   {
+   "id": "tpl-shipped-en",
+   "name": "On its way (English)",
+   "body": "Hi {{client}}, {{shop}} has sent order {{id}}.\nCarrier: {{carrier}}\nTracking: {{tracking}}",
+   "milestone": "shipped",
+   "lang": "en"
+  },
+  {
    "id": "tpl-ready",
    "name": "Order Ready",
    "body": "Hi {{client}}, your order {{id}} is ready! Total: {{price}} {{currency}}. Please arrange pickup or delivery. Thank you!"
@@ -4371,7 +4378,7 @@
    "id": "CLI-F633FC",
    "nameEn": "Nouf Al-Dossari",
    "nameAr": "",
-   "phone": "",
+   "phone": "07700900123",
    "email": "",
    "cr": "",
    "vat": "",
@@ -4413,7 +4420,7 @@
    "id": "CLI-1EF91E",
    "nameEn": "Sara Al-Harbi",
    "nameAr": "سارة الحربي",
-   "phone": "",
+   "phone": "055 123 4567",
    "email": "",
    "cr": "",
    "vat": "",

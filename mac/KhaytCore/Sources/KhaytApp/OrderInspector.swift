@@ -92,19 +92,12 @@ private struct Detail: View {
                     .buttonStyle(.link)
                     .font(.callout)
                 }
-                // The shop's OWN messages, which need no key, no connection
-                // and nobody's agreement to send a customer's details to a
-                // service. Offered whenever the book has any — a job with no
-                // customer record still gets a message the shop can copy, and
-                // the sheet says why the WhatsApp button is unavailable.
-                if !shop.messageTemplates.isEmpty {
-                    Divider()
-                    Button(shop.words.callIt("mac.send_a_message")) {
-                        shop.messagingFor = job
-                    }
-                    .buttonStyle(.link)
-                    .font(.callout)
-                }
+                // WhatsApp: the update due at this job's milestone, and the
+                // shop's OWN saved messages — no key, no connection, nobody's
+                // agreement to send a customer's details to a service. A job
+                // with no customer record still gets a message the shop can
+                // copy, and the sheet says why WhatsApp cannot be opened.
+                WhatsAppJobRow(shop: shop, job: job)
                 // A PHOTOGRAPH OF THE FINISHED PRINT. Portfolio has always
                 // read these and nothing here could write one, so the empty
                 // state told a shop to add a photo to a completed order and

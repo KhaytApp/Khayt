@@ -14,7 +14,10 @@ import Foundation
 public enum WaTemplate {
 
     /// Every placeholder a template may use, in the order the editor lists them.
-    public static let placeholders = ["client", "id", "price", "currency", "due", "status"]
+    /// `shop`, `tracking` and `carrier` came with the WhatsApp milestone
+    /// updates, at the end so the first six keep their places.
+    public static let placeholders = ["client", "id", "price", "currency", "due", "status",
+                                      "shop", "tracking", "carrier"]
 
     /// What is printed when a value is missing.
     ///
@@ -70,9 +73,27 @@ public struct MessageTemplate: Identifiable, Sendable, Equatable {
     public let id: String
     public let name: String
     public let body: String
+    /// The job milestone this template speaks for — `received`, `ready`,
+    /// `shipped`, `delivered` — or empty for a message sent any time. A
+    /// template with a milestone REPLACES Khayt's default words for that
+    /// WhatsApp update (`lib/whatsapp-message.js:templateFor`).
+    public let milestone: String
+    /// `ar` or `en`, or empty for every customer whatever their language.
+    public let lang: String
 
-    public init(id: String, name: String, body: String) {
+    public init(id: String, name: String, body: String, milestone: String = "", lang: String = "") {
         self.id = id; self.name = name; self.body = body
+        self.milestone = milestone; self.lang = lang
+    }
+
+    /// The row as the book stores it — what `lib/whatsapp-message.js` reads.
+    /// The two new fields only when set, so a template that has neither looks
+    /// exactly like one the other app wrote.
+    public var row: JSONValue {
+        var out: [String: JSONValue] = ["id": .string(id), "name": .string(name), "body": .string(body)]
+        if !milestone.isEmpty { out["milestone"] = .string(milestone) }
+        if !lang.isEmpty { out["lang"] = .string(lang) }
+        return .object(out)
     }
 
     /// The store key, which is the other app's.
@@ -89,7 +110,12 @@ public struct MessageTemplate: Identifiable, Sendable, Equatable {
                   case .string(let body)? = r["body"], !body.isEmpty else { return nil }
             var name = ""
             if case .string(let n)? = r["name"] { name = n }
-            return MessageTemplate(id: id, name: name.isEmpty ? id : name, body: body)
+            var milestone = ""
+            if case .string(let m)? = r["milestone"] { milestone = m }
+            var lang = ""
+            if case .string(let l)? = r["lang"] { lang = l }
+            return MessageTemplate(id: id, name: name.isEmpty ? id : name, body: body,
+                                   milestone: milestone, lang: lang)
         }
     }
 }
