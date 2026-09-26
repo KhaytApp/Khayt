@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(iOS) The companion declares its encryption, so TestFlight stops asking.**
+  Every cipher it uses is Apple's own — TLS, and AES-GCM through CryptoKit —
+  and the one algorithm written in the app is scrypt, a standard
+  passphrase-to-key function; the shop's owner answered App Store Connect's
+  export question "none", and `ITSAppUsesNonExemptEncryption` now says so in
+  the app.
+
 - **(iOS) Notifications, as the v2 design draws them.** A bell on Home, with
   how many are unread, opens everything the phone has been told about the
   shop, newest first: finished and failed prints, late jobs, low filament,
