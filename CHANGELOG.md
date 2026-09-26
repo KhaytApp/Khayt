@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Filament wasted on failed prints is its own line in your P&L.** Now that
+  filament is counted when a job uses it, plastic lost to a failed print was
+  not counted anywhere, so net profit would have read higher than it was. The
+  cost of every failed print you log is now its own line in the P&L, the
+  quarterly table (a "Filament wasted" column, when there is any), the
+  export and the per-location view, in the period the print failed.
+
 - **(Mac) Saving the Google Drive settings keeps your client ID.** Reported by
   the shop: "I did the gdrive and all I got was saved and nothing else". Save
   stored only the folder name and threw away the OAuth client ID and secret

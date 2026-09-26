@@ -1968,6 +1968,7 @@
   "pnl.cogs": "Cost of goods sold",
   "pnl.inventory": "Filament bought (stock, counted when used)",
   "pnl.inventory_note": "Filament bought in this period: {amount}. It is stock, counted as cost of goods when a job uses it, so it is not in the expenses above.",
+  "pnl.waste": "Filament wasted (failed prints)",
   "pnl.gross": "Gross profit",
   "pnl.gross_margin": "Gross margin %",
   "pnl.opex": "Operating expenses",

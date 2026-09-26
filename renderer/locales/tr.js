@@ -1967,6 +1967,7 @@
   "pnl.cogs": "Satılan malların maliyeti",
   "pnl.inventory": "Satın alınan filament (stok, kullanıldıkça sayılır)",
   "pnl.inventory_note": "Bu dönemde satın alınan filament: {amount}. Stoktur ve bir sipariş kullandığında satılan malın maliyetine sayılır; bu yüzden yukarıdaki giderlerde yer almaz.",
+  "pnl.waste": "Boşa giden filament (başarısız baskılar)",
   "pnl.gross": "Brüt kâr",
   "pnl.gross_margin": "Brüt kâr marjı %",
   "pnl.opex": "İşletme giderleri",

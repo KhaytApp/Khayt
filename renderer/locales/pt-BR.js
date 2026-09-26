@@ -1968,6 +1968,7 @@
   "pnl.cogs": "Custo dos produtos vendidos",
   "pnl.inventory": "Filamento comprado (estoque, contado ao ser usado)",
   "pnl.inventory_note": "Filamento comprado no período: {amount}. É estoque e entra no custo das vendas quando um pedido o usa, por isso não aparece nas despesas acima.",
+  "pnl.waste": "Filamento desperdiçado (impressões com falha)",
   "pnl.gross": "Lucro bruto",
   "pnl.gross_margin": "Margem bruta %",
   "pnl.opex": "Despesas operacionais",

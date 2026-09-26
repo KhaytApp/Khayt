@@ -1967,6 +1967,7 @@
   "pnl.cogs": "Coste de los bienes vendidos",
   "pnl.inventory": "Filamento comprado (existencias, se cuenta al usarse)",
   "pnl.inventory_note": "Filamento comprado en este periodo: {amount}. Es existencia y se cuenta como coste de ventas cuando un pedido lo usa, por eso no aparece en los gastos de arriba.",
+  "pnl.waste": "Filamento desperdiciado (impresiones fallidas)",
   "pnl.gross": "Beneficio bruto",
   "pnl.gross_margin": "Margen bruto %",
   "pnl.opex": "Gastos operativos",
