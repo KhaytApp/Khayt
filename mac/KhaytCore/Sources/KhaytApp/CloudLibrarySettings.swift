@@ -59,6 +59,8 @@ struct CloudLibrarySettings: View {
     @State private var draft = Draft()
     @State private var original = Draft()
     @State private var storedSecret = false
+    /// Use the shop's own Google client rather than Khayt's built-in one.
+    @State private var ownClient = false
     @State private var providers: [KhaytEngine.StorageProvider] = []
     @State private var summary: (count: Int, size: String, inCloud: Int)?
     @State private var driveConnected = false
@@ -193,18 +195,28 @@ struct CloudLibrarySettings: View {
     /// Google Drive: the shop's own OAuth client, a folder, and one button
     /// that signs in through the browser.
     @ViewBuilder private var driveFields: some View {
-        Text(shop.words.callIt("mac.gdrive_why"))
+        Text(shop.words.callIt(Shop.builtInGoogleClient == nil || ownClient ? "mac.gdrive_why" : "mac.gdrive_why_builtin"))
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
-        Text(shop.words.callIt("mac.gdrive_production"))
-            .font(.caption).foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        LabeledContent(shop.words.callIt("mac.gdrive_client_id")) {
-            TextField("", text: $draft.driveClientId, prompt: Text(verbatim: "….apps.googleusercontent.com"))
-                .textFieldStyle(.roundedBorder).frame(width: 320)
+        if Shop.builtInGoogleClient == nil || ownClient {
+            Text(shop.words.callIt("mac.gdrive_production"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        LabeledContent(shop.words.callIt("mac.gdrive_client_secret")) {
-            SecureField("", text: $draft.driveSecret).textFieldStyle(.roundedBorder).frame(width: 240)
+        // Khayt's own client when this build has one: nothing to set up, and
+        // the shop's own client is only offered under "advanced".
+        if Shop.builtInGoogleClient == nil || ownClient {
+            LabeledContent(shop.words.callIt("mac.gdrive_client_id")) {
+                TextField("", text: $draft.driveClientId, prompt: Text(verbatim: "….apps.googleusercontent.com"))
+                    .textFieldStyle(.roundedBorder).frame(width: 320)
+            }
+            LabeledContent(shop.words.callIt("mac.gdrive_client_secret")) {
+                SecureField("", text: $draft.driveSecret).textFieldStyle(.roundedBorder).frame(width: 240)
+            }
+        }
+        if Shop.builtInGoogleClient != nil {
+            Toggle(shop.words.callIt("mac.gdrive_own_client"), isOn: $ownClient)
+                .font(.caption)
         }
         LabeledContent(shop.words.callIt("mac.gdrive_folder")) {
             TextField("", text: $draft.driveFolder, prompt: Text(verbatim: "Khayt print library"))
@@ -213,13 +225,18 @@ struct CloudLibrarySettings: View {
         HStack {
             Button(shop.words.callIt("mac.gdrive_connect")) {
                 Task {
-                    await shop.connectGoogleDrive(clientId: draft.driveClientId, typedSecret: draft.driveSecret,
+                    // Khayt's own client unless the shop chose its own: an id
+                    // left in the book from before must not be used silently.
+                    let own = Shop.builtInGoogleClient == nil || ownClient
+                    await shop.connectGoogleDrive(clientId: own ? draft.driveClientId : "",
+                                                  typedSecret: own ? draft.driveSecret : "",
                                                   folderName: draft.driveFolder)
                     reload(); await refresh()
                 }
             }
             .disabled(shop.cloudLibraryBusy || !shop.canMoveJobs
-                      || draft.driveClientId.trimmingCharacters(in: .whitespaces).isEmpty)
+                      || (Shop.builtInGoogleClient == nil
+                          && draft.driveClientId.trimmingCharacters(in: .whitespaces).isEmpty))
             if driveConnected {
                 Button(shop.words.callIt("mac.gdrive_disconnect")) {
                     Task { await shop.disconnectGoogleDrive(); reload(); await refresh() }
@@ -255,6 +272,11 @@ struct CloudLibrarySettings: View {
     private func reload() {
         original = Draft.read(shop.settingsDict)
         draft = original
+        // A client already saved that is not Khayt's is the shop's own choice.
+        if let builtIn = Shop.builtInGoogleClient {
+            let saved = draft.driveClientId.trimmingCharacters(in: .whitespaces)
+            ownClient = !saved.isEmpty && saved != builtIn.id
+        }
         storedSecret = false
         driveConnected = false
         if case .object(let l)? = shop.settingsDict["printLibrary"], case .object(let gd)? = l["gdrive"],

@@ -463,6 +463,25 @@ if [ -n "${KHAYT_APPCAST:-}" ] && [ "$SPARKLE_EMBEDDED" = "1" ]; then
   <key>SUAllowsAutomaticUpdates</key><false/>"
 fi
 
+# KHAYT'S OWN GOOGLE SIGN-IN, so a shop connects Google Drive with one click
+# instead of creating an OAuth client in Google Cloud. The client is Khayt's,
+# verified with Google once, and is NOT in the repository: it comes from the
+# environment or from ~/.khayt/google-oauth.json ({"clientId": "...",
+# "clientSecret": "..."}). A Desktop-app client's secret is not confidential by
+# Google's own definition; PKCE protects the sign-in. A build without one
+# falls back to asking the shop for its own client, exactly as before.
+GOOGLE_ID="${KHAYT_GOOGLE_CLIENT_ID:-}"; GOOGLE_SECRET="${KHAYT_GOOGLE_CLIENT_SECRET:-}"
+if [ -z "$GOOGLE_ID" ] && [ -f "$HOME/.khayt/google-oauth.json" ]; then
+  GOOGLE_ID=$(/usr/bin/python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.khayt/google-oauth.json"))).get("clientId",""))')
+  GOOGLE_SECRET=$(/usr/bin/python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.khayt/google-oauth.json"))).get("clientSecret",""))')
+fi
+GOOGLE_KEYS=""
+if [ -n "$GOOGLE_ID" ]; then
+  GOOGLE_KEYS="  <key>KhaytGoogleClientID</key><string>${GOOGLE_ID}</string>
+  <key>KhaytGoogleClientSecret</key><string>${GOOGLE_SECRET}</string>"
+  echo "  google: Khayt's own Drive client built in"
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -475,6 +494,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
        sharing an identifier confuses Launch Services, the defaults domain and
        the Keychain's idea of who is asking. -->
   <key>CFBundleIdentifier</key><string>app.khayt.mac</string>
+$GOOGLE_KEYS
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD_VERSION</string>

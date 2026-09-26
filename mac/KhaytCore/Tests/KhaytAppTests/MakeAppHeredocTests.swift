@@ -25,7 +25,7 @@ struct MakeAppHeredocTests {
 
     /// The variables the heredoc is allowed to substitute — the whole reason it
     /// is unquoted. Anything else is a typo that would expand to nothing.
-    static let expected: Set<String> = ["VERSION", "BUILD_VERSION", "SPARKLE_KEYS"]
+    static let expected: Set<String> = ["VERSION", "BUILD_VERSION", "SPARKLE_KEYS", "GOOGLE_KEYS"]
 
     static func heredoc() throws -> String {
         let script = URL(fileURLWithPath: #filePath)

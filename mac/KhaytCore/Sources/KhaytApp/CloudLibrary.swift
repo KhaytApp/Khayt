@@ -457,9 +457,24 @@ extension Shop {
     /// Sign in to Google in the browser and keep what comes back. The client
     /// id is saved FIRST, as the other app does, so the sign-in is for the id
     /// on the screen.
+    /// Khayt's own Google client, built into this copy of the app (see
+    /// make-app.sh), or nil in a build without one.
+    static var builtInGoogleClient: (id: String, secret: String)? {
+        guard let id = Bundle.main.object(forInfoDictionaryKey: "KhaytGoogleClientID") as? String,
+              !id.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        let secret = Bundle.main.object(forInfoDictionaryKey: "KhaytGoogleClientSecret") as? String ?? ""
+        return (id, secret)
+    }
+
     func connectGoogleDrive(clientId: String, typedSecret: String, folderName: String) async {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
+        // No client typed: Khayt's own, when this build carries one. One
+        // click, as a shop expects from "Connect Google Drive".
+        var clientId = clientId, typedSecret = typedSecret
+        if clientId.trimmingCharacters(in: .whitespaces).isEmpty, let own = Self.builtInGoogleClient {
+            clientId = own.id; typedSecret = own.secret
+        }
         let id = clientId.trimmingCharacters(in: .whitespaces)
         guard !id.isEmpty else { cloudLibraryProblem = words.callIt("mac.gdrive_need_client"); return }
         guard !cloudLibraryBusy else { return }
