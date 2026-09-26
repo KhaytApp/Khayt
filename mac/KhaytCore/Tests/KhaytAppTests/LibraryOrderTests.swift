@@ -38,3 +38,16 @@ struct LibraryOrderTests {
         #expect(!src.contains("geometry = try? Mesh.measure3MF(destination)"), "measuring is back on the main thread")
     }
 }
+
+@MainActor
+struct LibraryFilterMenuTests {
+    @Test("the library opens as one flat grid of models, and filters are menus, not a row of chips")
+    func flatAndMenus() throws {
+        let shop = try QuoteSheetStatusTests.source("Shop.swift")
+        #expect(shop.contains("var libraryFlat = true"))
+        #expect(shop.contains("if libraryFlat, group == nil"))
+        let bar = try QuoteSheetStatusTests.source("LibraryFilterBar.swift")
+        #expect(bar.contains("Menu {"))
+        #expect(!bar.contains("FilterBar(chips: chips"), "the library is back to a strip of chips")
+    }
+}

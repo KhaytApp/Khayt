@@ -137,11 +137,69 @@ struct LibraryFilterBar: View {
         return rows + [KhaytEngine.GroupCount(name: name, count: 0)]
     }
 
+    // ── MENUS, NOT A STRIP OF BUBBLES ──────────────────────────────────────
+    //
+    // Every creator, category and tag used to be its own chip in one row, so
+    // the row grew with the library and ran off the window: the shop called
+    // it "too many bubbles to go through". Each axis is now one menu that
+    // says what it is set to and holds any number of choices, with counts.
+    // The rules behind them (what counts, the folding of spellings, a chosen
+    // value kept even at zero) are unchanged: `chips` above is what the menus
+    // are built from, so the two cannot disagree.
     var body: some View {
-        FilterBar(chips: chips,
-                  showingClear: shop.libraryFilterOn,
-                  clearLabel: shop.words.callIt("log.clear_filters")) {
-            shop.clearLibraryFilter()
+        HStack(spacing: 8) {
+            Picker("", selection: $shop.libraryFlat) {
+                Text(shop.words.callIt("mac.lib_view_models")).tag(true)
+                Text(shop.words.callIt("mac.lib_view_groups")).tag(false)
+            }
+            .pickerStyle(.segmented).labelsHidden().fixedSize()
+            .help(shop.words.callIt("mac.lib_view_help"))
+
+            menu("mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed"])
+            menu("mac.lib_printer", prefix: "ready:")
+            menu("mac.lib_creator", prefix: "creator:")
+            menu("mac.category", prefix: "category:")
+            menu("mac.lib_tag", prefix: "tag:")
+
+            Spacer(minLength: 0)
+            if shop.libraryFilterOn {
+                Button(shop.words.callIt("log.clear_filters")) { shop.clearLibraryFilter() }
+                    .buttonStyle(.link)
+            }
+        }
+        .controlSize(.small)
+        .padding(.horizontal, Metric.screen)
+        .padding(.vertical, 8)
+    }
+
+    /// One axis as a menu. Hidden when it has nothing to offer.
+    @ViewBuilder
+    private func menu(_ key: String, prefix: String? = nil, ids: [String] = []) -> some View {
+        let rows = chips.filter { chip in
+            if let prefix { return chip.id.hasPrefix(prefix) }
+            return ids.contains(chip.id)
+        }
+        if !rows.isEmpty {
+            let on = rows.filter(\.on)
+            Menu {
+                ForEach(rows) { chip in
+                    Button { chip.press() } label: {
+                        if chip.on { Label(chip.label + "  (\(chip.count))", systemImage: "checkmark") }
+                        else { Text(chip.label + "  (\(chip.count))") }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(shop.words.callIt(key)).foregroundStyle(.secondary)
+                    if !on.isEmpty {
+                        Text(on.count == 1 ? on[0].label : "\(on.count)")
+                            .fontWeight(.semibold)
+                            .lineLimit(1)
+                    }
+                }
+            }
+            .menuStyle(.button)
+            .fixedSize()
         }
     }
 }

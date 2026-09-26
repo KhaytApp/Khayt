@@ -43,6 +43,7 @@ struct ShopWindow: View {
     // A new key: under the old one every window remembered "Khayt's order",
     // and the new default (newest first) would never have been seen.
     @SceneStorage("library.sort.v2") private var storedSort = LibrarySort.added.rawValue
+    @SceneStorage("library.flat") private var storedFlat = true
     /// Nil where a context has no undo, which the documentation says to expect
     /// and which every registration in `Shop` is guarded for.
     @Environment(\.undoManager) private var undoManager
@@ -278,6 +279,8 @@ struct ShopWindow: View {
         .task(id: shop.shelf) { storedShelf = Shelves.name(shop.shelf) }
         .task(id: shop.librarySort) { storedSort = shop.librarySort.rawValue }
         .task { shop.librarySort = LibrarySort(rawValue: storedSort) ?? .added }
+        .task(id: shop.libraryFlat) { storedFlat = shop.libraryFlat }
+        .task { shop.libraryFlat = storedFlat }
         .task {
             // Only after the book has loaded: a group shelf means nothing until
             // the groups are known, and restoring one that no longer exists
