@@ -124,6 +124,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   sheet shows the number WhatsApp will use as you type it. Also fixed: ticking
   "no marketing" on the customer sheet did not stick, because saving the sheet
   wrote it back as unticked. No WhatsApp Business account is needed.
+- **(Mac) See which products earn the most for each hour on the printer.**
+  With one printer, machine time runs out before anything else, so two
+  products that make the same profit per sale are not equal if one takes ten
+  times as long. The Catalogue has a new "Per hour" column you can sort by:
+  (price − cost) ÷ print hours. Reports has a "Best use of the printer" card
+  ranking the catalogue that way, showing what finished jobs actually earned
+  per hour next to the planned figure, and pointing out products that earn
+  well below your own average with a price that would bring them level. The
+  Web Store sheet quietly suggests which listed products to feature and which
+  may be underpriced. Products with no print hours or no price show a dash
+  instead of a made-up number, and jobs marked Not business are left out.
 
 - **Security: a store or carrier notification could be replayed.** Salla,
   Zid, SMSA, Aramex and Saudi Post sign each notification's content but not

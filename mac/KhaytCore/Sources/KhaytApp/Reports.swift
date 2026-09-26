@@ -737,6 +737,10 @@ struct Reports: View {
                     // which is the finding, and why they sit on one screen.
                     ProductProfitTable(shop: shop, report: earns)
                         .card(rail: Khayt.brand, padding: 14)
+                    // What sold, above; what the printer's hours are best
+                    // spent on, here — the whole catalogue, made or not.
+                    BestUseOfPrinterCard(shop: shop, report: shop.profitPerHour)
+                        .card(rail: Khayt.brand, padding: 14)
                     ThroughputCard(shop: shop, report: when)
                         .card(rail: Khayt.brand, padding: 14)
                     // WHEN work finishes, above; how LONG it took, here.
