@@ -20,7 +20,7 @@ struct CarrierWebhookTests {
         let book = LanServerTests.Book()
         let writes = LanServerTests.Counter()
 
-        init(secrets: [String: String] = ["smsa": CarrierWebhookTests.secret]) async throws {
+        init(secrets: [String: String] = ["smsa": CarrierWebhookTests.secret], replayFile: URL? = nil) async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -37,6 +37,7 @@ struct CarrierWebhookTests {
             var host = LanServer.Host(store: { book.value }, pin: "2468", engine: engine,
                                       now: { CarrierWebhookTests.start }, nowText: { "09:16" })
             host.carrierSecrets = secrets
+            host.replayFile = replayFile
             let writes = self.writes
             host.carrierEvent = { event, at in
                 writes.n += 1
@@ -110,6 +111,33 @@ struct CarrierWebhookTests {
         #expect(try await bench.send(body, header: "X-Signature").status == 200)
         #expect(try await bench.send(body).status == 409)
         #expect(bench.writes.n == 1)
+    }
+
+    /// SEC-010. Ten minutes in memory was the whole defence, so a restart
+    /// forgot every delivery it had taken.
+    @Test("a replay is refused after the app restarts, and the file holds no signature")
+    func replayRefusedAcrossARestart() async throws {
+        let file = FileManager.default.temporaryDirectory.appending(path: "seen-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let body = #"{"awb":"SM123","status":"in transit"}"#
+        let first = try await Bench(replayFile: file)
+        #expect(try await first.send(body).status == 200)
+        first.stop()
+
+        let second = try await Bench(replayFile: file)
+        defer { second.stop() }
+        #expect(try await second.send(body).status == 409)
+
+        let saved = String(decoding: try Data(contentsOf: file), as: UTF8.self)
+        let signature = LanServer.webhookSignature(Data(body.utf8), secret: CarrierWebhookTests.secret)
+        #expect(!saved.contains(signature), "the file stores a replayable signature")
+        #expect(saved.contains(LanServer.seenKey(signature)))
+    }
+
+    @Test("the window is thirty days and ten thousand deliveries")
+    func window() {
+        #expect(LanServer.seenSignatureTTL == 30 * 24 * 60 * 60)
+        #expect(LanServer.seenSignatureMax == 10_000)
     }
 
     @Test("only the three carriers are routed, and the 404 does not advertise them")

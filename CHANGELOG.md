@@ -41,6 +41,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     template did not mark themselves changed. They never left this Mac, and a
     merge could put the old version back. Every write the Mac makes now bumps
     whatever it changed.
+- **(Mac) A storefront or carrier webhook cannot be replayed later
+  (SEC-010).** Salla, Zid and the carriers sign only the body, so a captured
+  delivery stays validly signed forever. The Mac remembered accepted
+  signatures for ten minutes, in memory, and at most 500 of them. The same
+  delivery could therefore be sent again later, after 500 newer ones, or after
+  the app restarted. It now remembers them for thirty days, up to 10,000, in a
+  file beside the book that only this Mac uses. That file keeps a hash of each
+  signature, never the signature itself. The book already limited the damage:
+  an order is recorded once, and a parcel never moves backwards.
 
 - **Choose which products are on your web store, and see what needs fixing
   before you publish.** Each product in Settings → Storefront has an "On
