@@ -134,6 +134,15 @@ struct Quoting: View {
         /// NOT `Money.figure`, which is a money formatter and always writes
         /// two decimals. Hours keep one, because a tenth of an hour is six
         /// minutes and a shop schedules in those; grams keep none.
+        /// The unit as the shop's language writes it. `unit` stays the KIND
+        /// ("g" or "h"), which is what `figure` decides its decimals by.
+        /// Binds a figure to its unit so a narrow column cannot split them.
+        private static let nbsp = "\u{00A0}"
+
+        private var shown: String {
+            shop.words.callIt(unit == "h" ? "mac.unit_h" : "common.grams")
+        }
+
         private func figure(_ value: Double) -> String {
             Money.quantity(value, decimals: unit == "h" ? 1 : 0)
         }
@@ -145,8 +154,24 @@ struct Quoting: View {
                 // does not know, and printing that as 0 g would read as a print
                 // that used no filament rather than one nobody measured.
                 if let est, let act {
-                    Text("\(figure(est)) \(unit) → \(figure(act)) \(unit)")
+                    if shop.words.isRTL {
+                        // ARABIC HAS AN ARABIC UNIT, and "559 غ" carries a
+                        // strong right-to-left letter — so the one-string
+                        // line above would resolve right to left with an
+                        // arrow that does not mirror, and read "587 became
+                        // 559". Laid out as three pieces instead: the stack
+                        // mirrors, the directional arrow mirrors with it, and
+                        // each figure is its own isolated unit.
+                        HStack(spacing: 4) {
+                            Text(Figure.isolated(figure(est) + Self.nbsp + shown))
+                            Image(systemName: "arrow.forward").imageScale(.small)
+                            Text(Figure.isolated(figure(act) + Self.nbsp + shown))
+                        }
                         .font(.callout.monospacedDigit())
+                    } else {
+                        Text("\(figure(est)) \(shown) → \(figure(act)) \(shown)")
+                            .font(.callout.monospacedDigit())
+                    }
                 } else {
                     Text(shop.words.callIt("mac.not_measured"))
                         .font(.callout).foregroundStyle(.secondary)

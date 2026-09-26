@@ -1003,7 +1003,7 @@ struct Reports: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Drawn(mark: .reports, size: 13).foregroundStyle(.tertiary)
-                    Text(shop.words.callIt("mac.quarter_drawn", ["q": .string(row.period)]))
+                    Text(shop.words.callIt("mac.quarter_drawn", ["q": .string(Figure.isolated(row.period))]))
                         .font(.system(size: 11, weight: .semibold))
                         .textCase(.uppercase).tracking(0.5)
                         .foregroundStyle(.secondary)

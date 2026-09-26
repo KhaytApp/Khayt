@@ -125,7 +125,7 @@ private struct KitChip: View {
                             .foregroundStyle(Khayt.attention)
                     }
                     Text(Money.quantity(r.actualHours) + " " + shop.words.callIt("common.hours"))
-                    Text(Money.grams(r.actualGrams) + " g")
+                    Text(Money.grams(r.actualGrams) + " " + shop.words.callIt("common.grams"))
                     if r.mixedCurrency {
                         Text(shop.words.callIt("mac.kit_mixed_currency"))
                             .foregroundStyle(Khayt.attention)
@@ -212,7 +212,7 @@ struct KitSection: View {
                                                 "total": .number(Double(r.jobs))]),
                            warn: r.measuredTime < r.jobs)
                 DetailLine(shop.words.callIt("common.hours"), Money.quantity(r.actualHours) + " " + shop.words.callIt("common.hours"))
-                DetailLine(shop.words.callIt("mac.filament"), Money.grams(r.actualGrams) + " g")
+                DetailLine(shop.words.callIt("mac.filament"), Money.grams(r.actualGrams) + " " + shop.words.callIt("common.grams"))
                 if r.mixedCurrency {
                     DetailLine(shop.words.callIt("mac.cost"),
                                shop.words.callIt("mac.kit_mixed_currency"), warn: true)

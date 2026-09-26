@@ -329,7 +329,7 @@ private struct Detail: View {
                         // printed a 129.18g part where a shop reads 129.2.
                         // The SYMBOL, not the word — this sits beside "×1" in
                         // a narrow column. `common.grams` is where Khayt keeps
-                        // it, and it is not "g" everywhere: Arabic writes جم.
+                        // it, and it is not "g" everywhere: Arabic writes غ.
                         // Hard-coding the letter was a claim that the symbol is
                         // universal, and the catalogue says otherwise.
                         Text("\(Money.grams(part.printWeight)) \(shop.words.callIt("common.grams"))")

@@ -152,7 +152,7 @@ struct MachineBandView: View {
                 ZStack(alignment: .topLeading) {
                     ForEach(Self.tickMinutes(band), id: \.self) { minute in
                         let x = geo.size.width * (minute / band.minutes)
-                        Text(Self.clock(band, minute))
+                        Text(Self.clock(band, minute, shop.words))
                             .font(.caption2).monospacedDigit()
                             .foregroundStyle(.tertiary)
                             .fixedSize()
@@ -538,19 +538,24 @@ struct MachineBandView: View {
     }
 
     /// The wall clock at that many minutes into the window.
-    static func clock(_ band: KhaytEngine.MachineBand, _ minute: Double) -> String {
+    ///
+    /// The day name at midnight is in the SHOP'S language (`Words.say`), not a
+    /// POSIX "Mon": an Arabic ruler read "Sun" and "Mon" between its own Arabic
+    /// labels. The hours stay `en_US_POSIX` digits — a clock face that reads
+    /// as one left-to-right unit in either language.
+    static func clock(_ band: KhaytEngine.MachineBand, _ minute: Double,
+                      _ words: Words) -> String {
         let at = Date(timeIntervalSince1970: band.from / 1000 + minute * 60)
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         // Midnight is called out, because it is the boundary a shop plans an
         // unattended overnight run around and "00:00" alone reads as a time
         // rather than as the end of the day.
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = .current
+        let cal = Calendar.book
+        f.timeZone = cal.timeZone
         let h = cal.component(.hour, from: at), m = cal.component(.minute, from: at)
         if h == 0 && m == 0 {
-            f.dateFormat = "EEE"
-            return f.string(from: at)
+            return words.say(at, .dateTime.weekday(.abbreviated))
         }
         f.dateFormat = "HH:mm"
         return f.string(from: at)

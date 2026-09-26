@@ -198,6 +198,30 @@ struct MachineBandTests {
         #expect(marks.count == 8 || marks.count == 7)
     }
 
+    /// Midnight is named by its DAY, in the shop's language. The Arabic ruler
+    /// read "Sun" and "Mon" between Arabic labels, from a POSIX "EEE".
+    @Test("the day at midnight is named in the shop's language")
+    @MainActor
+    func midnightInTheShopsLanguage() async throws {
+        let b = try await Self.band(machines: [Self.machine("M1", "U1")], orders: [])
+        let engine = try KhaytEngine()
+        let ar = Words(); await ar.load("ar", engine: engine)
+        let en = Words(); await en.load("en", engine: engine)
+        let midnight = try #require(MachineBandView.tickMinutes(b).first { m in
+            let at = Date(timeIntervalSince1970: b.from / 1000 + m * 60)
+            return Calendar.book.component(.hour, from: at) == 0
+        })
+        let said = MachineBandView.clock(b, midnight, ar)
+        #expect(!said.isEmpty)
+        #expect(!said.contains { $0.isASCII && $0.isLetter }, "an Arabic ruler said \(said)")
+        let english = MachineBandView.clock(b, midnight, en)
+        #expect(english.allSatisfy { $0.isASCII }, "an English ruler said \(english)")
+        // Every other mark is still a clock face, the same in both.
+        if let six = MachineBandView.tickMinutes(b).first(where: { $0 != midnight }) {
+            #expect(MachineBandView.clock(b, six, ar) == MachineBandView.clock(b, six, en))
+        }
+    }
+
     /// Every key this screen asks for has to be a word the app can say, or the
     /// band renders `mac.band_state_printing` at a shop.
     @Test("every word the band asks for is one this app knows")

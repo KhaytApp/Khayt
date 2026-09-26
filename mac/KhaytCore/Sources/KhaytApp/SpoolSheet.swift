@@ -210,7 +210,7 @@ struct SpoolSheet: View {
                     HStack(spacing: 4) {
                         TextField("", value: $reorderPoint, format: .number.precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
-                        Text(shop.words.callIt("mac.grams")).foregroundStyle(.secondary)
+                        Text(shop.words.callIt("common.grams")).foregroundStyle(.secondary)
                     }
                 }
                 // ── WHAT THIS FILAMENT WANTS ──────────────────────────
@@ -241,7 +241,7 @@ struct SpoolSheet: View {
                     HStack(spacing: 4) {
                         TextField("", value: $reorderQty, format: .number.precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
-                        Text(unit.isEmpty ? shop.words.callIt("mac.grams") : unit)
+                        Text(unit.isEmpty ? shop.words.callIt("common.grams") : unit)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -339,7 +339,7 @@ struct SpoolSheet: View {
     }
 
     /// The word after the quantity field, in the unit being chosen. Falls back
-    /// to the gram Khayt already keeps, because `common.grams` is `جم` in Arabic
+    /// to the gram Khayt already keeps, because `common.grams` is `غ` in Arabic
     /// and a `g` written here would be an English letter in an Arabic form.
     private var unitKey: String {
         units.first { $0.unit == unit }?.unitKey ?? "common.grams"

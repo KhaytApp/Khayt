@@ -142,7 +142,7 @@ struct TheShelf: View {
                         if (spool.weight ?? 0) <= 0 {
                             CapsLabel(shop.words.callIt("mac.out"), tint: Role.late, size: 9.5)
                         } else {
-                            Figure(value: spool.weight, style: .unit("g"), size: 10.5,
+                            Figure(value: spool.weight, style: .unit(shop.words.callIt("common.grams")), size: 10.5,
                                    tint: shop.lowSpools.contains(spool.id) ? Role.warn : Role.text2)
                         }
                     }

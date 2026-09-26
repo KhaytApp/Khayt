@@ -111,6 +111,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rather than on the next ten-second poll. The stream reconnects on its own
   when the cloud closes it; a busy cloud means wait, never signed out; and
   while the stream is up, the printer poll falls back to once a minute.
+- **Arabic review fixes, from screenshots of the shop's own book** (shared
+  Arabic catalogue and the Mac app).
+  - "Hex colour" no longer reads as "hexagonal" (سداسي): it is «رمز لون (hex)».
+  - One Arabic gram, **غ** (and **كغ**), everywhere. It was spelled جم, غم,
+    غرام and a Latin "g" on different screens; the Mac's shelf, figure strip,
+    waste card, variance and quote fields now take the unit from the catalogue.
+  - One word for Expenses (المصروفات, not المصاريف).
+  - Portfolio is «معرض الأعمال», so it no longer reads as a second "Jobs"
+    (الأعمال). On the Mac, Dashboard is «نظرة عامة» and Board is «لوحة المهام»,
+    no longer اللوحة beside اللوح.
+  - Eleven Arabic strings that dropped the instruction the English gives
+    (capacity targets, expense budgets, supplier price tags, retention data,
+    custom fields, BNPL links, three help paragraphs, packaging, part colours)
+    now say the whole sentence.
+  - (Mac) The machines timeline names midnight's day in the shop's language
+    instead of a fixed English "Mon"/"Sun", and the Reports quarter title keeps
+    "2026-Q3" as one left-to-right unit, matching its table.
 
 - **(Mac) Choose what goes on the web store, check it before it goes, and
   set up the store itself.** Asked for by the shop after a review of its first
