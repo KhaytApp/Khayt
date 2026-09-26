@@ -21,7 +21,11 @@ struct InputVatTests {
 
     static func rows() async throws -> [PnlPeriod] {
         let shop = Shop()
-        await shop.load(.sample)
+        // AS OF THE DAY THE SAMPLE WAS WRITTEN FOR. The book moves with the
+        // calendar (SampleBook.rebased) and this measures it at a PINNED
+        // `now`, so loaded as of today it decayed: the refund quarter slid out
+        // from under the assertion on 2026-09-26 and failed every PR.
+        await shop.load(.sample, asOf: try #require(SampleBook.anchor))
         let engine = try #require(shop.engine)
         return try await engine.pnlByPeriod(
             orders: shop.orderRows, expenses: shop.expenseRows,
