@@ -185,8 +185,16 @@ public enum SyncCrypto {
     /// a repeated nonce under one key is the failure that hands an attacker the
     /// keystream, and it is not a thing to economise on.
     public static func seal(_ object: [String: JSONValue], dek: Data) throws -> Blob {
+        try sealBytes(try JSONEncoder().encode(object), dek: dek)
+    }
+
+    /// The same envelope around bytes that are already JSON, sealed exactly as
+    /// they are. The off-site backup needs this: its payload is the book file
+    /// BYTE FOR BYTE, and decoding it only to re-encode it would reorder keys
+    /// and re-format numbers in a copy whose whole job is to be the original.
+    /// `openStore` is the way back.
+    public static func sealBytes(_ json: Data, dek: Data) throws -> Blob {
         guard dek.count == 32 else { throw Failure.malformed("the key is \(dek.count) bytes, not 32") }
-        let json = try JSONEncoder().encode(object)
         let packed = try gzip(json)
         let box = try AES.GCM.seal(packed, using: SymmetricKey(data: dek))
         return Blob(v: storeBlobVersion, z: compression,

@@ -789,6 +789,9 @@ final class Shop {
             if next.build != nil { startPublishingLeadTime() } else { stopPublishingLeadTime() }
             if next.build != nil { startWatchingPlugs() } else { stopWatchingPlugs() }
             if next.build != nil { await restoreCloudKey() }
+            // After the key: the launch check seals with it. Never for the
+            // sample shop, which is not a book anybody wants back.
+            if next.build != nil { startOffsiteBackups() } else { stopOffsiteBackups() }
             resetWebStore()
             if next.build != nil { Task { await self.refreshWebStore() } }
             refreshSyncStatus()
@@ -7382,6 +7385,15 @@ final class Shop {
 
     /// Has somebody unlocked the cloud this session?
     var cloudUnlocked: Bool { cloudDek != nil }
+
+    /// The key the off-site backup seals the book with — the cloud's own data
+    /// key, so a backup opens on a new Mac with the passphrase. Nil while the
+    /// cloud is locked or not set up, and then nothing is uploaded.
+    var offsiteKey: Data? { cloudDek }
+
+    /// The nightly off-site backup: its settings, when it last ran and
+    /// whether it is failing. See `OffsiteBackups.swift`.
+    let offsite = OffsiteBackupState()
 
     /// "Remember me on this Mac", from the sign-in sheet. On unless the shop
     /// turned it off: keeping the key is what stops the passphrase being asked

@@ -48,6 +48,15 @@ struct MoveBanners: View {
                 }
             }
         }
+        // THE OFF-SITE BACKUP HAS BEEN FAILING FOR MORE THAN TWO DAYS. A
+        // problem, not a notice: it stays until closed, and comes back on the
+        // next launch if it is still true. The settings line says why.
+        if shop.offsite.overdue() {
+            Banner(text: shop.words.callIt("mac.offsite_overdue"),
+                   symbol: "exclamationmark.icloud", tint: Khayt.attention) {
+                BannerClose(words: shop.words) { shop.offsite.noticeDismissed = true }
+            }
+        }
         if let problem = shop.moveProblem {
             Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention) {
                 BannerClose(words: shop.words) { shop.moveProblem = nil }

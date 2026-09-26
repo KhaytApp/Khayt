@@ -57,43 +57,59 @@ enum CloudLibrary {
         var tierOn = false
         if case .object(let t) = tier, case .bool(true)? = t["enabled"] { tierOn = true }
 
-        func open(_ value: String) async -> String? {
-            guard value.hasPrefix(SafeStorage.marker) else { return value }
-            guard let build else { return nil }
-            return try? await Secrets.open(value, for: build)
-        }
-        func reader(_ key: String) -> [String: JSONValue] {
-            if case .object(let o)? = library[key] { return o } else { return [:] }
-        }
-        func text(_ o: [String: JSONValue], _ key: String) -> String {
-            if case .string(let v)? = o[key] { return v.trimmingCharacters(in: .whitespaces) }
-            return ""
-        }
-        func on(_ o: [String: JSONValue]) -> Bool { if case .bool(true)? = o["enabled"] { true } else { false } }
-
-        let s3 = reader("s3")
         var bucket: Config?
-        if let secret = await open(text(s3, "secretAccessKey")) {
-            let c = S3Config(endpoint: text(s3, "endpoint"), bucket: text(s3, "bucket"), region: text(s3, "region"),
-                             accessKeyId: text(s3, "accessKeyId"), secretAccessKey: secret, prefix: text(s3, "prefix"))
-            if c.isConfigured {
-                bucket = Config(remote: .bucket(c), prefix: c.prefix, backsUp: on(s3),
-                                provider: c.endpoint, tier: tier, tierEnabled: tierOn)
-            }
+        if let c = await libraryBucket(settings: settings, build: build) {
+            bucket = Config(remote: .bucket(c), prefix: c.prefix, backsUp: on(section(library, "s3")),
+                            provider: c.endpoint, tier: tier, tierEnabled: tierOn)
         }
         if let bucket, bucket.backsUp { return bucket }
 
-        let gd = reader("gdrive")
-        if on(gd), let refresh = await open(text(gd, "refreshToken")),
-           let secret = await open(text(gd, "clientSecret")) {
-            let d = DriveClient.Config(clientId: text(gd, "clientId"), clientSecret: secret,
-                                       refreshToken: refresh, folderName: text(gd, "folderName"))
-            if d.isConfigured {
-                return Config(remote: .drive(DriveClient(d, fetch: fetch)), prefix: text(gd, "prefix"),
-                              backsUp: true, provider: "gdrive", tier: tier, tierEnabled: tierOn)
-            }
+        if on(section(library, "gdrive")), let d = await libraryDrive(settings: settings, build: build) {
+            return Config(remote: .drive(DriveClient(d.config, fetch: fetch)), prefix: d.prefix,
+                          backsUp: true, provider: "gdrive", tier: tier, tierEnabled: tierOn)
         }
         return bucket
+    }
+
+    /// The library's bucket, set up and with its secret opened — whether or
+    /// not the library is backing up to it. Nil when it is not set up, or its
+    /// secret will not open on this Mac. The off-site backup reuses it.
+    static func libraryBucket(settings: [String: JSONValue], build: StoreReader.Build?) async -> S3Config? {
+        guard case .object(let library)? = settings["printLibrary"] else { return nil }
+        let s3 = section(library, "s3")
+        guard let secret = await open(text(s3, "secretAccessKey"), build: build) else { return nil }
+        let c = S3Config(endpoint: text(s3, "endpoint"), bucket: text(s3, "bucket"), region: text(s3, "region"),
+                         accessKeyId: text(s3, "accessKeyId"), secretAccessKey: secret, prefix: text(s3, "prefix"))
+        return c.isConfigured ? c : nil
+    }
+
+    /// The library's Google Drive sign-in, whether or not the library is
+    /// using it. Nil when there is none on this book.
+    static func libraryDrive(settings: [String: JSONValue],
+                             build: StoreReader.Build?) async -> (config: DriveClient.Config, prefix: String)? {
+        guard case .object(let library)? = settings["printLibrary"] else { return nil }
+        let gd = section(library, "gdrive")
+        guard let refresh = await open(text(gd, "refreshToken"), build: build),
+              let secret = await open(text(gd, "clientSecret"), build: build) else { return nil }
+        let d = DriveClient.Config(clientId: text(gd, "clientId"), clientSecret: secret,
+                                   refreshToken: refresh, folderName: text(gd, "folderName"))
+        return d.isConfigured ? (d, text(gd, "prefix")) : nil
+    }
+
+    private static func open(_ value: String, build: StoreReader.Build?) async -> String? {
+        guard value.hasPrefix(SafeStorage.marker) else { return value }
+        guard let build else { return nil }
+        return try? await Secrets.open(value, for: build)
+    }
+    private static func section(_ library: [String: JSONValue], _ key: String) -> [String: JSONValue] {
+        if case .object(let o)? = library[key] { return o } else { return [:] }
+    }
+    private static func text(_ o: [String: JSONValue], _ key: String) -> String {
+        if case .string(let v)? = o[key] { return v.trimmingCharacters(in: .whitespaces) }
+        return ""
+    }
+    private static func on(_ o: [String: JSONValue]) -> Bool {
+        if case .bool(true)? = o["enabled"] { true } else { false }
     }
 
     /// Requests to a bucket. No redirects: a signed request followed somewhere

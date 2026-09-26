@@ -141,7 +141,16 @@ enum Restore {
         guard FileManager.default.fileExists(atPath: source.path) else {
             throw Refusal.noSuchBackup(source.lastPathComponent)
         }
-        return try await restore(backup: source, storeURL: build.storeURL,
+        return try await restore(backup: source, for: build, engine: engine, now: now)
+    }
+
+    /// Put back a backup that is not on the shelf — one brought down from
+    /// off-site storage and decrypted into a temporary file. The same checks,
+    /// the same safety copy, the same carrying forward: there is one restore.
+    @discardableResult
+    static func restore(backup source: URL, for build: StoreReader.Build,
+                        engine: KhaytEngine?, now: Date = Date()) async throws -> URL? {
+        try await restore(backup: source, storeURL: build.storeURL,
                                  owns: { StoreLock.weOwnIt(build) },
                                  whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
                                  protect: {

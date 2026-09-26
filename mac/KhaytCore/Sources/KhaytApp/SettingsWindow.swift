@@ -1168,6 +1168,7 @@ struct PreferencesPane: View {
                 }
                 LibraryLocationSettings(shop: shop)
                 CloudLibrarySettings(shop: shop)
+                OffsiteBackupSettings(shop: shop)
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
