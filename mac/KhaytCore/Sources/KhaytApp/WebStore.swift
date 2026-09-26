@@ -614,6 +614,15 @@ struct WebStoreSheet: View {
                         }
                     }
                 }
+                // ── WHAT EARNS MOST PER PRINTER HOUR ─────────────────────────
+                //
+                // Advice, and quiet about it: which listed products are the
+                // best use of the one printer, and which earn well under the
+                // shop's own average per hour. Only shown when there is
+                // something to say. `lib/profit-per-hour.js` decides.
+                if WebStorePerHourHints.hasAnything(shop.profitPerHour), let rates = shop.profitPerHour {
+                    WebStorePerHourHints(shop: shop, report: rates)
+                }
                 // ── THE STORE'S OWN SETTINGS ─────────────────────────────────
                 Section {
                     DisclosureGroup(isExpanded: $showSettings) {

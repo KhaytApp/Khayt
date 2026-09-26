@@ -752,6 +752,11 @@ public actor KhaytEngine {
         // How many quotes turn into work, and how much of the money does.
         // Which products actually earn, and which earn per machine hour.
         "product-profit",
+        // The catalogue ranked by profit per printer hour, planned and actual.
+        // Reaches `product-profit`, `product-price`, `product-specs`,
+        // `printer-actuals` and `estimate-variance` through their globals at
+        // call time, so its place in this list is not load-bearing.
+        "profit-per-hour",
         // Growing, or serving the same people?
         // Which machine is costing the shop, and what it keeps doing wrong.
         // When each machine is next due a service, and how many hours it has
@@ -4969,6 +4974,141 @@ public actor KhaytEngine {
               as: ProductProfit.self)
     }
 
+    // MARK: - Profit per printer hour
+
+    /// The catalogue ranked by what it earns for each hour on the printer.
+    ///
+    /// `lib/profit-per-hour.js`. A one-printer shop runs out of machine hours
+    /// before it runs out of anything else, so two products that make the same
+    /// profit per sale are not equal if one takes ten times as long.
+    ///
+    /// `perHour` is PLANNED, from the product record — the price the shop
+    /// charges, the cost `product-pricing` wrote and the hours `product-specs`
+    /// sums. `actual` is what finished business jobs of it really earned, with
+    /// the hours they really took. The two are kept apart on purpose: a gap
+    /// between them is the finding.
+    public struct ProfitPerHour: Decodable, Sendable {
+        public let rows: [Row]
+        public let totals: Totals
+        /// The rows the web store lists, best earners first — at most three,
+        /// and none unless there are two to choose between.
+        public let storeBest: [Row]
+        /// Listed rows earning well under the shop's own average per hour.
+        public let storeUnderpriced: [Row]
+
+        public init(rows: [Row], totals: Totals, storeBest: [Row] = [], storeUnderpriced: [Row] = []) {
+            self.rows = rows; self.totals = totals
+            self.storeBest = storeBest; self.storeUnderpriced = storeUnderpriced
+        }
+
+        public func row(_ id: String) -> Row? { rows.first { $0.productId == id } }
+
+        public struct Row: Decodable, Sendable, Identifiable, Hashable {
+            public let productId: String
+            public let name: String
+            /// Nil when the product has no price yet.
+            public let price: Double?
+            public let cost: Double?
+            /// Machine hours for one. Nil when its parts record none.
+            public let hours: Double?
+            /// Per sale. Nil with no price: zero would read as "breaks even".
+            public let profit: Double?
+            /// Planned profit per machine hour. Nil with no price or no hours —
+            /// never a division by zero.
+            public let perHour: Double?
+            /// `price` or `hours` — why there is no rate — or nil.
+            public let missing: String?
+            public let actual: Actual?
+            /// Earning well under the shop's own average per hour.
+            public let underpriced: Bool
+            /// The price that would earn the shop's average for its hours.
+            public let suggestedPrice: Double?
+            public var id: String { productId }
+
+            public init(productId: String, name: String, price: Double?, cost: Double?,
+                        hours: Double?, profit: Double?, perHour: Double?, missing: String?,
+                        actual: Actual? = nil, underpriced: Bool = false,
+                        suggestedPrice: Double? = nil) {
+                self.productId = productId; self.name = name; self.price = price; self.cost = cost
+                self.hours = hours; self.profit = profit; self.perHour = perHour
+                self.missing = missing; self.actual = actual
+                self.underpriced = underpriced; self.suggestedPrice = suggestedPrice
+            }
+        }
+
+        public struct Actual: Decodable, Sendable, Hashable {
+            public let jobs: Int
+            public let revenue: Double
+            public let cost: Double
+            public let hours: Double
+            public let profit: Double
+            public let perHour: Double?
+            /// Jobs whose time a printer measured.
+            public let measured: Int
+            /// Median of how far the measured hours ran from the estimate.
+            public let hoursDriftPct: Double?
+            /// `good`, `fair` or `thin`, from `estimate-variance`.
+            public let confidence: String?
+
+            public init(jobs: Int, revenue: Double, cost: Double, hours: Double, profit: Double,
+                        perHour: Double?, measured: Int = 0, hoursDriftPct: Double? = nil,
+                        confidence: String? = nil) {
+                self.jobs = jobs; self.revenue = revenue; self.cost = cost; self.hours = hours
+                self.profit = profit; self.perHour = perHour; self.measured = measured
+                self.hoursDriftPct = hoursDriftPct; self.confidence = confidence
+            }
+        }
+
+        public struct Totals: Decodable, Sendable {
+            public let ranked: Int
+            public let noHours: Int
+            public let noPrice: Int
+            /// Total planned profit over total hours; nil under three products.
+            public let averagePerHour: Double?
+            public let actualPerHour: Double?
+            public let best: String?
+            public let underpriced: Int
+
+            public init(ranked: Int, noHours: Int, noPrice: Int, averagePerHour: Double?,
+                        actualPerHour: Double?, best: String?, underpriced: Int) {
+                self.ranked = ranked; self.noHours = noHours; self.noPrice = noPrice
+                self.averagePerHour = averagePerHour; self.actualPerHour = actualPerHour
+                self.best = best; self.underpriced = underpriced
+            }
+        }
+    }
+
+    public func profitPerHour(products: [JSONValue], orders: [JSONValue], expenses: [JSONValue],
+                              inventory: [JSONValue], consumables: [JSONValue],
+                              settings: [String: JSONValue], clients: [JSONValue],
+                              language: String) throws -> ProfitPerHour {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG5, clients: ARG6 };
+          var r = globalThis.KhaytProfitPerHour.productRates({
+            products: ARG0, orders: ARG1, expenses: ARG2,
+            inventory: ARG3, consumables: ARG4, settings: ARG5,
+          }, {
+            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            partCostOf: function (p) { return globalThis.KhaytCalculatorCost.partTotalCost(p, ctx); },
+            nameOf: function (p) {
+              return globalThis.KhaytContentLanguages.read(p, 'name', ARG7, ARG5)
+                || (p && p.name) || '';
+            },
+          });
+          // What the web store lists is `storefront-catalog`'s decision, the
+          // same one a publish makes — not a second reading of the flag here.
+          var listed = globalThis.KhaytStorefrontCatalog
+            .publishable(ARG0, ARG5, ARG7).map(function (p) { return String(p.id); });
+          var hints = globalThis.KhaytProfitPerHour.storeHints(r, listed, { top: 3 });
+          return { rows: r.rows, totals: r.totals,
+                   storeBest: hints.best, storeUnderpriced: hints.underpriced };
+        })()
+        """#, [.array(products), .array(orders), .array(expenses), .array(inventory),
+               .array(consumables), .object(settings), .array(clients), .string(language)],
+              as: ProfitPerHour.self)
+    }
+
     // MARK: - How many quotes turn into work
 
     /// The quote funnel, and the two win rates that disagree with each other.
@@ -8662,17 +8802,23 @@ public actor KhaytEngine {
         public let thumbnail: String
         /// What the shop files this under. The grid groups by it.
         public let group: String
+        /// Planned profit per printer hour, from `profitPerHour`. Not part of
+        /// what `catalogue` returns — the host fills it in once the ranking has
+        /// been worked out, so the table can sort on it like any other column.
+        /// Nil for a product with no price or no hours.
+        public var perHour: Double?
 
         public init(id: String, name: String, description: String, base: Double, final: Double,
                     source: String, reason: String, margin: Double?, printHours: Double?,
                     weightGrams: Double?, material: String, parts: Int,
-                    thumbnail: String = "", group: String = "") {
+                    thumbnail: String = "", group: String = "", perHour: Double? = nil) {
             self.id = id; self.name = name; self.description = description
             self.base = base; self.final = final; self.source = source
             self.reason = reason
             self.margin = margin; self.printHours = printHours; self.weightGrams = weightGrams
             self.material = material; self.parts = parts
             self.thumbnail = thumbnail; self.group = group
+            self.perHour = perHour
         }
     }
 

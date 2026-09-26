@@ -286,6 +286,24 @@ struct Catalogue: View {
             .width(min: 70, ideal: 88)
             .alignment(.trailing)
 
+            // ── PER PRINTER HOUR ─────────────────────────────────────────
+            //
+            // The shop has one printer, so the column that decides what to
+            // sell is not the price or the markup but what an hour of machine
+            // time earns. `lib/profit-per-hour.js`; a dash for a product with
+            // no hours or no price, which has no rate rather than a zero one.
+            TableColumn(shop.words.callIt("mac.pph_column"), value: \.perHourSort) { row in
+                Text(PerHour.text(row.perHour, shop))
+                    .moneyStyle()
+                    .foregroundStyle(row.perHour == nil ? AnyShapeStyle(.tertiary)
+                                     : (row.perHour ?? 0) < 0 ? AnyShapeStyle(Khayt.late)
+                                     : AnyShapeStyle(.primary))
+                    .help(shop.words.callIt("mac.pph_column_help"))
+            }
+            .width(min: 80, ideal: 100)
+            .alignment(.trailing)
+            .customizationID("perHour")
+
             TableColumn(shop.words.callIt("mac.weight"), value: \.weightSort) { row in
                 Text(row.weightGrams.map { "\(Int($0)) \(shop.words.callIt("common.grams"))" } ?? "—")
                     .moneyStyle()
@@ -421,6 +439,9 @@ extension KhaytEngine.CatalogueRow {
     /// rather than as zero — a product with no margin set is not the cheapest.
     var marginSort: Double { margin ?? -1 }
     var weightSort: Double { weightGrams ?? -1 }
+    /// No rate sorts below every real one, including a loss — it is unknown,
+    /// not the worst.
+    var perHourSort: Double { perHour ?? -.greatestFiniteMagnitude }
 }
 
 /// One product, as a card.

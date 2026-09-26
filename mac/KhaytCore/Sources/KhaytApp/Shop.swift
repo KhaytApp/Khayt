@@ -768,6 +768,9 @@ final class Shop {
             // order's currency against them, and a book whose rows had not been
             // read yet would price a foreign job against the previous shop's.
             await resolveOwed(root)
+            // AFTER the catalogue, the jobs, the expenses and the settings
+            // tables: it ranks the first by what the rest say they earned.
+            await readProfitPerHour()
             await computeDashboard(root)
             // Ask the machines what they are doing — but never for the sample
             // shop, whose printers are somebody else's addresses on somebody
@@ -7324,6 +7327,23 @@ final class Shop {
     /// Resolved once per load. Three crossings per row — the name, the price
     /// and the specs — would be three hundred for a hundred products.
     private(set) var catalogueRows: [KhaytEngine.CatalogueRow] = []
+
+    /// The catalogue ranked by profit per printer hour — see
+    /// `ProfitPerHour.swift`. Read once per load, after the rows it ranks.
+    var profitPerHour: KhaytEngine.ProfitPerHour?
+
+    /// Put the planned rate on each catalogue row so the table can sort by it.
+    /// Only the one field changes; the rows are otherwise what `catalogue` said.
+    func stampPerHour(_ report: KhaytEngine.ProfitPerHour?) {
+        profitPerHour = report
+        let rates = Dictionary((report?.rows ?? []).map { ($0.productId, $0.perHour) },
+                               uniquingKeysWith: { first, _ in first })
+        catalogueRows = catalogueRows.map { row in
+            var row = row
+            row.perHour = rates[row.id] ?? nil
+            return row
+        }
+    }
 
     // MARK: - What the cloud holds
 
