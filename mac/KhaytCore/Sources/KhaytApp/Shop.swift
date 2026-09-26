@@ -797,6 +797,7 @@ final class Shop {
             // outside it races whatever is in flight — and only for a real
             // book, which is the only kind that can have one.
             rescueStrandedServiceLog(next.build)
+            if next.build != nil { await repairSpoolSizes() }
             await readSlicers()
             remeasureIfDue()
             createRecurringIfDue()
@@ -13319,6 +13320,81 @@ final class Shop {
     ///
     /// It is a no-op the second time: the stray key is removed by the same
     /// write, so there is nothing left to find.
+    /// Put back the spool SIZE a product was costed on, and re-price it.
+    ///
+    /// ── WHAT WAS WRONG ─────────────────────────────────────────────────────
+    ///
+    /// Five places copied a spool's `weight` (grams LEFT) into a part's
+    /// `spoolWeight`, which `calculator-cost.js` divides the spool's price by.
+    /// A product costed from a spool with 859 g left paid 75/859 a gram, not
+    /// 75/1000: 16% too much for the plastic, and more as the spool empties.
+    /// The code is fixed; this fixes what it already wrote (the shop chose to
+    /// have its four products repaired and re-priced).
+    ///
+    /// Idempotent: a part is touched only when its figure differs from the
+    /// spool's size, so the second open finds nothing. Each product is priced
+    /// by the same rule the product editor saves with, and written only if it
+    /// is still exactly as it was read, so an edit made meanwhile is never
+    /// overwritten. A spool with no recorded size is 1000 g, as everywhere.
+    /// The parts with each spool's SIZE in place, or nil when none differed.
+    static func spoolSizesFixed(_ parts: [JSONValue], sizes: [String: Double]) -> [JSONValue]? {
+        var changed = false
+        let fixed: [JSONValue] = parts.map { part in
+            guard case .object(var p) = part, case .string(let spool)? = p["filamentId"],
+                  let size = sizes[spool] else { return part }
+            if case .number(let had)? = p["spoolWeight"], had == size { return part }
+            p["spoolWeight"] = .number(size)
+            changed = true
+            return .object(p)
+        }
+        return changed ? fixed : nil
+    }
+
+    func repairSpoolSizes() async {
+        guard let engine, let build = source.build, canMoveJobs else { return }
+        var sizes: [String: Double] = [:]
+        for spool in spools { sizes[spool.id] = max(1, spool.spoolWeight ?? 1000) }
+        var repaired: [String: (was: JSONValue, now: [String: JSONValue])] = [:]
+        for row in productRows {
+            guard case .object(let product) = row, case .string(let id)? = product["id"],
+                  case .array(let parts)? = product["parts"] else { continue }
+            guard let fixed = Self.spoolSizesFixed(parts, sizes: sizes) else { continue }
+            var input: [String: JSONValue] = ["parts": .array(fixed)]
+            for key in ["defaultMargin", "components", "priceRound", "priceOverride"] {
+                if let v = product[key] { input[key] = v }
+            }
+            var next = product
+            next["parts"] = .array(fixed)
+            if let priced = try? await engine.productPricingFields(
+                .object(input), inventory: inventoryRows, settings: settingsDict, consumables: consumableRows) {
+                for (key, value) in priced { next[key] = value }
+            }
+            repaired[id] = (row, next)
+        }
+        guard !repaired.isEmpty else { return }
+        var done = 0
+        do {
+            try StoreWriter.update(build) { root in
+                var rows = Self.rows(root, "products")
+                for i in rows.indices {
+                    guard let id = Self.recordId(rows[i]), let fix = repaired[id], rows[i] == fix.was else { continue }
+                    var record = fix.now
+                    StoreWriter.stamp(&record)
+                    rows[i] = .object(record)
+                    done += 1
+                }
+                root["products"] = .array(rows)
+            }
+        } catch {
+            FileHandle.standardError.write(Data("khayt: spool size repair — \(error)\n".utf8))
+            return
+        }
+        guard done > 0 else { return }
+        FileHandle.standardError.write(Data("khayt: spool size repair — re-priced \(done) product(s)\n".utf8))
+        moveNotices.append(words.counting(done, "mac.spool_repair_done"))
+        await load(source)
+    }
+
     func rescueStrandedServiceLog(_ build: StoreReader.Build?) {
         guard let build, canWrite else { return }
         // Asked before writing, so an ordinary load of an ordinary book does

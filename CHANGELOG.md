@@ -10,6 +10,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   it had already accepted for only ten minutes, and forgot everything when it
   restarted. It now remembers for thirty days, across restarts, so a copy sent
   again is refused. The Mac app has the same fix (SEC-010).
+- **(Mac) Products costed on a spool's grams left are repaired and
+  re-priced.** The shop chose to have them corrected rather than wait for
+  each one to be edited. When a book opens, a product part whose stored spool
+  size differs from its spool's real size (1000 g when none is recorded) is
+  corrected, and the product is priced by the same rule the product editor
+  uses. A product changed in the meantime is left alone. On the shop's book
+  this re-priced four products by one or two riyals.
+
 - **(Maintainers) Two Mac tests stopped failing with the calendar.** They
   loaded the sample book as of today, which moves every date in it, and then
   measured it at a fixed date. On 2026-09-26 the refund quarter and the
