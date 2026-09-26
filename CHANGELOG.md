@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Maintainers) Two Mac tests stopped failing with the calendar.** They
+  loaded the sample book as of today, which moves every date in it, and then
+  measured it at a fixed date. On 2026-09-26 the refund quarter and the
+  break-even month slid out from under them, and "Mac app tests" went red on
+  every PR. Both now load the book as of the day it was written for.
+
 - **Choose which products are on your web store, and see what needs fixing
   before you publish.** Each product in Settings → Storefront has an "On
   store" box: untick it and the product stays in Khayt but is not published.

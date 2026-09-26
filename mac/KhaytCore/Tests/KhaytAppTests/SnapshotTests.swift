@@ -997,7 +997,9 @@ import KhaytCore
     @Test("the break-even card, short of the line and past it")
     func breakEvenCard() async throws {
         let shop = Shop()
-        await shop.load(.sample)
+        // As of the sample's own day: the months below are pinned, and the
+        // book moves with the calendar (see InputVatTests.rows).
+        await shop.load(.sample, asOf: try #require(SampleBook.anchor))
         let engine = try #require(shop.engine)
         let completed = shop.orderRows.filter {
             if case .object(let o) = $0, case .string(let s)? = o["status"] { return s == "completed" }
