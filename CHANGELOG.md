@@ -3919,6 +3919,67 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.50] - 2026-09-26
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Choose which products go on the web store, see what needs fixing before they
+go, set up the store from the Mac, and know when a publish has worked. Undo
+after a delete now survives the next sync.
+
+### Added
+
+- **(Mac) Choose what goes on the web store, check it before it goes, and
+  set up the store itself.** Asked for by the shop after a review of its first
+  published catalogue.
+  - **A "Show on the web store" switch in each product.** Hidden products are
+    left out of the catalogue on the Mac and the desktop alike: the rule is in
+    the shared `lib/storefront-catalog.js`. The product editor also gains the
+    Category field it never had.
+  - **"Before you publish" in the Web Store sheet** lists each product a
+    customer would find something wrong with. That covers no price, no photo, no
+    description, no category, a second language that is missing or repeats the
+    first, and names that read like file names. Each listing has **Edit…** and
+    **Hide** beside it.
+  - **Store settings** in the same sheet: shop note, lead time, minimum order,
+    deposit, tax, payment link, shipping methods and promo codes. Until now these
+    could only be set from the desktop app's Storefront dialog. They use the same
+    limits as the desktop, and the per-product prices, options and stock counts
+    beside them are left untouched.
+
+### Fixed
+
+- **(Mac) Publishing to the web store says whether it worked.** Reported by
+  the shop: "there is no way to know if the publish was successful unless I
+  check the website". The outcome was a small grey line at the foot of the
+  sheet. After a publish, the Mac now reads the catalogue back from Khayt Cloud
+  and says what the store is listing, for example "Published. Khayt Cloud is
+  now listing 5 products with 5 photos", in a banner at the top of the sheet
+  with the time it was checked. If fewer arrive than were sent, it says so in
+  the attention colour. A live store's automatic republish that fails is
+  reported in the app's notices, rather than only inside the sheet.
+
+- **(Mac) Undo after a delete survives the next sync.** Found in a review of
+  the tombstone fix: an undone delete came back under its old id, and the
+  delete marker, usually already in the cloud, deleted it again at the next
+  sync. A record put back after a delete now returns under a new id, and every
+  link to it (jobs, storefront prices and the rest) moves with it. Undo after
+  deleting a supplier, product or spool had also done nothing: it put the
+  record back and then deleted it again straight away. Undo after deleting a
+  consumable did nothing either. All four now restore the record.
+
+- **(Mac) The web store only republishes itself when it should.** Also from
+  that review:
+  - A live store is checked before each automatic republish, so a store taken
+    offline from the desktop stays offline.
+  - Opening a different book no longer republishes that book's store.
+  - A Mac signed in as a viewer no longer tries to publish at all.
+  - Deleting every product takes the store offline, rather than leaving the old
+    catalogue up for customers to order from, and says so.
+  - A publish whose confirmation could not be read back is no longer reported
+    as a failure.
+
 ## [4.0.0-alpha.49] - 2026-09-25
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
