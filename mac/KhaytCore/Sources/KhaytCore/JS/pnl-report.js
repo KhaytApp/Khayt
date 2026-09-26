@@ -9,6 +9,30 @@
   /** Finished work, in both spellings a book can hold. */
   const FINISHED = new Set(['completed', 'delivered']);
 
+  /* ── FILAMENT IS COUNTED WHEN IT IS USED, NOT WHEN IT IS BOUGHT ────────────
+   *
+   * Receiving a purchase order books the spool as an expense (category
+   * `filament`, lib/purchase-orders.js), and a shop can type one in by hand the
+   * same way. Once net took the cost of goods out as well (#1623), that spool
+   * was paid for twice in the P&L: once as an expense the day it arrived, and
+   * again as each job's cost when it was printed — so net understated every
+   * shop that recorded what it bought.
+   *
+   * The maintainer's decision (2026-09-26): accrual. A filament purchase is
+   * INVENTORY — money turned into stock on the shelf — and it reaches the P&L
+   * as cost of goods when a job uses it. It is left out of operating expenses
+   * here and reported beside them as `inventoryPurchases`, so the money is
+   * never simply gone from the report. The tax on it is still reclaimable:
+   * accrual moves WHEN the cost is recognised, not the VAT position.
+   *
+   * What this does NOT catch: filament wasted on a failed print never becomes a
+   * job's cost, so under accrual it leaves the P&L entirely. It was hidden
+   * inside the purchase before; booking waste as its own line is a separate
+   * decision. */
+  const INVENTORY_CATEGORIES = new Set(['filament']);
+  const isInventoryPurchase = (e) =>
+    !!e && INVENTORY_CATEGORIES.has(String(e.category || '').trim().toLowerCase());
+
   /**
    * @param {object} input
    * @param {Array<{revenue:number, cogs:number, vat?:number}>} input.orders base-currency per order
@@ -28,9 +52,10 @@
       vatCollected += +o.vat || 0;
     }
     const byCat = {};
-    let expensesTotal = 0;
+    let expensesTotal = 0, inventoryPurchases = 0;
     for (const e of expenses) {
       const amt = +e.amount || 0;
+      if (isInventoryPurchase(e)) { inventoryPurchases += amt; continue; }
       const cat = (e.category && String(e.category).trim()) || 'Uncategorized';
       byCat[cat] = (byCat[cat] || 0) + amt;
       expensesTotal += amt;
@@ -47,6 +72,9 @@
       expensesTotal: round2(expensesTotal),
       expensesByCategory: Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a])
         .map((category) => ({ category, amount: round2(byCat[category]) })),
+      // Filament bought in the period: stock, not an expense. It is in `cogs`
+      // as the jobs that use it finish.
+      inventoryPurchases: round2(inventoryPurchases),
       vatCollected: round2(vatCollected),
       netProfit: round2(netProfit),
     };
@@ -83,6 +111,13 @@
     rows.push(['', '']);
     rows.push([lab('vat', 'VAT collected'), summary.vatCollected]);
     rows.push([lab('net', 'Net profit'), summary.netProfit]);
+    // Not part of the arithmetic above: filament bought is stock, and reaches
+    // net only through cost of goods as it is used. Shown so the money is not
+    // simply missing from the report.
+    if (summary.inventoryPurchases) {
+      rows.push(['', '']);
+      rows.push([lab('inventory', 'Filament bought (stock, counted when used)'), summary.inventoryPurchases]);
+    }
     return '﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n');
   }
 
@@ -155,7 +190,7 @@
     const at = (key) => {
       if (!byQuarter[key]) {
         byQuarter[key] = {
-          period: key, orders: 0, revenue: 0, shipping: 0, expenses: 0,
+          period: key, orders: 0, revenue: 0, shipping: 0, expenses: 0, inventory: 0,
           vatCollected: 0, vatReclaimable: 0, cogs: 0, unpriced: 0,
         };
       }
@@ -234,7 +269,10 @@
       const claimable = (tax && profile && profile.rates && profile.rates.length)
         ? Math.min(paid, Math.max(0, +e.vatAmount || 0))
         : 0;
-      at(key).expenses += paid - claimable;
+      // Filament is stock, counted as cost of goods when used — see
+      // INVENTORY_CATEGORIES. Its tax is reclaimable all the same.
+      if (isInventoryPurchase(e)) at(key).inventory += paid - claimable;
+      else at(key).expenses += paid - claimable;
       at(key).vatReclaimable += claimable;
     }
 
@@ -262,6 +300,9 @@
         revenue: round2(row.revenue),
         shipping: round2(row.shipping),
         expenses: round2(row.expenses),
+        // Filament bought this period, net of reclaimable tax: stock, not an
+        // expense, so it is not in `net` — `cogs` carries it when it is used.
+        inventory: round2(row.inventory),
         fixed: round2(fixed),
         vatCollected: round2(row.vatCollected),
         vatReclaimable: round2(row.vatReclaimable),
@@ -283,7 +324,7 @@
     });
   }
 
-  const api = { computePnl, pnlToCsv, pnlByPeriod };
+  const api = { computePnl, pnlToCsv, pnlByPeriod, isInventoryPurchase, INVENTORY_CATEGORIES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') globalThis.KhaytPnl = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

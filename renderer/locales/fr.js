@@ -1965,6 +1965,8 @@
   "pnl.item": "Poste",
   "pnl.amount": "Montant",
   "pnl.cogs": "Coût des marchandises vendues",
+  "pnl.inventory": "Filament acheté (stock, compté à l’utilisation)",
+  "pnl.inventory_note": "Filament acheté sur la période : {amount}. C’est du stock, compté en coût des ventes quand une commande l’utilise ; il n’apparaît donc pas dans les dépenses ci-dessus.",
   "pnl.gross": "Bénéfice brut",
   "pnl.gross_margin": "Marge brute %",
   "pnl.opex": "Charges d'exploitation",

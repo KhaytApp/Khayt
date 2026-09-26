@@ -243,7 +243,11 @@ struct DayInTheShopTests {
             currencies: [:], now: Date())
         let quarter = try #require(pnl.first)
         #expect(quarter.orders == 1)
-        #expect(quarter.expenses == 90)
+        // The day's only expense is a 90 filament restock, and filament is STOCK
+        // (accrual, the maintainer's decision of 2026-09-26, lib/pnl-report.js):
+        // it reaches the P&L as the cost of goods of the work that uses it, not
+        // as an expense the day it arrives as well.
+        #expect(quarter.expenses == 0)
         // 15% INCLUSIVE, AND HELD FOR THE TAX AUTHORITY — which this test said
         // in words before its numbers agreed. The price is what the customer
         // paid; the shop keeps what is left after the tax inside it, and that
@@ -257,7 +261,8 @@ struct DayInTheShopTests {
                 "and the two together are still what the customer paid")
         // Net takes what the job cost to make off as well (Sep 2026), the way
         // the margin beside it always did.
-        #expect(abs(quarter.net - (price - held - (quarter.cogs ?? 0) - 90)) < 0.01)
+        // …and so the restock is not taken off net a second time.
+        #expect(abs(quarter.net - (price - held - (quarter.cogs ?? 0))) < 0.01)
         // The day recorded no tax on its own purchases, so there is none to
         // reclaim and the whole of what was charged is owed.
         #expect(quarter.vatReclaimable == 0)

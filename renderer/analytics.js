@@ -1686,6 +1686,14 @@ function renderPnLSection() {
           }).join('')}
         </tbody>
       </table>
+      ${(() => {
+        // Filament bought is stock, counted as cost of goods when a job uses
+        // it, so it is not in these expenses. Said here, or it looks missing.
+        const bought = rows.reduce((s, r) => s + (r.inventory || 0), 0);
+        return bought > 0
+          ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:6px;">${escapeHtml(t('pnl.inventory_note', { amount: fmtMoney(bought) }))}</div>`
+          : '';
+      })()}
     </div>`;
 }
 
@@ -1999,7 +2007,9 @@ function renderLocationPL() {
   });
 
   // Expenses
-  expenses.filter(e => inRange(e.date, analyticsRange, 'analytics')).forEach(e => {
+  // Filament bought is stock: it reaches a location's figures as its jobs'
+  // material cost (matCost above), not again as an expense (lib/pnl-report.js).
+  expenses.filter(e => inRange(e.date, analyticsRange, 'analytics') && !KhaytPnl.isInventoryPurchase(e)).forEach(e => {
     getD(e.locationId || '__none__').expenses += +e.amount || 0;
   });
 
@@ -2816,6 +2826,7 @@ function exportPnlCsv() {
     title: t('pnl.title'), item: t('pnl.item'), amount: t('pnl.amount'), orders: t('an.pnl_orders'),
     revenue: t('an.revenue'), cogs: t('pnl.cogs'), gross: t('pnl.gross'), gross_margin: t('pnl.gross_margin'),
     opex: t('pnl.opex'), vat: t('an.pnl_vat'), net: t('an.pnl_net'),
+    inventory: t('pnl.inventory'),
   };
   const csv = KhaytPnl.pnlToCsv(summary, { currency: currencySymbol(), labels });
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }),

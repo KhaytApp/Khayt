@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Net profit counted your filament twice.** Filament you record as bought —
+  from a purchase order or typed in as an expense — was taken off your
+  profit the day it arrived, and again as the cost of each job that used it,
+  so net profit read lower than it was. Filament is now counted once, when it
+  is used: the P&L treats what you buy as stock, shows it on its own line,
+  and takes it off profit as the cost of goods of the work that uses it. The
+  tax you paid on it is still counted as reclaimable. **Net profit figures
+  you have looked at before will be higher**, by what the filament had been
+  counted a second time.
 - **(Mac) The library's filters are a few menus instead of a row of
   bubbles, and it opens as one grid of every model.** Reported by the shop:
   "the library filter and grouping is not practical, too many bubbles to go
