@@ -270,6 +270,38 @@ public actor DriveClient {
                              "trash")
     }
 
+    /// Every file in the app's folder whose key starts with `keyPrefix`, in
+    /// the bucket's listing shape. `nameContains` narrows the query on Drive's
+    /// side (a key's last segment is the file's name); the key prefix is then
+    /// checked here, against the `khaytKey` each file was tagged with.
+    public func list(keyPrefix: String, nameContains: String) async throws -> [S3.Listed] {
+        let parent = try await ensureFolder()
+        var q = "\(Self.quoted(parent)) in parents and trashed=false"
+        if !nameContains.isEmpty { q += " and name contains \(Self.quoted(nameContains))" }
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        let base = "\(Self.api)/files?q=\(q.addingPercentEncoding(withAllowedCharacters: allowed) ?? "")"
+            + "&fields=nextPageToken,files(id,size,modifiedTime,appProperties)&pageSize=1000"
+        let stamp = ISO8601DateFormatter()
+        stamp.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var out: [S3.Listed] = []
+        var page: String?
+        for _ in 0..<50 {
+            let url = base + (page.map { "&pageToken=\($0.addingPercentEncoding(withAllowedCharacters: allowed) ?? "")" } ?? "")
+            let r = try await object(try await request(url), "list")
+            for f in (r["files"] as? [[String: Any]]) ?? [] {
+                guard let key = (f["appProperties"] as? [String: Any])?["khaytKey"] as? String,
+                      key.hasPrefix(keyPrefix) else { continue }
+                let size = Int((f["size"] as? String) ?? "") ?? (f["size"] as? Int) ?? 0
+                out.append(S3.Listed(key: key, size: size,
+                                     modified: (f["modifiedTime"] as? String).flatMap(stamp.date(from:))))
+            }
+            guard let next = r["nextPageToken"] as? String, !next.isEmpty else { return out }
+            page = next
+        }
+        return out
+    }
+
     /// Who is signed in, and how full their Drive is (nil limit: unlimited).
     public func about() async throws -> (email: String, usage: Double, limit: Double?) {
         let r = try await object(try await request("\(Self.api)/about?fields=user(emailAddress),storageQuota(limit,usage)"),

@@ -53,6 +53,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   spool change by default, which you can change under Settings › Operations.
   Khayt does not store a queue order, so the grouped order is a suggestion for
   the order to print in. Applying still assigns printers only.
+
+- **(Mac) An off-site backup of the book, every night.** Until now the only
+  backups sat beside the book on the same Mac, so a lost or broken Mac took
+  them with it. Settings → Preferences → Off-site backup now sends an
+  encrypted copy each night to a folder such as iCloud Drive, to the bucket
+  or Google Drive already set up for the print library (no second set of
+  keys), and keeps the last 30 days plus one a month for the year before.
+  The copy is locked with your Khayt Cloud key, so on a new Mac you sign in
+  with your passphrase and choose **Restore from Off-site…** to bring it
+  back; the book you have is copied first, as with any restore. Without
+  Khayt Cloud signed in and unlocked nothing is sent, and the pane says so.
+  It shows when the last copy went and how big it was, and a banner appears
+  if it has been failing for more than two days. Nothing is switched on for
+  you: the old bucket details left in the book from August are not used
+  unless you pick them.
+
 - **Security: a store or carrier notification could be replayed.** Salla,
   Zid, SMSA, Aramex and Saudi Post sign each notification's content but not
   when it was sent, so a copy captured once stays valid. Khayt remembered what

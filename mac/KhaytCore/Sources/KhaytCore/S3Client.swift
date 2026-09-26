@@ -122,12 +122,18 @@ public enum S3 {
     /// The signed request for one object. The key's segments are encoded
     /// once, and that same encoded path is both sent and signed.
     public static func request(_ c: S3Config, method: String, key: String, body: Data?,
+                               query: [(String, String)] = [],
                                now: Date = Date()) throws -> URLRequest {
         guard c.isConfigured else { throw Failure.notConfigured }
         let base = c.endpoint.trimmingCharacters(in: .whitespaces)
             .replacingOccurrences(of: "/+$", with: "", options: .regularExpression)
         let path = ([c.bucket] + key.split(separator: "/").map(String.init)).map(encode).joined(separator: "/")
-        guard let url = URL(string: base + "/" + path), let host = url.host else { throw Failure.badEndpoint(base) }
+        // The query is encoded the way the signer encodes it, so what is sent
+        // and what is signed are the same string.
+        let search = query.isEmpty ? "" : "?" + query.map { encode($0.0) + "=" + encode($0.1) }.joined(separator: "&")
+        guard let url = URL(string: base + "/" + path + search), let host = url.host else {
+            throw Failure.badEndpoint(base)
+        }
         // HTTPS, except to this Mac or the shop's own network: a customer's
         // model in plain HTTP across the internet is readable by every hop,
         // and a MinIO box on the LAN is the one place plain HTTP is normal.
@@ -196,6 +202,87 @@ public enum S3 {
         let size = Int(http.value(forHTTPHeaderField: "Content-Length") ?? "") ?? -1
         let etag = http.value(forHTTPHeaderField: "ETag")?.trimmingCharacters(in: CharacterSet(charactersIn: "\" "))
         return Head(size: size, etag: etag)
+    }
+
+    /// One object in a listing.
+    public struct Listed: Sendable, Equatable {
+        public let key: String
+        public let size: Int
+        public let modified: Date?
+        public init(key: String, size: Int, modified: Date?) {
+            self.key = key; self.size = size; self.modified = modified
+        }
+    }
+
+    /// Every object whose key starts with `prefix` — ListObjectsV2, followed
+    /// page by page. Capped at fifty pages (fifty thousand objects): a caller
+    /// listing one folder of backups that finds more than that is not looking
+    /// at what it thinks it is.
+    public static func list(_ c: S3Config, prefix: String, fetch: Fetch) async throws -> [Listed] {
+        var out: [Listed] = []
+        var token: String?
+        for _ in 0..<50 {
+            var query = [("list-type", "2"), ("prefix", prefix)]
+            if let token { query.append(("continuation-token", token)) }
+            let (data, response) = try await fetch(try request(c, method: "GET", key: "", body: nil, query: query))
+            let code = status(response)
+            guard (200..<300).contains(code) else { throw Failure.http("LIST", code) }
+            let page = ListParser.parse(data)
+            out += page.items
+            guard page.truncated, let next = page.next, !next.isEmpty else { return out }
+            token = next
+        }
+        return out
+    }
+
+    /// `ListBucketResult`, read with Foundation's own XML parser — which the
+    /// phone has too.
+    final class ListParser: NSObject, XMLParserDelegate {
+        var items: [Listed] = []
+        var truncated = false
+        var next: String?
+        private var text = ""
+        private var key = "", size = 0, modified: Date?
+        private var inContents = false
+
+        static func parse(_ data: Data) -> (items: [Listed], truncated: Bool, next: String?) {
+            let p = ListParser()
+            let xml = XMLParser(data: data)
+            xml.delegate = p
+            xml.parse()
+            return (p.items, p.truncated, p.next)
+        }
+
+        static func date(_ s: String) -> Date? {
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let d = f.date(from: s) { return d }
+            f.formatOptions = [.withInternetDateTime]
+            return f.date(from: s)
+        }
+
+        func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?,
+                    qualifiedName: String?, attributes: [String: String] = [:]) {
+            text = ""
+            if name == "Contents" { inContents = true; key = ""; size = 0; modified = nil }
+        }
+        func parser(_ parser: XMLParser, foundCharacters string: String) { text += string }
+        func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?,
+                    qualifiedName: String?) {
+            let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            switch name {
+            case "Key" where inContents: key = value
+            case "Size" where inContents: size = Int(value) ?? 0
+            case "LastModified" where inContents: modified = Self.date(value)
+            case "Contents":
+                inContents = false
+                if !key.isEmpty { items.append(Listed(key: key, size: size, modified: modified)) }
+            case "IsTruncated": truncated = value == "true"
+            case "NextContinuationToken": next = value
+            default: break
+            }
+            text = ""
+        }
     }
 
     public static func delete(_ c: S3Config, key: String, fetch: Fetch) async throws {
