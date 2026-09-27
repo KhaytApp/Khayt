@@ -17,9 +17,33 @@ import SwiftUI
 struct ConnectionBanner: View {
     @EnvironmentObject private var health: ConnectionHealth
     @EnvironmentObject private var api: KhaytAPIClient
+    @EnvironmentObject private var settings: ConnectionSettings
 
     var body: some View {
-        if health.state == .unauthorized {
+        if settings.isSampleShop {
+            // Said on every screen: nothing here is a real shop, and the way
+            // out is to pair with one — which clears the sample away.
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(L10n.tr("sample.banner"))
+                        .font(.khayt(12, .semibold, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.attention)
+                    Text(L10n.tr("sample.banner.line"))
+                        .font(.khayt(11, relativeTo: .caption2))
+                        .foregroundStyle(KhaytDesign.textDim)
+                }
+                Spacer(minLength: 0)
+                Button(L10n.tr("sample.pair")) { settings.unpair() }
+                    .font(.khayt(12, .semibold, relativeTo: .caption))
+                    .foregroundStyle(KhaytDesign.brand)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 5)
+                    .background(KhaytDesign.brand.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+            }
+            .padding(.horizontal, KhaytDesign.pad)
+            .padding(.vertical, 7)
+            .background(KhaytDesign.attention.opacity(0.12))
+        } else if health.state == .unauthorized {
             strip(tint: KhaytDesign.attention, loud: true,
                   title: L10n.tr("connection.unauthorized"), line: L10n.tr("connection.banner.pin"),
                   action: true)

@@ -215,7 +215,29 @@ final class KhaytAPIClient: ObservableObject {
     /// so. Away from the shop that would be fifteen seconds before every cloud
     /// read, so once the shop has not answered, the next half-minute of polls
     /// go straight to the cloud and only then is the shop asked again.
+    // MARK: - The sample shop
+
+    /// Open the built-in sample shop: its book written to this phone like a
+    /// pulled one, with nothing to pull it from and nowhere to send to.
+    func openSampleShop(now: Date = Date()) throws {
+        guard let book else { throw KhaytAPIError.notConfigured }
+        let store = SampleShop.book(now: now)
+        try book.replace(with: store, scope: SampleShop.scope(now: now))
+        try book.replaceBaseline(with: store)
+        settings.host = ""
+        settings.pin = ""
+        settings.shopLabel = SampleShop.label
+        settings.serviceName = ""
+        settings.isSampleShop = true
+        settings.isPaired = true
+    }
+
     func fetchLivePrinters(now: Date = Date()) async throws -> LiveSnapshot {
+        // The sample shop's printers run on the clock, so live tracking can be
+        // seen without a printer.
+        if settings.isSampleShop {
+            return LiveSnapshot(printers: SampleShop.liveReadings(now: now), source: .shop, reportedAt: nil)
+        }
         var lanError: Error?
         if lanLiveRetryAt.map({ now >= $0 }) ?? true {
             do {

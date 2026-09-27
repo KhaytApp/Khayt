@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(iOS) The companion can be tried without a shop.** "Explore with a
+  sample shop" on the first pairing screen opens a made-up print shop on the
+  phone — orders at every stage, a late job, spools running low, clients,
+  people waiting, and three printers whose live progress moves with the
+  clock. It is read through the same rules as a real shop's book, sends
+  nothing anywhere, and a strip on every screen says so, with "Pair with my
+  Mac" to leave it. For TestFlight's reviewers, who cannot pair with
+  anything, and for anyone trying the app before they run Khayt.
+
 - **(iOS) The companion declares its encryption, so TestFlight stops asking.**
   Every cipher it uses is Apple's own — TLS, and AES-GCM through CryptoKit —
   and the one algorithm written in the app is scrypt, a standard
