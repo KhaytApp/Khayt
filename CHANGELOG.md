@@ -4211,6 +4211,51 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.52] - 2026-09-27
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Delete several library models at once, connect Google Drive in one click, the
+Dashboard and Reports agree, wasted filament is its own cost line, and fixes
+from a review of every screen.
+
+### Changed and fixed
+
+- **(Mac) Connect Google Drive with one click.** Asked for by the shop, after
+  the setup proved to be a workaround: every shop had to create its own OAuth
+  client in Google Cloud and publish it. Khayt now carries its own Google
+  client, verified by Khayt. **Settings › Preferences › Online storage › Google
+  Drive › Connect** signs in and is done. A shop that wants its own client can
+  still use one, under "advanced". It asks only for the files Khayt itself puts
+  in the shop's Drive.
+
+- **(Mac) The dashboard's net agrees with Reports, and failed prints count.**
+  The header's "September · Net" was your sales before tax; it is now the same
+  net income Reports shows — sales less the material the work used, failed
+  prints, expenses and overhead. Failed-print waste is its own line in Reports
+  too. Every cost line in Reports now reads as a minus, in the table and the
+  side panel alike, and in Arabic the minus sign sits in front of the number.
+  A printer that has never answered is "not answering" everywhere on Machines
+  (it was "Free" on the timeline beside "Not answering" in Next up), while one
+  that answered before still gets two missed checks of grace. Also: the time
+  left on a machine card is in Arabic in Arabic, the Board says "1 finished job"
+  / "20 finished jobs" instead of "job(s)", the cash-flow totals fit under a
+  one-quarter P&L, and the Spoolman import, Add supplier and search box are
+  legible in dark mode.
+
+- **(Mac) Saving the Google Drive settings keeps your client ID.** Reported by
+  the shop: "I did the gdrive and all I got was saved and nothing else". Save
+  stored only the folder name and threw away the OAuth client ID and secret
+  just typed, which also greyed out **Connect Google Drive**. They are kept now.
+  The pane says plainly when Drive is not connected yet, and what to click.
+
+- **(Mac) Several models can be deleted from the library at once.** Reported
+  by the shop: "I tried to delete multiple files from the library but can't,
+  only one at a time". Select the models (Shift or Command click), right-click
+  one of them and choose **Delete N Models…**. One question, then all of them
+  go to the Trash and out of the library in a single change.
+
 ## [4.0.0-alpha.51] - 2026-09-26
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
