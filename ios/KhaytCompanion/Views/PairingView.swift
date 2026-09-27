@@ -23,6 +23,7 @@ struct PairingView: View {
     @State private var pinRefused = false
     @State private var failure: String?
     @State private var summary: PairingSummary?
+    @State private var sampleFailure: String?
     @FocusState private var pinFocused: Bool
 
     var body: some View {
@@ -76,6 +77,11 @@ struct PairingView: View {
             quietLink(L10n.tr("pair.use_cloud")) { showCloudSignIn = true }
                 .padding(.top, 10)
             foot(L10n.tr("pair.use_cloud.footer"))
+            quietLink(L10n.tr("pair.sample")) {
+                do { try api.openSampleShop() } catch { sampleFailure = error.localizedDescription }
+            }
+            .padding(.top, 10)
+            foot(sampleFailure ?? L10n.tr("pair.sample.footer"))
         }
         // Scoped to this step: browsing holds a network assertion, and there
         // is no reason to hold it while somebody types a PIN.

@@ -156,6 +156,11 @@ final class ConnectionSettings: ObservableObject {
     @Published var notifyLowStock: Bool {
         didSet { UserDefaults.standard.set(notifyLowStock, forKey: Keys.notifyLowStock) }
     }
+    /// This phone is showing the built-in sample shop (`SampleShop`), not a
+    /// real one: nothing is sent anywhere, and the connection strip says so.
+    @Published var isSampleShop: Bool {
+        didSet { UserDefaults.standard.set(isSampleShop, forKey: Keys.sampleShop) }
+    }
     @Published var notifyPrintDone: Bool {
         didSet { UserDefaults.standard.set(notifyPrintDone, forKey: Keys.notifyPrintDone) }
     }
@@ -173,6 +178,7 @@ final class ConnectionSettings: ObservableObject {
         static let notifyOverdue = "khayt.notify.overdue"
         static let notifyLowStock = "khayt.notify.lowstock"
         static let notifyPrintDone = "khayt.notify.printdone"
+        static let sampleShop = "khayt.sampleShop"
     }
 
     init() {
@@ -190,6 +196,7 @@ final class ConnectionSettings: ObservableObject {
         notifyOverdue = defaults.object(forKey: Keys.notifyOverdue) as? Bool ?? true
         notifyLowStock = defaults.object(forKey: Keys.notifyLowStock) as? Bool ?? true
         notifyPrintDone = defaults.object(forKey: Keys.notifyPrintDone) as? Bool ?? true
+        isSampleShop = defaults.bool(forKey: Keys.sampleShop)
         L10n.setLanguage(appLanguage)
     }
 
@@ -233,6 +240,7 @@ final class ConnectionSettings: ObservableObject {
 
     func unpair() {
         isPaired = false
+        isSampleShop = false
         serviceName = ""
         pin = ""
         KeychainHelper.delete(Keys.pinKeychain)

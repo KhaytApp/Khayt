@@ -560,3 +560,10 @@
 "feed.empty.sub" = "Finished prints, late jobs, low filament and new order requests land here.";
 "feed.unread" = "Unread";
 "feed.unread_count" = "%d unread";
+
+/* Sample shop */
+"pair.sample" = "Explore with a sample shop";
+"pair.sample.footer" = "A made-up shop on this phone only — orders, spools, printers. Nothing is sent anywhere; pair with your Mac any time.";
+"sample.banner" = "Sample shop";
+"sample.banner.line" = "Nothing here is real, and nothing leaves this phone.";
+"sample.pair" = "Pair with my Mac";
