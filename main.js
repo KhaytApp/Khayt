@@ -2160,7 +2160,14 @@ function printLibRemote() {
  */
 async function printLibMirrorFile(id, filename, srcPath) {
   const dir = printLibMirrorItemDir(id);
-  const s3 = printLibRemote();
+  // Drive's own "keep a copy of every new model" switch
+  // (settings.printLibrary.gdrive.backUpNew, set on the Mac's storage pane;
+  // absent means on). A bucket has its own, `s3.enabled`, which printLibS3
+  // already reads. Tiering is not a backup and still uses Drive either way.
+  const remote = printLibRemote();
+  const driveBackupOff = remote && remote.kind === 'gdrive'
+    && ((printLibSettings() || {}).gdrive || {}).backUpNew === false;
+  const s3 = driveBackupOff ? null : remote;
   if (!dir && !s3) return null;
   const out = { folder: null, s3: null };
   if (dir) {
