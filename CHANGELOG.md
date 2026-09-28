@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Arabic says خيط for filament everywhere.** Twelve screens still used
+  فلامنت or فيلامنت, including the inventory titles, the expense and supplier
+  categories, the calculator and the label scanner. They now use خيط (or خيوط
+  where it means more than one), the word the rest of the app and the Mac use.
+
 - **A machine's own profit now agrees with the shop P&L on its wear.** For a
   machine depreciated by printing hours, the machine table now counts the
   hours it printed before the period you are looking at against its life, as
