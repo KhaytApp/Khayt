@@ -17,6 +17,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   manager can. Khayt never keeps the key. The Medusa subscriber code it hands you now
   sends the key, the order's payment status, and each line's product and chosen options
   (colour, size), so the right product is matched and the colour is no longer lost.
+  Its "open in admin" link now works on Medusa v2 (it pointed at a page that does not
+  exist), a test copy of your store can send elsewhere by setting `KHAYT_IMPORT_URL`,
+  and an order Khayt rejects is no longer retried for ever.
   Copy the subscriber again to pick this up.
 
 - **(iOS) The companion can be tried without a shop.** "Explore with a

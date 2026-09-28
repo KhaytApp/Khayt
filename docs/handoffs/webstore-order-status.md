@@ -62,8 +62,18 @@ that carries the shop's import key. On the Khayt side (branch `medusa-subscriber
   `lines[{ name, qty, productId, options, unitPrice }]`.
 - It sends the key as `X-Khayt-Import-Key`, read from `process.env.KHAYT_IMPORT_KEY` in the
   Medusa server's environment, never from the generated source. Unset, it sends no header and
-  logs once per start that payment status will not be trusted. A 401 is logged as "set
-  KHAYT_IMPORT_KEY and restart".
+  logs once per start that payment status will not be trusted.
+- Verified by the storefront session against its live Medusa v2, then applied here:
+  - It posts to `process.env.KHAYT_IMPORT_URL` when set, else the URL baked in at generation,
+    so a clone or local stack need not post into the real queue. Which one is logged once per
+    start, with any query string cut off.
+  - It retries (throws) only on a network error, 5xx, 429 or 401 (401 is logged as "set
+    KHAYT_IMPORT_KEY and restart"). Any other 4xx is logged and dropped, not retried for ever.
+  - An order with neither `display_id` nor `custom_display_id` is logged and not sent: it would
+    collide with every other such order in the import's dedup key.
+  - The admin link is `${MEDUSA_ADMIN_URL}/app/orders/{id}`, where Medusa v2 serves the admin
+    (`/orders/{id}` answers 404). `MEDUSA_ADMIN_URL` is the bare origin; a trailing `/app` or
+    `/` is stripped.
 - The Mac's Integrations pane has an **Import key** row: status (`GET`), Create / Replace
   (`POST`, key shown once with Copy), Remove (`DELETE`). The key is not stored by the app.
 

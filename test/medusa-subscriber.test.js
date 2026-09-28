@@ -10,7 +10,7 @@ const URL = 'https://cloud.khaytapp.com/v1/shops/abc123/import/medusa';
 
 test('the generated subscriber carries the shop\'s own import URL', () => {
   const src = subscriberSource(URL);
-  assert.ok(src.includes(`const KHAYT_IMPORT_URL = "${URL}"`), 'URL is baked in');
+  assert.ok(src.includes(`const GENERATED_IMPORT_URL = "${URL}"`), 'URL is baked in');
   assert.ok(src.includes('event: "order.placed"'), 'listens to the right event');
   assert.ok(src.includes(SUBSCRIBER_PATH), 'names the file it should be saved as');
 });
@@ -69,11 +69,11 @@ test('the URL cannot break out of the string literal it is placed in', () => {
   // shop to run.
   const nasty = 'https://x/"; process.exit(1); const y = "';
   const src = subscriberSource(nasty);
-  const line = src.split('\n').find((l) => l.startsWith('const KHAYT_IMPORT_URL'));
-  assert.equal(line, 'const KHAYT_IMPORT_URL = "https://x/\\"; process.exit(1); const y = \\""');
+  const line = src.split('\n').find((l) => l.startsWith('const GENERATED_IMPORT_URL'));
+  assert.equal(line, 'const GENERATED_IMPORT_URL = "https://x/\\"; process.exit(1); const y = \\""');
   // And no newline can split the declaration across lines.
   assert.equal(subscriberSource('https://x/\n\ndelete-everything')
-    .split('\n').filter((l) => l.includes('KHAYT_IMPORT_URL =')).length, 1);
+    .split('\n').filter((l) => l.includes('GENERATED_IMPORT_URL =')).length, 1);
 });
 
 test('junk in does not throw', () => {
@@ -175,7 +175,7 @@ test('the admin link is optional and never invented', () => {
   // Khayt cannot derive it: the admin lives wherever the shop hosts it. Absent
   // env var means no admin_url key at all, rather than a broken link.
   const src = subscriberSource(URL);
-  assert.match(src, /const MEDUSA_ADMIN_URL = process\.env\.MEDUSA_ADMIN_URL/);
+  assert.match(src, /const MEDUSA_ADMIN_URL = \(process\.env\.MEDUSA_ADMIN_URL \?\? ""\)/);
   assert.match(src, /MEDUSA_ADMIN_URL \? \{ admin_url:/, 'only added when it is set');
 });
 
@@ -240,8 +240,8 @@ test('the import key comes from the environment and is sent as a header', () => 
 
 test('an unset key is said once, not on every order', () => {
   const src = subscriberSource(URL);
-  assert.ok(src.includes('let saidNoKey = false'));
-  assert.match(src, /if \(!KHAYT_IMPORT_KEY && !saidNoKey\) \{\s*saidNoKey = true\s*logger\.warn\(/);
+  assert.ok(src.includes('let saidSetup = false'));
+  assert.match(src, /if \(!saidSetup\) \{\s*saidSetup = true/);
   assert.equal((src.match(/logger\.warn\("Khayt: KHAYT_IMPORT_KEY is not set/g) || []).length, 1);
 });
 
@@ -257,5 +257,150 @@ test('no key is ever embedded in the generated source', () => {
 test('the generated comments tell the shop what the key does', () => {
   const src = subscriberSource(URL);
   assert.ok(src.includes("KHAYT_IMPORT_KEY  Your shop's import key"));
-  assert.ok(src.includes('restart it after setting either'));
+  assert.ok(src.includes('restart it after setting any of them'));
+  assert.ok(src.includes('KHAYT_IMPORT_URL  Where to send orders'));
+  assert.ok(src.includes('MEDUSA_ADMIN_URL  Your admin\'s bare origin'));
+  assert.ok(src.includes('/app/orders/{id}, where Medusa v2 serves it'));
+});
+
+// ── Running the generated file, not reading it ─────────────────────────────
+//
+// The checks above match text. These RUN the subscriber: the TypeScript is
+// stripped of its types by Node itself, the three Medusa imports are replaced
+// by stand-ins, and the handler is called with a fake container and fetch.
+// Behaviour the storefront verified against its live Medusa v2 is pinned here.
+
+const { stripTypeScriptTypes } = require('node:module');
+const canRun = typeof stripTypeScriptTypes === 'function';
+
+const ORDER = {
+  id: 'order_01', display_id: 42, email: 'a@b.c', payment_status: 'captured', metadata: {},
+  payment_collections: [{ status: 'captured' }], fulfillments: [],
+  items: [{ title: 'Dragon', quantity: 1, unit_price: 50, metadata: {},
+    product: { external_id: 'cat_1', material: 'PLA', title: 'x' },
+    variant: { id: 'v', title: 'Red', sku: 's', options: [{ value: 'Red', option: { title: 'Colour' } }] } }],
+};
+
+/** Load the generated handler under the given environment. */
+function load(env = {}, { order = ORDER, respond = () => ({ ok: true, status: 200 }) } = {}) {
+  let src = subscriberSource(URL);
+  src = src.replace(/^import .*$/gm, '');
+  src = src.replace('export default async function', 'async function')
+    .replace('export const config', 'const config');
+  const js = stripTypeScriptTypes(src);
+  const calls = [];
+  const logs = [];
+  const fakeFetch = async (url, init) => {
+    calls.push({ url, init });
+    const r = respond(url, init);
+    if (r instanceof Error) throw r;
+    return { ok: r.status >= 200 && r.status < 300, status: r.status, text: async () => 'why' };
+  };
+  const logger = {};
+  for (const level of ['info', 'warn', 'error']) logger[level] = (m) => logs.push([level, String(m)]);
+  const container = { resolve: () => logger };
+  const workflow = () => ({ run: async ({ input }) => {
+    if (!order) { const e = new Error('Order id not found'); e.type = 'not_found'; throw e; }
+    return { result: JSON.parse(JSON.stringify({ ...order, id: order.id || input.order_id })) };
+  } });
+  const fakeProcess = { env: { ...env } };
+  // eslint-disable-next-line no-new-func
+  const handler = new Function('ContainerRegistrationKeys', 'getOrderDetailWorkflow', 'fetch', 'process',
+    `${js}\nreturn khaytOrderPlaced;`)({ LOGGER: 'logger' }, workflow, fakeFetch, fakeProcess);
+  const run = () => handler({ event: { data: { id: 'order_01' } }, container });
+  return { run, calls, logs };
+}
+
+test('the admin link is /app/orders/{id}, whichever way the origin is spelt', { skip: !canRun }, async () => {
+  // Medusa v2 serves its admin under /app: /app/orders/{id} answers 200 and
+  // /orders/{id} 404 (checked against the live storefront's Medusa).
+  for (const spelt of ['https://admin.example.com', 'https://admin.example.com/',
+    'https://admin.example.com/app', 'https://admin.example.com/app/', ' https://admin.example.com/app ']) {
+    const h = load({ MEDUSA_ADMIN_URL: spelt });
+    await h.run();
+    const body = JSON.parse(h.calls[0].init.body);
+    assert.equal(body.metadata.admin_url, 'https://admin.example.com/app/orders/order_01', spelt);
+  }
+  const none = load({});
+  await none.run();
+  assert.ok(!('admin_url' in JSON.parse(none.calls[0].init.body).metadata), 'unset means no link');
+});
+
+test('KHAYT_IMPORT_URL wins over the generated link, and where it goes is said once without the key', { skip: !canRun }, async () => {
+  const h = load({ KHAYT_IMPORT_URL: ' https://staging.example/v1/shops/test/import/medusa?key=ik_SECRETSECRET ', KHAYT_IMPORT_KEY: 'ik_OTHERSECRET' });
+  await h.run();
+  await h.run();
+  assert.equal(h.calls[0].url, 'https://staging.example/v1/shops/test/import/medusa?key=ik_SECRETSECRET');
+  const said = h.logs.filter(([, m]) => m.includes('sending orders to'));
+  assert.equal(said.length, 1, 'said once per start, not per order');
+  assert.match(said[0][1], /staging\.example\/v1\/shops\/test\/import\/medusa \(from KHAYT_IMPORT_URL\)/);
+  for (const [, m] of h.logs) assert.ok(!m.includes('SECRET'), `a log carries the key: ${m}`);
+
+  const fallback = load({ KHAYT_IMPORT_URL: '   ' });
+  await fallback.run();
+  assert.equal(fallback.calls[0].url, URL, 'blank falls back to the generated link');
+  assert.ok(fallback.logs.some(([, m]) => m.includes('(as generated)')));
+});
+
+test('the key header is sent exactly when the variable is set', { skip: !canRun }, async () => {
+  const keyed = load({ KHAYT_IMPORT_KEY: ' ik_abc ' });
+  await keyed.run();
+  assert.equal(keyed.calls[0].init.headers['X-Khayt-Import-Key'], 'ik_abc');
+  assert.ok(!keyed.logs.some(([, m]) => m.includes('KHAYT_IMPORT_KEY is not set')));
+
+  const bare = load({});
+  await bare.run();
+  await bare.run();
+  assert.ok(!('X-Khayt-Import-Key' in bare.calls[0].init.headers));
+  assert.equal(bare.logs.filter(([, m]) => m.includes('KHAYT_IMPORT_KEY is not set')).length, 1);
+});
+
+test('only what a retry can fix is thrown: network, 5xx, 429 and 401', { skip: !canRun }, async () => {
+  for (const status of [500, 502, 503, 429, 401]) {
+    const h = load({}, { respond: () => ({ status }) });
+    await assert.rejects(h.run(), undefined, `${status} must throw so Medusa retries`);
+  }
+  const offline = load({}, { respond: () => new Error('ECONNREFUSED') });
+  await assert.rejects(offline.run(), /ECONNREFUSED/);
+  assert.ok(offline.logs.some(([l, m]) => l === 'error' && m.includes('could not reach')));
+
+  // Every other 4xx is about this order; sending it again cannot change it.
+  for (const status of [400, 403, 404, 405, 409, 413, 422]) {
+    const h = load({}, { respond: () => ({ status }) });
+    await h.run();
+    assert.equal(h.calls.length, 1);
+    assert.ok(h.logs.some(([l, m]) => l === 'error' && m.includes(`${status}`) && m.includes('not retrying')), `${status} logged`);
+  }
+  const fine = load({});
+  await fine.run();
+  assert.ok(!fine.logs.some(([l]) => l === 'error'));
+});
+
+test('an order with no display number is not sent', { skip: !canRun }, async () => {
+  for (const blank of [{ display_id: null }, { display_id: undefined, custom_display_id: '' }, { display_id: '  ' }]) {
+    const h = load({}, { order: { ...ORDER, ...blank } });
+    await h.run();
+    assert.equal(h.calls.length, 0, JSON.stringify(blank));
+    assert.ok(h.logs.some(([l, m]) => l === 'error' && m.includes('no display number')));
+  }
+  // A custom number alone is enough.
+  const custom = load({}, { order: { ...ORDER, display_id: null, custom_display_id: 'WEB-7' } });
+  await custom.run();
+  assert.equal(custom.calls.length, 1);
+});
+
+test('what is sent: payment status in, bookkeeping out, lines trimmed', { skip: !canRun }, async () => {
+  const h = load({});
+  await h.run();
+  const body = JSON.parse(h.calls[0].init.body);
+  assert.equal(body.payment_status, 'captured');
+  assert.ok(!('payment_collections' in body) && !('fulfillments' in body));
+  const line = body.items[0];
+  assert.deepEqual(line.product, { external_id: 'cat_1' });
+  assert.equal(line.metadata.material, 'PLA');
+  assert.deepEqual(line.variant.options, [{ value: 'Red', option: { title: 'Colour' } }]);
+
+  const gone = load({}, { order: null });
+  await gone.run();
+  assert.equal(gone.calls.length, 0, 'a vanished order is a warning, not a send');
 });
