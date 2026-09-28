@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Turning off Google Drive's "keep a copy of every new model" is honoured on
+  Windows and Linux too.** The switch is set in the Mac app's online-storage
+  settings; the desktop app ignored it and went on copying every model it
+  imported to Drive. It now leaves Drive alone when the switch is off. A
+  bucket's own backup setting is unchanged, and freeing up space still uses
+  Drive either way.
 - **Set what a machine cost, and see it lose value in your P&L.** Each
   machine in Settings has a Depreciation section: what you paid, when, how
   long it should last (in printing hours or years), what it will be worth at
