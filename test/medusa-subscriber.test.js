@@ -21,12 +21,14 @@ test('it fetches the order, because the event does not carry one', () => {
   // `data` straight through would send Khayt an object with one property.
   const src = subscriberSource(URL);
   assert.ok(src.includes('SubscriberArgs<{ id: string }>'), 'typed as the id-only payload');
-  assert.ok(src.includes('query.graph('), 'resolves the order before sending');
-  assert.ok(src.includes('filters: { id: data.id }'));
+  // Through Medusa's own order-detail workflow, which is the one read that
+  // works out payment_status (see 'payment status is asked of the workflow').
+  assert.ok(src.includes('getOrderDetailWorkflow(container).run('), 'resolves the order before sending');
+  assert.ok(src.includes('order_id: data.id'));
   // It posts `payload` — the order with the product's material folded onto each
   // line and the product object dropped. Still the order, not the event.
   assert.ok(src.includes('JSON.stringify(payload)'), 'sends the ORDER, not the event payload');
-  assert.ok(src.includes('const payload = {') && src.includes('...order,'), 'and payload is built from the order');
+  assert.ok(src.includes('const payload = {') && src.includes('...rest,'), 'and payload is built from the order');
   assert.ok(!/body: JSON\.stringify\(data\)/.test(src), 'must not post the bare event payload');
 });
 
@@ -144,7 +146,7 @@ test('the event and its payload are the ones Medusa emits', () => {
   const src = subscriberSource(URL);
   assert.match(src, /event: "order\.placed"/);
   assert.match(src, /SubscriberArgs<\{ id: string \}>/);
-  assert.match(src, /filters: \{ id: data\.id \}/, 'the id from the event is what is fetched');
+  assert.match(src, /order_id: data\.id/, 'the id from the event is what is fetched');
 });
 
 test('material is fetched from the product, because the line does not carry it', () => {
@@ -159,12 +161,14 @@ test('material is fetched from the product, because the line does not carry it',
    * you what the module graph can traverse.
    */
   const src = subscriberSource(URL);
-  assert.ok(FIELDS.includes('items.product.material'),
-    '`items.*` does not bring material — the relation has to be named');
+  assert.ok(FIELDS.includes('items.product.*'),
+    '`items.*` does not bring material — the relation has to be named (`.*` is its own columns, material among them)');
   assert.match(src, /material: line\.metadata\?\.material \?\? product\?\.material/,
     'folded onto the line, with the line winning so a commission can override the catalogue');
-  assert.match(src, /\(\{ product, \.\.\.line \}/,
-    'and the product object is dropped — fetched for one string, not for its shape');
+  assert.match(src, /\(\{ product, variant, \.\.\.line \}/,
+    'and the product is taken apart rather than sent whole');
+  assert.match(src, /product: product \? \{ external_id: product\.external_id/,
+    'only the ids that match the line to the catalogue go back out');
 });
 
 test('the admin link is optional and never invented', () => {
@@ -173,4 +177,85 @@ test('the admin link is optional and never invented', () => {
   const src = subscriberSource(URL);
   assert.match(src, /const MEDUSA_ADMIN_URL = process\.env\.MEDUSA_ADMIN_URL/);
   assert.match(src, /MEDUSA_ADMIN_URL \? \{ admin_url:/, 'only added when it is set');
+});
+
+// ── Paid orders and lines as data (docs/handoffs/webstore-order-status.md, §A) ──
+
+const { createHash } = require('crypto');
+const CLOUD_PENDING = ['payment_status', 'items.product.*', 'items.variant.*',
+  'items.variant.options.*', 'items.variant.options.option.*'];
+
+test('every field Khayt Cloud listed as pending is requested', () => {
+  // khayt-cloud's contracts/medusa-subscriber-fields.json names these as read
+  // by its mapper and not yet asked for. Until they are, `paid` and `lines[]`
+  // can never be built for a Medusa order, and it waits for a person.
+  const src = subscriberSource(URL);
+  for (const f of CLOUD_PENDING) {
+    assert.ok(FIELDS.includes(f), `${f} in FIELDS`);
+    assert.ok(src.includes(`"${f}"`), `${f} requested in the generated query`);
+  }
+  assert.equal(new Set(FIELDS).size, FIELDS.length, 'no field is listed twice');
+});
+
+test('FIELDS hashes to the value khayt-cloud must pin', () => {
+  /* khayt-cloud's contract test pins sha256(JSON.stringify(FIELDS)). Changing
+   * FIELDS here means that repo's copy must move too, so the hash is pinned on
+   * THIS side as well: a change to the list fails here first, with the number
+   * the other lane needs. */
+  const sha = createHash('sha256').update(JSON.stringify(FIELDS)).digest('hex');
+  assert.equal(sha, '3db7e319a97baeee6cc3b3aecfacb7ec9b22f9f86639ad997e29a591dea0cecb');
+});
+
+test('payment status is asked of the workflow, because a bare graph query cannot answer it', () => {
+  /* Measured against a migrated Medusa 2.21.1 database, not assumed:
+   * query.graph accepts `payment_status` and answers undefined, for ever — it
+   * is not a column. getOrderDetailWorkflow computes it from the payment
+   * collections (getLastPaymentStatus) and answers "captured", "not_paid" …
+   * A subscriber that asked the graph would send no payment status, and no
+   * Medusa order would ever become a paid job. */
+  const src = subscriberSource(URL);
+  assert.match(src, /import \{ getOrderDetailWorkflow \} from "@medusajs\/medusa\/core-flows"/);
+  assert.ok(!src.includes('query.graph('), 'no bare graph query remains');
+  // What the workflow adds to do its sum is not Khayt's business.
+  assert.match(src, /const \{ payment_collections, fulfillments, \.\.\.rest \} = order/);
+  // A missing order is still a warning, not a retry storm.
+  assert.match(src, /e\?\.type === "not_found"/);
+});
+
+test('the chosen options travel as title and value', () => {
+  const src = subscriberSource(URL);
+  assert.ok(src.includes('options: (variant.options ?? []).map((o: any) => ({ value: o?.value, option: { title: o?.option?.title } }))'));
+});
+
+test('the import key comes from the environment and is sent as a header', () => {
+  const src = subscriberSource(URL);
+  assert.ok(src.includes('const KHAYT_IMPORT_KEY = (process.env.KHAYT_IMPORT_KEY ?? "").trim()'));
+  assert.ok(src.includes('...(KHAYT_IMPORT_KEY ? { "X-Khayt-Import-Key": KHAYT_IMPORT_KEY } : {})'),
+    'sent only when set — an empty header would be a wrong key, and refused');
+  assert.ok(!/[?&]key=/.test(src), 'never in the URL, where it would reach logs');
+  // A 401 names the fix, rather than reading like Khayt being down.
+  assert.ok(src.includes('res.status === 401'));
+  assert.ok(src.includes('KHAYT_IMPORT_KEY is missing or out of date'));
+});
+
+test('an unset key is said once, not on every order', () => {
+  const src = subscriberSource(URL);
+  assert.ok(src.includes('let saidNoKey = false'));
+  assert.match(src, /if \(!KHAYT_IMPORT_KEY && !saidNoKey\) \{\s*saidNoKey = true\s*logger\.warn\(/);
+  assert.equal((src.match(/logger\.warn\("Khayt: KHAYT_IMPORT_KEY is not set/g) || []).length, 1);
+});
+
+test('no key is ever embedded in the generated source', () => {
+  // subscriberSource takes the URL and nothing else, so there is no way to hand
+  // it a key. Pinned so a later "convenience" parameter has to delete this test.
+  assert.equal(subscriberSource.length, 1, 'one parameter: the import URL');
+  const src = subscriberSource(URL);
+  assert.ok(!/ik_[A-Za-z0-9_-]{8,}/.test(src));
+  assert.ok(!/"X-Khayt-Import-Key": "/.test(src), 'the header value is never a literal');
+});
+
+test('the generated comments tell the shop what the key does', () => {
+  const src = subscriberSource(URL);
+  assert.ok(src.includes("KHAYT_IMPORT_KEY  Your shop's import key"));
+  assert.ok(src.includes('restart it after setting either'));
 });
