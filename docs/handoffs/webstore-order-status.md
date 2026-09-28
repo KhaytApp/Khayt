@@ -42,6 +42,45 @@ catalogue item id there, and in `metadata.khayt_id`), `options` from the variant
 
 Keep writing `description` exactly as now. Older Macs and the desktop read the bullet block.
 
+**Status (2026-09-28): the subscriber side is done.** Khayt Cloud shipped the above in
+khayt-cloud #106, keeping `paid`, `paymentStatus` and `lines[].unitPrice` only from an import
+that carries the shop's import key. On the Khayt side (branch `medusa-subscriber-paid-lines`):
+
+- `lib/medusa-subscriber.js` `FIELDS` now requests `payment_status`, `items.product.*`,
+  `items.variant.*`, `items.variant.options.*` and `items.variant.options.option.*`
+  (`items.product.*` replaces `items.product.material`, which it covers).
+  `sha256(JSON.stringify(FIELDS))` = `3db7e319a97baeee6cc3b3aecfacb7ec9b22f9f86639ad997e29a591dea0cecb`;
+  khayt-cloud must move these from `pendingDesktop` to `requested` in
+  `contracts/medusa-subscriber-fields.json` and pin that hash.
+- The generated subscriber reads the order through Medusa's `getOrderDetailWorkflow`, not a
+  bare `query.graph`. **`payment_status` is not a column**: measured against a migrated Medusa
+  2.21.1 database, `query.graph` accepts the name and answers `undefined`; only the workflow
+  computes it (`not_paid`, `captured`, …). It strips `payment_collections` and `fulfillments`
+  before sending, sends `product` as `{ external_id, metadata.khayt_id }` only, and `variant` as
+  `{ id, title, sku, options: [{ value, option: { title } }] }`. The result was fed through
+  khayt-cloud's `mapPlatformOrder('medusa', …)` and produced `paid`, `paymentStatus` and
+  `lines[{ name, qty, productId, options, unitPrice }]`.
+- It sends the key as `X-Khayt-Import-Key`, read from `process.env.KHAYT_IMPORT_KEY` in the
+  Medusa server's environment, never from the generated source. Unset, it sends no header and
+  logs once per start that payment status will not be trusted.
+- Verified by the storefront session against its live Medusa v2, then applied here:
+  - It posts to `process.env.KHAYT_IMPORT_URL` when set, else the URL baked in at generation,
+    so a clone or local stack need not post into the real queue. Which one is logged once per
+    start, with any query string cut off.
+  - It retries (throws) only on a network error, 5xx, 429 or 401 (401 is logged as "set
+    KHAYT_IMPORT_KEY and restart"). Any other 4xx is logged and dropped, not retried for ever.
+  - An order with neither `display_id` nor `custom_display_id` is logged and not sent: it would
+    collide with every other such order in the import's dedup key.
+  - The admin link is `${MEDUSA_ADMIN_URL}/app/orders/{id}`, where Medusa v2 serves the admin
+    (`/orders/{id}` answers 404). `MEDUSA_ADMIN_URL` is the bare origin; a trailing `/app` or
+    `/` is stripped.
+- The Mac's Integrations pane has an **Import key** row: status (`GET`), Create / Replace
+  (`POST`, key shown once with Copy), Remove (`DELETE`). The key is not stored by the app.
+
+**Still open:** import links copied for other storefronts (`importUrl` in
+`lib/integrations-registry.js`) do not append `?key=`, because the app does not keep the key.
+The pane says so in words, and warns before a key is created that orders without it are refused.
+
 Why it matters: without `lines[]`, a line is matched to a product by its **exact name**, and
 the customer's chosen colour is lost. Without `paid`, only Medusa orders become jobs
 automatically, because a placed Medusa order cannot be unpaid. Salla, Zid and the rest wait for

@@ -108,6 +108,13 @@ struct IntegrationsPane: View {
                     }
                 }
 
+                // Proves an import came from the shop's own store, so the
+                // cloud trusts its payment status. Cloud routes, so only once
+                // the book is connected.
+                if shop.cloudConnected {
+                    ImportKeySection(shop: shop)
+                }
+
                 Section(shop.words.callIt("integ.payments")) {
                     ForEach(showing?.payments ?? []) { system in
                         VStack(alignment: .leading, spacing: 4) {
