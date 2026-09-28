@@ -18,6 +18,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   place a machine's wear is counted — and the machine table no longer counts
   the estimated wear, electricity and labour inside each job's cost as if it
   were material. Quotes use the machine's own wear rate once it is set.
+- **(Mac) Online storage is built around Google Drive now.** After connecting
+  Drive, the pane no longer jumps to "A storage bucket": a shop with Drive and
+  no bucket was being read as using a bucket. The pane now opens on Google
+  Drive (recommended): one sentence and a Connect button; while you sign in,
+  the Open page / Copy link fallback; once connected, a card with your account,
+  how full your Drive is, the folder, and Disconnect. Below it, "Keep a copy of
+  every model" and "Move models off this Mac when unused for…" apply the moment
+  you change them, with no Save. A storage bucket and your own Google client
+  are under Advanced, and the folder defaults to "Khayt print library" without
+  renaming one you chose. The off-site backup lists Google Drive first and
+  offers it when Drive is connected, without changing a destination you picked.
 
 - **(Mac) The Dashboard tiles count cost the way Reports does.** Cost of
   goods is now only what was stocked (filament, extra materials, packaging), so

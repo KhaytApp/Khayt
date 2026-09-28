@@ -14,6 +14,8 @@ struct OffsiteBackupSettings: View {
     @State private var summary: (ready: Bool, text: String)?
     @State private var restoring = false
 
+    private var driveConnected: Bool { CloudLibrary.driveConnected(shop.settingsDict) }
+
     private struct SummaryKey: Equatable {
         let settings: OffsiteBackupState.Settings
         let book: JSONValue
@@ -26,10 +28,20 @@ struct OffsiteBackupSettings: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Toggle(shop.words.callIt("mac.offsite_on"), isOn: $state.settings.enabled)
+            // Drive first, as on the library's pane above: the easy path.
             Picker(shop.words.callIt("mac.offsite_where"), selection: $state.settings.destination) {
+                Text(verbatim: "Google Drive").tag(OffsiteBackupState.Destination.drive)
                 Text(shop.words.callIt("mac.offsite_dest_folder")).tag(OffsiteBackupState.Destination.folder)
                 Text(shop.words.callIt("mac.offsite_dest_bucket")).tag(OffsiteBackupState.Destination.bucket)
-                Text(verbatim: "Google Drive").tag(OffsiteBackupState.Destination.drive)
+            }
+            if OffsiteBackupState.suggestsDrive(state.settings, driveConnected: driveConnected) {
+                HStack(alignment: .firstTextBaseline) {
+                    Label(shop.words.callIt("mac.offsite_drive_suggest"), systemImage: "externaldrive.badge.icloud")
+                        .font(.callout).foregroundStyle(Role.text2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: Space.md)
+                    Button(shop.words.callIt("mac.offsite_use_drive")) { state.settings.destination = .drive }
+                }
             }
             if state.settings.destination == .folder {
                 HStack {
@@ -81,6 +93,10 @@ struct OffsiteBackupSettings: View {
         // Asked again when the choice changes AND when the book's settings do
         // — setting up the library's bucket above makes it ready here.
         .task(id: SummaryKey(settings: state.settings, book: shop.settingsValue)) {
+            // A Mac where nothing was ever chosen starts on the Drive the
+            // shop connected; a choice already made is never touched.
+            let adopted = OffsiteBackupState.adoptingDrive(state.settings, driveConnected: driveConnected)
+            if adopted != state.settings { state.settings = adopted; return }
             summary = await shop.offsiteDestinationSummary()
         }
         .sheet(isPresented: $restoring) { OffsiteRestoreSheet(shop: shop) }

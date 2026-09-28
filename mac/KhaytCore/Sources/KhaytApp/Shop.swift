@@ -269,6 +269,14 @@ final class Shop {
         settingsValue = .object(held)
     }
 
+    /// Give the shop a `printLibrary` block, or none, for a picture of the
+    /// online storage pane. The book on disk is not touched.
+    func pretendPrintLibrary(_ library: [String: JSONValue]?) {
+        var held: [String: JSONValue] = settingsDict
+        if let library { held["printLibrary"] = .object(library) } else { held.removeValue(forKey: "printLibrary") }
+        settingsValue = .object(held)
+    }
+
     /// Put a shop into a mode, for a test. The book on disk is not touched.
     func pretendMode(_ mode: String?) {
         var held: [String: JSONValue] = settingsDict

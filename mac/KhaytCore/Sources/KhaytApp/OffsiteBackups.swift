@@ -77,6 +77,31 @@ final class OffsiteBackupState {
         settings.enabled && !noticeDismissed && OffsiteBackup.isOverdue(status, now: now)
     }
 
+    // ── GOOGLE DRIVE, SUGGESTED — NEVER SWITCHED TO ──────────────────────
+    //
+    // A shop that has connected Drive for its library has already done the
+    // hard part, so Drive is the destination the pane offers first. It is
+    // OFFERED: a destination the shop picked (the shop that asked for this
+    // backs up to an iCloud Drive folder) is the shop's, and only the shop
+    // changes it. The one exception is a Mac where nothing was ever chosen —
+    // the untouched defaults — where Drive simply is the default.
+
+    /// The settings as they came out of the box: nothing chosen yet.
+    static func isUnchosen(_ s: Settings) -> Bool { s == Settings() }
+
+    /// Offer Drive: it is connected and the backup is going somewhere else.
+    static func suggestsDrive(_ s: Settings, driveConnected: Bool) -> Bool {
+        driveConnected && s.destination != .drive && !isUnchosen(s)
+    }
+
+    /// Drive as the default where nothing was ever chosen; anything else as is.
+    static func adoptingDrive(_ s: Settings, driveConnected: Bool) -> Settings {
+        guard driveConnected, isUnchosen(s) else { return s }
+        var next = s
+        next.destination = .drive
+        return next
+    }
+
     /// iCloud Drive's own folder on this Mac, with a folder for these in it.
     static var iCloudFolder: URL {
         FileManager.default.homeDirectoryForCurrentUser
