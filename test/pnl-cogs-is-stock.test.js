@@ -47,6 +47,7 @@ test("the quarter uses the FROZEN cost, scaled — not today's prices", () => {
 
 test('the desktop applies the same share to the headline and the CSV', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'analytics.js'), 'utf8');
-  assert.match(src, /\* KhaytPnl\.stockShare\(o, \{ inventory, settings \}\)/);
+  assert.equal((src.match(/\* KhaytPnl\.stockShare\(o, \{ inventory, settings \}\)/g) || []).length, 2,
+    'the P&L headline and the dashboard KPI margin, by the same rule');
   assert.equal((src.match(/inventory: \(typeof inventory !== 'undefined' \? inventory : \[\]\)/g) || []).length, 3);
 });

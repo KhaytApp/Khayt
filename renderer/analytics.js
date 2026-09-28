@@ -2630,7 +2630,11 @@ function openExecutiveSummary() {
       locationOf: (typeof orderLocationId === 'function') ? orderLocationId : null,
       money: (o) => ({
         revenue: orderNetRevenueBase(o),
+        // Cost of goods by the P&L's rule — only what was stocked
+        // (lib/pnl-report.js stockShare) — or the dashboard's margin and the
+        // P&L's disagree about the same jobs.
         cost: (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0)
+            * KhaytPnl.stockShare(o, { inventory, settings })
           + convertToBase(+o.shippingCost || 0, orderCurrency(o)),
         outstanding: (typeof orderOwedBase === 'function') ? orderOwedBase(o) : 0,
       }),
