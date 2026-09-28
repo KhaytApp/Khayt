@@ -341,6 +341,42 @@ function openMachineEditor(machineId = null) {
           <input type="number" id="machLastServiceHours" value="${draft.lastServiceHours || ''}" min="0" step="0.1" placeholder="0">
         </div>
       </div>
+      ${(() => {
+        /* DEPRECIATION — what the machine cost and how long it lasts. It sets
+         * the machine's wear rate for quotes (lib/print-rates.js) and is the
+         * ONE place its wear reaches the P&L (lib/pnl-report.js, the
+         * maintainer's decision of 2026-09-28). No price, no depreciation. */
+        const dep = draft.depreciation || {};
+        const v = (x) => (x == null || x === '' ? '' : escapeHtml(String(x)));
+        const sel = (a, b) => (a === b ? ' selected' : '');
+        return `<div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border-soft);">
+        <label style="margin-top:0; font-weight:600;">${escapeHtml(t('mach.dep_title'))}</label>
+        <div style="font-size:11.5px; color:var(--text-muted); margin:2px 0 8px;">${escapeHtml(t('mach.dep_hint'))}</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 12px;">
+          <div><label style="margin-top:0;">${escapeHtml(t('mach.dep_price'))}</label>
+            <input type="number" id="machDepPrice" min="0" step="0.01" value="${v(dep.price)}"></div>
+          <div><label style="margin-top:0;">${escapeHtml(t('mach.dep_date'))}</label>
+            <input type="date" id="machDepDate" value="${v(dep.purchaseDate)}"></div>
+          <div><label style="margin-top:0;">${escapeHtml(t('mach.dep_life'))}</label>
+            <div style="display:flex; gap:6px;">
+              <input type="number" id="machDepLife" min="0" step="1" value="${v(dep.life)}" style="flex:1;">
+              <select id="machDepLifeUnit" style="flex:1;">
+                <option value="hours"${sel(dep.lifeUnit || 'hours', 'hours')}>${escapeHtml(t('mach.dep_unit_hours'))}</option>
+                <option value="years"${sel(dep.lifeUnit, 'years')}>${escapeHtml(t('mach.dep_unit_years'))}</option>
+              </select>
+            </div></div>
+          <div><label style="margin-top:0;">${escapeHtml(t('mach.dep_residual'))}</label>
+            <input type="number" id="machDepResidual" min="0" step="0.01" value="${v(dep.residual)}" placeholder="0"></div>
+          <div><label style="margin-top:0;">${escapeHtml(t('mach.dep_method'))}</label>
+            <select id="machDepMethod">
+              <option value="perHour"${sel(dep.method || (dep.lifeUnit === 'years' ? 'straightLine' : 'perHour'), 'perHour')}>${escapeHtml(t('mach.dep_per_hour'))}</option>
+              <option value="straightLine"${sel(dep.method || (dep.lifeUnit === 'years' ? 'straightLine' : 'perHour'), 'straightLine')}>${escapeHtml(t('mach.dep_straight'))}</option>
+            </select></div>
+          <div><label style="margin-top:0;">${escapeHtml(t('mach.dep_monthly_hours'))}</label>
+            <input type="number" id="machDepMonthlyHours" min="0" step="1" value="${v(dep.monthlyHours)}"></div>
+        </div>
+      </div>`;
+      })()}
       <label style="margin-top:14px;">${escapeHtml(t('mach.location'))}</label>
       <select id="machLocationId" style="margin-top:6px;">
         <option value="">— ${escapeHtml(t('an.unassigned_location'))} —</option>
@@ -954,6 +990,19 @@ function openMachineEditor(machineId = null) {
           gramsThreshold: parseFloat(nozzleThreshEl?.value) || KhaytNozzleWear.defaultThresholdFor(nozzleMatEl?.value, settings),
           gramsAtInstall: parseFloat(nozzleAtInstEl?.value) || 0,
         };
+      }
+      // Depreciation, cleaned by the rule the Mac's machine sheet uses
+      // (lib/depreciation.js clean): no price removes it, rather than keeping
+      // a block that says nothing.
+      const DEP = (typeof KhaytDepreciation !== 'undefined') ? KhaytDepreciation : null;
+      if (DEP && document.getElementById('machDepPrice')) {
+        const val = (id) => document.getElementById(id)?.value ?? '';
+        const next = DEP.clean({
+          price: val('machDepPrice'), purchaseDate: val('machDepDate'), life: val('machDepLife'),
+          lifeUnit: val('machDepLifeUnit'), residual: val('machDepResidual'),
+          method: val('machDepMethod'), monthlyHours: val('machDepMonthlyHours'),
+        });
+        if (next) draft.depreciation = next; else delete draft.depreciation;
       }
       // Persist locationId
       const machLocEl = document.getElementById('machLocationId');

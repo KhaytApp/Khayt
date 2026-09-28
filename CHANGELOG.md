@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Set what a machine cost, and see it lose value in your P&L.** Each
+  machine in Settings has a Depreciation section: what you paid, when, how
+  long it should last (in printing hours or years), what it will be worth at
+  the end, and whether it wears by the hour or by time. The P&L, its export
+  and the machine table then show a "Machine depreciation" line — the one
+  place a machine's wear is counted — and the machine table no longer counts
+  the estimated wear, electricity and labour inside each job's cost as if it
+  were material. Quotes use the machine's own wear rate once it is set.
+
 - **(Mac) The Dashboard tiles count cost the way Reports does.** Cost of
   goods is now only what was stocked (filament, extra materials, packaging), so
   power, wear and labour reach the P&L once, as the bills, fixed costs and
