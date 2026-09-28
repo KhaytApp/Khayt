@@ -86,6 +86,9 @@ final class Shop {
     var libraryMoveProgress: (done: Int, total: Int, name: String)?
     /// The print library in the cloud — see `CloudLibrary`.
     var cloudLibraryNote: String?
+    /// The Google sign-in page while a Connect is waiting for it, so the
+    /// Settings pane can offer to open or copy it.
+    var googleSignInURL: URL?
     var cloudLibraryProblem: String?
     var cloudLibraryBusy = false
     var cloudProgress: (done: Int, total: Int, name: String)?

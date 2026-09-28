@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import CryptoKit
 import KhaytCore
 
@@ -466,6 +467,17 @@ extension Shop {
         return (id, secret)
     }
 
+    /// Open a page in the shop's default browser and bring the browser forward.
+    static func openInBrowser(_ url: URL) {
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+        NSWorkspace.shared.open(url, configuration: config) { _, error in
+            if let error {
+                FileHandle.standardError.write(Data("khayt: could not open the browser — \(error)\n".utf8))
+            }
+        }
+    }
+
     func connectGoogleDrive(clientId: String, typedSecret: String, folderName: String) async {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
@@ -491,11 +503,25 @@ extension Shop {
                let build = source.build {
                 secret = (try? await Secrets.open(stored, for: build)) ?? ""
             }
+            // THE PAGE IS OPENED HERE, on the main actor, and kept on screen.
+            // The default opener ran off the main thread inside the sign-in
+            // and its failure was silent: the shop saw "Waiting for the
+            // sign-in in your browser" with no browser page anywhere ("nothing
+            // opened"). Now the link is held for the pane to offer, and the
+            // browser is asked to come to the front.
             let refresh = try await GoogleSignIn.run(clientId: id, clientSecret: secret, words: words,
-                                                     fetch: CloudLibrary.fetch)
+                                                     fetch: CloudLibrary.fetch,
+                                                     open: { url in
+                                                         Task { @MainActor in
+                                                             self.googleSignInURL = url
+                                                             Self.openInBrowser(url)
+                                                         }
+                                                     })
+            googleSignInURL = nil
             try await writeDrive(refreshToken: refresh, enabled: true, bucketOff: true)
             cloudLibraryNote = words.callIt("mac.gdrive_connected")
         } catch {
+            googleSignInURL = nil
             cloudLibraryNote = nil
             cloudLibraryProblem = cloudSay(error)
         }

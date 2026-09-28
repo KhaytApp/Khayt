@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import KhaytCore
 
 /// Online storage for the print library: which bucket, whether new models are
@@ -179,6 +180,20 @@ struct CloudLibrarySettings: View {
             }
             if let note = shop.cloudLibraryNote {
                 Label(note, systemImage: "checkmark.circle").font(.caption).foregroundStyle(Khayt.done)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            // Waiting for Google: the page, in case the browser did not come up.
+            if let url = shop.googleSignInURL {
+                HStack {
+                    Button(shop.words.callIt("mac.gdrive_open_page")) { Shop.openInBrowser(url) }
+                    Button(shop.words.callIt("mac.gdrive_copy_link")) {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                    }
+                    Spacer()
+                }
+                Text(shop.words.callIt("mac.gdrive_no_page_hint"))
+                    .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let problem = shop.cloudLibraryProblem {
