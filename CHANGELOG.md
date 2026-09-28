@@ -30,6 +30,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   page anywhere. It now opens from the app's main thread and brings the browser
   forward. While waiting, the pane offers **Open the sign-in page** and **Copy
   link**.
+- **(Mac) Electricity measured per print, and the true cost of a failed print.**
+  A printer on a metering smart plug now has its energy added up while it
+  prints, including heat-up and pauses, and the kWh is saved on the job next to
+  its actual print time. After three metered prints, the machine sheet suggests
+  the wattage the plug actually saw, with a "Use this" button. It never changes
+  the figure on its own. Reports › By machine compares quoted and metered
+  electricity for each machine. A failed print linked to a job (a QC failure,
+  or a waste entry with its new Job field) now records its machine time and
+  electricity next to the filament. The Waste screen shows these per entry and
+  as a "True cost of failures" total. This is for your information only: the
+  profit and loss still counts the filament alone, because your electricity
+  bill and machine costs are already in your expenses. Two printers sharing one
+  plug are not metered, because the plug's reading cannot be split between them.
+  A print that runs while the app is closed keeps counting when the app
+  reopens. The time the app was closed is not guessed.
 
 - **(Mac) Syncing to the cloud is quick again after a full upload.** After it
   once had to upload the whole book, the Mac kept treating the cloud as

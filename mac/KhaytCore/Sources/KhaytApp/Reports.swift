@@ -71,6 +71,7 @@ struct Reports: View {
     /// readings enough without also throwing away last month's.
     @State private var accuracy: [KhaytEngine.MachineAccuracy] = []
     @State private var shopAccuracy: KhaytEngine.MachineAccuracy?
+    @State private var power: [KhaytEngine.MachinePower] = []
     @State private var variance: [KhaytEngine.ModelVariance] = []
     /// The sentence each row earned, keyed by model. Worked out here rather
     /// than in the row's body: it is an engine call, and a body runs whenever
@@ -100,6 +101,7 @@ struct Reports: View {
             } else if shop.reportPage == .machines {
                 MachineProfitPage(shop: shop, report: machinePL,
                                   accuracy: accuracy, shopAccuracy: shopAccuracy,
+                                  power: power,
                                   maintenance: maintenance,
                                   downtime: downtime, downtimeMonths: downtimeMonths)
             } else if shop.reportPage == .custom {
@@ -670,6 +672,8 @@ struct Reports: View {
         // measuring sees nothing and concludes the screen is broken.
         accuracy = (try? await engine.machineAccuracy(orders: shop.orderRows, minSamples: 1)) ?? []
         shopAccuracy = try? await engine.shopAccuracy(orders: shop.orderRows, minSamples: 1)
+        // Electricity, quoted and metered — beside the time, off the same book.
+        power = (try? await engine.powerByMachine(orders: shop.orderRows, machines: shop.machineRows)) ?? []
     }
 
     private func recomputeVariance() async {
