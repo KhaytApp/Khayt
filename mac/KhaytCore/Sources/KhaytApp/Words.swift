@@ -542,6 +542,34 @@ final class Words {
         // prints. Two spellings of the gram in one app is a typo with a
         // rationale.
         "mac.wasted":        ["en": "Filament wasted (g)", "ar": "الخيط المهدور (غ)"],
+        // THE WHOLE COST OF A FAILED PRINT (`lib/failed-print-cost.js`):
+        // filament, machine time, electricity. Shown on the Waste screen as
+        // information — the P&L keeps counting the filament only, because the
+        // machine and the power bill are already the shop's real expenses.
+        "mac.waste_filament":   ["en": "Filament", "ar": "الخيط"],
+        "mac.waste_machine":    ["en": "Machine time", "ar": "وقت الآلة"],
+        "mac.waste_power":      ["en": "Electricity", "ar": "الكهرباء"],
+        "mac.waste_full":       ["en": "True cost", "ar": "التكلفة الفعلية"],
+        "mac.waste_true_title": ["en": "True cost of failures", "ar": "التكلفة الفعلية للطباعات الفاشلة"],
+        "mac.waste_energy":     ["en": "Energy metered", "ar": "الطاقة المقيسة"],
+        "mac.waste_true_note":  ["en": "For your information. The machine's time and the electricity are already in your expenses, so the profit and loss counts the filament only.",
+                                 "ar": "للاطلاع فقط. وقت الآلة والكهرباء محسوبان مسبقًا ضمن مصروفاتك، لذا لا تحسب الأرباح والخسائر إلا الخيط."],
+        "mac.waste_true_older": ["en": "Entries logged without a job count their filament only.",
+                                 "ar": "الإدخالات المسجلة دون طلب تُحسب بخيطها فقط."],
+        "mac.waste_job":        ["en": "Job", "ar": "الطلب"],
+        "mac.waste_no_job":     ["en": "No job", "ar": "بلا طلب"],
+        "mac.waste_job_help":   ["en": "Link the failed print to its job to cost its machine time and electricity too.",
+                                 "ar": "اربط الطباعة الفاشلة بطلبها لتُحسب تكلفة وقت الآلة والكهرباء أيضًا."],
+        // A machine's wattage, from what its plug measured (`print-energy`).
+        // {prints} is a `Words.counting` of `mac.acc_prints`.
+        "mac.power_measured":   ["en": "The plug measured {watts} W over {prints}.",
+                                 "ar": "قاس المقبس {watts} واط على {prints}."],
+        "mac.power_use":        ["en": "Use this", "ar": "استخدم هذه القيمة"],
+        // Electricity quoted against electricity metered, per machine — the
+        // actuals panel, not the P&L.
+        "mac.acc_power_title":  ["en": "Electricity: quoted and metered", "ar": "الكهرباء: المقدّرة والمقيسة"],
+        "mac.acc_power_note":   ["en": "Only prints a smart plug metered. Your electricity bill stays in your expenses.",
+                                 "ar": "الطباعات التي قاسها مقبس ذكي فقط. تبقى فاتورة الكهرباء ضمن مصروفاتك."],
         // COUNTED through `Words.counting`, with a `_one` and an Arabic `_two`:
         // "20 finished job(s)" was the board's banner on the shop's own book
         // (alpha.51 review), and an "(s)" is a sentence that did not decide.

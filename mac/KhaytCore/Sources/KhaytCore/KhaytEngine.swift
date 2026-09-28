@@ -322,6 +322,12 @@ public actor KhaytEngine {
         // implementations of it is the one thing the shared rules exist to
         // prevent.
         "machine-pl",
+        // What a print drew from the wall, added up from its smart plug, and
+        // the job it belongs to (the finish photo's rule) — then a machine's
+        // wattage suggested from that history. And a failed print's whole
+        // cost: filament, machine time, electricity.
+        "print-energy",
+        "failed-print-cost",
         // ── REPORTS THE MAC COULD NOT DRAW ────────────────────────────────
         //
         // Each was written and tested while fixing a real arithmetic fault in
@@ -3942,6 +3948,125 @@ public actor KhaytEngine {
                           as: String?.self)
     }
 
+    // MARK: - What a print drew from the wall (`lib/print-energy.js`)
+
+    /// One metered print, as the plug readings added up.
+    public struct EnergyReading: Codable, Sendable, Equatable {
+        public let wh: Double
+        public let coveredS: Double
+        public let spanS: Double
+        /// Covered seconds over the span watched: below 0.8 it is not used to cost.
+        public let coverage: Double
+        public let samples: Int
+        public let gaps: Int
+
+        public init(wh: Double, coveredS: Double, spanS: Double, coverage: Double, samples: Int, gaps: Int) {
+            self.wh = wh; self.coveredS = coveredS; self.spanS = spanS
+            self.coverage = coverage; self.samples = samples; self.gaps = gaps
+        }
+
+        public var json: JSONValue {
+            .object(["wh": .number(wh), "coveredS": .number(coveredS), "spanS": .number(spanS),
+                     "coverage": .number(coverage), "samples": .number(Double(samples)),
+                     "gaps": .number(Double(gaps))])
+        }
+    }
+
+    public struct EnergyTick: Decodable, Sendable {
+        public let memo: JSONValue
+        /// Why a meter was abandoned — `new-file`, `stale`, `shared` — or nil.
+        public let reason: String?
+    }
+
+    public struct EnergyTaken: Decodable, Sendable {
+        public let memo: JSONValue
+        public let reading: EnergyReading?
+    }
+
+    /// Fold one plug reading into a machine's meter. `sample` is
+    /// `{ at (ms), watts, state, filename }`: the plug's watts beside the
+    /// PRINTER's state and file at that moment.
+    public func energyTick(memo: JSONValue, machineId: String, sample: JSONValue,
+                           shared: Bool) throws -> EnergyTick {
+        try runtime.call2("globalThis.KhaytPrintEnergy.tick(ARG0, ARG1, ARG2, { shared: ARG3 })",
+                          [memo, .string(machineId), sample, .bool(shared)], as: EnergyTick.self)
+    }
+
+    /// Take a machine's meter out at the end of a print.
+    public func energyTake(memo: JSONValue, machineId: String) throws -> EnergyTaken {
+        try runtime.call2("globalThis.KhaytPrintEnergy.take(ARG0, ARG1)",
+                          [memo, .string(machineId)], as: EnergyTaken.self)
+    }
+
+    /// The fields a metered print writes onto its job: `actualEnergyWh` and
+    /// `actualEnergy` (what it rests on).
+    public func energyJobFields(_ reading: EnergyReading, at: String) throws -> [String: JSONValue] {
+        try runtime.call2("globalThis.KhaytPrintEnergy.jobFields(ARG0, ARG1) || {}",
+                          [reading.json, .string(at)], as: [String: JSONValue].self)
+    }
+
+    /// Machines sharing one plug with another: never metered, since a sum
+    /// cannot be split between two printers.
+    public func sharedPlugIds(machines: [JSONValue]) throws -> [String] {
+        try runtime.call2("globalThis.KhaytPrintEnergy.sharedPlugIds(ARG0)",
+                          [.array(machines)], as: [String].self)
+    }
+
+    /// A machine's wattage from what its plug measured, or nil below three
+    /// metered prints.
+    public struct PowerSuggestion: Decodable, Sendable, Equatable {
+        public let watts: Double
+        public let basedOn: Int
+        public let hours: Double
+        public let wh: Double
+    }
+
+    public func suggestPowerDraw(printLog: [JSONValue], machineId: String) throws -> PowerSuggestion? {
+        try runtime.call2("globalThis.KhaytPrintEnergy.suggestPowerDraw(ARG0, ARG1)",
+                          [.array(printLog), .string(machineId)], as: PowerSuggestion?.self)
+    }
+
+    /// Electricity quoted against electricity metered, per machine — for the
+    /// actuals screens only. The P&L carries the real bill as an expense.
+    public struct MachinePower: Decodable, Sendable, Equatable, Identifiable {
+        public let machineId: String
+        public let sampled: Int
+        public let wh: Double
+        public let estCost: Double
+        public let actCost: Double
+        public let deltaPct: Double?
+        public var id: String { machineId }
+    }
+
+    public func powerByMachine(orders: [JSONValue], machines: [JSONValue]) throws -> [MachinePower] {
+        try runtime.call2("""
+            (function (orders, machines) {
+              var byId = {};
+              (machines || []).forEach(function (m) { if (m && m.id) byId[m.id] = m; });
+              return globalThis.KhaytPrintEnergy.powerByMachine(orders, function (id) {
+                return globalThis.KhaytPrintRates.ratesFor({ machine: byId[id] || null });
+              });
+            })(ARG0, ARG1)
+            """, [.array(orders), .array(machines)], as: [MachinePower].self)
+    }
+
+    /// The waste log's three costs summed — filament, machine time, power —
+    /// for the Waste screen. Information, not a P&L figure.
+    public struct FailedCostTotals: Decodable, Sendable, Equatable {
+        public let material: Double
+        public let machine: Double
+        public let power: Double
+        public let full: Double
+        public let energyWh: Double
+        /// Rows carrying the breakdown; older rows are filament only.
+        public let costed: Int
+    }
+
+    public func failedCostTotals(wasteLog: [JSONValue]) throws -> FailedCostTotals {
+        try runtime.call2("globalThis.KhaytFailedPrintCost.totals(ARG0)",
+                          [.array(wasteLog)], as: FailedCostTotals.self)
+    }
+
     /// A picture appended to a product through `product-images.addImage`.
     public struct ProductImageAdded: Decodable, Sendable {
         public let product: JSONValue
@@ -6391,13 +6516,18 @@ public actor KhaytEngine {
                                 inventory: [JSONValue], now: Date,
                                 wasteId: String, defaultReason: String,
                                 settings: [String: JSONValue] = [:],
-                                machines: [JSONValue] = [], today: String = "") throws -> QcFailure {
+                                machines: [JSONValue] = [], today: String = "",
+                                costing: JSONValue? = nil) throws -> QcFailure {
+        // `costing` — `{ machine, preset, actualHours, progress, energy }` —
+        // adds the machine-time and electricity breakdown beside the filament
+        // (`lib/failed-print-cost.js`). `cost` stays the material figure.
         try runtime.call2(QC_FAILURE_SCRIPT,
                           [order, .string(failureType), .string(severity), .string(reason),
                            .number(weight), inspector.map(JSONValue.string) ?? .null,
                            .array(inventory), .number(now.timeIntervalSince1970 * 1000),
                            .string(wasteId), .string(defaultReason),
-                           .object(settings), .array(machines), .string(today)],
+                           .object(settings), .array(machines), .string(today),
+                           costing ?? .null],
                           as: QcFailure.self)
     }
 
@@ -6763,12 +6893,21 @@ public actor KhaytEngine {
     /// `inventory` COMES BACK CHANGED when the entry deducts: the grams come
     /// off the spool it names, and the entry records which spool, so deleting
     /// it can put them back. Write both, or the shelf and the log disagree.
+    ///
+    /// With `order` and `costing` (`{ machine, preset, actualHours, progress,
+    /// energy }`) the row also carries the failed print's machine time and
+    /// electricity beside its filament (`lib/failed-print-cost.js`). `cost`
+    /// is never changed by that: it stays the material figure the P&L reads.
     public func newWasteEntry(_ input: [String: JSONValue], id: String, today: String,
-                              inventory: [JSONValue]) throws -> WasteWritten {
+                              inventory: [JSONValue], order: JSONValue? = nil,
+                              costing: JSONValue? = nil) throws -> WasteWritten {
         try runtime.call2(
             "(function(){var inv = ARG3; var out = KhaytWasteEntry.newEntry(ARG0, {id: ARG1, today: ARG2, inventory: inv});"
+          + " if (out.entry && ARG4 && ARG5) KhaytFailedPrintCost.attach(out.entry, ARG4, ARG5,"
+          + "   { machine: ARG5.machine || null, preset: ARG5.preset || null });"
           + " return {entry: out.entry, refused: out.refused, inventory: inv};})()",
-            [.object(input), .string(id), .string(today), .array(inventory)], as: WasteWritten.self)
+            [.object(input), .string(id), .string(today), .array(inventory),
+             order ?? .null, costing ?? .null], as: WasteWritten.self)
     }
 
     /// What wasted grams of a material cost, from the spool they came off.
@@ -10787,6 +10926,11 @@ private let QC_FAILURE_SCRIPT = """
     failureType: ARG1, severity: ARG2, reason: ARG3, weight: ARG4, inspector: ARG5
   }, { inventory: inventory, now: ARG7, wasteId: ARG8, defaultReason: ARG9,
        settings: ARG10, machines: ARG11, today: ARG12 });
+  // THE WHOLE COST, beside the filament: machine time and electricity
+  // (`failed-print-cost`). Attached here rather than inside the shared rule,
+  // so the other app's QC path is exactly what it was. `cost` is untouched.
+  if (ARG13) KhaytFailedPrintCost.attach(r.waste, order, ARG13,
+    { machine: ARG13.machine || null, preset: ARG13.preset || null });
   // THE SHELF COMES BACK. A failed print takes its filament off the spools it
   // was printing from, and the rule mutates the array it is handed — which is
   // a copy on this side of the bridge. Returning the order and the waste row

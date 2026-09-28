@@ -219,6 +219,27 @@ struct Waste: View {
                 Text(Money.text(w.cost, shop.currency)).monospacedDigit()
             }
             .width(min: 90, ideal: 110)
+            // THE REST OF WHAT THE FAILURE COST: the machine's time and the
+            // power, beside the filament above (`lib/failed-print-cost.js`).
+            // A dash, not a zero, on a row that has no breakdown — a failure
+            // logged without a job, or before this existed, was never costed,
+            // which is not the same as costing nothing.
+            TableColumn(shop.words.callIt("mac.waste_machine")) { (w: WasteEntry) in
+                Text(w.costMachine.map { Money.text($0, shop.currency) } ?? "—")
+                    .monospacedDigit().foregroundStyle(.secondary)
+            }
+            .width(min: 80, ideal: 100)
+            TableColumn(shop.words.callIt("mac.waste_power")) { (w: WasteEntry) in
+                Text(w.costPower.map { Money.text($0, shop.currency) } ?? "—")
+                    .monospacedDigit().foregroundStyle(.secondary)
+                    .help(w.energyWh.map { Money.quantity($0 / 1000, decimals: 2) + " kWh" } ?? "")
+            }
+            .width(min: 80, ideal: 100)
+            TableColumn(shop.words.callIt("mac.waste_full"), value: \.full) { w in
+                Text(Money.text(w.full, shop.currency)).monospacedDigit()
+                    .fontWeight(w.costFull == nil ? .regular : .semibold)
+            }
+            .width(min: 90, ideal: 110)
         }
         // As the expenses table above — including the stripes, which drew
         // twenty empty bands under this shop's six waste entries.
@@ -234,6 +255,45 @@ struct Waste: View {
         .overlay {
             if rows.isEmpty {
                 EmptyHere(title: shop.words.callIt("mac.waste_empty"), mark: .waste)
+            }
+        }
+    }
+
+    /// What the failures really cost: filament, machine time, electricity.
+    ///
+    /// Information, not a P&L figure — the note says so, in those words, so a
+    /// shop comparing this with the profit and loss is not left wondering why
+    /// the two disagree. Only drawn once some row carries the breakdown.
+    struct TrueCost: View {
+        let shop: Shop
+        let shown: [WasteEntry]
+
+        var body: some View {
+            let costed = shown.filter { $0.costFull != nil }
+            if !costed.isEmpty {
+                let filament = shown.reduce(0) { $0 + $1.cost }
+                let machine = shown.reduce(0) { $0 + ($1.costMachine ?? 0) }
+                let power = shown.reduce(0) { $0 + ($1.costPower ?? 0) }
+                let wh = shown.reduce(0) { $0 + ($1.energyWh ?? 0) }
+                DetailSection(shop.words.callIt("mac.waste_true_title")) {
+                    DetailLine(shop.words.callIt("mac.waste_filament"), Money.text(filament, shop.currency))
+                    DetailLine(shop.words.callIt("mac.waste_machine"), Money.text(machine, shop.currency))
+                    DetailLine(shop.words.callIt("mac.waste_power"), Money.text(power, shop.currency))
+                    if wh > 0 {
+                        DetailLine(shop.words.callIt("mac.waste_energy"),
+                                   Money.quantity(wh / 1000, decimals: 2) + " kWh")
+                    }
+                    DetailLine(shop.words.callIt("mac.waste_full"),
+                               Money.text(filament + machine + power, shop.currency), strong: true)
+                    Text(shop.words.callIt("mac.waste_true_note"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if costed.count < shown.count {
+                        Text(shop.words.callIt("mac.waste_true_older"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
         }
     }
@@ -260,6 +320,7 @@ struct Waste: View {
                         DetailLine(shop.words.callIt("waste.total_cost"),
                                    Money.text(cost, shop.currency), strong: true)
                     }
+                    TrueCost(shop: shop, shown: shown)
                     let counts = Dictionary(grouping: shown, by: \.failureType).mapValues(\.count)
                     if !counts.isEmpty {
                         DetailSection(shop.words.callIt("waste.failure_breakdown")) {

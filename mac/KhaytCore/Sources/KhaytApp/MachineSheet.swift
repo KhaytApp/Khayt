@@ -52,6 +52,9 @@ struct MachineSheet: View {
     @State private var search = ""
     @State private var nozzleDiameter: Double = 0.4
     @State private var powerDraw: Double = 0
+    /// What the machine's plug measured it drawing, over its recent prints —
+    /// offered beside the typed wattage, never applied without "Use this".
+    @State private var measuredPower: KhaytEngine.PowerSuggestion?
     @State private var targetHours: Double = 0
     @State private var nozzleMaterial = "brass"
     @State private var nozzleInstalled: Date?
@@ -171,6 +174,7 @@ struct MachineSheet: View {
         .task {
             await shop.readCatalog()
             kinds = await shop.machineKindChoices()
+            if let existing { measuredPower = await shop.measuredPowerDraw(existing.id) }
         }
         .onAppear(perform: fill)
     }
@@ -305,6 +309,21 @@ struct MachineSheet: View {
                         TextField("", value: $powerDraw, format: .number.precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 70)
                         Text("W").foregroundStyle(.secondary)
+                    }
+                }
+                if let measured = measuredPower, Int(measured.watts) != Int(powerDraw) {
+                    GridRow {
+                        Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                        HStack(spacing: 8) {
+                            Text(shop.words.callIt("mac.power_measured", [
+                                "watts": .number(measured.watts),
+                                "prints": .string(shop.words.counting(measured.basedOn, "mac.acc_prints")),
+                            ]))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            Button(shop.words.callIt("mac.power_use")) { powerDraw = measured.watts }
+                                .controlSize(.small)
+                        }
                     }
                 }
                 GridRow {

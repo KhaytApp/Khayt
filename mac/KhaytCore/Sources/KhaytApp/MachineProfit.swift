@@ -28,6 +28,11 @@ struct MachineProfitPage: View {
     /// property of this quarter.
     var accuracy: [KhaytEngine.MachineAccuracy] = []
     var shopAccuracy: KhaytEngine.MachineAccuracy?
+    /// Electricity quoted against electricity a smart plug metered, per
+    /// machine (`lib/print-energy.js`). The ACTUALS side only: the P&L keeps
+    /// the shop's real electricity bill as an expense, and counting metered
+    /// power there too would charge it twice.
+    var power: [KhaytEngine.MachinePower] = []
     /// What servicing each machine cost this year. Not filtered to the chosen
     /// range either: the rule buckets by calendar year, and a year is the
     /// period a shop budgets maintenance over.
@@ -45,6 +50,7 @@ struct MachineProfitPage: View {
                 VStack(alignment: .leading, spacing: 0) {
                     rows(report)
                     Accuracy(shop: shop, rows: accuracy, all: shopAccuracy)
+                    PowerActuals(shop: shop, rows: power)
                     // Under the money and the calibration, because it is the
                     // follow-up to both: the P&L already took maintenance off
                     // each machine's profit, and this says how much of it
@@ -59,12 +65,13 @@ struct MachineProfitPage: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        } else if !accuracy.isEmpty {
+        } else if !accuracy.isEmpty || !power.isEmpty {
             // The money is empty and the calibration is not, which happens
             // whenever a shop looks at a quiet month. Showing the empty state
             // over figures this screen HAS would be hiding them.
             ScrollView {
                 Accuracy(shop: shop, rows: accuracy, all: shopAccuracy)
+                PowerActuals(shop: shop, rows: power)
                 MaintenanceCostCard(shop: shop, rows: maintenance, year: Self.thisYear())
                     .card(rail: Khayt.brand, padding: 14)
                     .padding(Metric.screen)
@@ -381,6 +388,48 @@ struct MachineProfitPage: View {
 
             private func signed(_ pct: Double) -> String {
                 (pct >= 0 ? "+" : "−") + Money.quantity(abs(pct), decimals: 1) + "%"
+            }
+        }
+    }
+
+    /// What each machine's electricity was quoted at, against what its plug
+    /// metered, over the prints it metered. Drawn only when there are some.
+    struct PowerActuals: View {
+        let shop: Shop
+        let rows: [KhaytEngine.MachinePower]
+
+        var body: some View {
+            if !rows.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(shop.words.callIt("mac.acc_power_title"))
+                        .font(.callout.weight(.semibold))
+                    ForEach(rows) { row in
+                        let machine = shop.machines.first { $0.id == row.machineId }
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text(machine?.name ?? row.machineId).font(.callout.weight(.medium))
+                            Text(shop.words.counting(row.sampled, "mac.acc_prints"))
+                                .font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Text(Money.quantity(row.wh / 1000, decimals: 2) + " kWh")
+                                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                            Text(Money.text(row.estCost, shop.currency))
+                                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                            Text("→").font(.caption).foregroundStyle(.secondary)
+                            Text(Money.text(row.actCost, shop.currency))
+                                .font(.caption.monospacedDigit())
+                            Text(row.deltaPct.map { ($0 >= 0 ? "+" : "−") + Money.quantity(abs($0), decimals: 1) + "%" } ?? "—")
+                                .font(.callout.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(row.deltaPct.map { $0 >= 25 ? Khayt.late : ($0 >= 10 ? Khayt.attention : Khayt.done) } ?? .secondary)
+                                .frame(minWidth: 56, alignment: .trailing)
+                        }
+                        .card(padding: 12)
+                    }
+                    Text(shop.words.callIt("mac.acc_power_note"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 2)
+                }
+                .padding(Metric.screen)
             }
         }
     }

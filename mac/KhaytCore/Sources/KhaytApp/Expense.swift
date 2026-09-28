@@ -56,8 +56,28 @@ struct WasteEntry: Identifiable, Decodable, Hashable, Sendable {
     /// cannot put the filament back.
     let spoolId: String?
 
+    /// THE WHOLE COST of the failed print, when it was logged against a job
+    /// (`lib/failed-print-cost.js`): the filament, the machine's time and the
+    /// electricity. Information for the shop, not a P&L figure — `cost` is
+    /// what the P&L reads, and it stays the filament alone. Nil on a row
+    /// written before the breakdown, or on a row with no job behind it.
+    let costMachine: Double?
+    let costPower: Double?
+    let costFull: Double?
+    /// The hours the machine and power figures rest on, and how they are
+    /// known: `printer` (its own counter) or `progress` (estimate × how far).
+    let failedHours: Double?
+    let hoursSource: String?
+    /// What the plug metered for the attempt, when one did.
+    let energyWh: Double?
+
+    /// The filament, the machine and the power, summing to `full` — for a row
+    /// with no breakdown, the filament is everything anybody ever knew.
+    var full: Double { costFull ?? cost }
+
     private enum CodingKeys: String, CodingKey {
         case id, date, material, failureType, weight, cost, reason, notes, orderId, machineId, spoolId
+        case costMachine, costPower, costFull, failedHours, hoursSource, energyWh
     }
 
     init(from decoder: Decoder) throws {
@@ -73,6 +93,12 @@ struct WasteEntry: Identifiable, Decodable, Hashable, Sendable {
         orderId = try c.decodeIfPresent(String.self, forKey: .orderId)
         machineId = try c.decodeIfPresent(String.self, forKey: .machineId)
         spoolId = try c.decodeIfPresent(String.self, forKey: .spoolId)
+        costMachine = try? c.decodeIfPresent(Double.self, forKey: .costMachine)
+        costPower = try? c.decodeIfPresent(Double.self, forKey: .costPower)
+        costFull = try? c.decodeIfPresent(Double.self, forKey: .costFull)
+        failedHours = try? c.decodeIfPresent(Double.self, forKey: .failedHours)
+        hoursSource = try? c.decodeIfPresent(String.self, forKey: .hoursSource)
+        energyWh = try? c.decodeIfPresent(Double.self, forKey: .energyWh)
     }
 
     var day: Date? { Order.day(date) }

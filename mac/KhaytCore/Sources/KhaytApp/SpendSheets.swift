@@ -193,7 +193,15 @@ struct WasteSheet: View {
     @State private var date = Date()
     @State private var deduct = true
     @State private var machineId = ""
+    @State private var orderId = ""
     @FocusState private var focused: Bool
+
+    /// Jobs a print can have failed on: anything still in the works, and the
+    /// job whose print just stopped (the finish seam names it).
+    private var jobs: [Order] {
+        let open: Set<String> = ["pending", "on_hold", "printing", "post", "qc"]
+        return shop.orders.filter { open.contains($0.status) || $0.id == orderId }
+    }
 
     /// The materials on the shelf, once each — a shop picks what it wasted,
     /// and two spools of PLA are one choice.
@@ -248,6 +256,22 @@ struct WasteSheet: View {
                         .textFieldStyle(.roundedBorder)
                 }
                 GridRow {
+                    Text(shop.words.callIt("mac.waste_job")).foregroundStyle(.secondary)
+                    Picker("", selection: $orderId) {
+                        Text(shop.words.callIt("mac.waste_no_job")).tag("")
+                        ForEach(jobs) { Text($0.project.isEmpty ? $0.id : $0.project).tag($0.id) }
+                    }
+                    .labelsHidden()
+                    .help(shop.words.callIt("mac.waste_job_help"))
+                    .onChange(of: orderId) { _, id in
+                        // The job knows its machine; the shop should not have
+                        // to say it twice.
+                        if let m = shop.orders.first(where: { $0.id == id })?.machineId, !m.isEmpty {
+                            machineId = m
+                        }
+                    }
+                }
+                GridRow {
                     Text(shop.words.callIt("waste.printer")).foregroundStyle(.secondary)
                     Picker("", selection: $machineId) {
                         Text(shop.words.callIt("mach.unassigned")).tag("")
@@ -272,6 +296,12 @@ struct WasteSheet: View {
         .frame(width: Self.width)
         .onAppear {
             if material.isEmpty { material = materials.first ?? "" }
+            // The print that just stopped, when the finish seam could name its
+            // job: the likeliest thing a shop opening this sheet is logging.
+            if orderId.isEmpty, let failed = shop.lastFailedJob() {
+                orderId = failed.orderId
+                machineId = failed.machineId
+            }
             focused = true
         }
         // The shelf already knows what a gram of this costs, so the figure is
@@ -299,6 +329,7 @@ struct WasteSheet: View {
             "reason": .string(reason),
             "date": .string(Shop.today(date)),
             "machineId": .string(machineId),
+            "orderId": .string(orderId),
             "deduct": .bool(deduct),
         ]
         dismiss()

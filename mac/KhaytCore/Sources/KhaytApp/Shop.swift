@@ -1627,6 +1627,10 @@ final class Shop {
                     throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
                 }
                 let shelfBefore = Self.rows(root, "inventory")
+                // A QC failure is a print that RAN TO THE END: the whole of its
+                // time and power went into a part nobody can sell.
+                let costing = self.failedCosting(order: target, machines: Self.rows(root, "machines"),
+                                                 inspected: true)
                 let out = try await engine.recordQcFailure(
                     order: target, failureType: failureType, severity: "major",
                     reason: reason, weight: weight, inspector: nil,
@@ -1634,7 +1638,7 @@ final class Shop {
                     wasteId: Self.uid("WASTE"),
                     defaultReason: self.words.callIt("ord.qc_fail"),
                     settings: Self.settings(root), machines: Self.rows(root, "machines"),
-                    today: Self.today())
+                    today: Self.today(), costing: costing)
 
                 Self.write(&root, "printLog", changed: [out.order], before: orders, into: &undo)
 
@@ -1663,6 +1667,57 @@ final class Shop {
         } catch {
             moveProblem = String(describing: error)
         }
+    }
+
+    /// What a failed attempt is costed from, for `lib/failed-print-cost.js`:
+    /// the machine, how long the attempt ran and how far it got, and what its
+    /// plug metered.
+    ///
+    /// The hours are the PRINTER's, from the finish seam, when the last print
+    /// that ended on the job's machine was this job's; else the job's actual
+    /// time for an inspected print (it ran to the end); else the rule scales
+    /// the estimate by the progress at failure — 100% for an inspected print,
+    /// and the printer's last reported progress for one that stopped.
+    func failedCosting(order: JSONValue, machines: [JSONValue], inspected: Bool) -> JSONValue {
+        guard case .object(let o) = order else { return .null }
+        let jobId = Self.plainString(o["id"]) ?? ""
+        let machineId = Self.plainString(o["machineId"]) ?? ""
+        let ended = lastPrintEnded[machineId].flatMap { $0.orderId == jobId ? $0 : nil }
+        let live = printers.statusCache[machineId]
+        let attempt = energyMeter()?.attempt(for: jobId)
+        return Self.failedCosting(order: o, machines: machines, ended: ended, live: live,
+                                  attempt: attempt, inspected: inspected)
+    }
+
+    /// The same, from what is handed in — pure, for the tests.
+    static func failedCosting(order o: [String: JSONValue], machines: [JSONValue],
+                              ended: FinishCamera.Ended?, live: JSONValue?,
+                              attempt: KhaytEngine.EnergyReading?, inspected: Bool) -> JSONValue {
+        let machineId = plainString(o["machineId"]) ?? ""
+        var out: [String: JSONValue] = [:]
+        if let machine = machines.first(where: { recordId($0) == machineId }) { out["machine"] = machine }
+
+        if let s = ended?.durationS, s > 0 {
+            out["actualHours"] = .number(s / 3600)
+        } else if inspected, let h = plainNumber(o["actualPrintTime"]), h > 0 {
+            out["actualHours"] = .number(h)
+        }
+        if inspected {
+            out["progress"] = .number(100)
+        } else if ended != nil, case .object(let l)? = live, let p = plainNumber(l["progress"]), p > 0 {
+            out["progress"] = .number(p)
+        }
+
+        // The attempt's own plug reading. An inspected print finished, so its
+        // reading is already on the job; a stopped one was kept by the meter.
+        if let attempt {
+            out["energy"] = attempt.json
+        } else if inspected, let wh = plainNumber(o["actualEnergyWh"]), wh > 0 {
+            var e: [String: JSONValue] = ["wh": .number(wh)]
+            if case .object(let meta)? = o["actualEnergy"], let c = meta["coverage"] { e["coverage"] = c }
+            out["energy"] = .object(e)
+        }
+        return .object(out)
     }
 
     /// The job waiting for someone to say it passed inspection.
@@ -6523,9 +6578,17 @@ final class Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
+                // A failure logged against a JOB is costed whole: its machine
+                // time and power beside the filament (`failed-print-cost`).
+                let job: JSONValue? = Self.plainString(input["orderId"]).flatMap { id in
+                    id.isEmpty ? nil : Self.rows(root, "printLog").first { Self.recordId($0) == id }
+                }
+                let costing = job.map {
+                    self.failedCosting(order: $0, machines: Self.rows(root, "machines"), inspected: false)
+                }
                 let made = try await engine.newWasteEntry(
                     input, id: Self.uid("W"), today: Self.today(),
-                    inventory: Self.rows(root, "inventory"))
+                    inventory: Self.rows(root, "inventory"), order: job, costing: costing)
                 guard let entry = made.entry else {
                     throw MoveRefused(sentence: self.words.callIt("waste.err_material"))
                 }
@@ -9098,6 +9161,56 @@ final class Shop {
     private var lastPrinterState: [String: String] = [:]
     private var plugTask: Task<Void, Never>?
 
+    /// What each print is drawing from the wall, for the book that is open.
+    /// Nil for the sample shop, which has no plugs worth metering and no book
+    /// to write a reading to.
+    private var meterForBook: (URL, EnergyMeter)?
+    func energyMeter() -> EnergyMeter? {
+        guard let url = source.build?.storeURL else { return nil }
+        if let (book, meter) = meterForBook, book == url { return meter }
+        let meter = EnergyMeter.defaults(book: url)
+        meterForBook = (url, meter)
+        return meter
+    }
+
+    /// A machine's wattage from what its plug measured over recent prints —
+    /// nil below three metered prints. The machine sheet offers it; nothing
+    /// applies it for the shop.
+    func measuredPowerDraw(_ machineId: String) async -> KhaytEngine.PowerSuggestion? {
+        guard let engine else { return nil }
+        return (try? await engine.suggestPowerDraw(printLog: orderRows, machineId: machineId)) ?? nil
+    }
+
+    /// The end of a print: its metered energy goes on the job it belongs to.
+    ///
+    /// The job is the finish seam's — the photo's rule — and nil means the
+    /// book could not name one without guessing, so the reading is dropped
+    /// rather than put on a job it may not belong to. A FINISHED print writes
+    /// `actualEnergyWh` beside its actual time; a failed or cancelled one is
+    /// kept for the waste entry the shop logs against it, because the job
+    /// goes back to be printed again and its own actuals belong to the print
+    /// that succeeds.
+    func settleEnergy(_ ended: FinishCamera.Ended, meter: EnergyMeter? = nil,
+                      now: Date = Date()) async {
+        guard let engine, let meter = meter ?? energyMeter(),
+              let reading = await meter.take(ended.machineId, engine: engine) else { return }
+        guard ended.outcome == "finished" else {
+            meter.remember(ended.machineId, .init(orderId: ended.orderId, reading: reading, at: now))
+            return
+        }
+        guard let jobId = ended.orderId, let build = source.build, canWrite,
+              let fields = try? await engine.energyJobFields(reading, at: Self.isoNow(now)),
+              !fields.isEmpty else { return }
+        do {
+            try StoreWriter.updateRecord(build, collection: "printLog", id: jobId) { record in
+                for (key, value) in fields { record[key] = value }
+            }
+            await load(source)
+        } catch {
+            FileHandle.standardError.write(Data("khayt: energy not written — \(error)\n".utf8))
+        }
+    }
+
     /// The machine's record with its plug's secrets OPENED, for building one
     /// request — never kept, never written back.
     private func plugRecord(_ machineId: String) async -> JSONValue? {
@@ -9174,6 +9287,10 @@ final class Shop {
     private func plugTick() async {
         guard let engine else { return }
         let now = Date()
+        // A plug that feeds two printers reads their sum, and a sum cannot be
+        // split: those machines are never metered (`lib/print-energy.js`).
+        let sharedPlugs = Set((try? await engine.sharedPlugIds(machines: machineRows)) ?? [])
+        let meter = energyMeter()
         for machine in machines where machine.smartPlug?.usable == true {
             let live = printers.statusCache[machine.id]
             // A print ending is the edge from printing to anything else.
@@ -9185,6 +9302,11 @@ final class Shop {
                 lastPrinterState[machine.id] = state
             }
             await readPlug(machine)
+            // WHAT THE PRINT IS DRAWING, added to its meter while the printer
+            // says it is in a job. A plug that gives no watts adds nothing.
+            await meter?.observe(machine.id, watts: plugStates[machine.id]?.watts,
+                                 live: printers.statusCache[machine.id],
+                                 shared: sharedPlugs.contains(machine.id), now: now, engine: engine)
             guard plugStates[machine.id]?.on == true,
                   let record = await plugRecord(machine.id),
                   (try? await engine.plugAutoOffDue(machine: record, live: live,
@@ -10215,6 +10337,7 @@ final class Shop {
     /// that disagrees with this one about what "finished" means.
     func printFinished(_ ended: FinishCamera.Ended) async {
         lastPrintEnded[ended.machineId] = ended
+        await settleEnergy(ended)
         await sendPrintFinishedEvent(ended)
     }
 
@@ -10276,6 +10399,14 @@ final class Shop {
 
     /// The last print that ended on each machine, as `printFinished` saw it.
     private(set) var lastPrintEnded: [String: FinishCamera.Ended] = [:]
+
+    /// The most recent print that FAILED or was cancelled on a job the book
+    /// could name — what the waste sheet offers first.
+    func lastFailedJob() -> (orderId: String, machineId: String)? {
+        let failed = lastPrintEnded.values.filter { $0.outcome != "finished" && $0.orderId != nil }
+        guard let one = failed.first, failed.count == 1, let id = one.orderId else { return nil }
+        return (id, one.machineId)
+    }
 
     /// Put a camera frame on a job, whatever the job's status.
     ///
