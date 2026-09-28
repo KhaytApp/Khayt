@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Connect Google Drive opens the sign-in page, and shows it if the
+  browser doesn't.** Reported by the shop: "nothing opened". The page was
+  opened from inside the sign-in, off the main thread, and a failure there was
+  silent, so the pane said "Waiting for the sign-in in your browser" with no
+  page anywhere. It now opens from the app's main thread and brings the browser
+  forward. While waiting, the pane offers **Open the sign-in page** and **Copy
+  link**.
+
 - **(Mac) Syncing to the cloud is quick again after a full upload.** After it
   once had to upload the whole book, the Mac kept treating the cloud as
   refusing change-only syncs, and waited out the full-upload cool-down between
