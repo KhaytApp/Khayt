@@ -21,6 +21,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   equal to the price no longer makes a machine's wear free in quotes: the flat
   wear rate stands. "All time" depreciation starts at the book's first order,
   as the desktop's does.
+- **A quote on a machine with depreciation set now charges its real wear.**
+  Picking that machine in the calculator used to fill in the flat wear rate
+  (0.75 an hour unless you changed it), while the Mac charged what the
+  machine's price and life work out to. The desktop now fills in the same
+  figure. A straight-line machine's hourly figure, and its depreciation in the
+  P&L and the machine table, now also use what it has actually printed over
+  the last 90 days, as on the Mac.
 
 - **Set what a machine cost, and see it lose value in your P&L.** Each
   machine in Settings has a Depreciation section: what you paid, when, how

@@ -55,3 +55,42 @@ test('wear is counted once on the desktop: stocked cost, and depreciation', () =
   assert.equal((analyticsSrc.match(/machines: \(typeof machines !== 'undefined' \? machines : \[\]\),/g) || []).length, 3, 'every pnlByPeriod view');
   assert.match(analyticsSrc, /return \{ orders, expenses: expenseRows, waste: wasteRows, depreciation \};/, 'the headline and the CSV');
 });
+
+// The desktop's quote rate, run for real: the helpers out of machines.js in a
+// context holding a book, the same shape the renderer's globals have.
+const vm = require('node:vm');
+const helpersSrc = machinesSrc.slice(machinesSrc.indexOf('function machineRecentHours()'), machinesSrc.indexOf('\n  const api = {'));
+const withBook = (book) => {
+  const ctx = vm.createContext(Object.assign({ KhaytDepreciation: require('../lib/depreciation.js') }, book));
+  vm.runInContext(`let machines = this.machines, printLog = this.printLog;\n${helpersSrc}\nthis.api = { machineRecentHours, machineWearRate };`, ctx);
+  return ctx.api;
+};
+const recentDay = (() => { const d = new Date(); d.setDate(d.getDate() - 10); return day(d); })();
+
+test('a quote on a machine with depreciation charges its derived wear rate, as the Mac does', () => {
+  const perHour = { id: 'p', wearRate: 0.75, depreciation: { price: 3000, life: 2000, lifeUnit: 'hours', residual: 0, method: 'perHour' } };
+  const flat = { id: 'f', wearRate: 0.4 };
+  const bare = { id: 'b' };
+  const { machineWearRate } = withBook({ machines: [perHour, flat, bare], printLog: [] });
+  assert.equal(machineWearRate(perHour), 1.5, '3000 over 2000 hours, not the flat 0.75');
+  assert.equal(machineWearRate(flat), 0.4, 'no depreciation: the flat rate stands');
+  assert.equal(machineWearRate(bare), null, 'neither: the calculator keeps what it has');
+});
+
+test('a straight-line machine is costed on the hours it has actually printed lately', () => {
+  const m = { id: 's', depreciation: { price: 3650, life: 1, lifeUnit: 'years', residual: 0, method: 'straightLine' } };
+  const job = { status: 'completed', machineId: 's', date: recentDay, printTime: 90 };
+  const { machineRecentHours, machineWearRate } = withBook({ machines: [m], printLog: [job] });
+  const recent = machineRecentHours();
+  assert.equal(recent.s, 30.44, '90 hours over 90 days, a month of it');
+  const D = require('../lib/depreciation.js');
+  assert.equal(machineWearRate(m), D.hourlyRate(m, { recentMonthlyHours: recent.s }));
+  assert.equal(withBook({ machines: [m], printLog: [] }).machineWearRate(m), null, 'no hours known: no derived rate');
+});
+
+test('the calculator, both P&Ls and the headline all carry recent hours', () => {
+  const buildSrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'build.js'), 'utf8');
+  assert.match(buildSrc, /machineWearRate\(m\)/, 'applyMachineToCalculator');
+  assert.equal((analyticsSrc.match(/recentMonthlyHours: \(typeof machineRecentHours === 'function' \? machineRecentHours\(\) : \{\}\)/g) || []).length, 7,
+    'three pnlByPeriod, three machineProfit, one periodCharges');
+});
