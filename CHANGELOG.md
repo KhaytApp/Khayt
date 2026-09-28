@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A machine's own profit now agrees with the shop P&L on its wear.** For a
+  machine depreciated by printing hours, the machine table now counts the
+  hours it printed before the period you are looking at against its life, as
+  the shop P&L does. A machine that had already used up its life could
+  otherwise still show depreciation there.
+
 - **The bucket respects "Keep a copy of every model" too.** If you turned
   that off for your object storage on the Mac, the desktop kept copying new
   models there anyway. It now skips the copy, as it already did for Google
