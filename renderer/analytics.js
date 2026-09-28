@@ -177,6 +177,9 @@ function computeHandoffMachineRows() {
     unassigned: t('dash.unassigned'),
     days: analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date)),
     range: analyticsRangeSpan(printLog.map(o => o.date)),
+    // The whole book, so hours printed before the range count against a
+    // perHour machine's life, as in the shop P&L (lib/machine-pl.js).
+    orders: printLog,
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
     revenueOf: orderNetRevenueBase,
@@ -1588,6 +1591,9 @@ function renderPrinterUtilizationChart() {
     unassigned: t('dash.unassigned'),
     days: analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date)),
     range: analyticsRangeSpan(printLog.map(o => o.date)),
+    // The whole book, so hours printed before the range count against a
+    // perHour machine's life, as in the shop P&L (lib/machine-pl.js).
+    orders: printLog,
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
     revenueOf: orderNetRevenueBase,
@@ -1968,6 +1974,9 @@ function renderMachinePL() {
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
     unassigned: t('dash.unassigned'),
     range: analyticsRangeSpan(printLog.map(o => o.date)),
+    // The whole book, so hours printed before the range count against a
+    // perHour machine's life, as in the shop P&L (lib/machine-pl.js).
+    orders: printLog,
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
     revenueOf: orderNetRevenueBase,

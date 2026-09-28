@@ -94,3 +94,7 @@ test('the calculator, both P&Ls and the headline all carry recent hours', () => 
   assert.equal((analyticsSrc.match(/recentMonthlyHours: \(typeof machineRecentHours === 'function' \? machineRecentHours\(\) : \{\}\)/g) || []).length, 7,
     'three pnlByPeriod, three machineProfit, one periodCharges');
 });
+
+test('every machine P&L gets the whole book, so earlier hours count against its life', () => {
+  assert.equal((analyticsSrc.match(/range: analyticsRangeSpan\(printLog\.map\(o => o\.date\)\),\n(?:\s*\/\/[^\n]*\n)*\s*orders: printLog,/g) || []).length, 3);
+});
