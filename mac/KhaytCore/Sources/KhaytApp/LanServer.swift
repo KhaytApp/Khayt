@@ -37,7 +37,9 @@ import KhaytCore
 /// ── THE GATE ──────────────────────────────────────────────────────────────
 ///
 /// Owner data (names of customers and jobs) is behind the shop's PIN, sent
-/// as `x-khayt-pin` or `?pin=`. Ten wrong PINs from one address lock it out
+/// as `x-khayt-pin` (or `?pin=` on a GET — a write takes the header only,
+/// so a page on another origin cannot aim a plain form or `<img>` at a write
+/// route with the PIN in its address). Ten wrong PINs from one address lock it out
 /// for a minute — the rule is `lan-auth`'s, run in JavaScriptCore, so the two
 /// apps cannot come to disagree about what a lockout is. The comparison is
 /// constant-time and in Swift: a primitive, not a rule (see lan-auth.js).
@@ -567,7 +569,8 @@ final class LanServer {
     nonisolated static func reason(_ status: Int) -> String {
         switch status {
         case 200: "OK"; case 302: "Found"; case 400: "Bad Request"; case 401: "Unauthorized"
-        case 404: "Not Found"; case 413: "Payload Too Large"; case 429: "Too Many Requests"
+        case 404: "Not Found"; case 409: "Conflict"; case 413: "Payload Too Large"
+        case 415: "Unsupported Media Type"; case 429: "Too Many Requests"
         default: "OK"
         }
     }
@@ -710,6 +713,12 @@ final class LanServer {
         //
         // OFF BY DEFAULT: `host.fold` is nil unless the app sets it.
         case ("/api/store/deltas", false) where request.method == "POST":
+            // JSON only. A cross-origin page can send a "simple" POST (form or
+            // text/plain) without a preflight; it cannot send application/json.
+            // The phone has always sent it. Sep 2026 review.
+            guard Self.isJSON(request.headers["content-type"]) else {
+                return .json(415, #"{"error":"Content-Type must be application/json"}"#)
+            }
             if let refused = await pinGate(request) { return refused }
             return await foldFromPhone(request)
 
@@ -748,9 +757,8 @@ final class LanServer {
             let body = String(decoding: request.body, as: UTF8.self).replacingOccurrences(of: "+", with: "%20")
             let form = URLComponents(string: "http://x/?" + body)?
                 .queryItems ?? []
-            var asked = request
-            asked.query["pin"] = form.first { $0.name == "pin" }?.value ?? ""
-            if let refused = await pinGate(asked) {
+            let typed = form.first { $0.name == "pin" }?.value ?? ""
+            if let refused = await pinGate(request, formPin: typed) {
                 return refused.status == 401 ? Self.pinForm(wrong: true) : refused
             }
             return sessionResponse(to: "/")
@@ -1456,6 +1464,10 @@ final class LanServer {
             }
             return .json(200, #"{"ok":true}"#)
         } catch {
+            // Not recorded, so not seen: the provider's genuine retry of this
+            // delivery must be tried again, not refused as a replay for the
+            // life of the replay window.
+            forgetSeen(provided)
             return .json(400, Self.errorBody(String(describing: error)))
         }
     }
@@ -1507,6 +1519,7 @@ final class LanServer {
         if case .object(let settings)? = host.store()["settings"], case .object(let shipping)? = settings["shipping"],
            let mine = shipping[carrier] { config = mine }
         guard let event = try? await host.engine.carrierEvent(carrier: carrier, payload: payload, config: config) else {
+            forgetSeen(provided)
             return .json(422, #"{"error":"Signature valid, but this payload carried no tracking number and status Khayt could read.","carrier":"\#(carrier)"}"#)
         }
         var at = StoreWriter.iso(now)
@@ -1519,6 +1532,7 @@ final class LanServer {
             _ = try await host.carrierEvent(event, at)
             return .json(200, #"{"ok":true}"#)
         } catch {
+            forgetSeen(provided)   // see storefrontHook: a failed delivery was never taken
             return .json(400, Self.errorBody(String(describing: error)))
         }
     }
@@ -1545,6 +1559,18 @@ final class LanServer {
         }
         saveSeen()
         return false
+    }
+
+    /// Take back a signature `replayed` remembered, for a delivery that then
+    /// failed. It is remembered BEFORE processing so two copies arriving
+    /// together are not both processed; a delivery that was not taken must
+    /// not stay remembered, or the provider's retry is refused as a replay.
+    private func forgetSeen(_ signature: String) {
+        guard !signature.isEmpty else { return }
+        let key = Self.seenKey(signature)
+        let before = seenSignatures.count
+        seenSignatures.removeAll { $0.signature == key }
+        if seenSignatures.count != before { saveSeen() }
     }
 
     /// What is stored for a signature: its SHA-256, hex.
@@ -1593,7 +1619,13 @@ final class LanServer {
 
     /// Nil when the caller may pass; the refusal to send otherwise. The same
     /// answers, in the same order, as the Node server's `checkPinForGet`.
-    private func pinGate(_ request: Request) async -> Response? {
+    ///
+    /// Where the PIN may come from: a GET may carry it as `?pin=` (the queue
+    /// page's first visit, a calendar); anything else takes the `x-khayt-pin`
+    /// header only — or `formPin`, the `/session` form's field, which the
+    /// caller reads out of the body. A PIN in the address of a write is
+    /// ignored, not accepted.
+    private func pinGate(_ request: Request, formPin: String? = nil) async -> Response? {
         // DNS REBINDING: a web page the owner visits can point its own name at
         // this Mac and read the book through the owner's browser, same-origin.
         // A phone or a browser reaching the shop's book uses an address, a
@@ -1606,8 +1638,7 @@ final class LanServer {
         guard !host.pin.isEmpty else {
             return .json(401, #"{"error":"Configure a LAN PIN in Khayt settings to access this data"}"#)
         }
-        let provided = (request.query["pin"] ?? request.headers["x-khayt-pin"] ?? "")
-            .trimmingCharacters(in: .whitespaces)
+        let provided = (formPin ?? Self.pinProvided(request)).trimmingCharacters(in: .whitespaces)
         let now = host.now()
         // One lockout per IPv6 /64: a phone — or an attacker — has billions of
         // addresses in its prefix, and a lockout per address was none at all.
@@ -1631,6 +1662,18 @@ final class LanServer {
         }
         failures.removeValue(forKey: key)
         return nil
+    }
+
+    /// The PIN a request carries: the header, or on a GET/HEAD only, `?pin=`.
+    nonisolated static func pinProvided(_ request: Request) -> String {
+        let isGet = request.method == "GET" || request.method == "HEAD"
+        return (isGet ? request.query["pin"] : nil) ?? request.headers["x-khayt-pin"] ?? ""
+    }
+
+    /// `application/json`, with or without parameters (`; charset=utf-8`).
+    nonisolated static func isJSON(_ contentType: String?) -> Bool {
+        guard let type = contentType?.split(separator: ";").first else { return false }
+        return type.trimmingCharacters(in: .whitespaces).lowercased() == "application/json"
     }
 
     /// Connections open now, in all and per address (or IPv6 /64).

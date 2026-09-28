@@ -12,7 +12,13 @@ import KhaytCore
 /// * a `state` that must come back unchanged, compared in constant time
 ///   BEFORE the code is exchanged, so a code delivered by anything else on
 ///   this Mac is refused;
-/// * one callback, then the listener closes; five minutes, then it gives up.
+/// * the state is checked by the LISTENER, before anything else in the request
+///   is believed — an `?error=` included. A callback with a missing or wrong
+///   state is answered 400 and the listener keeps waiting, so another process
+///   on this Mac (or a web page scanning loopback ports) cannot abort or
+///   hijack a sign-in by getting to the port first;
+/// * one callback with the right state, then the listener closes; five
+///   minutes, then it gives up.
 ///
 /// Google's "Desktop app" OAuth clients accept any loopback port, which is
 /// why the shop's client must be of that type.
@@ -33,20 +39,22 @@ enum GoogleSignIn {
                     open: (URL) -> Void = { NSWorkspace.shared.open($0) }) async throws -> String {
         let (verifier, challenge) = DriveClient.pkce()
         let state = (0..<16).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined()
-        let loopback = try await Loopback.start()
+        let loopback = try await Loopback.start(state: state)
         defer { loopback.stop() }
         let redirect = "http://127.0.0.1:\(loopback.port)/callback"
         let no = words.callIt("mac.gdrive_page_not_connected")
         open(DriveClient.authorizeURL(clientId: clientId, redirectURI: redirect, challenge: challenge, state: state))
 
         let query = try await loopback.nextCallback(timeout: 300)
-        if let error = query["error"] {
-            await loopback.reply(title: no, body: words.callIt("mac.gdrive_page_google_said") + " " + error)
-            throw Failure.google(error)
-        }
+        // The listener only hands over a callback whose state matched; this
+        // is the second look, and it comes before `error` is believed.
         guard constantTimeEqual(query["state"] ?? "", state) else {
             await loopback.reply(title: no, body: words.callIt("mac.gdrive_page_wrong_state"))
             throw Failure.wrongState
+        }
+        if let error = query["error"] {
+            await loopback.reply(title: no, body: words.callIt("mac.gdrive_page_google_said") + " " + error)
+            throw Failure.google(error)
         }
         guard let code = query["code"], !code.isEmpty else {
             await loopback.reply(title: no, body: words.callIt("mac.gdrive_page_no_code"))
@@ -89,7 +97,14 @@ enum GoogleSignIn {
         return out
     }
 
-    /// A listener that takes ONE callback.
+    /// Whether a callback carries the state this sign-in sent — the only
+    /// callback the listener will take. Missing counts as wrong.
+    nonisolated static func acceptsCallback(_ query: [String: String], state: String) -> Bool {
+        guard let got = query["state"], !got.isEmpty, !state.isEmpty else { return false }
+        return constantTimeEqual(got, state)
+    }
+
+    /// A listener that takes ONE callback — the first one with the right state.
     final class Loopback: @unchecked Sendable {
         let listener: NWListener
         let port: UInt16
@@ -99,9 +114,14 @@ enum GoogleSignIn {
         /// A callback that came before anybody was waiting for it.
         private var early: [String: String]?
 
-        private init(listener: NWListener, port: UInt16) { self.listener = listener; self.port = port }
+        /// The state a callback must carry to be taken.
+        private let state: String
 
-        static func start() async throws -> Loopback {
+        private init(listener: NWListener, port: UInt16, state: String) {
+            self.listener = listener; self.port = port; self.state = state
+        }
+
+        static func start(state: String) async throws -> Loopback {
             let params = NWParameters.tcp
             params.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
             params.acceptLocalOnly = true
@@ -122,7 +142,7 @@ enum GoogleSignIn {
                 listener.newConnectionHandler = { _ in }
                 listener.start(queue: DispatchQueue(label: "khayt.google-signin.listen"))
             }
-            let loop = Loopback(listener: listener, port: port)
+            let loop = Loopback(listener: listener, port: port, state: state)
             listener.newConnectionHandler = { [loop] c in loop.accept(c) }
             return loop
         }
@@ -134,6 +154,13 @@ enum GoogleSignIn {
                 guard let query = GoogleSignIn.callbackQuery(text) else {
                     // A favicon, a probe — anything that is not the callback.
                     c.send(content: Data("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8),
+                           completion: .contentProcessed { _ in c.cancel() })
+                    return
+                }
+                // Not this sign-in's state: turned away, and the listener keeps
+                // waiting — a stray or hostile request cannot end the sign-in.
+                guard GoogleSignIn.acceptsCallback(query, state: state) else {
+                    c.send(content: Data("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8),
                            completion: .contentProcessed { _ in c.cancel() })
                     return
                 }

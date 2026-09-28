@@ -49,7 +49,7 @@ Authorization: Bearer khayt_<random>
 | Mechanism | Details |
 |-----------|---------|
 | Header | `x-khayt-pin: <owner-pin>` (preferred for native clients) |
-| Query | `?pin=<owner-pin>` (used by some PWA links) |
+| Query | `?pin=<owner-pin>` (used by some PWA links) — **GET only on the native Mac app**: its write routes ignore `?pin=` and take the header |
 
 **Owner PIN** is `settings.lanApi.pin` in the store — same as kiosk / queue API.
 
@@ -236,6 +236,10 @@ A paired client's changes, folded into the shop's book. **Requires owner PIN.**
   "cursor": null
 }
 ```
+
+**Headers** — `x-khayt-pin` (a `?pin=` in the address is ignored on this route) and
+`Content-Type: application/json` (anything else is **415**, so a cross-origin page
+cannot reach this route with a preflight-free form or `text/plain` POST).
 
 Neither end invents a rule here. The client computes the payload with the same
 function the desktop pushes with, and the Mac folds it with the same function

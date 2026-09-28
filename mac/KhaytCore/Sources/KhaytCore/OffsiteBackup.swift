@@ -271,6 +271,18 @@ public protocol OffsiteDestination: Sendable {
     func delete(_ name: String) async throws
 }
 
+extension OffsiteBackup {
+    /// The backup name a listed key stands for, or nil for one that is not
+    /// directly inside `folder` — outside it, nested under it, empty, or a
+    /// name with a `..` in it. Every remote destination lists through this.
+    public static func listedName(key: String, folder: String) -> String? {
+        guard key.hasPrefix(folder) else { return nil }
+        let name = String(key.dropFirst(folder.count))
+        guard !name.isEmpty, !name.contains("/"), !name.contains("\\"), !name.contains("..") else { return nil }
+        return name
+    }
+}
+
 /// A bucket — the print library's own, under `[prefix]/khayt-offsite-backups/`.
 public struct BucketDestination: OffsiteDestination {
     public let config: S3Config
@@ -285,8 +297,7 @@ public struct BucketDestination: OffsiteDestination {
     public func list() async throws -> [OffsiteBackup.Entry] {
         let folder = OffsiteBackup.keyFolder(prefix: config.prefix) + "/"
         return try await S3.list(config, prefix: folder, fetch: fetch).compactMap { item in
-            let name = String(item.key.dropFirst(folder.count))
-            guard item.key.hasPrefix(folder), !name.isEmpty, !name.contains("/") else { return nil }
+            guard let name = OffsiteBackup.listedName(key: item.key, folder: folder) else { return nil }
             return OffsiteBackup.Entry(name: name, bytes: item.size, modified: item.modified)
         }
     }
@@ -305,8 +316,12 @@ public struct DriveDestination: OffsiteDestination {
     public func delete(_ name: String) async throws { try await client.delete(key(name)) }
     public func list() async throws -> [OffsiteBackup.Entry] {
         let folder = OffsiteBackup.keyFolder(prefix: prefix) + "/"
-        return try await client.list(keyPrefix: folder, nameContains: OffsiteBackup.stem).map {
-            OffsiteBackup.Entry(name: String($0.key.dropFirst(folder.count)), bytes: $0.size, modified: $0.modified)
+        // The same guard as the bucket's. A Drive file's key is a property
+        // anyone with access to the folder can set, and a listed name is later
+        // handed back to `get`/`delete` and shown to the shop.
+        return try await client.list(keyPrefix: folder, nameContains: OffsiteBackup.stem).compactMap {
+            guard let name = OffsiteBackup.listedName(key: $0.key, folder: folder) else { return nil }
+            return OffsiteBackup.Entry(name: name, bytes: $0.size, modified: $0.modified)
         }
     }
 }

@@ -40,6 +40,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   figure. A straight-line machine's hourly figure, and its depreciation in the
   P&L and the machine table, now also use what it has actually printed over
   the last 90 days, as on the Mac.
+- **(Mac) Security review fixes.** Google sign-in now checks the sign-in's
+  own `state` before anything else in the callback: a stray or hostile request
+  to the sign-in listener (another app, or a web page probing local ports) gets
+  a 400 and the sign-in keeps waiting, instead of being cancelled by a forged
+  `?error=`. On the LAN server, a write (`POST /api/store/deltas`) takes the PIN
+  from the `X-Khayt-PIN` header only — never from `?pin=` in the address — and
+  only as `application/json`; the companion app already sends both, and GETs
+  (the queue page, calendar feeds) still accept `?pin=`. A storefront or
+  carrier webhook that fails to record is no longer remembered as delivered,
+  so the provider's retry is taken rather than refused as a replay. Telegram
+  and ntfy failures are logged by error code and HTTP status only, never with
+  the address that holds the bot token or topic. Cloud requests follow a
+  redirect only to the same host, so the shop's token cannot be carried off
+  by a 30x. The import key is copied to the clipboard as concealed, so
+  clipboard managers do not keep it. Drive backup listings ignore names that
+  point outside the backup folder, as bucket listings already did.
 
 - **Set what a machine cost, and see it lose value in your P&L.** Each
   machine in Settings has a Depreciation section: what you paid, when, how

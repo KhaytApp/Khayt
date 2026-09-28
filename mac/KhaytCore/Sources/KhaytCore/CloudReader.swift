@@ -114,6 +114,16 @@ public enum CloudReader {
         return request
     }
 
+    /// The session every request built by `request(...)` goes through.
+    ///
+    /// Its delegate follows a redirect only to the SAME scheme, host and port.
+    /// The `Authorization: Bearer` header is the shop's shop-wide credential,
+    /// and a 30x from the cloud host (or anything that can answer for it)
+    /// pointing somewhere else must not carry it along — the 30x comes back
+    /// to the caller as the answer instead. Sep 2026 security review.
+    nonisolated public static let session = URLSession(configuration: .ephemeral,
+                                                        delegate: SameHostRedirects(), delegateQueue: nil)
+
     /// One cold pull.
     ///
     /// `fetch` is a seam so the whole path can be exercised without a network
@@ -226,4 +236,23 @@ public enum CloudReader {
 
 private extension String {
     var trimmingTrailingSlash: String { hasSuffix("/") ? String(dropLast()) : self }
+}
+
+/// A redirect is followed only to the same scheme, host and port as the
+/// request it came from — see `CloudReader.session`.
+public final class SameHostRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+    public override init() { super.init() }
+
+    public static func allows(from original: URL?, to next: URL?) -> Bool {
+        guard let a = original, let b = next,
+              let ha = a.host?.lowercased(), let hb = b.host?.lowercased(), !ha.isEmpty else { return false }
+        return a.scheme?.lowercased() == b.scheme?.lowercased() && ha == hb && a.port == b.port
+    }
+
+    public func urlSession(_ session: URLSession, task: URLSessionTask,
+                           willPerformHTTPRedirection response: HTTPURLResponse,
+                           newRequest request: URLRequest) async -> URLRequest? {
+        let from = task.currentRequest?.url ?? task.originalRequest?.url
+        return Self.allows(from: from, to: request.url) ? request : nil
+    }
 }

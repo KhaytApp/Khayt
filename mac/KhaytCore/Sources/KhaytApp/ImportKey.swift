@@ -187,8 +187,7 @@ struct ImportKeySection: View {
                             .lineLimit(1).truncationMode(.middle)
                         Spacer()
                         Button(shop.words.callIt(copied ? "mac.ik_copied" : "mac.ik_copy")) {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(fresh.key, forType: .string)
+                            SecretPasteboard.copy(fresh.key)
                             copied = true
                         }
                     }
@@ -258,7 +257,7 @@ struct ImportKeySection: View {
         busy = true; defer { busy = false }
         do {
             let (connection, token) = try await shop.importKeyAccess()
-            let session = URLSession(configuration: .ephemeral)
+            let session = CloudReader.session
             status = try await ImportKeyClient.status(connection, token: token) { try await session.data(for: $0) }
             problem = nil
         } catch {
@@ -272,7 +271,7 @@ struct ImportKeySection: View {
         busy = true; defer { busy = false }
         do {
             let (connection, token) = try await shop.importKeyAccess()
-            let session = URLSession(configuration: .ephemeral)
+            let session = CloudReader.session
             let fetch: ImportKeyClient.Fetch = { try await session.data(for: $0) }
             switch which {
             case .create, .replace:

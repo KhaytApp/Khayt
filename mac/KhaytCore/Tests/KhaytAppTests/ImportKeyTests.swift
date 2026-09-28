@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Testing
 import KhaytCore
 @testable import KhaytApp
@@ -170,5 +171,18 @@ struct ImportKeyTests {
             #expect(Words.own[key]?["en"]?.isEmpty == false, Comment(rawValue: "\(key) en"))
             #expect(Words.own[key]?["ar"]?.isEmpty == false, Comment(rawValue: "\(key) ar"))
         }
+    }
+
+    @Test("the key is copied as concealed, so clipboard history does not keep it")
+    func copiedConcealed() {
+        let board = NSPasteboard(name: .init("khayt-test-\(UUID().uuidString)"))
+        defer { board.releaseGlobally() }
+        SecretPasteboard.copy("khk_secret", to: board)
+        #expect(board.string(forType: .string) == "khk_secret")
+        #expect(board.types?.contains(.init("org.nspasteboard.ConcealedType")) == true)
+        let source = try? String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/KhaytApp/ImportKey.swift"), encoding: .utf8)
+        #expect(source?.contains("SecretPasteboard.copy(fresh.key)") == true, "the import key is copied in the clear")
     }
 }
