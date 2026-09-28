@@ -944,7 +944,7 @@ final class Shop {
         let month = await Self.thisMonthsRow(
             engine: engine, orders: orders, expenses: expenses,
             settings: settings, clients: clients, currencies: Invoice.currencyTable(self),
-            wasteLog: Self.rows(root, "wasteLog"))
+            wasteLog: Self.rows(root, "wasteLog"), inventory: Self.rows(root, "inventory"))
         monthNetRevenue = month?.revenue
         // The masthead's NET is the P&L's net income for the month — revenue
         // less cost of goods, expenses and overhead, filament bought counted
@@ -971,7 +971,8 @@ final class Shop {
             orders: orders, settings: settings)) ?? []
         thisMonthRevenue = (try? await engine.kpis(orders: orders, clients: clients,
                                                    settings: settings, range: "month",
-                                                   language: words.language))?.revenue ?? 0
+                                                   language: words.language,
+                                                   inventory: Self.rows(root, "inventory")))?.revenue ?? 0
         kpiOrders = orders
         kpiClients = clients
         kpiSettings = settings
@@ -998,7 +999,7 @@ final class Shop {
         guard let engine, !kpiOrders.isEmpty else { kpis = nil; return }
         kpis = try? await engine.kpis(orders: kpiOrders, clients: kpiClients,
                                       settings: kpiSettings, range: kpiRange,
-                                      language: words.language)
+                                      language: words.language, inventory: inventoryRows)
     }
 
     enum Failure: Error { case missingSample }
@@ -12900,10 +12901,11 @@ final class Shop {
                               clients: [JSONValue],
                               currencies: [String: JSONValue],
                               wasteLog: [JSONValue] = [],
+                              inventory: [JSONValue] = [],
                               now: Date = Date()) async -> Double? {
         await thisMonthsRow(engine: engine, orders: orders, expenses: expenses,
                             settings: settings, clients: clients,
-                            currencies: currencies, wasteLog: wasteLog, now: now)?.revenue
+                            currencies: currencies, wasteLog: wasteLog, inventory: inventory, now: now)?.revenue
     }
 
     /// The current month's whole P&L row — the net and the gross come from it
@@ -12913,6 +12915,7 @@ final class Shop {
                               clients: [JSONValue],
                               currencies: [String: JSONValue],
                               wasteLog: [JSONValue] = [],
+                              inventory: [JSONValue] = [],
                               now: Date = Date()) async -> PnlPeriod? {
         guard let engine else { return nil }
         // The waste log goes in, as it does for Reports: failed prints are a
@@ -12921,7 +12924,7 @@ final class Shop {
         let periods = (try? await engine.pnlByPeriod(
             orders: orders, expenses: expenses, settings: settings, clients: clients,
             currencies: currencies, now: now, granularity: "month",
-            wasteLog: wasteLog)) ?? []
+            wasteLog: wasteLog, inventory: inventory)) ?? []
         return periods.first { $0.period == DateRange.localMonth(now) }
     }
 
