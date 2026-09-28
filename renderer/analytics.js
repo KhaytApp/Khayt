@@ -177,6 +177,7 @@ function computeHandoffMachineRows() {
     unassigned: t('dash.unassigned'),
     days: analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date)),
     range: analyticsRangeSpan(printLog.map(o => o.date)),
+    recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
     revenueOf: orderNetRevenueBase,
     // Only what was stocked: wear reaches this table as depreciation, once.
@@ -739,6 +740,7 @@ function renderMonthlyTrendChart() {
     now: today, granularity: 'month', wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
     inventory: (typeof inventory !== 'undefined' ? inventory : []),
     machines: (typeof machines !== 'undefined' ? machines : []),
+    recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   });
   const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
   const revByMonth = {};
@@ -933,6 +935,7 @@ function renderProfitMarginChart() {
     now: today, granularity: 'month', wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
     inventory: (typeof inventory !== 'undefined' ? inventory : []),
     machines: (typeof machines !== 'undefined' ? machines : []),
+    recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   });
   const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
   const vals = months.map(m => (byKey[m] && byKey[m].marginPct != null) ? byKey[m].marginPct : null);
@@ -1585,6 +1588,7 @@ function renderPrinterUtilizationChart() {
     unassigned: t('dash.unassigned'),
     days: analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date)),
     range: analyticsRangeSpan(printLog.map(o => o.date)),
+    recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
     revenueOf: orderNetRevenueBase,
     // Only what was stocked: wear reaches this table as depreciation, once.
@@ -1683,6 +1687,7 @@ function renderPnLSection() {
     wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
     inventory: (typeof inventory !== 'undefined' ? inventory : []),
     machines: (typeof machines !== 'undefined' ? machines : []),
+    recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   });
   if (rows.length === 0) { el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.pnl_empty'))}</p>`; return; }
   const hasFixed = rows.some((r) => r.fixed > 0);
@@ -1963,6 +1968,7 @@ function renderMachinePL() {
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
     unassigned: t('dash.unassigned'),
     range: analyticsRangeSpan(printLog.map(o => o.date)),
+    recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
     revenueOf: orderNetRevenueBase,
     // Only what was stocked: wear reaches this table as depreciation, once.
@@ -2872,7 +2878,8 @@ function pnlInputsForRange() {
   // Machines losing value over the range — the one place wear enters the P&L.
   const span = analyticsRangeSpan((printLog || []).map(o => o.date));
   const dep = (typeof KhaytDepreciation !== 'undefined' && span)
-    ? KhaytDepreciation.periodCharges(machines || [], printLog || [], [{ key: 'range', from: span.from, to: span.to }])
+    ? KhaytDepreciation.periodCharges(machines || [], printLog || [], [{ key: 'range', from: span.from, to: span.to }],
+        { recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}) })
     : {};
   const depreciation = (dep.range && dep.range.total) || 0;
   return { orders, expenses: expenseRows, waste: wasteRows, depreciation };

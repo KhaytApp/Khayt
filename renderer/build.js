@@ -998,8 +998,9 @@ function applyPreset(presetId) {
 }
 
 // Auto-fill the calculator's printer fields from an assigned machine. A machine
-// carries the printer identity (name/model) and the one printer-specific cost input
-// it knows — power draw (from the printer catalog). Shop-wide rates (labour, failure,
+// carries the printer identity (name/model) and the printer-specific cost inputs
+// it knows — power draw (from the printer catalog) and wear (its depreciation, or
+// the flat rate). Shop-wide rates (labour, failure,
 // electricity) stay as they are; a preset can still override everything.
 function applyMachineToCalculator(machineId) {
   const m = (typeof machines !== 'undefined' ? machines : []).find(x => x && x.id === machineId);
@@ -1007,7 +1008,11 @@ function applyMachineToCalculator(machineId) {
   const nameEl = $('#printerModel');
   if (nameEl) nameEl.value = m.printerModelName || m.name || '';
   if (m.powerDraw != null && m.powerDraw !== '') { const el = $('#powerDraw'); if (el) el.value = m.powerDraw; }
-  if (m.wearRate != null && m.wearRate !== '')   { const el = $('#wearRate');  if (el) el.value = m.wearRate; }
+  // Its depreciation's rate where it has one (renderer/machines.js
+  // machineWearRate), the flat figure otherwise — as the Mac quotes it.
+  const wear = (typeof machineWearRate === 'function') ? machineWearRate(m)
+    : ((m.wearRate != null && m.wearRate !== '') ? m.wearRate : null);
+  if (wear != null) { const el = $('#wearRate');  if (el) el.value = wear; }
   if (typeof updateGrandTotal === 'function') updateGrandTotal();
 }
 

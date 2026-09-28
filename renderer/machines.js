@@ -1655,6 +1655,37 @@ async function importPrinterHistory(machineId) {
     'success', 9000);
 }
 
+// What each machine with depreciation set has printed a month lately
+// (lib/depreciation.js recentMonthlyHours, the last 90 days of finished work),
+// `{ [machineId]: hours }`. A straight-line machine needs it to turn its
+// monthly amount into an hourly wear rate; the Mac passes the same figure to
+// its quotes and both P&Ls (Shop.swift `recentMonthlyHours`).
+function machineRecentHours() {
+  const D = (typeof KhaytDepreciation !== 'undefined') ? KhaytDepreciation : null;
+  if (!D) return {};
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const orders = (typeof printLog !== 'undefined' && Array.isArray(printLog)) ? printLog : [];
+  const out = {};
+  for (const m of (typeof machines !== 'undefined' && Array.isArray(machines)) ? machines : []) {
+    if (!m || !m.id || !D.settingsOf(m)) continue;
+    const h = D.recentMonthlyHours(orders, m.id, { today });
+    if (h) out[m.id] = h;
+  }
+  return out;
+}
+
+// The wear rate a quote charges on this machine: the one its depreciation
+// works out when it has any (lib/print-rates.js step 4, as the Mac quotes),
+// else the flat rate the shop typed. Null when it has neither.
+function machineWearRate(m) {
+  if (!m) return null;
+  const D = (typeof KhaytDepreciation !== 'undefined') ? KhaytDepreciation : null;
+  const derived = D ? D.hourlyRate(m, { recentMonthlyHours: machineRecentHours()[m.id] }) : null;
+  if (derived !== null && derived !== undefined) return derived;
+  return (m.wearRate != null && m.wearRate !== '') ? m.wearRate : null;
+}
+
   const api = {
 
     MACHINE_COLORS,
@@ -1680,6 +1711,8 @@ async function importPrinterHistory(machineId) {
     estimateMachineQueueClearDate,
     machineLiveBadge,
     updateMachinesLiveStatus,
+    machineRecentHours,
+    machineWearRate,
   };
   Object.assign(global, api);
   global.KhaytMachines = api;
