@@ -29,6 +29,22 @@ struct MachineValueTests {
         #expect(Shop.periodSpan(.last_month, now: Self.day(2026, 1, 3)) == ("2025-12-01", "2025-12-31"))
     }
 
+    @Test("All time starts at the book's first order, as the other app's analyticsRangeSpan does")
+    func allTimeFromFirstOrder() {
+        let now = Self.day(2026, 5, 12)
+        let dates = ["2026-03-04", "", "not a day", "2025-11-20T10:00:00Z", "2026-01-01"]
+        #expect(Shop.periodSpan(.all, now: now, dates: dates) == ("2025-11-20", "2026-05-12"))
+        // Only All time reads the dates.
+        #expect(Shop.periodSpan(.month, now: now, dates: dates) == ("2026-05-01", "2026-05-12"))
+        // And Reports hands it the book's dates.
+        let reports = (try? String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/Reports.swift"), encoding: .utf8)) ?? ""
+        #expect(reports.contains("range: Shop.periodSpan(shop.period, dates: shop.orderRows"))
+        #expect(reports.contains("inventory: shop.inventoryRows,\n"))
+        #expect(reports.contains("orders: shop.orderRows)"))
+    }
+
     @Test("a machine reads its depreciation and target hours back, leniently")
     func decodes() throws {
         let json = """

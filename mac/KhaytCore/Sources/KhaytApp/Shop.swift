@@ -1640,6 +1640,7 @@ final class Shop {
             moveProblem = words.callIt("mac.move_no_engine"); return
         }
 
+        var spentAttempt: String?
         var undo: [ChangedRecord] = []
         do {
             try await StoreWriter.update(
@@ -1654,8 +1655,9 @@ final class Shop {
                 let shelfBefore = Self.rows(root, "inventory")
                 // A QC failure is a print that RAN TO THE END: the whole of its
                 // time and power went into a part nobody can sell.
-                let costing = self.failedCosting(order: target, machines: Self.rows(root, "machines"),
-                                                 inspected: true)
+                let (costing, spent) = self.failedCosting(order: target, machines: Self.rows(root, "machines"),
+                                                          inspected: true)
+                spentAttempt = spent
                 let out = try await engine.recordQcFailure(
                     order: target, failureType: failureType, severity: "major",
                     reason: reason, weight: weight, inspector: nil,
@@ -1682,6 +1684,8 @@ final class Shop {
                 Self.write(&root, "inventory", changed: out.inventory,
                            before: shelfBefore, into: &undo)
             }
+            // The waste row is saved: a kept meter reading it used is spent.
+            if let spentAttempt { energyMeter()?.consumeAttempt(for: spentAttempt) }
             registerMoveUndo(undo, named: words.callIt("ord.qc_fail"))
             await load(source)
             // Back to be printed again — the move Khayt and Bed Ready both make
@@ -1703,15 +1707,20 @@ final class Shop {
     /// time for an inspected print (it ran to the end); else the rule scales
     /// the estimate by the progress at failure — 100% for an inspected print,
     /// and the printer's last reported progress for one that stopped.
-    func failedCosting(order: JSONValue, machines: [JSONValue], inspected: Bool) -> JSONValue {
-        guard case .object(let o) = order else { return .null }
+    ///
+    /// `spent` is the job whose kept meter attempt this costing used, for the
+    /// caller to consume once its waste row is saved (`EnergyMeter.consumeAttempt`).
+    func failedCosting(order: JSONValue, machines: [JSONValue],
+                       inspected: Bool) -> (costing: JSONValue, spent: String?) {
+        guard case .object(let o) = order else { return (.null, nil) }
         let jobId = Self.plainString(o["id"]) ?? ""
         let machineId = Self.plainString(o["machineId"]) ?? ""
         let ended = lastPrintEnded[machineId].flatMap { $0.orderId == jobId ? $0 : nil }
         let live = printers.statusCache[machineId]
         let attempt = energyMeter()?.attempt(for: jobId)
-        return Self.failedCosting(order: o, machines: machines, ended: ended, live: live,
-                                  attempt: attempt, inspected: inspected)
+        let costing = Self.failedCosting(order: o, machines: machines, ended: ended, live: live,
+                                         attempt: attempt, inspected: inspected)
+        return (costing, Self.usesAttempt(order: o, attempt: attempt, inspected: inspected) ? jobId : nil)
     }
 
     /// The same, from what is handed in — pure, for the tests.
@@ -1734,15 +1743,27 @@ final class Shop {
         }
 
         // The attempt's own plug reading. An inspected print finished, so its
-        // reading is already on the job; a stopped one was kept by the meter.
-        if let attempt {
-            out["energy"] = attempt.json
-        } else if inspected, let wh = plainNumber(o["actualEnergyWh"]), wh > 0 {
+        // reading is already on the job — and that one wins: a meter attempt
+        // for the same job is an EARLIER stopped print (cancelled at 40%, then
+        // reprinted whole), and costing the full failed print at the stopped
+        // one's 300 Wh under-costs it. A stopped print's was kept by the meter.
+        if inspected, let wh = plainNumber(o["actualEnergyWh"]), wh > 0 {
             var e: [String: JSONValue] = ["wh": .number(wh)]
             if case .object(let meta)? = o["actualEnergy"], let c = meta["coverage"] { e["coverage"] = c }
             out["energy"] = .object(e)
+        } else if let attempt {
+            out["energy"] = attempt.json
         }
         return .object(out)
+    }
+
+    /// Whether `failedCosting` took its energy from the meter's kept attempt —
+    /// in which case the attempt is spent once the waste row is saved.
+    static func usesAttempt(order o: [String: JSONValue],
+                            attempt: KhaytEngine.EnergyReading?, inspected: Bool) -> Bool {
+        guard attempt != nil else { return false }
+        if inspected, let wh = plainNumber(o["actualEnergyWh"]), wh > 0 { return false }
+        return true
     }
 
     /// The job waiting for someone to say it passed inspection.
@@ -6455,9 +6476,14 @@ final class Shop {
     /// machine's depreciation is pro-rated over in the machine P&L, so "This
     /// month" on the 12th charges twelve days of it, not thirty.
     ///
-    /// "All time" starts at the epoch: the rule clips to the day each machine
-    /// was bought, which is the real start of its depreciation.
-    static func periodSpan(_ period: Period, now: Date = Date()) -> (from: String, to: String) {
+    /// "All time" starts at the book's first order — `dates`, every job's
+    /// date — which is what the other app's `analyticsRangeSpan` answers, so a
+    /// straight-line machine bought before the shop's first job is charged
+    /// from the same day in both. The rule then clips to the day each machine
+    /// was bought. With no dates it falls back to the epoch, which the rule
+    /// clips to the purchase date.
+    static func periodSpan(_ period: Period, now: Date = Date(),
+                           dates: [String] = []) -> (from: String, to: String) {
         let cal = Calendar.book
         let today = Self.today(now)
         let year = cal.component(.year, from: now)
@@ -6478,7 +6504,9 @@ final class Shop {
         case .year:
             return (day(year, 1, 1), today)
         case .all:
-            return ("1970-01-01", today)
+            let first = dates.map { String($0.prefix(10)) }
+                .filter { Order.day($0) != nil }.min()
+            return (first ?? "1970-01-01", today)
         }
     }
 
@@ -6651,6 +6679,7 @@ final class Shop {
         guard let engine else {
             spendProblem = words.callIt("mac.move_no_engine"); return
         }
+        var spentAttempt: String?
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
@@ -6662,9 +6691,11 @@ final class Shop {
                 let job: JSONValue? = Self.plainString(input["orderId"]).flatMap { id in
                     id.isEmpty ? nil : Self.rows(root, "printLog").first { Self.recordId($0) == id }
                 }
-                let costing = job.map {
+                let costed = job.map {
                     self.failedCosting(order: $0, machines: Self.rows(root, "machines"), inspected: false)
                 }
+                let costing = costed?.costing
+                spentAttempt = costed?.spent
                 let made = try await engine.newWasteEntry(
                     input, id: Self.uid("W"), today: Self.today(),
                     inventory: Self.rows(root, "inventory"), order: job, costing: costing)
@@ -6680,6 +6711,9 @@ final class Shop {
                 root["inventory"] = .array(Self.stamping(made.inventory,
                                                          against: Self.rows(root, "inventory")))
             }
+            // Saved: the kept meter reading this row used is spent, so a second
+            // failure logged against the job does not carry it again.
+            if let spentAttempt { energyMeter()?.consumeAttempt(for: spentAttempt) }
             await load(source)
             spendNote = words.callIt("waste.saved")
         } catch let refusal as MoveRefused {

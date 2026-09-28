@@ -95,4 +95,18 @@ final class EnergyMeter {
             $0.orderId == orderId && now.timeIntervalSince($0.at) < 24 * 3600
         }?.reading
     }
+
+    /// The attempt has been written onto a waste row: forget it.
+    ///
+    /// `attempt(for:)` only looks, so a reading used by one waste row was
+    /// still there for the next — a print cancelled at 40% (300 Wh) put its
+    /// 300 Wh on every failure logged against the job for a day. Called AFTER
+    /// the row is saved, because the store write re-runs its change when the
+    /// book moved underneath it, and a reading consumed on the first run would
+    /// be missing from the second.
+    func consumeAttempt(for orderId: String) {
+        for (machineId, kept) in attempts where kept.orderId == orderId {
+            attempts[machineId] = nil
+        }
+    }
 }

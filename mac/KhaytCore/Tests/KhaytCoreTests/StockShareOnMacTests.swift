@@ -36,4 +36,32 @@ struct StockShareOnMacTests {
         // material 10, wear 10, power 1 → 10/21 of the frozen 40.
         #expect(abs((q3.cogs ?? 0) - 40 * 10.0 / 21.0) < 0.05)
     }
+
+    @Test("the machine P&L splits what was stocked with the shelf, as Reports' P&L does")
+    func machinePLHasTheShelf() async throws {
+        let engine = try KhaytEngine()
+        // Wear 10, and 100 g of TPU priced off the shelf (100 per kg) = 10.
+        let order: JSONValue = .object([
+            "id": .string("J1"), "status": .string("completed"), "date": .string("2026-09-10"),
+            "machineId": .string("M1"), "price": .number(100), "costBasis": .number(20),
+            "parts": .array([.object([
+                "qty": .number(1), "baseCost": .number(20), "printTime": .number(10), "wearRate": .number(1),
+                "extraMaterials": .array([.object(["material": .string("TPU"), "weight": .number(100)])]),
+            ])]),
+        ])
+        let shelf: [JSONValue] = [.object(["id": .string("s1"), "material": .string("TPU"),
+                                           "cost": .number(100), "weight": .number(1000)])]
+        func material(_ inventory: [JSONValue]) async throws -> Double? {
+            try await engine.machineProfit(
+                machines: [.object(["id": .string("M1"), "name": .string("U1")])], completed: [order],
+                expenses: [], maintenance: [], settings: [:], clients: [], unassigned: "—",
+                inventory: inventory).rows.first?.materialCost
+        }
+        // With the shelf: half the part is stocked (the TPU), half is wear.
+        #expect(try await material(shelf) == 10)
+        // Without it the TPU has no price, and the stocked share is nothing.
+        #expect(try await material([]) == 0)
+        let engineSource = try Self.source()
+        #expect(engineSource.contains("var ctx = { settings: ARG4, clients: ARG5, inventory: ARG10 };"))
+    }
 }

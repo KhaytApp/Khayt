@@ -155,6 +155,48 @@ struct EnergyCostTests {
         #expect(c["energy"] == .object(["wh": .number(2000), "coverage": .number(1)]))
     }
 
+    static let reading300 = KhaytEngine.EnergyReading(wh: 300, coveredS: 3600, spanS: 3600,
+                                                      coverage: 1, samples: 60, gaps: 0)
+
+    @Test("an inspected print is costed at its own metered energy, not an earlier stopped attempt's")
+    func inspectedPrefersTheJob() throws {
+        // Cancelled at 40% (300 Wh kept by the meter), reprinted whole (900 Wh
+        // on the job), then failed QC: the waste row is the whole print's 900.
+        var done = Self.order
+        done["actualEnergyWh"] = .number(900)
+        done["actualEnergy"] = .object(["coverage": .number(1)])
+        guard case .object(let c) = Shop.failedCosting(order: done, machines: Self.machines, ended: nil,
+                                                       live: nil, attempt: Self.reading300,
+                                                       inspected: true) else { Issue.record("not an object"); return }
+        #expect(c["energy"] == .object(["wh": .number(900), "coverage": .number(1)]))
+        #expect(!Shop.usesAttempt(order: done, attempt: Self.reading300, inspected: true),
+                "the kept attempt is not spent: it belongs to the stopped print")
+
+        // A stopped print with a kept attempt uses it, and spends it.
+        guard case .object(let s) = Shop.failedCosting(order: Self.order, machines: Self.machines, ended: nil,
+                                                       live: nil, attempt: Self.reading300,
+                                                       inspected: false) else { return }
+        #expect(s["energy"] == Self.reading300.json)
+        #expect(Shop.usesAttempt(order: Self.order, attempt: Self.reading300, inspected: false))
+        #expect(!Shop.usesAttempt(order: Self.order, attempt: nil, inspected: false))
+    }
+
+    @Test("a kept attempt is consumed once, so a second waste row does not carry it again")
+    func attemptConsumed() {
+        let m = Self.meter(Box())
+        let now = Date()
+        m.remember("M1", .init(orderId: "J1", reading: Self.reading300, at: now))
+        m.remember("M2", .init(orderId: "J2", reading: Self.reading300, at: now))
+        #expect(m.attempt(for: "J1", now: now) == Self.reading300)
+        #expect(m.attempt(for: "J1", now: now) == Self.reading300, "looking does not consume")
+        m.consumeAttempt(for: "J1")
+        #expect(m.attempt(for: "J1", now: now) == nil)
+        #expect(m.attempt(for: "J2", now: now) == Self.reading300, "another job's is untouched")
+        // And both waste paths spend it after their row is saved.
+        let shop = (try? SmartPlugTests.source("Shop.swift")) ?? ""
+        #expect(shop.components(separatedBy: "energyMeter()?.consumeAttempt(for: spentAttempt)").count == 3)
+    }
+
     @Test("a waste entry on a job carries machine time and power; `cost` stays the filament")
     func wasteEntry() async throws {
         let engine = try KhaytEngine()
