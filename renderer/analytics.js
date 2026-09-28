@@ -714,6 +714,7 @@ function renderMonthlyTrendChart() {
   const rows = KhaytPnl.pnlByPeriod(printLog, expenses, {
     settings, clients, currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
     now: today, granularity: 'month', wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
+    inventory: (typeof inventory !== 'undefined' ? inventory : []),
   });
   const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
   const revByMonth = {};
@@ -906,6 +907,7 @@ function renderProfitMarginChart() {
   const rows = KhaytPnl.pnlByPeriod(printLog, expenses, {
     settings, clients, currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
     now: today, granularity: 'month', wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
+    inventory: (typeof inventory !== 'undefined' ? inventory : []),
   });
   const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
   const vals = months.map(m => (byKey[m] && byKey[m].marginPct != null) ? byKey[m].marginPct : null);
@@ -1652,6 +1654,7 @@ function renderPnLSection() {
   const rows = Pnl.pnlByPeriod(printLog, expenses, {
     settings, clients, currencies: CURRENCIES, now: new Date(),
     wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
+    inventory: (typeof inventory !== 'undefined' ? inventory : []),
   });
   if (rows.length === 0) { el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.pnl_empty'))}</p>`; return; }
   const hasFixed = rows.some((r) => r.fixed > 0);
@@ -2627,7 +2630,11 @@ function openExecutiveSummary() {
       locationOf: (typeof orderLocationId === 'function') ? orderLocationId : null,
       money: (o) => ({
         revenue: orderNetRevenueBase(o),
+        // Cost of goods by the P&L's rule — only what was stocked
+        // (lib/pnl-report.js stockShare) — or the dashboard's margin and the
+        // P&L's disagree about the same jobs.
         cost: (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0)
+            * KhaytPnl.stockShare(o, { inventory, settings })
           + convertToBase(+o.shippingCost || 0, orderCurrency(o)),
         outstanding: (typeof orderOwedBase === 'function') ? orderOwedBase(o) : 0,
       }),
@@ -2808,7 +2815,10 @@ function pnlInputsForRange() {
     .filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && inRange(o.date, analyticsRange, 'analytics'))
     .map(o => {
       const revenue = orderNetRevenueBase(o);
+      // Only what was STOCKED (lib/pnl-report.js stockShare): power, wear and
+      // labour reach the P&L as the bills and fixed costs the shop records.
       const cogs = (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0)
+          * KhaytPnl.stockShare(o, { inventory, settings })
         + convertToBase(+o.shippingCost || 0, orderCurrency(o));
       // `revenue` here is gross — see lib/tax.js.
       return { revenue, cogs, vat: KhaytTax.computeTax(revenue, taxProfile).taxTotal };

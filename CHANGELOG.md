@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Electricity, machine wear and labour were taken off your profit twice.**
+  The cost Khayt works out for a job — for pricing and quotes — includes an
+  estimate of the electricity, machine wear and labour it takes, plus a margin
+  for failures. The P&L took that whole figure off as cost of goods, and then
+  also took off your real electricity bills, maintenance, wages and rent, and
+  now your real failed prints. In the P&L, a job's cost of goods is now only
+  what went into it from stock — filament, extra materials and packaging —
+  and the rest reaches your profit once, as what you actually paid. Quotes
+  and prices are unchanged. **Net profit, and the gross margin beside it,
+  will read higher**, by what had been counted twice.
+
 - **(Mac) Connect Google Drive opens the sign-in page, and shows it if the
   browser doesn't.** Reported by the shop: "nothing opened". The page was
   opened from inside the sign-in, off the main thread, and a failure there was
