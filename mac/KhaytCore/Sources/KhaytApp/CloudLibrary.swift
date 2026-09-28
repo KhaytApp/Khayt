@@ -669,7 +669,7 @@ extension Shop {
         config.activates = true
         NSWorkspace.shared.open(url, configuration: config) { _, error in
             if let error {
-                FileHandle.standardError.write(Data("khayt: could not open the browser — \(error)\n".utf8))
+                FileHandle.standardError.write(Data("khayt: could not open the browser — \(RedactedError.describe(error))\n".utf8))
             }
         }
     }

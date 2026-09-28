@@ -251,4 +251,20 @@ struct OffsiteBackupTests {
         var requests: [URLRequest] = []
         func add(_ r: URLRequest) { requests.append(r) }
     }
+
+    @Test("a listed name is only one directly inside the backup folder — Drive held to the bucket's guard")
+    func listedNamesStayInside() {
+        let folder = "shop/khayt-offsite-backups/"
+        #expect(OffsiteBackup.listedName(key: folder + "khayt-book-2026-09-28.khb", folder: folder) == "khayt-book-2026-09-28.khb")
+        #expect(OffsiteBackup.listedName(key: folder + "../khayt-book-x", folder: folder) == nil)
+        #expect(OffsiteBackup.listedName(key: folder + "a/khayt-book-x", folder: folder) == nil)
+        #expect(OffsiteBackup.listedName(key: folder + "..\\khayt-book-x", folder: folder) == nil)
+        #expect(OffsiteBackup.listedName(key: folder, folder: folder) == nil)
+        #expect(OffsiteBackup.listedName(key: "elsewhere/khayt-book-x", folder: folder) == nil)
+        let source = try? String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/KhaytCore/OffsiteBackup.swift"), encoding: .utf8)
+        #expect(source?.components(separatedBy: "OffsiteBackup.listedName(").count == 3,
+                "the bucket and Drive destinations must both list through listedName")
+    }
 }

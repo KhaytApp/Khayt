@@ -139,7 +139,7 @@ extension Shop {
     }
 
     private static let webStoreNetwork: CloudIntake.Fetch = { request in
-        try await URLSession(configuration: .ephemeral).data(for: request)
+        try await CloudReader.session.data(for: request)
     }
 
     /// The web-store jobs in the book, newest first — what the Online orders

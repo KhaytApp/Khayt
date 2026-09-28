@@ -160,7 +160,7 @@ extension Shop {
     }
 
     private static let overTheNetwork: CloudIntake.Fetch = { request in
-        try await URLSession(configuration: .ephemeral).data(for: request)
+        try await CloudReader.session.data(for: request)
     }
 
     // MARK: - Recording one

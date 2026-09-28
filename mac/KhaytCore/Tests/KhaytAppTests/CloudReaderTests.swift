@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import Testing
 import KhaytCore
 @testable import KhaytApp
@@ -474,5 +475,44 @@ struct WarmPullTests {
                 fetch: Self.answer(try Self.reply(rev: 9, base: nil,
                                                   deltas: [(9, ["records": .array([])])])))
         }
+    }
+
+    @Test("a redirect carrying the bearer token is followed only on the same scheme, host and port")
+    func redirectsStayOnTheCloudHost() {
+        let from = URL(string: "https://cloud.khaytapp.com/v1/shops/s/store")
+        #expect(SameHostRedirects.allows(from: from, to: URL(string: "https://cloud.khaytapp.com/v1/shops/s/store2")))
+        #expect(SameHostRedirects.allows(from: from, to: URL(string: "https://CLOUD.khaytapp.com/x")))
+        #expect(!SameHostRedirects.allows(from: from, to: URL(string: "https://evil.example/x")))
+        #expect(!SameHostRedirects.allows(from: from, to: URL(string: "http://cloud.khaytapp.com/x")), "no downgrade")
+        #expect(!SameHostRedirects.allows(from: from, to: URL(string: "https://cloud.khaytapp.com:8443/x")))
+        #expect(!SameHostRedirects.allows(from: nil, to: from))
+        #expect(CloudReader.session.delegate is SameHostRedirects)
+    }
+
+    @Test("the cloud session hands back a 30x to another host instead of following it")
+    func crossHostRedirectIsNotFollowed() async throws {
+        // A one-shot server on 127.0.0.1 that redirects to `localhost` — the
+        // same machine, a different host — and the session must stop there.
+        let listener = try NWListener(using: .tcp, on: .any)
+        let ready = AsyncStream<UInt16> { cont in
+            listener.stateUpdateHandler = { if case .ready = $0 { cont.yield(listener.port?.rawValue ?? 0); cont.finish() } }
+        }
+        listener.newConnectionHandler = { c in
+            c.start(queue: .global())
+            c.receive(minimumIncompleteLength: 1, maximumLength: 16_384) { _, _, _, _ in
+                let port = listener.port?.rawValue ?? 0
+                let reply = "HTTP/1.1 302 Found\r\nLocation: http://localhost:\(port)/stolen\r\n"
+                    + "Content-Length: 0\r\nConnection: close\r\n\r\n"
+                c.send(content: Data(reply.utf8), completion: .contentProcessed { _ in c.cancel() })
+            }
+        }
+        listener.start(queue: .global())
+        defer { listener.cancel() }
+        var port: UInt16 = 0
+        for await p in ready { port = p }
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/v1/shops/s/store")!)
+        request.setValue("Bearer secret", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await CloudReader.session.data(for: request)
+        #expect((response as? HTTPURLResponse)?.statusCode == 302)
     }
 }

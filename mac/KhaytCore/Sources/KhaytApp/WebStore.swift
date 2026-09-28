@@ -156,7 +156,7 @@ extension Shop {
             let connection = try CloudReader.connection(settingsDict)
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
-            let session = URLSession(configuration: .ephemeral)
+            let session = CloudReader.session
             let now = try await CatalogPublisher.status(connection, token: token) { try await session.data(for: $0) }
             webStoreLive = now.live
             webStoreAt = now.at
@@ -196,7 +196,7 @@ extension Shop {
             if case .object(let o) = catalog, case .array(let items)? = o["items"] { sent = items.count }
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
-            let session = URLSession(configuration: .ephemeral)
+            let session = CloudReader.session
 
             // ── AN AUTOMATIC PUBLISH ASKS FIRST ────────────────────────────
             //
@@ -287,7 +287,7 @@ extension Shop {
             let connection = try CloudReader.connection(settingsDict)
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
-            let session = URLSession(configuration: .ephemeral)
+            let session = CloudReader.session
             try await CatalogPublisher.publish(connection, token: token, catalog: nil) {
                 try await session.data(for: $0)
             }

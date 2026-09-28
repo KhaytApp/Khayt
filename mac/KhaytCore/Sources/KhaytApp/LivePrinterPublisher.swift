@@ -17,7 +17,7 @@ final class LivePrinterPublisher {
     private var refused = false
 
     var fetch: (URLRequest) async throws -> (Data, URLResponse) = { request in
-        try await URLSession.shared.data(for: request)
+        try await CloudReader.session.data(for: request)
     }
 
     func forget() { lastSent = nil; lastSignature = nil; notBefore = nil; refused = false }

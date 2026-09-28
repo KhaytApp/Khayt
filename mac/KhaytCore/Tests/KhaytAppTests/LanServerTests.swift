@@ -479,6 +479,31 @@ struct LanServerTests {
                 "the writer was entered for a payload that should never have reached it")
     }
 
+    @Test("a write takes the PIN from the header only, and only as JSON")
+    func writeTakesPinFromHeaderOnly() async throws {
+        let bench = try await Bench(foldsDeltas: true)
+        defer { bench.stop() }
+        let outbox = #"{"deltas":[{"collection":"clients","record":{"id":"C-9","rev":2}}],"tombstones":[],"cursor":null}"#
+        // The right PIN, in the address: ignored on a POST, so refused.
+        let inQuery = try await bench.post("/api/store/deltas?pin=2468", json: outbox)
+        #expect(inQuery.status == 401, Comment(rawValue: "\(inQuery.status) \(inQuery.text)"))
+        // A cross-origin "simple" POST cannot send application/json; refused
+        // before the PIN is even looked at.
+        for type in ["text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x"] {
+            let reply = try await bench.post("/api/store/deltas", json: outbox,
+                                             headers: ["x-khayt-pin": "2468", "Content-Type": type])
+            #expect(reply.status == 415, Comment(rawValue: "\(type): \(reply.status)"))
+        }
+        #expect(bench.foldCalls.n == 0)
+        // What the phone sends — the header, and JSON with a charset — lands.
+        let phone = try await bench.post("/api/store/deltas", json: outbox,
+                                         headers: ["x-khayt-pin": "2468",
+                                                   "Content-Type": "application/json; charset=utf-8"])
+        #expect(phone.status == 200, Comment(rawValue: phone.text))
+        // A GET still takes `?pin=`: the queue's first visit, a calendar app.
+        #expect(try await bench.get("/api/queue?pin=2468").status == 200)
+    }
+
     @Test("the live queue page is the module's HTML, with the clock it was given")
     func queuePageIsTheModules() async throws {
         let bench = try await Bench()

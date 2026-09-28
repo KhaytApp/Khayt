@@ -19,6 +19,8 @@ struct CarrierWebhookTests {
         let port: UInt16
         let book = LanServerTests.Book()
         let writes = LanServerTests.Counter()
+        /// While above zero, the writer fails (and counts it down).
+        let failing = LanServerTests.Counter()
 
         init(secrets: [String: String] = ["smsa": CarrierWebhookTests.secret], replayFile: URL? = nil) async throws {
             let shop = Shop()
@@ -39,7 +41,12 @@ struct CarrierWebhookTests {
             host.carrierSecrets = secrets
             host.replayFile = replayFile
             let writes = self.writes
+            let failing = self.failing
             host.carrierEvent = { event, at in
+                if failing.n > 0 {
+                    failing.n -= 1
+                    throw CocoaError(.fileWriteUnknown)
+                }
                 writes.n += 1
                 var root = book.value
                 let moved = try await Shop.applyCarrierEvent(into: &root, engine: engine, event: event, at: at)
@@ -115,6 +122,20 @@ struct CarrierWebhookTests {
 
     /// SEC-010. Ten minutes in memory was the whole defence, so a restart
     /// forgot every delivery it had taken.
+    @Test("an event that failed to write is not remembered, so the carrier's retry moves the parcel")
+    func failedEventCanBeRetried() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let body = #"{"awb":"SM123","status":"out for delivery"}"#
+        bench.failing.n = 1
+        #expect(try await bench.send(body).status == 400)
+        #expect(bench.job("J-1")?["shippingStatus"] == .string("label_created"))
+        let retry = try await bench.send(body)
+        #expect(retry.status == 200, "a retry of an event that never landed was refused as a replay")
+        #expect(bench.job("J-1")?["shippingStatus"] == .string("out_for_delivery"))
+        #expect(try await bench.send(body).status == 409)
+    }
+
     @Test("a replay is refused after the app restarts, and the file holds no signature")
     func replayRefusedAcrossARestart() async throws {
         let file = FileManager.default.temporaryDirectory.appending(path: "seen-\(UUID().uuidString).json")

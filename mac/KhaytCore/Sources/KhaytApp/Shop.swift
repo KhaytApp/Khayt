@@ -210,7 +210,7 @@ final class Shop {
             // reach somebody. A banner about a warning nobody requested is
             // itself the interruption it is warning about.
             FileHandle.standardError.write(Data(
-                "low-stock telegram failed: \(error)\n".utf8))
+                "low-stock telegram failed: \(RedactedError.describe(error))\n".utf8))
         }
     }
 
@@ -227,14 +227,16 @@ final class Shop {
                 let token = try await Secrets.open(sealed, for: source)
                 try await Telegram.send(botToken: token, chatId: chat, message: title + "\n" + body)
             } catch {
-                FileHandle.standardError.write(Data("printer alert telegram failed: \(error)\n".utf8))
+                FileHandle.standardError.write(Data("printer alert telegram failed: \(RedactedError.describe(error))\n".utf8))
             }
         }
         if routes.ntfy {
             do { try await sendNtfy(type: type, title: title, body: body) }
             catch {
+                // Shown in the shop's own settings pane, where the address is
+                // theirs to see; the LOG gets the kind of failure only.
                 ntfyProblem = String(describing: error)
-                FileHandle.standardError.write(Data("printer alert ntfy failed: \(error)\n".utf8))
+                FileHandle.standardError.write(Data("printer alert ntfy failed: \(RedactedError.describe(error))\n".utf8))
             }
         }
     }
@@ -7874,7 +7876,7 @@ final class Shop {
             if !fromServer, session.role != "viewer" {
                 do {
                     let connection = CloudReader.Connection(url: url, shopId: session.shopId, storedToken: sealed)
-                    let web = URLSession(configuration: .ephemeral)
+                    let web = CloudReader.session
                     published = try await KeysetPublisher.publishIfAbsent(
                         connection, token: session.token, keyset: keyset) { try await web.data(for: $0) } == .published
                 } catch {
@@ -7968,7 +7970,7 @@ final class Shop {
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
 
             let reply = try await CloudReader.pull(connection, token: token) { request in
-                try await URLSession(configuration: .ephemeral).data(for: request)
+                try await CloudReader.session.data(for: request)
             }
             guard case .object(let keyset)? = cloudKeyset() else {
                 throw CloudReader.Failure.malformed("this book has no keyset to unlock")
@@ -8051,7 +8053,7 @@ final class Shop {
             // means the shop is told the truth without a request at all.
             guard cloudRoleCanWrite else { throw CloudWriter.Failure.readOnly }
 
-            let session = URLSession(configuration: .ephemeral)
+            let session = CloudReader.session
             // ASKS ONLY FOR WHAT IT HAS NOT SEEN. This runs before every push,
             // and every push used to re-download the base and the whole chain.
             let (reply, folded) = try await pullCloudStore(
@@ -8215,7 +8217,7 @@ final class Shop {
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
 
-            let session = URLSession(configuration: .ephemeral)
+            let session = CloudReader.session
             let (reply, folded) = try await pullCloudStore(
                 connection, token: token, dek: dek, engine: engine) { request in
                 try await session.data(for: request)
@@ -9486,7 +9488,7 @@ final class Shop {
             guard let build = source.build else { return }
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
-            let session = URLSession(configuration: .ephemeral)
+            let session = CloudReader.session
             try await LeadTimePublisher.publish(connection, token: token, snapshot: snapshot) {
                 try await session.data(for: $0)
             }
@@ -9548,7 +9550,7 @@ final class Shop {
             if sheet == nil, quoteSheetPublished == nil { return }
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
-            let session = URLSession(configuration: .ephemeral)
+            let session = CloudReader.session
             try await QuoteSheetPublisher.publish(connection, token: token, sheet: sheet) {
                 try await session.data(for: $0)
             }
@@ -10469,7 +10471,7 @@ final class Shop {
             let connection = try CloudReader.connection(settingsDict)
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { return nil }
-            let session = URLSession(configuration: .ephemeral)
+            let session = CloudReader.session
             let outcome = try await ShopEventPublisher.send(
                 connection, token: token, dek: dek, kind: "print-finished", at: at, payload: payload) {
                 try await session.data(for: $0)

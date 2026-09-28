@@ -28,6 +28,8 @@ struct StorefrontWebhookTests {
         let port: UInt16
         let book = LanServerTests.Book()
         let writes = LanServerTests.Counter()
+        /// While above zero, the writer fails (and counts it down).
+        let failing = LanServerTests.Counter()
 
         init(secrets: [String: String] = ["salla": StorefrontWebhookTests.secret,
                                           "zid": StorefrontWebhookTests.secret]) async throws {
@@ -49,9 +51,14 @@ struct StorefrontWebhookTests {
                                       now: { StorefrontWebhookTests.start }, nowText: { "09:16" })
             host.storefrontSecrets = secrets
             let writes = self.writes
+            let failing = self.failing
             // The same mutation the app runs inside its write, on the bench's
             // book instead of a file.
             host.storefrontOrder = { platform, payload in
+                if failing.n > 0 {
+                    failing.n -= 1
+                    throw CocoaError(.fileWriteUnknown)
+                }
                 writes.n += 1
                 var root = book.value
                 let order = try await Shop.recordStorefront(
@@ -161,6 +168,22 @@ struct StorefrontWebhookTests {
         let replay = try await bench.deliver("salla", body)
         #expect(replay.status == 409)
         #expect(bench.writes.n == 1)
+    }
+
+    @Test("a delivery that failed to record is not remembered: the provider's retry is taken, not refused as a replay")
+    func failedDeliveryCanBeRetried() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let body = Self.salla("SL-9")
+        bench.failing.n = 1
+        #expect(try await bench.deliver("salla", body).status == 400)
+        #expect(bench.orders.isEmpty)
+        // The genuine retry — byte for byte the same delivery.
+        let retry = try await bench.deliver("salla", body)
+        #expect(retry.status == 200, "a retry of a delivery that never landed was refused as a replay")
+        #expect(bench.orders.count == 1)
+        // And once taken, the same bytes again ARE a replay.
+        #expect(try await bench.deliver("salla", body).status == 409)
     }
 
     @Test("an order for something on the shelf comes off it")
