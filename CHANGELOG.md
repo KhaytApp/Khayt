@@ -4406,6 +4406,115 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.55] - 2026-09-28
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+True costing (depreciation, measured electricity, learned failure rate, the full
+cost of a failed print), Online storage built around Google Drive, and review fixes.
+
+### Changed and fixed
+
+- **(Mac) Saving a machine no longer drops its downtime windows.** A
+  maintenance window stored as a full timestamp (such as
+  `2026-07-05T08:00:00.000Z`, which the desktop app and the sample shop both
+  hold) opened on the Mac as "now to now", was flagged "ends before it
+  starts", and was deleted when you saved the machine, even if you changed
+  nothing. The Mac now reads these windows as the times they name and saves
+  any end you did not touch exactly as it was.
+
+- **(Mac) Fixes from the pre-release UI review.** Google Drive, and the rest
+  of online storage, is now under Settings › Online, where shops looked for it
+  (it was under Preferences). Waiting for Google's sign-in has a Cancel, which
+  stops the wait. When this Mac cannot change the book, the storage and library
+  buttons say why instead of just greying out. In Arabic, Drive's usage line
+  keeps "41.2 GB" in order, "5 months" and "7 days" take their proper plural,
+  the printer's millimetre and watt units are in Arabic, and filament is
+  `خيط` on the Expenses and Calculator screens as everywhere else. The status
+  strip says "saved today" / "saved 14 Sep" (it printed "12:00 AM" every day)
+  and "not saved yet" (in Arabic it said "never printed"). The machine
+  sheet's Value tab shows the riyal mark, a one-line explanation, "Working
+  out…" while the hourly figure is computed rather than a warning, and asks
+  for hours a month only when that changes the answer. The dashboard's
+  "Material cost" is now "Cost of goods sold", the same figure Reports prints
+  for the month. The Reports table fits the default window in English and
+  Arabic: shorter headers, plain figures (the mark is on the totals), and a
+  narrower totals panel. The sample shop's laser now depreciates and one
+  failed print is tied to its job, so those lines are drawn.
+
+- **(Mac) Machine costing agrees with the P&L in four more places.** A
+  machine depreciated per print hour is now charged in the machine P&L exactly
+  what the shop's P&L charges it: nothing for jobs dated before it was bought,
+  and nothing once the hours it has already printed use up its life (it read
+  50 in one and 0 in the other). The machine P&L's material cost is split by
+  the shelf, as Reports' is. A failed print's plug reading is used for one
+  waste entry only, and a print that failed inspection is costed at its own
+  metered energy rather than an earlier cancelled attempt's. A residual value
+  equal to the price no longer makes a machine's wear free in quotes: the flat
+  wear rate stands. "All time" depreciation starts at the book's first order,
+  as the desktop's does.
+
+- **(Mac) Security review fixes.** Google sign-in now checks the sign-in's
+  own `state` before anything else in the callback: a stray or hostile request
+  to the sign-in listener (another app, or a web page probing local ports) gets
+  a 400 and the sign-in keeps waiting, instead of being cancelled by a forged
+  `?error=`. On the LAN server, a write (`POST /api/store/deltas`) takes the PIN
+  from the `X-Khayt-PIN` header only — never from `?pin=` in the address — and
+  only as `application/json`; the companion app already sends both, and GETs
+  (the queue page, calendar feeds) still accept `?pin=`. A storefront or
+  carrier webhook that fails to record is no longer remembered as delivered,
+  so the provider's retry is taken rather than refused as a replay. Telegram
+  and ntfy failures are logged by error code and HTTP status only, never with
+  the address that holds the bot token or topic. Cloud requests follow a
+  redirect only to the same host, so the shop's token cannot be carried off
+  by a 30x. The import key is copied to the clipboard as concealed, so
+  clipboard managers do not keep it. Drive backup listings ignore names that
+  point outside the backup folder, as bucket listings already did.
+
+- **(Mac) Online storage is built around Google Drive now.** After connecting
+  Drive, the pane no longer jumps to "A storage bucket": a shop with Drive and
+  no bucket was being read as using a bucket. The pane now opens on Google
+  Drive (recommended): one sentence and a Connect button; while you sign in,
+  the Open page / Copy link fallback; once connected, a card with your account,
+  how full your Drive is, the folder, and Disconnect. Below it, "Keep a copy of
+  every model" and "Move models off this Mac when unused for…" apply the moment
+  you change them, with no Save. A storage bucket and your own Google client
+  are under Advanced, and the folder defaults to "Khayt print library" without
+  renaming one you chose. The off-site backup lists Google Drive first and
+  offers it when Drive is connected, without changing a destination you picked.
+  Turning "Keep a copy" off while a bucket is in use keeps the bucket (it no
+  longer switched the library to Google Drive and began copying there), "Use
+  Google Drive instead" / "Use a storage bucket" really switch when the other
+  one is ready, each keeping its own copy switch, re-saving the bucket no
+  longer turns a backup you switched off back on, a half-typed bucket survives
+  a change to the options, and a bucket key sealed on another Mac no longer
+  shows as the bucket while Drive is the one used.
+
+- **(Mac) The Dashboard tiles count cost the way Reports does.** Cost of
+  goods is now only what was stocked (filament, extra materials, packaging), so
+  power, wear and labour reach the P&L once, as the bills, fixed costs and
+  depreciation the shop records. The Mac's Dashboard tiles still added up the
+  full priced cost of each job, so their margin would have disagreed with
+  Reports. They use the same rule now, and both are given the shelf, so extra
+  materials are priced rather than counted as nothing.
+
+- **(Mac) Machine depreciation, and a failure % learned from your own prints.**
+  A machine now has a Value tab: what you paid, when you bought it, how long
+  it should last (in print hours or in years), what it should resell for, and
+  whether to spread the cost per print hour or evenly by month. Quotes on that
+  machine then charge its real wear per hour instead of the flat 0.75 (a wear
+  rate you typed on a part still wins). The machine card shows its book value,
+  what it has lost so far and the life it has left. In Reports, machine wear
+  is now counted once: as a "Machine depreciation" line in the P&L and in each
+  machine's own P&L — per print hour on the hours it actually ran, or the
+  monthly amount for the period. A machine without a price is priced and
+  reported exactly as before. Beside the failure % in the calculator, product
+  parts and rate presets, Khayt now shows what your QC fails and waste log say
+  (for example "Your history: 6% failed, based on 48 prints") with a "Use
+  this" button — it never changes the figure on its own. Editing a machine on
+  the Mac also no longer wipes its target hours per day.
+
 ## [4.0.0-alpha.54] - 2026-09-28
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
