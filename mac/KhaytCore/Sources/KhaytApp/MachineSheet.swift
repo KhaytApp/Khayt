@@ -694,9 +694,7 @@ struct MachineSheet: View {
         nozzleInstalled = Order.day(machine.nozzle?.installedAt)
         nozzleThreshold = machine.nozzle?.gramsThreshold ?? 0
         nozzleAtInstall = machine.nozzle?.gramsAtInstall ?? 0
-        downtime = (machine.downtimeBlocks ?? []).map {
-            .init(from: $0.from ?? "", to: $0.to ?? "", reason: $0.words)
-        }
+        downtime = DowntimeEditor.windows(of: machine)
         plugType = machine.smartPlug?.type.flatMap { $0.isEmpty ? nil : $0 } ?? "none"
         plugHost = machine.smartPlug?.host ?? ""
         plugEntity = machine.smartPlug?.entity ?? ""
@@ -1002,10 +1000,7 @@ struct MachineSheet: View {
             // window that runs backwards or cannot be read, sorts them and caps
             // the list. A row typed wrongly is refused in ONE place rather than
             // by two apps with two opinions.
-            input["downtimeBlocks"] = .array(windows.map {
-                .object(["from": .string($0.from), "to": .string($0.to),
-                         "reason": .string($0.reason)])
-            })
+            input["downtimeBlocks"] = DowntimeEditor.payload(windows)
             let cam: JSONValue = .object([
                 "enabled": .bool(wantsCamera),
                 "snapshotUrl": .string(still),
@@ -1359,26 +1354,73 @@ struct DowntimeEditor: View {
     private func binding(_ at: Int, _ path: WritableKeyPath<Shop.DowntimeBlock, String>) -> Binding<Date> {
         Binding(
             get: { Self.parse(blocks[at][keyPath: path]) ?? Date() },
-            set: { blocks[at][keyPath: path] = Self.stamp($0) })
+            set: { blocks[at][keyPath: path] = Self.edited(blocks[at][keyPath: path], picked: $0) })
     }
 
     private func reason(_ at: Int) -> Binding<String> {
         Binding(get: { blocks[at].reason }, set: { blocks[at].reason = $0 })
     }
 
-    /// `2026-09-10T14:00` — no zone, no seconds, matching Khayt's own field.
-    static func stamp(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd'T'HH:mm"
-        return f.string(from: date)
+    /// The windows a machine opens with — exactly as the book holds them.
+    static func windows(of machine: Machine) -> [Shop.DowntimeBlock] {
+        (machine.downtimeBlocks ?? []).map {
+            .init(from: $0.from ?? "", to: $0.to ?? "", reason: $0.words)
+        }
     }
 
+    /// What the sheet hands the shared rule on save.
+    static func payload(_ windows: [Shop.DowntimeBlock]) -> JSONValue {
+        .array(windows.map {
+            .object(["from": .string($0.from), "to": .string($0.to),
+                     "reason": .string($0.reason)])
+        })
+    }
+
+    /// One end of a window after the picker reports `picked`. Only a real
+    /// change rewrites the field: a window Khayt wrote as `…T08:00:00.000Z`
+    /// stays byte-for-byte what it was unless the shop moves it — a picker
+    /// reporting the minute it already shows is not an edit.
+    static func edited(_ was: String, picked: Date) -> String {
+        if let old = parse(was), stamp(old) == stamp(picked) { return was }
+        return stamp(picked)
+    }
+
+    /// `2026-09-10T14:00` — no zone, no seconds, matching Khayt's own field,
+    /// on the book's clock (`Calendar.book`: Gregorian, this Mac's zone).
+    static func stamp(_ date: Date) -> String {
+        local("yyyy-MM-dd'T'HH:mm").string(from: date)
+    }
+
+    /// Every shape a real book holds, not only the one this sheet writes.
+    ///
+    /// ── A WINDOW KHAYT WROTE AS AN INSTANT MUST OPEN AS ITSELF ───────────
+    ///
+    /// `lib/downtime.js` and the shared save rule accept anything
+    /// `new Date()` reads, and books do hold `2026-07-05T08:00:00.000Z` (the
+    /// bundled sample shop does). Reading only the local form made such a
+    /// window open as now→now, flagged "ends before it starts", and DROPPED
+    /// on save — a shop lost a maintenance window by opening a printer and
+    /// pressing Save (Sep 2026).
+    ///
+    /// A stamp with `Z` or an offset is an absolute instant; one without a
+    /// zone is the shop's wall clock, read in the book's time zone.
     static func parse(_ text: String) -> Date? {
+        let t = text.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty else { return nil }
+        if let instant = Calendar.instant(t) { return instant }
+        for shape in ["yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss.SSS"] {
+            if let d = local(shape).date(from: t) { return d }
+        }
+        return nil
+    }
+
+    private static func local(_ shape: String) -> DateFormatter {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd'T'HH:mm"
-        return f.date(from: text)
+        f.calendar = Calendar.book
+        f.timeZone = Calendar.book.timeZone
+        f.dateFormat = shape
+        return f
     }
 
     private static func at(_ day: Date, hour: Int) -> Date {

@@ -70,7 +70,7 @@ struct DowntimeEditorTests {
         #expect(editor.lowerBound > polled.lowerBound)
         // After the `polled` block closes, which the wear comment follows.
         #expect(editor.lowerBound < wear.lowerBound)
-        #expect(sheet.contains("input[\"downtimeBlocks\"] = .array("),
+        #expect(sheet.contains("input[\"downtimeBlocks\"] = DowntimeEditor.payload("),
                 "the sheet edits windows and never saves them")
     }
 
@@ -97,5 +97,103 @@ struct DowntimeEditorTests {
         #expect(kept.count == 1, "kept \(kept.count)")
         guard case .object(let one) = kept[0] else { return }
         #expect(one["reason"] == JSONValue.string("Lens"))
+    }
+
+    // ── A WINDOW KHAYT WROTE AS AN INSTANT ────────────────────────────────
+    //
+    // Books hold `2026-07-05T08:00:00.000Z` as well as the local form (the
+    // bundled sample does). Reading only the local form opened such a window
+    // as now→now, flagged it backwards, and the save DROPPED it (Sep 2026).
+
+    static func utc(_ y: Int, _ mo: Int, _ d: Int, _ h: Int, _ mi: Int = 0, _ s: Int = 0) -> Date {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "UTC")!
+        return c.date(from: DateComponents(year: y, month: mo, day: d, hour: h, minute: mi, second: s))!
+    }
+
+    @Test("full ISO stamps parse to the instant they name")
+    func isoStampsAreInstants() {
+        let eight = Self.utc(2026, 7, 5, 8)
+        #expect(DowntimeEditor.parse("2026-07-05T08:00:00.000Z") == eight)
+        #expect(DowntimeEditor.parse("2026-07-05T08:00:00Z") == eight)
+        #expect(DowntimeEditor.parse("2026-07-05T11:00:00+03:00") == eight)
+        #expect(DowntimeEditor.parse("2026-07-05T11:00:00.000+03:00") == eight)
+        #expect(DowntimeEditor.parse("2026-07-05T08:00:00.250Z") == eight.addingTimeInterval(0.25))
+        // The local form with seconds is still the shop's own clock.
+        let local = try! #require(DowntimeEditor.parse("2026-09-10T14:30:15"))
+        let back = Calendar.book.dateComponents([.hour, .minute, .second], from: local)
+        #expect(back.hour == 14 && back.minute == 30 && back.second == 15)
+        #expect(DowntimeEditor.parse("not a date") == nil)
+        #expect(DowntimeEditor.parse("") == nil)
+    }
+
+    @Test("a window held as ISO instants is readable, not 'ends before it starts'")
+    func isoBlockIsReadable() {
+        let block = Shop.DowntimeBlock(from: "2026-07-05T08:00:00.000Z",
+                                       to: "2026-07-06T18:00:00.000Z", reason: "Lens")
+        #expect(block.isReadable)
+        // Mixed: one end edited here, the other as Khayt wrote it.
+        let mixed = Shop.DowntimeBlock(from: "2026-07-05T08:00:00.000Z",
+                                       to: DowntimeEditor.stamp(Self.utc(2026, 7, 6, 18)), reason: "")
+        #expect(mixed.isReadable)
+    }
+
+    @Test("a picker reporting the time already shown leaves the stamp untouched")
+    func untouchedEndKeepsItsBytes() {
+        let iso = "2026-07-05T08:00:00.000Z"
+        let shown = try! #require(DowntimeEditor.parse(iso))
+        #expect(DowntimeEditor.edited(iso, picked: shown) == iso)
+        // A real move is written in the shape Khayt's field writes.
+        let later = shown.addingTimeInterval(3600)
+        #expect(DowntimeEditor.edited(iso, picked: later) == DowntimeEditor.stamp(later))
+    }
+
+    /// Open the sheet on a machine whose windows are ISO instants, touch
+    /// nothing, save: what the shared rule writes back is what was there.
+    @Test("opening and saving a machine keeps its ISO windows byte-identical")
+    func openAndSaveKeepsIsoWindows() async throws {
+        let blocks: JSONValue = .array([
+            .object(["from": .string("2026-07-05T08:00:00.000Z"),
+                     "to": .string("2026-07-06T18:00:00.000Z"),
+                     "reason": .string("Lens clean, mirror align")]),
+            .object(["from": .string("2026-08-01T09:00"),
+                     "to": .string("2026-08-01T13:00"),
+                     "reason": .string("Belt")]),
+        ])
+        let row: JSONValue = .object(["id": .string("M1"), "name": .string("Laser"),
+                                      "kind": .string("laser"), "downtimeBlocks": blocks])
+        let machine = try JSONDecoder().decode(Machine.self, from: JSONEncoder().encode(row))
+        let opened = DowntimeEditor.windows(of: machine)
+        #expect(opened.allSatisfy { $0.isReadable })
+        let engine = try KhaytEngine()
+        let saved = try await engine.editMachine(row, input: [
+            "name": .string("Laser"),
+            "downtimeBlocks": DowntimeEditor.payload(opened),
+        ], settings: [:])
+        guard case .object(let fields)? = saved.machine else {
+            Issue.record("no machine came back"); return
+        }
+        #expect(fields["downtimeBlocks"] == blocks)
+    }
+
+    /// The sample shop's laser was booked out for a lens clean. It must open
+    /// on that window — not on now→now.
+    @Test("the sample laser shows its real window")
+    func sampleLaserWindow() throws {
+        let laser = try #require(try SampleShopTests.rows("machines").first {
+            $0["kind"] == .string("laser")
+        })
+        let machine = try JSONDecoder().decode(Machine.self,
+                                               from: JSONEncoder().encode(JSONValue.object(laser)))
+        let windows = DowntimeEditor.windows(of: machine)
+        #expect(!windows.isEmpty, "the sample laser lost its downtime")
+        for w in windows {
+            #expect(w.isReadable, "\(w.from) → \(w.to) opens as unreadable")
+            let from = try #require(DowntimeEditor.parse(w.from))
+            let to = try #require(DowntimeEditor.parse(w.to))
+            #expect(from == Calendar.instant(w.from))
+            #expect(to.timeIntervalSince(from) == 34 * 3600, "lens clean ran \(to.timeIntervalSince(from) / 3600)h")
+            #expect(abs(from.timeIntervalSinceNow) > 3600, "opened on now")
+        }
     }
 }
