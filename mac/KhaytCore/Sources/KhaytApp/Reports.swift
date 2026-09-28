@@ -407,7 +407,7 @@ struct Reports: View {
             settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), now: Date(),
             granularity: shop.pnlByMonth ? "month" : "quarter",
-            wasteLog: shop.wasteRows)) ?? []
+            wasteLog: shop.wasteRows, inventory: shop.inventoryRows)) ?? []
         await recomputeBreakEven()
         await recomputeCashFlow()
         await recomputeTrends()

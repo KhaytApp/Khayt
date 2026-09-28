@@ -2993,14 +2993,14 @@ public actor KhaytEngine {
     /// renderer makes, from the same module.
     public func kpis(orders: [JSONValue], clients: [JSONValue],
                      settings: [String: JSONValue], range: String,
-                     language: String) throws -> Kpis {
+                     language: String, inventory: [JSONValue] = []) throws -> Kpis {
         // `kpi-rows` still runs in JavaScript: it reads `order-money`,
         // `order-payment` and `content-languages`, none of which have moved
         // yet, and the money function it takes cannot cross the bridge. Adding
         // the rows up is `KhaytCore.Kpi` now.
         let rows: [JSONValue] = try runtime.call2(
             KPI_SCRIPT, [.array(orders), .array(clients), .object(settings),
-                         .string(range), .string("\u{2014}"), .string(language)],
+                         .string(range), .string("\u{2014}"), .string(language), .array(inventory)],
             as: [JSONValue].self)
         let summary = Kpi.compute(Kpi.rows(rows))
         return Kpis(orderCount: summary.orderCount, completedCount: summary.completedCount,
@@ -6796,14 +6796,15 @@ public actor KhaytEngine {
                             settings: [String: JSONValue], clients: [JSONValue],
                             currencies: [String: JSONValue], now: Date,
                             granularity: String = "quarter",
-                            wasteLog: [JSONValue] = []) throws -> [PnlPeriod] {
+                            wasteLog: [JSONValue] = [],
+                            inventory: [JSONValue] = []) throws -> [PnlPeriod] {
         // `wasteLog` is the book's failed-print log: the rule charges each
         // entry's `cost` to its period as a WASTE line, and net takes it off.
         try runtime.call2(
-            "KhaytPnl.pnlByPeriod(ARG0, ARG1, {settings: ARG2, clients: ARG3, currencies: ARG4, now: new Date(ARG5), granularity: ARG6, wasteLog: ARG7})",
+            "KhaytPnl.pnlByPeriod(ARG0, ARG1, {settings: ARG2, clients: ARG3, currencies: ARG4, now: new Date(ARG5), granularity: ARG6, wasteLog: ARG7, inventory: ARG8})",
             [.array(orders), .array(expenses), .object(settings), .array(clients),
              .object(currencies), .number(now.timeIntervalSince1970 * 1000), .string(granularity),
-             .array(wasteLog)],
+             .array(wasteLog), .array(inventory)],
             as: [PnlPeriod].self)
     }
 
@@ -10957,9 +10958,12 @@ private let KPI_SCRIPT = """
     money: function (o) {
       return {
         revenue: M.orderNetRevenueBase(o, ctx),
+        // Only what was STOCKED, as Reports counts it (lib/pnl-report.js
+        // stockShare): power, wear and labour reach the P&L as the bills,
+        // fixed costs and depreciation the shop records, never twice.
         cost: (o.parts || []).reduce(function (s, p) {
           return s + (+p.unitCost || 0) * (+p.qty || 1);
-        }, 0),
+        }, 0) * globalThis.KhaytPnl.stockShare(o, { inventory: ARG6 || [], settings: ARG2 }),
         outstanding: M.orderOwedBase(o, ctx)
       };
     },

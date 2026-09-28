@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) The Dashboard tiles count cost the way Reports does.** Cost of
+  goods is now only what was stocked (filament, extra materials, packaging), so
+  power, wear and labour reach the P&L once, as the bills, fixed costs and
+  depreciation the shop records. The Mac's Dashboard tiles still added up the
+  full priced cost of each job, so their margin would have disagreed with
+  Reports. They use the same rule now, and both are given the shelf, so extra
+  materials are priced rather than counted as nothing.
+
 - **Electricity, machine wear and labour were taken off your profit twice.**
   The cost Khayt works out for a job — for pricing and quotes — includes an
   estimate of the electricity, machine wear and labour it takes, plus a margin
