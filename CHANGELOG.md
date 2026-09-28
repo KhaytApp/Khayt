@@ -4238,6 +4238,36 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.53] - 2026-09-28
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Google Drive connects in one click, syncing is quick again after a full
+upload, and paid web-store orders arrive marked paid with their options once
+the shop sets an import key.
+
+### Changed and fixed
+
+- **(Mac) Syncing to the cloud is quick again after a full upload.** After it
+  once had to upload the whole book, the Mac kept treating the cloud as
+  refusing change-only syncs, and waited out the full-upload cool-down between
+  syncs until it was restarted. Khayt Cloud has accepted change-only syncs
+  since 25 September. The Mac now goes back to them as soon as one succeeds.
+
+- **(Mac) Paid Medusa orders can become jobs by themselves.** Settings → Integrations
+  has a new **Import key** row: create a key, copy it once, and set it as
+  `KHAYT_IMPORT_KEY` on your Medusa server. With it, Khayt Cloud trusts the order's
+  payment status and prices, so a paid order turns into a job without anyone opening
+  it. You can replace or remove the key there too, and only the shop's owner or a
+  manager can. Khayt never keeps the key. The Medusa subscriber code it hands you now
+  sends the key, the order's payment status, and each line's product and chosen options
+  (colour, size), so the right product is matched and the colour is no longer lost.
+  Its "open in admin" link now works on Medusa v2 (it pointed at a page that does not
+  exist), a test copy of your store can send elsewhere by setting `KHAYT_IMPORT_URL`,
+  and an order Khayt rejects is no longer retried for ever.
+  Copy the subscriber again to pick this up.
+
 ## [4.0.0-alpha.52] - 2026-09-27
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
