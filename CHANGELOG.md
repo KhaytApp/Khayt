@@ -8,6 +8,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   فلامنت or فيلامنت, including the inventory titles, the expense and supplier
   categories, the calculator and the label scanner. They now use خيط (or خيوط
   where it means more than one), the word the rest of the app and the Mac use.
+- **(Mac) Saving a machine no longer drops its downtime windows.** A
+  maintenance window stored as a full timestamp (such as
+  `2026-07-05T08:00:00.000Z`, which the desktop app and the sample shop both
+  hold) opened on the Mac as "now to now", was flagged "ends before it
+  starts", and was deleted when you saved the machine, even if you changed
+  nothing. The Mac now reads these windows as the times they name and saves
+  any end you did not touch exactly as it was.
 
 - **A machine's own profit now agrees with the shop P&L on its wear.** For a
   machine depreciated by printing hours, the machine table now counts the

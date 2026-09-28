@@ -1785,9 +1785,11 @@ final class Shop {
     /// the printer said it actually took.
     /// A window a machine is out of action for.
     ///
-    /// `from` and `to` are `YYYY-MM-DDTHH:mm` local wall-clock, the shape
-    /// Khayt's own `datetime-local` field writes — see `DowntimeEditor` for why
-    /// both apps must write the same one.
+    /// `from` and `to` are written as `YYYY-MM-DDTHH:mm` local wall-clock, the
+    /// shape Khayt's own `datetime-local` field writes — see `DowntimeEditor`
+    /// for why both apps must write the same one. A book can also hold full
+    /// ISO instants (`…T08:00:00.000Z`); those are read as they are and kept
+    /// untouched unless the shop edits that end of the window.
     struct DowntimeBlock: Identifiable, Equatable, Hashable {
         var from: String
         var to: String
