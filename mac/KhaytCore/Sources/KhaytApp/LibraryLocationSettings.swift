@@ -45,6 +45,7 @@ struct LibraryLocationSettings: View {
                 Spacer()
             }
             .disabled(shop.libraryMoveBusy || !shop.canMoveJobs)
+            if !shop.canMoveJobs { BookLockedNote(shop: shop) }
             Text(shop.words.callIt("mac.libmove_hint"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -123,5 +124,19 @@ struct LibraryLocationSettings: View {
         panel.allowsMultipleSelection = false
         panel.prompt = shop.words.callIt("mac.libmove_choose_prompt")
         if panel.runModal() == .OK, let url = panel.url { pending = url }
+    }
+}
+
+/// Why the buttons above it are grey, when it is because this Mac may not
+/// change the book: another app has it open, or it is the sample shop.
+/// Disabled with no reason given, a shop reads a broken screen.
+struct BookLockedNote: View {
+    let shop: Shop
+
+    var body: some View {
+        Label(shop.words.callIt(shop.source.isReal ? "mac.group_locked" : "mac.settings_sample"),
+              systemImage: "lock")
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

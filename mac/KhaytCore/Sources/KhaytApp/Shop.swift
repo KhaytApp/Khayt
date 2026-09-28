@@ -100,6 +100,8 @@ final class Shop {
     /// The Google sign-in page while a Connect is waiting for it, so the
     /// Settings pane can offer to open or copy it.
     var googleSignInURL: URL?
+    /// The Connect in progress, so Cancel can stop it — see `cancelGoogleSignIn`.
+    var googleSignInTask: Task<Void, Never>?
     var cloudLibraryProblem: String?
     var cloudLibraryBusy = false
     var cloudProgress: (done: Int, total: Int, name: String)?
@@ -980,6 +982,10 @@ final class Shop {
         // put "NET 50.00" beside Reports' "NET INCOME 14.09".
         monthNetIncome = month?.net
         monthGrossRevenue = month.map { $0.revenue + $0.vatCollected }
+        // The masthead's cost figure, off the same row: Reports' "Cost of
+        // goods sold" for this month, so the two screens name one figure
+        // one way.
+        monthCostOfGoods = month.map(\.cogsValue)
         var perMachine: [String: NozzleWear] = [:]
         for machine in machines {
             guard case .object(let record) = machine,
@@ -12146,13 +12152,26 @@ final class Shop {
     /// synced recently, which is a different sentence and belongs in Settings.
     var isCloudLinked: Bool { cloudConnected }
 
-    /// "saved 11:38", or when the book has never been written, nothing.
-    var lastSavedLabel: String {
-        guard let backup = lastBackup, let day = Order.day(backup) else {
-            return words.callIt("mac.never")
+    /// "saved today", "saved yesterday", "saved 14 Sep" — or "not saved yet".
+    ///
+    /// The last backup is a DAY (`2026-09-14`, from the file's name), not a
+    /// moment. Formatting it with a time printed that day's midnight, so the
+    /// strip read "saved 12:00 AM" on every shop, every day. And the
+    /// never-saved case borrowed `mac.never`, which is "never PRINTED" in
+    /// Arabic.
+    var lastSavedLabel: String { Self.savedLabel(lastBackup, words: words) }
+
+    static func savedLabel(_ backup: String?, words: Words, today: Date = Date()) -> String {
+        guard let backup, let day = Order.day(backup) else {
+            return words.callIt("mac.not_saved_yet")
         }
+        let cal = Calendar.book
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: day),
+                                      to: cal.startOfDay(for: today)).day ?? 0
+        if days == 0 { return words.callIt("mac.saved_today") }
+        if days == 1 { return words.callIt("mac.saved_yesterday") }
         return words.callIt("mac.saved_at",
-                            ["t": .string(words.say(day, Date.FormatStyle(date: .omitted, time: .shortened)))])
+                            ["t": .string(words.say(day, .dateTime.day().month(.abbreviated)))])
     }
 
     /// Is anything actually printing? One dot in the sidebar, and a dot is
@@ -13136,6 +13155,10 @@ final class Shop {
     /// one its prices with the tax on top, an unregistered one the net itself.
     /// Never below the net, by construction rather than by luck.
     private(set) var monthGrossRevenue: Double?
+
+    /// The month's cost of goods sold — `PnlPeriod.cogs`, the figure Reports
+    /// prints under that name. Nil as `monthNetIncome` is.
+    private(set) var monthCostOfGoods: Double?
 
     /// The current month's row, or nil.
     ///

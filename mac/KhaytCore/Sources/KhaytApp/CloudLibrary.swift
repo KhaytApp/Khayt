@@ -674,6 +674,30 @@ extension Shop {
         }
     }
 
+    /// Connect, as a task the Settings pane can cancel. Held on the shop,
+    /// not the pane, so a Cancel still works after the pane was closed and
+    /// opened again mid-sign-in.
+    @discardableResult
+    func startGoogleSignIn(clientId: String, typedSecret: String, folderName: String) -> Task<Void, Never> {
+        googleSignInTask?.cancel()
+        let task = Task { [weak self] () -> Void in
+            guard let self else { return }
+            await self.connectGoogleDrive(clientId: clientId, typedSecret: typedSecret, folderName: folderName)
+        }
+        googleSignInTask = task
+        return task
+    }
+
+    /// Stop waiting for Google. Cancelling the task stops the loopback wait
+    /// (`GoogleSignIn.Loopback.nextCallback`), which closes the port; the
+    /// waiting screen is cleared at once rather than when that lands.
+    func cancelGoogleSignIn() {
+        googleSignInTask?.cancel()
+        googleSignInTask = nil
+        googleSignInURL = nil
+        cloudLibraryNote = nil
+    }
+
     func connectGoogleDrive(clientId: String, typedSecret: String, folderName: String) async {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
@@ -714,12 +738,16 @@ extension Shop {
                                                          }
                                                      })
             googleSignInURL = nil
+            try Task.checkCancellation()
             try await writeDrive(refreshToken: refresh, enabled: true, bucketOff: true)
             cloudLibraryNote = words.callIt("mac.gdrive_connected")
+            googleSignInTask = nil
         } catch {
             googleSignInURL = nil
             cloudLibraryNote = nil
-            cloudLibraryProblem = cloudSay(error)
+            // A Cancel the shop pressed is not a problem to report.
+            if !(error is CancellationError) { cloudLibraryProblem = cloudSay(error) }
+            if !Task.isCancelled { googleSignInTask = nil }
         }
     }
 

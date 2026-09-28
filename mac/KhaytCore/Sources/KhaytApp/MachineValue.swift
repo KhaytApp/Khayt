@@ -24,8 +24,7 @@ struct MachineValueLines: View {
                            dim: true)
             } else if let months = value.remainingMonths {
                 DetailLine(shop.words.callIt("mac.dep_left"),
-                           shop.words.callIt("mac.dep_months_left",
-                                             ["n": .string(Money.quantity(months, decimals: 0))]),
+                           shop.words.counting(Int(months.rounded()), "mac.dep_months_left"),
                            dim: true)
             }
             if let rate = value.hourlyRate {

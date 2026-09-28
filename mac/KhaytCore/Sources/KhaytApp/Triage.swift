@@ -41,8 +41,8 @@ struct Triage: View {
 /// The navy strip: what is owed, what the month made, and the two figures a
 /// shop is asked to trust.
 ///
-/// `MATERIAL COST` is drawn with a dash and a reason whenever any job in the
-/// month carries no material cost. That is §5 doing its job on the most
+/// `COST OF GOODS SOLD` is marked "at least", with a reason, whenever any job
+/// in the month carries no material cost. That is §5 doing its job on the most
 /// expensive number on the screen: a material cost averaged over the jobs
 /// that happen to have one is a margin that reads as measured and is not.
 struct MoneyMasthead: View {
@@ -67,10 +67,14 @@ struct MoneyMasthead: View {
                            style: .money(code: shop.currency),
                            words: shop.words, onNavy: true, size: 14)
             rule
-            LabelledFigure(label: shop.words.callIt("mac.material_cost"),
-                           value: shop.monthMaterialCost,
+            // Reports' name and Reports' figure: the month's row of the same
+            // P&L. It was "Material cost", summed here over every job dated
+            // this month, finished or not — a second name for a second
+            // number beside the one Reports prints.
+            LabelledFigure(label: shop.words.callIt("pnl.cogs"),
+                           value: shop.monthCostOfGoods,
                            style: .money(code: shop.currency),
-                           certainty: shop.monthMaterialCost == nil ? .exact : .atLeast,
+                           certainty: shop.materialCostGapNote == nil ? .exact : .atLeast,
                            note: shop.materialCostGapNote,
                            words: shop.words, onNavy: true, size: 14)
 

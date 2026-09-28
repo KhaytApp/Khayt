@@ -135,6 +135,9 @@ struct MachineSheet: View {
     @State private var depMonthly: Double = 0
     /// What the rule makes of the figures on screen, as they are typed.
     @State private var depPreview: KhaytEngine.MachineValue?
+    /// The fields `depPreview` was worked out for; while it trails
+    /// `depSignature`, the preview is still being asked for.
+    @State private var depPreviewFor: String?
 
     private var isNew: Bool { existing == nil }
 
@@ -320,7 +323,7 @@ struct MachineSheet: View {
                             TextField("", value: $nozzleDiameter,
                                       format: .number.precision(.fractionLength(0...2)))
                                 .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 70)
-                            Text("mm").foregroundStyle(.secondary)
+                            Text(shop.words.callIt("mac.unit_mm")).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -329,7 +332,7 @@ struct MachineSheet: View {
                     HStack(spacing: 4) {
                         TextField("", value: $powerDraw, format: .number.precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 70)
-                        Text("W").foregroundStyle(.secondary)
+                        Text(shop.words.callIt("mac.unit_watts")).foregroundStyle(.secondary)
                     }
                 }
                 if let measured = measuredPower, Int(measured.watts) != Int(powerDraw) {
@@ -542,13 +545,16 @@ struct MachineSheet: View {
     @ViewBuilder private var valuePane: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(shop.words.callIt("mac.dep_title")).font(.subheadline.weight(.semibold))
+            Text(shop.words.callIt("mac.dep_what"))
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
                     Text(shop.words.callIt("mac.dep_price")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
                         TextField("", value: $depPrice, format: .number.precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
-                        Text(shop.currency).foregroundStyle(.secondary)
+                        Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                     }
                 }
                 GridRow {
@@ -582,7 +588,7 @@ struct MachineSheet: View {
                     HStack(spacing: 4) {
                         TextField("", value: $depResidual, format: .number.precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
-                        Text(shop.currency).foregroundStyle(.secondary)
+                        Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                     }
                 }
                 GridRow {
@@ -593,12 +599,18 @@ struct MachineSheet: View {
                     }
                     .labelsHidden().fixedSize()
                 }
-                GridRow {
-                    Text(shop.words.callIt("mac.dep_monthly_hours")).foregroundStyle(.secondary)
-                    HStack(spacing: 4) {
-                        TextField("", value: $depMonthly, format: .number.precision(.fractionLength(0...1)))
-                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 80)
-                        Text(shop.words.callIt("common.hours")).foregroundStyle(.secondary)
+                // Only where it changes the answer (`lib/depreciation.js`
+                // `hourlyRate`): a life in years is turned into hours with it,
+                // and an even spread divides the month by it. Per print hour
+                // over a life in print hours never reads it.
+                if monthlyHoursMatter {
+                    GridRow {
+                        Text(shop.words.callIt("mac.dep_monthly_hours")).foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            TextField("", value: $depMonthly, format: .number.precision(.fractionLength(0...1)))
+                                .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 80)
+                            Text(shop.words.callIt("mac.dep_unit_hours")).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -606,7 +618,12 @@ struct MachineSheet: View {
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if depPrice > 0 {
-                if let rate = depPreview?.hourlyRate {
+                if depPreviewFor != depSignature {
+                    // The rule has not answered for these fields yet: saying
+                    // "not enough" now is a warning about a sum still running.
+                    Text(shop.words.callIt("mac.dep_working"))
+                        .font(.callout).foregroundStyle(.secondary)
+                } else if let rate = depPreview?.hourlyRate {
                     Text(shop.words.callIt("mac.dep_rate_line", ["rate": .string(Money.text(rate, shop.currency))]))
                         .font(.callout.weight(.semibold)).monospacedDigit()
                 } else {
@@ -636,15 +653,30 @@ struct MachineSheet: View {
         "\(depPrice)|\(depBought.map { Shop.today($0) } ?? "")|\(depLife)|\(depUnit)|\(depResidual)|\(depMethod)|\(depMonthly)"
     }
 
+    /// Whether "Hours a month" feeds the hourly figure — the same test
+    /// `hourlyRate` makes.
+    static func monthlyHoursMatter(method: String, unit: String) -> Bool {
+        method == "straightLine" || unit == "years"
+    }
+    private var monthlyHoursMatter: Bool { Self.monthlyHoursMatter(method: depMethod, unit: depUnit) }
+
     private func previewDepreciation() async {
-        guard depPrice > 0, let engine = shop.engine else { depPreview = nil; return }
+        let asked = depSignature
+        guard depPrice > 0, let engine = shop.engine else {
+            depPreview = nil; depPreviewFor = asked; return
+        }
         let id = existing?.id ?? "MACH-draft"
         var record: [String: JSONValue] = ["id": .string(id), "depreciation": depreciationInput,
                                            "targetHoursPerDay": .number(targetHours)]
         if let recent = shop.machineValue[id]?.recentMonthlyHours { record["recentMonthlyHours"] = .number(recent) }
-        depPreview = try? await engine.depreciationStatus(
+        let answer = try? await engine.depreciationStatus(
             machine: .object(record), today: Shop.today(),
             hoursRun: shop.machineValue[id]?.hoursRun ?? 0)
+        // An answer for fields that have since changed is dropped: the task
+        // for the new ones is already running and will answer for them.
+        guard asked == depSignature else { return }
+        depPreview = answer
+        depPreviewFor = asked
     }
 
     private func fill() {

@@ -115,6 +115,12 @@ struct OnlinePane: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
+                // ── ONLINE STORAGE, FIRST ───────────────────────────────
+                //
+                // It lived under Preferences, and the shop looked for Google
+                // Drive here, under Online. It saves itself as it changes, so
+                // the Save bar below is not its business.
+                CloudLibrarySettings(shop: shop)
                 Section(shop.words.callIt("mac.online_title")) {
                     Text(shop.words.callIt("mac.online_desc"))
                         .font(.callout).foregroundStyle(.secondary)

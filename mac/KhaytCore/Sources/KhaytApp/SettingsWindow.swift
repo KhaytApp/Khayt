@@ -1167,7 +1167,8 @@ struct PreferencesPane: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 LibraryLocationSettings(shop: shop)
-                CloudLibrarySettings(shop: shop)
+                // Online storage (Google Drive, a bucket) is under Online,
+                // where shops looked for it — see `OnlinePane`.
                 OffsiteBackupSettings(shop: shop)
             }
             .formStyle(.grouped)

@@ -125,6 +125,7 @@ final class Words {
     /// Khayt's word, then this app's, then the key — which is visible enough on
     /// screen to be reported rather than quietly reading as a label.
     func callIt(_ key: String) -> String {
+        if let mine = Self.sayInstead[key] { return callIt(mine) }
         if let theirs = khayt[key], !theirs.isEmpty { return theirs }
         if let mine = Self.own[key]?[language] ?? Self.own[key]?["en"] { return mine }
         return key
@@ -171,6 +172,16 @@ final class Words {
         // The first shape is also the one §5 prefers, because it substitutes
         // rather than concatenating a numeral onto a word in whatever the
         // paragraph's direction happens to be.
+        // ── AND THREE TO TEN, WHERE THE WORD HAS BEEN GIVEN THEM ──────────
+        //
+        // Arabic counts 3–10 with the plural (٣ أيام) and 11–99 with the
+        // accusative singular (٣٠ يومًا). A key written in the second shape
+        // read "5 يومًا". Opt-in like the dual: only a key with a `_few`.
+        let tail = n % 100
+        if language == "ar", (3...10).contains(tail), let few = Self.own[key + "_few"]?["ar"], !few.isEmpty {
+            let number = Self.counter.string(from: NSNumber(value: n)) ?? String(n)
+            return few.replacingOccurrences(of: "{n}", with: number)
+        }
         let said = callIt(n == 1 ? key + "_one" : key)
         let number = Self.counter.string(from: NSNumber(value: n)) ?? String(n)
         if said.contains("{n}") {
@@ -326,6 +337,22 @@ final class Words {
     /// `PrintFactLines.ownWords` is MERGED IN rather than copied: the Quick Look
     /// preview shows the same facts from a separate bundle and needs the same
     /// words, and two literals would agree today and drift by the third change.
+    /// Shared keys this app says in its OWN word, because the shared one
+    /// disagrees with the rest of the app.
+    ///
+    /// Filament is `خيط` in this app's Arabic — the word in every
+    /// filament string it supplies, and in most of the shared ones — but two
+    /// shared keys it shows say `فلامنت`: the Expenses category and the
+    /// Calculator's part row. One screen said خيط, the next فلامنت, for the
+    /// same spool. The shared catalogue is a verbatim copy of the other app's
+    /// (`mac-core-is-not-a-fork`), so the word is changed here, for this app,
+    /// and only for keys whose English is the same word — `WordsTests` holds
+    /// that, so an alias can never change what an English reader sees.
+    nonisolated static let sayInstead: [String: String] = [
+        "exp.cat.filament": "mac.filament",
+        "calc.part.filament": "mac.filament",
+    ]
+
     nonisolated static let own: [String: [String: String]] =
         base.merging(PrintFactLines.ownWords) { mine, _ in mine }
 
@@ -565,6 +592,9 @@ final class Words {
         "mac.power_measured":   ["en": "The plug measured {watts} W over {prints}.",
                                  "ar": "قاس المقبس {watts} واط على {prints}."],
         "mac.power_use":        ["en": "Use this", "ar": "استخدم هذه القيمة"],
+        // Units beside the printer's fields, in the shop's language.
+        "mac.unit_mm":          ["en": "mm", "ar": "مم"],
+        "mac.unit_watts":       ["en": "W", "ar": "واط"],
         // Electricity quoted against electricity metered, per machine — the
         // actuals panel, not the P&L.
         "mac.acc_power_title":  ["en": "Electricity: quoted and metered", "ar": "الكهرباء: المقدّرة والمقيسة"],
@@ -1036,7 +1066,6 @@ final class Words {
         "mac.dur_hm":        ["en": "{h}h {m}m", "ar": "{h} س {m} د"],
         "mac.dur_m":         ["en": "{m}m",      "ar": "{m} د"],
         "mac.dur_under_1m":  ["en": "<1m",       "ar": "أقل من دقيقة"],
-        "mac.material_cost": ["en": "Material cost", "ar": "تكلفة الخامة"],
         "mac.record_a_payment": ["en": "Record a payment", "ar": "تسجيل دفعة"],
         "mac.triage": ["en": "Triage", "ar": "الفرز"],
         "mac.ledger": ["en": "Ledger", "ar": "السجل"],
@@ -1291,6 +1320,9 @@ final class Words {
         // What a machine cost and how long it should last — lib/depreciation.js.
         "mac.pane_value": ["en": "Value", "ar": "القيمة"],
         "mac.dep_title": ["en": "Depreciation", "ar": "الإهلاك"],
+        "mac.dep_what": ["en": "What this printer costs you in wear, per hour of printing.",
+                         "ar": "ما تكلّفك هذه الطابعة من استهلاك عن كل ساعة طباعة."],
+        "mac.dep_working": ["en": "Working out the hourly figure…", "ar": "جارٍ حساب المبلغ بالساعة…"],
         "mac.dep_price": ["en": "Purchase price", "ar": "سعر الشراء"],
         "mac.dep_bought": ["en": "Bought on", "ar": "تاريخ الشراء"],
         "mac.dep_life": ["en": "Expected life", "ar": "العمر المتوقع"],
@@ -1319,7 +1351,12 @@ final class Words {
         "mac.dep_to_date": ["en": "Depreciated so far", "ar": "الإهلاك حتى الآن"],
         "mac.dep_left": ["en": "Life left", "ar": "العمر المتبقي"],
         "mac.dep_hours_left": ["en": "{n} print hours", "ar": "{n} ساعة طباعة"],
+        // Counted with `Words.counting`: Arabic says one, two, three-to-ten
+        // and eleven-up differently, and "{n} شهرًا" is only the last.
         "mac.dep_months_left": ["en": "{n} months", "ar": "{n} شهرًا"],
+        "mac.dep_months_left_one": ["en": "{n} month", "ar": "شهر واحد"],
+        "mac.dep_months_left_two": ["en": "{n} months", "ar": "شهران"],
+        "mac.dep_months_left_few": ["en": "{n} months", "ar": "{n} أشهر"],
         "mac.dep_rate": ["en": "Wear charged", "ar": "الاستهلاك المحمَّل"],
         "mac.dep_per_hour_amount": ["en": "{rate} / hour", "ar": "{rate} / ساعة"],
         "mac.dep_fully": [
@@ -1330,6 +1367,13 @@ final class Words {
         "mac.dep_needs_purchaseDate": ["en": "Add when it was bought to work this out.", "ar": "أضف تاريخ شرائها لحساب ذلك."],
         "mac.dep_needs_monthlyHours": ["en": "Add its hours a month to work out an hourly figure.", "ar": "أضف ساعات الشهر لحساب مبلغ بالساعة."],
         "mac.pnl_depreciation": ["en": "Machine depreciation", "ar": "إهلاك الآلات"],
+        // The P&L TABLE's headers, short enough to fit their columns. The
+        // statement and the waterfall keep the full names (`pnl.waste`,
+        // `an.pnl_vat`); a column header is a label, not the line's name.
+        "mac.pnl_col_cogs": ["en": "Cost of goods", "ar": "تكلفة البضاعة"],
+        "mac.pnl_col_waste": ["en": "Waste", "ar": "الهدر"],
+        "mac.pnl_col_vat": ["en": "VAT", "ar": "الضريبة"],
+        "mac.pnl_col_margin": ["en": "Margin", "ar": "الهامش"],
         // A failure allowance learned from the shop's own history —
         // lib/failure-rate.js. Offered beside the field, never applied alone.
         "mac.fail_suggest": [
@@ -1362,6 +1406,13 @@ final class Words {
         "mac.synced":        ["en": "synced",       "ar": "متزامن"],
         "mac.offline":       ["en": "offline",      "ar": "غير متصل"],
         "mac.saved_at":      ["en": "saved {t}",    "ar": "حُفظ {t}"],
+        // The strip's save line. Its own words, not `mac.never` — that one is
+        // "never PRINTED" in Arabic (لم يُطبع), and the strip read it as the
+        // book never having been saved.
+        "mac.not_saved_yet": ["en": "not saved yet", "ar": "لم يُحفظ بعد"],
+        // The last backup is a DAY, so the strip says the day, not a time.
+        "mac.saved_today":   ["en": "saved today",   "ar": "حُفظ اليوم"],
+        "mac.saved_yesterday": ["en": "saved yesterday", "ar": "حُفظ أمس"],
         "mac.n_machines":    ["en": "{n} machines", "ar": "{n} آلات"],
         "mac.n_machines_one": ["en": "{n} machine", "ar": "آلة واحدة"],
         "mac.n_people":      ["en": "{n} people",   "ar": "{n} أشخاص"],
@@ -2143,6 +2194,9 @@ final class Words {
         "mac.cloudlib_opt_move": ["en": "Move models off this Mac when unused for", "ar": "انقل المجسّمات عن هذا الماك إن لم تُستخدم لمدة"],
         "mac.cloudlib_opt_move_why": ["en": "They stay in the library and come back when you open one. Nothing is removed from this Mac until the online copy has been checked.", "ar": "تبقى في المكتبة وتعود عند فتحها. لا يُحذف شيء من هذا الماك قبل التحقق من النسخة على الإنترنت."],
         "mac.cloudlib_n_days": ["en": "{n} days", "ar": "{n} يومًا"],
+        "mac.cloudlib_n_days_one": ["en": "{n} day", "ar": "يوم واحد"],
+        "mac.cloudlib_n_days_two": ["en": "{n} days", "ar": "يومان"],
+        "mac.cloudlib_n_days_few": ["en": "{n} days", "ar": "{n} أيام"],
         "mac.offsite_drive_suggest": ["en": "Google Drive is connected under Online storage. Send the nightly backup there?", "ar": "ربطتَ Google Drive في التخزين السحابي. أترسل النسخة الليلية إليه؟"],
         "mac.offsite_use_drive": ["en": "Use Google Drive", "ar": "استخدم Google Drive"],
         // The off-site backup (OffsiteBackups.swift).

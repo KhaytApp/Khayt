@@ -2578,6 +2578,15 @@
    },
    "powerDraw": 1400,
    "createdAt": "2026-05-02",
+   "depreciation": {
+    "price": 24000,
+    "purchaseDate": "2026-05-02",
+    "life": 5,
+    "lifeUnit": "years",
+    "residual": 4000,
+    "method": "straightLine",
+    "monthlyHours": 0
+   },
    "targetHoursPerDay": 6,
    "downtimeBlocks": [
     {
@@ -4229,9 +4238,16 @@
    "failureType": "warping",
    "reason": "Lifted at hour six, chamber too cool",
    "notes": "",
-   "orderId": null,
+   "orderId": "ORD-01025",
    "machineId": "MACH-core-one",
-   "spoolId": "sp-4"
+   "spoolId": "sp-4",
+   "costMaterial": 43.2,
+   "costMachine": 9,
+   "costPower": 0.13,
+   "costFull": 52.33,
+   "failedHours": 6,
+   "hoursSource": "printer",
+   "powerSource": "rate"
   },
   {
    "id": "W-0005",
