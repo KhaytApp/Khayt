@@ -118,6 +118,27 @@ function handoffSparkSvg(data, w, h) {
  * (true value ~9%) — and Math.min(100, …) hid the overflow, so it looked plausible
  * instead of obviously broken. A 7-day custom range understated by ~4x.
  */
+/**
+ * The selected analytics range as `{ from, to }`, `to` cut to today — what a
+ * straight-line machine's depreciation is pro-rated over. `all`, and a custom
+ * range with no bounds, span the data itself (from its first date to today).
+ * lib/date-range.js `bounds` works it out from the same rules as `inRange`.
+ */
+function analyticsRangeSpan(dates) {
+  const DR = (typeof KhaytDateRange !== 'undefined') ? KhaytDateRange : null;
+  // Guarded like analyticsRangeDays: a harness (or Bed Ready) that renders
+  // this file without the range globals still gets an answer.
+  const from = (typeof customRangeFrom !== 'undefined' && customRangeFrom.analytics) || '';
+  const to = (typeof customRangeTo !== 'undefined' && customRangeTo.analytics) || '';
+  const b = DR && DR.bounds ? DR.bounds(analyticsRange, { now: new Date(), from, to }) : null;
+  if (b) return b;
+  const first = (dates || []).map(d => String(d || '').slice(0, 10)).filter(Boolean).sort()[0];
+  return first ? { from: first, to: localDateStr() } : null;
+}
+
+/** A part's cost as the P&L counts it: only what was stocked (stockShare). */
+const stockedPartCost = (p) => partTotalCost(p) * KhaytPnl.stockShare({ parts: [p] }, { inventory, settings });
+
 function analyticsRangeDays(range, ctx, dates) {
   const now = new Date();
   if (range === 'month') return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -155,9 +176,11 @@ function computeHandoffMachineRows() {
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
     unassigned: t('dash.unassigned'),
     days: analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date)),
+    range: analyticsRangeSpan(printLog.map(o => o.date)),
   }, {
     revenueOf: orderNetRevenueBase,
-    partCostOf: partTotalCost,
+    // Only what was stocked: wear reaches this table as depreciation, once.
+    partCostOf: stockedPartCost,
   });
 
   // ── AND THE HOURS FROM THE SAME RULE ──────────────────────────────────
@@ -715,11 +738,12 @@ function renderMonthlyTrendChart() {
     settings, clients, currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
     now: today, granularity: 'month', wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
     inventory: (typeof inventory !== 'undefined' ? inventory : []),
+    machines: (typeof machines !== 'undefined' ? machines : []),
   });
   const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
   const revByMonth = {};
   const expByMonth = {};
-  months.forEach(m => { revByMonth[m] = byKey[m] ? byKey[m].revenue : 0; expByMonth[m] = byKey[m] ? byKey[m].expenses + (byKey[m].waste || 0) : 0; });
+  months.forEach(m => { revByMonth[m] = byKey[m] ? byKey[m].revenue : 0; expByMonth[m] = byKey[m] ? byKey[m].expenses + (byKey[m].waste || 0) + (byKey[m].depreciation || 0) : 0; });
 
   const maxVal = Math.max(...months.map(m => Math.max(revByMonth[m], expByMonth[m])), 1);
 
@@ -908,6 +932,7 @@ function renderProfitMarginChart() {
     settings, clients, currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
     now: today, granularity: 'month', wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
     inventory: (typeof inventory !== 'undefined' ? inventory : []),
+    machines: (typeof machines !== 'undefined' ? machines : []),
   });
   const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
   const vals = months.map(m => (byKey[m] && byKey[m].marginPct != null) ? byKey[m].marginPct : null);
@@ -1559,9 +1584,11 @@ function renderPrinterUtilizationChart() {
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
     unassigned: t('dash.unassigned'),
     days: analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date)),
+    range: analyticsRangeSpan(printLog.map(o => o.date)),
   }, {
     revenueOf: orderNetRevenueBase,
-    partCostOf: partTotalCost,
+    // Only what was stocked: wear reaches this table as depreciation, once.
+    partCostOf: stockedPartCost,
   });
 
   const colorOf = {};
@@ -1655,11 +1682,14 @@ function renderPnLSection() {
     settings, clients, currencies: CURRENCIES, now: new Date(),
     wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
     inventory: (typeof inventory !== 'undefined' ? inventory : []),
+    machines: (typeof machines !== 'undefined' ? machines : []),
   });
   if (rows.length === 0) { el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.pnl_empty'))}</p>`; return; }
   const hasFixed = rows.some((r) => r.fixed > 0);
   // Filament lost to failed prints: its own column, where there is any.
   const hasWaste = rows.some((r) => (r.waste || 0) > 0);
+  // Machines losing value (lib/depreciation.js): a column where there is any.
+  const hasDep = rows.some((r) => (r.depreciation || 0) > 0);
 
   const cur = currencySymbol();
   el.innerHTML = `
@@ -1674,6 +1704,7 @@ function renderPnLSection() {
             <th style="padding:4px 8px;">${escapeHtml(t('pnl.cogs'))} (${cur})</th>
             <th style="padding:4px 8px;">${escapeHtml(t('an.pnl_expenses'))} (${cur})</th>
             ${hasWaste ? `<th style="padding:4px 8px;">${escapeHtml(t('pnl.waste'))} (${cur})</th>` : ''}
+            ${hasDep ? `<th style="padding:4px 8px;">${escapeHtml(t('pnl.depreciation'))} (${cur})</th>` : ''}
             <th style="padding:4px 8px;">${escapeHtml(t('an.pnl_vat'))} (${cur})</th>
             <th style="padding:4px 8px; font-weight:700;">${escapeHtml(t('an.pnl_net'))} (${cur})</th>
           </tr>
@@ -1688,6 +1719,7 @@ function renderPnLSection() {
               <td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.cogs || 0)}</td>
               <td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.expenses + r.fixed)}</td>
               ${hasWaste ? `<td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">${r.waste > 0 ? '−' + fmtMoney(r.waste) : '—'}</td>` : ''}
+              ${hasDep ? `<td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">${r.depreciation > 0 ? '−' + fmtMoney(r.depreciation) : '—'}</td>` : ''}
               <td style="padding:6px 8px; text-align:right; color:var(--text-muted); font-variant-numeric:tabular-nums;">${fmtMoney(r.vatCollected)}</td>
               <td style="padding:6px 8px; text-align:right; font-weight:700; color:${netCol}; font-variant-numeric:tabular-nums;">${fmtMoney(r.net)}</td>
             </tr>`;
@@ -1930,9 +1962,11 @@ function renderMachinePL() {
     expenses: expenses.filter(e => e.orderId),
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
     unassigned: t('dash.unassigned'),
+    range: analyticsRangeSpan(printLog.map(o => o.date)),
   }, {
     revenueOf: orderNetRevenueBase,
-    partCostOf: partTotalCost,
+    // Only what was stocked: wear reaches this table as depreciation, once.
+    partCostOf: stockedPartCost,
   });
   if (rows.length === 0) {
     el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.no_data'))}</p>`;
@@ -1940,6 +1974,9 @@ function renderMachinePL() {
   }
 
   const cur = currencySymbol();
+  // A machine with a purchase price set loses value as it prints — the one
+  // place its wear is counted. A column only where there is any.
+  const hasDep = rows.some((r) => (r.depreciation || 0) > 0);
   el.innerHTML = `
     <div class="table-wrap">
       <table class="machine-pl-table" style="width:100%; border-collapse:collapse; font-size:13px;">
@@ -1951,6 +1988,7 @@ function renderMachinePL() {
             <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.mat_cost_col'))} (${cur})</th>
             <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.linked_exp_col'))} (${cur})</th>
             <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.maint_cost_col'))} (${cur})</th>
+            ${hasDep ? `<th style="text-align:right; padding:6px 8px;">${escapeHtml(t('pnl.depreciation'))} (${cur})</th>` : ''}
             <th style="text-align:right; padding:6px 8px; font-weight:700;">${escapeHtml(t('an.net_col'))} (${cur})</th>
             <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.margin_col'))}</th>
           </tr>
@@ -1974,6 +2012,7 @@ function renderMachinePL() {
               <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.materialCost)}</td>
               <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.linkedExpenses)}</td>
               <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.maintenance)}</td>
+              ${hasDep ? `<td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">${r.depreciation > 0 ? '−' + fmtMoney(r.depreciation) : '—'}</td>` : ''}
               <td style="text-align:right; padding:6px 8px; font-weight:700; color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}; font-variant-numeric:tabular-nums;">${fmtMoney(net)}</td>
               <td style="text-align:right; padding:6px 8px; font-weight:600; color:${marginCol};">${margin === null ? '—' : margin.toFixed(1) + '%'}</td>
             </tr>`;
@@ -2830,7 +2869,13 @@ function pnlInputsForRange() {
   const wasteRows = (typeof wasteLog !== 'undefined' ? wasteLog : [])
     .filter(w => w && inRange(w.date, analyticsRange, 'analytics'))
     .map(w => ({ cost: +w.cost || 0 }));
-  return { orders, expenses: expenseRows, waste: wasteRows };
+  // Machines losing value over the range — the one place wear enters the P&L.
+  const span = analyticsRangeSpan((printLog || []).map(o => o.date));
+  const dep = (typeof KhaytDepreciation !== 'undefined' && span)
+    ? KhaytDepreciation.periodCharges(machines || [], printLog || [], [{ key: 'range', from: span.from, to: span.to }])
+    : {};
+  const depreciation = (dep.range && dep.range.total) || 0;
+  return { orders, expenses: expenseRows, waste: wasteRows, depreciation };
 }
 
 function exportPnlCsv() {
@@ -2840,16 +2885,16 @@ function exportPnlCsv() {
     const f = customRangeFrom.analytics || '', tt = customRangeTo.analytics || '';
     if (f || tt) label = `${f || '…'} → ${tt || '…'}`;
   }
-  const { orders, expenses: exps, waste } = pnlInputsForRange();
+  const { orders, expenses: exps, waste, depreciation } = pnlInputsForRange();
 
   if (!orders.length && !exps.length) { toast(t('an.pnl_empty') || 'No data for this period', 'error'); return; }
 
-  const summary = KhaytPnl.computePnl({ orders, expenses: exps, waste, label });
+  const summary = KhaytPnl.computePnl({ orders, expenses: exps, waste, depreciation, label });
   const labels = {
     title: t('pnl.title'), item: t('pnl.item'), amount: t('pnl.amount'), orders: t('an.pnl_orders'),
     revenue: t('an.revenue'), cogs: t('pnl.cogs'), gross: t('pnl.gross'), gross_margin: t('pnl.gross_margin'),
     opex: t('pnl.opex'), vat: t('an.pnl_vat'), net: t('an.pnl_net'),
-    inventory: t('pnl.inventory'), waste: t('pnl.waste'),
+    inventory: t('pnl.inventory'), waste: t('pnl.waste'), depreciation: t('pnl.depreciation'),
   };
   const csv = KhaytPnl.pnlToCsv(summary, { currency: currencySymbol(), labels });
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }),
