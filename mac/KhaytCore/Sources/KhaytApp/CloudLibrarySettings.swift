@@ -59,6 +59,22 @@ struct CloudLibrarySettings: View {
             }
             return d
         }
+
+        /// The draft after the book changed underneath it: a field the shop
+        /// has not touched follows the book, a field it has typed in is kept.
+        /// Every option switch saves and reloads the settings, and resetting
+        /// the whole draft then threw away a half-typed bucket — its secret
+        /// included.
+        static func rebased(_ draft: Draft, was: Draft, now: Draft) -> Draft {
+            var out = draft
+            func follow<V: Equatable>(_ k: WritableKeyPath<Draft, V>) {
+                if draft[keyPath: k] == was[keyPath: k] { out[keyPath: k] = now[keyPath: k] }
+            }
+            follow(\.provider); follow(\.vars); follow(\.endpoint); follow(\.bucket); follow(\.region)
+            follow(\.prefix); follow(\.accessKeyId); follow(\.secret)
+            follow(\.driveClientId); follow(\.driveSecret); follow(\.driveFolder)
+            return out
+        }
     }
 
     /// Whether the screen opens on the bucket rather than on Google Drive:
@@ -102,8 +118,9 @@ struct CloudLibrarySettings: View {
     private var bucketSaved: Bool { !original.bucket.isEmpty && !original.accessKeyId.isEmpty && storedSecret }
     private var usesOwnClient: Bool { Shop.builtInGoogleClient == nil || ownClient }
     private var waiting: Bool { connecting || shop.googleSignInURL != nil }
-    /// The options apply to whatever the library is using, once it can.
-    private var ready: Bool { showsBucket ? bucketSaved : driveConnected }
+    /// The options apply to whatever the library is using, and are shown
+    /// only while that is the one on screen.
+    private var ready: Bool { showsBucket ? remote == .bucket : remote == .drive }
     /// A picture is taken of the sample shop, which cannot be written; its
     /// buttons are drawn as a real shop sees them rather than greyed.
     @Environment(\.photographFlat) private var photographing
@@ -210,7 +227,7 @@ struct CloudLibrarySettings: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Button(shop.words.callIt("mac.gdrive_disconnect")) {
-                Task { await shop.disconnectGoogleDrive(); reload(); await refresh() }
+                Task { await shop.disconnectGoogleDrive(); reload(reset: true); await refresh() }
             }
             .disabled(locked)
             .help(shop.words.callIt("mac.gdrive_disconnect_warn"))
@@ -270,7 +287,7 @@ struct CloudLibrarySettings: View {
                                           typedSecret: own ? draft.driveSecret : "",
                                           folderName: draft.driveFolder)
             connecting = false
-            reload(); await refresh()
+            reload(reset: shop.cloudLibraryProblem == nil); await refresh()
         }
     }
 
@@ -278,12 +295,17 @@ struct CloudLibrarySettings: View {
 
     @ViewBuilder private var advancedBlock: some View {
         VStack(alignment: .leading, spacing: Space.md) {
+            // Switching the screen with the other one READY switches the
+            // library to it — otherwise the switches below would go on
+            // writing to the remote that is no longer shown. Not ready (Drive
+            // not connected, no bucket saved): only the form changes, and
+            // Connect or Save make the choice.
             if showsBucket {
-                Button(shop.words.callIt("mac.cloudlib_use_drive")) { showsBucket = false }
-                    .buttonStyle(.link)
+                Button(shop.words.callIt("mac.cloudlib_use_drive")) { switchTo(.drive) }
+                    .buttonStyle(.link).disabled(locked)
             } else {
-                Button(shop.words.callIt("mac.cloudlib_use_bucket")) { showsBucket = true }
-                    .buttonStyle(.link)
+                Button(shop.words.callIt("mac.cloudlib_use_bucket")) { switchTo(.bucket) }
+                    .buttonStyle(.link).disabled(locked)
                 if !driveConnected {
                     LabeledContent(shop.words.callIt("mac.gdrive_folder")) {
                         TextField("", text: $draft.driveFolder,
@@ -476,19 +498,24 @@ struct CloudLibrarySettings: View {
         if let region = r.region, !region.isEmpty { draft.region = region }
     }
 
-    private func reload() {
+    private func switchTo(_ target: CloudLibrary.Remote) {
+        showsBucket = target == .bucket
+        let isReady = target == .bucket ? bucketSaved : driveConnected
+        guard isReady, remote != target else { return }
+        Task { await shop.chooseLibraryRemote(target); reload(); await refresh() }
+    }
+
+    /// Read the book again. `reset` drops what is typed (after it was saved);
+    /// otherwise a typed field is kept — see `Draft.rebased`.
+    private func reload(reset: Bool = false) {
         let settings = shop.settingsDict
-        original = Draft.read(settings)
-        draft = original
-        options = CloudLibrary.options(settings)
-        // Follow the book when what it is USING changes — connecting Drive,
-        // saving a bucket — and otherwise leave the shop's own choice of form
-        // alone, so a settings change elsewhere does not snap it back.
-        let now = CloudLibrary.remoteInUse(settings)
-        if now != remote {
-            remote = now
-            showsBucket = now == .bucket
-        }
+        let now = Draft.read(settings)
+        draft = reset ? now : Draft.rebased(draft, was: original, now: now)
+        original = now
+        // Against the remote as last found; `refresh` asks again which one
+        // opens on this Mac and follows it (reading the stored settings here
+        // too would make a book sealed on another Mac flicker between them).
+        options = CloudLibrary.options(settings, using: remote)
         // A client already saved that is not Khayt's is the shop's own choice.
         if let builtIn = Shop.builtInGoogleClient {
             let saved = draft.driveClientId.trimmingCharacters(in: .whitespaces)
@@ -500,7 +527,21 @@ struct CloudLibrarySettings: View {
            case .string(let s)? = s3["secretAccessKey"] { storedSecret = !s.isEmpty }
     }
 
+    /// Follow the book when what it is USING changes — connecting Drive,
+    /// saving a bucket — and otherwise leave the shop's own choice of form
+    /// alone, so a settings change elsewhere does not snap it back.
+    private func follow(_ now: CloudLibrary.Remote) {
+        guard now != remote else { return }
+        remote = now
+        showsBucket = now == .bucket
+        options = CloudLibrary.options(shop.settingsDict, using: now)
+    }
+
     private func refresh() async {
+        // What the library will REALLY use on this Mac: a secret sealed on
+        // another Mac does not open here, and the stored-settings reading
+        // above cannot know that.
+        follow(await CloudLibrary.remoteInUse(shop.settingsDict, build: shop.source.build))
         summary = ready ? await shop.cloudTierSummary() : nil
         if driveConnected, !showsBucket {
             // Kept when Google cannot be asked: the problem line says why,
@@ -515,7 +556,7 @@ struct CloudLibrarySettings: View {
         await shop.saveCloudLibrary(provider: draft.provider, endpoint: draft.endpoint, bucket: draft.bucket,
                                     region: draft.region, prefix: draft.prefix, accessKeyId: draft.accessKeyId,
                                     typedSecret: draft.secret.trimmingCharacters(in: .whitespaces))
-        reload()
+        reload(reset: shop.cloudLibraryProblem == nil)
         await refresh()
     }
 }

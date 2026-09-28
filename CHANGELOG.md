@@ -29,6 +29,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   are under Advanced, and the folder defaults to "Khayt print library" without
   renaming one you chose. The off-site backup lists Google Drive first and
   offers it when Drive is connected, without changing a destination you picked.
+  Turning "Keep a copy" off while a bucket is in use keeps the bucket (it no
+  longer switched the library to Google Drive and began copying there), "Use
+  Google Drive instead" / "Use a storage bucket" really switch when the other
+  one is ready, each keeping its own copy switch, re-saving the bucket no
+  longer turns a backup you switched off back on, a half-typed bucket survives
+  a change to the options, and a bucket key sealed on another Mac no longer
+  shows as the bucket while Drive is the one used.
 
 - **(Mac) The Dashboard tiles count cost the way Reports does.** Cost of
   goods is now only what was stocked (filament, extra materials, packaging), so
