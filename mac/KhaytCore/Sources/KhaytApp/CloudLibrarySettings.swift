@@ -124,7 +124,10 @@ struct CloudLibrarySettings: View {
     /// A picture is taken of the sample shop, which cannot be written; its
     /// buttons are drawn as a real shop sees them rather than greyed.
     @Environment(\.photographFlat) private var photographing
-    private var locked: Bool { shop.cloudLibraryBusy || (!shop.canMoveJobs && !photographing) }
+    private var locked: Bool { shop.cloudLibraryBusy || lockedByBook }
+    /// Locked because this Mac may not change the book — said under the
+    /// buttons, which otherwise just sit there grey.
+    private var lockedByBook: Bool { !shop.canMoveJobs && !photographing }
 
     var body: some View {
         Group {
@@ -168,6 +171,7 @@ struct CloudLibrarySettings: View {
                         .disabled(locked || (Shop.builtInGoogleClient == nil
                                              && draft.driveClientId.trimmingCharacters(in: .whitespaces).isEmpty))
                         .padding(.top, Space.xs)
+                    if lockedByBook { BookLockedNote(shop: shop) }
                     if Shop.builtInGoogleClient == nil
                         && draft.driveClientId.trimmingCharacters(in: .whitespaces).isEmpty {
                         // A build with no Google client of its own: the shop's
@@ -208,9 +212,14 @@ struct CloudLibrarySettings: View {
                     }
                     VStack(alignment: .leading, spacing: Space.xs) {
                         if let f = st.fraction { usageBar(f) }
+                        // Each figure in a left-to-right isolate, as
+                        // `Money.held` does: "41.2 GB" is a number and a
+                        // Latin unit, and in an Arabic sentence the bidi
+                        // algorithm set it "GB 41.2".
                         Text(st.limit.map {
-                            shop.words.callIt("mac.gdrive_usage_of", ["used": .string(st.used), "limit": .string($0)])
-                        } ?? shop.words.callIt("mac.gdrive_usage", ["used": .string(st.used)]))
+                            shop.words.callIt("mac.gdrive_usage_of", ["used": .string(Self.isolated(st.used)),
+                                                                      "limit": .string(Self.isolated($0))])
+                        } ?? shop.words.callIt("mac.gdrive_usage", ["used": .string(Self.isolated(st.used))]))
                             .font(.caption).foregroundStyle(Role.text2)
                     }
                 } else {
@@ -224,6 +233,7 @@ struct CloudLibrarySettings: View {
                 .font(TypeScale.body())
                 .foregroundStyle(Role.text2)
                 .fixedSize(horizontal: false, vertical: true)
+                if lockedByBook { BookLockedNote(shop: shop) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Button(shop.words.callIt("mac.gdrive_disconnect")) {
@@ -234,6 +244,9 @@ struct CloudLibrarySettings: View {
         }
         .padding(.vertical, Space.xs)
     }
+
+    /// A figure kept in one left-to-right run inside any sentence.
+    static func isolated(_ figure: String) -> String { "\u{2066}" + figure + "\u{2069}" }
 
     /// Drawn, not a `ProgressView`: the bar is a figure, not a task, and it
     /// turns the attention colour when the Drive is nearly full.
@@ -262,13 +275,20 @@ struct CloudLibrarySettings: View {
                 Text(shop.words.callIt("mac.gdrive_no_page_hint"))
                     .font(TypeScale.body()).foregroundStyle(Role.text2)
                     .fixedSize(horizontal: false, vertical: true)
-                if let url = shop.googleSignInURL {
-                    HStack {
+                HStack {
+                    if let url = shop.googleSignInURL {
                         Button(shop.words.callIt("mac.gdrive_open_page")) { Shop.openInBrowser(url) }
                         Button(shop.words.callIt("mac.gdrive_copy_link")) {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(url.absoluteString, forType: .string)
                         }
+                    }
+                    // The way out. A shop that closed the browser tab, or
+                    // meant a different account, was left on this screen for
+                    // the five minutes the sign-in waits.
+                    Button(shop.words.callIt("common.cancel")) {
+                        shop.cancelGoogleSignIn()
+                        connecting = false
                     }
                 }
             }
@@ -279,13 +299,14 @@ struct CloudLibrarySettings: View {
 
     private func connect() {
         connecting = true
+        // Khayt's own client unless the shop chose its own: an id
+        // left in the book from before must not be used silently.
+        let own = usesOwnClient
+        let signIn = shop.startGoogleSignIn(clientId: own ? draft.driveClientId : "",
+                                            typedSecret: own ? draft.driveSecret : "",
+                                            folderName: draft.driveFolder)
         Task {
-            // Khayt's own client unless the shop chose its own: an id
-            // left in the book from before must not be used silently.
-            let own = usesOwnClient
-            await shop.connectGoogleDrive(clientId: own ? draft.driveClientId : "",
-                                          typedSecret: own ? draft.driveSecret : "",
-                                          folderName: draft.driveFolder)
+            await signIn.value
             connecting = false
             reload(reset: shop.cloudLibraryProblem == nil); await refresh()
         }
@@ -419,7 +440,7 @@ struct CloudLibrarySettings: View {
                 Spacer()
                 Picker("", selection: Binding(get: { options.keepDays }, set: { apply(\.keepDays, $0) })) {
                     ForEach(dayChoices, id: \.self) { n in
-                        Text(shop.words.callIt("mac.cloudlib_n_days", ["n": .number(Double(n))])).tag(n)
+                        Text(shop.words.counting(n, "mac.cloudlib_n_days")).tag(n)
                     }
                 }
                 .labelsHidden().fixedSize()

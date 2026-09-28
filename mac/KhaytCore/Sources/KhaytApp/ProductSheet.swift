@@ -304,7 +304,7 @@ struct ProductSheet: View {
                                     .trimmingCharacters(in: .whitespaces)
                                 rule.override = cleaned.isEmpty ? nil : max(0, Double(cleaned) ?? 0)
                             }
-                        Text(shop.currency).foregroundStyle(.secondary)
+                        Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                         Spacer()
                     }
                 }

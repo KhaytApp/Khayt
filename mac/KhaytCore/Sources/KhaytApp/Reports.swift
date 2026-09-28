@@ -151,7 +151,8 @@ struct Reports: View {
                         // Capped so a shop with three years of quarters gets a
                         // table that scrolls rather than a page that does.
                         table
-                            .frame(height: Self.tableHeight(rows.count))
+                            .frame(height: Self.tableHeight(rows.count, lines: rows.contains {
+                                $0.fixed > 0 && $0.depreciationValue > 0 } ? 3 : 2))
                         // WHY A MARGIN CAN READ −400%. Finished jobs charged
                         // nothing still cost their material, and the margin
                         // counts it. Said, with the way to leave them out,
@@ -183,7 +184,11 @@ struct Reports: View {
                     }
                     }
                     Totals(shop: shop, rows: rows, floor: floor)
-                        .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
+                        // At most 300: at the default window the split gave
+                        // the totals ~345pt of a 360 maximum and the table
+                        // lost its last column. The totals wrap; a Table
+                        // column cannot.
+                        .frame(minWidth: 240, idealWidth: 280, maxWidth: 300)
                 }
             }
         }
@@ -243,9 +248,13 @@ struct Reports: View {
     /// version floored at two so a shop with one quarter still got a table that
     /// looks like one; ceiling of ten so three years of quarters scroll inside
     /// the table rather than making the page itself enormous.
-    static func tableHeight(_ count: Int) -> CGFloat {
+    ///
+    /// THREE lines when a quarter carries machine depreciation as well as
+    /// overhead: the expenses cell then stacks the figure and two captions,
+    /// and at 44 a row cut the depreciation caption in half.
+    static func tableHeight(_ count: Int, lines: Int = 2) -> CGFloat {
         let rows = CGFloat(max(1, min(count, 10)))
-        return 46 + rows * 44
+        return 46 + rows * (lines > 2 ? 60 : 44)
     }
 
     /// The sentence under the table when some finished work was charged
@@ -260,43 +269,51 @@ struct Reports: View {
     // its ideal (measured on Jobs, see `OrdersTable`), so the ideals are the
     // row's floor and the waste column made it wider still. It grows into
     // whatever room the split gives it.
+    //
+    // PLAIN FIGURES, the currency said once (the statement beside it and the
+    // waterfall above carry the mark). With the mark on every cell the nine
+    // columns needed ~880pt of ideals and the default window gives the table
+    // ~800: "Filament wast…", and VAT and Net cut off the trailing edge — in
+    // Arabic the leading one. `CustomersTable` made the same trade. The
+    // headers are short labels (`mac.pnl_col_*`); the statement keeps the
+    // lines' full names.
     private var table: some View {
         Table(rows.sorted(using: order), sortOrder: $order, columnCustomization: $columns) {
             TableColumn(shop.words.callIt("an.pnl_period"), value: \.period) { r in
                 Text(r.period).font(.body.weight(.semibold)).monospacedDigit()
             }
-            .width(min: 80, ideal: 80, max: 160)
+            .width(min: 64, ideal: 64, max: 160)
             TableColumn(shop.words.callIt("an.pnl_orders"), value: \.orders) { r in
                 Text("\(r.orders)").monospacedDigit()
             }
-            .width(min: 60, ideal: 60, max: 120)
+            .width(min: 44, ideal: 44, max: 120)
             TableColumn(shop.words.callIt("an.revenue"), value: \.revenue) { r in
-                Text(Money.text(r.revenue, shop.currency)).monospacedDigit()
+                Text(Money.figure(r.revenue)).monospacedDigit()
             }
-            .width(min: 110, ideal: 110, max: 220)
+            .width(min: 70, ideal: 70, max: 220)
             // WHAT THE WORK COST TO MAKE, the figure the margin and the net
             // both take off. Without it on the row the net could not be worked
             // out from the columns beside it, and a -495.8% margin sat next to
             // a positive net income with nothing to say how.
-            TableColumn(shop.words.callIt("pnl.cogs"), value: \.cogsValue) { r in
-                Text(r.cogsValue > 0 ? Money.cost(r.cogsValue, shop.currency) : "—")
+            TableColumn(shop.words.callIt("mac.pnl_col_cogs"), value: \.cogsValue) { r in
+                Text(r.cogsValue > 0 ? Money.figure(-r.cogsValue) : "—")
                     .monospacedDigit()
                     .foregroundStyle(r.cogsValue > 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .width(min: 110, ideal: 110, max: 220)
+            .width(min: 84, ideal: 84, max: 220)
             // FILAMENT LOST TO FAILED PRINTS — its own line in the rule since
             // the waste log reached the P&L, signed like every cost here.
             // Only for a shop that has logged any: a column of dashes teaches
             // people to stop reading the ones next to it.
             if rows.contains(where: { $0.wasteValue > 0 }) {
-                TableColumn(shop.words.callIt("pnl.waste"), value: \.wasteValue) { r in
-                    Text(r.wasteValue > 0 ? Money.cost(r.wasteValue, shop.currency) : "—")
+                TableColumn(shop.words.callIt("mac.pnl_col_waste"), value: \.wasteValue) { r in
+                    Text(r.wasteValue > 0 ? Money.figure(-r.wasteValue) : "—")
                         .monospacedDigit()
                         .foregroundStyle(r.wasteValue > 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                .width(min: 90, ideal: 90, max: 200)
+                .width(min: 56, ideal: 56, max: 200)
             }
             TableColumn(shop.words.callIt("an.pnl_expenses"), value: \.expenses) { r in
                 // What was spent AND the overhead charged to the period, which
@@ -312,24 +329,24 @@ struct Reports: View {
                     // Negated rather than prefixed with a minus glyph: the
                     // formatter's own sign is the one the net column uses, and
                     // two different minus signs in one table is a typo.
-                    Text(spent > 0 ? Money.cost(spent, shop.currency) : "—")
+                    Text(spent > 0 ? Money.figure(-spent) : "—")
                         .monospacedDigit()
                         .foregroundStyle(spent > 0 ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.tertiary))
                     if r.fixed > 0 {
-                        Text(shop.words.callIt("mac.of_which_fixed") + " " + Money.text(r.fixed, shop.currency))
+                        Text(shop.words.callIt("mac.of_which_fixed") + " " + Money.figure(r.fixed))
                             .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
                     }
                     if r.depreciationValue > 0 {
-                        Text(shop.words.callIt("mac.pnl_depreciation") + " " + Money.text(r.depreciationValue, shop.currency))
+                        Text(shop.words.callIt("mac.pnl_depreciation") + " " + Money.figure(r.depreciationValue))
                             .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .width(min: 120, ideal: 120, max: 240)
+            .width(min: 92, ideal: 92, max: 240)
             // The margin on what the shop kept. Blended by the rule, so one
             // small job at a high margin cannot colour a month green.
-            TableColumn(shop.words.callIt("an.margin_col"), value: \.marginSort) { r in
+            TableColumn(shop.words.callIt("mac.pnl_col_margin"), value: \.marginSort) { r in
                 if let pct = r.marginPct {
                     Text(Money.quantity(pct, decimals: pct == pct.rounded() ? 0 : 1) + "%")
                         .monospacedDigit()
@@ -338,12 +355,12 @@ struct Reports: View {
                     Text("—").foregroundStyle(.tertiary)
                 }
             }
-            .width(min: 70, ideal: 70, max: 120)
-            TableColumn(shop.words.callIt("an.pnl_vat"), value: \.vatCollected) { r in
-                Text(Money.text(r.vatCollected, shop.currency))
+            .width(min: 54, ideal: 54, max: 120)
+            TableColumn(shop.words.callIt("mac.pnl_col_vat"), value: \.vatCollected) { r in
+                Text(Money.figure(r.vatCollected))
                     .monospacedDigit().foregroundStyle(.secondary)
             }
-            .width(min: 100, ideal: 100, max: 200)
+            .width(min: 64, ideal: 64, max: 200)
             // WHAT IS ACTUALLY OWED, in its own column beside what was charged.
             // The tax a shop paid on its purchases comes off the tax it
             // charged, and the difference is the figure a return is filed on.
@@ -355,24 +372,24 @@ struct Reports: View {
             if shop.reclaimsTax {
                 TableColumn(shop.words.callIt("exp.vat_due"), value: \.vatDue) { r in
                     VStack(alignment: .trailing, spacing: 1) {
-                        Text(Money.text(r.vatDue, shop.currency))
+                        Text(Money.figure(r.vatDue))
                             .monospacedDigit()
                         if r.vatReclaimable > 0 {
-                            Text(Money.cost(r.vatReclaimable, shop.currency))
+                            Text(Money.figure(-r.vatReclaimable))
                                 .font(.caption).foregroundStyle(.tertiary)
                                 .help(shop.words.callIt("exp.vat_reclaimed"))
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                .width(min: 100, ideal: 100, max: 220)
+                .width(min: 72, ideal: 72, max: 220)
             }
             TableColumn(shop.words.callIt("an.pnl_net"), value: \.net) { r in
-                Text(Money.text(r.net, shop.currency))
+                Text(Money.figure(r.net))
                     .font(.body.weight(.semibold)).monospacedDigit()
                     .foregroundStyle(r.net >= 0 ? AnyShapeStyle(.primary) : AnyShapeStyle(Khayt.late))
             }
-            .width(min: 110, ideal: 140, max: 220)
+            .width(min: 80, ideal: 80, max: 220)
         }
         // NO ZEBRA. This table has one row per quarter — two of them on the
         // shop's own book — and the stripes are drawn down the whole window

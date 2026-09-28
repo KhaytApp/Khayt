@@ -20,6 +20,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   models there anyway. It now skips the copy, as it already did for Google
   Drive. Saving the bucket settings on the desktop also no longer resets
   that switch.
+- **(Mac) Fixes from the pre-release UI review.** Google Drive, and the rest
+  of online storage, is now under Settings › Online, where shops looked for it
+  (it was under Preferences). Waiting for Google's sign-in has a Cancel, which
+  stops the wait. When this Mac cannot change the book, the storage and library
+  buttons say why instead of just greying out. In Arabic, Drive's usage line
+  keeps "41.2 GB" in order, "5 months" and "7 days" take their proper plural,
+  the printer's millimetre and watt units are in Arabic, and filament is
+  `خيط` on the Expenses and Calculator screens as everywhere else. The status
+  strip says "saved today" / "saved 14 Sep" (it printed "12:00 AM" every day)
+  and "not saved yet" (in Arabic it said "never printed"). The machine
+  sheet's Value tab shows the riyal mark, a one-line explanation, "Working
+  out…" while the hourly figure is computed rather than a warning, and asks
+  for hours a month only when that changes the answer. The dashboard's
+  "Material cost" is now "Cost of goods sold", the same figure Reports prints
+  for the month. The Reports table fits the default window in English and
+  Arabic: shorter headers, plain figures (the mark is on the totals), and a
+  narrower totals panel. The sample shop's laser now depreciates and one
+  failed print is tied to its job, so those lines are drawn.
 
 - **Turning off Google Drive's "keep a copy of every new model" is honoured on
   Windows and Linux too.** The switch is set in the Mac app's online-storage

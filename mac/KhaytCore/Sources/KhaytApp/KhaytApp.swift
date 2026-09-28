@@ -1281,6 +1281,18 @@ final class Activator: NSObject, NSApplicationDelegate {
                 MachineSheet.opensOn = "printer"
                 await settle()
             }
+            // The Value tab, on the sample machine that carries depreciation,
+            // so the preview line and the rows it depends on are drawn.
+            if let valued = shop.machines.first(where: { $0.depreciation != nil }) {
+                MachineSheet.opensOn = "value"
+                shop.editingMachine = valued
+                await settle()
+                try? await Task.sleep(for: .milliseconds(900))
+                captureSheet(named: "22c-machine-value", into: dir)
+                shop.editingMachine = nil
+                MachineSheet.opensOn = "printer"
+                await settle()
+            }
             shop.shelf = .inventory
             await settle()
             capture(named: "08-inventory", into: dir)

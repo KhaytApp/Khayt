@@ -244,16 +244,8 @@ extension Shop {
         monthNetIncome == nil ? words.callIt("mac.net_in_reports") : nil
     }
 
-    /// What the month's material cost is KNOWN to be.
-    ///
-    /// Nil when nothing is known; otherwise the sum of what is, labelled "at
-    /// least" by the masthead — never averaged over the jobs that recorded
-    /// nothing. `materialCostGapNote` is the one line that says why.
-    var monthMaterialCost: Double? {
-        let known = thisMonthsOrders.filter { $0.costBasis > 0 }.map(\.costBasis)
-        return known.isEmpty ? nil : known.reduce(0, +)
-    }
-
+    /// Jobs this month with parts and no cost recorded: the masthead's cost
+    /// of goods is then "at least", and this is the one line that says why.
     var materialCostGapNote: String? {
         let missing = thisMonthsOrders.count { $0.costBasis <= 0 && !$0.parts.isEmpty }
         guard missing > 0 else { return nil }

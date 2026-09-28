@@ -171,9 +171,27 @@ enum GoogleSignIn {
             }
         }
 
+        /// Set by a cancelled task (the pane's Cancel), on `queue`.
+        private var cancelled = false
+
         func nextCallback(timeout: TimeInterval) async throws -> [String: String] {
+            // Cancellable: a continuation does not notice its task being
+            // cancelled, so Cancel on the waiting screen left this listening
+            // for the whole timeout.
+            try await withTaskCancellationHandler {
+                try await waitForCallback(timeout: timeout)
+            } onCancel: {
+                queue.async { [self] in
+                    cancelled = true
+                    if let w = waiter { waiter = nil; w.resume(throwing: CancellationError()) }
+                }
+            }
+        }
+
+        private func waitForCallback(timeout: TimeInterval) async throws -> [String: String] {
             try await withCheckedThrowingContinuation { cont in
                 queue.async { [self] in
+                    if cancelled { cont.resume(throwing: CancellationError()); return }
                     if let q = early { early = nil; cont.resume(returning: q); return }
                     waiter = cont
                     queue.asyncAfter(deadline: .now() + timeout) { [self] in

@@ -47,7 +47,11 @@ struct MastheadNetTests {
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), now: Date(),
-            granularity: "month", wasteLog: shop.wasteRows)
+            granularity: "month", wasteLog: shop.wasteRows,
+            // As Reports asks it: the machines, so their depreciation is in
+            // the net (the sample's laser carries some since the UI review).
+            inventory: shop.inventoryRows, machines: shop.machineRows,
+            recentMonthlyHours: shop.recentMonthlyHours)
         let key = DateRange.localMonth(Date())
         let reports = rows.first { $0.period == key }?.net
         // Hoisted, and stringified with an explicit closure: `String.init` on
@@ -84,10 +88,15 @@ struct MastheadNetTests {
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), now: Date(),
-            granularity: "month", wasteLog: shop.wasteRows)
+            granularity: "month", wasteLog: shop.wasteRows,
+            // As Reports asks it: the machines, so their depreciation is in
+            // the net (the sample's laser carries some since the UI review).
+            inventory: shop.inventoryRows, machines: shop.machineRows,
+            recentMonthlyHours: shop.recentMonthlyHours)
         let row = try #require(rows.first { $0.period == DateRange.localMonth(Date()) })
         let net = try #require(shop.monthNet)
         let expected = row.revenue - (row.cogs ?? 0) - (row.waste ?? 0) - row.expenses - row.fixed
+            - row.depreciationValue
         #expect(abs(net - expected) < 0.011,
                 Comment(rawValue: "masthead \(net) vs revenue−cogs−expenses−overhead \(expected)"))
         if (row.cogs ?? 0) > 0 {
@@ -112,7 +121,11 @@ struct MastheadNetTests {
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), now: Date(),
-            granularity: "month", wasteLog: shop.wasteRows)
+            granularity: "month", wasteLog: shop.wasteRows,
+            // As Reports asks it: the machines, so their depreciation is in
+            // the net (the sample's laser carries some since the UI review).
+            inventory: shop.inventoryRows, machines: shop.machineRows,
+            recentMonthlyHours: shop.recentMonthlyHours)
         let row = rows.first { $0.period == DateRange.localMonth(Date()) }
         let expected = row.map { $0.revenue + $0.vatCollected }
         let said = shop.monthGross.map { "\($0)" } ?? "nil"
