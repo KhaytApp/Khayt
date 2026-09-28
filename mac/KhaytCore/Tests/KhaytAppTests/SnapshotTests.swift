@@ -363,6 +363,43 @@ import KhaytCore
         ])
     }
 
+    /// Online storage, in the three states a shop meets it: not connected,
+    /// waiting for Google's sign-in, and connected. Light and dark each, in
+    /// whichever language the run is in (run once more with KHAYT_LANG=ar).
+    ///
+    /// A test build carries no Google client of its own, so the not-connected
+    /// picture is given a client id; the shipped app has Khayt's built in and
+    /// draws the same screen. The connected card is handed its account and
+    /// usage, because a picture cannot ask Google.
+    @Test("the online storage pane renders, before, during and after connecting Drive")
+    func onlineStorage() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let lang = Direction.shopLanguage()
+
+        func shoot(_ name: String, _ height: CGFloat, status: CloudLibrary.DriveStatus? = nil) throws {
+            func pane() -> some View {
+                VStack(alignment: .leading, spacing: 12) { CloudLibrarySettings(shop: shop, status: status) }
+                    .padding(20)
+                    .frame(width: 600, height: height, alignment: .top)
+            }
+            try render(pane().background(Khayt.ground), "\(name)-\(lang)-light", size: CGSize(width: 600, height: height))
+            try renderDark(pane(), "\(name)-\(lang)-dark", size: CGSize(width: 600, height: height))
+        }
+
+        shop.pretendPrintLibrary(["gdrive": .object(["clientId": .string("123-shop.apps.googleusercontent.com")])])
+        try shoot("60-storage-not-connected", 210)
+
+        shop.googleSignInURL = URL(string: "https://accounts.google.com/o/oauth2/v2/auth?client_id=x")
+        try shoot("61-storage-waiting", 210)
+        shop.googleSignInURL = nil
+
+        shop.pretendPrintLibrary(OnlineStoragePaneTests.connectedLibrary)
+        try shoot("62-storage-connected", 380,
+                  status: .init(email: "atharstudio@gmail.com", used: "41.2 GB", limit: "100 GB", fraction: 0.412))
+        shop.pretendPrintLibrary(nil)
+    }
+
     @Test("the sheets render, with their words")
     func sheets() async throws {
         let shop = Shop()

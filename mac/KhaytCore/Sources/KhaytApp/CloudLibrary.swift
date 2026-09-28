@@ -37,8 +37,8 @@ enum CloudLibrary {
         var remote: LibraryRemote
         /// Put in front of every key — the bucket's folder; empty for Drive.
         var prefix: String
-        /// New models are backed up as they come in (`enabled` on whichever
-        /// remote this is).
+        /// New models are backed up as they come in (`backUpNew` on whichever
+        /// remote this is — see `bucketBacksUp` / `driveBacksUp`).
         var backsUp: Bool
         /// What the sidecar records as where it went.
         var provider: String
@@ -49,27 +49,31 @@ enum CloudLibrary {
     }
 
     /// The bucket when it is switched on, else Google Drive when that is,
-    /// else a bucket that is set up but not backing up (so moved models can
+    /// else a bucket that is set up but switched off (so moved models can
     /// still be brought back) — `printLibRemote()` in the other app, which
-    /// prefers the bucket when both are on.
+    /// prefers the bucket when both are on. The order is `pick`, shared with
+    /// `remoteInUse` so the settings pane and the library cannot disagree.
     static func config(settings: [String: JSONValue], build: StoreReader.Build?) async -> Config? {
         guard case .object(let library)? = settings["printLibrary"] else { return nil }
         let tier = library["tier"] ?? .object([:])
         var tierOn = false
         if case .object(let t) = tier, case .bool(true)? = t["enabled"] { tierOn = true }
 
-        var bucket: Config?
-        if let c = await libraryBucket(settings: settings, build: build) {
-            bucket = Config(remote: .bucket(c), prefix: c.prefix, backsUp: on(section(library, "s3")),
-                            provider: c.endpoint, tier: tier, tierEnabled: tierOn)
-        }
-        if let bucket, bucket.backsUp { return bucket }
-
-        if on(section(library, "gdrive")), let d = await libraryDrive(settings: settings, build: build) {
+        let bucket = await libraryBucket(settings: settings, build: build)
+        let drive = await libraryDrive(settings: settings, build: build)
+        switch pick(library, bucketUsable: bucket != nil, driveUsable: drive != nil) {
+        case .bucket:
+            guard let c = bucket else { return nil }
+            return Config(remote: .bucket(c), prefix: c.prefix, backsUp: bucketBacksUp(section(library, "s3")),
+                          provider: c.endpoint, tier: tier, tierEnabled: tierOn)
+        case .drive:
+            guard let d = drive else { return nil }
             return Config(remote: .drive(DriveClient(d.config, fetch: fetch)), prefix: d.prefix,
-                          backsUp: true, provider: "gdrive", tier: tier, tierEnabled: tierOn)
+                          backsUp: driveBacksUp(section(library, "gdrive")), provider: "gdrive",
+                          tier: tier, tierEnabled: tierOn)
+        case .none:
+            return nil
         }
-        return bucket
     }
 
     /// The library's bucket, set up and with its secret opened — whether or
@@ -95,6 +99,200 @@ enum CloudLibrary {
         let d = DriveClient.Config(clientId: text(gd, "clientId"), clientSecret: secret,
                                    refreshToken: refresh, folderName: text(gd, "folderName"))
         return d.isConfigured ? (d, text(gd, "prefix")) : nil
+    }
+
+    // MARK: - What the settings say, without opening a secret
+
+    /// Which remote the library is using, read off the settings alone — the
+    /// same order as `config`, with "set up" meaning its credentials are
+    /// stored rather than that they open. The settings pane asks this.
+    ///
+    /// ── THE FLIP THIS REPLACES ────────────────────────────────────────────
+    ///
+    /// The pane used to work it out as `gdrive.enabled && !backsUp`, where
+    /// `backsUp` was the bucket form's own default — `true` — whenever the
+    /// book had NO `s3` block at all. So a shop with only Google Drive, just
+    /// connected, was shown "A storage bucket": the missing bucket counted as
+    /// a bucket that was backing up. Reported on alpha.54.
+    enum Remote: Equatable, Sendable { case none, drive, bucket }
+
+    /// THE order, for `config` and `remoteInUse` alike: a bucket switched on,
+    /// else Drive switched on, else a bucket kept but switched off. "Usable"
+    /// is the caller's: whether the credentials OPEN (`config`, the async
+    /// `remoteInUse`) or are merely stored (the first frame of the pane).
+    ///
+    /// `enabled` is WHICH REMOTE, never whether new models are copied: that is
+    /// `backUpNew` on each (see `bucketBacksUp`). Once it meant both, and
+    /// turning the bucket's copy off switched the library to Google Drive.
+    static func pick(_ library: [String: JSONValue], bucketUsable: Bool, driveUsable: Bool) -> Remote {
+        if bucketUsable, on(section(library, "s3")) { return .bucket }
+        if driveUsable, on(section(library, "gdrive")) { return .drive }
+        return bucketUsable ? .bucket : .none
+    }
+
+    /// Read off the stored settings alone, without opening a secret — for
+    /// the pane's first frame, which must not wait. A secret sealed on
+    /// another Mac counts here and not in `config`; the pane corrects itself
+    /// with the async form below as soon as it can.
+    static func remoteInUse(_ settings: [String: JSONValue]) -> Remote {
+        guard case .object(let library)? = settings["printLibrary"] else { return .none }
+        let s3 = section(library, "s3"), gd = section(library, "gdrive")
+        let bucketStored = ["endpoint", "bucket", "accessKeyId", "secretAccessKey"].allSatisfy { !text(s3, $0).isEmpty }
+        let driveStored = !text(gd, "clientId").isEmpty && !text(gd, "refreshToken").isEmpty
+        return pick(library, bucketUsable: bucketStored, driveUsable: driveStored)
+    }
+
+    /// The remote `config` will actually use on this Mac: the same `pick`,
+    /// with the same test of each credential — that it opens here.
+    static func remoteInUse(_ settings: [String: JSONValue], build: StoreReader.Build?) async -> Remote {
+        guard case .object(let library)? = settings["printLibrary"] else { return .none }
+        let bucket = await libraryBucket(settings: settings, build: build) != nil
+        let drive = await libraryDrive(settings: settings, build: build) != nil
+        return pick(library, bucketUsable: bucket, driveUsable: drive)
+    }
+
+    /// A Google account is signed in on this book: a refresh token is kept.
+    static func driveConnected(_ settings: [String: JSONValue]) -> Bool {
+        guard case .object(let library)? = settings["printLibrary"] else { return false }
+        return !text(section(library, "gdrive"), "refreshToken").isEmpty
+    }
+
+    /// The folder in the shop's Drive: the one it named, or Khayt's own.
+    static let defaultDriveFolder = "Khayt print library"
+    static func driveFolder(_ settings: [String: JSONValue]) -> String {
+        guard case .object(let library)? = settings["printLibrary"] else { return defaultDriveFolder }
+        let n = text(section(library, "gdrive"), "folderName")
+        return n.isEmpty ? defaultDriveFolder : n
+    }
+
+    /// The folder name to write at Connect: what was typed; else the name the
+    /// shop already has (never overwritten by a blank field); else Khayt's.
+    static func folderToWrite(typed: String, stored: JSONValue?) -> String {
+        let t = typed.trimmingCharacters(in: .whitespaces)
+        if !t.isEmpty { return t }
+        if case .string(let s)? = stored, !s.trimmingCharacters(in: .whitespaces).isEmpty {
+            return s.trimmingCharacters(in: .whitespaces)
+        }
+        return defaultDriveFolder
+    }
+
+    /// New models are copied to Drive as they come in unless the shop said
+    /// not to (`backUpNew: false`). Absent is on: Drive has always backed up
+    /// new models, here and in the other app — which does not read this
+    /// switch, and keeps copying when it is the one importing.
+    static func driveBacksUp(_ gd: [String: JSONValue]) -> Bool {
+        if case .bool(false)? = gd["backUpNew"] { return false }
+        return true
+    }
+
+    /// New models are copied to the bucket: its own `backUpNew` when the
+    /// shop has set it, else `enabled` — what the switch meant before the two
+    /// were separated, so a book written then reads exactly as it did. The
+    /// other app does not read `backUpNew`: it copies whenever the bucket is
+    /// switched on, as it does for Drive.
+    static func bucketBacksUp(_ s3: [String: JSONValue]) -> Bool {
+        if case .bool(let b)? = s3["backUpNew"] { return b }
+        return on(s3)
+    }
+
+    /// Make `remote` the library's remote in a `printLibrary` block, leaving
+    /// each one's copy switch as it was. Switching to the other one and back
+    /// is therefore not a way to lose "keep a copy: off" — and a bucket whose
+    /// switch was only ever `enabled` has it written down as `backUpNew`
+    /// before `enabled` is taken for the choice.
+    static func choose(_ remote: Remote, in library: inout [String: JSONValue]) {
+        var s3 = section(library, "s3"), gd = section(library, "gdrive")
+        let bucketExisted = ["endpoint", "bucket", "accessKeyId"].contains { !text(s3, $0).isEmpty }
+        if bucketExisted, s3["backUpNew"] == nil { s3["backUpNew"] = .bool(on(s3)) }
+        switch remote {
+        case .bucket:
+            s3["enabled"] = .bool(true)
+            if !gd.isEmpty { gd["enabled"] = .bool(false) }
+        case .drive:
+            gd["enabled"] = .bool(true)
+            if !s3.isEmpty { s3["enabled"] = .bool(false) }
+        case .none:
+            break
+        }
+        if !s3.isEmpty { library["s3"] = .object(s3) }
+        if !gd.isEmpty { library["gdrive"] = .object(gd) }
+    }
+
+    /// Who is signed in to Drive and how full it is, said for the status card.
+    struct DriveStatus: Equatable, Sendable {
+        var email: String
+        var used: String
+        var limit: String?
+        /// Used over limit, 0…1, for the bar; nil for an unlimited Drive.
+        var fraction: Double?
+    }
+
+    /// The two options under the status card, as the settings say them now.
+    struct Options: Equatable, Sendable {
+        var backsUp = true
+        var tierOn = false
+        var keepDays = 90
+    }
+
+    /// `using` is the remote in use, as `remoteInUse(_:build:)` found it;
+    /// left out, it is read off the stored settings.
+    static func options(_ settings: [String: JSONValue], using: Remote? = nil) -> Options {
+        var o = Options()
+        guard case .object(let library)? = settings["printLibrary"] else { return o }
+        switch using ?? remoteInUse(settings) {
+        case .bucket: o.backsUp = bucketBacksUp(section(library, "s3"))
+        case .drive, .none: o.backsUp = driveBacksUp(section(library, "gdrive"))
+        }
+        let t = section(library, "tier")
+        o.tierOn = on(t)
+        if case .number(let n)? = t["keepDays"], n >= 1 { o.keepDays = Int(n) }
+        return o
+    }
+
+    /// The bucket's form, as typed.
+    struct BucketForm: Equatable, Sendable {
+        var provider, endpoint, bucket, region, prefix, accessKeyId: String
+    }
+
+    /// Write the bucket's form into a `printLibrary` block and choose it as
+    /// the remote (it wins over Drive, as in the other app). Its copy switch
+    /// is KEPT: saving a new key does not turn back on a backup the shop
+    /// turned off. A bucket saved for the first time copies (absent is on).
+    static func saveBucket(_ f: BucketForm, sealedSecret: String?, in library: inout [String: JSONValue]) {
+        choose(.bucket, in: &library)
+        var s3 = section(library, "s3")
+        s3["provider"] = .string(f.provider)
+        s3["endpoint"] = .string(f.endpoint.trimmingCharacters(in: .whitespaces))
+        s3["bucket"] = .string(f.bucket.trimmingCharacters(in: .whitespaces))
+        s3["region"] = .string(f.region.trimmingCharacters(in: .whitespaces).isEmpty ? "auto" : f.region)
+        s3["prefix"] = .string(f.prefix.trimmingCharacters(in: .whitespaces))
+        s3["accessKeyId"] = .string(f.accessKeyId.trimmingCharacters(in: .whitespaces))
+        if let sealedSecret { s3["secretAccessKey"] = .string(sealedSecret) }
+        library["s3"] = .object(s3)
+    }
+
+    /// Write the options into a book, for whichever remote is in use: that
+    /// remote's own `backUpNew`. `enabled` is NOT touched — it chooses the
+    /// remote, and writing the copy switch into it is how "Keep a copy" off
+    /// once moved a shop's models to Google Drive. Everything else in
+    /// `printLibrary` is left as it was.
+    static func applyOptions(_ o: Options, using: Remote? = nil, to root: inout [String: JSONValue]) {
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = root["settings"] { settings = s }
+        let using = using ?? remoteInUse(settings)
+        var library: [String: JSONValue] = [:]
+        if case .object(let l)? = settings["printLibrary"] { library = l }
+        if using == .bucket {
+            var s3 = section(library, "s3"); s3["backUpNew"] = .bool(o.backsUp); library["s3"] = .object(s3)
+        } else {
+            var gd = section(library, "gdrive"); gd["backUpNew"] = .bool(o.backsUp); library["gdrive"] = .object(gd)
+        }
+        var tier = section(library, "tier")
+        tier["enabled"] = .bool(o.tierOn)
+        tier["keepDays"] = .number(Double(max(1, o.keepDays)))
+        library["tier"] = .object(tier)
+        settings["printLibrary"] = .object(library)
+        root["settings"] = .object(settings)
     }
 
     private static func open(_ value: String, build: StoreReader.Build?) async -> String? {
@@ -440,15 +638,13 @@ extension Shop {
             if let sealedSecret { gd["clientSecret"] = .string(sealedSecret) }
             if let sealedToken { gd["refreshToken"] = .string(sealedToken); gd["folderId"] = .string("") }
             if let folderName {
-                let n = folderName.trimmingCharacters(in: .whitespaces)
-                gd["folderName"] = .string(n.isEmpty ? "Khayt print library" : n)
+                gd["folderName"] = .string(CloudLibrary.folderToWrite(typed: folderName, stored: gd["folderName"]))
             }
             if let enabled { gd["enabled"] = .bool(enabled) }
             library["gdrive"] = .object(gd)
-            // Drive chosen: the bucket stops backing up, or it would win.
-            if bucketOff, case .object(var s3)? = library["s3"] {
-                s3["enabled"] = .bool(false); library["s3"] = .object(s3)
-            }
+            // Drive chosen: the bucket is switched off, or it would win — its
+            // own copy switch kept, for the day the shop goes back to it.
+            if bucketOff { CloudLibrary.choose(.drive, in: &library) }
             settings["printLibrary"] = .object(library)
             root["settings"] = .object(settings)
         }
@@ -527,49 +723,43 @@ extension Shop {
         }
     }
 
-    /// Save Drive's folder and the free-up-space rule, with Drive as the
-    /// remote: the bucket's backing up is switched off, since the bucket wins
-    /// whenever it is on.
-    func saveDriveLibrary(folderName: String, tierOn: Bool, keepDays: Int,
-                          clientId: String = "", typedSecret: String = "") async {
+    /// Switch the library to the bucket or to Google Drive — "Use a storage
+    /// bucket" / "Use Google Drive instead" with the other one ready. Each
+    /// one's copy switch stays as the shop left it.
+    func chooseLibraryRemote(_ remote: CloudLibrary.Remote) async {
         cloudLibraryProblem = nil
-        cloudLibraryNote = nil
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
         do {
-            // THE CLIENT ID IS KEPT. Save used to write only the folder and the
-            // tier rule, then reload the form from the book — so the client id
-            // and secret the shop had just typed vanished, Connect (which needs
-            // an id) went grey, and the only answer on screen was "Saved".
-            // Reported by the shop: "all I got was saved and nothing else".
-            let id = clientId.trimmingCharacters(in: .whitespaces)
-            if !id.isEmpty {
-                let typed = typedSecret.trimmingCharacters(in: .whitespaces)
-                try await writeDrive(clientId: id, clientSecret: typed.isEmpty ? nil : typed, folderName: folderName)
-            }
             try StoreWriter.update(build) { root in
                 var settings = Self.settings(root)
                 var library: [String: JSONValue] = [:]
                 if case .object(let l)? = settings["printLibrary"] { library = l }
-                var gd: [String: JSONValue] = [:]
-                if case .object(let o)? = library["gdrive"] { gd = o }
-                let n = folderName.trimmingCharacters(in: .whitespaces)
-                gd["folderName"] = .string(n.isEmpty ? "Khayt print library" : n)
-                library["gdrive"] = .object(gd)
-                if case .object(var s3)? = library["s3"] { s3["enabled"] = .bool(false); library["s3"] = .object(s3) }
-                var tier: [String: JSONValue] = [:]
-                if case .object(let t)? = library["tier"] { tier = t }
-                tier["enabled"] = .bool(tierOn)
-                tier["keepDays"] = .number(Double(max(1, keepDays)))
-                library["tier"] = .object(tier)
+                CloudLibrary.choose(remote, in: &library)
                 settings["printLibrary"] = .object(library)
                 root["settings"] = .object(settings)
             }
             await load(source)
-            // Saved is not connected: say what is left to do.
-            var connected = false
-            if case .object(let l)? = settingsDict["printLibrary"], case .object(let gd)? = l["gdrive"],
-               case .string(let t)? = gd["refreshToken"] { connected = !t.isEmpty }
-            cloudLibraryNote = words.callIt(connected ? "mac.cloudlib_saved" : "mac.gdrive_saved_connect")
+        } catch {
+            cloudLibraryProblem = cloudSay(error)
+        }
+    }
+
+    /// The options under the status card, written as soon as they change —
+    /// there is no Save to forget. A book that cannot be written (the
+    /// sample) says so.
+    ///
+    /// This replaces Drive's Save, which wrote the folder and the tier rule
+    /// together and was the one button on the Drive screen a shop had to
+    /// find. The folder is given at Connect now, and the client id with it,
+    /// so nothing typed can be lost between the two (the "all I got was
+    /// saved" report that Save once caused).
+    func setLibraryOptions(_ options: CloudLibrary.Options) async {
+        cloudLibraryProblem = nil
+        guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
+        do {
+            let using = await CloudLibrary.remoteInUse(settingsDict, build: source.build)
+            try StoreWriter.update(build) { root in CloudLibrary.applyOptions(options, using: using, to: &root) }
+            await load(source)
         } catch {
             cloudLibraryProblem = cloudSay(error)
         }
@@ -589,14 +779,19 @@ extension Shop {
 
     /// Who is connected and how full their Drive is — asked of Google, not
     /// read off the settings: a revoked grant looks like a working one there.
-    func googleDriveStatus() async -> (email: String, used: String, limit: String?)? {
-        guard let engine, let config = await cloudConfig(), case .drive(let drive) = config.remote else { return nil }
+    /// The signed-in account, whichever remote the library is using — the
+    /// status card asks for it even while a bucket takes the models.
+    func googleDriveStatus() async -> CloudLibrary.DriveStatus? {
+        guard let engine, let d = await CloudLibrary.libraryDrive(settings: settingsDict, build: source.build) else {
+            return nil
+        }
         do {
-            let about = try await drive.about()
+            let about = try await DriveClient(d.config, fetch: CloudLibrary.fetch).about()
             let used = (try? await engine.formatBytes(about.usage)) ?? ""
             var limit: String?
             if let l = about.limit { limit = try? await engine.formatBytes(l) }
-            return (about.email, used, limit)
+            return .init(email: about.email, used: used, limit: limit,
+                         fraction: about.limit.flatMap { $0 > 0 ? min(1, about.usage / $0) : nil })
         } catch {
             cloudLibraryProblem = cloudSay(error)
             return nil
@@ -606,9 +801,12 @@ extension Shop {
     /// Save the bucket, as the other app's settings page writes it: the whole
     /// `printLibrary.s3` and `.tier` objects, the secret sealed, a blank secret
     /// keeping the one that is stored.
+    ///
+    /// Saving the bucket is CHOOSING it: see `CloudLibrary.saveBucket`. The
+    /// two options — backing up, freeing space — are the status area's
+    /// switches and are left as they are; see `setLibraryOptions`.
     func saveCloudLibrary(provider: String, endpoint: String, bucket: String, region: String,
-                          prefix: String, accessKeyId: String, typedSecret: String,
-                          backsUp: Bool, tierOn: Bool, keepDays: Int) async {
+                          prefix: String, accessKeyId: String, typedSecret: String) async {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
@@ -622,22 +820,9 @@ extension Shop {
                 var settings = Self.settings(root)
                 var library: [String: JSONValue] = [:]
                 if case .object(let l)? = settings["printLibrary"] { library = l }
-                var s3: [String: JSONValue] = [:]
-                if case .object(let o)? = library["s3"] { s3 = o }
-                s3["enabled"] = .bool(backsUp)
-                s3["provider"] = .string(provider)
-                s3["endpoint"] = .string(endpoint.trimmingCharacters(in: .whitespaces))
-                s3["bucket"] = .string(bucket.trimmingCharacters(in: .whitespaces))
-                s3["region"] = .string(region.trimmingCharacters(in: .whitespaces).isEmpty ? "auto" : region)
-                s3["prefix"] = .string(prefix.trimmingCharacters(in: .whitespaces))
-                s3["accessKeyId"] = .string(accessKeyId.trimmingCharacters(in: .whitespaces))
-                if let sealed { s3["secretAccessKey"] = .string(sealed) }
-                library["s3"] = .object(s3)
-                var tier: [String: JSONValue] = [:]
-                if case .object(let t)? = library["tier"] { tier = t }
-                tier["enabled"] = .bool(tierOn)
-                tier["keepDays"] = .number(Double(max(1, keepDays)))
-                library["tier"] = .object(tier)
+                CloudLibrary.saveBucket(.init(provider: provider, endpoint: endpoint, bucket: bucket, region: region,
+                                              prefix: prefix, accessKeyId: accessKeyId),
+                                        sealedSecret: sealed, in: &library)
                 settings["printLibrary"] = .object(library)
                 root["settings"] = .object(settings)
             }
