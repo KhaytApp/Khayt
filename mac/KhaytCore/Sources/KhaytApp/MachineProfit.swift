@@ -209,6 +209,13 @@ struct MachineProfitPage: View {
                            shop: shop, negative: true)
                     Figure(label: words.callIt("an.maint_cost_col"), amount: row.maintenance,
                            shop: shop, negative: true)
+                    // What the machine lost in value over the range — its
+                    // wear, counted here and nowhere else. Only for a machine
+                    // whose price the shop has written down.
+                    if let lost = row.depreciation, lost > 0 {
+                        Figure(label: words.callIt("mac.pnl_depreciation"), amount: lost,
+                               shop: shop, negative: true)
+                    }
                     Spacer()
                     // ── AND HOW HARD IT WORKED FOR IT ─────────────────────
                     //

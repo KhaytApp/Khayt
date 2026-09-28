@@ -303,7 +303,10 @@ struct Reports: View {
                 // is the figure the net is worked out from. Two numbers in one
                 // column, because the shop is owed the one it can check.
                 VStack(alignment: .trailing, spacing: 1) {
-                    let spent = r.expenses + r.fixed
+                    // Machine depreciation rides here too, as a line of its
+                    // own below: a Table holds only so many columns, and it
+                    // is an operating cost like the overhead beside it.
+                    let spent = r.expenses + r.fixed + r.depreciationValue
                     // A quarter that spent nothing shows nothing, rather than
                     // "−0.00", which reads as a figure somebody worked out.
                     // Negated rather than prefixed with a minus glyph: the
@@ -314,6 +317,10 @@ struct Reports: View {
                         .foregroundStyle(spent > 0 ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.tertiary))
                     if r.fixed > 0 {
                         Text(shop.words.callIt("mac.of_which_fixed") + " " + Money.text(r.fixed, shop.currency))
+                            .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                    }
+                    if r.depreciationValue > 0 {
+                        Text(shop.words.callIt("mac.pnl_depreciation") + " " + Money.text(r.depreciationValue, shop.currency))
                             .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
                     }
                 }
@@ -409,7 +416,9 @@ struct Reports: View {
             settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), now: Date(),
             granularity: shop.pnlByMonth ? "month" : "quarter",
-            wasteLog: shop.wasteRows, inventory: shop.inventoryRows)) ?? []
+            wasteLog: shop.wasteRows, inventory: shop.inventoryRows,
+            machines: shop.machineRows,
+            recentMonthlyHours: shop.recentMonthlyHours)) ?? []
         await recomputeBreakEven()
         await recomputeCashFlow()
         await recomputeTrends()
@@ -653,6 +662,10 @@ struct Reports: View {
             maintenance: done.maintenance,
             settings: shop.settingsDict, clients: shop.clientRows,
             unassigned: shop.words.callIt("dash.unassigned"),
+            // What a straight-line machine's depreciation is pro-rated over:
+            // the same period the four collections were filtered by.
+            range: Shop.periodSpan(shop.period),
+            recentMonthlyHours: shop.recentMonthlyHours,
             // The denominator for utilisation. Taken from the same period the
             // four collections above were filtered by, and spanning the data
             // itself on "All time" — the other app's answer, so the same
@@ -1021,6 +1034,10 @@ struct Reports: View {
             if row.wasteValue != 0 {
                 out.append(WaterfallStep(label: shop.words.callIt("pnl.waste"), amount: -row.wasteValue))
             }
+            if row.depreciationValue != 0 {
+                out.append(WaterfallStep(label: shop.words.callIt("mac.pnl_depreciation"),
+                                         amount: -row.depreciationValue))
+            }
             out.append(WaterfallStep(label: shop.words.callIt("an.pnl_expenses"), amount: -row.expenses))
             // Only when there is any. A bar of zero height under a label is a
             // row of the table that wandered onto the chart.
@@ -1101,6 +1118,8 @@ struct Reports: View {
                                  + "\(Money.figure(rows.reduce(0) { $0 + $1.cogsValue })) − "
                                  + (rows.contains { $0.wasteValue > 0 }
                                     ? "\(Money.figure(rows.reduce(0) { $0 + $1.wasteValue })) − " : "")
+                                 + (rows.contains { $0.depreciationValue > 0 }
+                                    ? "\(Money.figure(rows.reduce(0) { $0 + $1.depreciationValue })) − " : "")
                                  + "\(Money.figure(rows.reduce(0) { $0 + $1.expenses + $1.fixed }))")
                                 .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
                         }
@@ -1132,6 +1151,10 @@ struct Reports: View {
                             if rows.contains(where: { $0.wasteValue > 0 }) {
                                 DetailLine(shop.words.callIt("pnl.waste"),
                                            Money.cost(rows.reduce(0) { $0 + $1.wasteValue }, shop.currency), dim: true)
+                            }
+                            if rows.contains(where: { $0.depreciationValue > 0 }) {
+                                DetailLine(shop.words.callIt("mac.pnl_depreciation"),
+                                           Money.cost(rows.reduce(0) { $0 + $1.depreciationValue }, shop.currency), dim: true)
                             }
                             DetailLine(shop.words.callIt("an.pnl_expenses"),
                                        Money.cost(rows.reduce(0) { $0 + $1.expenses + $1.fixed }, shop.currency), dim: true)

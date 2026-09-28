@@ -65,6 +65,12 @@ function hoursOf(order) {
  *   maintenance machine maintenance entries already filtered, `{ machineId, cost }`
  *   unassigned what to call work that names no machine
  *   days       how long the range is, for utilisation; omit and it is null
+ *   range      `{ from, to }` YYYY-MM-DD, the range the four were filtered to
+ *              (`to` cut to today for one still running) — what a
+ *              straight-line machine's depreciation is pro-rated over. Omit
+ *              it and only perHour machines, charged on their hours, have one.
+ *   recentMonthlyHours  `{ [machineId]: hours }`, for a straight-line machine
+ *              whose hourly figure depends on it
  * @param {object} deps
  *   revenueOf  (order) => net revenue in the shop's base currency
  *   partCostOf (part)  => what that part's material cost
@@ -84,17 +90,19 @@ function machineProfit(input, deps) {
 
   const NONE = '__none__';
   const byId = new Map();
+  const records = new Map();
   for (const m of Array.isArray(i.machines) ? i.machines : []) {
     if (!m || !m.id) continue;
+    records.set(String(m.id), m);
     byId.set(String(m.id), {
       machineId: String(m.id), name: String(m.name || ''), color: m.color || '#888888',
-      jobs: 0, revenue: 0, materialCost: 0, linkedExpenses: 0, maintenance: 0,
+      jobs: 0, revenue: 0, materialCost: 0, linkedExpenses: 0, maintenance: 0, depreciation: 0,
       hours: 0, measured: 0, targetHoursPerDay: num(m.targetHoursPerDay) || null,
     });
   }
   byId.set(NONE, {
     machineId: NONE, name: String(i.unassigned || ''), color: '#888888',
-    jobs: 0, revenue: 0, materialCost: 0, linkedExpenses: 0, maintenance: 0,
+    jobs: 0, revenue: 0, materialCost: 0, linkedExpenses: 0, maintenance: 0, depreciation: 0,
     // Work naming no machine has no machine to be a target of.
     hours: 0, measured: 0, targetHoursPerDay: null,
   });
@@ -133,12 +141,36 @@ function machineProfit(input, deps) {
     row.linkedExpenses += linked.get(String(o.id)) || 0;
   }
 
+  /* ── WHAT THE MACHINE LOST IN VALUE OVER THE RANGE ──────────────────────
+   *
+   * The one place its wear is counted (the maintainer's decision, 2026-09-28,
+   * and the same line the shop's P&L carries): perHour on the hours it ran in
+   * the range, straightLine as its monthly amount pro-rated over the range.
+   * A machine without depreciation set has none, and its net is unchanged. */
+  const D = global.KhaytDepreciation
+    || (typeof require === 'function'
+      ? (() => { try { return require('./depreciation.js'); } catch (e) { return null; } })()
+      : null);
+  const range = i.range || {};
+  const recentBy = i.recentMonthlyHours || {};
+  if (D) {
+    for (const [id, m] of records) {
+      const row = byId.get(id);
+      if (!row || !D.settingsOf(m)) continue;
+      const opts = { recentMonthlyHours: recentBy[id] };
+      const s = D.settingsOf(m);
+      row.depreciation = s.method === 'perHour'
+        ? D.periodCharge(m, { hours: row.hours }, opts)
+        : D.periodCharge(m, { from: range.from, to: range.to }, opts);
+    }
+  }
+
   const rows = [];
   for (const row of byId.values()) {
     // A machine that finished nothing in this range has no P&L. A row of
     // zeroes reads as a machine that lost nothing, which is a different claim.
     if (row.jobs === 0) continue;
-    const net = row.revenue - row.materialCost - row.linkedExpenses - row.maintenance;
+    const net = row.revenue - row.materialCost - row.linkedExpenses - row.maintenance - row.depreciation;
     rows.push({
       ...row,
       net,
@@ -176,11 +208,12 @@ function machineProfit(input, deps) {
     materialCost: t.materialCost + r.materialCost,
     linkedExpenses: t.linkedExpenses + r.linkedExpenses,
     maintenance: t.maintenance + r.maintenance,
+    depreciation: t.depreciation + r.depreciation,
     net: t.net + r.net,
     hours: t.hours + r.hours,
     measured: t.measured + r.measured,
   }), { jobs: 0, revenue: 0, materialCost: 0, linkedExpenses: 0, maintenance: 0,
-        net: 0, hours: 0, measured: 0 });
+        depreciation: 0, net: 0, hours: 0, measured: 0 });
 
   return { rows, totals };
 }

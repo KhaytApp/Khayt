@@ -151,8 +151,8 @@ enum SheetMap {
         // THE ONE ROW COUNTED ON THIS APP RATHER THAN THE OTHER ONE. The
         // design's table said 22 and named a build-volume pane the Mac has no
         // fields for; corrected to what this sheet actually asks.
-        .init(name: "Machine", fields: 13,
-              panes: ["printer", "connection", "upkeep"]),
+        .init(name: "Machine", fields: 14,
+              panes: ["printer", "connection", "upkeep", "value"]),
         .init(name: "Customer", fields: 19,
               panes: ["who", "contact", "billing", "notes"]),
         .init(name: "Shop settings", fields: 17,
