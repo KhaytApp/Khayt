@@ -675,6 +675,19 @@ struct ProductSheet: View {
                     rateRow("calc.machine.power", "powerDraw", unit: shop.words.callIt("calc.machine.watts"))
                     rateRow("calc.machine.elec", "elecRate", unit: shop.words.callIt("calc.machine.per_kwh"))
                     rateRow("calc.labor.failure", "failureRate", unit: "%")
+                    // What this part's material has actually failed at in the
+                    // shop — offered, never applied on its own. A product part
+                    // names no machine, so the rule answers by material first.
+                    GridRow {
+                        Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                        VStack(alignment: .leading, spacing: 2) {
+                            FailureHint(shop: shop, machineId: nil,
+                                        material: shop.spools.first { $0.id == newPart.spoolId }?.material,
+                                        current: Double(newPart.rates["failureRate"] ?? "")) { pct in
+                                newPart.rates["failureRate"] = Words.plain(.number(pct))
+                            }
+                        }
+                    }
                 }
                 .padding(.top, 4)
             } label: {

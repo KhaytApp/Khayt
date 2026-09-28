@@ -95,6 +95,18 @@ struct Calculator: View {
                 rateRow("calc.machine.power", "powerDraw", unit: "W")
                 rateRow("calc.machine.elec", "elecRate", unit: shop.currency)
                 rateRow("calc.labor.failure", "failureRate", unit: "%")
+                // What this machine and material have actually failed at —
+                // offered, never applied on its own.
+                GridRow {
+                    Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                    VStack(alignment: .leading, spacing: 2) {
+                        FailureHint(shop: shop, machineId: machineId,
+                                    material: shop.spools.first { $0.id == spoolId }?.material,
+                                    current: Double(rates["failureRate"] ?? "")) { pct in
+                            rates["failureRate"] = Words.plain(.number(pct))
+                        }
+                    }
+                }
             }
             .padding(.top, 6)
             HStack(spacing: 8) {

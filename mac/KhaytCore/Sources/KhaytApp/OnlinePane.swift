@@ -431,6 +431,17 @@ struct OnlinePane: View {
                 presetRow("calc.machine.power", "powerDraw", unit: shop.words.callIt("calc.machine.watts"))
                 presetRow("calc.machine.elec", "elecRate", unit: shop.words.callIt("calc.machine.per_kwh"))
                 presetRow("calc.labor.failure", "failureRate", unit: "%")
+                // A preset is shop-wide, so the shop's own record answers.
+                // Offered, never applied on its own.
+                GridRow {
+                    Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                    VStack(alignment: .leading, spacing: 2) {
+                        FailureHint(shop: shop, machineId: nil, material: nil,
+                                    current: Double(presetRates["failureRate"] ?? "")) { pct in
+                            presetRates["failureRate"] = Words.plain(.number(pct))
+                        }
+                    }
+                }
             }
         }
     }

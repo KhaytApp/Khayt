@@ -120,6 +120,22 @@ struct MachineSheet: View {
     @State private var testWorked = false
     @FocusState private var focused: Bool
 
+    // ── What it cost, and how long it should last ───────────────────────
+    //
+    // `lib/depreciation.js`. A price of nothing means no depreciation at all,
+    // and the machine is quoted at its flat wear rate as it always was.
+    @State private var depPrice: Double = 0
+    @State private var depBought: Date?
+    @State private var depLife: Double = 0
+    /// `hours` or `years` — the shop's choice of how to say it.
+    @State private var depUnit = "hours"
+    @State private var depResidual: Double = 0
+    /// `perHour` or `straightLine`.
+    @State private var depMethod = "perHour"
+    @State private var depMonthly: Double = 0
+    /// What the rule makes of the figures on screen, as they are typed.
+    @State private var depPreview: KhaytEngine.MachineValue?
+
     private var isNew: Bool { existing == nil }
 
     /// The catalogue, narrowed by what has been typed. Everything when nothing
@@ -150,6 +166,7 @@ struct MachineSheet: View {
                         switch id {
                         case "connection": connectionPane
                         case "upkeep":     upkeepPane
+                        case "value":      valuePane
                         default:           printerPane
                         }
                     }
@@ -160,6 +177,8 @@ struct MachineSheet: View {
                 if polled { LayerRule(); connectionPane }
                 LayerRule()
                 upkeepPane
+                LayerRule()
+                valuePane
             }
         } footer: {
             HStack {
@@ -189,6 +208,7 @@ struct MachineSheet: View {
         .init(id: "printer", titleKey: "mac.pane_printer"),
         .init(id: "connection", titleKey: "mac.pane_connection"),
         .init(id: "upkeep", titleKey: "mac.pane_upkeep"),
+        .init(id: "value", titleKey: "mac.pane_value"),
     ]
 
     /// What this sheet is actually asking, which is not a constant.
@@ -204,6 +224,7 @@ struct MachineSheet: View {
         if polled { n += 5 }                     // protocol, host, port, key, and the camera block
         n += 1                                   // the downtime log
         if shows("nozzleDiameter") { n += 3 }    // fitment, installed on, replace after
+        n += 1                                   // what it cost — one block, like the camera
         return n
     }
 
@@ -515,6 +536,117 @@ struct MachineSheet: View {
             }
     }
 
+    /// What the machine cost and how long it should last — and so what its
+    /// wear costs a quote. `lib/depreciation.js` does every sum; this pane only
+    /// asks, and shows the rule's answer under the fields as they are typed.
+    @ViewBuilder private var valuePane: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(shop.words.callIt("mac.dep_title")).font(.subheadline.weight(.semibold))
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    Text(shop.words.callIt("mac.dep_price")).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        TextField("", value: $depPrice, format: .number.precision(.fractionLength(0...2)))
+                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                        Text(shop.currency).foregroundStyle(.secondary)
+                    }
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.dep_bought")).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Toggle("", isOn: Binding(
+                            get: { depBought != nil },
+                            set: { depBought = $0 ? (depBought ?? Date()) : nil }))
+                            .labelsHidden()
+                        if let bought = depBought {
+                            DatePicker("", selection: Binding(get: { bought }, set: { depBought = $0 }),
+                                       in: ...Date(), displayedComponents: .date)
+                                .labelsHidden()
+                        }
+                    }
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.dep_life")).foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        TextField("", value: $depLife, format: .number.precision(.fractionLength(0...1)))
+                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 80)
+                        Picker("", selection: $depUnit) {
+                            Text(shop.words.callIt("mac.dep_unit_hours")).tag("hours")
+                            Text(shop.words.callIt("mac.dep_unit_years")).tag("years")
+                        }
+                        .labelsHidden().fixedSize()
+                    }
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.dep_residual")).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        TextField("", value: $depResidual, format: .number.precision(.fractionLength(0...2)))
+                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
+                        Text(shop.currency).foregroundStyle(.secondary)
+                    }
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.dep_method")).foregroundStyle(.secondary)
+                    Picker("", selection: $depMethod) {
+                        Text(shop.words.callIt("mac.dep_per_hour")).tag("perHour")
+                        Text(shop.words.callIt("mac.dep_straight")).tag("straightLine")
+                    }
+                    .labelsHidden().fixedSize()
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.dep_monthly_hours")).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        TextField("", value: $depMonthly, format: .number.precision(.fractionLength(0...1)))
+                            .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 80)
+                        Text(shop.words.callIt("common.hours")).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Text(shop.words.callIt(depMethod == "perHour" ? "mac.dep_per_hour_hint" : "mac.dep_straight_hint"))
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if depPrice > 0 {
+                if let rate = depPreview?.hourlyRate {
+                    Text(shop.words.callIt("mac.dep_rate_line", ["rate": .string(Money.text(rate, shop.currency))]))
+                        .font(.callout.weight(.semibold)).monospacedDigit()
+                } else {
+                    Text(shop.words.callIt("mac.dep_rate_missing"))
+                        .font(.callout).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .task(id: depSignature) { await previewDepreciation() }
+    }
+
+    /// The fields as the record keeps them.
+    private var depreciationInput: JSONValue {
+        .object([
+            "price": .number(depPrice),
+            "purchaseDate": .string(depBought.map { Shop.today($0) } ?? ""),
+            "life": .number(depLife),
+            "lifeUnit": .string(depUnit),
+            "residual": .number(depResidual),
+            "method": .string(depMethod),
+            "monthlyHours": .number(depMonthly),
+        ])
+    }
+
+    private var depSignature: String {
+        "\(depPrice)|\(depBought.map { Shop.today($0) } ?? "")|\(depLife)|\(depUnit)|\(depResidual)|\(depMethod)|\(depMonthly)"
+    }
+
+    private func previewDepreciation() async {
+        guard depPrice > 0, let engine = shop.engine else { depPreview = nil; return }
+        let id = existing?.id ?? "MACH-draft"
+        var record: [String: JSONValue] = ["id": .string(id), "depreciation": depreciationInput,
+                                           "targetHoursPerDay": .number(targetHours)]
+        if let recent = shop.machineValue[id]?.recentMonthlyHours { record["recentMonthlyHours"] = .number(recent) }
+        depPreview = try? await engine.depreciationStatus(
+            machine: .object(record), today: Shop.today(),
+            hoursRun: shop.machineValue[id]?.hoursRun ?? 0)
+    }
+
     private func fill() {
         loadedRows = LoadedRow.rows(for: existing)
         guard let machine = existing else { focused = true; return }
@@ -553,6 +685,16 @@ struct MachineSheet: View {
         hasStoredCode = !(machine.printerApi?.accessCode ?? "").isEmpty
         apiSerial = machine.printerApi?.serial ?? ""
         apiSlug = machine.printerApi?.printerSlug ?? ""
+        targetHours = machine.targetHoursPerDay ?? 0
+        if let d = machine.depreciation {
+            depPrice = d.price ?? 0
+            depBought = Order.day(d.purchaseDate)
+            depLife = d.life ?? 0
+            depUnit = d.lifeUnit == "years" ? "years" : "hours"
+            depResidual = d.residual ?? 0
+            depMethod = d.method == "straightLine" ? "straightLine" : "perHour"
+            depMonthly = d.monthlyHours ?? 0
+        }
         focused = true
     }
 
@@ -735,6 +877,9 @@ struct MachineSheet: View {
             "powerDraw": .number(powerDraw),
             "targetHoursPerDay": .number(targetHours),
             "nozzle": .object(nozzle),
+            // Through the shared rule, which drops the whole block when there
+            // is no price — so clearing the price is how a shop takes it off.
+            "depreciation": depreciationInput,
         ]
         let id = existing?.id
         let catalogId = chosen

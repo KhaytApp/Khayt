@@ -65,6 +65,17 @@ final class Shop {
     /// Wear per machine, keyed by id. `nozzleWear` answers for one machine at
     /// a time, so this is one call each — a handful of printers, not a table.
     private(set) var wear: [String: NozzleWear] = [:]
+    /// What each machine with depreciation set is worth, keyed by id —
+    /// `lib/depreciation.js`, worked out once per load beside the wear above.
+    /// Absent for a machine without it.
+    private(set) var machineValue: [String: KhaytEngine.MachineValue] = [:]
+
+    /// What each machine has actually printed a month, lately — the figure a
+    /// straight-line machine's hourly wear rate and P&L share lean on when the
+    /// shop has not typed its own.
+    var recentMonthlyHours: [String: Double] {
+        machineValue.compactMapValues { $0.recentMonthlyHours }
+    }
 
     /// The biggest bed on this floor, which every bed plan is drawn against.
     ///
@@ -842,6 +853,7 @@ final class Shop {
             consumables = []
             messageTemplates = []
             wear = [:]
+            machineValue = [:]
             libraryRoots = nil
             owner = nil
             facts = nil
@@ -941,10 +953,15 @@ final class Shop {
         //
         // One more crossing per LOAD, beside the several already here — not
         // per redraw.
+        // What each machine is worth, BEFORE the month's row: a straight-line
+        // machine's share of the month leans on its recent hours.
+        machineValue = (try? await engine.machineValues(machines: machines, orders: orders,
+                                                        today: Self.today())) ?? [:]
         let month = await Self.thisMonthsRow(
             engine: engine, orders: orders, expenses: expenses,
             settings: settings, clients: clients, currencies: Invoice.currencyTable(self),
-            wasteLog: Self.rows(root, "wasteLog"), inventory: Self.rows(root, "inventory"))
+            wasteLog: Self.rows(root, "wasteLog"), inventory: Self.rows(root, "inventory"),
+            machines: machines, recentMonthlyHours: recentMonthlyHours)
         monthNetRevenue = month?.revenue
         // The masthead's NET is the P&L's net income for the month — revenue
         // less cost of goods, expenses and overhead, filament bought counted
@@ -3721,12 +3738,34 @@ final class Shop {
     /// A machine as the book holds it, for the two rates a printer knows about
     /// itself. Nil for a job on no particular machine, which is the usual case
     /// at the moment somebody is quoting it.
-    private func machineRow(_ id: String?) -> JSONValue? {
+    ///
+    /// A machine with depreciation set goes in carrying `recentMonthlyHours`
+    /// — what it has actually printed a month lately. Never written back: it
+    /// is a figure for this one costing, which a straight-line machine needs
+    /// to turn its monthly amount into an hourly wear rate
+    /// (`lib/depreciation.js`).
+    func machineRow(_ id: String?) -> JSONValue? {
         guard let id, !id.isEmpty else { return nil }
-        return machineRows.first {
+        let row = machineRows.first {
             if case .object(let m) = $0 { return m["id"] == .string(id) }
             return false
         }
+        guard case .object(var m)? = row, let recent = machineValue[id]?.recentMonthlyHours
+        else { return row }
+        m["recentMonthlyHours"] = .number(recent)
+        return .object(m)
+    }
+
+    /// A failure allowance learned from this book's own QC fails and waste,
+    /// for one machine and one material — `lib/failure-rate.js`. Only ever a
+    /// SUGGESTION: the screens offer it beside the field and the shop decides.
+    func failureSuggestion(machineId: String?, material: String?) async
+        -> KhaytEngine.FailureSuggestion? {
+        guard let engine else { return nil }
+        return try? await engine.failureSuggestion(
+            orders: orderRows, wasteLog: wasteRows, today: Self.today(),
+            machineId: machineId.flatMap { $0.isEmpty ? nil : $0 },
+            material: material.flatMap { $0.isEmpty ? nil : $0 })
     }
 
 
@@ -6400,6 +6439,38 @@ final class Shop {
             guard let first = days.first, let last = days.last,
                   let from = Order.day(first), let to = Order.day(last) else { return 30 }
             return max(1, Int((to.timeIntervalSince(from) / 86_400).rounded()) + 1)
+        }
+    }
+
+    /// The chosen period as book days, `YYYY-MM-DD` both ends inclusive, with
+    /// the end cut to today for a period still running — what a straight-line
+    /// machine's depreciation is pro-rated over in the machine P&L, so "This
+    /// month" on the 12th charges twelve days of it, not thirty.
+    ///
+    /// "All time" starts at the epoch: the rule clips to the day each machine
+    /// was bought, which is the real start of its depreciation.
+    static func periodSpan(_ period: Period, now: Date = Date()) -> (from: String, to: String) {
+        let cal = Calendar.book
+        let today = Self.today(now)
+        let year = cal.component(.year, from: now)
+        let month = cal.component(.month, from: now)
+        func day(_ y: Int, _ m: Int, _ d: Int) -> String { String(format: "%04d-%02d-%02d", y, m, d) }
+        func lastDay(_ y: Int, _ m: Int) -> Int {
+            guard let first = cal.date(from: DateComponents(year: y, month: m, day: 1)) else { return 28 }
+            return cal.range(of: .day, in: .month, for: first)?.count ?? 28
+        }
+        switch period {
+        case .month:
+            return (day(year, month, 1), today)
+        case .last_month:
+            let (y, m) = month == 1 ? (year - 1, 12) : (year, month - 1)
+            return (day(y, m, 1), day(y, m, lastDay(y, m)))
+        case .quarter:
+            return (day(year, ((month - 1) / 3) * 3 + 1, 1), today)
+        case .year:
+            return (day(year, 1, 1), today)
+        case .all:
+            return ("1970-01-01", today)
         }
     }
 
@@ -13047,6 +13118,8 @@ final class Shop {
                               currencies: [String: JSONValue],
                               wasteLog: [JSONValue] = [],
                               inventory: [JSONValue] = [],
+                              machines: [JSONValue] = [],
+                              recentMonthlyHours: [String: Double] = [:],
                               now: Date = Date()) async -> PnlPeriod? {
         guard let engine else { return nil }
         // The waste log goes in, as it does for Reports: failed prints are a
@@ -13055,7 +13128,8 @@ final class Shop {
         let periods = (try? await engine.pnlByPeriod(
             orders: orders, expenses: expenses, settings: settings, clients: clients,
             currencies: currencies, now: now, granularity: "month",
-            wasteLog: wasteLog, inventory: inventory)) ?? []
+            wasteLog: wasteLog, inventory: inventory, machines: machines,
+            recentMonthlyHours: recentMonthlyHours)) ?? []
         return periods.first { $0.period == DateRange.localMonth(now) }
     }
 

@@ -12,6 +12,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Reports. They use the same rule now, and both are given the shelf, so extra
   materials are priced rather than counted as nothing.
 
+- **(Mac) Machine depreciation, and a failure % learned from your own prints.**
+  A machine now has a Value tab: what you paid, when you bought it, how long
+  it should last (in print hours or in years), what it should resell for, and
+  whether to spread the cost per print hour or evenly by month. Quotes on that
+  machine then charge its real wear per hour instead of the flat 0.75 (a wear
+  rate you typed on a part still wins). The machine card shows its book value,
+  what it has lost so far and the life it has left. In Reports, machine wear
+  is now counted once: as a "Machine depreciation" line in the P&L and in each
+  machine's own P&L — per print hour on the hours it actually ran, or the
+  monthly amount for the period. A machine without a price is priced and
+  reported exactly as before. Beside the failure % in the calculator, product
+  parts and rate presets, Khayt now shows what your QC fails and waste log say
+  (for example "Your history: 6% failed, based on 48 prints") with a "Use
+  this" button — it never changes the figure on its own. Editing a machine on
+  the Mac also no longer wipes its target hours per day.
+
 - **Electricity, machine wear and labour were taken off your profit twice.**
   The cost Khayt works out for a job — for pricing and quotes — includes an
   estimate of the electricity, machine wear and labour it takes, plus a margin

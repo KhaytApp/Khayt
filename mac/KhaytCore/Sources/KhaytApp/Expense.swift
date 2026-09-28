@@ -151,4 +151,7 @@ extension PnlPeriod {
     var cogsValue: Double { cogs ?? 0 }
     /// Filament lost to failed prints, zero for a bundle older than the field.
     var wasteValue: Double { waste ?? 0 }
+    /// What the machines lost in value, zero for a bundle older than the field
+    /// or a book whose machines carry no depreciation.
+    var depreciationValue: Double { depreciation ?? 0 }
 }

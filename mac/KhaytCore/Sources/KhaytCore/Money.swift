@@ -584,6 +584,11 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// line of its own, and `net` already has it taken off. Optional because a
     /// bundle older than the waste line has no such field.
     public let waste: Double?
+    /// What the shop's machines lost in value in the period — the one place
+    /// machine wear enters the P&L (lib/depreciation.js), and `net` already
+    /// has it taken off. Optional because an older bundle has no such field;
+    /// zero for a book whose machines carry no depreciation.
+    public let depreciation: Double?
     public var id: String { period }
 }
 

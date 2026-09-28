@@ -1288,6 +1288,63 @@ final class Words {
         "mac.pane_printer": ["en": "Printer", "ar": "الطابعة"],
         "mac.pane_connection": ["en": "Connection", "ar": "الاتصال"],
         "mac.pane_upkeep": ["en": "Upkeep", "ar": "الصيانة"],
+        // What a machine cost and how long it should last — lib/depreciation.js.
+        "mac.pane_value": ["en": "Value", "ar": "القيمة"],
+        "mac.dep_title": ["en": "Depreciation", "ar": "الإهلاك"],
+        "mac.dep_price": ["en": "Purchase price", "ar": "سعر الشراء"],
+        "mac.dep_bought": ["en": "Bought on", "ar": "تاريخ الشراء"],
+        "mac.dep_life": ["en": "Expected life", "ar": "العمر المتوقع"],
+        "mac.dep_unit_hours": ["en": "print hours", "ar": "ساعة طباعة"],
+        "mac.dep_unit_years": ["en": "years", "ar": "سنوات"],
+        "mac.dep_residual": ["en": "Resale value", "ar": "قيمة إعادة البيع"],
+        "mac.dep_method": ["en": "Spread the cost", "ar": "توزيع التكلفة"],
+        "mac.dep_per_hour": ["en": "Per print hour", "ar": "لكل ساعة طباعة"],
+        "mac.dep_straight": ["en": "Evenly over the years", "ar": "بالتساوي على السنوات"],
+        "mac.dep_monthly_hours": ["en": "Hours a month", "ar": "ساعات في الشهر"],
+        "mac.dep_per_hour_hint": [
+            "en": "The price less the resale value, spread over the hours it should print. Every job on this machine is charged that much per hour.",
+            "ar": "السعر ناقص قيمة إعادة البيع، موزعًا على الساعات التي يُتوقع أن تطبعها. يُحمَّل كل عمل على هذه الآلة هذا المبلغ عن كل ساعة.",
+        ],
+        "mac.dep_straight_hint": [
+            "en": "The price less the resale value, spread evenly by month. Quotes charge the monthly amount over the hours it prints a month — the figure above, or what it has printed lately.",
+            "ar": "السعر ناقص قيمة إعادة البيع، موزعًا بالتساوي على الأشهر. تُحمِّل عروض الأسعار المبلغ الشهري على ساعات الطباعة في الشهر — الرقم أعلاه، أو ما طبعته الآلة مؤخرًا.",
+        ],
+        "mac.dep_rate_line": ["en": "Quotes on this machine: {rate} per print hour", "ar": "عروض الأسعار على هذه الآلة: {rate} لكل ساعة طباعة"],
+        "mac.dep_rate_missing": [
+            "en": "Not enough to work out an hourly figure yet — add the expected life, and for a life in years the hours a month. Until then the flat wear rate is used.",
+            "ar": "لا يكفي هذا لحساب مبلغ بالساعة بعد — أضف العمر المتوقع، ولعمر بالسنوات أضف ساعات الشهر. حتى ذلك الحين يُستخدم معدل الاستهلاك الثابت.",
+        ],
+        "mac.dep_value": ["en": "Value", "ar": "القيمة"],
+        "mac.dep_book_value": ["en": "Book value", "ar": "القيمة الدفترية"],
+        "mac.dep_to_date": ["en": "Depreciated so far", "ar": "الإهلاك حتى الآن"],
+        "mac.dep_left": ["en": "Life left", "ar": "العمر المتبقي"],
+        "mac.dep_hours_left": ["en": "{n} print hours", "ar": "{n} ساعة طباعة"],
+        "mac.dep_months_left": ["en": "{n} months", "ar": "{n} شهرًا"],
+        "mac.dep_rate": ["en": "Wear charged", "ar": "الاستهلاك المحمَّل"],
+        "mac.dep_per_hour_amount": ["en": "{rate} / hour", "ar": "{rate} / ساعة"],
+        "mac.dep_fully": [
+            "en": "Fully depreciated. Quotes still charge its wear, to pay for the next one.",
+            "ar": "مُهلكة بالكامل. تبقى عروض الأسعار تحمّل استهلاكها لتغطية الآلة التالية.",
+        ],
+        "mac.dep_needs_life": ["en": "Add its expected life to work this out.", "ar": "أضف عمرها المتوقع لحساب ذلك."],
+        "mac.dep_needs_purchaseDate": ["en": "Add when it was bought to work this out.", "ar": "أضف تاريخ شرائها لحساب ذلك."],
+        "mac.dep_needs_monthlyHours": ["en": "Add its hours a month to work out an hourly figure.", "ar": "أضف ساعات الشهر لحساب مبلغ بالساعة."],
+        "mac.pnl_depreciation": ["en": "Machine depreciation", "ar": "إهلاك الآلات"],
+        // A failure allowance learned from the shop's own history —
+        // lib/failure-rate.js. Offered beside the field, never applied alone.
+        "mac.fail_suggest": [
+            "en": "Your history: {pct}% failed, based on {n} prints",
+            "ar": "سجلك: فشل {pct}٪، بناءً على {n} طباعة",
+        ],
+        "mac.fail_use": ["en": "Use this", "ar": "استخدم هذا"],
+        "mac.fail_scope_machine_material": ["en": "This machine and material, last 90 days", "ar": "هذه الآلة وهذه المادة، آخر 90 يومًا"],
+        "mac.fail_scope_machine": ["en": "This machine, last 90 days", "ar": "هذه الآلة، آخر 90 يومًا"],
+        "mac.fail_scope_material": ["en": "This material, last 90 days", "ar": "هذه المادة، آخر 90 يومًا"],
+        "mac.fail_scope_shop": ["en": "The whole shop, last 90 days", "ar": "المحل كله، آخر 90 يومًا"],
+        "mac.fail_too_few": [
+            "en": "{n} prints in the last 90 days — a suggestion needs {min}.",
+            "ar": "{n} طباعة في آخر 90 يومًا — يحتاج الاقتراح إلى {min}.",
+        ],
         // The picker's one verb. "Choose", not "Add": choosing a model fills
         // the part in; adding the part is the next button along.
         "mac.choose": ["en": "Choose", "ar": "اختيار"],

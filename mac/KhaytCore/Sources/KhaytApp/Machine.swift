@@ -17,6 +17,10 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
     let nozzleDiameter: Double?
     let extruderType: String?
     let powerDraw: Double?
+    /// Hours a day the shop wants this machine printing. The machine sheet
+    /// asked for it and never read it back, so every edit on this Mac wrote
+    /// it over with nothing.
+    let targetHoursPerDay: Double?
     let bed: Bed?
     let nozzle: Nozzle?
     let printerApi: PrinterApi?
@@ -37,6 +41,40 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
     /// field optional; the token and password are `__enc__` sealed and opened
     /// only at the moment a request is sent. See `lib/smart-plug.js`.
     let smartPlug: SmartPlug?
+
+    /// What the machine cost and how long it should last, when the shop has
+    /// said — `lib/depreciation.js`. Every field optional: a machine without
+    /// one is quoted at its flat wear rate, as every machine always was.
+    let depreciation: Depreciation?
+
+    struct Depreciation: Decodable, Hashable, Sendable {
+        let price: Double?
+        let purchaseDate: String?
+        let life: Double?
+        /// `hours` or `years`.
+        let lifeUnit: String?
+        let residual: Double?
+        /// `perHour` or `straightLine`.
+        let method: String?
+        let monthlyHours: Double?
+
+        private enum CodingKeys: String, CodingKey {
+            case price, purchaseDate, life, lifeUnit, residual, method, monthlyHours
+        }
+
+        /// Field by field, so one value of the wrong type costs that field and
+        /// never the whole machine list.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            price = try? c.decode(Double.self, forKey: .price)
+            purchaseDate = try? c.decode(String.self, forKey: .purchaseDate)
+            life = try? c.decode(Double.self, forKey: .life)
+            lifeUnit = try? c.decode(String.self, forKey: .lifeUnit)
+            residual = try? c.decode(Double.self, forKey: .residual)
+            method = try? c.decode(String.self, forKey: .method)
+            monthlyHours = try? c.decode(Double.self, forKey: .monthlyHours)
+        }
+    }
 
     struct SmartPlug: Decodable, Hashable, Sendable {
         let type: String?

@@ -414,6 +414,16 @@ private struct Card: View {
                 }
             }
 
+            // ── WHAT IT IS WORTH ─────────────────────────────────────────
+            //
+            // Only for a machine whose price the shop has written down. The
+            // figures are `lib/depreciation.js`'s; see `MachineValueLines`.
+            if let value = shop.machineValue[machine.id] {
+                DetailSection(shop.words.callIt("mac.dep_value")) {
+                    MachineValueLines(shop: shop, value: value)
+                }
+            }
+
             if let materials = machine.compatMaterials, !materials.isEmpty {
                 DetailSection(shop.words.callIt("mac.takes")) {
                     Text(materials.joined(separator: " · "))

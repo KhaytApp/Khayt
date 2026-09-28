@@ -409,8 +409,13 @@ public actor KhaytEngine {
         // calculator-cost, because it supplies four of the six things that
         // module adds up — and a caller that omits them gets a price with
         // material in it and no error at all.
+        // What a machine loses in value, and the wear rate that follows from
+        // it. BEFORE print-rates, which asks it for a machine's derived rate.
+        "depreciation",
         "print-rates",
         "calculator-cost",
+        // A failure allowance learned from the shop's own QC fails and waste.
+        "failure-rate",
         "order-new",
         // A customer's standing order and their agreed prices. The recurrence
         // engine is what the schedule advances by (the 31st of January to the
@@ -4094,6 +4099,10 @@ public actor KhaytEngine {
         /// Expenses filed against one of this machine's orders.
         public let linkedExpenses: Double
         public let maintenance: Double
+        /// What the machine lost in value over the range — the one place its
+        /// wear is counted (lib/depreciation.js). Optional: an older bundle
+        /// has no such field, and a machine without depreciation set has 0.
+        public let depreciation: Double?
         public let net: Double
         /// NULL for a machine that earned nothing. Not zero — zero reads as
         /// "broke even", and the truth is that there is no answer.
@@ -4122,6 +4131,7 @@ public actor KhaytEngine {
         public let materialCost: Double
         public let linkedExpenses: Double
         public let maintenance: Double
+        public let depreciation: Double?
         public let net: Double
         public let hours: Double
         public let measured: Int
@@ -4147,22 +4157,36 @@ public actor KhaytEngine {
     public func machineProfit(machines: [JSONValue], completed: [JSONValue],
                               expenses: [JSONValue], maintenance: [JSONValue],
                               settings: [String: JSONValue], clients: [JSONValue],
-                              unassigned: String, days: Int = 0) throws -> MachineProfitReport {
-        try runtime.call2(#"""
+                              unassigned: String,
+                              range: (from: String, to: String)? = nil,
+                              recentMonthlyHours: [String: Double] = [:],
+                              days: Int = 0) throws -> MachineProfitReport {
+        // `range` is the period the four were filtered to, as book days — what
+        // a straight-line machine's depreciation is pro-rated over.
+        let span: JSONValue = range.map { .object(["from": .string($0.from), "to": .string($0.to)]) } ?? .null
+        return try runtime.call2(#"""
         (function () {
           var ctx = { settings: ARG4, clients: ARG5 };
           return globalThis.KhaytMachinePL.machineProfit({
             machines: ARG0, completed: ARG1, expenses: ARG2,
             maintenance: ARG3, unassigned: ARG6, days: ARG7,
+            range: ARG8, recentMonthlyHours: ARG9,
           }, {
             revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
-            partCostOf: function (p) { return globalThis.KhaytCalculatorCost.partTotalCost(p, ctx); },
+            // WHAT WAS STOCKED, as the shop's P&L counts it (lib/pnl-report.js
+            // stockShare): the machine's wear reaches this report once, as its
+            // depreciation line, and not a second time inside material cost.
+            partCostOf: function (p) {
+              return globalThis.KhaytCalculatorCost.partTotalCost(p, ctx)
+                * globalThis.KhaytPnl.stockShare({ parts: [p] }, ctx);
+            },
           });
         })()
         """#,
                           [.array(machines), .array(completed), .array(expenses),
                            .array(maintenance), .object(settings), .array(clients),
-                           .string(unassigned), .number(Double(days))],
+                           .string(unassigned), .number(Double(days)), span,
+                           .object(recentMonthlyHours.mapValues { .number($0) })],
                           as: MachineProfitReport.self)
     }
 
@@ -6936,14 +6960,20 @@ public actor KhaytEngine {
                             currencies: [String: JSONValue], now: Date,
                             granularity: String = "quarter",
                             wasteLog: [JSONValue] = [],
-                            inventory: [JSONValue] = []) throws -> [PnlPeriod] {
+                            inventory: [JSONValue] = [],
+                            machines: [JSONValue] = [],
+                            recentMonthlyHours: [String: Double] = [:]) throws -> [PnlPeriod] {
         // `wasteLog` is the book's failed-print log: the rule charges each
         // entry's `cost` to its period as a WASTE line, and net takes it off.
+        // `machines` is what the DEPRECIATION line is worked out from — the
+        // one place a machine's wear enters the P&L (lib/depreciation.js). A
+        // machine with no depreciation set adds nothing.
         try runtime.call2(
-            "KhaytPnl.pnlByPeriod(ARG0, ARG1, {settings: ARG2, clients: ARG3, currencies: ARG4, now: new Date(ARG5), granularity: ARG6, wasteLog: ARG7, inventory: ARG8})",
+            "KhaytPnl.pnlByPeriod(ARG0, ARG1, {settings: ARG2, clients: ARG3, currencies: ARG4, now: new Date(ARG5), granularity: ARG6, wasteLog: ARG7, inventory: ARG8, machines: ARG9, recentMonthlyHours: ARG10})",
             [.array(orders), .array(expenses), .object(settings), .array(clients),
              .object(currencies), .number(now.timeIntervalSince1970 * 1000), .string(granularity),
-             .array(wasteLog), .array(inventory)],
+             .array(wasteLog), .array(inventory), .array(machines),
+             .object(recentMonthlyHours.mapValues { .number($0) })],
             as: [PnlPeriod].self)
     }
 
@@ -9551,6 +9581,75 @@ public actor KhaytEngine {
                            preset: JSONValue? = nil) throws -> [String: Double] {
         try runtime.call2("KhaytPrintRates.ratesFor({ machine: ARG0, preset: ARG1 })",
                           [machine ?? .null, preset ?? .null], as: [String: Double].self)
+    }
+
+    // MARK: - What a machine is worth, and what fails
+
+    /// Where a machine with depreciation set stands — `lib/depreciation.js`.
+    public struct MachineValue: Decodable, Sendable, Equatable {
+        public let method: String
+        public let price: Double
+        public let residual: Double
+        public let depreciable: Double
+        /// The wear rate a quote on this machine is charged. Nil when it cannot
+        /// be worked out yet, and the flat rate stands.
+        public let hourlyRate: Double?
+        public let monthly: Double?
+        public let hoursPerMonth: Double?
+        public let hoursRun: Double
+        public let lifeHours: Double?
+        public let lifeMonths: Double?
+        public let toDate: Double?
+        public let bookValue: Double?
+        public let remainingHours: Double?
+        public let remainingMonths: Double?
+        public let fullyDepreciated: Bool
+        /// What is missing for the figures to be whole: `life`,
+        /// `purchaseDate`, `monthlyHours` — or nil.
+        public let needs: String?
+        /// What the machine has actually printed a month, lately.
+        public let recentMonthlyHours: Double?
+    }
+
+    /// Every machine with depreciation set, keyed by id, in one crossing.
+    /// `today` is the book's own day, `YYYY-MM-DD`.
+    public func machineValues(machines: [JSONValue], orders: [JSONValue],
+                              today: String) throws -> [String: MachineValue] {
+        try runtime.call2("KhaytDepreciation.machineValues(ARG0, ARG1, { today: ARG2 })",
+                          [.array(machines), .array(orders), .string(today)],
+                          as: [String: MachineValue].self)
+    }
+
+    /// One machine's standing, from figures not yet saved — what the machine
+    /// sheet shows under its fields as they are typed. Nil without a price.
+    public func depreciationStatus(machine: JSONValue, today: String,
+                                   hoursRun: Double) throws -> MachineValue? {
+        try runtime.call2(
+            "KhaytDepreciation.status(ARG0, { today: ARG1, hoursRun: ARG2 })",
+            [machine, .string(today), .number(hoursRun)], as: MachineValue?.self)
+    }
+
+    /// A failure allowance learned from the book — `lib/failure-rate.js`.
+    public struct FailureSuggestion: Decodable, Sendable, Equatable {
+        /// The suggested %, or nil when there is not enough to go on.
+        public let pct: Double?
+        public let failures: Int
+        public let attempts: Int
+        /// `machine_material`, `machine`, `material` or `shop`.
+        public let scope: String
+        public let enough: Bool
+        public let days: Int
+        public let minSample: Int
+    }
+
+    public func failureSuggestion(orders: [JSONValue], wasteLog: [JSONValue], today: String,
+                                  machineId: String? = nil, material: String? = nil) throws
+        -> FailureSuggestion {
+        try runtime.call2(
+            "KhaytFailureRate.suggest({ orders: ARG0, wasteLog: ARG1 }, { today: ARG2, machineId: ARG3, material: ARG4 })",
+            [.array(orders), .array(wasteLog), .string(today),
+             machineId.map { .string($0) } ?? .null, material.map { .string($0) } ?? .null],
+            as: FailureSuggestion.self)
     }
 
     public func costPart(_ part: JSONValue, inventory: [JSONValue],

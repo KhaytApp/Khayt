@@ -310,6 +310,22 @@
         delayMin: Number.isFinite(delay) && delay >= 0 ? Math.min(Math.round(delay), 240) : (was.delayMin ?? 10),
       };
     }
+    /* ── WHAT THE MACHINE COST, AND HOW LONG IT SHOULD LAST ─────────────
+     *
+     * `depreciation` is `{ price, purchaseDate, life, lifeUnit, residual,
+     * method, monthlyHours }`, cleaned by lib/depreciation.js — the same rule
+     * that turns it into a wear rate, so what is stored is what it can read.
+     * No price means no depreciation, and the block is REMOVED rather than kept
+     * half-filled: a machine without one is quoted at its flat wear rate, and a
+     * leftover life with no price would say otherwise on the machine card. */
+    if (has('depreciation')) {
+      const D = (typeof require === 'function')
+        ? (() => { try { return require('./depreciation.js'); } catch (e) { return null; } })()
+        : (typeof globalThis !== 'undefined' ? globalThis.KhaytDepreciation : null);
+      const next = D ? D.clean(i.depreciation) : null;
+      if (next) m.depreciation = next;
+      else delete m.depreciation;
+    }
     if (has('nozzle')) {
       const n = i.nozzle || {};
       const material = trim(n.material) || 'brass';
