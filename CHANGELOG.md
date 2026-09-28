@@ -10,6 +10,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   imported to Drive. It now leaves Drive alone when the switch is off. A
   bucket's own backup setting is unchanged, and freeing up space still uses
   Drive either way.
+- **(Mac) Machine costing agrees with the P&L in four more places.** A
+  machine depreciated per print hour is now charged in the machine P&L exactly
+  what the shop's P&L charges it: nothing for jobs dated before it was bought,
+  and nothing once the hours it has already printed use up its life (it read
+  50 in one and 0 in the other). The machine P&L's material cost is split by
+  the shelf, as Reports' is. A failed print's plug reading is used for one
+  waste entry only, and a print that failed inspection is costed at its own
+  metered energy rather than an earlier cancelled attempt's. A residual value
+  equal to the price no longer makes a machine's wear free in quotes: the flat
+  wear rate stands. "All time" depreciation starts at the book's first order,
+  as the desktop's does.
+
 - **Set what a machine cost, and see it lose value in your P&L.** Each
   machine in Settings has a Depreciation section: what you paid, when, how
   long it should last (in printing hours or years), what it will be worth at

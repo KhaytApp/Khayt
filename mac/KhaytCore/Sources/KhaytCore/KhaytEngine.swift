@@ -4160,18 +4160,30 @@ public actor KhaytEngine {
                               unassigned: String,
                               range: (from: String, to: String)? = nil,
                               recentMonthlyHours: [String: Double] = [:],
-                              days: Int = 0) throws -> MachineProfitReport {
+                              days: Int = 0,
+                              inventory: [JSONValue] = [],
+                              orders: [JSONValue]? = nil) throws -> MachineProfitReport {
         // `range` is the period the four were filtered to, as book days — what
         // a straight-line machine's depreciation is pro-rated over.
+        //
+        // `inventory` is the shelf, which `stockShare` needs to tell what was
+        // stocked from what was bought for the job — without it the split was
+        // not the one Reports' P&L makes (`pnlByPeriod` is handed it too).
+        //
+        // `orders` is the WHOLE book: with it a perHour machine is charged
+        // exactly what the shop P&L charges it — nothing for hours before it
+        // was bought, nothing past its life (lib/machine-pl.js).
         let span: JSONValue = range.map { .object(["from": .string($0.from), "to": .string($0.to)]) } ?? .null
         return try runtime.call2(#"""
         (function () {
-          var ctx = { settings: ARG4, clients: ARG5 };
-          return globalThis.KhaytMachinePL.machineProfit({
+          var ctx = { settings: ARG4, clients: ARG5, inventory: ARG10 };
+          var input = {
             machines: ARG0, completed: ARG1, expenses: ARG2,
             maintenance: ARG3, unassigned: ARG6, days: ARG7,
             range: ARG8, recentMonthlyHours: ARG9,
-          }, {
+          };
+          if (Array.isArray(ARG11)) input.orders = ARG11;
+          return globalThis.KhaytMachinePL.machineProfit(input, {
             revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
             // WHAT WAS STOCKED, as the shop's P&L counts it (lib/pnl-report.js
             // stockShare): the machine's wear reaches this report once, as its
@@ -4186,7 +4198,8 @@ public actor KhaytEngine {
                           [.array(machines), .array(completed), .array(expenses),
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned), .number(Double(days)), span,
-                           .object(recentMonthlyHours.mapValues { .number($0) })],
+                           .object(recentMonthlyHours.mapValues { .number($0) }),
+                           .array(inventory), orders.map { .array($0) } ?? .null],
                           as: MachineProfitReport.self)
     }
 

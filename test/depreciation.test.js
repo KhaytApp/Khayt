@@ -241,3 +241,58 @@ test('machine P&L: depreciation per machine, in its net, both methods', () => {
   const bare = machineProfit({ machines, completed }, deps);
   assert.equal(bare.rows.find((r) => r.machineId === 'M2').depreciation, 0);
 });
+
+// ── The machine P&L charges a perHour machine what the shop P&L does ────────
+//
+// It charged `rate × hours in range` with no `hoursBefore` and no purchase-date
+// filter, so a machine already past its life, or a job dated before the
+// machine was bought, read 50 in the machine P&L and 0 in the shop's.
+
+const small = (extra) => ({
+  id: 'M1', name: 'U1',
+  depreciation: Object.assign({ price: 600, residual: 100, life: 100, lifeUnit: 'hours',
+                                method: 'perHour', purchaseDate: '2026-01-01' }, extra),
+});
+const septPnl = (machines, orders) => pnlByPeriod(orders, [], { now: new Date(2026, 8, 30, 12),
+  granularity: 'month', machines }).find((r) => r.period === '2026-09').depreciation;
+const deps0 = { revenueOf: (o) => o.price, partCostOf: () => 0 };
+const sept = { from: '2026-09-01', to: '2026-09-30' };
+
+test('machine P&L perHour: hours already printed count against its life, as in the shop P&L', () => {
+  const machines = [small()];
+  const orders = [job('old', 'M1', '2026-05-10', 100, 1000), job('sep', 'M1', '2026-09-10', 10, 200)];
+  const completed = orders.filter((o) => o.date >= sept.from);
+  const shop = septPnl(machines, orders);
+  assert.equal(shop, 0);
+  const out = machineProfit({ machines, completed, range: sept, orders }, deps0);
+  assert.equal(out.rows[0].depreciation, shop);
+  // Half-way through its life, the rest of the rate still applies.
+  const half = [job('old', 'M1', '2026-05-10', 95, 1000), job('sep', 'M1', '2026-09-10', 10, 200)];
+  const halfOut = machineProfit({ machines, completed: half.slice(1), range: sept, orders: half }, deps0);
+  assert.equal(halfOut.rows[0].depreciation, septPnl(machines, half));
+  assert.equal(halfOut.rows[0].depreciation, 25);
+});
+
+test('machine P&L perHour: a job before the purchase date is not charged, as in the shop P&L', () => {
+  const machines = [small({ purchaseDate: '2026-09-20' })];
+  const orders = [job('early', 'M1', '2026-09-10', 10, 200)];
+  const shop = septPnl(machines, orders);
+  assert.equal(shop, 0);
+  assert.equal(machineProfit({ machines, completed: orders, range: sept, orders }, deps0)
+    .rows[0].depreciation, shop);
+  // An older caller that passes no book still leaves the pre-purchase job out.
+  assert.equal(machineProfit({ machines, completed: orders, range: sept }, deps0)
+    .rows[0].depreciation, 0);
+  // And one after the purchase date is charged.
+  const later = [job('late', 'M1', '2026-09-25', 10, 200)];
+  assert.equal(machineProfit({ machines, completed: later, range: sept, orders: later }, deps0)
+    .rows[0].depreciation, 50);
+});
+
+test('a residual equal to the price derives no wear rate, and the flat one stands', () => {
+  // (price − residual) is 0, so the derived rate was 0 and quoted wear as free.
+  assert.equal(D.hourlyRate(perHour({ residual: 6000 })), 0);
+  assert.equal(ratesFor({ machine: perHour({ residual: 6000 }) }).wearRate, DEFAULTS.wearRate);
+  assert.equal(ratesFor({ machine: Object.assign(perHour({ residual: 6000 }), { wearRate: 2 }) }).wearRate, 2);
+  assert.equal(ratesFor({ machine: straight({ residual: 5000 }) }).wearRate, DEFAULTS.wearRate);
+});

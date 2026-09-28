@@ -111,6 +111,44 @@ import Testing
         #expect(report.totals.depreciation == 40)
     }
 
+    static func small(bought: String) -> JSONValue {
+        .object([
+            "id": .string("M1"), "name": .string("U1"),
+            "depreciation": .object([
+                "price": .number(600), "residual": .number(100), "life": .number(100),
+                "lifeUnit": .string("hours"), "method": .string("perHour"),
+                "purchaseDate": .string(bought),
+            ]),
+        ])
+    }
+
+    @Test("perHour in the machine P&L is the shop P&L's: past its life and before purchase charge nothing")
+    func machinePLMatchesShopPL() async throws {
+        let engine = try KhaytEngine()
+        let now = Date(timeIntervalSince1970: 1_790_000_000)   // 2026-09-21
+        func both(_ machine: JSONValue, _ orders: [JSONValue], _ inRange: [JSONValue]) async throws -> (Double?, Double?) {
+            let report = try await engine.machineProfit(
+                machines: [machine], completed: inRange, expenses: [], maintenance: [],
+                settings: [:], clients: [], unassigned: "—",
+                range: (from: "2026-09-01", to: "2026-09-30"), orders: orders)
+            let shop = try await engine.pnlByPeriod(orders: orders, expenses: [], settings: [:], clients: [],
+                                                    currencies: [:], now: now, granularity: "month",
+                                                    machines: [machine])
+            return (report.rows.first?.depreciation, shop.first { $0.period == "2026-09" }?.depreciation)
+        }
+        // 100 h already printed on a 100 h life: September's 10 h is nothing more.
+        let spent = [Self.job("old", machine: "M1", date: "2026-05-10", hours: 100),
+                     Self.job("sep", machine: "M1", date: "2026-09-10", hours: 10)]
+        let (a, b) = try await both(Self.small(bought: "2026-01-01"), spent, [spent[1]])
+        #expect(a == 0)
+        #expect(a == b)
+        // Bought on the 20th: a job on the 10th is not its wear.
+        let early = [Self.job("early", machine: "M1", date: "2026-09-10", hours: 10)]
+        let (c, d) = try await both(Self.small(bought: "2026-09-20"), early, early)
+        #expect(c == 0)
+        #expect(c == (d ?? 0))
+    }
+
     @Test("a failure allowance is suggested from the book, with how many prints it rests on")
     func failureSuggestion() async throws {
         let engine = try KhaytEngine()

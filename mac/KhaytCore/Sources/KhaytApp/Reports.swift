@@ -664,7 +664,10 @@ struct Reports: View {
             unassigned: shop.words.callIt("dash.unassigned"),
             // What a straight-line machine's depreciation is pro-rated over:
             // the same period the four collections were filtered by.
-            range: Shop.periodSpan(shop.period),
+            range: Shop.periodSpan(shop.period, dates: shop.orderRows.compactMap { row in
+                if case .object(let o) = row, case .string(let d)? = o["date"] { return d }
+                return nil
+            }),
             recentMonthlyHours: shop.recentMonthlyHours,
             // The denominator for utilisation. Taken from the same period the
             // four collections above were filtered by, and spanning the data
@@ -674,7 +677,12 @@ struct Reports: View {
             days: shop.periodDays(dates: done.orders.compactMap { row in
                 if case .object(let o) = row, case .string(let d)? = o["date"] { return d }
                 return nil
-            }))
+            }),
+            // The shelf, so what was stocked splits as the shop P&L splits it.
+            inventory: shop.inventoryRows,
+            // The whole book, so a perHour machine's depreciation is the shop
+            // P&L's: hours before its purchase and past its life are not charged.
+            orders: shop.orderRows)
     }
 
     private func recomputeAccuracy() async {
