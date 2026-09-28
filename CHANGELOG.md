@@ -4246,6 +4246,24 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.54] - 2026-09-28
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Connect Google Drive opens the sign-in page, and offers it if the browser
+does not come up.
+
+### Changed and fixed
+
+- **(Mac) Connect Google Drive opens the sign-in page, and shows it if the
+  browser doesn't.** Reported by the shop: "nothing opened". The page was
+  opened from inside the sign-in, off the main thread, and a failure there was
+  silent, so the pane said "Waiting for the sign-in in your browser" with no
+  page anywhere. It now opens from the app's main thread and brings the browser
+  forward. While waiting, the pane offers **Open the sign-in page** and **Copy
+  link**.
+
 ## [4.0.0-alpha.53] - 2026-09-28
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
