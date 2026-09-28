@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **The bucket respects "Keep a copy of every model" too.** If you turned
+  that off for your object storage on the Mac, the desktop kept copying new
+  models there anyway. It now skips the copy, as it already did for Google
+  Drive. Saving the bucket settings on the desktop also no longer resets
+  that switch.
+
 - **Turning off Google Drive's "keep a copy of every new model" is honoured on
   Windows and Linux too.** The switch is set in the Mac app's online-storage
   settings; the desktop app ignored it and went on copying every model it

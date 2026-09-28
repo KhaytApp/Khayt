@@ -2517,8 +2517,12 @@ async function savePrintLibS3() {
     if (r && r.ok) { endpoint = r.endpoint; region = region || r.region; }
   }
 
+  // Merged over what is there, not replacing it: the Mac keeps fields this
+  // form does not show (`backUpNew`, its own copy switch), and dropping them
+  // silently turns that switch back to whatever `enabled` says.
   settings.printLibrary = Object.assign({}, settings.printLibrary, {
     s3: {
+      ...cur,
       enabled: !!$('#set_plibS3On')?.checked,
       provider,
       endpoint,

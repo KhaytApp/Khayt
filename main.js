@@ -2160,14 +2160,15 @@ function printLibRemote() {
  */
 async function printLibMirrorFile(id, filename, srcPath) {
   const dir = printLibMirrorItemDir(id);
-  // Drive's own "keep a copy of every new model" switch
-  // (settings.printLibrary.gdrive.backUpNew, set on the Mac's storage pane;
-  // absent means on). A bucket has its own, `s3.enabled`, which printLibS3
-  // already reads. Tiering is not a backup and still uses Drive either way.
+  // Each remote's own "keep a copy of every new model" switch
+  // (settings.printLibrary.<s3|gdrive>.backUpNew, set on the Mac's storage
+  // pane). `enabled` only says which remote is in use; absent `backUpNew`
+  // means on, so a book written before the switch backs up as it always did.
+  // Tiering is not a backup and still uses the remote either way.
   const remote = printLibRemote();
-  const driveBackupOff = remote && remote.kind === 'gdrive'
-    && ((printLibSettings() || {}).gdrive || {}).backUpNew === false;
-  const s3 = driveBackupOff ? null : remote;
+  const backupOff = !!remote
+    && ((printLibSettings() || {})[remote.kind] || {}).backUpNew === false;
+  const s3 = backupOff ? null : remote;
   if (!dir && !s3) return null;
   const out = { folder: null, s3: null };
   if (dir) {
