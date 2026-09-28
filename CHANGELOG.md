@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Syncing to the cloud is quick again after a full upload.** After it
+  once had to upload the whole book, the Mac kept treating the cloud as
+  refusing change-only syncs, and waited out the full-upload cool-down between
+  syncs until it was restarted. Khayt Cloud has accepted change-only syncs
+  since 25 September. The Mac now goes back to them as soon as one succeeds.
+
 - **(iOS) The companion can be tried without a shop.** "Explore with a
   sample shop" on the first pairing screen opens a made-up print shop on the
   phone — orders at every stage, a late job, spools running low, clients,

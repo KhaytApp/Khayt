@@ -8983,9 +8983,16 @@ final class Shop {
         await sendToCloud()
         syncInFlight = false
 
+        // The gate's state is what the LAST send found, not what any send ever
+        // found. Set on a whole-book push and never cleared, this outlived the
+        // gate reopening: Khayt Cloud reported the shop's deltas open and every
+        // append accepted since 25 Sep, while this Mac kept waiting out the
+        // whole-book floor between syncs until it was relaunched.
         if cloudSent?.wholeStore == true {
             chainIsClosed = true
             lastWholeBookPush = Date()
+        } else if cloudSent != nil {
+            chainIsClosed = false
         }
 
         if let problem = cloudProblem {
