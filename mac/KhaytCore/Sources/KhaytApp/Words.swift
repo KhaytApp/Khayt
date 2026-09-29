@@ -125,7 +125,6 @@ final class Words {
     /// Khayt's word, then this app's, then the key — which is visible enough on
     /// screen to be reported rather than quietly reading as a label.
     func callIt(_ key: String) -> String {
-        if let mine = Self.sayInstead[key] { return callIt(mine) }
         if let theirs = khayt[key], !theirs.isEmpty { return theirs }
         if let mine = Self.own[key]?[language] ?? Self.own[key]?["en"] { return mine }
         return key
@@ -337,22 +336,6 @@ final class Words {
     /// `PrintFactLines.ownWords` is MERGED IN rather than copied: the Quick Look
     /// preview shows the same facts from a separate bundle and needs the same
     /// words, and two literals would agree today and drift by the third change.
-    /// Shared keys this app says in its OWN word, because the shared one
-    /// disagrees with the rest of the app.
-    ///
-    /// Filament is `خيط` in this app's Arabic — the word in every
-    /// filament string it supplies, and in most of the shared ones — but two
-    /// shared keys it shows say `فلامنت`: the Expenses category and the
-    /// Calculator's part row. One screen said خيط, the next فلامنت, for the
-    /// same spool. The shared catalogue is a verbatim copy of the other app's
-    /// (`mac-core-is-not-a-fork`), so the word is changed here, for this app,
-    /// and only for keys whose English is the same word — `WordsTests` holds
-    /// that, so an alias can never change what an English reader sees.
-    nonisolated static let sayInstead: [String: String] = [
-        "exp.cat.filament": "mac.filament",
-        "calc.part.filament": "mac.filament",
-    ]
-
     nonisolated static let own: [String: [String: String]] =
         base.merging(PrintFactLines.ownWords) { mine, _ in mine }
 

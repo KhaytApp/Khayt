@@ -279,8 +279,7 @@ struct CloudLibrarySettings: View {
                     if let url = shop.googleSignInURL {
                         Button(shop.words.callIt("mac.gdrive_open_page")) { Shop.openInBrowser(url) }
                         Button(shop.words.callIt("mac.gdrive_copy_link")) {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                            SecretPasteboard.copy(url.absoluteString)
                         }
                     }
                     // The way out. A shop that closed the browser tab, or
