@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) One word for filament, and the sign-in link copied privately.** The
+  two Arabic filament labels this app re-worded itself now come straight from
+  the shared words, which say خيط since the desktop fix. Copying the Google
+  sign-in link marks it private, as the import key already is, so clipboard
+  managers do not keep it.
+
 - **Arabic says خيط for filament everywhere.** Twelve screens still used
   فلامنت or فيلامنت, including the inventory titles, the expense and supplier
   categories, the calculator and the label scanner. They now use خيط (or خيوط

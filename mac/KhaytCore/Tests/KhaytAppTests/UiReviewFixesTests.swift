@@ -60,17 +60,16 @@ struct UiReviewFixesTests {
 
     // MARK: - One word for filament
 
-    @Test("the filament aliases change only the Arabic")
+    @Test("filament is one word in Arabic, on every screen")
     func filamentOneWord() async throws {
-        let en = try await Self.words("en")
         let ar = try await Self.words("ar")
-        let english = try await KhaytEngine().translations(language: "en")
-        for (shared, mine) in Words.sayInstead {
-            // What an English reader sees must not move.
-            let englishShared = try #require(english[shared])
-            #expect(en.callIt(shared) == englishShared, "\(shared) changed in English")
-            #expect(ar.callIt(shared) == ar.callIt(mine))
-            #expect(!ar.callIt(shared).contains("فلامنت"))
+        let shared = try await KhaytEngine().translations(language: "ar")
+        // The shared catalogue says خيط now (the other app's #1669), so the
+        // two keys this app used to re-word read the same as its own.
+        #expect(ar.callIt("calc.part.filament") == ar.callIt("mac.filament"))
+        #expect(ar.callIt("exp.cat.filament").contains("خيوط"))
+        for (key, text) in shared {
+            #expect(!text.contains("فلامنت") && !text.contains("فيلامنت"), "\(key) says فلامنت")
         }
     }
 
