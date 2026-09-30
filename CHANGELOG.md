@@ -10,10 +10,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   sign-in link marks it private, as the import key already is, so clipboard
   managers do not keep it.
 
-- **Arabic says خيط for filament everywhere.** Twelve screens still used
-  فلامنت or فيلامنت, including the inventory titles, the expense and supplier
-  categories, the calculator and the label scanner. They now use خيط (or خيوط
-  where it means more than one), the word the rest of the app and the Mac use.
 - **(Mac) Saving a machine no longer drops its downtime windows.** A
   maintenance window stored as a full timestamp (such as
   `2026-07-05T08:00:00.000Z`, which the desktop app and the sample shop both
@@ -22,17 +18,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   nothing. The Mac now reads these windows as the times they name and saves
   any end you did not touch exactly as it was.
 
-- **A machine's own profit now agrees with the shop P&L on its wear.** For a
-  machine depreciated by printing hours, the machine table now counts the
-  hours it printed before the period you are looking at against its life, as
-  the shop P&L does. A machine that had already used up its life could
-  otherwise still show depreciation there.
-
-- **The bucket respects "Keep a copy of every model" too.** If you turned
-  that off for your object storage on the Mac, the desktop kept copying new
-  models there anyway. It now skips the copy, as it already did for Google
-  Drive. Saving the bucket settings on the desktop also no longer resets
-  that switch.
 - **(Mac) Fixes from the pre-release UI review.** Google Drive, and the rest
   of online storage, is now under Settings › Online, where shops looked for it
   (it was under Preferences). Waiting for Google's sign-in has a Cancel, which
@@ -52,12 +37,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   narrower totals panel. The sample shop's laser now depreciates and one
   failed print is tied to its job, so those lines are drawn.
 
-- **Turning off Google Drive's "keep a copy of every new model" is honoured on
-  Windows and Linux too.** The switch is set in the Mac app's online-storage
-  settings; the desktop app ignored it and went on copying every model it
-  imported to Drive. It now leaves Drive alone when the switch is off. A
-  bucket's own backup setting is unchanged, and freeing up space still uses
-  Drive either way.
 - **(Mac) Machine costing agrees with the P&L in four more places.** A
   machine depreciated per print hour is now charged in the machine P&L exactly
   what the shop's P&L charges it: nothing for jobs dated before it was bought,
@@ -69,13 +48,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   equal to the price no longer makes a machine's wear free in quotes: the flat
   wear rate stands. "All time" depreciation starts at the book's first order,
   as the desktop's does.
-- **A quote on a machine with depreciation set now charges its real wear.**
-  Picking that machine in the calculator used to fill in the flat wear rate
-  (0.75 an hour unless you changed it), while the Mac charged what the
-  machine's price and life work out to. The desktop now fills in the same
-  figure. A straight-line machine's hourly figure, and its depreciation in the
-  P&L and the machine table, now also use what it has actually printed over
-  the last 90 days, as on the Mac.
+
 - **(Mac) Security review fixes.** Google sign-in now checks the sign-in's
   own `state` before anything else in the callback: a stray or hostile request
   to the sign-in listener (another app, or a web page probing local ports) gets
@@ -93,14 +66,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   clipboard managers do not keep it. Drive backup listings ignore names that
   point outside the backup folder, as bucket listings already did.
 
-- **Set what a machine cost, and see it lose value in your P&L.** Each
-  machine in Settings has a Depreciation section: what you paid, when, how
-  long it should last (in printing hours or years), what it will be worth at
-  the end, and whether it wears by the hour or by time. The P&L, its export
-  and the machine table then show a "Machine depreciation" line — the one
-  place a machine's wear is counted — and the machine table no longer counts
-  the estimated wear, electricity and labour inside each job's cost as if it
-  were material. Quotes use the machine's own wear rate once it is set.
 - **(Mac) Online storage is built around Google Drive now.** After connecting
   Drive, the pane no longer jumps to "A storage bucket": a shop with Drive and
   no bucket was being read as using a bucket. The pane now opens on Google
@@ -144,17 +109,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   this" button — it never changes the figure on its own. Editing a machine on
   the Mac also no longer wipes its target hours per day.
 
-- **Electricity, machine wear and labour were taken off your profit twice.**
-  The cost Khayt works out for a job — for pricing and quotes — includes an
-  estimate of the electricity, machine wear and labour it takes, plus a margin
-  for failures. The P&L took that whole figure off as cost of goods, and then
-  also took off your real electricity bills, maintenance, wages and rent, and
-  now your real failed prints. In the P&L, a job's cost of goods is now only
-  what went into it from stock — filament, extra materials and packaging —
-  and the rest reaches your profit once, as what you actually paid. Quotes
-  and prices are unchanged. **Net profit, and the gross margin beside it,
-  will read higher**, by what had been counted twice.
-
 - **(Mac) Connect Google Drive opens the sign-in page, and shows it if the
   browser doesn't.** Reported by the shop: "nothing opened". The page was
   opened from inside the sign-in, off the main thread, and a failure there was
@@ -162,6 +116,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   page anywhere. It now opens from the app's main thread and brings the browser
   forward. While waiting, the pane offers **Open the sign-in page** and **Copy
   link**.
+
 - **(Mac) Electricity measured per print, and the true cost of a failed print.**
   A printer on a metering smart plug now has its energy added up while it
   prints, including heat-up and pauses, and the kWh is saved on the job next to
@@ -183,6 +138,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   refusing change-only syncs, and waited out the full-upload cool-down between
   syncs until it was restarted. Khayt Cloud has accepted change-only syncs
   since 25 September. The Mac now goes back to them as soon as one succeeds.
+
 - **(Mac) Paid Medusa orders can become jobs by themselves.** Settings → Integrations
   has a new **Import key** row: create a key, copy it once, and set it as
   `KHAYT_IMPORT_KEY` on your Medusa server. With it, Khayt Cloud trusts the order's
@@ -220,12 +176,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   events. A line about a job opens the job; an order request opens Intake.
   And with the app open, a new order request now says so at once, instead of
   waiting for the Mac to import it.
+
 - **(iOS) The companion can be uploaded to TestFlight.** Its version and build
   numbers now come from the build settings in the app and both extensions
   (they were fixed at 1, which App Store Connect refuses a second time); the
   iPad offers every orientation, which iPad multitasking requires; and the
   NFC entitlement asks only for `TAG` — the app reads spool tags with a tag
   session, and the current SDK refuses the old `NDEF` value outright.
+
 - **(Mac) Connect Google Drive with one click.** Asked for by the shop, after
   the setup proved to be a workaround: every shop had to create its own OAuth
   client in Google Cloud and publish it. Khayt now carries its own Google
@@ -233,6 +191,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Drive › Connect** signs in and is done. A shop that wants its own client can
   still use one, under "advanced". It asks only for the files Khayt itself puts
   in the shop's Drive.
+
 - **(Mac) The dashboard's net agrees with Reports, and failed prints count.**
   The header's "September · Net" was your sales before tax; it is now the same
   net income Reports shows — sales less the material the work used, failed
@@ -252,6 +211,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   stored only the folder name and threw away the OAuth client ID and secret
   just typed, which also greyed out **Connect Google Drive**. They are kept now.
   The pane says plainly when Drive is not connected yet, and what to click.
+
 - **(Mac) Several models can be deleted from the library at once.** Reported
   by the shop: "I tried to delete multiple files from the library but can't,
   only one at a time". Select the models (Shift or Command click), right-click
@@ -268,6 +228,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   counted as stock and costed when a job uses it, so it is no longer in
   expenses. The Mac's Reports lists "Filament bought" beside the P&L, as the
   desktop does, so the money spent is still visible.
+
 - **(iOS) A print alert reaches a locked phone with the job on it.** Push is
   on, and a new notification service extension opens the Mac's sealed
   `print-finished` event with the shop's key on the phone — the cloud and
@@ -286,6 +247,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   The library also opens on **All models**, newest first, with **Groups** one
   click away, so a model just added is on screen at once rather than inside a
   folder.
+
 - **(Mac) When a print ends, the shop's iPhones are told.** The Mac sends a
   sealed "print finished" event to Khayt Cloud, which passes it to any open
   Khayt screen and as a notification to the shop's iPhones. The event says
@@ -321,12 +283,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     empty waste log says "No waste logged yet." without the "great job!".
   - **Spool colours** written as `#RGB` or `RRGGBBAA` (as a Bambu AMS reports
     them) are drawn instead of falling back to the unknown grey.
+
 - **(Mac) Adding a large model no longer freezes the window.** Reported by
   the shop: "I tried adding a file and it is stuck with a loading ball". The
   import measured the model on the main thread, so a large 3MF took the whole
   window with it. The file is now read, hashed, copied and measured in the
   background. Measuring is also faster: the reader was rebuilding a small text
   pattern for every tag in the file, and a 55 MB model has millions of tags.
+
 - **(Mac) The library opens newest-added first, and can be sorted from the
   Library screen.** Asked for by the shop: "after adding files I have to look
   for them, I want to see them immediately". **Date added** is the new default.
@@ -360,6 +324,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   if it has been failing for more than two days. Nothing is switched on for
   you: the old bucket details left in the book from August are not used
   unless you pick them.
+
 - **(Mac) Paid web-store orders now become jobs on their own.** Every couple of
   minutes the Mac collects paid orders from your web store and makes each one a
   job. The job is priced from your catalogue, filed under the right customer
@@ -383,6 +348,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   product photo** adds that picture to the product the job was made from,
   labelled as a photo of the actual print, which the web store shows right
   after your main picture. Your main picture stays the main one.
+
 - **(Mac) WhatsApp updates to customers.** When a job is received, ready,
   shipped or delivered, the job now offers "Send on WhatsApp". WhatsApp opens
   on the customer's number with the message already typed, in the customer's
@@ -397,6 +363,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   sheet shows the number WhatsApp will use as you type it. Also fixed: ticking
   "no marketing" on the customer sheet did not stick, because saving the sheet
   wrote it back as unticked. No WhatsApp Business account is needed.
+
 - **(Mac) See which products earn the most for each hour on the printer.**
   With one printer, machine time runs out before anything else, so two
   products that make the same profit per sale are not equal if one takes ten
@@ -454,6 +421,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     template did not mark themselves changed. They never left this Mac, and a
     merge could put the old version back. Every write the Mac makes now bumps
     whatever it changed.
+
 - **(Mac) A storefront or carrier webhook cannot be replayed later
   (SEC-010).** Salla, Zid and the carriers sign only the body, so a captured
   delivery stays validly signed forever. The Mac remembered accepted
@@ -484,6 +452,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rather than on the next ten-second poll. The stream reconnects on its own
   when the cloud closes it; a busy cloud means wait, never signed out; and
   while the stream is up, the printer poll falls back to once a minute.
+
 - **(Mac) Choose what goes on the web store, check it before it goes, and
   set up the store itself.** Asked for by the shop after a review of its first
   published catalogue.
@@ -510,6 +479,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   deleting a supplier, product or spool had also done nothing: it put the
   record back and then deleted it again straight away. Undo after deleting a
   consumable did nothing either. All four now restore the record.
+
 - **(Mac) The web store only republishes itself when it should.** Also from
   that review:
   - A live store is checked before each automatic republish, so a store taken
@@ -553,6 +523,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   deleted revision as the desktop does. A merge from the cloud or a phone
   leaves none of its own. Something deleted before this update and since
   brought back by a sync needs deleting once more.
+
 - **(Mac) The Web Store and Online Orders buttons are on the Catalogue
   screen.** Both were added only to the old window toolbar, which the current
   window does not draw, so neither could be reached. Reported by the shop:
@@ -612,6 +583,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   signed out and puts **Sign in again** under it; a busy cloud (429) reads
   as "trying again shortly", never as signed out; and every other cloud
   failure is said with its status code and reason.
+
 - **(iOS) The phone follows its Mac to a new address.** Pairing stored the
   Mac's IP, and a router hands IPs out on a lease: after a restart the Mac
   came back somewhere else and the phone went on calling the old one,
@@ -628,6 +600,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   every two seconds), and a heartbeat every 45 seconds when nothing does, so
   the phone can tell an idle shop from a Mac that is off. A viewer's account
   never publishes.
+
 - **(Mac) Khayt offers each update, and never installs one on its own.**
   Asked for by the shop: "the app should check for updates at launch and
   offer the user to update" — and "it should never auto update, it should
@@ -691,6 +664,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   first, large, with what the job costs the shop beneath it. Space Grotesk's
   full SIL Open Font License now travels in the app beside the font files, as
   the licence requires of every copy.
+
 - **(Mac) The PIN no longer sits in the browser's address bar.** Opening the
   live queue in a browser asks for the PIN once, in a form, and keeps a
   12-hour session cookie (HttpOnly, SameSite=Strict) instead — the page
@@ -717,6 +691,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   product, named after the folder. Every part is filled by the same rule as a
   single model: weight and time from the file, measured from the geometry
   where the file cannot say, and linked to the model.
+
 - **(Mac) A sliced file's own time, weight and material are read at last.**
   Reported by the shop: "it didn't get the info from the file". The Mac
   imported models without reading what the slicer wrote into them, so a
@@ -728,6 +703,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   background — only where it has nothing recorded, and without touching Undo.
   Products already made keep their figures: open one and fill its part from
   the file again to take the slicer's.
+
 - **(iOS) Home is Shop Pulse, as the v2 design draws it.** Today's counts (in
   queue, printing, done today), the money (owed, this month, this year), the
   pipeline lanes, alerts for late jobs, low stock and people waiting, and the
@@ -735,6 +711,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   own rules (`orderOwedBase`, the P&L's month rows), and a figure the phone's
   copy of the book cannot answer — a month or a year older than the oldest
   finished order it holds — shows an em-dash and "On the Mac", never a zero.
+
 - **(iOS) Orders and the order page follow the v2 design.** Active and
   History, stage chips, and cards swiped forward to move a job on. Opening a
   job pushes a PAGE (it was a half-height sheet): its stage, the facts a shop
@@ -743,6 +720,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saying how much of it the phone holds and that the rest is on the Mac.
   Filament and quantity are read from the phone's book rather than added to
   `/api/queue`, which the desktop, the native Mac and the phone all share.
+
 - **(iOS) Pairing is the design's three steps.** Which shop (the Macs on
   this Wi-Fi, each saying whether the phone can work offline with it, and a
   quiet link to type an address instead), the owner PIN (a refused PIN is
@@ -750,28 +728,33 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   settings, open orders, the newest finished, clients, inventory, machines —
   and that the rest stayed on the Mac. A desktop that does not serve its book
   skips the last step and is paired all the same.
+
 - **(iOS) Inventory and the spool page follow the v2 design.** The spools
   lowest first, with an amber rail on the ones running low and a closing line
   that says the phone holds every spool the shop has. A spool opens as a page
   (it was a sheet): its colour, what is left with −50 g / +50 g beneath it
   (taps in a row are one write, not several), the label's facts, and writing
   it to an NFC tag. The figure itself can be tapped to set it exactly.
+
 - **(iOS) Add spool follows the v2 design.** One card per way in — scan the
   label (first, in blue), tap an NFC tag, the box barcode, or type it in — and
   a form that asks for brand, material, colour and weight first, with the Add
   button held at the bottom of the screen instead of the end of the form.
+
 - **(iOS) Machines and Clients follow the v2 design.** A machine is a card —
   printing in orange with its progress and temperatures, a fault in red, idle
   with no colour — and when the Mac is out of reach the list says these are
   the book's last readings. A client shows how many of their jobs are open
   and, only when the phone holds the whole order history, how many they have
   ever placed; otherwise that figure is "On the Mac", not a short count.
+
 - **(iOS) Settings follows the v2 design.** It opens on the connection, said
   once (green with the Mac in reach, quiet without it when the phone has its
   book, red only with neither), then "What this phone holds" — each
   collection's count, amber where it is the newest few rather than all — and
   what was not sent. Language is a two-way switch; the Mac's address and PIN
   fold away until they are needed.
+
 - **(iOS) Intake follows the v2 design, and a walk-in can be taken.** Each
   request is a card with "Take it" and "Dismiss". Taking one makes it a
   pending job and moves the request to the waiting-list history as
@@ -779,6 +762,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   it. That needs the shop's book on the phone (the LAN endpoint has no
   `converted`); without one, the card offers Dismiss alone and says why.
   Reminding and calling are a long-press away.
+
 - **(iOS) The Arabic the design's copy review flagged is fixed.** The heated
   bed was "السرير" — the bed you sleep in — on four screens; it is المنصّة,
   as the desktop says. "Owner" had been dropped from the owner-PIN label
@@ -787,6 +771,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the one Arabic-Indic figure in the catalogue now uses the Western digits
   every other one does. Sixty-four strings the rebuilt screens no longer use
   are gone from both languages.
+
 - **(iOS) New order follows the v2 design** — one card of labelled fields and
   a single button — with one deliberate difference. The design refuses a
   write while the Mac is away; the phone need not, because it saves into its
@@ -802,6 +787,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   strip it specifies — losing the Mac while the phone holds the book is now a
   quiet "Working from the book · as of 14:32" with Refresh, and red is kept for
   a phone that holds nothing and cannot reach the Mac.
+
 - **(iOS) A spool typed in by hand has a colour.** The add-spool form had no
   colour at all, so every roll entered by hand went on the shelf grey. It has
   the design's ten swatches and a picker for any other, and a row of common
@@ -821,6 +807,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   book (#1574). The Mac's Restore list marks it "taken before everything was
   reset" — not "taken before an update", which is what it would otherwise
   have been called, or nothing at all.
+
 - **(Mac) Security fixes from the September scan, fourth batch.**
   - **A web page could read the shop's book through the owner's browser**
     (DNS rebinding). The PIN-protected routes answer only to an address,
@@ -861,6 +848,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   127.0.0.1 with PKCE and a checked `state`; the refresh token and client
   secret are sealed in the book like every other credential. Disconnecting
   forgets the account here and says where to withdraw it at Google.
+
 - **(Mac) Keep the print library in iCloud Drive, or any folder.** Settings →
   Preferences → Where the library lives: Use iCloud Drive, Choose a folder…,
   or Back to this Mac's own folder. The models already there move with it —
@@ -886,6 +874,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   holds the exact file (size and content hash, or a download and compare), and
   a model brought back is checked against the hash recorded when it left.
   Plain HTTP is refused except to this Mac or the shop's own network.
+
 - **(Mac) Importing a folder knows when a folder is a project.** A folder with
   two or more models, at any depth, becomes a folder in the library; a folder
   holding a single model does not, and names that model instead — so
@@ -895,6 +884,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   own name is kept as the model's original name. Folders in iCloud Drive or a
   Google Drive / Dropbox folder import the same way; macOS downloads each file
   as it is read.
+
 - **(Mac) Fixes from the September scan, third batch.**
   - **A Mac set to the Islamic calendar wrote Hijri dates into the book.**
     Today's date, the report periods, the month tiles and the tax year all
@@ -926,6 +916,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   `waitingListHistory`, out of `waitingList`. The phone now makes that move and
   sends the removal as a tombstone, which every device's sync applies — so the
   request does not come straight back into the Mac's queue.
+
 - **(iOS) Setup says what it is waiting for.** The Mac you tap shows a
   checkmark and its address, the PIN field is labelled, and while Continue is
   off a line says what is missing. The first screen shows the Khayt mark.
@@ -941,6 +932,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   holds a slice of the shop, so a whole-store upload from it would delete
   every record it never carried. A phone can also be set up from Khayt Cloud
   alone, with the Mac paired later.
+
 - **(iOS) A refresh from the Mac no longer wipes edits not yet sent.** Edit a
   job with the Mac away, walk back into range, open any screen: the refresh
   replaced the book and took the edit and its pending count, silently. Upstream
@@ -1157,6 +1149,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   is missing, which says nothing rather than guessing.
 
   The Arabic is mine and has had no native read.
+
 - **(iOS) A roll booked in from the phone now says what it cost, and books in
   with the Mac switched off.** The add-spool sheet never asked for a price, so
   every roll booked in from a label, a tag or the camera went on the shelf at
@@ -1202,6 +1195,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   product does, and belongs to a decision about the product.
 
   The Arabic for the one new string has had no native read.
+
 - **(Mac) A piece can be sold off the shelf, and the shop can see how many
   went.** Every order this app has ever written is work the shop made for
   somebody. A piece printed in a batch weeks ago, for nobody in particular, had
@@ -1577,6 +1571,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   side of it are the bytes that were already there. A file this app genuinely
   cannot read the layout of converts anyway and says the plates were left where
   the source slicer put them, which is a sentence a shop can act on.
+
 - **(Mac) A shop on its own mail server can send from the Mac now, and any
   shop can set email up here at all.** Khayt sends a customer's update through
   SendGrid, Mailgun, or a shop's own SMTP server, and the Mac could do the
@@ -3251,9 +3246,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   "see ARG0" broke the call (and merging stopped working while that note
   existed), and crafted text could close its own quotes and run. Inputs are
   now handed over as values and never become script. Found by a security scan.
+
 - **(Mac) A crafted 3MF uploaded to the shop's intake page could crash the app.**
   Offsets near the largest number the Mac can hold overflowed, and a member
   claiming to unpack to terabytes was allocated as claimed. Both are refused.
+
 - **(Mac) Five numbers that crashed the app when out of range:** a printer port
   above 65535 (on every launch, once saved), a camera address with a port above
   65535 or a reply with a negative length, a damaged lock file, a huge hourly
@@ -3267,9 +3264,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   now replaced in one atomic step, and a book left only as its `.prev` copy is
   put back when the app opens (a damaged one opens from `.prev`, as the other
   app already did).
+
 - **(Mac) Two changes made at the same moment could lose one.** A change that
   asks the business rules is worked out while other saves can land; it now
   checks the book again before saving and redoes itself on the newer book.
+
 - **(Mac) Files are moved to the Trash instead of deleted.** Originals brought
   into the library, a product's photos and documents, and a model the Trash
   would not take (which used to be deleted outright). Importing from a folder
@@ -3279,12 +3278,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **(Mac) A job could not be marked "Not business".** The other app has had
   the switch; the Mac had no way to set it. It is on the job's right-click
   menu and in Edit job.
+
 - **(Mac) A spool's full weight could not be entered.** What a kilo costs and
   how full a spool is drawn both need what the spool held when bought, and a
   spool added before that was recorded had none, so "What materials cost"
   said only "No data yet" and every spool drew as the same grey disc. Edit a
   spool to fill in Full spool. With nothing to price, the card is now one line
   saying what is missing instead of an empty card at the top of the screen.
+
 - **(Mac) Four small things on the real book's screens.** The P&L chart
   labelled an empty bar "−0.00"; no figure prints a signed zero now. "By
   quarter / By month" on Reports and "Import from Spoolman" on Inventory were
@@ -3297,6 +3298,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   it, so they read like warnings. Every notice has a Close button now, and they
   go on their own 15 seconds after the last one arrived. Problems still stay
   until they are dealt with.
+
 - **(Mac) The cloud asked for the passphrase at every launch.** The unlocked
   key lived only in memory, so each time the app opened a shop had to sign in
   to the cloud again before anything synced. It is kept in this Mac's login
@@ -3304,6 +3306,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   unlocks by itself. The passphrase itself is still never stored. Locking the
   cloud from the menu bar removes the kept key. If the shop's key changes on
   another device, this Mac asks once rather than keep sending with the old one.
+
 - **(Mac) A storefront waited up to six hours for its prices.** The prices a
   storefront quotes an upload from are sent to Khayt Cloud on a timer: ninety
   seconds after the app opens, then every six hours. Switching storefront
@@ -3311,11 +3314,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   later, and nothing said whether it had. Saving that section now sends them
   straight away, and Settings → Online says what happened: sent, withdrawn, or
   why not, including "sign in to the cloud" when the Mac is not signed in.
+
 - **(Mac) Every spool was called low.** With three spools at 859 g, 1,000 g and
   1,000 g and a 200 g threshold, the sidebar showed ▼3 beside Inventory and
   the dashboard's shelf tinted all three as running out. Nothing was low: both
   screens counted every spool the low-stock rule had looked at, not the ones
   it said were low. They now count only those.
+
 - **(Mac) A printer that is not answering was shown as free.** The 48-hour
   band on Machines drew a switched-off printer as "Free", with forty-eight free
   hours counted into the shop's total, next to a dashboard saying "not
@@ -3325,6 +3330,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   time" also appeared whenever any machine was simply free; it now appears
   only when that is true. A machine in a maintenance window no longer shows
   the raw text `mac.band_state_down`.
+
 - **(Mac) A short job on the 48-hour band read as "(n…".** A block too narrow
   for its name (two hours of a forty-eight-hour band) was drawn with its label
   cut to a letter and an ellipsis. It is drawn bare now; the name and time are
@@ -3868,6 +3874,87 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.0] - 2026-10-01
+
+Profit figures, machine wear and backups, since 3.10.1. Individual entries
+are kept below; this is what changed for you.
+
+**Your profit counts each cost once.** A job's cost of goods is now what
+came off the shelf for it: filament, extras and packaging. Electricity,
+machine wear and labour used to be added to every job's cost and taken off
+your profit, even though you pay for them separately as bills or wages. So
+they came off twice. **Net profit and gross margin figures you have seen
+before will go up.**
+
+**Tell Khayt what a machine cost, and it loses value in your P&L.** Each
+machine has a Depreciation section: the price, the purchase date, how long
+it should last, and what it will be worth at the end. That becomes its own
+P&L line, the only place machine wear is counted. A quote on that machine
+charges the same wear per hour, the same figure the Mac app uses. The
+machine table and the shop P&L agree on it.
+
+**"Keep a copy of every model" is respected.** If you turned it off for
+Google Drive or for your bucket, the desktop no longer copies new models
+there.
+
+**Arabic says خيط for filament everywhere.**
+
+### Changed
+
+- **Electricity, machine wear and labour were taken off your profit twice.**
+  The cost Khayt works out for a job — for pricing and quotes — includes an
+  estimate of the electricity, machine wear and labour it takes, plus a margin
+  for failures. The P&L took that whole figure off as cost of goods, and then
+  also took off your real electricity bills, maintenance, wages and rent, and
+  now your real failed prints. In the P&L, a job's cost of goods is now only
+  what went into it from stock — filament, extra materials and packaging —
+  and the rest reaches your profit once, as what you actually paid. Quotes
+  and prices are unchanged. **Net profit, and the gross margin beside it,
+  will read higher**, by what had been counted twice.
+
+- **Set what a machine cost, and see it lose value in your P&L.** Each
+  machine in Settings has a Depreciation section: what you paid, when, how
+  long it should last (in printing hours or years), what it will be worth at
+  the end, and whether it wears by the hour or by time. The P&L, its export
+  and the machine table then show a "Machine depreciation" line — the one
+  place a machine's wear is counted — and the machine table no longer counts
+  the estimated wear, electricity and labour inside each job's cost as if it
+  were material. Quotes use the machine's own wear rate once it is set.
+
+- **A quote on a machine with depreciation set now charges its real wear.**
+  Picking that machine in the calculator used to fill in the flat wear rate
+  (0.75 an hour unless you changed it), while the Mac charged what the
+  machine's price and life work out to. The desktop now fills in the same
+  figure. A straight-line machine's hourly figure, and its depreciation in the
+  P&L and the machine table, now also use what it has actually printed over
+  the last 90 days, as on the Mac.
+
+- **A machine's own profit now agrees with the shop P&L on its wear.** For a
+  machine depreciated by printing hours, the machine table now counts the
+  hours it printed before the period you are looking at against its life, as
+  the shop P&L does. A machine that had already used up its life could
+  otherwise still show depreciation there.
+
+- **Arabic says خيط for filament everywhere.** Twelve screens still used
+  فلامنت or فيلامنت, including the inventory titles, the expense and supplier
+  categories, the calculator and the label scanner. They now use خيط (or خيوط
+  where it means more than one), the word the rest of the app and the Mac use.
+
+### Fixed
+
+- **Turning off Google Drive's "keep a copy of every new model" is honoured on
+  Windows and Linux too.** The switch is set in the Mac app's online-storage
+  settings; the desktop app ignored it and went on copying every model it
+  imported to Drive. It now leaves Drive alone when the switch is off. A
+  bucket's own backup setting is unchanged, and freeing up space still uses
+  Drive either way.
+
+- **The bucket respects "Keep a copy of every model" too.** If you turned
+  that off for your object storage on the Mac, the desktop kept copying new
+  models there anyway. It now skips the copy, as it already did for Google
+  Drive. Saving the bucket settings on the desktop also no longer resets
+  that switch.
 
 ## [3.10.1] - 2026-09-26
 
