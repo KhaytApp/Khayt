@@ -243,8 +243,12 @@ struct EngineBanner: View {
 
     var body: some View {
         if let problem = shop.engineProblem {
+            // With the way to report it beside it: a tester who sees this has
+            // found exactly what `Feedback` exists to collect.
             Banner(text: shop.words.callIt("mac.engine_failed") + " \u{2014} " + problem,
-                   symbol: "exclamationmark.octagon", tint: Khayt.attention)
+                   symbol: "exclamationmark.octagon", tint: Khayt.attention) {
+                Button(shop.words.callIt("mac.feedback_menu")) { shop.askForFeedback() }
+            }
         }
     }
 }

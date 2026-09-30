@@ -660,6 +660,7 @@ struct WindowSheets: ViewModifier {
             .sheet(isPresented: $shop.scanning) { ScanSheet(shop: shop) }
             .sheet(isPresented: $shop.planningCampaign) { CampaignSheet(shop: shop) }
             .sheet(isPresented: $shop.signingIntoCloud) { CloudSignInSheet(shop: shop) }
+            .sheet(isPresented: $shop.sendingFeedback) { FeedbackSheet(shop: shop) }
             .sheet(item: $shop.draftingFor) { job in
                 DraftMessageSheet(shop: shop, job: job)
             }

@@ -67,7 +67,11 @@ struct KhaytCommands: Commands {
         // THE HELP MENU, which macOS supplies empty and which stays empty
         // unless something is put in it. An app whose Help menu holds nothing
         // is an app that has told you it has no help.
-        CommandGroup(replacing: .help) { HelpCommand() }
+        CommandGroup(replacing: .help) {
+            HelpCommand()
+            // A tester's report, with what it takes to reproduce it — see `Feedback`.
+            Button(Words.upfront("mac.feedback_menu")) { shop.askForFeedback() }
+        }
 
         CommandMenu(Text(Words.upfront("mac.menu_book"))) { BookMenu().environment(shop) }
         CommandMenu(Text(Words.upfront("mac.menu_go"))) { GoMenu().environment(shop) }
