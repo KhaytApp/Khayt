@@ -203,7 +203,7 @@ extension Shop {
     /// because a figure with no period on it is the commonest way a dashboard
     /// lies by omission.
     var monthNetLabel: String {
-        let month = words.say(Date(), .dateTime.month(.wide)).uppercased()
+        let month = words.say(now, .dateTime.month(.wide)).uppercased()
         return month + " · " + words.callIt("mac.net_income")
     }
 

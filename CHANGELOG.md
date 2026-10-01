@@ -4,6 +4,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Tests no longer fail on the first of the month.** A test that reads the
+  sample book on a pinned day now also asks "this month" of that day, so the
+  masthead, the period filter and their tests stop depending on today's date.
+
 - **(Mac) One word for filament, and the sign-in link copied privately.** The
   two Arabic filament labels this app re-worded itself now come straight from
   the shared words, which say خيط since the desktop fix. Copying the Google

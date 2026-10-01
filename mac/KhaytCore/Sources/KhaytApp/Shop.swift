@@ -491,6 +491,14 @@ final class Shop {
     /// `Invoice`, which needs to ask it the same questions the screens do.
     private(set) var engine: KhaytEngine?
 
+    /// The day a test pinned with `load(_:asOf:)`, or nil for the real
+    /// calendar. The period filter and the masthead's month read it, so a book
+    /// rebased to a pinned day is also READ on that day — on the 1st of a
+    /// month the rebased sample has nothing in "this month" otherwise, and
+    /// every test that looks at this month failed on the calendar, not code.
+    private(set) var clock: Date?
+    var now: Date { clock ?? Date() }
+
     init(source: Source = .sample) {
         self.source = source
     }
@@ -501,7 +509,9 @@ final class Shop {
     /// screens are built against. Everything the day reaches — the rebasing of
     /// the sample's dates, and the projection that reads them — takes it from
     /// here, so the two cannot be asked about different days.
-    func load(_ next: Source, asOf day: Date = Date()) async {
+    func load(_ next: Source, asOf pinned: Date? = nil) async {
+        let day = pinned ?? Date()
+        clock = pinned
         source = next
         problem = nil
         skipped = []
@@ -968,12 +978,12 @@ final class Shop {
         // What each machine is worth, BEFORE the month's row: a straight-line
         // machine's share of the month leans on its recent hours.
         machineValue = (try? await engine.machineValues(machines: machines, orders: orders,
-                                                        today: Self.today())) ?? [:]
+                                                        today: Self.today(now))) ?? [:]
         let month = await Self.thisMonthsRow(
             engine: engine, orders: orders, expenses: expenses,
             settings: settings, clients: clients, currencies: Invoice.currencyTable(self),
             wasteLog: Self.rows(root, "wasteLog"), inventory: Self.rows(root, "inventory"),
-            machines: machines, recentMonthlyHours: recentMonthlyHours)
+            machines: machines, recentMonthlyHours: recentMonthlyHours, now: now)
         monthNetRevenue = month?.revenue
         // The masthead's NET is the P&L's net income for the month — revenue
         // less cost of goods, expenses and overhead, filament bought counted
@@ -6445,8 +6455,8 @@ final class Shop {
         return (orders, spend, serviced)
     }
 
-    func inPeriod(_ date: String, now: Date = Date()) -> Bool {
-        Self.inPeriod(date, period: period, now: now)
+    func inPeriod(_ date: String, now: Date? = nil) -> Bool {
+        Self.inPeriod(date, period: period, now: now ?? self.now)
     }
 
     /// How long the chosen period is, in days.
@@ -6461,7 +6471,8 @@ final class Shop {
     /// machine look under-worked, and it is still the right answer: the target
     /// is a rate for the month, the figure is what has been done against it so
     /// far, and a shop reading 40% on the 12th is reading something true.
-    func periodDays(now: Date = Date(), dates: [String] = []) -> Int {
+    func periodDays(now pinned: Date? = nil, dates: [String] = []) -> Int {
+        let now = pinned ?? self.now
         let cal = Calendar.book
         switch period {
         case .month:
