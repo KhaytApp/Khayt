@@ -135,4 +135,159 @@ struct ElecRateParityTests {
         guard case .object(let q) = qc.waste else { Issue.record("no waste"); return }
         #expect(q["costPower"] == .number(0.6))
     }
+
+    // MARK: - One bound, and blank read the same everywhere
+
+    @Test("the bound is one figure: the Mac's restated one is the JavaScript's, and both clamp to it")
+    func oneBound() async throws {
+        let fromNode = try Self.node("R.MAX_ELEC_RATE")
+        #expect(fromNode == .number(Shop.maxElecRate))
+        #expect(Shop.maxElecRate == 10_000)
+        let engine = try KhaytEngine()
+        // A KRW/NGN shop's real tariff stands; a figure over the bound is clamped TO it.
+        #expect(try await engine.printRates(settings: ["elecRate": .number(250)])["elecRate"] == 250)
+        let over: [String: JSONValue] = ["elecRate": .number(250_000)]
+        #expect(try await engine.printRates(settings: over)["elecRate"] == Shop.maxElecRate)
+        let node = try Self.node("R.ratesFor({ settings: { elecRate: 250000 } }).elecRate")
+        #expect(node == .number(Shop.maxElecRate))
+        // Junk is refused on both sides, whitespace included.
+        for bad: JSONValue in [.string(" "), .string("abc"), .number(-1), .bool(true), .null] {
+            #expect(try await engine.printRates(settings: ["elecRate": bad])["elecRate"] == 0.18,
+                    Comment(rawValue: "\(bad)"))
+        }
+    }
+
+    @Test("whitespace parity: a blank preset tariff defers to the shop's on the Mac, in Node and in the public quote")
+    func blankPresetDefers() async throws {
+        let engine = try KhaytEngine()
+        for blank in ["", " ", "   ", "\t"] {
+            let preset: JSONValue = .object(["id": .string("P1"), "elecRate": .string(blank),
+                                             "laborRate": .string(blank)])
+            let mac = try await engine.printRates(preset: preset, settings: Self.settings)
+            #expect(mac["elecRate"] == 0.3, Comment(rawValue: "mac \(blank.debugDescription)"))
+            #expect(mac["laborRate"] == 90, "a blank labour rate is not a free hour either")
+            let p = try Self.json(preset), st = try Self.json(.object(Self.settings))
+            let fromNode = try Self.node("""
+                (() => { const PQ = require('./lib/public-quote.js');
+                  return { rates: R.ratesFor({ preset: \(p), settings: \(st) }).elecRate,
+                           quote: PQ.elecRateFor(\(p), \(st)) }; })()
+                """)
+            #expect(fromNode == .object(["rates": .number(0.3), "quote": .number(0.3)]),
+                    Comment(rawValue: "node \(blank.debugDescription)"))
+        }
+    }
+
+    @Test("the setup's preset is held to the same bound: over it is clamped, junk writes nothing")
+    func setupPresetBounded() {
+        var root: [String: JSONValue] = ["printers": .array([])]
+        let id = Shop.writeSetupPreset(into: &root, name: "Shop rates", aliases: [], tariff: 1e9,
+                                       openers: ["laborRate": 90])
+        #expect(id != nil)
+        guard case .array(let rows)? = root["printers"], case .object(let row)? = rows.first else {
+            Issue.record("no preset"); return
+        }
+        #expect(row["elecRate"] == .number(Shop.maxElecRate))
+        for bad in [Double.nan, .infinity, -1] {
+            var untouched = root
+            #expect(Shop.writeSetupPreset(into: &untouched, name: "Shop rates", aliases: [], tariff: bad,
+                                          openers: ["laborRate": 90]) == nil)
+            #expect(untouched == root, Comment(rawValue: "\(bad)"))
+        }
+    }
+
+    // MARK: - Settings › Business keeps the old setup preset in step
+
+    /// A book an alpha.56 setup wrote: its tariff on a MARKED preset, with the
+    /// shop's own labour rate (as text) and a field this app does not model.
+    static func bookWithSetupPreset(settings: [String: JSONValue] = ["currency": .string("SAR")]) -> [String: JSONValue] {
+        ["settings": .object(settings),
+         "printers": .array([
+            .object(["id": .string("PRNTR-setup"), "name": .string("Shop rates"),
+                     Shop.setupPresetMarker: .bool(true), "elecRate": .number(0.18),
+                     "laborRate": .string("40"), "wearRate": .number(0.75), "notes": .string("mine")]),
+            .object(["id": .string("PRNTR-hand"), "name": .string("Shop rates (old)"),
+                     "elecRate": .number(0.5)]),
+         ])]
+    }
+
+    static func preset(_ root: [String: JSONValue], _ id: String) -> [String: JSONValue]? {
+        guard case .array(let rows)? = root["printers"] else { return nil }
+        for row in rows { if case .object(let o) = row, o["id"] == .string(id) { return o } }
+        return nil
+    }
+
+    /// The Business pane's save, exactly: the draft's form against what it opened.
+    func saveBusinessPane(_ root: inout [String: JSONValue], engine: KhaytEngine,
+                          edit: (inout BusinessPane.Draft) -> Void) async throws {
+        let shop = Shop()
+        let original = BusinessPane.Draft.read(Shop.settings(root), shop: shop)
+        var draft = original
+        edit(&draft)
+        try await Shop.applySettings(to: &root, form: draft.form(), opened: original.form(),
+                                     country: nil, engine: engine)
+    }
+
+    @Test("a new price in Settings › Business goes onto the marked setup preset too, and only its tariff")
+    func businessSaveUpdatesSetupPreset() async throws {
+        let engine = try KhaytEngine()
+        var root = Self.bookWithSetupPreset()
+        let hand = Self.preset(root, "PRNTR-hand")
+        try await saveBusinessPane(&root, engine: engine) { $0.elecRate = 0.3 }
+
+        guard case .object(let settings)? = root["settings"] else { Issue.record("no settings"); return }
+        #expect(settings["elecRate"] == .number(0.3))
+        let marked = try #require(Self.preset(root, "PRNTR-setup"))
+        #expect(marked["elecRate"] == .number(0.3), "the old setup preset no longer beats the new price")
+        #expect(marked["laborRate"] == .string("40"), "the rest of the preset as the book spells it")
+        #expect(marked["notes"] == .string("mine"))
+        #expect(marked[Shop.setupPresetMarker] == .bool(true))
+        #expect(Self.preset(root, "PRNTR-hand") == hand, "a preset the shop named itself is its own figure")
+        // So the preset, picked, now costs at the shop's price.
+        let rates = try await engine.printRates(preset: .object(marked), settings: settings)
+        #expect(rates["elecRate"] == 0.3)
+
+        // A KRW-sized price is not cut to 100 on the way.
+        try await saveBusinessPane(&root, engine: engine) { $0.elecRate = 250 }
+        #expect(Self.preset(root, "PRNTR-setup")?["elecRate"] == .number(250))
+        if case .object(let s)? = root["settings"] { #expect(s["elecRate"] == .number(250)) }
+    }
+
+    @Test("clearing the price takes it off the setup preset, which then falls back to Khayt's")
+    func businessClearRemovesFromSetupPreset() async throws {
+        let engine = try KhaytEngine()
+        var root = Self.bookWithSetupPreset(settings: ["currency": .string("SAR"), "elecRate": .number(0.3)])
+        try await saveBusinessPane(&root, engine: engine) { $0.elecRate = nil }
+
+        guard case .object(let settings)? = root["settings"] else { Issue.record("no settings"); return }
+        #expect(settings["elecRate"] == nil)
+        let marked = try #require(Self.preset(root, "PRNTR-setup"))
+        #expect(marked["elecRate"] == nil, "removed, not written as 0 — 0 would be a free kWh")
+        #expect(marked["laborRate"] == .string("40"))
+        #expect(try await engine.printRates(preset: .object(marked), settings: settings)["elecRate"] == 0.18)
+        // And the next price set reaches it again.
+        try await saveBusinessPane(&root, engine: engine) { $0.elecRate = 0.22 }
+        #expect(Self.preset(root, "PRNTR-setup")?["elecRate"] == .number(0.22))
+    }
+
+    @Test("saving the Business pane without touching the price leaves it, and the preset, byte-identical")
+    func untouchedPriceRoundTrips() async throws {
+        let engine = try KhaytEngine()
+        for stored: JSONValue in [.string("abc"), .string("inf"), .string("nan"), .string(" "), .string("0.30"),
+                                  .number(250_000), .number(-2), .object([:])] {
+            var root = Self.bookWithSetupPreset(settings: ["currency": .string("SAR"), "elecRate": stored,
+                                                           "phone": .string("1")])
+            let before = root
+            // Another field changes; the price field is never touched.
+            try await saveBusinessPane(&root, engine: engine) { $0.phone = "2" }
+            guard case .object(let s)? = root["settings"] else { Issue.record("no settings"); continue }
+            #expect(s["elecRate"] == stored, Comment(rawValue: "\(stored)"))
+            #expect(s["phone"] == .string("2"))
+            #expect(root["printers"] == before["printers"], Comment(rawValue: "\(stored)"))
+        }
+        // A junk value shows empty rather than as a number the field invented.
+        let shop = Shop()
+        for junk: JSONValue in [.string("abc"), .string("inf"), .string("nan")] {
+            #expect(BusinessPane.Draft.read(["elecRate": junk], shop: shop).elecRate == nil)
+        }
+    }
 }

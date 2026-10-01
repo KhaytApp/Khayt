@@ -67,6 +67,19 @@
 
   // Same shape, same reason: `print-risk.js` owns which values are allowed and
   // what an unrecognised one means, so this does not keep a second list.
+  // The shared tariff bound (`KhaytPrintRates.MAX_ELEC_RATE`). A host that
+  // loads this file without print-rates (the Electron renderer's pages) gets
+  // the same figure from `ELEC_RATE_BOUND` below, which
+  // test/shop-elec-rate.test.js pins equal to the shared one.
+  const printRates = () => (typeof global.KhaytPrintRates !== 'undefined')
+    ? global.KhaytPrintRates
+    : (function () { try { return require('./print-rates.js'); } catch (e) { return null; } })();
+  const ELEC_RATE_BOUND = 10000;
+  const maxElecRate = () => {
+    const R = printRates();
+    return R && typeof R.MAX_ELEC_RATE === 'number' ? R.MAX_ELEC_RATE : ELEC_RATE_BOUND;
+  };
+
   const printRisk = () => (typeof global.KhaytPrintRisk !== 'undefined')
     ? global.KhaytPrintRisk
     : (function () { try { return require('./print-risk.js'); } catch (e) { return null; } })();
@@ -264,13 +277,15 @@
     // costing reads it between Khayt's 0.18 and a preset. BLANK DELETES THE
     // KEY rather than storing 0: 0 is a real answer (a shop on solar), and
     // "not said" must go back to the default. Anything that is not a number
-    // keeps what was stored.
+    // keeps what was stored. The ceiling is the SHARED one every reader
+    // clamps to (MAX_ELEC_RATE, 10,000): per kWh in the shop's own currency,
+    // so a KRW or NGN shop's real ~250 is stored as typed, not as 100.
     if (has(f, 'elecRate')) {
       const raw = f.elecRate;
       if (raw === null || String(raw).trim() === '') delete out.elecRate;
       else {
         const n = num(raw, NaN);
-        if (Number.isFinite(n)) out.elecRate = clamp(0, 100, n);
+        if (Number.isFinite(n)) out.elecRate = clamp(0, maxElecRate(), n);
       }
     }
     if (has(f, 'wip')) {
@@ -659,7 +674,7 @@
     return out;
   }
 
-  const api = { apply, chooseCountry, DAYS, WIP_COLUMNS, DEFAULT_EXPENSE_CATEGORIES };
+  const api = { apply, chooseCountry, DAYS, WIP_COLUMNS, DEFAULT_EXPENSE_CATEGORIES, ELEC_RATE_BOUND };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytSettingsEdit = api;
 

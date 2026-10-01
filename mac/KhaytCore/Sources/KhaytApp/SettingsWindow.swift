@@ -273,7 +273,11 @@ struct BusinessPane: View {
         @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
             let r = SettingsReader(settings: settings)
             var d = Draft(phone: r.text("phone"), email: r.text("email"), vat: r.text("vat"), cr: r.text("cr"))
-            d.elecRate = Shop.plainNumber(settings["elecRate"])
+            // Only a figure the field can show. Junk (`"abc"`, `"inf"`, `"nan"`)
+            // shows empty — and saving the pane untouched still leaves it
+            // byte-identical: the form sends "" both as edited and as opened,
+            // so `RoundTrip` puts the stored value back (`applySettings`).
+            d.elecRate = Shop.plainNumber(settings["elecRate"]).flatMap { $0.isFinite ? $0 : nil }
             for field in shop.contentFields(["biz", "tagline", "addr"]) { d.content[field.key] = r.text(field.key) }
             return d
         }
