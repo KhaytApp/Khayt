@@ -187,6 +187,78 @@ struct EditPartTests {
         #expect(part["printTime"] == .number(0))
     }
 
+    // MARK: - Costed at the spool it is written with
+
+    static func spoolPart(filamentId: String, spoolCost: Double) -> [String: JSONValue] {
+        ["id": .string("P1"), "name": .string("Bracket"), "printWeight": .number(30),
+         "printTime": .number(1), "qty": .number(1), "filamentId": .string(filamentId),
+         "material": .string("PLA"), "spoolCost": .number(spoolCost), "spoolWeight": .number(1000)]
+    }
+
+    @Test("a weight corrected on a part whose spool is on the shelf writes the price it was costed at")
+    func recostWritesItsSpool() throws {
+        // The cost is worked out at the shelf's price for INV-2 (60). The part
+        // was bought at 50, and used to keep 50 beside a cost made from 60.
+        let raw = Self.spoolPart(filamentId: "INV-2", spoolCost: 50)
+        let opened = EditPartSheet.Opened(name: "Bracket", grams: "30", hours: "1", qty: 1, spoolId: "INV-2")
+        var now = opened
+        now.grams = "60"
+        let spool = try #require(Shop.partCostSpool(now, opened: opened, raw: raw, spools: RoundTripTests.spools))
+        #expect(spool.id == "INV-2")
+        let out = Shop.orderWithPartEdited(Self.orderRecord([.object(raw)]), partId: "P1", now,
+                                           opened: opened, spool: spool, costed: nil)
+        let part = try #require(Self.fields(out, partId: "P1"))
+        #expect(part["spoolCost"] == .number(60), "the part kept a price its cost was not made from")
+        #expect(part["printWeight"] == .number(60))
+    }
+
+    @Test("a part whose spool is gone is costed at its own price, not the first roll of its material")
+    func goneSpoolIsNotSubstituted() throws {
+        // INV-9 is not on the shelf. The sheet opens the part on INV-1, the
+        // first PLA, because it has to show something — and a weight corrected
+        // there was costed at INV-1's 85 while the part still named INV-9.
+        let raw = Self.spoolPart(filamentId: "INV-9", spoolCost: 50)
+        let opened = EditPartSheet.Opened(name: "Bracket", grams: "30", hours: "1", qty: 1, spoolId: "INV-1")
+        var now = opened
+        now.grams = "60"
+        #expect(Shop.partCostSpool(now, opened: opened, raw: raw, spools: RoundTripTests.spools) == nil)
+        guard case .object(let input) = Shop.costInput(spool: nil, grams: 60, hours: 1, qty: 1, extra: raw) else {
+            Issue.record("no input"); return
+        }
+        #expect(input["spoolCost"] == .number(50))
+        #expect(input["filamentId"] == .string("INV-9"))
+        let out = Shop.orderWithPartEdited(Self.orderRecord([.object(raw)]), partId: "P1", now,
+                                           opened: opened, spool: nil, costed: nil)
+        let part = try #require(Self.fields(out, partId: "P1"))
+        #expect(part["filamentId"] == .string("INV-9"))
+        #expect(part["spoolCost"] == .number(50))
+        // Choosing a roll on purpose still moves the part onto it.
+        var moved = now
+        moved.spoolId = "INV-2"
+        #expect(Shop.partCostSpool(moved, opened: opened, raw: raw, spools: RoundTripTests.spools)?.id == "INV-2")
+    }
+
+    @Test("the sheet's preview is costed at the part's own rates, as Save is")
+    func previewMatchesSave() async throws {
+        let shop = await Self.shop()
+        var raw = Self.spoolPart(filamentId: "INV-GONE", spoolCost: 20)
+        raw["laborRate"] = .number(500)
+        raw["prepTime"] = .number(1)
+        let opened = EditPartSheet.Opened(name: "Bracket", grams: "30", hours: "1", qty: 1, spoolId: nil)
+        var now = opened
+        now.grams = "60"
+        let preview = try #require(await shop.partEditCost(raw: raw, now, opened: opened).costed)
+        let defaults = try #require(await shop.costedPart(spoolId: nil, grams: 60, hours: 1, qty: 1))
+        #expect(preview.rates.laborRate == 500, "the preview ignored the part's own labour rate")
+        #expect(preview.cost != defaults.cost)
+        // And both the sheet and the save go through that one call.
+        let sheet = EmptyStateTests.source("EditPartSheet.swift")
+        #expect(sheet.contains("preview = await shop.partEditCost(raw: shop.rawPart(orderId, partId: part.id)"),
+                "the preview no longer costs the way Save does")
+        #expect(EmptyStateTests.source("Shop.swift").contains(
+            "? await partEditCost(raw: rawPart(orderId, partId: partId), now, opened: opened)"))
+    }
+
     @Test("a sample book refuses the edit rather than half-applying it")
     func sampleIsReadOnly() async throws {
         // `canMoveJobs` is false on the sample. The sheet disables its save

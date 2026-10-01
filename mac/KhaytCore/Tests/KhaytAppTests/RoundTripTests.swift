@@ -302,7 +302,108 @@ struct RoundTripTests {
         #expect(Self.diff(saved, raw) == ["category"])
     }
 
+    // MARK: - Products, priced (#1676)
+    //
+    // The cases above pass `priced: [:]`, so they never saw the price. The
+    // fixture's part was bought at 80 and its spool (INV-1) is on the shelf at
+    // "85" today: the sheet's parts carry 85, the book's carry 80.
+
+    static func pricer(_ engine: KhaytEngine) -> ([String: JSONValue]) async -> [String: JSONValue]? {
+        let inventory = rows("inventory").map(JSONValue.object)
+        let settings = settings
+        return { input in
+            try? await engine.productPricingFields(.object(input), inventory: inventory,
+                                                   settings: settings, consumables: [])
+        }
+    }
+
+    /// The fixture product, carrying the price its OWN stored parts make —
+    /// a product that was consistent when it was last saved.
+    static func pricedProduct(_ engine: KhaytEngine) async throws -> [String: JSONValue] {
+        var raw = first("products")
+        guard case .array(let parts)? = raw["parts"] else { return raw }
+        let fields = try #require(await pricer(engine)(
+            Shop.pricingInput(for: Product.from(raw, keys: keys), parts: parts)))
+        for (key, value) in fields { raw[key] = value }
+        return raw
+    }
+
+    /// `Shop.saveProduct`'s pure half: the baseline, the price, the record.
+    static func savedProduct(_ edited: ProductSheet.Opened, over raw: [String: JSONValue],
+                             engine: KhaytEngine) async -> [String: JSONValue] {
+        let opened = ProductSheet.opening(Product.from(raw, keys: keys))
+        let sent = ProductSheet.payload(edited, spools: spools)
+        let priced = await Shop.productPriceFields(
+            product: sent.product, parts: sent.parts,
+            opened: ProductSheet.payload(opened, spools: spools),
+            storedParts: raw["parts"], price: pricer(engine))
+        return Shop.productRecord(written: productSave(edited), baseline: productSave(opened),
+                                  priced: priced, over: raw)
+    }
+
+    @Test("a priced product opened and saved keeps its price, after its spool's price moved")
+    func pricedProductUntouched() async throws {
+        let engine = try KhaytEngine()
+        let raw = try await Self.pricedProduct(engine)
+        let opened = ProductSheet.opening(Product.from(raw, keys: Self.keys))
+        // The trap is set: pricing what the sheet sends gives another price.
+        let sent = ProductSheet.payload(opened, spools: Self.spools)
+        let naive = await Self.pricer(engine)(Shop.pricingInput(for: sent.product, parts: sent.parts))
+        #expect(naive?["baseCost"] != raw["baseCost"], "the fixture no longer moves the spool's price")
+
+        let saved = await Self.savedProduct(opened, over: raw, engine: engine)
+        #expect(Self.diff(saved, raw).isEmpty, "changed: \(Self.diff(saved, raw))")
+    }
+
+    @Test("a priced product renamed changes only its name")
+    func pricedProductRenamed() async throws {
+        let engine = try KhaytEngine()
+        let raw = try await Self.pricedProduct(engine)
+        var edited = ProductSheet.opening(Product.from(raw, keys: Self.keys))
+        edited.draft.names["en"] = "Tall vase"
+        let saved = await Self.savedProduct(edited, over: raw, engine: engine)
+        #expect(Self.diff(saved, raw) == ["nameEn"], "changed: \(Self.diff(saved, raw))")
+    }
+
+    @Test("a part's grams edited re-prices the product from the parts as saved")
+    func pricedProductGramsEdited() async throws {
+        let engine = try KhaytEngine()
+        let raw = try await Self.pricedProduct(engine)
+        var edited = ProductSheet.opening(Product.from(raw, keys: Self.keys))
+        edited.parts[0].grams = "40"
+        let saved = await Self.savedProduct(edited, over: raw, engine: engine)
+        guard case .array(let parts)? = saved["parts"], case .object(let part) = parts[0] else {
+            Issue.record("no parts"); return
+        }
+        #expect(part["printWeight"] == .number(40))
+        #expect(part["spoolCost"] == .number(80), "the untouched price the part was bought at was replaced")
+        #expect(saved["baseCost"] != raw["baseCost"], "a heavier part did not change the cost")
+        // The record agrees with itself: its price is what its own parts make.
+        let own = await Self.pricer(engine)(
+            Shop.pricingInput(for: Product.from(saved, keys: Self.keys), parts: parts))
+        for key in ["baseCost", "basePrice", "price"] {
+            #expect(saved[key] == own?[key], "\(key) is not what the saved parts price at")
+        }
+    }
+
     // MARK: - Spools
+
+    @Test("a spool's price changed over a price stored as text keeps the old price in its history")
+    func spoolPriceHistory() async throws {
+        let engine = try KhaytEngine()
+        let raw = Self.first("inventory")
+        let form = SpoolSheet.Form.opening(Self.spools[0], unit: "g")
+        var edited = form
+        edited.cost = 90
+        let out = try await Shop.editedSpool(
+            .object(raw), input: edited.input(isNew: false, reclaimsTax: true),
+            opened: form.input(isNew: false, reclaimsTax: true),
+            settings: Self.settings, today: "2026-09-29", engine: engine)
+        guard case .object(let saved) = out.spool else { Issue.record("no spool"); return }
+        #expect(Self.diff(saved, raw) == ["cost", "priceHistory"], "changed: \(Self.diff(saved, raw))")
+        #expect(saved["priceHistory"] == .array([.object(["cost": .string("85"),
+                                                           "date": .string("2026-09-29")])]))
+    }
 
     @Test("a spool opened and saved is unchanged")
     func spoolUntouched() async throws {

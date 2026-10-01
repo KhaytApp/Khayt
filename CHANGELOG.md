@@ -15,6 +15,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   anyone who has it can post to that channel. It was copied into the cloud backup and served to paired phones in full.
   It is now hidden from both, like the other webhook addresses and the ntfy
   topic, and a cloud sync or restore keeps this computer's own address.
+- **(Mac) Saving a product you did not change no longer re-prices it.** The
+  product sheet priced its parts at today's spool price while the saved parts
+  kept the price they were bought at, so opening a product after a filament
+  price change and pressing Save moved its price, and its parts no longer added
+  up to its cost. An untouched save, or a name-only edit, now keeps the stored
+  price exactly; an edit that does change the price works it out from the
+  parts as they are saved.
+- **(Mac) Editing a job's part: the cost shown is the cost saved.** The preview
+  ignored a part's own labour, power and wear rates, which Save used. A re-cost
+  now also writes the spool price it was worked out from, and a part whose
+  spool has left the shelf is costed at its own recorded price rather than the
+  first roll of the same material.
+- **(Mac/Electron) A spool price change is always recorded in its history.** A
+  price stored as text ("85") counted as a change on every save, and on the
+  Mac that made a real change's entry disappear. Prices are now compared as
+  numbers.
+- **(Mac) Running the first-run setup again keeps your preset rates.** It used
+  to reset a customised "Shop rates" preset to Khayt's opening figures; it now
+  changes only the electricity price, and finds the same preset whether the
+  setup was run in English or Arabic.
 
 - **(Mac) A first-run setup for a new shop.** An empty book, or a Mac with no
   book at all, now opens a short setup: your currency, VAT and electricity

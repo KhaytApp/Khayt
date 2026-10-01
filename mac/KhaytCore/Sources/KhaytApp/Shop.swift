@@ -3532,6 +3532,45 @@ final class Shop {
         return record
     }
 
+    /// The price fields a product save lays over the record — or NONE, when
+    /// nothing the price is made from was edited.
+    ///
+    /// ── WHY NOT SIMPLY PRICE WHAT THE SHEET SENT ──────────────────────────
+    ///
+    /// The sheet's parts are REFRESHED: `PartRow.record(spools:)` copies each
+    /// part's `spoolCost`/`spoolWeight` off the spool on the shelf today. So
+    /// pricing them priced the product at today's filament — and then
+    /// `keepUntouched` put the stored parts back, with the price they were
+    /// bought at, because those fields were not edited. A shop that opened a
+    /// product after a roll went from 80 to 85 and pressed Save got a new
+    /// price for nothing it did, and parts that no longer summed to the
+    /// product's own `baseCost` (#1676; the Sep 50 → 13.74 incident's class).
+    ///
+    /// So: the sheet's parts are priced, and so are the parts it OPENED with
+    /// (the baseline — refreshed the same way). Equal means nothing priced
+    /// was touched, and the stored price stands, byte for byte. Different
+    /// means something was: and then the price is worked out from the parts
+    /// AS THEY WILL BE SAVED — the edit, with every untouched field put back
+    /// as the book holds it — so the record agrees with itself.
+    ///
+    /// `opened` is nil for a new product: everything is an edit, priced as sent.
+    static func productPriceFields(
+        product: Product, parts: [JSONValue], opened: ProductSheet.Payload?,
+        storedParts: JSONValue?,
+        price: ([String: JSONValue]) async -> [String: JSONValue]?
+    ) async -> [String: JSONValue] {
+        guard let sent = await price(pricingInput(for: product, parts: parts)) else { return [:] }
+        guard let opened else { return sent }
+        let untouched = await price(pricingInput(for: opened.product, parts: opened.parts))
+        if untouched == sent { return [:] }
+        var kept = parts
+        if case .array(let merged)? = RoundTrip.merge(.array(parts), baseline: .array(opened.parts),
+                                                      stored: storedParts) {
+            kept = merged
+        }
+        return await price(pricingInput(for: product, parts: kept)) ?? sent
+    }
+
     /// Save a product, and its pictures.
     ///
     /// `pictures` is nil for a caller that is not editing them at all, which is
@@ -3593,9 +3632,13 @@ final class Shop {
         // document row the other app wrote, a part weighing 12.34567 g that
         // the form shows to four places.
         var baseline: [String: JSONValue]?
+        var openedPayload: ProductSheet.Payload?
+        var storedParts: JSONValue?
         if case .object(let stored)? = productRows.first(where: { Self.recordId($0) == product.id }) {
             let opened = ProductSheet.payload(ProductSheet.opening(Product.from(stored, keys: keys)),
                                               spools: spools)
+            openedPayload = opened
+            storedParts = stored["parts"]
             var b = opened.product.record(keys: keys)
             if staged != nil {
                 for (key, value) in await Self.pictureFields(await self.pictures(of: product.id),
@@ -3624,12 +3667,14 @@ final class Shop {
         var priced: [String: JSONValue] = [:]
         if let parts {
             partFields["parts"] = .array(parts)
-            let forPricing = Self.pricingInput(for: product, parts: parts)
-            if let engine,
-               let fields = try? await engine.productPricingFields(
-                .object(forPricing), inventory: inventoryRows,
-                settings: settingsDict, consumables: consumableRows) {
-                priced = fields
+            if let engine {
+                let inventory = inventoryRows, settings = settingsDict, consumables = consumableRows
+                priced = await Self.productPriceFields(
+                    product: product, parts: parts, opened: openedPayload, storedParts: storedParts
+                ) { input in
+                    try? await engine.productPricingFields(.object(input), inventory: inventory,
+                                                           settings: settings, consumables: consumables)
+                }
             }
         }
 
@@ -4266,6 +4311,69 @@ final class Shop {
         return id
     }
 
+    /// The field marking the preset the first-run setup made — so running
+    /// the setup again finds it whatever language its name was written in.
+    static let setupPresetMarker = "khaytSetupPreset"
+
+    /// The first-run setup's electricity tariff, into its own preset.
+    ///
+    /// ── ONLY THE TARIFF ──────────────────────────────────────────────────
+    ///
+    /// The setup asks one question — what a kWh costs — and used to answer it
+    /// by writing all seven rates: Khayt's openers plus the tariff, saved over
+    /// the same-named preset. A shop that had since set its own labour rate
+    /// and failure allowance on "Shop rates" and re-ran the setup had all six
+    /// reset to the openers (#1675). So a preset already there keeps every
+    /// rate it has and only `elecRate` changes; the openers are used only for
+    /// a preset made fresh, where there is nothing else to start from.
+    ///
+    /// ── FOUND BY A MARKER, NOT BY ONE NAME ────────────────────────────────
+    ///
+    /// The name is the localised "Shop rates", so the setup run in English
+    /// and then in Arabic made two presets. The preset carries
+    /// `setupPresetMarker`; one without it (made before the marker existed)
+    /// is matched by any of the names the setup has used (`aliases`), and
+    /// gains the marker. Its name is left as it is.
+    ///
+    /// Returns the preset's id, or nil when there was none and the openers
+    /// could not be read.
+    @discardableResult
+    static func writeSetupPreset(into root: inout [String: JSONValue], name: String,
+                                 aliases: [String], tariff: Double,
+                                 openers: [String: Double]?) -> String? {
+        var rows: [JSONValue] = []
+        if case .array(let had)? = root["printers"] { rows = had }
+        let names = Set(([name] + aliases).map { $0.trimmingCharacters(in: .whitespaces).lowercased() })
+        func marked(_ row: JSONValue) -> Bool {
+            if case .object(let o) = row { return o[setupPresetMarker] == .bool(true) }
+            return false
+        }
+        func named(_ row: JSONValue) -> Bool {
+            guard let p = Preset.from(row) else { return false }
+            return names.contains(p.name.trimmingCharacters(in: .whitespaces).lowercased())
+        }
+        if let at = rows.firstIndex(where: marked) ?? rows.firstIndex(where: named),
+           case .object(let was) = rows[at], var preset = Preset.from(rows[at]) {
+            preset.rates["elecRate"] = tariff
+            // Through `presetRow`, so the six untouched rates go back exactly as
+            // the book spells them (and one it never carried stays absent).
+            var row = presetRow(preset, over: was)
+            row[setupPresetMarker] = .bool(true)
+            rows[at] = .object(row)
+            root["printers"] = .array(rows)
+            return preset.id
+        }
+        guard let openers else { return nil }
+        var preset = Preset(id: "PRNTR-\(UUID().uuidString.prefix(8))", name: name)
+        preset.rates = openers
+        preset.rates["elecRate"] = tariff
+        guard case .object(var row) = preset.record else { return nil }
+        row[setupPresetMarker] = .bool(true)
+        rows.append(.object(row))
+        root["printers"] = .array(rows)
+        return preset.id
+    }
+
     /// `printFiles` as written. See `setups(for:)` and `versions(for:)`.
     private(set) var fileRows: [JSONValue] = []
 
@@ -4750,20 +4858,62 @@ final class Shop {
     func editPart(_ orderId: Order.ID, partId: String, _ now: EditPartSheet.Opened,
                   opened: EditPartSheet.Opened?) async {
         guard now != opened else { return }
-        let grams = Double(now.grams) ?? 0, hours = Double(now.hours) ?? 0
         let recost = opened.map {
             $0.grams != now.grams || $0.hours != now.hours || $0.qty != now.qty || $0.spoolId != now.spoolId
         } ?? true
-        let costed = recost
-            ? await costedPart(spoolId: now.spoolId, grams: grams, hours: hours, qty: now.qty,
-                               extra: rawPart(orderId, partId: partId) ?? [:])
-            : nil
-        let spool = now.spoolId.flatMap { id in spools.first { $0.id == id } }
+        // Costed, and written, by the one call the sheet's preview makes — so
+        // the figure on screen is the figure saved, and the spool fields the
+        // cost was worked out from are the ones that land on the part.
+        let (spool, costed): (Spool?, KhaytEngine.CostedPart?) = recost
+            ? await partEditCost(raw: rawPart(orderId, partId: partId), now, opened: opened)
+            : (nil, nil)
 
         await writeToOneOrder(orderId, named: words.callIt("mac.edit_part")) { order, _, _ in
             OneOrderEdit(order: Self.orderWithPartEdited(
                 order, partId: partId, now, opened: opened, spool: spool, costed: costed))
         }
+    }
+
+    /// The spool an edited part is costed at — and whose four fields
+    /// (`filamentId`, `material`, `spoolCost`, `spoolWeight`) the save then
+    /// writes — or nil, to cost it at what the part already carries.
+    ///
+    /// - A spool CHOSEN in the sheet (or no sheet state at all): that spool.
+    /// - The spool the part names, still on the shelf: that spool, at today's
+    ///   price — and its price is written with the cost, so the part never
+    ///   carries a `spoolCost` its own `unitCost` was not worked out from.
+    /// - The spool the part names is GONE: the part's own stored
+    ///   `spoolCost`/`spoolWeight`. The sheet opens such a part on the first
+    ///   roll of the same material, for want of anything better to show; a
+    ///   weight corrected there used to be costed at THAT roll's price while
+    ///   the part went on naming the old one. A spool nobody picked is not
+    ///   one to re-cost at.
+    /// - It names none, and carries no price of its own: the spool the sheet
+    ///   shows, written whole (id included), since there is nothing else to
+    ///   cost at.
+    static func partCostSpool(_ now: EditPartSheet.Opened, opened: EditPartSheet.Opened?,
+                              raw: [String: JSONValue]?, spools: [Spool]) -> Spool? {
+        guard let id = now.spoolId else { return nil }
+        let shown = spools.first { $0.id == id }
+        guard let opened, opened.spoolId == id else { return shown }
+        if let named = plainString(raw?["filamentId"]), let spool = spools.first(where: { $0.id == named }) {
+            return spool
+        }
+        if plainNumber(raw?["spoolCost"]) != nil { return nil }
+        return shown
+    }
+
+    /// What an edited part will cost, worked out exactly as `editPart` saves
+    /// it: the spool from `partCostSpool`, and the part's own rates (`raw`)
+    /// beating the machine's. The sheet's preview calls THIS, so the price on
+    /// the button cannot differ from the one written.
+    func partEditCost(raw: [String: JSONValue]?, _ now: EditPartSheet.Opened,
+                      opened: EditPartSheet.Opened?) async -> (spool: Spool?, costed: KhaytEngine.CostedPart?) {
+        let spool = Self.partCostSpool(now, opened: opened, raw: raw, spools: spools)
+        let costed = await costedPart(spoolId: spool?.id, grams: Double(now.grams) ?? 0,
+                                      hours: Double(now.hours) ?? 0, qty: now.qty,
+                                      extra: raw ?? [:])
+        return (spool, costed)
     }
 
     /// A part as the book holds it, every field.
@@ -4798,7 +4948,11 @@ final class Shop {
             if now.grams != opened.grams { part["printWeight"] = .number(max(0, Double(now.grams) ?? 0)) }
             if now.hours != opened.hours { part["printTime"] = .number(max(0, Double(now.hours) ?? 0)) }
             if now.qty != opened.qty { part["qty"] = .number(Double(max(1, now.qty))) }
-            if now.spoolId != opened.spoolId, let spool {
+            // `spool` is the one the cost was worked out from (`partCostSpool`),
+            // so its fields go down whenever it is given — not only when the
+            // choice changed, or a part re-costed at today's price kept the
+            // price it was bought at beside a cost that did not use it.
+            if let spool {
                 part["filamentId"] = .string(spool.id)
                 part["material"] = .string(spool.material)
                 part["spoolCost"] = .number(spool.cost ?? 0)
@@ -9955,7 +10109,18 @@ final class Shop {
         let out = try await engine.editSpool(stored, input: input, settings: settings, today: today)
         guard let opened, out.refused == nil else { return out }
         let base = try await engine.editSpool(stored, input: opened, settings: settings, today: today)
-        return SpoolEdited(spool: keptEdit(stored, written: out.spool, baseline: base.spool) ?? out.spool,
+        var spool = keptEdit(stored, written: out.spool, baseline: base.spool) ?? out.spool
+        // A price the shop CHANGED is a price-history entry, whatever the
+        // baseline did. The rule compares numerically now, but a baseline that
+        // logged a phantom change (a stored `"85"` re-saved as 85) used to
+        // carry the very entry the real edit wrote, and the round trip then
+        // put the stored list back — the old price silently gone from history.
+        if plainNumber(input["cost"]) != plainNumber(opened["cost"]),
+           case .object(var kept) = spool, case .object(let written) = out.spool {
+            if let history = written["priceHistory"] { kept["priceHistory"] = history }
+            spool = .object(kept)
+        }
+        return SpoolEdited(spool: spool,
                            settings: out.settings, refused: out.refused, colourAdded: out.colourAdded)
     }
 
