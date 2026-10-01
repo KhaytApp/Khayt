@@ -14,21 +14,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   error kind only, never the message, which could carry a customer's name.
   Report folders left in the temporary directory are removed after a day. The
   window picture says that it shows customer names and prices.
+
 - **(Mac) Starting a new book can never replace one.** If a book appeared
   between the check and the write, the empty one replaced it; the new book is
   now created exclusively, readable only by you.
+
 - **(Mac) Copied secrets stay on this Mac.** An import key or sign-in link you
   copy is kept off Universal Clipboard, and is marked both concealed and
   transient so clipboard history apps that honour those markers skip it.
-- **Security: an export with secrets hidden also leaves out survey links and
-  the wrapped cloud key.** Each finished order's customer survey link was
-  still in the file, and so was the shop's cloud data key, locked with its
-  passphrase. Anyone with the file could try passwords against that key
-  offline. Both are now left out of the hidden-secrets export and the iCloud
-  copy. The full local backup keeps them, and a survey link is made again
-  when it is next needed.
-- **Arabic: a spool's default order quantity says grams.** The box is in
-  grams, as every other language says, but the Arabic label said (كغ).
 
 - **(Mac) Grouping prints is visible again.** Group, Category and the
   "where it came from" menu were only in the classic layout's toolbar, so on
@@ -36,11 +29,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the Library beside Sort and Import, and right-clicking a model offers Group
   (the shop's groups, New Group…, Remove from Group) for every selected model.
 
-- **Security: the outgoing event webhook's address stays on the computer
-  it was set on.** A Slack or Discord webhook address works as a password:
-  anyone who has it can post to that channel. It was copied into the cloud backup and served to paired phones in full.
-  It is now hidden from both, like the other webhook addresses and the ntfy
-  topic, and a cloud sync or restore keeps this computer's own address.
 - **(Mac) Saving a product you did not change no longer re-prices it.** The
   product sheet priced its parts at today's spool price while the saved parts
   kept the price they were bought at, so opening a product after a filament
@@ -48,15 +36,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   up to its cost. An untouched save, or a name-only edit, now keeps the stored
   price exactly; an edit that does change the price works it out from the
   parts as they are saved.
+
 - **(Mac) Editing a job's part: the cost shown is the cost saved.** The preview
   ignored a part's own labour, power and wear rates, which Save used. A re-cost
   now also writes the spool price it was worked out from, and a part whose
   spool has left the shelf is costed at its own recorded price rather than the
   first roll of the same material.
+
 - **(Mac/Electron) A spool price change is always recorded in its history.** A
   price stored as text ("85") counted as a change on every save, and on the
   Mac that made a real change's entry disappear. Prices are now compared as
   numbers.
+
 - **(Mac) Running the first-run setup again keeps your preset rates.** It used
   to reset a customised "Shop rates" preset to Khayt's opening figures; it now
   changes only the electricity price, and finds the same preset whether the
@@ -78,6 +69,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   priority control no longer runs into the right margin; and the feedback
   sheet's wording is clearer about what the diagnostics file holds and when to
   attach the book.
+
 - **(Mac) A first-run setup for a new shop.** An empty book, or a Mac with no
   book at all, now opens a short setup: your currency, VAT and electricity
   price; your printer (pick the model and its power is filled in), what it
@@ -87,14 +79,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   with no book, finishing starts your own. It is under Book › Set up your
   shop, and on the empty dashboard, if you want it again. The electricity
   price is saved as a calculator preset named "Shop rates".
+
 - **(Mac) Picking a printer model keeps its power and nozzle.** Adding a
   machine and choosing its model from the list saved it with no power draw
   and a brass nozzle, whatever the model uses, because the sheet's own empty
   fields were written over the model's. Picking a model now fills in its
   power, nozzle size and nozzle material on screen, and those are saved.
+
 - **(Mac) Tests no longer fail on the first of the month.** A test that reads the
   sample book on a pinned day now also asks "this month" of that day, so the
   masthead, the period filter and their tests stop depending on today's date.
+
 - **(Mac) Help ▸ Send Feedback…** Testers can report a problem by email with
   what it takes to reproduce it. The sheet asks what happened, then opens a
   draft to support@khaytapp.com in your mail app with a diagnostics file
@@ -106,6 +101,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   until you press Send. With no mail app set up, the files are saved as a zip in
   Downloads and the address is copied. The same action is on the "shared rules
   did not load" banner and on a right-click of the last-crash notice.
+
 - **(Mac) Opening something and pressing Save no longer changes it.** Every
   editor on the Mac (customers, suppliers, products, spools, consumables,
   machines, a job's due date and priority, a job's part, maintenance tasks,
@@ -3996,6 +3992,37 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.1] - 2026-10-01
+
+Security fixes since 3.11.0. Individual entries are kept below; this is
+what changed for you.
+
+**Two kinds of secret no longer leave your computer.** A Slack or Discord
+webhook address is now kept off the cloud backup and paired phones. An export
+with secrets hidden, and the iCloud copy, no longer carry customer survey
+links or your cloud data key. Nothing changes in how Khayt works for you.
+
+### Security
+
+- **Security: an export with secrets hidden also leaves out survey links and
+  the wrapped cloud key.** Each finished order's customer survey link was
+  still in the file, and so was the shop's cloud data key, locked with its
+  passphrase. Anyone with the file could try passwords against that key
+  offline. Both are now left out of the hidden-secrets export and the iCloud
+  copy. The full local backup keeps them, and a survey link is made again
+  when it is next needed.
+
+- **Security: the outgoing event webhook's address stays on the computer
+  it was set on.** A Slack or Discord webhook address works as a password:
+  anyone who has it can post to that channel. It was copied into the cloud backup and served to paired phones in full.
+  It is now hidden from both, like the other webhook addresses and the ntfy
+  topic, and a cloud sync or restore keeps this computer's own address.
+
+### Changed
+
+- **Arabic: a spool's default order quantity says grams.** The box is in
+  grams, as every other language says, but the Arabic label said (كغ).
 
 ## [3.11.0] - 2026-10-01
 
