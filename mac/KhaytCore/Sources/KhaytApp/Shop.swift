@@ -4465,12 +4465,20 @@ final class Shop {
     /// is matched by any of the names the setup has used (`aliases`), and
     /// gains the marker. Its name is left as it is.
     ///
+    /// ── THE SAME BOUND AS EVERY OTHER READER ─────────────────────────────
+    ///
+    /// The preset's tariff BEATS the shop's wherever the preset is picked, so
+    /// it is held to the rule the shop's own is read by (`shopTariff`): NaN,
+    /// Infinity or negative writes nothing, and above `maxElecRate` is clamped
+    /// to it — before, this wrote whatever it was handed.
+    ///
     /// Returns the preset's id, or nil when there was none and the openers
-    /// could not be read.
+    /// could not be read, or the tariff was refused.
     @discardableResult
     static func writeSetupPreset(into root: inout [String: JSONValue], name: String,
-                                 aliases: [String], tariff: Double,
+                                 aliases: [String], tariff raw: Double,
                                  openers: [String: Double]?) -> String? {
+        guard let tariff = boundedTariff(raw) else { return nil }
         var rows: [JSONValue] = []
         if case .array(let had)? = root["printers"] { rows = had }
         let names = Set(([name] + aliases).map { $0.trimmingCharacters(in: .whitespaces).lowercased() })
@@ -4483,15 +4491,12 @@ final class Shop {
             return names.contains(p.name.trimmingCharacters(in: .whitespaces).lowercased())
         }
         if let at = rows.firstIndex(where: marked) ?? rows.firstIndex(where: named),
-           case .object(let was) = rows[at], var preset = Preset.from(rows[at]) {
-            preset.rates["elecRate"] = tariff
-            // Through `presetRow`, so the six untouched rates go back exactly as
-            // the book spells them (and one it never carried stays absent).
-            var row = presetRow(preset, over: was)
+           case .object(let was) = rows[at], let id = Preset.from(rows[at])?.id {
+            var row = withTariff(tariff, over: was)
             row[setupPresetMarker] = .bool(true)
             rows[at] = .object(row)
             root["printers"] = .array(rows)
-            return preset.id
+            return id
         }
         guard let openers else { return nil }
         var preset = Preset(id: "PRNTR-\(UUID().uuidString.prefix(8))", name: name)
@@ -4502,6 +4507,59 @@ final class Shop {
         rows.append(.object(row))
         root["printers"] = .array(rows)
         return preset.id
+    }
+
+    /// The most a kWh can cost — `KhaytPrintRates.MAX_ELEC_RATE`, the one
+    /// bound every reader of a shop tariff clamps to (lib/print-rates.js says
+    /// why 10,000). Swift needs it in a static, engine-less writer, so it is
+    /// restated here and `ElecRateParityTests` pins it to the JavaScript.
+    static let maxElecRate: Double = 10_000
+
+    /// A tariff by `shopTariff`'s rules: nil for NaN, Infinity or negative;
+    /// clamped to `maxElecRate` above it.
+    static func boundedTariff(_ v: Double) -> Double? {
+        guard v.isFinite, v >= 0 else { return nil }
+        return min(v, maxElecRate)
+    }
+
+    /// A preset row with its tariff set to `tariff`, or REMOVED for nil —
+    /// every other field exactly as the book spells it. Setting goes through
+    /// `presetRow` (the #1676 round-trip rule); removing takes only the key
+    /// away, because `Preset.record` writes an absent rate as 0, and 0 is a
+    /// tariff (a free kWh) rather than "say nothing, use the shop's".
+    static func withTariff(_ tariff: Double?, over was: [String: JSONValue]) -> [String: JSONValue] {
+        guard let tariff else {
+            var row = was
+            row.removeValue(forKey: "elecRate")
+            return row
+        }
+        guard var preset = Preset.from(.object(was)) else { return was }
+        preset.rates["elecRate"] = tariff
+        return presetRow(preset, over: was)
+    }
+
+    /// Keep the preset the first-run setup made (`setupPresetMarker`) in step
+    /// with the shop's tariff, after the shop changes it in Settings ›
+    /// Business.
+    ///
+    /// A setup before the shop-wide tariff saved the answer ONLY as that
+    /// preset, and a preset's tariff beats the shop's — so a shop that later
+    /// changed its price in Settings was still charged the old one wherever
+    /// "Shop rates" was picked. A new price is written onto the preset; a
+    /// cleared one takes the tariff off it, so it falls back to the shop's
+    /// (and then to Khayt's). Only the MARKED preset: one the shop named
+    /// "Shop rates" by hand is its own figure. No marked preset, no write.
+    static func keepSetupPresetInStep(_ root: inout [String: JSONValue], tariff: Double?) {
+        guard case .array(var rows)? = root["printers"],
+              let at = rows.firstIndex(where: {
+                  if case .object(let o) = $0 { return o[setupPresetMarker] == .bool(true) }
+                  return false
+              }),
+              case .object(let was) = rows[at] else { return }
+        let row = withTariff(tariff.flatMap(boundedTariff), over: was)
+        guard row != was else { return }
+        rows[at] = .object(row)
+        root["printers"] = .array(rows)
     }
 
     /// `printFiles` as written. See `setups(for:)` and `versions(for:)`.
@@ -11142,6 +11200,13 @@ final class Shop {
             // kept in its own spelling.
             settings = RoundTrip.keepUntouched(written: settings, baseline: baseline, stored: stored,
                                                fillingGaps: true)
+        }
+        // THE SHOP'S TARIFF CHANGED: the preset an earlier setup made carries
+        // the old one and would beat it wherever it is picked. Only on a real
+        // change — a save that leaves the stored value as it was (a junk value
+        // the pane could not show, untouched) writes no preset.
+        if form["elecRate"] != nil, settings["elecRate"] != stored["elecRate"] {
+            keepSetupPresetInStep(&root, tariff: plainNumber(settings["elecRate"]))
         }
         root["settings"] = .object(settings)
     }

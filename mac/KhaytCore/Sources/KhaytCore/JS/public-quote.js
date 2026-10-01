@@ -47,6 +47,19 @@ const num = (v, d = 0) => {
 };
 
 /**
+ * The ceiling on a shop's tariff — `KhaytPrintRates.MAX_ELEC_RATE`, the one
+ * bound every reader clamps `settings.elecRate` to (see lib/print-rates.js for
+ * why 10,000). This file is vendored without print-rates, so where that module
+ * is not loaded the same figure comes from `ELEC_RATE_BOUND`, which
+ * test/shop-elec-rate.test.js pins equal to the shared one.
+ */
+const ELEC_RATE_BOUND = 10000;
+const maxElecRate = () => {
+  const R = typeof globalThis !== 'undefined' ? globalThis.KhaytPrintRates : null;
+  return R && typeof R.MAX_ELEC_RATE === 'number' ? R.MAX_ELEC_RATE : ELEC_RATE_BOUND;
+};
+
+/**
  * The electricity tariff a public quote charges: the preset's own, else the
  * SHOP'S (`settings.elecRate`, lib/print-rates.js), else 0.
  *
@@ -55,11 +68,16 @@ const num = (v, d = 0) => {
  * shop that has said nothing about electricity was quoted without it before
  * the shop tariff existed. A preset that says nothing (absent, blank, null)
  * now defers to the shop; a preset that says a number is used as it stands.
+ * The shop's is read by `KhaytPrintRates.shopTariff`'s rules: blank, negative
+ * or not a number is "not said", above the bound is clamped to it.
  */
 function elecRateFor(preset, settings) {
-  const said = (v) => v !== undefined && v !== null && String(v).trim() !== '' && Number.isFinite(Number(v));
+  const said = (v) => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== ''))
+    && Number.isFinite(Number(v));
   if (preset && said(preset.elecRate)) return Number(preset.elecRate);
-  if (settings && said(settings.elecRate) && Number(settings.elecRate) >= 0) return Number(settings.elecRate);
+  if (settings && said(settings.elecRate) && Number(settings.elecRate) >= 0) {
+    return Math.min(Number(settings.elecRate), maxElecRate());
+  }
   return 0;
 }
 
@@ -249,7 +267,7 @@ function publicQuote(input) {
 // quote here would use, so the web price and the LAN price cannot differ.
 // `elecRateFor` for the same reason: the sheet carries the tariff a quote here
 // would charge, shop tariff included.
-const api = { publicQuote, DEFAULT_CONFIG, materialBasis, elecRateFor };
+const api = { publicQuote, DEFAULT_CONFIG, materialBasis, elecRateFor, ELEC_RATE_BOUND };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 global.KhaytPublicQuote = api;
 

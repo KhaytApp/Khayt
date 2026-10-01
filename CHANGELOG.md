@@ -11,6 +11,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   preset with its own electricity price still wins. Leave it empty to keep
   Khayt's default. The Mac app reads the same setting.
 
+- **The shop's electricity price takes a real figure in every currency.** It
+  was capped at 100 per kWh, so a shop pricing in won or naira had its real
+  ~250 saved as 100 without a word. The ceiling is now 10,000 per kWh, and
+  every place that reads the price uses that one figure: a higher stored
+  value is costed at the ceiling, and a blank, negative or non-numeric one is
+  still ignored.
+- **A blank electricity figure on a calculator preset no longer means free
+  electricity.** A tariff field holding only spaces was costed at 0 per kWh in
+  a job's costing while the online quote ignored it. Both now treat it as not
+  set, so the shop's own price applies. The same goes for the preset's other
+  rates and a machine's power draw and wear rate.
+- **(Mac) Changing the electricity price in Settings › Business also updates
+  the "Shop rates" preset that an earlier first-run setup made.** That preset's
+  old price was used instead of the new one wherever the preset was picked.
+  Clearing the price removes it from that preset too, so it falls back to the
+  shop's price. A preset the shop named itself is left alone. Saving the pane
+  without touching the price keeps whatever was stored exactly as it was.
 - **Selecting print files only ever holds what is on screen.** Changing the
   filter, the search or the view now drops any selected file it hides, and
   Delete refuses outright if anything selected is not shown. A selection used

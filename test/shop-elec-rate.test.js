@@ -129,11 +129,18 @@ test('print-energy: tariffOf falls to the resolved rates, which carry the shop t
 
 // ── settings-edit ───────────────────────────────────────────────────────────
 
-test('settings-edit: elecRate is clamped 0–100, blank deletes, junk and absence keep', () => {
+test('settings-edit: elecRate is clamped 0–MAX_ELEC_RATE, blank deletes, junk and absence keep', () => {
   assert.equal(apply({}, { elecRate: 0.3 }).elecRate, 0.3);
   assert.equal(apply({}, { elecRate: '0.25' }).elecRate, 0.25);
   assert.equal(apply({}, { elecRate: -1 }).elecRate, 0);
-  assert.equal(apply({}, { elecRate: 500 }).elecRate, 100);
+  // A KRW or NGN shop's real tariff is stored as typed — the old 0–100 made it 100.
+  assert.equal(apply({}, { elecRate: 250 }).elecRate, 250);
+  assert.equal(apply({}, { elecRate: 500 }).elecRate, 500);
+  assert.equal(apply({}, { elecRate: R.MAX_ELEC_RATE }).elecRate, R.MAX_ELEC_RATE);
+  assert.equal(apply({}, { elecRate: 1e9 }).elecRate, R.MAX_ELEC_RATE);
+  // Infinity and NaN are not numbers here: what was stored stays.
+  assert.equal(apply({ elecRate: 0.3 }, { elecRate: Infinity }).elecRate, 0.3);
+  assert.equal(apply({ elecRate: 0.3 }, { elecRate: NaN }).elecRate, 0.3);
   assert.equal(apply({}, { elecRate: 0 }).elecRate, 0);
   // Blank is "not said": the key goes, so the default applies again.
   assert.ok(!('elecRate' in apply({ elecRate: 0.3 }, { elecRate: '' })));
@@ -185,4 +192,65 @@ test('quote sheet: carries the resolved tariff, so the storefront agrees with th
   // A preset with its own keeps it; a book without the key publishes 0 as before.
   assert.equal(QS.build(store({ elecRate: 0.3 }, { elecRate: 0.5 }), {}).printer.elecRate, 0.5);
   assert.equal(QS.build(store({}, {}), {}).printer.elecRate, 0);
+});
+
+// ── ONE BOUND, EVERY READER ─────────────────────────────────────────────────
+//
+// settings.elecRate is per kWh in the shop's OWN currency, so the ceiling has
+// to fit IQD/NGN/KRW. 10,000 — see lib/print-rates.js for the reasoning. Every
+// reader clamps a stored value above it TO it (the shop did say a price), and
+// refuses blank, negative, NaN, Infinity and junk as "not said".
+
+test('MAX_ELEC_RATE is one figure: print-rates, settings-edit and public-quote agree', () => {
+  assert.equal(R.MAX_ELEC_RATE, 10000);
+  const SE = require('../lib/settings-edit.js');
+  // The fallbacks used where print-rates is not loaded (the Electron renderer,
+  // the storefront's vendored public-quote) are the same number.
+  assert.equal(SE.ELEC_RATE_BOUND, R.MAX_ELEC_RATE);
+  assert.equal(PQ.ELEC_RATE_BOUND, R.MAX_ELEC_RATE);
+  // And it covers a real tariff in the weakest-unit currency Khayt prices in.
+  const { CURRENCIES } = require('../lib/currencies.js');
+  for (const code of ['IQD', 'NGN', 'KRW']) assert.ok(CURRENCIES && CURRENCIES[code], code);
+});
+
+test('readers clamp a stored tariff above the bound, and refuse junk', () => {
+  const big = { elecRate: 250000 };
+  assert.equal(R.shopTariff({ elecRate: 250 }), 250);
+  assert.equal(R.shopTariff(big), R.MAX_ELEC_RATE);
+  assert.equal(R.shopTariff({ elecRate: '250000' }), R.MAX_ELEC_RATE);
+  assert.equal(R.ratesFor({ settings: big }).elecRate, R.MAX_ELEC_RATE);
+  assert.equal(R.defaultsFor(big).elecRate, R.MAX_ELEC_RATE);
+  assert.equal(PQ.elecRateFor({}, big), R.MAX_ELEC_RATE);
+  assert.equal(PQ.elecRateFor({}, { elecRate: 250 }), 250);
+  for (const bad of ['', '   ', '\t', null, undefined, -0.1, -500, NaN, Infinity, -Infinity, 'abc', {}, [], true]) {
+    assert.equal(R.shopTariff({ elecRate: bad }), null, String(bad));
+    assert.equal(R.ratesFor({ settings: { elecRate: bad } }).elecRate, 0.18, String(bad));
+    assert.equal(PQ.elecRateFor({}, { elecRate: bad }), 0, String(bad));
+  }
+});
+
+test('whitespace parity: a blank preset tariff defers, in ratesFor as in elecRateFor', () => {
+  const settings = { elecRate: 0.3 };
+  for (const blank of ['', ' ', '   ', '\t', '\n']) {
+    // The preset step: blank is "not said", so the shop's tariff stands…
+    assert.equal(R.ratesFor({ settings, preset: { elecRate: blank } }).elecRate, 0.3, JSON.stringify(blank));
+    assert.equal(PQ.elecRateFor({ elecRate: blank }, settings), 0.3, JSON.stringify(blank));
+    // …and with no shop tariff, Khayt's default (ratesFor) / 0 (public quote), never a free kWh by accident.
+    assert.equal(R.ratesFor({ preset: { elecRate: blank } }).elecRate, 0.18, JSON.stringify(blank));
+    // Every preset rate, and the machine's two, read blank the same way.
+    const all = R.ratesFor({ preset: { wearRate: blank, laborRate: blank, failureRate: blank },
+      machine: { powerDraw: blank, wearRate: blank } });
+    assert.equal(all.wearRate, R.DEFAULTS.wearRate);
+    assert.equal(all.laborRate, R.DEFAULTS.laborRate);
+    assert.equal(all.failureRate, R.DEFAULTS.failureRate);
+    assert.equal(all.powerDraw, R.DEFAULTS.powerDraw);
+  }
+  // A number with spaces round it is still that number, in both.
+  assert.equal(R.ratesFor({ preset: { elecRate: ' 0.25 ' } }).elecRate, 0.25);
+  assert.equal(PQ.elecRateFor({ elecRate: ' 0.25 ' }, settings), 0.25);
+  // 0 said on a preset is a real answer in both.
+  assert.equal(R.ratesFor({ settings, preset: { elecRate: 0 } }).elecRate, 0);
+  assert.equal(PQ.elecRateFor({ elecRate: 0 }, settings), 0);
+  assert.equal(R.ratesFor({ settings, preset: { elecRate: '0' } }).elecRate, 0);
+  assert.equal(PQ.elecRateFor({ elecRate: '0' }, settings), 0);
 });
