@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Security: the outgoing event webhook's address stays on the computer
+  it was set on.** A Slack or Discord webhook address works as a password:
+  anyone who has it can post to that channel. It was copied into the cloud backup and served to paired phones in full.
+  It is now hidden from both, like the other webhook addresses and the ntfy
+  topic, and a cloud sync or restore keeps this computer's own address.
+
 - **(Mac) A first-run setup for a new shop.** An empty book, or a Mac with no
   book at all, now opens a short setup: your currency, VAT and electricity
   price; your printer (pick the model and its power is filled in), what it

@@ -146,6 +146,10 @@
    *   settings.webhooks.events{}             URLs carry their secret in the path
    *                                        (the second is the legacy one-URL-
    *                                        per-event map; lib/webhook-bus.js)
+   *   settings.eventWebhooks.url           the one outgoing event webhook
+   *                                        (lib/order-status.js), the same
+   *                                        kind of URL; added 2026-10-01 after
+   *                                        the Mac's review found it unmasked
    *
    * The phone never needs them, and the cloud blob is readable by anyone who
    * holds the shop's passphrase. So /api/store (the Mac's LanServer) and the
@@ -157,6 +161,7 @@
     'settings.ntfy.topic',
     'settings.webhooks.subscriptions[].url',
     'settings.webhooks.events{}',
+    'settings.eventWebhooks.url',
   ]);
 
   /* ── MACHINE-LOCAL: belongs to the computer it was set on ────────────────
@@ -235,9 +240,16 @@
       if (lv === undefined) delete parent[leaf]; else parent[leaf] = clone(lv);
     }
     if (mask === undefined) return incoming;
-    const lTopic = walk(loc, ['settings', 'ntfy', 'topic']);
-    const iNtfy = walk(incoming, ['settings', 'ntfy']);
-    if (iNtfy && iNtfy.topic === mask) iNtfy.topic = typeof lTopic === 'string' ? lTopic : '';
+    // The single-value paths (the ntfy topic, the event webhook URL).
+    for (const p of DEVICE_PRIVATE_PATHS) {
+      if (p.includes('[]') || p.endsWith('{}')) continue;
+      const keys = p.split('.');
+      const leaf = keys.pop();
+      const iParent = walk(incoming, keys);
+      if (!iParent || typeof iParent !== 'object' || iParent[leaf] !== mask) continue;
+      const lv = walk(loc, keys.concat(leaf));
+      iParent[leaf] = typeof lv === 'string' && lv !== mask ? lv : '';
+    }
     const lSubs = walk(loc, ['settings', 'webhooks', 'subscriptions']);
     const iSubs = walk(incoming, ['settings', 'webhooks', 'subscriptions']);
     if (Array.isArray(iSubs)) {
