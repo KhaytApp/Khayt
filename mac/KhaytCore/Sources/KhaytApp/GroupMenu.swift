@@ -10,7 +10,6 @@ import KhaytCore
 /// possible and deliberately second.
 struct GroupMenu: View {
     @Bindable var shop: Shop
-    @State private var naming = false
     @State private var typed = ""
 
     private var count: Int { shop.fileSelection.count }
@@ -32,7 +31,7 @@ struct GroupMenu: View {
                     }
                 }
                 if !shop.groups.isEmpty { Divider() }
-                Button(shop.words.callIt("mac.new_group")) { typed = ""; naming = true }
+                Button(shop.words.callIt("mac.new_group")) { typed = ""; shop.namingGroup = true }
                 if shop.selectedFiles.contains(where: { $0.groupName != nil }) {
                     Button(shop.words.callIt("mac.remove_from_group")) {
                         Task { await shop.fileSelection(under: "") }
@@ -49,9 +48,9 @@ struct GroupMenu: View {
         .help(shop.canWrite
               ? shop.words.callIt("mac.group_why")
               : shop.words.callIt("mac.group_locked"))
-        .popover(isPresented: $naming, arrowEdge: .bottom) {
+        .popover(isPresented: $shop.namingGroup, arrowEdge: .bottom) {
             NameAGroup(words: shop.words, typed: $typed) { name in
-                naming = false
+                shop.namingGroup = false
                 let wanted = name.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !wanted.isEmpty else { return }
                 Task { await shop.fileSelection(under: wanted) }

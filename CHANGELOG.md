@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Grouping prints is visible again.** Group, Category and the
+  "where it came from" menu were only in the classic layout's toolbar, so on
+  the default layout a shop could not group prints at all. They now sit above
+  the Library beside Sort and Import, and right-clicking a model offers Group
+  (the shop's groups, New Group…, Remove from Group) for every selected model.
+
 - **Security: the outgoing event webhook's address stays on the computer
   it was set on.** A Slack or Discord webhook address works as a password:
   anyone who has it can post to that channel. It was copied into the cloud backup and served to paired phones in full.

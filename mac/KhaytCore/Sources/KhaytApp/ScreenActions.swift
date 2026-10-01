@@ -89,6 +89,19 @@ struct ScreenActions: View {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
                 .help(shop.words.callIt("mac.sort_by"))
+                // GROUP, CATEGORY, WHERE IT CAME FROM. The old shell put these
+                // in the window's toolbar and this shell has none, so a shop on
+                // the default layout had no way to group prints at all — and
+                // asked for one. Same menus, drawn on the strip.
+                Group {
+                    GroupMenu(shop: shop)
+                    CategoryMenu(shop: shop)
+                    ProvenanceMenu(shop: shop)
+                }
+                .font(TypeScale.body(11.5))
+                .foregroundStyle(Role.onNavy2)
+                .menuStyle(.borderlessButton)
+                .fixedSize()
                 NavyAction(label: shop.words.callIt("mac.import_models"),
                            symbol: "square.and.arrow.down",
                            enabled: shop.canMoveJobs && !shop.importing) {
