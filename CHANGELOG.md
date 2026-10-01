@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Set your shop's electricity price once.** Settings › Business has a
+  Running costs card with your price per kWh, and the 📍 Auto button can fill
+  it from your country. The calculator starts on that price instead of 0.18,
+  and changes with it unless you have typed your own figure there. A printer
+  preset with its own electricity price still wins. Leave it empty to keep
+  Khayt's default. The Mac app reads the same setting.
+
 - **Selecting print files only ever holds what is on screen.** Changing the
   filter, the search or the view now drops any selected file it hides, and
   Delete refuses outright if anything selected is not shown. A selection used

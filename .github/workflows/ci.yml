@@ -334,6 +334,11 @@ jobs:
       - name: E2E smoke (the catalogue accepts photos)
         run: xvfb-run -a npm run test:e2e:productimages
 
+      # The shop's own electricity price: Settings saves it, the calculator
+      # follows it, a typed price is kept, a blank removes it.
+      - name: E2E smoke (shop electricity price)
+        run: xvfb-run -a npm run test:e2e:elecrate
+
       - name: E2E smoke (consumable reorder)
         run: xvfb-run -a npm run test:e2e:consumables
 

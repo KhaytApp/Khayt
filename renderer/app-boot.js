@@ -337,6 +337,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   wireEvents();
   loadSettingsIntoForm();
+  // The calculator opens on the shop's own electricity price, not Khayt's 0.18.
+  if (typeof seedCalcElecRate === 'function') seedCalcElecRate(0.18);
   refreshCurrencyLabels();
   initialRender();
   if (typeof wireFormLabels === 'function') wireFormLabels(); // a11y: associate static form labels
