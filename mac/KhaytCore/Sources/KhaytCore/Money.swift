@@ -488,6 +488,14 @@ public struct CatalogPrinter: Decodable, Sendable, Identifiable, Equatable {
     /// The bed, the nozzle, the colours, the power — what the catalogue has
     /// checked, and by its absence what it has not.
     public let specs: String
+    /// What the catalogue knows about the three things a sheet puts in front
+    /// of the shop the moment a model is picked — so what is saved is what was
+    /// on screen. Nil where the catalogue has not checked it.
+    public var powerDraw: Double? = nil
+    public var nozzleDiameter: Double? = nil
+    public var nozzleMaterial: String? = nil
+    /// `fdm`, `resin`… — `lib/printer-catalog.js`'s `tech`.
+    public var tech: String? = nil
 }
 
 /// A new spool, or the reason there is not one.

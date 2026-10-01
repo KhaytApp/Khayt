@@ -122,7 +122,12 @@ private struct BookMenu: View {
     var body: some View {
         Button(Words.upfront("mac.reload")) { shop.reload() }
             .keyboardShortcut("r")
-            
+        // The first-run setup, again — for a shop that closed it, or wants to
+        // add a printer's price the quick way. On a Mac with no book yet this
+        // is how one is started.
+        Button(Words.upfront("mac.setup_menu") + "\u{2026}") { shop.settingUpShop = true }
+            .disabled(!shop.canRunSetup)
+
         Divider()
         // A backup is taken once a day on its own; this is for the shop that
         // is about to do something it might want to undo.

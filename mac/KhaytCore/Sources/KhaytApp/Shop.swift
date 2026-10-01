@@ -4224,26 +4224,10 @@ final class Shop {
             moveProblem = words.callIt(source.build == nil ? "mac.move_sample" : "mac.product_need_name")
             return nil
         }
-        let existing = presets.first { $0.name.lowercased() == wanted.lowercased() }
-        let id = existing?.id ?? "PRNTR-\(UUID().uuidString.prefix(8))"
-        var preset = Preset(id: id, name: wanted)
-        preset.rates = rates
         do {
+            var id = ""
             try StoreWriter.update(build) { root in
-                var rows: [JSONValue] = []
-                if case .array(let had)? = root["printers"] { rows = had }
-                // Saved OVER a preset of the same name: in place, and keeping
-                // every field of it this app does not model (the other app's
-                // presets carry more than the seven rates) and every rate that
-                // did not change, as the book spells it. It used to be removed
-                // and re-added from the seven rates alone.
-                if let at = rows.firstIndex(where: { Self.recordId($0) == id }),
-                   case .object(let was) = rows[at] {
-                    rows[at] = .object(Self.presetRow(preset, over: was))
-                } else {
-                    rows.append(preset.record)
-                }
-                root["printers"] = .array(rows)
+                id = Self.writePreset(into: &root, name: wanted, rates: rates)
             }
             await load(source)
             return id
@@ -4251,6 +4235,31 @@ final class Shop {
             moveProblem = String(describing: error)
             return nil
         }
+    }
+
+    /// The preset write, against the book as it is on disk — the Calculator's
+    /// "Save preset" and the first-run setup's electricity figure both land
+    /// here. A name already in use (without case) is saved OVER that preset:
+    /// in place, keeping every field of it this app does not model (the other
+    /// app's presets carry more than the seven rates) and every rate that did
+    /// not change, as the book spells it. Returns the preset's id.
+    @discardableResult
+    static func writePreset(into root: inout [String: JSONValue], name: String,
+                            rates: [String: Double]) -> String {
+        var rows: [JSONValue] = []
+        if case .array(let had)? = root["printers"] { rows = had }
+        let existing = rows.compactMap(Preset.from).first { $0.name.lowercased() == name.lowercased() }
+        let id = existing?.id ?? "PRNTR-\(UUID().uuidString.prefix(8))"
+        var preset = Preset(id: id, name: name)
+        preset.rates = rates
+        if let at = rows.firstIndex(where: { recordId($0) == id }),
+           case .object(let was) = rows[at] {
+            rows[at] = .object(presetRow(preset, over: was))
+        } else {
+            rows.append(preset.record)
+        }
+        root["printers"] = .array(rows)
+        return id
     }
 
     /// `printFiles` as written. See `setups(for:)` and `versions(for:)`.
@@ -9946,6 +9955,19 @@ final class Shop {
                            settings: out.settings, refused: out.refused, colourAdded: out.colourAdded)
     }
 
+    /// A new spool on the shelf, against the book as it is on disk — the
+    /// Spool sheet's Add and the first-run setup's filament both land here,
+    /// through `lib/spool-edit.js`. A NEW record: nothing was opened, so
+    /// there is nothing to keep untouched. False when the rule refused it (no
+    /// material), in which case nothing was changed.
+    static func writeNewSpool(into root: inout [String: JSONValue], input: [String: JSONValue],
+                              engine: KhaytEngine, newId: String, today: String) async throws -> Bool {
+        let made = try await engine.newSpool(input, id: newId, today: today)
+        guard let record = made.spool else { return false }
+        root["inventory"] = .array(rows(root, "inventory") + [record])
+        return true
+    }
+
     /// `opened` is the sheet's input for the spool as it opened — see
     /// `keptEdit`. Nil for a new spool.
     func saveSpool(_ input: [String: JSONValue], id: Spool.ID?,
@@ -9983,11 +10005,11 @@ final class Shop {
                     shelf[at] = .object(record)
                     root["settings"] = .object(out.settings)
                 } else {
-                    let made = try await engine.newSpool(input, id: Self.uid("INV"), today: Self.today())
-                    guard let record = made.spool else {
-                        throw MoveRefused(sentence: self.words.callIt("inv.material_ph"))
-                    }
-                    shelf.append(record)
+                    root["inventory"] = .array(shelf)
+                    guard try await Self.writeNewSpool(into: &root, input: input, engine: engine,
+                                                       newId: Self.uid("INV"), today: Self.today())
+                    else { throw MoveRefused(sentence: self.words.callIt("inv.material_ph")) }
+                    return
                 }
                 root["inventory"] = .array(shelf)
             }
@@ -10446,48 +10468,17 @@ final class Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
-                var floor = Self.rows(root, "machines")
-                let settings = Self.settings(root)
-                var record: JSONValue
-                var at: Int?
-                if let id {
-                    guard let found = floor.firstIndex(where: { Self.recordId($0) == id }),
-                          case .object(let was) = floor[found] else {
-                        throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
+                do {
+                    if let was = try await Self.writeMachine(into: &root, input: input, id: id,
+                                                             catalogId: catalogId, opened: opened,
+                                                             engine: engine, newId: Self.uid("MACH")),
+                       let id {
+                        undo.append(ChangedRecord(collection: "machines", id: id, was: was))
                     }
-                    undo.append(ChangedRecord(collection: "machines", id: id, was: was))
-                    record = floor[found]
-                    at = found
-                } else {
-                    let made = try await engine.newMachine(input, id: Self.uid("MACH"), count: floor.count)
-                    guard let fresh = made.machine else {
-                        throw MoveRefused(sentence: self.words.callIt("mach.need_name"))
-                    }
-                    record = fresh
+                } catch let refused as MachineRefused {
+                    throw MoveRefused(sentence: self.words.callIt(refused == .gone ? "mac.move_gone"
+                                                                                    : "mach.need_name"))
                 }
-                let stored = record
-                var wasOpened: [String: JSONValue]?
-                if at != nil, let opened { wasOpened = await Self.sanitisingWebcam(opened, engine: engine) }
-                if let catalogId, !catalogId.isEmpty {
-                    record = try await engine.applyPrinterModel(record, catalogId: catalogId,
-                                                                settings: settings).machine ?? record
-                }
-                let edited = try await Self.editedMachine(
-                    stored, record: record,
-                    input: await Self.sanitisingWebcam(input, engine: engine),
-                    opened: wasOpened,
-                    settings: settings, engine: engine)
-                if edited.refused != nil {
-                    throw MoveRefused(sentence: self.words.callIt("mach.need_name"))
-                }
-                guard case .object(var fields)? = edited.machine else { return }
-                if let at {
-                    StoreWriter.stamp(&fields)
-                    floor[at] = .object(fields)
-                } else {
-                    floor.append(.object(fields))
-                }
-                root["machines"] = .array(floor)
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("mach.edit")) }
             editingMachine = nil
@@ -10499,6 +10490,202 @@ final class Shop {
         } catch {
             spendProblem = String(describing: error)
         }
+    }
+
+    /// Why a machine write was refused, before it has words.
+    enum MachineRefused: Error { case gone, needName }
+
+    /// The machine write itself, against the book as it is ON DISK — the one
+    /// path a machine reaches the book by, whether the Machine sheet sent it or
+    /// the first-run setup did (`ShopSetup`). Static and taking `root` so it
+    /// runs inside the write and can be held to a record in a test.
+    ///
+    /// A catalogue model is applied FIRST, the way Khayt's picker does on the
+    /// change, then `lib/machine-edit.js` takes what was typed — keeping every
+    /// field the shop did not touch as the book spells it (`opened`, see
+    /// `editedMachine`). A new machine has nothing opened. Returns the record
+    /// as it was when an existing machine was corrected, for undo.
+    @discardableResult
+    static func writeMachine(into root: inout [String: JSONValue], input: [String: JSONValue],
+                             id: Machine.ID?, catalogId: String?, opened: [String: JSONValue]?,
+                             engine: KhaytEngine, newId: String) async throws -> [String: JSONValue]? {
+        var floor = Self.rows(root, "machines")
+        let bookSettings = Self.settings(root)
+        var record: JSONValue
+        var at: Int?
+        var was: [String: JSONValue]?
+        if let id {
+            guard let found = floor.firstIndex(where: { Self.recordId($0) == id }),
+                  case .object(let old) = floor[found] else { throw MachineRefused.gone }
+            was = old
+            record = floor[found]
+            at = found
+        } else {
+            let made = try await engine.newMachine(input, id: newId, count: floor.count)
+            guard let fresh = made.machine else { throw MachineRefused.needName }
+            record = fresh
+        }
+        let stored = record
+        var wasOpened: [String: JSONValue]?
+        if at != nil, let opened { wasOpened = await Self.sanitisingWebcam(opened, engine: engine) }
+        if let catalogId, !catalogId.isEmpty {
+            record = try await engine.applyPrinterModel(record, catalogId: catalogId,
+                                                        settings: bookSettings).machine ?? record
+        }
+        let edited = try await Self.editedMachine(
+            stored, record: record,
+            input: await Self.sanitisingWebcam(input, engine: engine),
+            opened: wasOpened,
+            settings: bookSettings, engine: engine)
+        if edited.refused != nil { throw MachineRefused.needName }
+        guard case .object(var fields)? = edited.machine else { return was }
+        if let at {
+            StoreWriter.stamp(&fields)
+            floor[at] = .object(fields)
+        } else {
+            floor.append(.object(fields))
+        }
+        root["machines"] = .array(floor)
+        return was
+    }
+
+    // MARK: - The first-run setup
+
+    /// The setup sheet, open. See `ShopSetup` and `ShopSetupSheet`.
+    var settingUpShop = false
+    /// What the last setup did, or why it could not.
+    var setupProblem: String?
+
+    /// Is there a real book on this Mac at all?
+    var aRealBookExists: Bool { Self.available.contains(where: \.isReal) }
+
+    /// Can the setup do anything from here? On the shop's own writable book,
+    /// or on a Mac with no book yet — where Finish starts one. Not on the
+    /// sample while a real book exists: that is somebody looking around, and
+    /// the answers belong in the book they are not looking at.
+    var canRunSetup: Bool {
+        source.isReal ? canWrite : !aRealBookExists
+    }
+
+    /// Where the shop's answer to "not now" is kept.
+    ///
+    /// ── IN THIS MAC'S DEFAULTS, NOT IN THE BOOK ───────────────────────────
+    ///
+    /// Two reasons. Skipping must write NOTHING to the book: it is shared with
+    /// the other app and synced, and a flag written on a dismissal is a change
+    /// and a stamp for nothing. And the book's own `settings.firstRunDone` is
+    /// the other app's WIZARD flag — setting it from a Mac "Skip" would
+    /// silently cancel an onboarding the shop has not seen. Once the book has
+    /// a machine or a job the setup stops offering itself anyway, so this only
+    /// has to remember the empty case. Keyed by the book's path (lower-cased:
+    /// `khayt` and `Khayt` are one folder on a default Mac), or by "no book".
+    static func setupKey(for build: StoreReader.Build?) -> String {
+        "setup.dismissed." + (build.map { $0.storeURL.path.lowercased() } ?? "no-book")
+    }
+
+    var setupDismissed: Bool {
+        UserDefaults.standard.bool(forKey: Self.setupKey(for: source.build))
+    }
+
+    func rememberSetupDismissed() {
+        UserDefaults.standard.set(true, forKey: Self.setupKey(for: source.build))
+    }
+
+    /// Open the setup by itself, once, when the book calls for it. Called by
+    /// the window after the first load — never by `load`, so tests and the
+    /// snapshot runner, which load books all day, are never interrupted.
+    func offerSetupIfNew() {
+        guard ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"] == nil,
+              !setupDismissed,
+              ShopSetup.offers(isReal: source.isReal, canWrite: canWrite,
+                               machines: machines.count, orders: orders.count,
+                               aRealBookExists: aRealBookExists)
+        else { return }
+        settingUpShop = true
+    }
+
+    /// "Try the sample shop instead": nothing written, and not asked again.
+    func setupChoseSample() async {
+        rememberSetupDismissed()
+        settingUpShop = false
+        if source.isReal { await load(.sample) }
+    }
+
+    /// Closed or skipped without an answer: nothing written, not asked again.
+    func setupSkipped() {
+        rememberSetupDismissed()
+        settingUpShop = false
+    }
+
+    /// Write what the setup was told, through the seams the sheets use, in
+    /// one write. Nothing at all when nothing was answered.
+    ///
+    /// On a Mac with no book this is where the shop's book is STARTED — the
+    /// sheet's first step says so on the button, so nobody gets a book they
+    /// did not ask for.
+    @discardableResult
+    func finishSetup(_ setup: ShopSetup) async -> Bool {
+        setupProblem = nil
+        let held = ShopSetup.settingsReading(settingsDict)
+        guard setup.writesAnything(currentCurrency: held.currency, currentlyChargesVat: held.chargesVat,
+                                   currentVatRate: held.vatRate) else {
+            setupSkipped()
+            return true
+        }
+        if !source.isReal {
+            guard !aRealBookExists else {
+                setupProblem = words.callIt("mac.move_sample"); return false
+            }
+            do {
+                try Self.startEmptyBook(at: StoreReader.Build.shipped.storeURL)
+            } catch {
+                setupProblem = String(describing: error); return false
+            }
+            await load(.store(.shipped))
+        }
+        guard let build = source.build, canWrite else {
+            setupProblem = words.callIt("mac.move_sample"); return false
+        }
+        guard let engine else {
+            setupProblem = words.callIt("mac.move_no_engine"); return false
+        }
+        let presetName = words.callIt("mac.setup_preset_name")
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                try await ShopSetup.apply(setup, to: &root, engine: engine, presetName: presetName)
+            }
+        } catch {
+            setupProblem = String(describing: error)
+            return false
+        }
+        rememberSetupDismissed()
+        settingUpShop = false
+        await load(source)
+        spendNote = words.callIt("mac.setup_saved")
+        return true
+    }
+
+    /// A new, empty book where there is none.
+    ///
+    /// REFUSES if anything is already there — including the `.prev` an
+    /// interrupted save leaves, which `StoreReader` puts back on open. Starting
+    /// a book over a shop's real one would be the worst thing this app could
+    /// do, so the check is here, at the only place that creates one, and not in
+    /// the caller. The book is `{}`: every collection is absent, which both
+    /// apps read as empty, and the other app merges its default settings over
+    /// whatever `settings` is there.
+    static func startEmptyBook(at url: URL) throws {
+        let fm = FileManager.default
+        let prev = url.appendingPathExtension("prev")
+        guard !fm.fileExists(atPath: url.path), !fm.fileExists(atPath: prev.path) else {
+            throw CocoaError(.fileWriteFileExists)
+        }
+        try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try StoreWriter.atomicWrite(Data("{}".utf8), to: url)
     }
 
     // MARK: - The shop's own settings

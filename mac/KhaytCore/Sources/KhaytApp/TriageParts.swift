@@ -214,6 +214,13 @@ struct FirstRun: View {
             }
             .frame(maxWidth: 720)
 
+            // The obvious next step: the four questions every figure on this
+            // screen starts from. See `ShopSetup`.
+            if shop.canRunSetup {
+                Button(shop.words.callIt("mac.setup_menu")) { shop.settingUpShop = true }
+                    .buttonStyle(.borderedProminent)
+            }
+
             // The escape hatch: a shop that wants to see the app working
             // before typing anything of its own.
             Button {

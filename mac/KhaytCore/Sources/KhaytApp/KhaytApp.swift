@@ -109,6 +109,9 @@ struct KhaytApp: App {
                     // toolbar, and an app that opens on invented data when real
                     // data exists is answering a question nobody asked.
                     await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
+                    // A new shop — an empty book, or no book on this Mac at
+                    // all — is offered the setup, once. See `ShopSetup.offers`.
+                    shop.offerSetupIfNew()
                 }
 
                 // CHOOSING A MODEL IN SPOTLIGHT OPENS IT HERE.

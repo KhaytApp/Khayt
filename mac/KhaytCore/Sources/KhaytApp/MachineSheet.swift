@@ -915,6 +915,28 @@ struct MachineSheet: View {
         model = printer.specs
         search = printer.name
         if name.trimmingCharacters(in: .whitespaces).isEmpty { name = printer.name }
+        let filled = Self.picked(printer, into: form)
+        powerDraw = filled.powerDraw
+        nozzleDiameter = filled.nozzleDiameter
+        nozzleMaterial = filled.nozzleMaterial
+    }
+
+    /// What picking a model puts on screen, beyond its name.
+    ///
+    /// ── INCLUDING THE POWER AND THE NOZZLE ────────────────────────────────
+    ///
+    /// Picking used to set the model's name and stop. The model was applied
+    /// at save — and then the fields on screen were applied OVER it, so a new
+    /// machine picked as a Bambu X1C was written with the sheet's 0 W (which
+    /// `applyEdit` stores as no power at all) and a brass nozzle where the
+    /// catalogue says hardened steel. Static so the first-run setup
+    /// (`ShopSetup`) fills its form the same way.
+    static func picked(_ printer: CatalogPrinter, into form: Form) -> Form {
+        var f = form
+        if let watts = printer.powerDraw, watts > 0 { f.powerDraw = watts }
+        if let size = printer.nozzleDiameter, size > 0 { f.nozzleDiameter = size }
+        if let fitted = printer.nozzleMaterial, !fitted.isEmpty { f.nozzleMaterial = fitted }
+        return f
     }
 
     /// Whether a field belongs to the kind being edited. The module decides;

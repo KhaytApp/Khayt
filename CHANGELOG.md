@@ -4,6 +4,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) A first-run setup for a new shop.** An empty book, or a Mac with no
+  book at all, now opens a short setup: your currency, VAT and electricity
+  price; your printer (pick the model and its power is filled in), what it
+  cost, when you bought it and how long it should last; and what a spool
+  costs. Every question is optional, each step can be skipped, the sample
+  shop is one click away, and nothing is saved until the last step. On a Mac
+  with no book, finishing starts your own. It is under Book › Set up your
+  shop, and on the empty dashboard, if you want it again. The electricity
+  price is saved as a calculator preset named "Shop rates".
+- **(Mac) Picking a printer model keeps its power and nozzle.** Adding a
+  machine and choosing its model from the list saved it with no power draw
+  and a brass nozzle, whatever the model uses, because the sheet's own empty
+  fields were written over the model's. Picking a model now fills in its
+  power, nozzle size and nozzle material on screen, and those are saved.
 - **(Mac) Tests no longer fail on the first of the month.** A test that reads the
   sample book on a pinned day now also asks "this month" of that day, so the
   masthead, the period filter and their tests stop depending on today's date.

@@ -7175,9 +7175,12 @@ public actor KhaytEngine {
     public func printerCatalog() throws -> [CatalogPrinter] {
         try runtime.call2(
             "KhaytPrinterCatalog.list().map(function (p) {"
+          + " var s = KhaytPrinterCatalog.toMachineSpecs(p);"
           + " return {id: p.id, name: KhaytPrinterCatalog.displayName(p),"
           + "  vendor: p.vendor,"
-          + "  specs: KhaytMachineEdit.specsLine(KhaytPrinterCatalog.toMachineSpecs(p), {chamber: ARG0})};})",
+          + "  specs: KhaytMachineEdit.specsLine(s, {chamber: ARG0}),"
+          + "  powerDraw: s.powerDraw, nozzleDiameter: s.nozzleDiameter,"
+          + "  nozzleMaterial: s.nozzle ? s.nozzle.material : null, tech: s.tech};})",
             [.string("chamber")], as: [CatalogPrinter].self)
     }
 
