@@ -3104,7 +3104,7 @@
   "inv.label_generated": "تم إنشاء الملصق",
   "inv.dry_by": "جفّف قبل",
   "inv.reorder_point": "نقطة إعادة الطلب (غ)",
-  "inv.reorder_qty": "كمية إعادة الطلب (كغ)",
+  "inv.reorder_qty": "كمية إعادة الطلب (غ)",
   "inv.price_hist_empty": "لا يوجد سجل أسعار",
   "inv.price_change": "تغيير السعر",
   "inv.type_fdm": "FDM (فتيل)",

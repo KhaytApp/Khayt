@@ -27,6 +27,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   offline. Both are now left out of the hidden-secrets export and the iCloud
   copy. The full local backup keeps them, and a survey link is made again
   when it is next needed.
+- **Arabic: a spool's default order quantity says grams.** The box is in
+  grams, as every other language says, but the Arabic label said (كغ).
 
 - **(Mac) Grouping prints is visible again.** Group, Category and the
   "where it came from" menu were only in the classic layout's toolbar, so on
