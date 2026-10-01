@@ -269,6 +269,7 @@
   "plib.bulk_count": "{n} 件のファイルを選択中。",
   "plib.bulk_del_btn": "{n} 件を削除",
   "plib.bulk_del_confirm": "{n} 件のプリントファイルと、ディスク上のその中身をすべて削除しますか？元に戻せません。",
+  "plib.bulk_del_hidden": "このうち {n} 件は現在のフィルターでは表示されていません。先頭に表示しています。",
   "plib.bulk_del_title": "選択したファイルを削除",
   "plib.bulk_deleted": "{n} 件のファイルを削除しました",
   "plib.bulk_filed": "{n} 件のファイルを更新しました",

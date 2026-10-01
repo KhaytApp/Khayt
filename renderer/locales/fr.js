@@ -269,6 +269,7 @@
   "plib.bulk_count": "{n} fichiers sélectionnés.",
   "plib.bulk_del_btn": "Supprimer {n} fichiers",
   "plib.bulk_del_confirm": "Retirer {n} fichiers d’impression et tout ce qu’ils occupent sur le disque ? C’est irréversible.",
+  "plib.bulk_del_hidden": "{n} d’entre eux ne sont pas affichés avec le filtre actuel. Ils sont listés en premier.",
   "plib.bulk_del_title": "Supprimer les fichiers sélectionnés",
   "plib.bulk_deleted": "{n} fichiers supprimés",
   "plib.bulk_filed": "{n} fichiers mis à jour",

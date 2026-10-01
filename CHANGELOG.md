@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Deleting several print files warns when some of them are not on screen.**
+  A selection is kept when you change the filter, so you can pick files from
+  several groups. That also means Delete can include files you are no longer
+  looking at. The delete dialog now says how many of them the current filter
+  hides, in red, and lists those first. The Mac app lost 34 models to this
+  kind of hidden selection.
+
 - **(Mac) A feedback report's book carries no live links or keys.** The
   "include a copy of my book" attachment was masked the way the cloud copy is,
   which keeps each job's customer-portal link, quote-approval link and survey
