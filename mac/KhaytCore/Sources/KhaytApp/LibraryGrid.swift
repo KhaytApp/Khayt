@@ -68,7 +68,8 @@ struct LibraryGrid: View {
                                 FolderCell(name: name, count: count,
                                            thumbnail: cover.flatMap { shop.thumbnail(for: $0) },
                                            words: shop.words,
-                                           kind: shop.groupKind(path))
+                                           kind: shop.groupKind(path),
+                                           parent: FolderCell.parent(of: path, open: shop.shelf))
                                     .id(entry.id)
                                     // A folder OPENS. The shelf already filters
                                     // by group, so entering one is setting it —
@@ -236,7 +237,7 @@ struct LibraryGrid: View {
 /// first half doing the work. A bare back arrow says where it goes and not
 /// where you are, and a shop three folders into a hundred and fifty models
 /// wants both.
-private struct GroupCrumb: View {
+struct GroupCrumb: View {
     @Bindable var shop: Shop
     let group: String
 
@@ -303,10 +304,21 @@ private struct GroupCrumb: View {
                     }
                 }
             } label: {
-                Label(shop.words.callIt(shop.groupKind(group).wordKey),
-                      systemImage: shop.groupKind(group).symbol)
+                // IN THE CRUMB'S OWN INK. As a borderless menu its label was
+                // drawn pale grey — the look of a control that is switched
+                // off — beside links drawn in the brand colour. A plain
+                // button-style menu takes the colour it is given.
+                HStack(spacing: 3) {
+                    Image(systemName: shop.groupKind(group).symbol)
+                    Text(shop.words.callIt(shop.groupKind(group).wordKey)).lineLimit(1)
+                    Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                }
+                .foregroundStyle(shop.canWrite ? AnyShapeStyle(Khayt.brand) : AnyShapeStyle(.secondary))
+                .contentShape(Rectangle())
             }
-            .menuStyle(.borderlessButton)
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
             .fixedSize()
             .disabled(!shop.canWrite)
             .help(shop.words.callIt("mac.group_kind_menu"))
@@ -345,6 +357,9 @@ struct FolderCell: View {
     /// One print in parts (a puzzle piece) or separate prints (a stack): the
     /// badge and the second line differ, so the two read differently.
     var kind: GroupKind = .assumed
+    /// The level this group sits in, when the screen does not already say so
+    /// — see `parent(of:open:)`.
+    var parent: String? = nil
 
     /// How far each card behind the picture shows above it.
     static let peek: CGFloat = 4
@@ -356,12 +371,17 @@ struct FolderCell: View {
                 .overlay { stack }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(TitleBreaks.soften(name))
+                // "Set A · in Collection X": a part's own name is often a
+                // word that means nothing alone ("Set A", "left", "pose 2"),
+                // and in All models the folder it lives in is nowhere else on
+                // screen. On the name's own two lines, so the tile is the
+                // height of every other tile.
+                title
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(2, reservesSpace: true)
                     .truncationMode(.tail)
                     .multilineTextAlignment(.leading)
-                    .help(name)
+                    .help(parent.map { name + " \u{00B7} " + words.callIt("mac.group_in_parent", ["name": .string($0)]) } ?? name)
                 // "One print · 3 parts" or "Collection · 7 models", so the
                 // words say it as well as the picture. "1 model", not "1
                 // models"; Arabic's one and two are words.
@@ -379,8 +399,29 @@ struct FolderCell: View {
         .contentShape(RoundedRectangle(cornerRadius: 8))
         // One element that says what it is: a group, its name, how many.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Self.accessibilityText(name: name, count: count, kind: kind, words: words))
+        .accessibilityLabel(Self.accessibilityText(
+            name: parent.map { name + ", " + words.callIt("mac.group_in_parent", ["name": .string($0)]) } ?? name,
+            count: count, kind: kind, words: words))
         .accessibilityAddTraits(.isButton)
+    }
+
+    private var title: Text {
+        guard let parent else { return Text(TitleBreaks.soften(name)) }
+        return Text(TitleBreaks.soften(name))
+            + Text(verbatim: " \u{00B7} " + words.callIt("mac.group_in_parent", ["name": .string(parent)]))
+                .foregroundStyle(.secondary)
+    }
+
+    /// The level a group tile names under its own: the folder it sits in, by
+    /// its own name — unless that folder is the one open, where the crumb
+    /// above the grid already says it. Nil for a group at the top.
+    static func parent(of path: String, open shelf: Shop.Shelf) -> String? {
+        var levels = path.components(separatedBy: ImportGrouping.separator)
+        guard levels.count > 1 else { return nil }
+        levels.removeLast()
+        let above = levels.joined(separator: ImportGrouping.separator)
+        if case .library(let open?) = shelf, open == above { return nil }
+        return Shop.groupLeaf(above)
     }
 
     /// What is in it, counted in the kind's own word: a print has PARTS, a
@@ -408,13 +449,25 @@ struct FolderCell: View {
                 .opacity(0.6)
             card.padding(.horizontal, 7)
                 .padding(.top, Self.peek)
-            Thumbnail(source: thumbnail)
+            // ── INSIDE THE SAME SQUARE A MODEL'S PICTURE FILLS ─────────────
+            //
+            // The picture was the full width and pushed down by the cards,
+            // and a thumbnail that fills its frame grew past the square: the
+            // tile's picture sat about 4pt lower than the models beside it.
+            // Now it is a smaller square, inset by the peek at the sides and
+            // twice the peek at the top, so the back card's top and the
+            // picture's bottom are exactly a model tile's top and bottom.
+            // `Color.clear` takes the size it is offered and nothing else, so
+            // the picture cannot widen it.
+            Color.clear
+                .overlay { Thumbnail(source: thumbnail) }
                 // On the window's own ground: the thumbnail's grey is
                 // translucent, and without this the cards behind showed
                 // through it and the tile came out a different colour from a
                 // model's.
                 .background(Khayt.ground)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
+                .padding(.horizontal, Self.peek)
                 .padding(.top, Self.peek * 2)
                 // Bottom TRAILING, where a file puts nothing — so it never sits
                 // on the palette a file draws bottom-leading — and trailing

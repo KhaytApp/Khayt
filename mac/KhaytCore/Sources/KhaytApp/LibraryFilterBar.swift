@@ -148,12 +148,18 @@ struct LibraryFilterBar: View {
     // are built from, so the two cannot disagree.
     var body: some View {
         HStack(spacing: 8) {
-            Picker("", selection: $shop.libraryFlat) {
-                Text(shop.words.callIt("mac.lib_view_models")).tag(true)
-                Text(shop.words.callIt("mac.lib_view_groups")).tag(false)
+            // Only at the top. Inside an open group both choices draw that
+            // group's own levels (`Shop.libraryEntries`), so the switch was
+            // on screen and did nothing — a control that changes nothing
+            // reads as broken.
+            if Self.offersViewSwitch(shop.shelf) {
+                Picker("", selection: $shop.libraryFlat) {
+                    Text(shop.words.callIt("mac.lib_view_models")).tag(true)
+                    Text(shop.words.callIt("mac.lib_view_groups")).tag(false)
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
+                .help(shop.words.callIt("mac.lib_view_help"))
             }
-            .pickerStyle(.segmented).labelsHidden().fixedSize()
-            .help(shop.words.callIt("mac.lib_view_help"))
 
             menu("mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed"])
             menu("mac.lib_printer", prefix: "ready:")
@@ -170,6 +176,12 @@ struct LibraryFilterBar: View {
         .controlSize(.small)
         .padding(.horizontal, Metric.screen)
         .padding(.vertical, 8)
+    }
+
+    /// Is the All models / Groups switch drawn? Only with no group open.
+    static func offersViewSwitch(_ shelf: Shop.Shelf) -> Bool {
+        if case .library(let open?) = shelf, !open.isEmpty { return false }
+        return true
     }
 
     /// One axis as a menu. Hidden when it has nothing to offer.

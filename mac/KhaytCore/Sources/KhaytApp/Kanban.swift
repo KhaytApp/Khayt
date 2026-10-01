@@ -411,7 +411,7 @@ private struct JobCard: View {
                             Image(systemName: "flag.fill").font(.caption2)
                                 .foregroundStyle(Khayt.attention)
                         }
-                        Text(job.project).font(.callout.weight(.medium)).lineLimit(2)
+                        Text(shop.shownTitle(of: job)).font(.callout.weight(.medium)).lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if !job.client.isEmpty {

@@ -624,7 +624,9 @@ struct WindowSheets: ViewModifier {
             }
             // Several at once: one question naming how many, and which.
             .confirmationDialog(
-                shop.words.callIt("plib.delete_title"),
+                // Counted: the one-model title ("Delete print file") headed a
+                // question about ten (alpha.57 snapshot).
+                shop.words.counting(shop.pendingLibraryDeletes.count, "mac.delete_many_title"),
                 isPresented: Binding(get: { !shop.pendingLibraryDeletes.isEmpty },
                                      set: { if !$0 { shop.pendingLibraryDeletes = [] } }),
                 titleVisibility: .visible

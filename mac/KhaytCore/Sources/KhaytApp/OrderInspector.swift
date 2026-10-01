@@ -174,9 +174,12 @@ private struct Detail: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(job.project)
+            // The shown title (never a printer's hash — `JobTitle`), with
+            // what the book really holds on hover.
+            Text(shop.shownTitle(of: job))
                 .font(.title3.weight(.semibold))
                 .textSelection(.enabled)
+                .help(job.project)
             HStack(spacing: 6) {
                 Text(job.id).monospacedDigit()
                 if let s = Stage.of(job) {
