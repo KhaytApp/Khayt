@@ -4621,6 +4621,135 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.56] - 2026-10-01
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+A first-run setup for a new shop, Help > Send Feedback, and opening a record and
+pressing Save no longer changes it.
+
+### Changed and fixed
+
+- **(Mac) A feedback report's book carries no live links or keys.** The
+  "include a copy of my book" attachment was masked the way the cloud copy is,
+  which keeps each job's customer-portal link, quote-approval link and survey
+  link — so a report could hand a stranger the means to post as a customer or
+  approve a quote. It now also goes through the export redaction (those links
+  removed, LAN API token hashes masked), and the cloud's wrapped key and each
+  job's survey link are taken out. A failed rule is now reported by its
+  error kind only, never the message, which could carry a customer's name.
+  Report folders left in the temporary directory are removed after a day. The
+  window picture says that it shows customer names and prices.
+
+- **(Mac) Starting a new book can never replace one.** If a book appeared
+  between the check and the write, the empty one replaced it; the new book is
+  now created exclusively, readable only by you.
+
+- **(Mac) Copied secrets stay on this Mac.** An import key or sign-in link you
+  copy is kept off Universal Clipboard, and is marked both concealed and
+  transient so clipboard history apps that honour those markers skip it.
+
+- **(Mac) Grouping prints is visible again.** Group, Category and the
+  "where it came from" menu were only in the classic layout's toolbar, so on
+  the default layout a shop could not group prints at all. They now sit above
+  the Library beside Sort and Import, and right-clicking a model offers Group
+  (the shop's groups, New Group…, Remove from Group) for every selected model.
+
+- **(Mac) Saving a product you did not change no longer re-prices it.** The
+  product sheet priced its parts at today's spool price while the saved parts
+  kept the price they were bought at, so opening a product after a filament
+  price change and pressing Save moved its price, and its parts no longer added
+  up to its cost. An untouched save, or a name-only edit, now keeps the stored
+  price exactly; an edit that does change the price works it out from the
+  parts as they are saved.
+
+- **(Mac) Editing a job's part: the cost shown is the cost saved.** The preview
+  ignored a part's own labour, power and wear rates, which Save used. A re-cost
+  now also writes the spool price it was worked out from, and a part whose
+  spool has left the shelf is costed at its own recorded price rather than the
+  first roll of the same material.
+
+- **(Mac) Running the first-run setup again keeps your preset rates.** It used
+  to reset a customised "Shop rates" preset to Khayt's opening figures; it now
+  changes only the electricity price, and finds the same preset whether the
+  setup was run in English or Arabic.
+
+- **(Mac) Fixes from the alpha.56 review.** The currency menu (Settings and
+  the first-run setup) and the tax-country menu now name each entry in the
+  shop's language and sort in it, rather than in English. The setup's summary
+  groups a printer's life hours (5,000), says in a sentence why Finish could
+  not save instead of showing Swift's error text, forgets that message when
+  the sheet closes, and no longer offers "Try the sample shop" while the
+  sample is what is already open. The machine sheet calls a laser cutter or a
+  CNC router a machine ("Edit Machine", "Machine name", "Machine model") and
+  not a printer; its downtime arrow turns round in Arabic and its date
+  pickers read in the shop's language. The spool sheet writes its unit as a
+  word (غ, not "g") and no longer repeats the unit in brackets beside the
+  reorder boxes; a consumable's unit cost carries the currency mark after the
+  box instead of "(SAR)" in the label; the Edit Job sheet is wider so its
+  priority control no longer runs into the right margin; and the feedback
+  sheet's wording is clearer about what the diagnostics file holds and when to
+  attach the book.
+
+- **(Mac) A first-run setup for a new shop.** An empty book, or a Mac with no
+  book at all, now opens a short setup: your currency, VAT and electricity
+  price; your printer (pick the model and its power is filled in), what it
+  cost, when you bought it and how long it should last; and what a spool
+  costs. Every question is optional, each step can be skipped, the sample
+  shop is one click away, and nothing is saved until the last step. On a Mac
+  with no book, finishing starts your own. It is under Book › Set up your
+  shop, and on the empty dashboard, if you want it again. The electricity
+  price is saved as a calculator preset named "Shop rates".
+
+- **(Mac) Picking a printer model keeps its power and nozzle.** Adding a
+  machine and choosing its model from the list saved it with no power draw
+  and a brass nozzle, whatever the model uses, because the sheet's own empty
+  fields were written over the model's. Picking a model now fills in its
+  power, nozzle size and nozzle material on screen, and those are saved.
+
+- **(Mac) Tests no longer fail on the first of the month.** A test that reads the
+  sample book on a pinned day now also asks "this month" of that day, so the
+  masthead, the period filter and their tests stop depending on today's date.
+
+- **(Mac) Help ▸ Send Feedback…** Testers can report a problem by email with
+  what it takes to reproduce it. The sheet asks what happened, then opens a
+  draft to support@khaytapp.com in your mail app with a diagnostics file
+  (versions, your Mac, language and region, window size, how many jobs,
+  customers, machines, spools and library files the book holds, whether cloud
+  sync, Google Drive and the LAN server are on, and the rules that failed
+  lately, by name only), a picture of the window, and, only if you tick it, a
+  copy of your book with every password, key and token masked. Nothing is sent
+  until you press Send. With no mail app set up, the files are saved as a zip in
+  Downloads and the address is copied. The same action is on the "shared rules
+  did not load" banner and on a right-click of the last-crash notice.
+
+- **(Mac) Opening something and pressing Save no longer changes it.** Every
+  editor on the Mac (customers, suppliers, products, spools, consumables,
+  machines, a job's due date and priority, a job's part, maintenance tasks,
+  message templates, calculator presets, every settings pane, slicers, saved
+  reports and the web store settings) now saves only what you changed. Fields
+  you did not touch stay exactly as the book holds them, even when the Mac
+  shows them differently: a date with a time, a number stored as text, an
+  empty value, a choice the Mac has no menu item for, or a field the Mac does
+  not show at all. Before, such a save could quietly rewrite them. A spool
+  could gain a 200 g reorder point and a price-history entry, a printer's
+  colour name became blue, a supplier's zero-priced quote was dropped, a
+  job's due date was rewritten and logged as an edit, and a part's hours
+  stored as text were saved as 0 and re-costed at the shop's default rates.
+  Editing a part now also opens it on its own spool rather than the first
+  spool of the same material, and a changed part is costed at its own rates.
+  Records with numbers stored as text, such as a phone number or a
+  printer's port, now open on the Mac instead of being skipped. Colours
+  written as `#f80` and schedule dates stored with a time now open as
+  themselves.
+
+- **(Mac) One word for filament, and the sign-in link copied privately.** The
+  two Arabic filament labels this app re-worded itself now come straight from
+  the shared words, which say خيط since the desktop fix. Copying the Google
+  sign-in link marks it private, as the import key already is, so clipboard
+  managers do not keep it.
+
 ## [4.0.0-alpha.55] - 2026-09-28
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
