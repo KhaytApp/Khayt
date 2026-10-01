@@ -579,6 +579,7 @@ struct RoundTripTests {
         "saveCloudLibrary": "the caller of saveBucket, above; it adds only a secret that is sealed when typed",
         "editFiles": "a library edit hands one closure per field the shop changed; it never re-encodes a record",
         "saveSeen": "the LAN server's replay list, a file of its own; not a record in the book",
+        "saveInstead": "Send Feedback's fallback: writes a zip to Downloads; reads the book, never writes it",
     ]
 
     @Test("every save path is round-trip tested or says why it need not be")
