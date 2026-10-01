@@ -120,9 +120,41 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// not shown. It never surfaced because this Mac's own book was written
     /// entirely by Bed Ready's job creator, which does set `client`.
     ///
-    /// So they are defaulted rather than required. Everything else stays strict:
-    /// a row missing an `id` or a `price` is a row this app should refuse rather
-    /// than guess at.
+    /// So they are defaulted rather than required.
+    ///
+    /// NINE FIELDS THE OTHER APP DOES NOT REQUIRE EITHER.
+    ///
+    /// `date`, `status`, `project`, `price`, `paidAmount`, `paymentStatus`,
+    /// `printTime`, `priority` and `notes` were required here, and a number
+    /// was required to BE a number. A job an import, a webstore or an older
+    /// build wrote without one of them — or with `"price": "120"` — was
+    /// skipped: counted, and not shown, while Khayt and every `lib/` rule read
+    /// it fine. They are read now the way `lib/` reads them:
+    ///
+    ///   price, paidAmount, printTime   `+o.price || 0` (`order-money.js`,
+    ///                                   `order-payment.js`): a numeric string is
+    ///                                   its number, absent/blank/junk is 0.
+    ///   status                         `KhaytOrderStatus.stageOf` returns the
+    ///                                   status or null — so "" here, `Stage.of`
+    ///                                   is nil, and the board says it has a job
+    ///                                   it has no column for. Not "pending":
+    ///                                   that would put it in a column the shop
+    ///                                   never chose and the other app's board
+    ///                                   does not draw it in.
+    ///   paymentStatus                  "" — the stored word is only ever read
+    ///                                   through `order-payment.js` `statusOf`,
+    ///                                   which derives it from price and paid.
+    ///   date, project, notes           `o.project || ''`: empty text.
+    ///   priority                       `!!o.priority`, JavaScript truthiness.
+    ///
+    /// READ, NEVER WRITTEN. `Order` is not `Encodable`: every write starts from
+    /// the stored record and changes only what the shop changed
+    /// (`EditJobSheet.fields`, `RoundTrip`), so a default shown here is never
+    /// put into the book. A job missing its price still has no price after it
+    /// is opened and saved.
+    ///
+    /// Only a row without an `id` is still refused — nothing could find it
+    /// again to write to it.
     /// A text field that may be absent, null, empty or — for a numeric AWB —
     /// a number. Empty reads as absent.
     private static func lenientText(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> String? {
@@ -133,26 +165,41 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         return nil
     }
 
+    /// `!!x` in JavaScript: what the shared rules make of a stored flag.
+    private static func truthy(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Bool {
+        guard c.contains(key), (try? c.decodeNil(forKey: key)) != true else { return false }
+        if let b = try? c.decode(Bool.self, forKey: key) { return b }
+        if let n = try? c.decode(Double.self, forKey: key) { return n != 0 && !n.isNaN }
+        if let s = try? c.decode(String.self, forKey: key) { return !s.isEmpty }
+        // An object or an array: truthy in JavaScript.
+        return true
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        // The ONE field a job cannot be read without: every write finds its
+        // record by it, so a row with no id is skipped and counted (`Shop.skipped`,
+        // which the sidebar and the status line both report).
         id = try c.decode(String.self, forKey: .id)
-        date = try c.decode(String.self, forKey: .date)
-        status = try c.decode(String.self, forKey: .status)
-        project = try c.decode(String.self, forKey: .project)
+        // Everything below reads the way `lib/` reads it — see "NINE FIELDS THE
+        // OTHER APP DOES NOT REQUIRE" above.
+        date = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
+        status = try c.decodeIfPresent(String.self, forKey: .status) ?? ""
+        project = try c.decodeIfPresent(String.self, forKey: .project) ?? ""
         client = try c.decodeIfPresent(String.self, forKey: .client) ?? ""
         currency = try c.decodeIfPresent(String.self, forKey: .currency) ?? ""
         // Lenient: only `true` means anything, and a stray value in an old
         // book must not take the whole job list down with it.
         nonBusiness = (try? c.decodeIfPresent(Bool.self, forKey: .nonBusiness)) ?? nil
-        price = try c.decode(Double.self, forKey: .price)
-        paidAmount = try c.decode(Double.self, forKey: .paidAmount)
+        price = try c.decodeIfPresent(Double.self, forKey: .price) ?? 0
+        paidAmount = try c.decodeIfPresent(Double.self, forKey: .paidAmount) ?? 0
         costBasis = try c.decodeIfPresent(Double.self, forKey: .costBasis) ?? 0
-        paymentStatus = try c.decode(String.self, forKey: .paymentStatus)
+        paymentStatus = try c.decodeIfPresent(String.self, forKey: .paymentStatus) ?? ""
         paymentMethod = try c.decodeIfPresent(String.self, forKey: .paymentMethod)
-        printTime = try c.decode(Double.self, forKey: .printTime)
-        priority = try c.decode(Bool.self, forKey: .priority)
+        printTime = try c.decodeIfPresent(Double.self, forKey: .printTime) ?? 0
+        priority = Self.truthy(c, .priority)
         priorityLevel = try c.decodeIfPresent(String.self, forKey: .priorityLevel)
-        notes = try c.decode(String.self, forKey: .notes)
+        notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
         machineId = try c.decodeIfPresent(String.self, forKey: .machineId)
         // Absent means made to order, which is every order written before
         // the shelf existed and most of them since.
