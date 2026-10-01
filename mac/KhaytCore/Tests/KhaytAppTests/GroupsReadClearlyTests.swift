@@ -376,17 +376,20 @@ struct GroupsReadClearlyTests {
         ]), files: ["Kings", "Kings/Faisal", "Saudi"])
         let original = root
         let undo = Self.move("Kings", to: "Saudi/Kings", in: &root)
-        #expect(Self.kinds(root) == ["Saudi/Kings": .collection, "Saudi/Kings/Faisal": .parts,
-                                     "Saudi": .collection])
+        // Typed and split: one literal compared inside #expect took CI's
+        // type-checker past its limit.
+        let afterMove: [String: GroupKind] = ["Saudi/Kings": .collection, "Saudi/Kings/Faisal": .parts,
+                                              "Saudi": .collection]
+        #expect(Self.kinds(root) == afterMove)
         let redo = Shop.applyRestore(&root, undo)
         #expect(Self.kinds(root) == Self.kinds(original))
         #expect(Shop.settings(root)["libraryGroups"] == Shop.settings(original)["libraryGroups"],
                 "the undone map is not the map as the book spelled it")
-        #expect(Self.files(root).map { $0.group }.sorted { ($0 ?? "") < ($1 ?? "") }
-                == Self.files(original).map { $0.group }.sorted { ($0 ?? "") < ($1 ?? "") })
+        let groupsNow: [String] = Self.files(root).map { $0.group ?? "" }.sorted()
+        let groupsBefore: [String] = Self.files(original).map { $0.group ?? "" }.sorted()
+        #expect(groupsNow == groupsBefore)
         _ = Shop.applyRestore(&root, redo)
-        #expect(Self.kinds(root) == ["Saudi/Kings": .collection, "Saudi/Kings/Faisal": .parts,
-                                     "Saudi": .collection])
+        #expect(Self.kinds(root) == afterMove)
     }
 
     @Test("an edit that touches no kind leaves Undo nothing to put back in settings")
