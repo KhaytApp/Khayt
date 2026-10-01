@@ -1432,7 +1432,8 @@ import KhaytCore
     @Test("a machine row shows what it earned AND how hard it worked")
     func machineRowWithHours() async throws {
         let shop = Shop()
-        await shop.load(.sample)
+        // This month's rows: read on the sample's own day, not the 1st.
+        await shop.load(.sample, asOf: SampleBook.anchor)
         let engine = try #require(shop.engine)
         let done = await shop.completedInPeriod()
         let report = try await engine.machineProfit(

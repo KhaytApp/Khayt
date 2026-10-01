@@ -25,8 +25,10 @@ import KhaytCore
 struct MastheadNetTests {
 
     static func loaded() async -> Shop {
+        // Read on the sample's own day: on the 1st of a month the rebased
+        // book has nothing in "this month", and these compare this month.
         let shop = Shop()
-        await shop.load(.sample)
+        await shop.load(.sample, asOf: SampleBook.anchor)
         return shop
     }
 
@@ -46,13 +48,13 @@ struct MastheadNetTests {
         let rows = try await engine.pnlByPeriod(
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
-            currencies: Invoice.currencyTable(shop), now: Date(),
+            currencies: Invoice.currencyTable(shop), now: shop.now,
             granularity: "month", wasteLog: shop.wasteRows,
             // As Reports asks it: the machines, so their depreciation is in
             // the net (the sample's laser carries some since the UI review).
             inventory: shop.inventoryRows, machines: shop.machineRows,
             recentMonthlyHours: shop.recentMonthlyHours)
-        let key = DateRange.localMonth(Date())
+        let key = DateRange.localMonth(shop.now)
         let reports = rows.first { $0.period == key }?.net
         // Hoisted, and stringified with an explicit closure: `String.init` on
         // an optional Double picks an overload the diagnostic engine chokes
@@ -87,13 +89,13 @@ struct MastheadNetTests {
         let rows = try await engine.pnlByPeriod(
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
-            currencies: Invoice.currencyTable(shop), now: Date(),
+            currencies: Invoice.currencyTable(shop), now: shop.now,
             granularity: "month", wasteLog: shop.wasteRows,
             // As Reports asks it: the machines, so their depreciation is in
             // the net (the sample's laser carries some since the UI review).
             inventory: shop.inventoryRows, machines: shop.machineRows,
             recentMonthlyHours: shop.recentMonthlyHours)
-        let row = try #require(rows.first { $0.period == DateRange.localMonth(Date()) })
+        let row = try #require(rows.first { $0.period == DateRange.localMonth(shop.now) })
         let net = try #require(shop.monthNet)
         let expected = row.revenue - (row.cogs ?? 0) - (row.waste ?? 0) - row.expenses - row.fixed
             - row.depreciationValue
@@ -120,13 +122,13 @@ struct MastheadNetTests {
         let rows = try await engine.pnlByPeriod(
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
-            currencies: Invoice.currencyTable(shop), now: Date(),
+            currencies: Invoice.currencyTable(shop), now: shop.now,
             granularity: "month", wasteLog: shop.wasteRows,
             // As Reports asks it: the machines, so their depreciation is in
             // the net (the sample's laser carries some since the UI review).
             inventory: shop.inventoryRows, machines: shop.machineRows,
             recentMonthlyHours: shop.recentMonthlyHours)
-        let row = rows.first { $0.period == DateRange.localMonth(Date()) }
+        let row = rows.first { $0.period == DateRange.localMonth(shop.now) }
         let expected = row.map { $0.revenue + $0.vatCollected }
         let said = shop.monthGross.map { "\($0)" } ?? "nil"
         let theirs = expected.map { "\($0)" } ?? "nil"
@@ -150,7 +152,7 @@ struct MastheadNetTests {
     @Test("the label still names the month, because a figure with no period lies by omission")
     func theLabelNamesThePeriod() async {
         let shop = await Self.loaded()
-        let month = Date().formatted(.dateTime.month(.wide)).uppercased()
+        let month = shop.now.formatted(.dateTime.month(.wide)).uppercased()
         #expect(shop.monthNetLabel.contains(month),
                 Comment(rawValue: "\(shop.monthNetLabel) does not name \(month)"))
     }
@@ -185,13 +187,13 @@ struct MastheadNetTests {
         let rows = try await engine.pnlByPeriod(
             orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,
-            currencies: Invoice.currencyTable(shop), now: Date(), granularity: "month", wasteLog: shop.wasteRows)
+            currencies: Invoice.currencyTable(shop), now: shop.now, granularity: "month", wasteLog: shop.wasteRows)
         #expect(!rows.isEmpty, "no periods at all, so the lookup proves nothing")
         for row in rows {
             #expect(row.period.count == 7 && row.period.contains("-"),
                     Comment(rawValue: "\(row.period) is not a YYYY-MM key"))
         }
-        #expect(rows.contains { $0.period == DateRange.localMonth(Date()) }
+        #expect(rows.contains { $0.period == DateRange.localMonth(shop.now) }
                 || shop.monthNet == nil,
                 "a figure was shown for a month the rule has no row for")
     }
