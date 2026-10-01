@@ -4043,16 +4043,20 @@ public actor KhaytEngine {
         public var id: String { machineId }
     }
 
-    public func powerByMachine(orders: [JSONValue], machines: [JSONValue]) throws -> [MachinePower] {
+    ///
+    /// `settings` carries the shop's own tariff (`settings.elecRate`), which
+    /// every machine is charged at — there is no preset here to say otherwise.
+    public func powerByMachine(orders: [JSONValue], machines: [JSONValue],
+                               settings: [String: JSONValue] = [:]) throws -> [MachinePower] {
         try runtime.call2("""
-            (function (orders, machines) {
+            (function (orders, machines, settings) {
               var byId = {};
               (machines || []).forEach(function (m) { if (m && m.id) byId[m.id] = m; });
               return globalThis.KhaytPrintEnergy.powerByMachine(orders, function (id) {
-                return globalThis.KhaytPrintRates.ratesFor({ machine: byId[id] || null });
+                return globalThis.KhaytPrintRates.ratesFor({ machine: byId[id] || null, settings: settings });
               });
-            })(ARG0, ARG1)
-            """, [.array(orders), .array(machines)], as: [MachinePower].self)
+            })(ARG0, ARG1, ARG2)
+            """, [.array(orders), .array(machines), .object(settings)], as: [MachinePower].self)
     }
 
     /// The waste log's three costs summed — filament, machine time, power —
@@ -6946,8 +6950,8 @@ public actor KhaytEngine {
     /// off the spool it names, and the entry records which spool, so deleting
     /// it can put them back. Write both, or the shelf and the log disagree.
     ///
-    /// With `order` and `costing` (`{ machine, preset, actualHours, progress,
-    /// energy }`) the row also carries the failed print's machine time and
+    /// With `order` and `costing` (`{ machine, preset, settings, actualHours,
+    /// progress, energy }` — `settings` for the shop's tariff) the row also carries the failed print's machine time and
     /// electricity beside its filament (`lib/failed-print-cost.js`). `cost`
     /// is never changed by that: it stays the material figure the P&L reads.
     public func newWasteEntry(_ input: [String: JSONValue], id: String, today: String,
@@ -6956,7 +6960,7 @@ public actor KhaytEngine {
         try runtime.call2(
             "(function(){var inv = ARG3; var out = KhaytWasteEntry.newEntry(ARG0, {id: ARG1, today: ARG2, inventory: inv});"
           + " if (out.entry && ARG4 && ARG5) KhaytFailedPrintCost.attach(out.entry, ARG4, ARG5,"
-          + "   { machine: ARG5.machine || null, preset: ARG5.preset || null });"
+          + "   { machine: ARG5.machine || null, preset: ARG5.preset || null, settings: ARG5.settings || null });"
           + " return {entry: out.entry, refused: out.refused, inventory: inv};})()",
             [.object(input), .string(id), .string(today), .array(inventory),
              order ?? .null, costing ?? .null], as: WasteWritten.self)
@@ -9300,7 +9304,7 @@ public actor KhaytEngine {
                          machine: JSONValue? = nil, preset: JSONValue? = nil) throws -> Double {
         try runtime.call2("""
             KhaytCalculatorCost.computePartBaseCost(
-              Object.assign({}, KhaytPrintRates.ratesFor({ machine: ARG3, preset: ARG4 }), ARG0),
+              Object.assign({}, KhaytPrintRates.ratesFor({ machine: ARG3, preset: ARG4, settings: ARG2 }), ARG0),
               { inventory: ARG1, settings: ARG2 })
             """,
                           [part, .array(inventory), .object(settings),
@@ -9320,7 +9324,7 @@ public actor KhaytEngine {
                               preset: JSONValue? = nil) throws -> CostParts {
         try runtime.call2("""
             KhaytCalculatorCost.computePartBreakdown(
-              Object.assign({}, KhaytPrintRates.ratesFor({ machine: ARG3, preset: ARG4 }), ARG0),
+              Object.assign({}, KhaytPrintRates.ratesFor({ machine: ARG3, preset: ARG4, settings: ARG2 }), ARG0),
               { inventory: ARG1, settings: ARG2 })
             """,
                           [part, .array(inventory), .object(settings),
@@ -9597,8 +9601,11 @@ public actor KhaytEngine {
     /// them — the same numbers the other app's calculator form carries before
     /// a shop touches it. A product part made here must arrive with them, or
     /// it is priced at material cost and nothing else.
-    public func printRateDefaults() throws -> [String: Double] {
-        try runtime.call2("KhaytPrintRates.DEFAULTS", [], as: [String: Double].self)
+    ///
+    /// With the shop's own tariff (`settings.elecRate`) over Khayt's 0.18 —
+    /// `defaultsFor`, the same layering `ratesFor` starts from.
+    public func printRateDefaults(settings: [String: JSONValue] = [:]) throws -> [String: Double] {
+        try runtime.call2("KhaytPrintRates.defaultsFor(ARG0)", [.object(settings)], as: [String: Double].self)
     }
 
     /// The seven figures RESOLVED for one machine and one saved preset.
@@ -9609,9 +9616,10 @@ public actor KhaytEngine {
     /// the two a printer knows about itself. A screen that recomputed that
     /// order in Swift would be a second opinion, and the first thing to drift.
     public func printRates(machine: JSONValue? = nil,
-                           preset: JSONValue? = nil) throws -> [String: Double] {
-        try runtime.call2("KhaytPrintRates.ratesFor({ machine: ARG0, preset: ARG1 })",
-                          [machine ?? .null, preset ?? .null], as: [String: Double].self)
+                           preset: JSONValue? = nil,
+                           settings: [String: JSONValue] = [:]) throws -> [String: Double] {
+        try runtime.call2("KhaytPrintRates.ratesFor({ machine: ARG0, preset: ARG1, settings: ARG2 })",
+                          [machine ?? .null, preset ?? .null, .object(settings)], as: [String: Double].self)
     }
 
     // MARK: - What a machine is worth, and what fails
@@ -9688,7 +9696,7 @@ public actor KhaytEngine {
                          machine: JSONValue? = nil, preset: JSONValue? = nil) throws -> CostedPart {
         try runtime.call2("""
             (function (part, inventory, settings, machine, preset) {
-              var rates = KhaytPrintRates.ratesFor({ machine: machine, preset: preset });
+              var rates = KhaytPrintRates.ratesFor({ machine: machine, preset: preset, settings: settings });
               // The part's own values beat the rates, and this merged object is
               // what BOTH the figure and the record are made from — so what gets
               // written down is what was charged, not a second guess at it.
@@ -11060,7 +11068,8 @@ private let QC_FAILURE_SCRIPT = """
   // (`failed-print-cost`). Attached here rather than inside the shared rule,
   // so the other app's QC path is exactly what it was. `cost` is untouched.
   if (ARG13) KhaytFailedPrintCost.attach(r.waste, order, ARG13,
-    { machine: ARG13.machine || null, preset: ARG13.preset || null });
+    { machine: ARG13.machine || null, preset: ARG13.preset || null,
+      settings: ARG13.settings || ARG10 || null });
   // THE SHELF COMES BACK. A failed print takes its filament off the spools it
   // was printing from, and the rule mutates the array it is handed — which is
   // a copy on this side of the bridge. Returning the order and the waste row

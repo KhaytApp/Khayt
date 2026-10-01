@@ -1692,7 +1692,7 @@ final class Shop {
                 // A QC failure is a print that RAN TO THE END: the whole of its
                 // time and power went into a part nobody can sell.
                 let (costing, spent) = self.failedCosting(order: target, machines: Self.rows(root, "machines"),
-                                                          inspected: true)
+                                                          settings: Self.settings(root), inspected: true)
                 spentAttempt = spent
                 let out = try await engine.recordQcFailure(
                     order: target, failureType: failureType, severity: "major",
@@ -1746,7 +1746,7 @@ final class Shop {
     ///
     /// `spent` is the job whose kept meter attempt this costing used, for the
     /// caller to consume once its waste row is saved (`EnergyMeter.consumeAttempt`).
-    func failedCosting(order: JSONValue, machines: [JSONValue],
+    func failedCosting(order: JSONValue, machines: [JSONValue], settings: [String: JSONValue],
                        inspected: Bool) -> (costing: JSONValue, spent: String?) {
         guard case .object(let o) = order else { return (.null, nil) }
         let jobId = Self.plainString(o["id"]) ?? ""
@@ -1754,18 +1754,27 @@ final class Shop {
         let ended = lastPrintEnded[machineId].flatMap { $0.orderId == jobId ? $0 : nil }
         let live = printers.statusCache[machineId]
         let attempt = energyMeter()?.attempt(for: jobId)
-        let costing = Self.failedCosting(order: o, machines: machines, ended: ended, live: live,
+        let costing = Self.failedCosting(order: o, machines: machines, settings: settings,
+                                         ended: ended, live: live,
                                          attempt: attempt, inspected: inspected)
         return (costing, Self.usesAttempt(order: o, attempt: attempt, inspected: inspected) ? jobId : nil)
     }
 
     /// The same, from what is handed in — pure, for the tests.
+    ///
+    /// `settings` is the shop's: only its tariff (`elecRate`) travels, so a
+    /// failed print's electricity is charged what the shop pays rather than
+    /// Khayt's 0.18 — there is no preset on this path to say otherwise.
     static func failedCosting(order o: [String: JSONValue], machines: [JSONValue],
+                              settings: [String: JSONValue] = [:],
                               ended: FinishCamera.Ended?, live: JSONValue?,
                               attempt: KhaytEngine.EnergyReading?, inspected: Bool) -> JSONValue {
         let machineId = plainString(o["machineId"]) ?? ""
         var out: [String: JSONValue] = [:]
         if let machine = machines.first(where: { recordId($0) == machineId }) { out["machine"] = machine }
+        if let tariff = settings["elecRate"], tariff != .null {
+            out["settings"] = .object(["elecRate": tariff])
+        }
 
         if let s = ended?.durationS, s > 0 {
             out["actualHours"] = .number(s / 3600)
@@ -3033,7 +3042,7 @@ final class Shop {
         // shop's rate defaults, but a part that ARRIVES from the library was
         // treated as an existing one and left blank. So they are filled here,
         // where every way from the library to the catalogue passes.
-        if let defaults = try? await engine.printRateDefaults() {
+        if let defaults = try? await engine.printRateDefaults(settings: settingsDict) {
             for (key, value) in defaults where part[key] == nil { part[key] = .number(value) }
         }
         var costedWith: String?
@@ -3184,8 +3193,15 @@ final class Shop {
     /// rule's own figures, so a product made here is priced the way the other
     /// app would price it. See `ProductSheet.PartRow.rates`.
     func printRateDefaults() async -> [String: String]? {
-        guard let engine, let defaults = try? await engine.printRateDefaults() else { return nil }
+        guard let engine, let defaults = try? await engine.printRateDefaults(settings: settingsDict) else { return nil }
         return defaults.mapValues { Money.fieldValue($0) }
+    }
+
+    /// One of those figures, as a number — `settings: [:]` for Khayt's own,
+    /// before the shop's tariff.
+    func printRateDefault(_ key: String, settings: [String: JSONValue]? = nil) async -> Double? {
+        guard let engine else { return nil }
+        return (try? await engine.printRateDefaults(settings: settings ?? settingsDict))?[key]
     }
 
     func priceProduct(parts: [JSONValue], margin: Double?,
@@ -3451,13 +3467,15 @@ final class Shop {
         guard let engine else { return .refused(words.callIt("mac.move_no_engine")) }
         do {
             let draft = try await AiClient.draftQuote(said, shop: self)
-            // `defaults` are the shop's RATE fields, which this screen does not
-            // take from the draft — it costs the part with `costedPart`, the
-            // same call a hand-typed part goes through. Empty is honest here;
-            // filling it would be pretending the model set rates it never saw.
+            // `defaults` are the shop's RATE fields — Khayt's figures with the
+            // shop's own tariff over them (`defaultsFor`), never the model's.
+            // This screen still costs the part with `costedPart`, the same call
+            // a hand-typed part goes through, so these only keep the drafted
+            // part's rate fields from reading as zero.
+            let rateDefaults = (try? await engine.printRateDefaults(settings: settingsDict)) ?? [:]
             let out = try await engine.aiQuoteToPart(
                 draft: draft, inventory: inventoryRows,
-                defaults: [:], reclaimsTax: reclaimsTax)
+                defaults: rateDefaults.mapValues { .number($0) }, reclaimsTax: reclaimsTax)
             guard case .object(let o) = out, case .object(let part)? = o["part"] else {
                 return .refused(words.callIt("mac.ai_no_draft"))
             }
@@ -3908,7 +3926,8 @@ final class Shop {
     func resolvedRates(presetId: String?, machineId: String?) async -> [String: Double] {
         guard let engine else { return [:] }
         return (try? await engine.printRates(machine: machineRow(machineId),
-                                             preset: presetRow(presetId))) ?? [:]
+                                             preset: presetRow(presetId),
+                                             settings: settingsDict)) ?? [:]
     }
 
     /// A machine as the book holds it, for the two rates a printer knows about
@@ -4329,7 +4348,14 @@ final class Shop {
     /// the setup again finds it whatever language its name was written in.
     static let setupPresetMarker = "khaytSetupPreset"
 
-    /// The first-run setup's electricity tariff, into its own preset.
+    /// The first-run setup's electricity tariff, into the preset it made.
+    ///
+    /// ── KEEPING AN OLD ONE IN STEP ───────────────────────────────────────
+    ///
+    /// The tariff is the shop's own now (`settings.elecRate`), and the setup
+    /// calls this with `openers: nil`: it no longer makes a preset, it only
+    /// updates one an earlier setup made, whose tariff would otherwise beat
+    /// the new answer wherever that preset is picked.
     ///
     /// ── ONLY THE TARIFF ──────────────────────────────────────────────────
     ///
@@ -7058,7 +7084,8 @@ final class Shop {
                     id.isEmpty ? nil : Self.rows(root, "printLog").first { Self.recordId($0) == id }
                 }
                 let costed = job.map {
-                    self.failedCosting(order: $0, machines: Self.rows(root, "machines"), inspected: false)
+                    self.failedCosting(order: $0, machines: Self.rows(root, "machines"),
+                                       settings: Self.settings(root), inspected: false)
                 }
                 let costing = costed?.costing
                 spentAttempt = costed?.spent

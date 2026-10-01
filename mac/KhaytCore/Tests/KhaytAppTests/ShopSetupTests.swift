@@ -161,23 +161,32 @@ struct ShopSetupTests {
         #expect(Shop.plainNumber(settings["vatRate"]) == 5)
     }
 
-    @Test("the electricity tariff becomes one preset, replaced rather than duplicated")
-    func electricityPreset() async throws {
+    @Test("the electricity tariff becomes the shop's own (settings.elecRate) — no preset is made")
+    func electricityTariff() async throws {
         let engine = try KhaytEngine()
         var root: [String: JSONValue] = [:]
         var setup = ShopSetup()
         setup.electricity = 0.25
         try await ShopSetup.apply(setup, to: &root, engine: engine, presetName: "Shop rates")
+        #expect(Shop.plainNumber(Shop.settings(root)["elecRate"]) == 0.25)
         setup.electricity = 0.3
         try await ShopSetup.apply(setup, to: &root, engine: engine, presetName: "Shop rates")
-        let presets = Shop.rows(root, "printers").compactMap(Shop.Preset.from)
-        #expect(presets.count == 1)
-        #expect(presets.first?.name == "Shop rates")
-        #expect(presets.first?.rates["elecRate"] == 0.3)
-        // The other six are Khayt's openers, not zeros.
-        let openers = try await engine.printRates()
-        #expect(presets.first?.rates["laborRate"] == openers["laborRate"])
-        #expect((presets.first?.rates["failureRate"] ?? 0) > 0)
+        #expect(Shop.plainNumber(Shop.settings(root)["elecRate"]) == 0.3)
+        #expect(Shop.rows(root, "printers").isEmpty, "the setup no longer makes a preset")
+        // And every costing with no preset is now charged it.
+        let rates = try await engine.printRates(settings: Shop.settings(root))
+        #expect(rates["elecRate"] == 0.3)
+    }
+
+    @Test("a zero or blank tariff writes nothing")
+    func noTariffNoWrite() async throws {
+        let engine = try KhaytEngine()
+        var root: [String: JSONValue] = ["settings": .object(["currency": .string("SAR")])]
+        var setup = ShopSetup()
+        setup.electricity = 0
+        #expect(setup.settingsForm(currentCurrency: "SAR", currentlyChargesVat: false, currentVatRate: 15) == nil)
+        try await ShopSetup.apply(setup, to: &root, engine: engine, presetName: "Shop rates")
+        #expect(Shop.settings(root)["elecRate"] == nil)
     }
 
     @Test("re-running the setup changes only the tariff on a preset the shop customised")
@@ -193,6 +202,9 @@ struct ShopSetupTests {
         var setup = ShopSetup()
         setup.electricity = 0.3
         try await ShopSetup.apply(setup, to: &root, engine: engine, presetName: "Shop rates")
+        #expect(Shop.plainNumber(Shop.settings(root)["elecRate"]) == 0.3)
+        // The preset an earlier setup made is kept in step: its tariff beats
+        // the shop's wherever it is picked, so a stale one would undo the answer.
         let rows = Shop.rows(root, "printers")
         #expect(rows.count == 1)
         guard case .object(let now)? = rows.first else { return }
@@ -212,10 +224,12 @@ struct ShopSetupTests {
         let en = try #require(names["en"]), ar = try #require(names["ar"])
         #expect(ShopSetup.presetNames.contains(en) && ShopSetup.presetNames.contains(ar))
 
-        var root: [String: JSONValue] = [:]
+        // A preset an earlier setup made, marked, in English.
+        var root: [String: JSONValue] = [
+            "printers": .array([.object(["id": .string("PRNTR-EN"), "name": .string(en),
+                                         "elecRate": .number(0.25),
+                                         Shop.setupPresetMarker: .bool(true)])])]
         var setup = ShopSetup()
-        setup.electricity = 0.25
-        try await ShopSetup.apply(setup, to: &root, engine: engine, presetName: en)
         setup.electricity = 0.3
         try await ShopSetup.apply(setup, to: &root, engine: engine, presetName: ar)
         var presets = Shop.rows(root, "printers").compactMap(Shop.Preset.from)

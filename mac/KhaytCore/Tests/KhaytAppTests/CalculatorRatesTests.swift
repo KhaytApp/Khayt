@@ -67,6 +67,36 @@ struct CalculatorRatesTests {
         #expect(rates["wearRate"] == 9, "the machine's own wear rate")
         #expect(rates["laborRate"] == 150, "labour comes from the preset, never the machine")
         #expect(rates["elecRate"] == 0.18, "untouched by either, so Khayt's opener")
+        let shop = try await engine.printRates(machine: machine, preset: Self.preset,
+                                               settings: ["elecRate": .number(0.3)])
+        #expect(shop["elecRate"] == 0.3, "the shop's own tariff, which neither overrides")
+    }
+
+    /// `settings.elecRate`: between Khayt's opener and a preset.
+    @Test("the shop's own tariff is charged with no preset, and a preset's beats it")
+    func shopTariff() async throws {
+        let engine = try KhaytEngine()
+        let settings: [String: JSONValue] = ["elecRate": .number(0.3)]
+        #expect(try await engine.printRates(settings: settings)["elecRate"] == 0.3)
+        #expect(try await engine.printRateDefaults(settings: settings)["elecRate"] == 0.3)
+        // Labour and the rest stay Khayt's: only the tariff is the shop's.
+        #expect(try await engine.printRateDefaults(settings: settings)["laborRate"] == 90)
+        // A preset that says nothing of electricity leaves the shop's standing…
+        #expect(try await engine.printRates(preset: Self.preset, settings: settings)["elecRate"] == 0.3)
+        // …and one that does wins.
+        let own: JSONValue = .object(["id": .string("P2"), "elecRate": .number(0.12)])
+        #expect(try await engine.printRates(preset: own, settings: settings)["elecRate"] == 0.12)
+        // Through the costing itself, and through what the part is written down at.
+        let costed = try await engine.costPart(Self.part(), inventory: [], settings: settings)
+        #expect(costed.rates.elecRate == 0.3)
+        let plain = try await engine.costPart(Self.part(), inventory: [], settings: [:])
+        #expect(costed.cost > plain.cost)
+        let viaPartCost = try await engine.partCost(Self.part(), inventory: [], settings: settings)
+        #expect(abs(viaPartCost - costed.cost) < 1e-9)
+        // Blank or negative is "not said": the opener stands.
+        for bad: JSONValue in [.string(""), .number(-1), .null] {
+            #expect(try await engine.printRates(settings: ["elecRate": bad])["elecRate"] == 0.18)
+        }
     }
 
     @Test("with nothing saved, the rates are Khayt's own openers")

@@ -266,21 +266,31 @@ struct BusinessPane: View {
         /// The shop's own text, keyed by store field (`bizEn`, `addr_fr`…).
         var content: [String: String] = [:]
         var phone = "", email = "", vat = "", cr = ""
+        /// The shop's electricity tariff (`settings.elecRate`), per kWh. Nil
+        /// is "not said" — Khayt's default applies, and the key stays absent.
+        var elecRate: Double?
 
         @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
             let r = SettingsReader(settings: settings)
             var d = Draft(phone: r.text("phone"), email: r.text("email"), vat: r.text("vat"), cr: r.text("cr"))
+            d.elecRate = Shop.plainNumber(settings["elecRate"])
             for field in shop.contentFields(["biz", "tagline", "addr"]) { d.content[field.key] = r.text(field.key) }
             return d
         }
+        /// Blank goes as "" — `settings-edit` deletes the key for it, so a
+        /// cleared field returns the shop to the default rather than to 0.
         func form() -> [String: JSONValue] {
             ["content": .object(content.mapValues(JSONValue.string)),
-             "phone": .string(phone), "email": .string(email), "vat": .string(vat), "cr": .string(cr)]
+             "phone": .string(phone), "email": .string(email), "vat": .string(vat), "cr": .string(cr),
+             "elecRate": elecRate.map { .number($0) } ?? .string("")]
         }
     }
 
     @State private var draft = Draft()
     @State private var original = Draft()
+    /// Khayt's own tariff (`KhaytPrintRates.DEFAULTS`), for the hint — read
+    /// from the rule, never restated here.
+    @State private var defaultElecRate: Double?
     @AppStorage("mac.menuBar") private var menuBar = true
     /// The same key AND the same default as `ShopWindow` — both from
     /// `ShellChoice`, because declaring the default twice is how this switch
@@ -368,6 +378,27 @@ struct BusinessPane: View {
                     latinRow(shop.taxProfile?.registration ?? shop.words.callIt("set.vat")) { LatinField(text: $draft.vat) }
                     latinRow(shop.words.callIt("set.cr")) { LatinField(text: $draft.cr) }
                 }
+                // ── WHAT A kWh COSTS THIS SHOP ────────────────────────────
+                //
+                // `settings.elecRate`, layered by `lib/print-rates.js` between
+                // Khayt's default and a calculator preset — so a failed print
+                // and the power-by-machine report, which have no preset, are
+                // charged what the shop actually pays.
+                Section(shop.words.callIt("mac.set_running_costs")) {
+                    row(shop.words.callIt("mac.set_elec_rate")) {
+                        HStack(spacing: 4) {
+                            TextField("", value: $draft.elecRate,
+                                      format: .number.precision(.fractionLength(0...3)),
+                                      prompt: defaultElecRate.map { Text(Money.fieldValue($0)) })
+                                .multilineTextAlignment(.trailing).monospacedDigit().frame(width: 90)
+                            Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(shop.words.callIt("mac.set_elec_rate_hint",
+                                           ["rate": .string(defaultElecRate.map { Money.fieldValue($0) } ?? "")]))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 // What the shop pays every month. Here, beside the tax
                 // registration, because this is the pane about the business
@@ -383,6 +414,7 @@ struct BusinessPane: View {
                     revert: { draft = original })
         }
         .task(id: shop.settingsValue) { reset() }
+        .task { defaultElecRate = await shop.printRateDefault("elecRate", settings: [:]) }
     }
 
     private func reset() { original = .read(shop.settingsDict, shop: shop); draft = original }
