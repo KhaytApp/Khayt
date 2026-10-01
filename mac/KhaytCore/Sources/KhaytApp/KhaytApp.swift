@@ -888,7 +888,7 @@ final class Activator: NSObject, NSApplicationDelegate {
                 await settle()
             }
 
-            shop.fileSelection = Set(shop.shownFiles.prefix(1).map(\.id))
+            shop.fileSelection = Set(shop.visibleFiles.prefix(1).map(\.id))
             await settle()
             capture(named: "04-model-selected", into: dir)
             // The Model menu should now be live: library shelf, one model
@@ -902,10 +902,10 @@ final class Activator: NSObject, NSApplicationDelegate {
 
             // Several selected: the shape a shop is in when it files the
             // Kings as one collection.
-            shop.fileSelection = Set(shop.shownFiles.prefix(4).map(\.id))
+            shop.fileSelection = Set(shop.visibleFiles.prefix(4).map(\.id))
             await settle()
             capture(named: "04b-many-selected", into: dir)
-            shop.fileSelection = Set(shop.shownFiles.prefix(1).map(\.id))
+            shop.fileSelection = Set(shop.visibleFiles.prefix(1).map(\.id))
 
             if let group = shop.groups.first {
                 shop.shelf = .library(group)

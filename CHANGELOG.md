@@ -33,6 +33,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   are only for display. Opening such a job and saving it without changes
   leaves it exactly as it was in the book. A job with no id still can't be
   read, and the app still says how many there are.
+- **(Mac) Selecting models in the library can no longer reach models you
+  cannot see.** In the Groups view, Select All (⌘A), a Shift-click range and
+  Shift-arrow also picked every model hidden inside the group folders, and the
+  selection was kept when you switched views, opened or left a folder, searched
+  or filtered — so a right-click "Delete N Models…" on one visible model could
+  delete a whole group (a shop lost a 34-model group this way). The selection
+  now holds only the model tiles on screen: folders are never selected, and
+  changing view, folder, search or filter drops whatever leaves the screen.
+  Grouping, category, licence, source, tags, Print next and Add to Catalogue
+  act on the same on-screen selection. Deleting several models now lists them
+  by name (the first eight, then how many more) and says how many are in a
+  group, and refuses outright if any of them is not on screen.
+
 - **(Mac) A feedback report's book carries no live links or keys.** The
   "include a copy of my book" attachment was masked the way the cloud copy is,
   which keeps each job's customer-portal link, quote-approval link and survey

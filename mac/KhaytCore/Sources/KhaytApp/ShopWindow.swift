@@ -622,7 +622,7 @@ struct WindowSheets: ViewModifier {
                 Text(shop.words.callIt("plib.delete_confirm",
                                        ["name": .string(shop.pendingLibraryDelete?.title ?? "")]))
             }
-            // Several at once: one question naming how many.
+            // Several at once: one question naming how many, and which.
             .confirmationDialog(
                 shop.words.callIt("plib.delete_title"),
                 isPresented: Binding(get: { !shop.pendingLibraryDeletes.isEmpty },
@@ -632,15 +632,14 @@ struct WindowSheets: ViewModifier {
                 Button(shop.words.callIt("mac.delete_n_models",
                                          ["n": .number(Double(shop.pendingLibraryDeletes.count))]),
                        role: .destructive) {
-                    let files = shop.pendingLibraryDeletes
-                    Task { await shop.deleteLibraryFiles(files) }
+                    Task { await shop.confirmLibraryDeletes() }
                 }
                 Button(shop.words.callIt("common.cancel"), role: .cancel) {
                     shop.pendingLibraryDeletes = []
                 }
             } message: {
-                Text(shop.words.callIt("mac.delete_n_confirm",
-                                       ["n": .number(Double(shop.pendingLibraryDeletes.count))]))
+                // WHICH models, not just how many — see `libraryDeleteMessage`.
+                Text(verbatim: shop.libraryDeleteMessage(shop.pendingLibraryDeletes))
             }
             .sheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
             .sheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }

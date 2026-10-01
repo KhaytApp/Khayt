@@ -14,7 +14,7 @@ struct LibraryInspector: View {
     @State private var proofFor: LibraryFile?
 
     var body: some View {
-        if shop.fileSelection.count > 1 {
+        if shop.selectedFiles.count > 1 {
             ManyModels(shop: shop)
         } else if let file = shop.selectedFile {
             ScrollView {

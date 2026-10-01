@@ -8,9 +8,9 @@ struct LibraryBulkDeleteTests {
     @Test("a multi-selection offers one delete for all of it, asked once, written once")
     func wired() throws {
         let actions = try QuoteSheetStatusTests.source("FileActions.swift")
-        #expect(actions.contains("shop.pendingLibraryDeletes = chosenForDelete"))
+        #expect(actions.contains("shop.askToDeleteFromLibrary(chosenForDelete)"))
         let window = try QuoteSheetStatusTests.source("ShopWindow.swift")
-        #expect(window.contains("await shop.deleteLibraryFiles(files)"))
+        #expect(window.contains("await shop.confirmLibraryDeletes()"))
         let shop = try QuoteSheetStatusTests.source("Shop.swift")
         #expect(shop.contains("func deleteLibraryFiles(_ files: [LibraryFile]) async"))
         #expect(shop.contains("await deleteLibraryFiles([file])"), "single delete no longer goes the same way")
