@@ -1314,6 +1314,37 @@ final class Words {
         "mac.setup_sum_printer_value": ["en": "{name}, bought for {price}, expected to last {hours} print hours",
                                         "ar": "{name}، اشتُريت بـ{price}، ويُتوقع أن تعمل {hours} ساعة طباعة"],
         "mac.setup_sum_filament": ["en": "A spool of {material} at {price}", "ar": "بكرة {material} بسعر {price}"],
+        // Why Finish did not save, in a sentence — it showed Swift's own
+        // `String(describing:)` of the error before (alpha.56 review).
+        "mac.setup_err_exists": ["en": "There is already a book on this Mac, so a new one was not started. None of your answers were saved.",
+                                 "ar": "يوجد دفتر على هذا الجهاز بالفعل، فلم يُبدأ دفتر جديد. لم تُحفظ أي من إجاباتك."],
+        "mac.setup_err_start": ["en": "Khayt could not start a book on this Mac — its folder could not be written. None of your answers were saved.",
+                                "ar": "تعذّر على خيط بدء دفتر على هذا الجهاز — لم تمكن الكتابة في مجلده. لم تُحفظ أي من إجاباتك."],
+        "mac.setup_err_not_ours": ["en": "Another copy of Khayt has the book open, and it owns the book while it runs. Close it, then try again. None of your answers were saved.",
+                                   "ar": "نسخة أخرى من خيط تفتح الدفتر، وهي تملكه ما دامت تعمل. أغلقها ثم حاول مجددًا. لم تُحفظ أي من إجاباتك."],
+        "mac.setup_err_too_large": ["en": "The book is too large to change safely. None of your answers were saved.",
+                                    "ar": "الدفتر أكبر من أن يُعدَّل بأمان. لم تُحفظ أي من إجاباتك."],
+        "mac.setup_err_unreadable": ["en": "Khayt could not read the book to change it. None of your answers were saved.",
+                                     "ar": "تعذّر على خيط قراءة الدفتر لتعديله. لم تُحفظ أي من إجاباتك."],
+        "mac.setup_err_other": ["en": "The setup could not be saved. None of your answers were saved — try again.",
+                                "ar": "تعذّر حفظ الإعداد. لم تُحفظ أي من إجاباتك — حاول مجددًا."],
+        // The Machine sheet for a laser cutter or a CNC router, which are not
+        // printers: it said "Edit Printer" and "Printer name" over a laser.
+        "mac.mach_edit_machine": ["en": "Edit Machine", "ar": "تعديل الآلة"],
+        "mac.mach_add_machine": ["en": "+ Add Machine", "ar": "+ إضافة آلة"],
+        "mac.mach_name_machine": ["en": "Machine name", "ar": "اسم الآلة"],
+        "mac.mach_name_ph_machine": ["en": "e.g. xTool S1, Shapeoko 5", "ar": "مثال: xTool S1، Shapeoko 5"],
+        "mac.mach_model_machine": ["en": "Machine model", "ar": "طراز الآلة"],
+        "mac.mach_model_ph_machine": ["en": "The model, as its maker names it", "ar": "الطراز كما تسمّيه الشركة المصنّعة"],
+        "mac.mach_model_hint_machine": ["en": "Type the model as its maker names it.",
+                                        "ar": "اكتب الطراز كما تسمّيه الشركة المصنّعة."],
+        "mac.dep_what_machine": ["en": "What this machine costs you in wear, per hour of work.",
+                                 "ar": "ما تكلّفك هذه الآلة من استهلاك عن كل ساعة عمل."],
+        // The spool's reorder fields. The unit is the word after the box, so
+        // the label does not carry it a second time in brackets — and the
+        // shared `inv.reorder_qty` says (كغ) in Arabic over a box in grams.
+        "mac.spool_reorder_point": ["en": "Reorder when below", "ar": "أعد الطلب عند أقل من"],
+        "mac.spool_reorder_qty": ["en": "Default order quantity", "ar": "كمية الطلب الافتراضية"],
         "mac.first": ["en": "First", "ar": "أولًا"],
         "mac.then": ["en": "Then", "ar": "ثم"],
         "mac.add_a_machine": ["en": "Add a machine", "ar": "أضف آلة"],
@@ -3076,12 +3107,12 @@ final class Words {
                                     "ar": "إرفاق صورة للنافذة"],
         "mac.feedback_screenshot_note": ["en": "The picture shows what is on screen — customer names and prices included.",
                                          "ar": "تُظهر الصورة ما على الشاشة، بما في ذلك أسماء العملاء والأسعار."],
-        "mac.feedback_book":  ["en": "Include a copy of my book (private — only if asked)",
-                               "ar": "إرفاق نسخة من دفتري (خاص — فقط إن طُلب منك)"],
+        "mac.feedback_book":  ["en": "Include a copy of my book — only if Khayt support asks for it",
+                               "ar": "إرفاق نسخة من دفتري — فقط إن طلبها منك دعم خيط"],
         "mac.feedback_book_note": ["en": "Your book holds your customers and your prices. Passwords, keys and tokens are masked before it is attached.",
                                    "ar": "يحوي دفترك عملاءك وأسعارك. تُحجب كلمات المرور والمفاتيح والرموز قبل إرفاقه."],
-        "mac.feedback_diag_note": ["en": "A diagnostics file is always attached: versions, your Mac, how many records the book holds, and recent rule errors — no names, prices or secrets. Nothing is sent until you press Send in your mail app.",
-                                   "ar": "يُرفق دائمًا ملف تشخيص: الإصدارات وجهازك وعدد السجلات في الدفتر وأخطاء القواعد الأخيرة — دون أسماء أو أسعار أو أسرار. لا يُرسل شيء حتى تضغط «إرسال» في تطبيق البريد."],
+        "mac.feedback_diag_note": ["en": "A diagnostics file is always attached: versions, your Mac, how many records the book holds, and recent errors inside Khayt — no names, prices or secrets. Nothing is sent until you press Send in your mail app.",
+                                   "ar": "يُرفق دائمًا ملف تشخيص: الإصدارات وجهازك وعدد السجلات في الدفتر وآخر الأخطاء داخل خيط — دون أسماء أو أسعار أو أسرار. لا يُرسل شيء حتى تضغط «إرسال» في تطبيق البريد."],
         "mac.feedback_compose": ["en": "Compose Email", "ar": "كتابة رسالة"],
         "mac.feedback_composed": ["en": "A draft is open in your mail app, addressed to {address}. Check it, then press Send.",
                                   "ar": "فُتحت مسودة في تطبيق البريد موجّهة إلى {address}. راجعها ثم اضغط «إرسال»."],
@@ -3441,7 +3472,7 @@ final class Words {
         "mach.add",
         "mach.color", "mach.name", "mach.name_ph", "mach.nozzle_installed", "mach.nozzle_material", "mach.nozzle_threshold", "mach.printer_model", "mach.printer_model_hint", "mach.printer_model_ph", "mach.target_hours",
         // The shelf
-        "inv.colour_variant", "inv.lot", "inv.material_ph", "inv.opened_on", "inv.price_history", "inv.reorder_point",
+        "inv.colour_variant", "inv.lot", "inv.material_ph", "inv.opened_on", "inv.price_history",
         "set.last_backup",
         // Reports
         "an.aged_receivables",
@@ -3535,5 +3566,51 @@ extension Words {
     /// through it — which is what lets a test find the ones that do not.
     func say(_ date: Date, _ style: Date.FormatStyle) -> String {
         date.formatted(style.locale(locale))
+    }
+
+    /// The currency menu, in the shop's language and sorted in it.
+    ///
+    /// The shared table's labels are English only ("Saudi Riyal (SAR)"), so
+    /// the Arabic Settings window and first-run setup listed every currency
+    /// in English, ordered by the English name (alpha.56 review). The name
+    /// comes from the system's own currency names for this language instead,
+    /// with the code kept beside it because it is what invoices print. The
+    /// table's label is the fallback for a code the system does not name.
+    ///
+    /// `labels` is code → the table's label; `current` is added if the table
+    /// does not have it, so the picker is never blank.
+    func currencyChoices(_ labels: [String: String], current: String? = nil) -> [(code: String, label: String)] {
+        var codes = Array(labels.keys)
+        if let current, !current.isEmpty, labels[current] == nil { codes.append(current) }
+        let named = codes.map { code -> (code: String, label: String) in
+            if let name = locale.localizedString(forCurrencyCode: code), !name.isEmpty,
+               name.uppercased() != code.uppercased() {
+                return (code, "\(name) (\(code))")
+            }
+            return (code, labels[code] ?? code)
+        }
+        let order = locale
+        return named.sorted {
+            $0.label.compare($1.label, options: [.caseInsensitive], range: nil, locale: order) == .orderedAscending
+        }
+    }
+
+    /// Why the first-run setup's Finish did not save, as a sentence.
+    ///
+    /// `startingBook` is the failure of creating the empty book, as opposed
+    /// to writing the answers into one.
+    func setupFailure(_ error: Error, startingBook: Bool) -> String {
+        if startingBook {
+            if let cocoa = error as? CocoaError, cocoa.code == .fileWriteFileExists {
+                return callIt("mac.setup_err_exists")
+            }
+            return callIt("mac.setup_err_start")
+        }
+        switch error as? StoreWriter.Refusal {
+        case .notOurs?: return callIt("mac.setup_err_not_ours")
+        case .tooLarge?: return callIt("mac.setup_err_too_large")
+        case .unreadable?: return callIt("mac.setup_err_unreadable")
+        case nil: return callIt("mac.setup_err_other")
+        }
     }
 }

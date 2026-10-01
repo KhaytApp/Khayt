@@ -71,9 +71,13 @@ struct ConsumableSheet: View {
                     }
                 }
                 GridRow {
-                    Text("\(shop.words.callIt("cons.cost")) (\(shop.currency))")
-                        .foregroundStyle(.secondary)
-                    amount($cost, step: 0.01)
+                    Text(shop.words.callIt("cons.cost")).foregroundStyle(.secondary)
+                    // The currency's mark after the box, as on every other
+                    // sheet — not "(SAR)" in the label.
+                    HStack(spacing: 6) {
+                        amount($cost, step: 0.01)
+                        Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
+                    }
                 }
                 GridRow {
                     Text(shop.words.callIt("cons.category")).foregroundStyle(.secondary)

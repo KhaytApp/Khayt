@@ -108,7 +108,7 @@ struct ReorderQtyTests {
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp/SpoolSheet.swift"), encoding: .utf8)
-        #expect(sheet.contains("inv.reorder_qty"), "there is no way to say how much to order")
+        #expect(sheet.contains("mac.spool_reorder_qty"), "there is no way to say how much to order")
         #expect(sheet.contains("inv.purchased_on"), "there is no way to say when it was bought")
         #expect(sheet.contains("\"reorderQty\": .number(reorderQty)"),
                 "the sheet draws the box and does not send it")

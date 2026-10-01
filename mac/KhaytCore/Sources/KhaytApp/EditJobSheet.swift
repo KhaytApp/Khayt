@@ -25,8 +25,16 @@ struct EditJobSheet: View {
     /// urgent" came out one or two characters to a line, seven lines tall, in
     /// the shipping English app. The labels are `fixedSize` now so the column
     /// is measured from the text rather than from the leftovers, and the sheet
-    /// is wide enough to hold both. Arabic is the tighter of the two.
-    static let width: CGFloat = 460
+    /// is wide enough to hold both.
+    ///
+    /// 500 since the alpha.56 review: the English row needs about 450pt —
+    /// the label is ~140, and the segmented control will not go below 297
+    /// however it is framed — and at 460 that is a 424pt column, so the
+    /// control ran through the right margin to the sheet's edge. Measured in
+    /// an `NSHostingView` (`EditJobMarginTests`); the snapshot draws the
+    /// control as a placeholder of whatever width it is offered, so it cannot
+    /// show this.
+    static let width: CGFloat = 500
 
     let shop: Shop
     let subject: Shop.PendingHold

@@ -10808,7 +10808,7 @@ final class Shop {
             do {
                 try Self.startEmptyBook(at: StoreReader.Build.shipped.storeURL)
             } catch {
-                setupProblem = String(describing: error); return false
+                setupProblem = words.setupFailure(error, startingBook: true); return false
             }
             await load(.store(.shipped))
         }
@@ -10828,7 +10828,7 @@ final class Shop {
                 try await ShopSetup.apply(setup, to: &root, engine: engine, presetName: presetName)
             }
         } catch {
-            setupProblem = String(describing: error)
+            setupProblem = words.setupFailure(error, startingBook: false)
             return false
         }
         rememberSetupDismissed()

@@ -165,7 +165,9 @@ private struct Card: View {
         }
         .contextMenu {
                 if shop.canMoveJobs {
-                    Button(shop.words.callIt("mach.edit")) { shop.editingMachine = machine }
+                    // "Edit Machine" for a laser or a CNC, as the sheet it opens says.
+                    Button(shop.words.callIt(MachineSheet.isPrinter(shop.kind(of: machine)?.kind ?? "fdm")
+                                             ? "mach.edit" : "mac.mach_edit_machine")) { shop.editingMachine = machine }
                     // Only where there is a history to read. Klipper keeps one;
                     // the other six protocols do not expose one Khayt can read,
                     // and a menu item that always answers "not this printer" is
