@@ -139,6 +139,20 @@ struct MoveBanners: View {
                 if !Task.isCancelled, shop.convertNote == note { shop.convertNote = nil }
             }
         }
+        // MODELS FILED INTO A GROUP, and the way to it. A collection's models
+        // stay where they were in "All models", so filing changed nothing on
+        // screen and the shop could not tell it had worked. A note like the
+        // import's — it goes on its own — with Show, which opens the group.
+        if let note = shop.groupNote {
+            Banner(text: note.text, symbol: "checkmark.circle", tint: Khayt.done) {
+                Button(shop.words.callIt("mac.show_group")) { shop.showGroup(note.path) }
+                BannerClose(words: shop.words) { shop.groupNote = nil }
+            }
+            .task(id: note) {
+                try? await Task.sleep(for: Shop.noticeLifetime)
+                if !Task.isCancelled, shop.groupNote == note { shop.groupNote = nil }
+            }
+        }
         if shop.converting {
             Banner(text: shop.words.callIt("mac.converting"),
                    symbol: "gearshape.arrow.trianglehead.2.clockwise.rotate.90",

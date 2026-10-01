@@ -93,6 +93,57 @@ enum LibraryEntry: Identifiable, Hashable {
         return folders + here.sorted(by: order).map { LibraryEntry.file($0) }
     }
 
+    /// What "All models" draws: every model as a tile, EXCEPT that a group
+    /// which is one print in parts is one tile.
+    ///
+    /// Each file's group path is walked from the top. At the first level
+    /// whose kind is `.parts` (`GroupKinds.kind` — a level with no entry is
+    /// `GroupKind.assumed`) the file folds into that group's tile; if every
+    /// level is a collection, or there is no group, the file is its own tile.
+    /// So `Collection X/Set A/a.stl` with X a collection and Set A in parts is
+    /// one tile called "Set A", opening `Collection X/Set A`.
+    ///
+    /// ── IN THE GRID'S ORDER, NOT FOLDERS FIRST ───────────────────────────
+    ///
+    /// A parts group IS one print, so it takes its place among the prints by
+    /// the active sort: where its earliest member would have stood. Newest
+    /// first then puts a group just made exactly where its models were a
+    /// moment ago, instead of moving it to a block at the top. `files` is
+    /// taken in the order it is drawn — `shownFiles` has already sorted it,
+    /// including the Print next and duplicate orders, which `order` does not
+    /// know — and `order` only picks each tile's cover.
+    static func allModels(of files: [LibraryFile], kinds: [String: GroupKind],
+                          order: (LibraryFile, LibraryFile) -> Bool) -> [LibraryEntry] {
+        var held: [String: [LibraryFile]] = [:]
+        var tileOf: [LibraryFile.ID: String] = [:]
+        for file in files {
+            guard let path = partsGroup(of: file.groupName, kinds: kinds) else { continue }
+            held[path, default: []].append(file)
+            tileOf[file.id] = path
+        }
+        var out: [LibraryEntry] = []
+        var drawn = Set<String>()
+        for file in files {
+            guard let path = tileOf[file.id] else { out.append(.file(file)); continue }
+            guard drawn.insert(path).inserted, let members = held[path] else { continue }
+            out.append(.folder(name: Shop.groupLeaf(path), path: path, count: members.count,
+                               cover: cover(of: members, order: order)))
+        }
+        return out
+    }
+
+    /// The group a file folds into in "All models", or nil to show it alone.
+    static func partsGroup(of group: String?, kinds: [String: GroupKind]) -> String? {
+        guard let group, !group.isEmpty else { return nil }
+        var levels: [String] = []
+        for level in group.components(separatedBy: ImportGrouping.separator) {
+            levels.append(level)
+            let path = levels.joined(separator: ImportGrouping.separator)
+            if GroupKinds.kind(of: path, in: kinds) == .parts { return path }
+        }
+        return nil
+    }
+
     /// The picture a folder wears.
     ///
     /// The first file that HAS a thumbnail, in the shop's own sort order —

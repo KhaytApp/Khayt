@@ -2312,6 +2312,10 @@
   }
  ],
  "settings": {
+   "libraryGroups" : {
+     "Saudi Kings" : { "kind" : "collection" },
+     "Dental" : { "kind" : "parts" }
+   },
    "storefront" : {
      "stockQty" : {
        "PRD-0522F9" : 12,

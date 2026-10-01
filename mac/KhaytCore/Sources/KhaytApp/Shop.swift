@@ -289,6 +289,13 @@ final class Shop {
         clearLibrarySelection()
     }
 
+    /// Give the library's groups their kinds, for a test. The book on disk is
+    /// not touched. See `GroupKind`.
+    func pretendGroupKinds(_ kinds: [String: GroupKind]) {
+        libraryGroupKinds = kinds
+        pruneSelectionToVisible()
+    }
+
     /// Put a shop into a mode, for a test. The book on disk is not touched.
     func pretendMode(_ mode: String?) {
         var held: [String: JSONValue] = settingsDict
@@ -560,6 +567,7 @@ final class Shop {
             let library = Self.decodeFiles(root)
             files = library.items
             skipped += library.skipped
+            libraryGroupKinds = GroupKinds.read(Self.settings(root))
             libraryRoots = next.build.map { build in
                 LibraryLocation.resolveRoots(settings: Self.librarySettings(root),
                                              defaultRoot: LibraryLocation.defaultRoot(for: build))
@@ -1494,7 +1502,12 @@ final class Shop {
     /// One write for the whole selection, not one per model. Seven kings filed
     /// one at a time is seven read-modify-writes, seven `.prev` generations, and
     /// six windows in which a crash leaves the collection half made.
-    func fileSelection(under name: String) async {
+    ///
+    /// `kind` is what a NEW group is (the naming popover asks); nil leaves the
+    /// group's kind as it is. It is written in the same store write as the
+    /// files, so a group never exists for a moment with the wrong kind.
+    func fileSelection(under name: String, kind: GroupKind? = nil) async {
+        clearLastOutcome()
         let ids = selectedIds
         guard !ids.isEmpty else { return }
         // Through the engine, so a name matching one the shop already uses
@@ -1507,9 +1520,73 @@ final class Shop {
         let named = name.isEmpty
             ? words.callIt("mac.remove_from_group")
             : words.callIt("mac.file_in", ["name": .string(name)])
-        editFiles(ids, named: named) { record in
+        // The name the engine WROTE, which is the shop's existing spelling
+        // when `unify` adopted one — and so the path the kind belongs to.
+        var written = name
+        if case .string(let g)? = patch["group"], !g.isEmpty { written = g }
+        let wrote = editFiles(ids, named: named, alsoRoot: kind.map { kind in
+            { root in GroupKinds.write([written: kind], into: &root) }
+        }) { record in
             for (key, value) in patch { record[key] = value }
         }
+        // SAY WHERE THEY WENT, with the way there. From "All models" a
+        // collection's models stay where they were, so filing changed nothing
+        // on screen and a shop cannot tell it worked (reported: "the group I
+        // created still appears as single models"). Only when the write
+        // happened: a book this app cannot write leaves `editFiles` doing
+        // nothing, and a note would claim otherwise.
+        guard wrote, !name.isEmpty else { return }
+        groupNote = GroupNote(
+            text: words.callIt("mac.filed_in_group", [
+                "models": .string(words.counting(ids.count, "mac.n_models")),
+                "name": .string(Self.groupLeaf(written))]),
+            path: written)
+    }
+
+    /// What filing models into a group had to say, and the group to show.
+    struct GroupNote: Equatable {
+        let text: String
+        let path: String
+    }
+    var groupNote: GroupNote?
+
+    /// The library's group kinds, by path, as the book's settings hold them.
+    /// See `GroupKind`.
+    private(set) var libraryGroupKinds: [String: GroupKind] = [:]
+
+    func groupKind(_ path: String) -> GroupKind { GroupKinds.kind(of: path, in: libraryGroupKinds) }
+
+    /// Say what a group is: one print in parts, or separate prints.
+    func setGroupKind(_ path: String, _ kind: GroupKind) async {
+        guard let build = source.build, !path.isEmpty, groupKind(path) != kind else { return }
+        do {
+            try StoreWriter.update(build) { root in GroupKinds.write([path: kind], into: &root) }
+            writeProblem = nil
+            await load(source)
+        } catch {
+            writeProblem = String(describing: error)
+        }
+    }
+
+    /// The last level of a group path — what a shop calls the group it is
+    /// looking at. `MyProject/pose 1` is "pose 1"; the whole path is for the
+    /// tooltip, where there is room for it.
+    nonisolated static func groupLeaf(_ path: String) -> String {
+        path.components(separatedBy: ImportGrouping.separator).last(where: { !$0.isEmpty }) ?? path
+    }
+
+    /// Open a group in the library, from anywhere that names one: a model's
+    /// group label in "All models", or the note that says models were filed.
+    ///
+    /// Opening it also ends a search and the filters. The label is mostly
+    /// met on a search's flat list of matches, and a search left on would
+    /// narrow the group to the one model that matched — the group the shop
+    /// asked to see would never appear whole.
+    func showGroup(_ path: String) {
+        groupNote = nil
+        search = ""
+        clearLibraryFilter()
+        shelf = .library(path)
     }
 
     /// The Mac's undo stack, handed over by the window.
@@ -1568,8 +1645,11 @@ final class Shop {
             let rest = (file.groupName ?? "").dropFirst(path.count)
             wanted[file.id] = destination + rest
         }
+        // The folder's kind, and every kind beneath it, go with it — or a
+        // collection moved under a new parent would read as parts there.
         editFiles(Set(moving.map(\.id)),
-                  named: words.callIt("mac.file_in", ["name": .string(destination)])) { record in
+                  named: words.callIt("mac.file_in", ["name": .string(destination)]),
+                  alsoRoot: { root in GroupKinds.carry(from: path, to: destination, in: &root) }) { record in
             guard case .string(let id)? = record["id"], let to = wanted[id] else { return }
             // BOTH fields, as `KhaytOrganise.assign` writes them — the older
             // build's dialog writes only `folder`, and sync merges whole
@@ -1579,9 +1659,16 @@ final class Shop {
         }
     }
 
+    /// True when the change was written.
+    @discardableResult
+    ///
+    /// `alsoRoot` is a change to the rest of the book made in the SAME write —
+    /// a group's kind, which lives in settings and must not land a write apart
+    /// from the files it describes.
     private func editFiles(_ ids: Set<LibraryFile.ID>, named actionName: String,
-                           change: @escaping (inout [String: JSONValue]) -> Void) {
-        guard let build = source.build, !ids.isEmpty else { return }
+                           alsoRoot: ((inout [String: JSONValue]) -> Void)? = nil,
+                           change: @escaping (inout [String: JSONValue]) -> Void) -> Bool {
+        guard let build = source.build, !ids.isEmpty else { return false }
         var before: [String: [String: JSONValue]] = [:]
         do {
             try StoreWriter.update(build) { root in
@@ -1595,12 +1682,15 @@ final class Shop {
                     rows[i] = .object(record)
                 }
                 root["printFiles"] = .array(rows)
+                alsoRoot?(&root)
             }
             writeProblem = nil
             registerUndo(of: before, named: actionName)
             Task { await load(source) }
+            return true
         } catch {
             writeProblem = String(describing: error)
+            return false
         }
     }
 
@@ -8824,6 +8914,7 @@ final class Shop {
         convertNote = nil
         convertProblem = nil
         slicerProblem = nil
+        groupNote = nil
     }
 
     /// Ask for a file and add it.
@@ -13317,26 +13408,54 @@ final class Shop {
     ///
     /// The separator matters: `MyProject` must not swallow `MyProjectile`, so
     /// a deeper match has to be on `MyProject/` and never on the bare prefix.
-    static func isUnder(_ group: String?, _ folder: String) -> Bool {
+    nonisolated static func isUnder(_ group: String?, _ folder: String) -> Bool {
         guard let group else { return false }
         return group == folder || group.hasPrefix(folder + ImportGrouping.separator)
     }
 
     var shownEntries: [LibraryEntry] {
-        // Every model, flat, at the top of the library. Inside a folder the
-        // folder's own levels still show. See `libraryShowsFlat`.
-        //
         // THE ONE BUILDER of what the grid draws: the selection
         // (`visibleFiles`) is read from this list, so a new way of drawing
-        // the flat view belongs here and nowhere else.
+        // the library belongs here and nowhere else. See `libraryShowsFlat`.
         guard !libraryShowsFlat, case .library(let group) = shelf else {
             return shownFiles.map { LibraryEntry.file($0) }
         }
-        // INSIDE a folder as well as at the top. A project with levels shows
-        // its sub-folders when it is opened; before this it showed a flat list
-        // of everything beneath it, which is the same flattening the import
-        // was doing and just as hard to read.
-        return LibraryEntry.top(of: shownFiles, under: group, order: librarySort.order)
+        return Self.libraryEntries(shownFiles, under: group, flat: libraryFlat,
+                                   showingMatches: libraryShowsMatches, kinds: libraryGroupKinds,
+                                   order: librarySort.order)
+    }
+
+    /// The library's tiles, without a shop around it, so it can be tested on
+    /// a library with groups in it (the sample book has none).
+    ///
+    /// - Inside a folder, either view: that folder's own levels. A project
+    ///   with levels shows its sub-folders when it is opened; before that it
+    ///   showed a flat list of everything beneath it, which was as hard to
+    ///   read as the flat import it replaced.
+    /// - Groups view at the top: every group a tile, loose models as models.
+    /// - All models, searching or filtering: the matches flat, wherever they
+    ///   live, the way a Finder search is — each tile names its group
+    ///   (`Cell.groupShown`) with a way into it.
+    /// - All models otherwise: a group that is one print in parts is one
+    ///   tile, a collection's models are models (`LibraryEntry.allModels`).
+    ///   Before the kinds existed this was every model flat, and a group the
+    ///   shop had just made was nowhere to be seen — reported as *"the group I
+    ///   created still appears as single models in All models"*.
+    static func libraryEntries(_ files: [LibraryFile], under group: String?, flat: Bool,
+                               showingMatches: Bool, kinds: [String: GroupKind],
+                               order: (LibraryFile, LibraryFile) -> Bool) -> [LibraryEntry] {
+        if showsFlat(under: group, flat: flat, showingMatches: showingMatches) {
+            return files.map { LibraryEntry.file($0) }
+        }
+        if group != nil || !flat { return LibraryEntry.top(of: files, under: group, order: order) }
+        return LibraryEntry.allModels(of: files, kinds: kinds, order: order)
+    }
+
+    /// Is every shown model its own tile? Only in All models, at the top, while
+    /// a search or filter is on. Plain All models is NOT flat any more: a
+    /// group that is one print in parts collapses to one tile.
+    nonisolated static func showsFlat(under group: String?, flat: Bool, showingMatches: Bool) -> Bool {
+        group == nil && flat && showingMatches
     }
 
     /// One axis of the library filter: a name, or the things that have none.
@@ -13593,15 +13712,22 @@ final class Shop {
     var libraryReadyOn: String? { didSet { libraryViewChanged() } }
     /// One creator's models. See `LibraryFile.creator`.
     var libraryCreator: String? { didSet { libraryViewChanged() } }
-    /// The library as one flat grid of models (true, the default) or as
-    /// folders. Flat by default so a model just added is on screen at once,
-    /// newest first, rather than inside a folder named after a sub-folder.
+    /// The library as models (true, the default — "All models") or as
+    /// folders ("Groups"). In All models a group that is one print in parts is
+    /// still one tile; see `libraryEntries`.
     var libraryFlat = true {
         didSet { if libraryFlat != oldValue { pruneSelectionToVisible() } }
     }
 
-    /// Does the library draw every shown model as a tile (true), or folder
-    /// tiles plus the models loose at this level (false)?
+    /// Is the shop LOOKING for something — a search typed, or any filter on?
+    /// Then All models shows the matching models flat, parts and all; see
+    /// `libraryEntries`.
+    var libraryShowsMatches: Bool {
+        libraryFilterOn || !search.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// Does the library draw every shown model as a tile (true), or the tiles
+    /// `libraryEntries` builds — folders, parts groups, models (false)?
     ///
     /// THE ONE PLACE that decides it. `shownEntries` draws from it and
     /// `visibleFiles` — which every selection reads — is derived from the same
@@ -13609,7 +13735,7 @@ final class Shop {
     /// Outside the library everything shown is a plain row.
     var libraryShowsFlat: Bool {
         guard case .library(let group) = shelf else { return true }
-        return libraryFlat && group == nil
+        return Self.showsFlat(under: group, flat: libraryFlat, showingMatches: libraryShowsMatches)
     }
 
     /// A filter axis changed: recount the chips, and drop from the selection

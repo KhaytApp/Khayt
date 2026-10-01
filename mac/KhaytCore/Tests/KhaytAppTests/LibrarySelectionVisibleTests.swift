@@ -35,6 +35,10 @@ struct LibrarySelectionVisibleTests {
         // ones: a range or an arrow walk over `shownFiles` crosses them.
         rows += [row("PF-loose-a", "aaa loose"), row("PF-loose-b", "mmm loose"), row("PF-loose-c", "zzz loose")]
         shop.pretendLibrary(rows)
+        // A COLLECTION, so "All models" draws all 33 as model tiles. A group
+        // with no kind is one print in parts and All models folds it to one
+        // tile — that case is `partsGroupIsOneTileInAllModels` below.
+        shop.pretendGroupKinds(["Luffy Card": .collection])
         shop.libraryShowArchived = false
         shop.clearLibraryFilter()
         shop.search = ""
@@ -65,6 +69,20 @@ struct LibrarySelectionVisibleTests {
         #expect(Set(shop.visibleFiles.map(\.id)) == Self.loose)
         shop.libraryFlat = true
         #expect(shop.visibleFiles.count == 33, "the flat view draws every model")
+    }
+
+    @Test("All models: a group that is one print in parts is one tile, so ⌘A takes only the loose models")
+    func partsGroupIsOneTileInAllModels() async {
+        let shop = await Self.shop()
+        shop.libraryFlat = true
+        shop.pretendGroupKinds([:])          // no kind written: parts
+        #expect(Set(shop.visibleFiles.map(\.id)) == Self.loose)
+        #expect(shop.shownEntries.contains { if case .folder(_, "Luffy Card", 30, _) = $0 { true } else { false } })
+        shop.selectAllShown()
+        #expect(shop.fileSelection == Self.loose)
+        // A search shows every match flat, parts and all.
+        shop.search = "luffy"
+        #expect(shop.visibleFiles.count == 30)
     }
 
     @Test("⌘A in the grouped view selects only the 3 loose models")
