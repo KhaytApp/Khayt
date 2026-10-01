@@ -63,3 +63,16 @@ test('the fallbacks, the AI draft and the settings form all use the shop price',
   }
   assert.match(read('renderer/index.html'), /id="set_elecRate"/);
 });
+
+test('print-rates loads before settings-edit, which reads its bound', () => {
+  for (const page of ['renderer/index.html', 'renderer/bedready.html']) {
+    const src = read(page);
+    const pr = src.indexOf('<script src="../lib/print-rates.js">');
+    const se = src.indexOf('<script src="../lib/settings-edit.js">');
+    assert.ok(pr > 0 && se > 0 && pr < se, page);
+  }
+});
+
+test('a preset with a blank electricity rate gives the shop price, not 0', () => {
+  assert.match(buildSrc, /String\(p\.elecRate\)\.trim\(\) === ''\) \? shopRateDefaults\(\)\.elecRate : p\.elecRate/);
+});

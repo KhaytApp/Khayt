@@ -1017,7 +1017,11 @@ function applyPreset(presetId) {
   if (p.name)        $('#printerModel').value  = p.name;
   if (p.wearRate    !== undefined) $('#wearRate').value    = p.wearRate;
   if (p.powerDraw   !== undefined) $('#powerDraw').value   = p.powerDraw;
-  if (p.elecRate    !== undefined) $('#elecRate').value    = p.elecRate;
+  // A preset with no electricity figure of its own (blank, as an old preset
+  // can be) means the shop's price, as lib/print-rates.js ratesFor reads it —
+  // not 0, which is what copying the blank across made it.
+  if (p.elecRate    !== undefined) $('#elecRate').value    =
+    (p.elecRate === null || String(p.elecRate).trim() === '') ? shopRateDefaults().elecRate : p.elecRate;
   if (p.laborRate   !== undefined) $('#laborRate').value   = p.laborRate;
   if (p.failureRate !== undefined) $('#failureRate').value = p.failureRate;
   if (p.prepTime    !== undefined) $('#prepTime').value    = p.prepTime;
