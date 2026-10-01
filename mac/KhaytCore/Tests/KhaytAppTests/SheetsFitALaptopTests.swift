@@ -89,6 +89,8 @@ private let laptopScreenHeight: CGFloat = 875
                 CloudSignInSheet(shop: shop))))
             measured.append(("CloudCheckSheet", Self.height(of:
                 CloudCheckSheet(shop: shop))))
+            measured.append(("FeedbackSheet", Self.height(of:
+                FeedbackSheet(shop: shop))))
             if let subject {
                 measured.append(("PaymentSheet", Self.height(of:
                     PaymentSheet(shop: shop, subject: subject))))

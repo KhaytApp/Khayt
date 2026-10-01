@@ -420,6 +420,10 @@ struct ShellSidebar: View {
                 noticeLine(shop.words.callIt("mac.last_crash"),
                            "exclamationmark.bubble", Role.lateOnNavy, help: crash)
                     .onTapGesture { shop.forgetLastCrash() }
+                    // A crash is what a report is for — see `Feedback`.
+                    .contextMenu {
+                        Button(shop.words.callIt("mac.feedback_menu")) { shop.askForFeedback() }
+                    }
             }
         }
     }

@@ -7590,6 +7590,11 @@ final class Shop {
     /// True while the passphrase sheet is up.
     var checkingCloud = false
     var signingIntoCloud = false
+    /// True while the Send Feedback sheet is up — see `Feedback`.
+    var sendingFeedback = false
+    /// The window as it was when feedback was asked for. Taken BEFORE the
+    /// sheet opens, so the picture is of the screen the problem was on.
+    var feedbackCapture: Feedback.Capture?
     /// True while the request is in flight.
     var cloudBusy = false
     /// What the last send put up, if there was one.

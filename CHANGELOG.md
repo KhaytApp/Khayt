@@ -7,6 +7,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **(Mac) Tests no longer fail on the first of the month.** A test that reads the
   sample book on a pinned day now also asks "this month" of that day, so the
   masthead, the period filter and their tests stop depending on today's date.
+- **(Mac) Help ▸ Send Feedback…** Testers can report a problem by email with
+  what it takes to reproduce it. The sheet asks what happened, then opens a
+  draft to support@khaytapp.com in your mail app with a diagnostics file
+  (versions, your Mac, language and region, window size, how many jobs,
+  customers, machines, spools and library files the book holds, whether cloud
+  sync, Google Drive and the LAN server are on, and the rules that failed
+  lately, by name only), a picture of the window, and, only if you tick it, a
+  copy of your book with every password, key and token masked. Nothing is sent
+  until you press Send. With no mail app set up, the files are saved as a zip in
+  Downloads and the address is copied. The same action is on the "shared rules
+  did not load" banner and on a right-click of the last-crash notice.
 
 - **(Mac) One word for filament, and the sign-in link copied privately.** The
   two Arabic filament labels this app re-worded itself now come straight from
