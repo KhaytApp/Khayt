@@ -32,6 +32,37 @@ struct EditPartSheet: View {
     @State private var suggestion: KhaytEngine.PartFromFile?
     @State private var preview: KhaytEngine.CostedPart?
     @State private var saving = false
+    /// The fields as the sheet opened them — what Save compares with, so a
+    /// part nobody changed is not re-costed or re-spelled.
+    @State private var opened: Opened?
+
+    /// The part's fields as the sheet shows them.
+    struct Opened: Equatable, Sendable {
+        var name: String
+        var grams: String
+        var hours: String
+        var qty: Int
+        var spoolId: String?
+    }
+
+    /// A part as the sheet opens it, from the part AS THE BOOK HOLDS IT.
+    ///
+    /// The spool is the one the part names (`filamentId`) when the shop still
+    /// has it. It used to be the FIRST spool of the same material, so a part
+    /// printed from the second roll of PLA was moved onto the first by
+    /// opening it and pressing Save — with that roll's price. The hours read
+    /// `"2.5"` as well as 2.5: a part whose time was a string opened at 0 h and
+    /// saved at 0 h.
+    @MainActor static func opening(_ part: Order.Part, raw: [String: JSONValue]?,
+                                   spools: [Spool]) -> Opened {
+        let named = Shop.plainString(raw?["filamentId"])
+        let spool = spools.first { $0.id == named } ?? spools.first { $0.material == part.material }
+        return Opened(name: part.name,
+                      grams: number(Shop.plainNumber(raw?["printWeight"]) ?? part.printWeight),
+                      hours: number(Shop.plainNumber(raw?["printTime"]) ?? 0),
+                      qty: max(1, part.qty),
+                      spoolId: spool?.id)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -78,11 +109,10 @@ struct EditPartSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save")) {
                     saving = true
+                    let now = Opened(name: name, grams: grams, hours: hours, qty: qty, spoolId: spoolId)
+                    let was = opened
                     Task {
-                        await shop.editPart(orderId, partId: part.id, name: name,
-                                            spoolId: spoolId,
-                                            grams: Double(grams) ?? 0,
-                                            hours: Double(hours) ?? 0, qty: qty)
+                        await shop.editPart(orderId, partId: part.id, now, opened: was)
                         saving = false
                         dismiss()
                     }
@@ -94,11 +124,14 @@ struct EditPartSheet: View {
         .padding(20)
         .frame(width: 420)
         .task {
-            name = part.name
-            grams = Self.number(part.printWeight)
-            qty = max(1, part.qty)
-            spoolId = shop.spools.first { $0.material == part.material }?.id
-            hours = Self.number(await shop.partHours(orderId, partId: part.id) ?? 0)
+            let was = Self.opening(part, raw: shop.rawPart(orderId, partId: part.id),
+                                   spools: shop.spools)
+            name = was.name
+            grams = was.grams
+            qty = was.qty
+            spoolId = was.spoolId
+            hours = was.hours
+            opened = was
             suggestion = await shop.partSuggestion(fileId: part.printFileId)
         }
         // Re-costed as the figures change, so the price on the button is the

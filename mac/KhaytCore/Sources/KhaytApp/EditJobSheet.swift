@@ -112,11 +112,11 @@ struct EditJobSheet: View {
         .onAppear {
             guard !started else { return }
             started = true
-            if let day = Order.day(job?.dueDate) {
-                hasDueDate = true
-                dueDate = day
-            }
-            priority = shop.priorityOf(job)
+            let was = Self.opening(job, priority: shop.priorityOf(job))
+            opened = was
+            hasDueDate = was.hasDueDate
+            if let day = was.dueDate { dueDate = day }
+            priority = was.priority
             nonBusiness = job?.nonBusiness == true
         }
     }
@@ -131,17 +131,51 @@ struct EditJobSheet: View {
         }
     }
 
+    /// The three fields as the sheet opens a job.
+    struct Opened: Equatable {
+        var hasDueDate: Bool
+        var dueDate: Date?
+        var priority: String
+    }
+
+    @State private var opened = Opened(hasDueDate: false, dueDate: nil, priority: "normal")
+
+    static func opening(_ job: Order?, priority: String) -> Opened {
+        let day = Order.day(job?.dueDate)
+        return Opened(hasDueDate: day != nil, dueDate: day, priority: priority)
+    }
+
+    /// What the shared rule is handed: ONLY what the shop changed.
+    ///
+    /// A due date is compared as a DAY — the picker shows days — so a job
+    /// whose due date the book holds as `2026-10-05T21:00:00.000Z` keeps that
+    /// stamp unless the shop picks a different day. Sending the re-read day
+    /// every time re-spelled it as `2026-10-06`, and wrote an edit into the
+    /// job's history that nobody made. A priority the rule does not know
+    /// (`low`, from somewhere else) is likewise kept unless the shop picks one.
+    static func fields(opened: Opened, hasDueDate: Bool, dueDate: Date, priority: String,
+                       price: Double?) -> [String: JSONValue] {
+        var out: [String: JSONValue] = [:]
+        let sameDay = opened.dueDate.map { Calendar.book.isDate($0, inSameDayAs: dueDate) } ?? false
+        if hasDueDate != opened.hasDueDate || (hasDueDate && !sameDay) {
+            out["dueDate"] = hasDueDate ? .string(Shop.localDay(dueDate)) : .null
+        }
+        if priority != opened.priority { out["priorityLevel"] = .string(priority) }
+        if let price { out["price"] = .number(price) }
+        return out
+    }
+
     private func commit() {
         let id = subject.id
-        let when = hasDueDate ? dueDate : nil
-        let level = priority
         let typed = priceText.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
         let price = typed.isEmpty ? nil : Double(typed).map { max(0, $0) }
+        let fields = Self.fields(opened: opened, hasDueDate: hasDueDate, dueDate: dueDate,
+                                 priority: priority, price: price)
         let wasNonBusiness = job?.nonBusiness == true
         let nowNonBusiness = nonBusiness
         shop.clearQuestion()
         Task {
-            await shop.editJob(id, dueDate: when, priorityLevel: level, price: price)
+            if !fields.isEmpty { await shop.editJob(id, fields: fields) }
             // Only when it changed: an edit that did not touch it writes nothing.
             if nowNonBusiness != wasNonBusiness { await shop.setNonBusiness(id, nowNonBusiness) }
         }

@@ -465,6 +465,10 @@ public struct PortalRefresh: Decodable, Sendable, Equatable {
 public struct MachineWritten: Decodable, Sendable {
     public let machine: JSONValue?
     public let refused: String?
+
+    public init(machine: JSONValue?, refused: String?) {
+        self.machine = machine; self.refused = refused
+    }
 }
 
 /// A nozzle fitment, as `lib/nozzle-wear-data.js` describes it.
@@ -498,6 +502,12 @@ public struct SpoolEdited: Decodable, Sendable {
     public let settings: [String: JSONValue]
     public let refused: String?
     public let colourAdded: String?
+
+    public init(spool: JSONValue, settings: [String: JSONValue], refused: String?,
+                colourAdded: String?) {
+        self.spool = spool; self.settings = settings
+        self.refused = refused; self.colourAdded = colourAdded
+    }
 }
 
 /// A new consumable, or the reason there is not one.
@@ -510,6 +520,10 @@ public struct ConsumableWritten: Decodable, Sendable {
 public struct ConsumableEdited: Decodable, Sendable {
     public let consumable: JSONValue
     public let refused: String?
+
+    public init(consumable: JSONValue, refused: String?) {
+        self.consumable = consumable; self.refused = refused
+    }
 }
 
 /// What the shop is owed, aged.

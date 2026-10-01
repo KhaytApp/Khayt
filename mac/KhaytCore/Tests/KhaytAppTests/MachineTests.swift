@@ -161,7 +161,7 @@ struct MachineTests {
     func sampleRefuses() async throws {
         let shop = Shop()
         await shop.load(.sample)
-        await shop.saveMachine(["name": .string("Bench")], id: nil, catalogId: nil)
+        await shop.saveMachine(["name": .string("Bench")], id: nil, catalogId: nil, opened: nil)
         #expect(shop.spendProblem == shop.words.callIt("mac.move_sample"))
     }
 

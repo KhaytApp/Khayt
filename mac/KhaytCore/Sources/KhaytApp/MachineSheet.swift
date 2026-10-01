@@ -637,17 +637,7 @@ struct MachineSheet: View {
     }
 
     /// The fields as the record keeps them.
-    private var depreciationInput: JSONValue {
-        .object([
-            "price": .number(depPrice),
-            "purchaseDate": .string(depBought.map { Shop.today($0) } ?? ""),
-            "life": .number(depLife),
-            "lifeUnit": .string(depUnit),
-            "residual": .number(depResidual),
-            "method": .string(depMethod),
-            "monthlyHours": .number(depMonthly),
-        ])
-    }
+    private var depreciationInput: JSONValue { form.depreciation }
 
     private var depSignature: String {
         "\(depPrice)|\(depBought.map { Shop.today($0) } ?? "")|\(depLife)|\(depUnit)|\(depResidual)|\(depMethod)|\(depMonthly)"
@@ -679,52 +669,242 @@ struct MachineSheet: View {
         depPreviewFor = asked
     }
 
+    /// The form's fields as one value — so opening a machine and saving it
+    /// are ONE mapping, which `Shop.saveMachine` also runs over the machine
+    /// as it opened to tell what the shop changed from what the form merely
+    /// re-spelled: a colour name no swatch can show, a `lifeUnit` the menu
+    /// does not offer, an install date stamped with a time, `"150"` watts.
+    struct Form: Equatable {
+        var name = ""
+        var kind = "fdm"
+        var swatch = Khayt.brand
+        var nozzleDiameter: Double = 0.4
+        var powerDraw: Double = 0
+        var targetHours: Double = 0
+        var nozzleMaterial = "brass"
+        var nozzleInstalled: Date?
+        var nozzleThreshold: Double = 0
+        var nozzleAtInstall: Double = 0
+        var apiType = ""
+        var apiHost = ""
+        var apiPort = 0
+        var apiSerial = ""
+        var apiSlug = ""
+        var camEnabled = false
+        var camSnapshot = ""
+        var camRotate = 0
+        var camFlipH = false
+        var camFlipV = false
+        var downtime: [Shop.DowntimeBlock] = []
+        var plugType = "none"
+        var plugHost = ""
+        var plugEntity = ""
+        var plugUser = ""
+        var plugAutoOff = false
+        var plugDelay: Double = 10
+        var loadedRows: [LoadedRow] = []
+        var depPrice: Double = 0
+        var depBought: Date?
+        var depLife: Double = 0
+        var depUnit = "hours"
+        var depResidual: Double = 0
+        var depMethod = "perHour"
+        var depMonthly: Double = 0
+
+        /// A machine as the sheet opens it. `kind` is the module's answer —
+        /// for every machine recorded before Khayt could ask, a filament
+        /// printer.
+        @MainActor static func opening(_ machine: Machine, kind: String) -> Form {
+            var f = Form()
+            f.loadedRows = LoadedRow.rows(for: machine)
+            f.name = machine.name
+            f.kind = kind
+            f.swatch = Color(nsColor: NSColor(hex: machine.color ?? "#5b9cf0") ?? .systemBlue)
+            f.nozzleDiameter = machine.nozzleDiameter ?? 0.4
+            f.powerDraw = machine.powerDraw ?? 0
+            f.nozzleMaterial = machine.nozzle?.material ?? "brass"
+            f.nozzleInstalled = Order.day(machine.nozzle?.installedAt)
+            f.nozzleThreshold = machine.nozzle?.gramsThreshold ?? 0
+            f.nozzleAtInstall = machine.nozzle?.gramsAtInstall ?? 0
+            f.downtime = DowntimeEditor.windows(of: machine)
+            f.plugType = machine.smartPlug?.type.flatMap { $0.isEmpty ? nil : $0 } ?? "none"
+            f.plugHost = machine.smartPlug?.host ?? ""
+            f.plugEntity = machine.smartPlug?.entity ?? ""
+            f.plugUser = machine.smartPlug?.user ?? ""
+            f.plugAutoOff = machine.smartPlug?.autoOff ?? false
+            f.plugDelay = machine.smartPlug?.delayMin ?? 10
+            f.camEnabled = machine.webcam?.enabled ?? false
+            f.camSnapshot = machine.webcam?.snapshotUrl ?? ""
+            f.camRotate = machine.webcam?.rotate ?? 0
+            f.camFlipH = machine.webcam?.flipH ?? false
+            f.camFlipV = machine.webcam?.flipV ?? false
+            f.apiType = machine.printerApi?.type ?? ""
+            f.apiHost = machine.printerApi?.host ?? ""
+            f.apiPort = machine.printerApi?.port ?? 0
+            f.apiSerial = machine.printerApi?.serial ?? ""
+            f.apiSlug = machine.printerApi?.printerSlug ?? ""
+            f.targetHours = machine.targetHoursPerDay ?? 0
+            if let d = machine.depreciation {
+                f.depPrice = d.price ?? 0
+                f.depBought = Order.day(d.purchaseDate)
+                f.depLife = d.life ?? 0
+                f.depUnit = d.lifeUnit == "years" ? "years" : "hours"
+                f.depResidual = d.residual ?? 0
+                f.depMethod = d.method == "straightLine" ? "straightLine" : "perHour"
+                f.depMonthly = d.monthlyHours ?? 0
+            }
+            return f
+        }
+
+        @MainActor var depreciation: JSONValue {
+            .object([
+                "price": .number(depPrice),
+                "purchaseDate": .string(depBought.map { Shop.localDay($0) } ?? ""),
+                "life": .number(depLife),
+                "lifeUnit": .string(depUnit),
+                "residual": .number(depResidual),
+                "method": .string(depMethod),
+                "monthlyHours": .number(depMonthly),
+            ])
+        }
+
+        /// What Save hands the shared rule, the secrets aside (they are sealed
+        /// by the sheet and added only when typed) and the camera not yet
+        /// through `sanitizeWebcam` (the shop does that, for this input and
+        /// the opened one alike).
+        @MainActor func input() -> [String: JSONValue] {
+            var nozzle: [String: JSONValue] = [
+                "material": .string(nozzleMaterial),
+                "installedAt": .string(nozzleInstalled.map { Shop.localDay($0) } ?? ""),
+                "gramsThreshold": .number(nozzleThreshold),
+                "gramsAtInstall": .number(nozzleAtInstall),
+            ]
+            // A threshold left at zero is one nobody has chosen; the rule fills it
+            // from what that material is expected to last.
+            if nozzleThreshold <= 0 { nozzle["gramsThreshold"] = .number(0) }
+            var input: [String: JSONValue] = [
+                "name": .string(name),
+                "color": .string(NSColor(swatch).hexString ?? "#5b9cf0"),
+                "kind": .string(kind),
+                "nozzleDiameter": .number(nozzleDiameter),
+                "powerDraw": .number(powerDraw),
+                "targetHoursPerDay": .number(targetHours),
+                "nozzle": .object(nozzle),
+                // Through the shared rule, which drops the whole block when there
+                // is no price — so clearing the price is how a shop takes it off.
+                "depreciation": depreciation,
+            ]
+            let serial = apiSerial.trimmingCharacters(in: .whitespaces)
+            let slug = apiSlug.trimmingCharacters(in: .whitespaces)
+            var api: [String: JSONValue] = [
+                "type": .string(apiType),
+                "host": .string(apiHost.trimmingCharacters(in: .whitespaces)),
+                "port": .number(Double(apiPort)),
+            ]
+            // The identifier each transport addresses a machine by. Sent only
+            // for the protocols that use it, so switching a Bambu to Moonraker
+            // does not write an empty serial over the one it had.
+            if ["bambu", "sdcp"].contains(apiType) { api["serial"] = .string(serial) }
+            if apiType == "repetier" { api["printerSlug"] = .string(slug) }
+            input["printerApi"] = .object(api)
+            // Through the shared rule like everything else here: it drops a
+            // window that runs backwards or cannot be read, sorts them and caps
+            // the list. A row typed wrongly is refused in ONE place rather than
+            // by two apps with two opinions.
+            input["downtimeBlocks"] = DowntimeEditor.payload(downtime)
+            // THROUGH THE SHARED RULE, not written as typed — `Shop.saveMachine`
+            // hands this to `sanitizeWebcam`, which makes a path absolute
+            // against the printer's host, bounds the rotation to the four it
+            // allows, and drops anything that is not an http(s) URL.
+            input["webcam"] = .object([
+                "enabled": .bool(camEnabled),
+                "snapshotUrl": .string(camSnapshot.trimmingCharacters(in: .whitespaces)),
+                "rotate": .number(Double(camRotate)),
+                "flipH": .bool(camFlipH), "flipV": .bool(camFlipV),
+            ])
+            // Through the shared rule, which drops a colour it cannot read.
+            if kind == "fdm" {
+                input["loaded"] = .array(loadedRows.filter(\.on).map {
+                    .object(["slot": .number(Double($0.id)),
+                             "hex": .string(NSColor($0.colour).hexString ?? ""),
+                             "material": .string($0.material.trimmingCharacters(in: .whitespaces))])
+                })
+            }
+            // The plug through the shared rule. Its secrets are the sheet's
+            // to add: absent keeps what is stored.
+            input["smartPlug"] = .object([
+                "type": .string(plugType), "host": .string(plugHost.trimmingCharacters(in: .whitespaces)),
+                "entity": .string(plugEntity.trimmingCharacters(in: .whitespaces)),
+                "user": .string(plugUser.trimmingCharacters(in: .whitespaces)),
+                "autoOff": .bool(plugAutoOff), "delayMin": .number(plugDelay),
+            ])
+            return input
+        }
+    }
+
+    /// The form as it opened, for `Shop.saveMachine` to compare the save with.
+    @State private var opened: Form?
+
+    private var form: Form {
+        Form(name: name, kind: kind, swatch: swatch, nozzleDiameter: nozzleDiameter,
+             powerDraw: powerDraw, targetHours: targetHours, nozzleMaterial: nozzleMaterial,
+             nozzleInstalled: nozzleInstalled, nozzleThreshold: nozzleThreshold,
+             nozzleAtInstall: nozzleAtInstall, apiType: apiType, apiHost: apiHost,
+             apiPort: apiPort, apiSerial: apiSerial, apiSlug: apiSlug,
+             camEnabled: camEnabled, camSnapshot: camSnapshot, camRotate: camRotate,
+             camFlipH: camFlipH, camFlipV: camFlipV, downtime: downtime,
+             plugType: plugType, plugHost: plugHost, plugEntity: plugEntity,
+             plugUser: plugUser, plugAutoOff: plugAutoOff, plugDelay: plugDelay,
+             loadedRows: loadedRows, depPrice: depPrice, depBought: depBought,
+             depLife: depLife, depUnit: depUnit, depResidual: depResidual,
+             depMethod: depMethod, depMonthly: depMonthly)
+    }
+
     private func fill() {
         loadedRows = LoadedRow.rows(for: existing)
         guard let machine = existing else { focused = true; return }
-        name = machine.name
-        // What the module says this machine is, which for every machine
-        // recorded before Khayt could ask is a filament printer.
-        kind = shop.kind(of: machine)?.kind ?? "fdm"
-        swatch = Color(nsColor: NSColor(hex: machine.color ?? "#5b9cf0") ?? .systemBlue)
+        let f = Form.opening(machine, kind: shop.kind(of: machine)?.kind ?? "fdm")
+        name = f.name
+        kind = f.kind
+        swatch = f.swatch
         model = machine.printerModelName ?? ""
-        nozzleDiameter = machine.nozzleDiameter ?? 0.4
-        powerDraw = machine.powerDraw ?? 0
-        nozzleMaterial = machine.nozzle?.material ?? "brass"
-        nozzleInstalled = Order.day(machine.nozzle?.installedAt)
-        nozzleThreshold = machine.nozzle?.gramsThreshold ?? 0
-        nozzleAtInstall = machine.nozzle?.gramsAtInstall ?? 0
-        downtime = DowntimeEditor.windows(of: machine)
-        plugType = machine.smartPlug?.type.flatMap { $0.isEmpty ? nil : $0 } ?? "none"
-        plugHost = machine.smartPlug?.host ?? ""
-        plugEntity = machine.smartPlug?.entity ?? ""
-        plugUser = machine.smartPlug?.user ?? ""
-        plugAutoOff = machine.smartPlug?.autoOff ?? false
-        plugDelay = machine.smartPlug?.delayMin ?? 10
-        camEnabled = machine.webcam?.enabled ?? false
-        camSnapshot = machine.webcam?.snapshotUrl ?? ""
-        camRotate = machine.webcam?.rotate ?? 0
-        camFlipH = machine.webcam?.flipH ?? false
-        camFlipV = machine.webcam?.flipV ?? false
-        apiType = machine.printerApi?.type ?? ""
-        apiHost = machine.printerApi?.host ?? ""
-        apiPort = machine.printerApi?.port ?? 0
+        nozzleDiameter = f.nozzleDiameter
+        powerDraw = f.powerDraw
+        nozzleMaterial = f.nozzleMaterial
+        nozzleInstalled = f.nozzleInstalled
+        nozzleThreshold = f.nozzleThreshold
+        nozzleAtInstall = f.nozzleAtInstall
+        downtime = f.downtime
+        plugType = f.plugType
+        plugHost = f.plugHost
+        plugEntity = f.plugEntity
+        plugUser = f.plugUser
+        plugAutoOff = f.plugAutoOff
+        plugDelay = f.plugDelay
+        camEnabled = f.camEnabled
+        camSnapshot = f.camSnapshot
+        camRotate = f.camRotate
+        camFlipH = f.camFlipH
+        camFlipV = f.camFlipV
+        apiType = f.apiType
+        apiHost = f.apiHost
+        apiPort = f.apiPort
         // Whether there IS one, never what it is. Opening a credential to put
         // it in a text field is how a secret ends up in a screenshot.
         hasStoredKey = !(machine.printerApi?.apiKey ?? "").isEmpty
         hasStoredCode = !(machine.printerApi?.accessCode ?? "").isEmpty
-        apiSerial = machine.printerApi?.serial ?? ""
-        apiSlug = machine.printerApi?.printerSlug ?? ""
-        targetHours = machine.targetHoursPerDay ?? 0
-        if let d = machine.depreciation {
-            depPrice = d.price ?? 0
-            depBought = Order.day(d.purchaseDate)
-            depLife = d.life ?? 0
-            depUnit = d.lifeUnit == "years" ? "years" : "hours"
-            depResidual = d.residual ?? 0
-            depMethod = d.method == "straightLine" ? "straightLine" : "perHour"
-            depMonthly = d.monthlyHours ?? 0
-        }
+        apiSerial = f.apiSerial
+        apiSlug = f.apiSlug
+        targetHours = f.targetHours
+        depPrice = f.depPrice
+        depBought = f.depBought
+        depLife = f.depLife
+        depUnit = f.depUnit
+        depResidual = f.depResidual
+        depMethod = f.depMethod
+        depMonthly = f.depMonthly
+        loadedRows = f.loadedRows
+        opened = f
         focused = true
     }
 
@@ -890,27 +1070,8 @@ struct MachineSheet: View {
     }
 
     private func commit() {
-        var nozzle: [String: JSONValue] = [
-            "material": .string(nozzleMaterial),
-            "installedAt": .string(nozzleInstalled.map { Shop.today($0) } ?? ""),
-            "gramsThreshold": .number(nozzleThreshold),
-            "gramsAtInstall": .number(nozzleAtInstall),
-        ]
-        // A threshold left at zero is one nobody has chosen; the rule fills it
-        // from what that material is expected to last.
-        if nozzleThreshold <= 0 { nozzle["gramsThreshold"] = .number(0) }
-        var input: [String: JSONValue] = [
-            "name": .string(name),
-            "color": .string(NSColor(swatch).hexString ?? "#5b9cf0"),
-            "kind": .string(kind),
-            "nozzleDiameter": .number(nozzleDiameter),
-            "powerDraw": .number(powerDraw),
-            "targetHoursPerDay": .number(targetHours),
-            "nozzle": .object(nozzle),
-            // Through the shared rule, which drops the whole block when there
-            // is no price — so clearing the price is how a shop takes it off.
-            "depreciation": depreciationInput,
-        ]
+        var input = form.input()
+        let was = opened?.input()
         let id = existing?.id
         let catalogId = chosen
         let typed = apiKey
@@ -918,28 +1079,14 @@ struct MachineSheet: View {
         let typedCode = accessCode
         let clearingCode = forgetCode
         let serial = apiSerial.trimmingCharacters(in: .whitespaces)
-        let slug = apiSlug.trimmingCharacters(in: .whitespaces)
-        let wantsCamera = camEnabled
-        let still = camSnapshot.trimmingCharacters(in: .whitespaces)
-        let turn = camRotate
-        let mirrorH = camFlipH, mirrorV = camFlipV
-        let windows = downtime
-        let loadedNow = kind == "fdm" ? loadedRows.filter(\.on) : nil
-        let plugForm: [String: JSONValue] = [
-            "type": .string(plugType), "host": .string(plugHost.trimmingCharacters(in: .whitespaces)),
-            "entity": .string(plugEntity.trimmingCharacters(in: .whitespaces)),
-            "user": .string(plugUser.trimmingCharacters(in: .whitespaces)),
-            "autoOff": .bool(plugAutoOff), "delayMin": .number(plugDelay),
-        ]
+        let host = apiHost.trimmingCharacters(in: .whitespaces)
+        let type = apiType
         let typedPlugToken = plugToken, typedPlugPassword = plugPassword
         let build = shop.source.build
         dismiss()
         Task {
-            var api: [String: JSONValue] = [
-                "type": .string(apiType),
-                "host": .string(apiHost.trimmingCharacters(in: .whitespaces)),
-                "port": .number(Double(apiPort)),
-            ]
+            guard case .object(var api)? = input["printerApi"],
+                  case .object(var plug)? = input["smartPlug"] else { return }
             // ── THE KEY IS SEALED HERE OR NOT WRITTEN AT ALL ──────────────
             //
             // `apiKey` is a registered secret path, so what belongs on the
@@ -965,14 +1112,9 @@ struct MachineSheet: View {
                     return
                 }
             }
-            // The identifier each transport addresses a machine by. Sent only
-            // for the protocols that use it, so switching a Bambu to Moonraker
-            // does not write an empty serial over the one it had.
-            if ["bambu", "sdcp"].contains(apiType) { api["serial"] = .string(serial) }
-            if apiType == "repetier" { api["printerSlug"] = .string(slug) }
             // A Bambu's access code: sealed here or not written, exactly as the
             // key above — it is the MQTT password and a registered secret path.
-            if apiType == "bambu" {
+            if type == "bambu" {
                 if clearingCode {
                     api["accessCode"] = .string("")
                 } else if !typedCode.isEmpty {
@@ -982,7 +1124,7 @@ struct MachineSheet: View {
                     }
                     // A new access code re-trusts the printer's certificate:
                     // this is how a replaced or reset Bambu is let back in.
-                    BambuPin.forget(serial: serial, host: apiHost.trimmingCharacters(in: .whitespaces))
+                    BambuPin.forget(serial: serial, host: host)
                     do { api["accessCode"] = .string(try await Secrets.seal(typedCode, for: build)) }
                     catch {
                         await MainActor.run { shop.spendProblem = String(describing: error) }
@@ -991,43 +1133,14 @@ struct MachineSheet: View {
                 }
             }
             input["printerApi"] = .object(api)
-            // THROUGH THE SHARED RULE, not written as typed. `sanitizeWebcam`
-            // makes a path absolute against the printer's host, bounds the
-            // rotation to the four it allows, and drops anything that is not an
-            // http(s) URL — so a camera saved here is one this app and Khayt
-            // will both fetch from, or none at all.
-            // Through the shared rule like everything else here: it drops a
-            // window that runs backwards or cannot be read, sorts them and caps
-            // the list. A row typed wrongly is refused in ONE place rather than
-            // by two apps with two opinions.
-            input["downtimeBlocks"] = DowntimeEditor.payload(windows)
-            let cam: JSONValue = .object([
-                "enabled": .bool(wantsCamera),
-                "snapshotUrl": .string(still),
-                "rotate": .number(Double(turn)),
-                "flipH": .bool(mirrorH), "flipV": .bool(mirrorV),
-            ])
-            if let engine = shop.engine,
-               let clean = try? await engine.sanitizeWebcam(cam, printerApi: .object(api)) {
-                input["webcam"] = clean
-            }
-            // Through the shared rule, which drops a colour it cannot read.
-            if let loadedNow {
-                input["loaded"] = .array(loadedNow.map {
-                    .object(["slot": .number(Double($0.id)),
-                             "hex": .string(NSColor($0.colour).hexString ?? ""),
-                             "material": .string($0.material.trimmingCharacters(in: .whitespaces))])
-                })
-            }
-            // The plug through the shared rule. A secret goes in SEALED, and only
-            // when one was typed: absent keeps what is stored.
-            var plug = plugForm
+            // The plug's secrets go in SEALED, and only when one was typed:
+            // absent keeps what is stored.
             for (key, typed) in [("token", typedPlugToken), ("password", typedPlugPassword)] where !typed.isEmpty {
                 guard let build else { break }
                 if let sealed = try? await Secrets.seal(typed, for: build) { plug[key] = .string(sealed) }
             }
             input["smartPlug"] = .object(plug)
-            await shop.saveMachine(input, id: id, catalogId: catalogId)
+            await shop.saveMachine(input, id: id, catalogId: catalogId, opened: was)
             shop.loadedChanged()
         }
     }

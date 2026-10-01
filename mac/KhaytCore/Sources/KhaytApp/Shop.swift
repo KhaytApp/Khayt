@@ -1901,11 +1901,7 @@ final class Shop {
                     // An edit, so it is stamped like any other — and undoable.
                     guard case .object(let was) = rows[at] else { return }
                     undo.append(ChangedRecord(collection: "clients", id: client.id, was: was))
-                    // Fields this app does not offer are the shop's and stay:
-                    // the price list, the recurring schedule, the comms log.
-                    for (key, value) in was where record[key] == nil {
-                        record[key] = value
-                    }
+                    record = Self.customerRecord(saving: client, over: was)
                     StoreWriter.stamp(&record)
                     rows[at] = .object(record)
                 } else {
@@ -1920,6 +1916,27 @@ final class Shop {
         } catch {
             moveProblem = String(describing: error)
         }
+    }
+
+    /// The customer record a save writes over `was`.
+    ///
+    /// Fields this app does not offer are the shop's and stay: the comms log,
+    /// anything a newer build writes. And a field the sheet shows but was not
+    /// changed stays AS THE BOOK SPELLS IT — `null` rather than `""`, `"12"`
+    /// rather than `12`, a price row the other app wrote with a field of its
+    /// own — because the sheet's own open→save of the stored row is the
+    /// baseline every untouched value is compared with (`RoundTrip`).
+    static func customerRecord(saving client: Client,
+                               over was: [String: JSONValue]) -> [String: JSONValue] {
+        var record = client.record
+        if let stored = Client.decoding(was) {
+            let baseline = CustomerSheet.saving(CustomerSheet.opening(stored)).record
+            record = RoundTrip.keepUntouched(written: record, baseline: baseline, stored: was)
+        }
+        for (key, value) in was where record[key] == nil {
+            record[key] = value
+        }
+        return record
     }
 
     /// Put rows on the catalogue without a book. FOR TESTS ONLY, and named so
@@ -3462,6 +3479,55 @@ final class Shop {
         }
     }
 
+    /// The three picture fields a product carries for these pictures, settled
+    /// by the shared rule.
+    ///
+    /// `images` is written even when EMPTY, so removing the last picture
+    /// actually removes it. `normalise` treats an empty array beside a set
+    /// `imagePath` as an unmigrated product and rebuilds the array from it —
+    /// which would resurrect the picture just deleted — so the legacy fields
+    /// are cleared in the same breath. And then the shared rule has the last
+    /// word on all three, because `imagePath` and `thumbnail` are what the
+    /// storefront, the portal and label printing still read, and a Swift copy
+    /// of that mirroring is a second thing to get out of step.
+    static func pictureFields(_ staged: [StagedPicture], productId: String,
+                              engine: KhaytEngine?) async -> [String: JSONValue] {
+        var draft: [String: JSONValue] = [
+            "id": .string(productId),
+            "images": .array(staged.map { $0.record() }),
+            "imagePath": .string(staged.first?.path ?? ""),
+            "thumbnail": .string(staged.first?.thumbnail ?? ""),
+        ]
+        if let engine, case .object(let applied)? =
+            try? await engine.applyProductPictures(.object(draft)) {
+            draft = applied
+        }
+        var out: [String: JSONValue] = [:]
+        for key in ["images", "imagePath", "thumbnail"] { out[key] = draft[key] ?? .string("") }
+        return out
+    }
+
+    /// A product saved over the stored row `was`.
+    ///
+    /// `written` is what the sheet made; `baseline` what the same sheet makes
+    /// of the stored row untouched. What was not changed goes back as the book
+    /// spells it. The price the shared rule worked out (`priced`) is laid on
+    /// after, because it is derived rather than typed. Whatever this sheet is
+    /// not editing at all — the components, the storefront fields, anything a
+    /// newer build writes — is the shop's, and none of this app's business to
+    /// drop.
+    static func productRecord(written: [String: JSONValue], baseline: [String: JSONValue]?,
+                              priced: [String: JSONValue],
+                              over was: [String: JSONValue]) -> [String: JSONValue] {
+        var record = written
+        if let baseline {
+            record = RoundTrip.keepUntouched(written: written, baseline: baseline, stored: was)
+        }
+        for (key, value) in priced { record[key] = value }
+        for (key, value) in was where record[key] == nil { record[key] = value }
+        return record
+    }
+
     /// Save a product, and its pictures.
     ///
     /// `pictures` is nil for a caller that is not editing them at all, which is
@@ -3513,30 +3579,30 @@ final class Shop {
         // record, and doing it here keeps the write itself to the one thing a
         // write should be.
         var pictureFields: [String: JSONValue] = [:]
-        if let staged {
-            var draft: [String: JSONValue] = [
-                "id": .string(product.id),
-                // Written even when the array is EMPTY, so removing the last
-                // picture actually removes it. `normalise` treats an empty
-                // array beside a set `imagePath` as an unmigrated product and
-                // rebuilds the array from it — which would resurrect the
-                // picture just deleted — so the legacy fields are cleared here
-                // in the same breath.
-                "images": .array(staged.map { $0.record() }),
-                "imagePath": .string(staged.first?.path ?? ""),
-                "thumbnail": .string(staged.first?.thumbnail ?? ""),
-            ]
-            // And then the shared rule has the last word on all three, because
-            // `imagePath` and `thumbnail` are what the storefront, the portal
-            // and label printing still read, and a Swift copy of that mirroring
-            // is a second thing to get out of step.
-            if let engine, case .object(let applied)? =
-                try? await engine.applyProductPictures(.object(draft)) {
-                draft = applied
+        if let staged { pictureFields = await Self.pictureFields(staged, productId: product.id, engine: engine) }
+
+        // ── WHAT AN UNTOUCHED SAVE WOULD WRITE ─────────────────────────────
+        //
+        // The stored row put through the sheet's own open→save mapping. What
+        // the save still has equal to this was not edited, and goes back as
+        // the book spells it (`RoundTrip`): a tier with a field of its own, a
+        // document row the other app wrote, a part weighing 12.34567 g that
+        // the form shows to four places.
+        var baseline: [String: JSONValue]?
+        if case .object(let stored)? = productRows.first(where: { Self.recordId($0) == product.id }) {
+            let opened = ProductSheet.payload(ProductSheet.opening(Product.from(stored, keys: keys)),
+                                              spools: spools)
+            var b = opened.product.record(keys: keys)
+            if staged != nil {
+                for (key, value) in await Self.pictureFields(await self.pictures(of: product.id),
+                                                             productId: product.id, engine: engine) {
+                    b[key] = value
+                }
             }
-            for key in ["images", "imagePath", "thumbnail"] {
-                pictureFields[key] = draft[key] ?? .string("")
-            }
+            if parts != nil { b["parts"] = .array(opened.parts) }
+            if tiers != nil { b["priceTiers"] = .array(opened.tiers) }
+            if docs != nil { b["docs"] = .array(opened.docs) }
+            baseline = b
         }
 
         // ── THE PARTS, AND THE PRICE THEY MAKE ────────────────────────────
@@ -3551,14 +3617,15 @@ final class Shop {
         // Settled before the write opens: `StoreWriter.update` takes a
         // synchronous closure and the rule lives behind an actor.
         var partFields: [String: JSONValue] = [:]
+        var priced: [String: JSONValue] = [:]
         if let parts {
             partFields["parts"] = .array(parts)
             let forPricing = Self.pricingInput(for: product, parts: parts)
             if let engine,
-               let priced = try? await engine.productPricingFields(
+               let fields = try? await engine.productPricingFields(
                 .object(forPricing), inventory: inventoryRows,
                 settings: settingsDict, consumables: consumableRows) {
-                for (key, value) in priced { partFields[key] = value }
+                priced = fields
             }
         }
 
@@ -3583,15 +3650,12 @@ final class Shop {
                 if let at = rows.firstIndex(where: { Self.recordId($0) == product.id }) {
                     guard case .object(let was) = rows[at] else { return }
                     undo.append(ChangedRecord(collection: "products", id: product.id, was: was))
-                    // Whatever this sheet is not editing — the components, the
-                    // storefront fields, anything a newer build writes: the
-                    // shop's, and none of this app's business to drop.
-                    for (key, value) in was where record[key] == nil {
-                        record[key] = value
-                    }
+                    record = Self.productRecord(written: record, baseline: baseline,
+                                                priced: priced, over: was)
                     StoreWriter.stamp(&record)
                     rows[at] = .object(record)
                 } else {
+                    for (key, value) in priced { record[key] = value }
                     StoreWriter.stamp(&record)
                     rows.append(.object(record))
                 }
@@ -4138,6 +4202,19 @@ final class Shop {
 
     var presets: [Preset] { presetRows.compactMap(Preset.from) }
 
+    /// A preset written over the stored row `was` — see `savePreset`.
+    static func presetRow(_ preset: Preset, over was: [String: JSONValue]) -> [String: JSONValue] {
+        guard case .object(let written) = preset.record else { return was }
+        var out = was
+        if let stored = Preset.from(.object(was)), case .object(let baseline) = stored.record {
+            let kept = RoundTrip.keepUntouched(written: written, baseline: baseline, stored: was)
+            for key in written.keys { out[key] = kept[key] }
+        } else {
+            for (key, value) in written { out[key] = value }
+        }
+        return out
+    }
+
     /// Save a preset, matching the other app's rule: a name already in use is
     /// REPLACED rather than duplicated, compared without case, and the id is
     /// kept so anything pointing at it still does.
@@ -4155,11 +4232,17 @@ final class Shop {
             try StoreWriter.update(build) { root in
                 var rows: [JSONValue] = []
                 if case .array(let had)? = root["printers"] { rows = had }
-                rows.removeAll {
-                    if case .object(let o) = $0, case .string(let had)? = o["id"] { return had == id }
-                    return false
+                // Saved OVER a preset of the same name: in place, and keeping
+                // every field of it this app does not model (the other app's
+                // presets carry more than the seven rates) and every rate that
+                // did not change, as the book spells it. It used to be removed
+                // and re-added from the seven rates alone.
+                if let at = rows.firstIndex(where: { Self.recordId($0) == id }),
+                   case .object(let was) = rows[at] {
+                    rows[at] = .object(Self.presetRow(preset, over: was))
+                } else {
+                    rows.append(preset.record)
                 }
-                rows.append(preset.record)
                 root["printers"] = .array(rows)
             }
             await load(source)
@@ -4557,14 +4640,12 @@ final class Shop {
     /// Two fields, not thirty: the ones a shop floor actually adjusts. Every
     /// other field the order editor writes is left exactly as it was, which the
     /// shared rule guarantees rather than this app promising it.
-    func editJob(_ id: Order.ID, dueDate: Date?, priorityLevel: String,
-                 price: Double? = nil) async {
+    ///
+    /// `fields` holds only what the shop changed — `EditJobSheet.fields`.
+    func editJob(_ id: Order.ID, fields: [String: JSONValue]) async {
         await writeToOneOrder(id, named: words.callIt("mac.edit_job")) { order, engine, _ in
             let out = try await engine.editJob(
-                order: order,
-                dueDate: dueDate.map(Self.localDay),
-                priorityLevel: priorityLevel,
-                price: price,
+                order: order, fields: fields,
                 now: Date(), editId: Self.uid("edit"))
             // Nothing moved: return the order untouched so the write path finds
             // no change, stamps nothing and syncs nothing.
@@ -4646,16 +4727,80 @@ final class Shop {
     /// The cost is NOT taken from whatever was on the part before. A shop that
     /// corrects a weight has corrected the price of the job, and leaving the old
     /// figure there would be a job whose parts no longer add up to its total.
-    func editPart(_ orderId: Order.ID, partId: String, name: String,
-                  spoolId: String?, grams: Double, hours: Double, qty: Int) async {
-        let costed = await costedPart(spoolId: spoolId, grams: grams, hours: hours, qty: qty)
-        let spool = spoolId.flatMap { id in spools.first { $0.id == id } }
+    ///
+    /// `opened` is the sheet's fields as it opened the part. Only what differs
+    /// from it is written, and the part is re-costed only when a figure the
+    /// cost is made from changed — at the PART'S OWN RATES (its labour, power,
+    /// wear and failure figures), not the shop's defaults: costing from grams
+    /// and hours alone is the fault that re-priced the catalogue's portrait
+    /// from 50 to 13.74, and this path did it to a job's part on every save.
+    func editPart(_ orderId: Order.ID, partId: String, _ now: EditPartSheet.Opened,
+                  opened: EditPartSheet.Opened?) async {
+        guard now != opened else { return }
+        let grams = Double(now.grams) ?? 0, hours = Double(now.hours) ?? 0
+        let recost = opened.map {
+            $0.grams != now.grams || $0.hours != now.hours || $0.qty != now.qty || $0.spoolId != now.spoolId
+        } ?? true
+        let costed = recost
+            ? await costedPart(spoolId: now.spoolId, grams: grams, hours: hours, qty: now.qty,
+                               extra: rawPart(orderId, partId: partId) ?? [:])
+            : nil
+        let spool = now.spoolId.flatMap { id in spools.first { $0.id == id } }
 
         await writeToOneOrder(orderId, named: words.callIt("mac.edit_part")) { order, _, _ in
             OneOrderEdit(order: Self.orderWithPartEdited(
-                order, partId: partId, name: name, spool: spool,
-                grams: grams, hours: hours, qty: qty, costed: costed))
+                order, partId: partId, now, opened: opened, spool: spool, costed: costed))
         }
+    }
+
+    /// A part as the book holds it, every field.
+    func rawPart(_ orderId: Order.ID, partId: String) -> [String: JSONValue]? {
+        guard case .object(let order)? = orderRows.first(where: {
+            if case .object(let o) = $0, case .string(let id)? = o["id"] { return id == orderId }
+            return false
+        }), case .array(let rows)? = order["parts"] else { return nil }
+        for row in rows {
+            if case .object(let part) = row, case .string(let id)? = part["id"], id == partId { return part }
+        }
+        return nil
+    }
+
+    /// `orderWithPartEdited`, writing only the fields that differ from what
+    /// the sheet opened with. A field the shop did not change stays as the
+    /// book spells it — 12.34567 g is not rounded to the 12.35 the box shows.
+    static func orderWithPartEdited(_ order: JSONValue, partId: String,
+                                    _ now: EditPartSheet.Opened, opened: EditPartSheet.Opened?,
+                                    spool: Spool?, costed: KhaytEngine.CostedPart?) -> JSONValue {
+        guard let opened else {
+            return orderWithPartEdited(order, partId: partId, name: now.name, spool: spool,
+                                       grams: Double(now.grams) ?? 0, hours: Double(now.hours) ?? 0,
+                                       qty: now.qty, costed: costed)
+        }
+        guard case .object(var record) = order,
+              case .array(var rows)? = record["parts"] else { return order }
+        for i in rows.indices {
+            guard case .object(var part) = rows[i],
+                  case .string(let id)? = part["id"], id == partId else { continue }
+            if now.name != opened.name { part["name"] = .string(now.name) }
+            if now.grams != opened.grams { part["printWeight"] = .number(max(0, Double(now.grams) ?? 0)) }
+            if now.hours != opened.hours { part["printTime"] = .number(max(0, Double(now.hours) ?? 0)) }
+            if now.qty != opened.qty { part["qty"] = .number(Double(max(1, now.qty))) }
+            if now.spoolId != opened.spoolId, let spool {
+                part["filamentId"] = .string(spool.id)
+                part["material"] = .string(spool.material)
+                part["spoolCost"] = .number(spool.cost ?? 0)
+                // At least one gram: the cost model divides by this.
+                part["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
+            }
+            if let costed {
+                part["unitCost"] = .number(costed.cost)
+                part["baseCost"] = .number(costed.cost)
+                for (key, value) in costed.rates.fields { part[key] = value }
+            }
+            rows[i] = .object(part)
+        }
+        record["parts"] = .array(rows)
+        return .object(record)
     }
 
     /// The patch itself, with no store and no clock in it.
@@ -5466,6 +5611,25 @@ final class Shop {
     /// heard of it would empty the shop's purchase history, which is exactly
     /// how a Mac product save once dropped a product's part costs and re-priced
     /// it at a quarter of what it was worth.
+    /// The supplier record a save writes over `was`: the sheet's fields laid
+    /// over the stored row, with every field the shop did not change kept as
+    /// the book spells it — a price row with fields of its own, a lead time of
+    /// 2.5 days, a supplier with no name — because the sheet's own open→save
+    /// of the stored row is the baseline (`RoundTrip`). Before, a quote at 0,
+    /// a quote with a note, or `leadDays: 0` was rewritten or dropped by
+    /// opening the supplier and pressing Save.
+    static func supplierRecord(saving supplier: Supplier,
+                               over was: [String: JSONValue]) -> [String: JSONValue] {
+        var record = was
+        var edits = supplier.edits
+        if let stored = Supplier(row: .object(was)) {
+            let baseline = SupplierSheet.saving(stored, lead: SupplierSheet.leadText(stored)).edits
+            edits = RoundTrip.keepUntouched(written: edits, baseline: baseline, stored: was)
+        }
+        for key in supplier.edits.keys { record[key] = edits[key] }
+        return record
+    }
+
     func saveSupplier(_ supplier: Supplier) async {
         moveProblem = nil
         guard let build = source.build else {
@@ -5481,10 +5645,10 @@ final class Shop {
                 var rows = Self.rows(root, "suppliers")
                 let edits = supplier.edits
                 if let at = rows.firstIndex(where: { Self.recordId($0) == supplier.id }),
-                   case .object(var record) = rows[at] {
+                   case .object(let was) = rows[at] {
                     undo.append(ChangedRecord(collection: "suppliers", id: supplier.id,
-                                              was: record))
-                    for (key, value) in edits { record[key] = value }
+                                              was: was))
+                    var record = Self.supplierRecord(saving: supplier, over: was)
                     StoreWriter.stamp(&record)
                     rows[at] = .object(record)
                 } else {
@@ -8941,7 +9105,44 @@ final class Shop {
     /// form field, so it would be kept rather than replaced, and Save would do
     /// nothing at all. Two named keys, written explicitly, is the same
     /// narrowness by another route.
-    func saveSlicers(_ list: [KhaytEngine.Slicer], defaultId: String) async {
+    /// The settings keys the slicer list is written as.
+    ///
+    /// The legacy single slicer is kept in step. `lib/slicers.js` says it is
+    /// mirrored to the default "so existing consumers keep working unchanged"
+    /// — the kanban print, machine slice-and-print and the quote slice all
+    /// still read it, in the app next to this one.
+    static func slicerFields(_ list: [KhaytEngine.Slicer], defaultId: String) -> [String: JSONValue] {
+        var out: [String: JSONValue] = [
+            "slicers": .array(list.map { slicer in
+                .object(["id": .string(slicer.id), "name": .string(slicer.name),
+                         "path": .string(slicer.path), "args": .string(slicer.args)])
+            }),
+            "defaultSlicerId": .string(defaultId),
+        ]
+        if let chosen = list.first(where: { $0.id == defaultId }) ?? list.first {
+            out["slicer"] = .object(["path": .string(chosen.path), "args": .string(chosen.args)])
+        }
+        return out
+    }
+
+    /// Settings keys an editor rewrites, laid over `settings` keeping what it
+    /// did not change as the book spells it (`RoundTrip`). A slicer the other
+    /// app stored with a field of its own keeps it; so does a saved report.
+    static func settingsKeys(_ written: [String: JSONValue], opened: [String: JSONValue]?,
+                             over settings: [String: JSONValue]) -> [String: JSONValue] {
+        var out = settings
+        var keys = written
+        if let opened {
+            let stored = settings.filter { written[$0.key] != nil || opened[$0.key] != nil }
+            keys = RoundTrip.keepUntouched(written: written, baseline: opened, stored: stored)
+        }
+        for key in written.keys { out[key] = keys[key] }
+        return out
+    }
+
+    /// `opened` is the list as the pane opened it.
+    func saveSlicers(_ list: [KhaytEngine.Slicer], defaultId: String,
+                     opened: (list: [KhaytEngine.Slicer], defaultId: String)?) async {
         settingsProblem = nil
         settingsNote = nil
         guard let build = source.build else {
@@ -8953,21 +9154,10 @@ final class Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
-                var settings = Self.settings(root)
-                settings["slicers"] = .array(list.map { slicer in
-                    .object(["id": .string(slicer.id), "name": .string(slicer.name),
-                             "path": .string(slicer.path), "args": .string(slicer.args)])
-                })
-                settings["defaultSlicerId"] = .string(defaultId)
-                // The legacy single slicer, kept in step. `lib/slicers.js` says
-                // it is mirrored to the default "so existing consumers keep
-                // working unchanged" — the kanban print, machine slice-and-
-                // print and the quote slice all still read it, in the app next
-                // to this one.
-                if let chosen = list.first(where: { $0.id == defaultId }) ?? list.first {
-                    settings["slicer"] = .object(["path": .string(chosen.path),
-                                                  "args": .string(chosen.args)])
-                }
+                let settings = Self.settingsKeys(
+                    Self.slicerFields(list, defaultId: defaultId),
+                    opened: opened.map { Self.slicerFields($0.list, defaultId: $0.defaultId) },
+                    over: Self.settings(root))
                 root["settings"] = .object(settings)
             }
             await load(source)
@@ -9040,7 +9230,18 @@ final class Shop {
     /// The LIST is computed by `lib/saved-reports.js` before it gets here. This
     /// only writes it, so the rule about what a re-save under one name does
     /// lives in one place and both apps obey it.
-    func saveReports(_ list: [KhaytEngine.SavedReport]) async {
+    /// The saved reports, as settings holds them.
+    static func reportFields(_ list: [KhaytEngine.SavedReport]) -> [String: JSONValue] {
+        ["savedReports": .array(list.map { r in
+            .object(["id": .string(r.id), "name": .string(r.name),
+                     "fields": .array(r.fields.map { .string($0) }),
+                     "statusIn": .array(r.statusIn.map { .string($0) }),
+                     "from": .string(r.from), "to": .string(r.to)])
+        })]
+    }
+
+    /// `opened` is the list before this change.
+    func saveReports(_ list: [KhaytEngine.SavedReport], opened: [KhaytEngine.SavedReport]?) async {
         settingsProblem = nil
         settingsNote = nil
         guard let build = source.build else {
@@ -9052,13 +9253,9 @@ final class Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
-                var settings = Self.settings(root)
-                settings["savedReports"] = .array(list.map { r in
-                    .object(["id": .string(r.id), "name": .string(r.name),
-                             "fields": .array(r.fields.map { .string($0) }),
-                             "statusIn": .array(r.statusIn.map { .string($0) }),
-                             "from": .string(r.from), "to": .string(r.to)])
-                })
+                let settings = Self.settingsKeys(Self.reportFields(list),
+                                                 opened: opened.map(Self.reportFields),
+                                                 over: Self.settings(root))
                 root["settings"] = .object(settings)
             }
             await load(source)
@@ -9723,7 +9920,36 @@ final class Shop {
     /// every other, because the cloud's sync baseline reads the stamp. The
     /// settings go with it when a colour variant taught the shop's library
     /// something — one swap, or the library forgets what was just typed.
-    func saveSpool(_ input: [String: JSONValue], id: Spool.ID?) async {
+    /// A rule's edit of `stored`, with every field the shop did not change
+    /// put back as the book spells it.
+    ///
+    /// `written` is the rule's answer to the save; `baseline` its answer to
+    /// the form exactly as it opened. Both start from the same stored record,
+    /// so wherever they agree the difference from the book is the FORM's
+    /// re-spelling — `"150"` read as 150, an ISO stamp read as a day, a colour
+    /// name read as grey — and not anything the shop did (`RoundTrip`).
+    static func keptEdit(_ stored: JSONValue, written: JSONValue?,
+                         baseline: JSONValue?) -> JSONValue? {
+        guard case .object(let w)? = written, case .object(let b)? = baseline,
+              case .object(let s) = stored else { return written }
+        return .object(RoundTrip.keepUntouched(written: w, baseline: b, stored: s))
+    }
+
+    /// A spool edited by the shared rule, keeping what the shop did not touch.
+    static func editedSpool(_ stored: JSONValue, input: [String: JSONValue],
+                            opened: [String: JSONValue]?, settings: [String: JSONValue],
+                            today: String, engine: KhaytEngine) async throws -> SpoolEdited {
+        let out = try await engine.editSpool(stored, input: input, settings: settings, today: today)
+        guard let opened, out.refused == nil else { return out }
+        let base = try await engine.editSpool(stored, input: opened, settings: settings, today: today)
+        return SpoolEdited(spool: keptEdit(stored, written: out.spool, baseline: base.spool) ?? out.spool,
+                           settings: out.settings, refused: out.refused, colourAdded: out.colourAdded)
+    }
+
+    /// `opened` is the sheet's input for the spool as it opened — see
+    /// `keptEdit`. Nil for a new spool.
+    func saveSpool(_ input: [String: JSONValue], id: Spool.ID?,
+                   opened: [String: JSONValue]?) async {
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -9745,9 +9971,9 @@ final class Shop {
                           case .object(let was) = shelf[at] else {
                         throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
                     }
-                    let out = try await engine.editSpool(shelf[at], input: input,
+                    let out = try await Self.editedSpool(shelf[at], input: input, opened: opened,
                                                          settings: Self.settings(root),
-                                                         today: Self.today())
+                                                         today: Self.today(), engine: engine)
                     if out.refused != nil {
                         throw MoveRefused(sentence: self.words.callIt("inv.material_ph"))
                     }
@@ -9822,7 +10048,22 @@ final class Shop {
     /// INSIDE the write (the in-memory copy lags every in-flight write), and
     /// hand the record to the rule rather than rebuilding it, so the fields
     /// neither this app nor the rule knows about survive.
-    func saveConsumable(_ input: [String: JSONValue], id: Consumable.ID?) async {
+    /// A consumable edited by the shared rule, keeping what the shop did not
+    /// touch — see `keptEdit`.
+    static func editedConsumable(_ stored: JSONValue, input: [String: JSONValue],
+                                 opened: [String: JSONValue]?,
+                                 engine: KhaytEngine) async throws -> ConsumableEdited {
+        let out = try await engine.editConsumable(stored, input: input)
+        guard let opened, out.refused == nil else { return out }
+        let base = try await engine.editConsumable(stored, input: opened)
+        return ConsumableEdited(
+            consumable: keptEdit(stored, written: out.consumable, baseline: base.consumable) ?? out.consumable,
+            refused: out.refused)
+    }
+
+    /// `opened` is the sheet's input for the item as it opened. Nil for a new one.
+    func saveConsumable(_ input: [String: JSONValue], id: Consumable.ID?,
+                        opened: [String: JSONValue]?) async {
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -9844,7 +10085,8 @@ final class Shop {
                           case .object(let was) = shelf[at] else {
                         throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
                     }
-                    let out = try await engine.editConsumable(shelf[at], input: input)
+                    let out = try await Self.editedConsumable(shelf[at], input: input,
+                                                              opened: opened, engine: engine)
                     if out.refused != nil {
                         throw MoveRefused(sentence: self.words.callIt("cons.name_ph"))
                     }
@@ -10154,7 +10396,41 @@ final class Shop {
     /// `catalogId` applies a printer model FIRST, the way Khayt's picker does
     /// on the change — the bed, the colours, the power and what the nozzle is
     /// made of, arriving together rather than as eight fields to type.
-    func saveMachine(_ input: [String: JSONValue], id: Machine.ID?, catalogId: String?) async {
+    /// The camera block through `sanitizeWebcam`, as the shared rule wants it
+    /// — for the save and for the form as it opened alike. A camera the rule
+    /// cannot make sense of is left out, which the rule reads as "leave the
+    /// stored one alone".
+    static func sanitisingWebcam(_ input: [String: JSONValue],
+                                 engine: KhaytEngine?) async -> [String: JSONValue] {
+        var out = input
+        guard let cam = input["webcam"] else { return out }
+        if let engine,
+           let clean = try? await engine.sanitizeWebcam(cam, printerApi: input["printerApi"] ?? .object([:])) {
+            out["webcam"] = clean
+        } else {
+            out.removeValue(forKey: "webcam")
+        }
+        return out
+    }
+
+    /// A machine edited by the shared rule, keeping what the shop did not
+    /// touch — see `keptEdit`. `record` is the machine with any picked
+    /// printer model already applied; `stored` the machine as the book has it.
+    static func editedMachine(_ stored: JSONValue, record: JSONValue,
+                              input: [String: JSONValue], opened: [String: JSONValue]?,
+                              settings: [String: JSONValue],
+                              engine: KhaytEngine) async throws -> MachineWritten {
+        let edited = try await engine.editMachine(record, input: input, settings: settings)
+        guard let opened, edited.refused == nil else { return edited }
+        let base = try await engine.editMachine(stored, input: opened, settings: settings)
+        return MachineWritten(machine: keptEdit(stored, written: edited.machine, baseline: base.machine),
+                              refused: nil)
+    }
+
+    /// `opened` is the sheet's `MachineSheet.Form.input()` for the machine as
+    /// it opened — nil for a new one.
+    func saveMachine(_ input: [String: JSONValue], id: Machine.ID?, catalogId: String?,
+                     opened: [String: JSONValue]?) async {
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -10189,11 +10465,18 @@ final class Shop {
                     }
                     record = fresh
                 }
+                let stored = record
+                var wasOpened: [String: JSONValue]?
+                if at != nil, let opened { wasOpened = await Self.sanitisingWebcam(opened, engine: engine) }
                 if let catalogId, !catalogId.isEmpty {
                     record = try await engine.applyPrinterModel(record, catalogId: catalogId,
                                                                 settings: settings).machine ?? record
                 }
-                let edited = try await engine.editMachine(record, input: input, settings: settings)
+                let edited = try await Self.editedMachine(
+                    stored, record: record,
+                    input: await Self.sanitisingWebcam(input, engine: engine),
+                    opened: wasOpened,
+                    settings: settings, engine: engine)
                 if edited.refused != nil {
                     throw MoveRefused(sentence: self.words.callIt("mach.need_name"))
                 }
@@ -10274,7 +10557,15 @@ final class Shop {
     /// The whole record is re-read from disk inside the write and the window
     /// reloads from the file afterwards: what the screen shows is what was
     /// written, not what was hoped.
-    func saveSettings(_ form: [String: JSONValue], country: String? = nil) async {
+    ///
+    /// `opened` is the same pane's form as it was when the pane was filled —
+    /// what saving would send had nobody touched anything. Everything the
+    /// shared rule writes the same for both is put back as the book had it
+    /// (`RoundTrip`), so a pane that reads `vatRate: "15"` or no `currency`
+    /// at all does not re-spell them the day the shop changes its phone
+    /// number. Nil only for a caller with no form of its own to compare with.
+    func saveSettings(_ form: [String: JSONValue], opened: [String: JSONValue]?,
+                      country: String? = nil) async {
         settingsProblem = nil
         settingsNote = nil
         guard let build = source.build else {
@@ -10289,7 +10580,8 @@ final class Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
-                try await Self.applySettings(to: &root, form: form, country: country, engine: engine)
+                try await Self.applySettings(to: &root, form: form, opened: opened,
+                                             country: country, engine: engine)
             }
             await load(source)
             settingsNote = words.callIt("mac.settings_saved")
@@ -10300,13 +10592,24 @@ final class Shop {
 
     /// The settings write, on a book already read: the seam the tests use.
     static func applySettings(to root: inout [String: JSONValue], form: [String: JSONValue],
+                              opened: [String: JSONValue]? = nil,
                               country: String?, engine: KhaytEngine) async throws {
-        var settings = Self.settings(root)
+        let stored = Self.settings(root)
+        let year = Calendar.book.component(.year, from: Date())
+        var settings = stored
         if let country, country != Self.taxCountry(settings) {
             settings = try await engine.chooseTaxCountry(settings, code: country)
         }
-        settings = try await engine.applySettings(
-            settings, form: form, year: Calendar.book.component(.year, from: Date()))
+        settings = try await engine.applySettings(settings, form: form, year: year)
+        if let opened {
+            let baseline = try await engine.applySettings(stored, form: opened, year: year)
+            // `fillingGaps`: a key the book lacks is written as the rule
+            // fills it — `firstRunDone`, the invoice counter's year — as any
+            // settings save always has. Only what the book already HAS is
+            // kept in its own spelling.
+            settings = RoundTrip.keepUntouched(written: settings, baseline: baseline, stored: stored,
+                                               fillingGaps: true)
+        }
         root["settings"] = .object(settings)
     }
 
@@ -11582,8 +11885,13 @@ final class Shop {
     /// Both fields are required, exactly as the other app requires them: a
     /// template with no name cannot be picked off a list, and one with no body
     /// sends nothing.
+    ///
+    /// `opened` is the template as the sheet opened it; what the shop did not
+    /// change is kept as the book spells it (`RoundTrip`) — the body's own
+    /// trailing newline, a milestone this build has no menu item for.
     func saveTemplate(id: String?, name: String, body: String,
-                      milestone: String = "", lang: String = "") {
+                      milestone: String = "", lang: String = "",
+                      opened: MessageTemplate?) {
         writeProblem = nil
         // THE FIELDS BEFORE THE BOOK. What is wrong with the two strings is a
         // fact about the arguments, true whichever book is open, so the answer
@@ -11609,13 +11917,10 @@ final class Shop {
                 // REPLACED IN PLACE, keeping its position. A corrected template
                 // that jumps to the bottom of the list is one a shop has to
                 // find again every time it fixes a typo.
-                //
-                // Any other field the stored row carries is kept — a field this
-                // app does not edit is not this app's to drop.
-                if case .object(let was) = rows[at], case .object(var next) = row {
-                    for (key, value) in was where next[key] == nil
-                        && key != "milestone" && key != "lang" { next[key] = value }
-                    rows[at] = .object(next)
+                if case .object(let was) = rows[at] {
+                    rows[at] = .object(Self.templateRow(
+                        id: wanted, name: name, body: body, milestone: milestone, lang: lang,
+                        over: was, opened: opened))
                 } else {
                     rows[at] = row
                 }
@@ -11624,6 +11929,32 @@ final class Shop {
             }
             root[MessageTemplate.collection] = .array(rows)
         }
+    }
+
+    /// A template saved over the stored row `was`.
+    ///
+    /// Any other field the stored row carries is kept — a field this app does
+    /// not edit is not this app's to drop — and so is any field the shop did
+    /// not change, as the book spells it.
+    static func templateRow(id: String, name: String, body: String, milestone: String,
+                            lang: String, over was: [String: JSONValue],
+                            opened: MessageTemplate?) -> [String: JSONValue] {
+        func laid(_ name: String, _ body: String, _ milestone: String,
+                  _ lang: String) -> [String: JSONValue] {
+            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard case .object(var next) = MessageTemplate(
+                id: id, name: trimmedName, body: trimmedBody,
+                milestone: milestone, lang: lang).row else { return was }
+            for (key, value) in was where next[key] == nil
+                && key != "milestone" && key != "lang" { next[key] = value }
+            return next
+        }
+        let written = laid(name, body, milestone, lang)
+        guard let opened else { return written }
+        let baseline = laid(opened.name, opened.body, opened.milestone,
+                            opened.milestone.isEmpty ? "" : opened.lang)
+        return RoundTrip.keepUntouched(written: written, baseline: baseline, stored: was)
     }
 
     /// Take one off the list. An id nobody has is not an error.
@@ -14232,7 +14563,8 @@ final class Shop {
     /// was just carried out. Restamping would quietly clear a task that is
     /// overdue at this moment.
     func editMaintenanceTask(_ taskId: String, name: String,
-                             intervalHours: Double, intervalDays: Double) async {
+                             intervalHours: Double, intervalDays: Double,
+                             opened: MaintenanceTaskEdit.Opened?) async {
         writeProblem = nil
         guard let build = source.build, canMoveJobs else {
             writeProblem = words.callIt("mac.move_sample"); return
@@ -14249,7 +14581,8 @@ final class Shop {
                           case .string(let id)? = task["id"], id == taskId else { continue }
                     var next = MaintenanceTaskEdit.edited(task, name: name,
                                                           intervalHours: intervalHours,
-                                                          intervalDays: intervalDays)
+                                                          intervalDays: intervalDays,
+                                                          opened: opened)
                     // Without the stamp the other machine's older copy wins the
                     // next merge and the interval goes back.
                     StoreWriter.stamp(&next)

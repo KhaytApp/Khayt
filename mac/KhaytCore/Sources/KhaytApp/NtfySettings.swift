@@ -109,17 +109,23 @@ struct NtfySettings: View {
         } else { storedToken = false }
     }
 
-    private func save() async {
-        guard let build = shop.source.build else {
-            shop.settingsProblem = shop.words.callIt("mac.move_sample"); return
-        }
-        var ntfy: [String: JSONValue] = [
+    /// What the pane sends, the token aside — for the draft being saved and
+    /// for the one it opened with, so what was not touched is kept as stored.
+    static func form(_ draft: Draft) -> [String: JSONValue] {
+        [
             "enabled": .bool(draft.enabled),
             "server": .string(draft.server.trimmingCharacters(in: .whitespaces)),
             "topic": .string(draft.topic.trimmingCharacters(in: .whitespaces)),
             "events": .object(["error": .bool(draft.error), "offline": .bool(draft.offline),
                                "stall": .bool(draft.stall), "runout": .bool(draft.runout)]),
         ]
+    }
+
+    private func save() async {
+        guard let build = shop.source.build else {
+            shop.settingsProblem = shop.words.callIt("mac.move_sample"); return
+        }
+        var ntfy = Self.form(draft)
         let typed = draft.token.trimmingCharacters(in: .whitespaces)
         if draft.clearToken && typed.isEmpty {
             ntfy["token"] = .string("")
@@ -127,7 +133,7 @@ struct NtfySettings: View {
             do { ntfy["token"] = .string(try await Secrets.seal(typed, for: build)) }
             catch { shop.settingsProblem = String(describing: error); return }
         }
-        await shop.saveSettings(["ntfy": .object(ntfy)])
+        await shop.saveSettings(["ntfy": .object(ntfy)], opened: ["ntfy": .object(Self.form(original))])
         result = nil
         reload()
     }

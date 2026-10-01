@@ -108,7 +108,8 @@ struct TemplateSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save")) {
                     shop.saveTemplate(id: isNew ? nil : template.id, name: name, body: message,
-                                      milestone: milestone, lang: milestone.isEmpty ? "" : lang)
+                                      milestone: milestone, lang: milestone.isEmpty ? "" : lang,
+                                      opened: isNew ? nil : template)
                     if shop.writeProblem == nil { shop.editingTemplate = nil }
                 }
                 .keyboardShortcut(.defaultAction)

@@ -414,6 +414,32 @@ enum MaintenanceTaskEdit {
         return next
     }
 
+    /// What the sheet opened with, to tell an edit from a re-spelling.
+    struct Opened: Equatable, Sendable {
+        var name: String
+        var intervalHours: Double
+        var intervalDays: Double
+    }
+
+    /// The sheet's fields as it opens a task.
+    static func opening(_ task: KhaytEngine.MaintenanceCard.Task) -> Opened {
+        Opened(name: task.name, intervalHours: task.intervalHours ?? 0,
+               intervalDays: task.intervalDays ?? 0)
+    }
+
+    /// `edited`, keeping every field the shop did not change as the book
+    /// spells it: `"250"` stays `"250"`, a name with a trailing space keeps it,
+    /// `0` stays `0` rather than becoming `null`.
+    static func edited(_ task: [String: JSONValue], name: String,
+                       intervalHours: Double, intervalDays: Double,
+                       opened: Opened?) -> [String: JSONValue] {
+        let written = edited(task, name: name, intervalHours: intervalHours, intervalDays: intervalDays)
+        guard let opened else { return written }
+        let baseline = edited(task, name: opened.name, intervalHours: opened.intervalHours,
+                              intervalDays: opened.intervalDays)
+        return RoundTrip.keepUntouched(written: written, baseline: baseline, stored: task)
+    }
+
     /// Without the task named. Rows this build cannot read are left alone.
     static func removing(_ taskId: String, from tasks: [JSONValue]) -> [JSONValue] {
         tasks.filter { row in
@@ -493,11 +519,13 @@ struct MaintenanceTaskSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(words.callIt("common.save")) {
                     let draft = (name, hours, days, existing?.id)
+                    let opened = existing.map(MaintenanceTaskEdit.opening)
                     dismiss()
                     Task {
                         if let id = draft.3 {
                             await shop.editMaintenanceTask(id, name: draft.0,
-                                                           intervalHours: draft.1, intervalDays: draft.2)
+                                                           intervalHours: draft.1, intervalDays: draft.2,
+                                                           opened: opened)
                         } else {
                             await shop.addMaintenanceTask(machineId: machine.id, name: draft.0,
                                                           intervalHours: draft.1, intervalDays: draft.2)
@@ -512,9 +540,10 @@ struct MaintenanceTaskSheet: View {
             guard !started else { return }
             started = true
             guard let existing else { return }
-            name = existing.name
-            hours = existing.intervalHours ?? 0
-            days = existing.intervalDays ?? 0
+            let opened = MaintenanceTaskEdit.opening(existing)
+            name = opened.name
+            hours = opened.intervalHours
+            days = opened.intervalDays
         }
     }
 }

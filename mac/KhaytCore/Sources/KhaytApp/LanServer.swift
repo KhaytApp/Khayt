@@ -2311,17 +2311,28 @@ extension Shop {
         lanRunning = nil
     }
 
-    /// Save the Online pane. A typed PIN is sealed for the book before it goes
-    /// in, the way a printer key is; a blank one keeps the stored PIN, which
-    /// is the rule's own reading of a blank.
-    func saveLanSettings(enabled: Bool, port: Int, pin typed: String, bindLan: Bool,
-                         intakeQuote: [String: JSONValue]? = nil,
-                         storefrontSecrets typedSecrets: [String: String] = [:]) async {
+    /// The Online pane's fields, the secrets aside.
+    static func lanForm(enabled: Bool, port: Int, bindLan: Bool,
+                        intakeQuote: [String: JSONValue]?) -> [String: JSONValue] {
         var lan: [String: JSONValue] = ["enabled": .bool(enabled), "port": .number(Double(port)),
                                         "bindLan": .bool(bindLan)]
         // Kept whole rather than spread, as the other app's page keeps it, so
         // an older book without the key simply arrives as "off".
         if let intakeQuote { lan["intakeQuote"] = .object(intakeQuote) }
+        return lan
+    }
+
+    /// Save the Online pane. A typed PIN is sealed for the book before it goes
+    /// in, the way a printer key is; a blank one keeps the stored PIN, which
+    /// is the rule's own reading of a blank.
+    ///
+    /// `opened` is the pane's own `lanForm` of what it opened with, so the
+    /// fields nobody touched are kept as the book holds them (`RoundTrip`).
+    func saveLanSettings(enabled: Bool, port: Int, pin typed: String, bindLan: Bool,
+                         intakeQuote: [String: JSONValue]? = nil,
+                         storefrontSecrets typedSecrets: [String: String] = [:],
+                         opened: [String: JSONValue]?) async {
+        var lan = Self.lanForm(enabled: enabled, port: port, bindLan: bindLan, intakeQuote: intakeQuote)
         let trimmed = typed.trimmingCharacters(in: .whitespaces)
         if !trimmed.isEmpty, let build = source.build {
             do { lan["pin"] = .string(try await Secrets.seal(trimmed, for: build)) }
@@ -2336,7 +2347,7 @@ extension Shop {
             do { lan[field] = .string(try await Secrets.seal(secret, for: build)) }
             catch { settingsProblem = String(describing: error); return }
         }
-        await saveSettings(["lanApi": .object(lan)])
+        await saveSettings(["lanApi": .object(lan)], opened: opened.map { ["lanApi": .object($0)] })
         // NOW, not on the next tick. The publisher runs ninety seconds after
         // launch and then every six hours, so a shop that switched storefront
         // pricing on (or changed a margin) waited up to six hours for its

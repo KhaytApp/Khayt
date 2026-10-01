@@ -379,7 +379,7 @@ struct BusinessPane: View {
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
-                    save: { Task { await shop.saveSettings(draft.form()); reset() } },
+                    save: { Task { await shop.saveSettings(draft.form(), opened: original.form()); reset() } },
                     revert: { draft = original })
         }
         .task(id: shop.settingsValue) { reset() }
@@ -560,7 +560,7 @@ struct InvoicePane: View {
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
-                    save: { Task { await shop.saveSettings(draft.form(), country: draft.taxCountry); reset() } },
+                    save: { Task { await shop.saveSettings(draft.form(), opened: original.form(), country: draft.taxCountry); reset() } },
                     revert: { draft = original })
         }
         .task(id: shop.settingsValue) { reset() }
@@ -707,7 +707,7 @@ struct PaymentsPane: View {
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
-                    save: { Task { await shop.saveSettings(draft.form()); reset() } },
+                    save: { Task { await shop.saveSettings(draft.form(), opened: original.form()); reset() } },
                     revert: { draft = original })
         }
         .task(id: shop.settingsValue) { reset() }
@@ -946,7 +946,7 @@ struct OperationsPane: View {
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
-                    save: { Task { await shop.saveSettings(draft.form()); reset() } },
+                    save: { Task { await shop.saveSettings(draft.form(), opened: original.form()); reset() } },
                     revert: { draft = original })
         }
         .task(id: shop.settingsValue) { reset() }
@@ -1173,7 +1173,7 @@ struct PreferencesPane: View {
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
-                    save: { Task { await shop.saveSettings(draft.form()); reset() } },
+                    save: { Task { await shop.saveSettings(draft.form(), opened: original.form()); reset() } },
                     revert: { draft = original })
         }
         .task(id: shop.settingsValue) { reset() }
@@ -1376,6 +1376,18 @@ struct AssistantPane: View {
         chosen = try? await engine.aiProviderOf(settings: ["ai": .object(ai)])
     }
 
+    /// What the pane sends, the key aside — also run over what it opened
+    /// with, so what was not touched is kept as stored.
+    static func form(_ draft: Draft) -> [String: JSONValue] {
+        [
+            "enabled": .bool(draft.enabled),
+            "provider": .string(draft.provider),
+            "baseUrl": .string(draft.baseUrl.trimmingCharacters(in: .whitespaces)),
+            "model": .string(draft.model.trimmingCharacters(in: .whitespaces)),
+            "features": .object(draft.features.mapValues(JSONValue.bool)),
+        ]
+    }
+
     private func checkAddress(_ raw: String) async {
         guard let engine = shop.engine else { return }
         addressProblem = (try? await engine.aiAddressProblem(raw)) ?? nil
@@ -1389,13 +1401,7 @@ struct AssistantPane: View {
             addressProblem = problem
             return
         }
-        var ai: [String: JSONValue] = [
-            "enabled": .bool(draft.enabled),
-            "provider": .string(draft.provider),
-            "baseUrl": .string(draft.baseUrl.trimmingCharacters(in: .whitespaces)),
-            "model": .string(draft.model.trimmingCharacters(in: .whitespaces)),
-            "features": .object(draft.features.mapValues(JSONValue.bool)),
-        ]
+        var ai = Self.form(draft)
         // ── THE KEY IS SEALED HERE OR NOT WRITTEN AT ALL ──────────────────
         //
         // `settings.ai.apiKey` is a registered secret path, so what belongs in
@@ -1416,7 +1422,7 @@ struct AssistantPane: View {
             }
         }
         // Absent `apiKey` means the shared rule carries the stored one through.
-        await shop.saveSettings(["ai": .object(ai)])
+        await shop.saveSettings(["ai": .object(ai)], opened: ["ai": .object(Self.form(original))])
         draft.key = ""
         draft.clearKey = false
         await reload()
@@ -1501,6 +1507,11 @@ extension NSColor {
         var s = hex.trimmingCharacters(in: .whitespaces)
         guard s.hasPrefix("#") else { return nil }
         s.removeFirst()
+        // `#abc` and `#aabbccdd` as well as `#aabbcc`: CSS reads all three,
+        // and so does every colour picker in the other app. A machine stored
+        // as `#f80` opened here as the fallback blue.
+        if s.count == 3 { s = s.map { "\($0)\($0)" }.joined() }
+        if s.count == 8 { s = String(s.prefix(6)) }
         guard s.count == 6, let v = UInt32(s, radix: 16) else { return nil }
         self.init(srgbRed: CGFloat((v >> 16) & 0xff) / 255, green: CGFloat((v >> 8) & 0xff) / 255,
                   blue: CGFloat(v & 0xff) / 255, alpha: 1)
@@ -1605,7 +1616,8 @@ struct SlicersPane: View {
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: dirty,
-                    save: { Task { await shop.saveSlicers(list, defaultId: defaultId); reset() } },
+                    save: { Task { await shop.saveSlicers(list, defaultId: defaultId,
+                                                                opened: (original, originalDefault)); reset() } },
                     revert: { reset() })
         }
         .task(id: shop.settingsValue) { reset() }

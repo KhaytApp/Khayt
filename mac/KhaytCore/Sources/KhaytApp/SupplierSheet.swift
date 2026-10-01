@@ -161,7 +161,7 @@ struct SupplierSheet: View {
     init(shop: Shop, supplier: Supplier) {
         self.shop = shop
         _draft = State(initialValue: supplier)
-        _lead = State(initialValue: supplier.leadDays.map(String.init) ?? "")
+        _lead = State(initialValue: Self.leadText(supplier))
     }
 
     var body: some View {
@@ -287,12 +287,24 @@ struct SupplierSheet: View {
         shop.editingSupplier = nil
     }
 
-    private func commit() {
+    /// The lead time as the field shows it when the sheet opens.
+    static func leadText(_ supplier: Supplier) -> String {
+        supplier.leadDays.map(String.init) ?? ""
+    }
+
+    /// The supplier Save hands the shop. `Shop.supplierRecord` runs the same
+    /// over the stored row to learn what an untouched save writes.
+    static func saving(_ draft: Supplier, lead: String) -> Supplier {
         var wanted = draft
         // Blank means the shop has not said, which is null in the book — not
         // zero, and not the figure that happened to be there before.
         let typed = Int(lead.trimmingCharacters(in: .whitespaces))
         wanted.leadDays = (typed ?? 0) > 0 ? typed : nil
+        return wanted
+    }
+
+    private func commit() {
+        let wanted = Self.saving(draft, lead: lead)
         Task {
             await shop.saveSupplier(wanted)
             if let said = shop.moveProblem { problem = said }
