@@ -20,6 +20,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **(Mac) Copied secrets stay on this Mac.** An import key or sign-in link you
   copy is kept off Universal Clipboard, and is marked both concealed and
   transient so clipboard history apps that honour those markers skip it.
+- **Security: an export with secrets hidden also leaves out survey links and
+  the wrapped cloud key.** Each finished order's customer survey link was
+  still in the file, and so was the shop's cloud data key, locked with its
+  passphrase. Anyone with the file could try passwords against that key
+  offline. Both are now left out of the hidden-secrets export and the iCloud
+  copy. The full local backup keeps them, and a survey link is made again
+  when it is next needed.
+
 - **(Mac) Grouping prints is visible again.** Group, Category and the
   "where it came from" menu were only in the classic layout's toolbar, so on
   the default layout a shop could not group prints at all. They now sit above

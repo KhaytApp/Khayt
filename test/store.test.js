@@ -255,3 +255,24 @@ test('a backup keeps the tokens an export drops', () => {
   const share = buildExportPayload(collections, { redactSecrets: true });
   assert.equal('trackingToken' in share.printLog[0], false);
 });
+
+test('a redacted export leaves out the survey link and the wrapped data key', () => {
+  const S = require('../lib/store.js');
+  const orders = [{ id: 'O1', surveyToken: 'srv-abc', trackingToken: 't', name: 'kept' }, { id: 'O2' }];
+  const out = S.redactOrdersForExport(orders);
+  assert.equal('surveyToken' in out[0], false, 'deleted, so it is minted afresh rather than adopted as a mask');
+  assert.equal(out[0].name, 'kept');
+  assert.equal(orders[0].surveyToken, 'srv-abc', 'the book itself is untouched');
+  assert.equal(out[1], orders[1]);
+
+  const settings = { cloud: { url: 'https://c', token: 'tok', keyset: { wrapped: 'xx', kdf: { salt: 's' } } } };
+  const red = S.redactSettingsForExport(settings);
+  assert.equal('keyset' in red.cloud, false, 'an offline passphrase guess needs it');
+  assert.equal(red.cloud.url, 'https://c');
+  assert.ok(settings.cloud.keyset, 'the book keeps it');
+  assert.deepEqual(S.redactSettingsForExport({}), {});
+
+  const full = S.buildExportPayload({ settings, printLog: orders }, { redactSecrets: false });
+  assert.ok(full.settings.cloud.keyset, 'an unredacted backup still restores whole');
+  assert.equal(full.printLog[0].surveyToken, 'srv-abc');
+});
