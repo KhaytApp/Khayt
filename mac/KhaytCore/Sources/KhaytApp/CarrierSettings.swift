@@ -108,7 +108,11 @@ struct CarrierSettings: View {
             shop.settingsProblem = shop.words.callIt("mac.move_sample"); return
         }
         var form: [String: JSONValue] = [:]
+        var opened: [String: JSONValue] = [:]
         for (id, row) in draft where row != original[id] ?? Row() {
+            let was = original[id] ?? Row()
+            opened[id] = .object(["enabled": .bool(was.enabled),
+                                  "accountNumber": .string(was.accountNumber)])
             var cfg: [String: JSONValue] = ["enabled": .bool(row.enabled),
                                             "accountNumber": .string(row.accountNumber)]
             // SEALED HERE OR NOT WRITTEN. Absent keeps what is stored, which is
@@ -122,7 +126,7 @@ struct CarrierSettings: View {
             form[id] = .object(cfg)
         }
         guard !form.isEmpty else { return }
-        await shop.saveSettings(["shipping": .object(form)])
+        await shop.saveSettings(["shipping": .object(form)], opened: ["shipping": .object(opened)])
         await reload()
     }
 }

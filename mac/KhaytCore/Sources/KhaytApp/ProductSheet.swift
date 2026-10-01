@@ -353,9 +353,11 @@ struct ProductSheet: View {
                     let saving = draft
                     let staged = pictures
                     let unlink = removedPictures
-                    let rows = effectiveParts.map { $0.record(spools: shop.spools) }
-                    let tierRows = tiers.compactMap { $0.record }
-                    let docRows = docs.map { $0.record }
+                    let sent = Self.payload(draft: saving, parts: effectiveParts, tiers: tiers,
+                                            docs: docs, spools: shop.spools)
+                    let rows = sent.parts
+                    let tierRows = sent.tiers
+                    let docRows = sent.docs
                     let dropped = removedDocs
                     Task { await shop.saveProduct(saving, pictures: staged,
                                                   unlinking: unlink, parts: rows,
@@ -384,10 +386,9 @@ struct ProductSheet: View {
         // here must not lose the parts it was made with — this sheet could not
         // hold them at all until now, and `rest` is what carried them through.
         .task(id: existing.id) {
-            if case .array(let list)? = existing.rest["parts"] {
-                parts = list.compactMap(PartRow.from)
-            }
-            rule = Shop.priceRule(of: existing)
+            let opened = Self.opening(existing)
+            parts = opened.parts
+            rule = opened.rule
             overrideText = rule.override.map { Money.fieldValue($0) } ?? ""
             if let defaults = await shop.printRateDefaults() {
                 rateDefaults = defaults
@@ -396,10 +397,8 @@ struct ProductSheet: View {
                 // price of a product the shop only opened to look at.
                 if !newPart.hasRates { newPart.rates = defaults }
             }
-            tiers = Shop.tiers(of: existing).map { TierRow(label: $0.label, margin: $0.margin) }
-            if case .array(let list)? = existing.rest["docs"] {
-                docs = list.compactMap(ProductDocs.Attached.from)
-            }
+            tiers = opened.tiers
+            docs = opened.docs
             await reprice()
         }
         // Re-priced when the margin changes, because the margin is above the
@@ -411,13 +410,7 @@ struct ProductSheet: View {
         // And when the rounding or the typed price changes — written into the
         // record at the same moment, so what the preview says is what saves.
         .task(id: rule) {
-            // `null`, not absent: a save merges every key the sheet did not
-            // write forward from the record that was there, so clearing a
-            // typed price by removing the key would resurrect it. Khayt's own
-            // editor writes null for both, and so does this.
-            draft.rest["priceOverride"] = rule.override.map { JSONValue.number($0) } ?? .null
-            draft.rest["priceRound"] = rule.step > 0
-                ? .object(["step": .number(rule.step), "mode": .string(rule.mode)]) : .null
+            Self.write(rule, into: &draft)
             await reprice()
         }
         .sheet(isPresented: $pickingModel) {
@@ -906,6 +899,66 @@ struct ProductSheet: View {
         var out = parts
         out.insert(pending, at: min(editingAt ?? out.count, out.count))
         return out
+    }
+
+    // MARK: - Opening and saving, as one mapping
+
+    /// What the sheet holds while a product is open.
+    struct Opened {
+        var draft: Product
+        var parts: [PartRow]
+        var tiers: [TierRow]
+        var docs: [ProductDocs.Attached]
+        var rule: Shop.PriceRule
+    }
+
+    /// A product as this sheet opens it. `Shop.saveProduct` runs this, and
+    /// `payload`, over the stored row to learn what an untouched save writes —
+    /// so the one mapping from record to form is the one both use.
+    @MainActor static func opening(_ product: Product) -> Opened {
+        var parts: [PartRow] = []
+        if case .array(let list)? = product.rest["parts"] { parts = list.compactMap(PartRow.from) }
+        var docs: [ProductDocs.Attached] = []
+        if case .array(let list)? = product.rest["docs"] { docs = list.compactMap(ProductDocs.Attached.from) }
+        let rule = Shop.priceRule(of: product)
+        var draft = product
+        write(rule, into: &draft)
+        return Opened(draft: draft, parts: parts,
+                      tiers: Shop.tiers(of: product).map { TierRow(label: $0.label, margin: $0.margin) },
+                      docs: docs, rule: rule)
+    }
+
+    /// The rounding and the typed price, written onto the draft.
+    ///
+    /// `null`, not absent: a save merges every key the sheet did not write
+    /// forward from the record that was there, so clearing a typed price by
+    /// removing the key would resurrect it. Khayt's own editor writes null for
+    /// both, and so does this.
+    static func write(_ rule: Shop.PriceRule, into draft: inout Product) {
+        draft.rest["priceOverride"] = rule.override.map { JSONValue.number($0) } ?? .null
+        draft.rest["priceRound"] = rule.step > 0
+            ? .object(["step": .number(rule.step), "mode": .string(rule.mode)]) : .null
+    }
+
+    /// What Save hands `Shop.saveProduct`, pictures aside.
+    struct Payload {
+        var product: Product
+        var parts: [JSONValue]
+        var tiers: [JSONValue]
+        var docs: [JSONValue]
+    }
+
+    static func payload(draft: Product, parts: [PartRow], tiers: [TierRow],
+                        docs: [ProductDocs.Attached], spools: [Spool]) -> Payload {
+        Payload(product: draft,
+                parts: parts.map { $0.record(spools: spools) },
+                tiers: tiers.compactMap { $0.record },
+                docs: docs.map { $0.record })
+    }
+
+    static func payload(_ opened: Opened, spools: [Spool]) -> Payload {
+        payload(draft: opened.draft, parts: opened.parts, tiers: opened.tiers,
+                docs: opened.docs, spools: spools)
     }
 
     /// Price what is in the list, through the shared rule.

@@ -30,9 +30,9 @@ struct MessageTemplateEditTests {
         await shop.load(.sample)
         // The sample book refuses every write; what is pinned here is that the
         // refusal for a blank field is the FIELD's refusal, not the book's.
-        shop.saveTemplate(id: nil, name: "  ", body: "hello")
+        shop.saveTemplate(id: nil, name: "  ", body: "hello", opened: nil)
         #expect(shop.writeProblem == shop.words.callIt("wa.tpl_need_name"))
-        shop.saveTemplate(id: nil, name: "Ready", body: "   ")
+        shop.saveTemplate(id: nil, name: "Ready", body: "   ", opened: nil)
         #expect(shop.writeProblem == shop.words.callIt("wa.tpl_need_body"))
     }
 
@@ -41,7 +41,7 @@ struct MessageTemplateEditTests {
         let shop = Shop()
         await shop.load(.sample)
         let before = shop.messageTemplates.count
-        shop.saveTemplate(id: nil, name: "Ready", body: "Your order {{id}} is ready")
+        shop.saveTemplate(id: nil, name: "Ready", body: "Your order {{id}} is ready", opened: nil)
         #expect(shop.writeProblem == shop.words.callIt("mac.move_sample"))
         #expect(shop.messageTemplates.count == before, "the sample took a template")
     }

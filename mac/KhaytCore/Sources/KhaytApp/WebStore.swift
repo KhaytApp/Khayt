@@ -480,16 +480,31 @@ extension Shop {
         }
     }
 
+    /// `settings.storefront` after a save of `draft`.
+    static func storefront(_ draft: StorefrontDraft, opened: StorefrontDraft?,
+                           over sf: [String: JSONValue]) -> [String: JSONValue] {
+        var written = sf
+        draft.apply(to: &written)
+        guard let opened else { return written }
+        var baseline = sf
+        opened.apply(to: &baseline)
+        return RoundTrip.keepUntouched(written: written, baseline: baseline, stored: sf)
+    }
+
     /// Save the store's shop-wide settings.
-    func saveStorefront(_ draft: StorefrontDraft) async {
+    ///
+    /// `opened` is the draft as the pane opened it: what the shop did not
+    /// change is kept as the book spells it (`RoundTrip`) — a shipping row or
+    /// a promo the other app wrote with a field of its own, a promo this pane
+    /// would filter out, a lead time of `"3"`.
+    func saveStorefront(_ draft: StorefrontDraft, opened: StorefrontDraft?) async {
         guard let build = source.build else { return }
         do {
             try StoreWriter.update(build) { root in
                 var settings = Self.settings(root)
                 var sf: [String: JSONValue] = [:]
                 if case .object(let had)? = settings["storefront"] { sf = had }
-                draft.apply(to: &sf)
-                settings["storefront"] = .object(sf)
+                settings["storefront"] = .object(Self.storefront(draft, opened: opened, over: sf))
                 root["settings"] = .object(settings)
             }
             await load(source)
@@ -743,7 +758,7 @@ struct WebStoreSheet: View {
             Spacer()
             Button(w.callIt("common.cancel")) { store = storeSaved }
                 .disabled(store == storeSaved)
-            Button(w.callIt("common.save")) { Task { await shop.saveStorefront(store) } }
+            Button(w.callIt("common.save")) { Task { await shop.saveStorefront(store, opened: storeSaved) } }
                 .disabled(store == storeSaved || !shop.canMoveJobs)
         }
         .padding(.top, 6)

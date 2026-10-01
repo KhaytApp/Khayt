@@ -345,24 +345,108 @@ struct SpoolSheet: View {
         units.first { $0.unit == unit }?.unitKey ?? "common.grams"
     }
 
+    /// The form's fields, as one value — so opening a spool and saving it
+    /// are one mapping that `Shop.saveSpool` can also run over the stored
+    /// record, to tell what the shop changed from what the form re-spells.
+    struct Form: Equatable {
+        var material = ""
+        var unit = "g"
+        var colourVariant = ""
+        var swatch = Color(nsColor: NSColor(hex: "#888888") ?? .gray)
+        var cost: Double = 0
+        var vatAmount: Double = 0
+        var weight: Double = 1000
+        var fullWeight: Double = 0
+        var lot = ""
+        var reorderPoint: Double = 200
+        var printTemp: Double = 0
+        var bedTemp: Double = 0
+        var maxSpeed: Double = 0
+        var openedAt: Date?
+        var purchasedAt: Date?
+        var reorderQty: Double = 0
+
+        @MainActor static func opening(_ spool: Spool, unit: String) -> Form {
+            Form(material: spool.material,
+                 unit: unit,
+                 colourVariant: spool.colourVariant ?? "",
+                 swatch: Color(nsColor: NSColor(hex: spool.color ?? "#888888") ?? .gray),
+                 cost: spool.cost ?? 0,
+                 vatAmount: spool.vatAmount ?? 0,
+                 weight: spool.weight ?? 0,
+                 fullWeight: spool.spoolWeight ?? 0,
+                 lot: spool.lot ?? "",
+                 reorderPoint: spool.reorderPoint ?? 200,
+                 printTemp: spool.printTemp ?? 0,
+                 bedTemp: spool.bedTemp ?? 0,
+                 maxSpeed: spool.maxSpeed ?? 0,
+                 openedAt: Order.day(spool.openedAt),
+                 purchasedAt: Order.day(spool.purchasedAt),
+                 reorderQty: spool.reorderQty ?? 0)
+        }
+
+        /// What the shared rule is handed on Save.
+        @MainActor func input(isNew: Bool, reclaimsTax: Bool) -> [String: JSONValue] {
+            var input: [String: JSONValue] = [
+                "material": .string(material),
+                "color": .string(NSColor(swatch).hexString ?? "#888888"),
+                "cost": .number(cost),
+                "vatAmount": .number(reclaimsTax ? min(max(0, vatAmount), cost) : 0),
+                "weight": .number(weight),
+                "unit": .string(unit),
+                "lot": .string(lot),
+                "colourVariant": .string(colourVariant),
+                "reorderPoint": .number(reorderPoint),
+                // Sent even at zero, which is how the rule is told to CLEAR one:
+                // it stores nothing for a value that is not above zero, so a shop
+                // that empties the box empties the field.
+                "reorderQty": .number(reorderQty),
+                "printTemp": .number(printTemp),
+                "bedTemp": .number(bedTemp),
+                "maxSpeed": .number(maxSpeed),
+            ]
+            if !isNew, fullWeight > 0 { input["spoolWeight"] = .number(fullWeight) }
+            if !isNew {
+                // Absent means "leave it as it is", so a cleared date has to be
+                // sent as an empty string rather than left out.
+                input["openedAt"] = .string(openedAt.map { Shop.today($0) } ?? "")
+                input["purchasedAt"] = .string(purchasedAt.map { Shop.today($0) } ?? "")
+            }
+            return input
+        }
+    }
+
+    /// The form as it opened, for `Shop.saveSpool` to compare the save with.
+    @State private var opened: Form?
+
+    private var form: Form {
+        Form(material: material, unit: unit, colourVariant: colourVariant, swatch: swatch,
+             cost: cost, vatAmount: vatAmount, weight: weight, fullWeight: fullWeight,
+             lot: lot, reorderPoint: reorderPoint, printTemp: printTemp, bedTemp: bedTemp,
+             maxSpeed: maxSpeed, openedAt: openedAt, purchasedAt: purchasedAt,
+             reorderQty: reorderQty)
+    }
+
     private func fill() {
         guard let spool = existing else { focused = true; return }
-        material = spool.material
-        colourVariant = spool.colourVariant ?? ""
-        swatch = Color(nsColor: NSColor(hex: spool.color ?? "#888888") ?? .gray)
-        cost = spool.cost ?? 0
-        vatAmount = spool.vatAmount ?? 0
-        weight = spool.weight ?? 0
-        fullWeight = spool.spoolWeight ?? 0
-        unit = shop.unit(of: spool)?.unit ?? "g"
-        lot = spool.lot ?? ""
-        reorderPoint = spool.reorderPoint ?? 200
-        printTemp = spool.printTemp ?? 0
-        bedTemp = spool.bedTemp ?? 0
-        maxSpeed = spool.maxSpeed ?? 0
-        openedAt = Order.day(spool.openedAt)
-        purchasedAt = Order.day(spool.purchasedAt)
-        reorderQty = spool.reorderQty ?? 0
+        let f = Form.opening(spool, unit: shop.unit(of: spool)?.unit ?? "g")
+        material = f.material
+        colourVariant = f.colourVariant
+        swatch = f.swatch
+        cost = f.cost
+        vatAmount = f.vatAmount
+        weight = f.weight
+        fullWeight = f.fullWeight
+        unit = f.unit
+        lot = f.lot
+        reorderPoint = f.reorderPoint
+        printTemp = f.printTemp
+        bedTemp = f.bedTemp
+        maxSpeed = f.maxSpeed
+        openedAt = f.openedAt
+        purchasedAt = f.purchasedAt
+        reorderQty = f.reorderQty
+        opened = f
         focused = true
     }
 
@@ -414,33 +498,11 @@ struct SpoolSheet: View {
     }
 
     private func commit() {
-        var input: [String: JSONValue] = [
-            "material": .string(material),
-            "color": .string(NSColor(swatch).hexString ?? "#888888"),
-            "cost": .number(cost),
-            "vatAmount": .number(shop.reclaimsTax ? min(max(0, vatAmount), cost) : 0),
-            "weight": .number(weight),
-            "unit": .string(unit),
-            "lot": .string(lot),
-            "colourVariant": .string(colourVariant),
-            "reorderPoint": .number(reorderPoint),
-            // Sent even at zero, which is how the rule is told to CLEAR one:
-            // it stores nothing for a value that is not above zero, so a shop
-            // that empties the box empties the field.
-            "reorderQty": .number(reorderQty),
-            "printTemp": .number(printTemp),
-            "bedTemp": .number(bedTemp),
-            "maxSpeed": .number(maxSpeed),
-        ]
-        if !isNew, fullWeight > 0 { input["spoolWeight"] = .number(fullWeight) }
-        if !isNew {
-            // Absent means "leave it as it is", so a cleared date has to be
-            // sent as an empty string rather than left out.
-            input["openedAt"] = .string(openedAt.map { Shop.today($0) } ?? "")
-            input["purchasedAt"] = .string(purchasedAt.map { Shop.today($0) } ?? "")
-        }
+        let tax = shop.reclaimsTax
+        let input = form.input(isNew: isNew, reclaimsTax: tax)
+        let was = opened?.input(isNew: isNew, reclaimsTax: tax)
         let id = existing?.id
         dismiss()
-        Task { await shop.saveSpool(input, id: id) }
+        Task { await shop.saveSpool(input, id: id, opened: was) }
     }
 }

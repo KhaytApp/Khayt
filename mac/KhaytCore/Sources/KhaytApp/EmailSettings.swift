@@ -242,8 +242,10 @@ struct EmailSettings: View {
         triggers = (try? await shop.engine?.emailTriggers()) ?? []
     }
 
-    private func save() async {
-        var config: [String: JSONValue] = [
+    /// What the pane sends, the secrets aside — for the draft being saved and
+    /// for the one it opened with, so what was not touched is kept as stored.
+    static func form(_ draft: Draft) -> [String: JSONValue] {
+        [
             "provider": .string(draft.provider),
             "fromEmail": .string(draft.fromEmail),
             "fromName": .string(draft.fromName),
@@ -254,6 +256,10 @@ struct EmailSettings: View {
             "smtpSecure": .bool(draft.secure),
             "triggers": .array(draft.triggers.sorted().map(JSONValue.string)),
         ]
+    }
+
+    private func save() async {
+        var config = Self.form(draft)
 
         // ── THE SECRETS ARE SEALED HERE OR NOT WRITTEN AT ALL ─────────────
         //
@@ -277,7 +283,8 @@ struct EmailSettings: View {
         guard await seal(draft.apiKey, clear: draft.clearApiKey, into: "apiKey") else { return }
         guard await seal(draft.password, clear: draft.clearPassword, into: "smtpPassword") else { return }
 
-        await shop.saveSettings(["emailConfig": .object(config)])
+        await shop.saveSettings(["emailConfig": .object(config)],
+                                opened: ["emailConfig": .object(Self.form(original))])
         draft.apiKey = ""
         draft.password = ""
         draft.clearApiKey = false

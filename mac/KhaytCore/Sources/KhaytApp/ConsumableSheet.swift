@@ -136,35 +136,60 @@ struct ConsumableSheet: View {
             }
     }
 
+    /// The form's fields as one value: opening an item and saving it are one
+    /// mapping, which `Shop.saveConsumable` also runs over the item as it
+    /// opened to tell an edit from a re-spelling.
+    struct Form: Equatable {
+        var name = "", stock: Double = 0, unit = "", cost: Double = 0
+        var minStock: Double = 0, usagePerHour: Double = 0, category = "", isPackaging = false
+
+        static func opening(_ c: Consumable) -> Form {
+            Form(name: c.name ?? "", stock: c.onHand, unit: c.unit ?? "", cost: c.cost ?? 0,
+                 minStock: c.threshold, usagePerHour: c.usagePerHour ?? 0,
+                 category: c.category ?? "", isPackaging: c.isPackaging ?? false)
+        }
+
+        /// Every field is sent, including the zeroes and the empty category:
+        /// absent means "leave it alone" to the rule, so a shop clearing a
+        /// category or a usage rate has to send the cleared value, not omit it.
+        var input: [String: JSONValue] {
+            [
+                "name": .string(name),
+                "stock": .number(stock),
+                "unit": .string(unit),
+                "cost": .number(cost),
+                "minStock": .number(minStock),
+                "usagePerHour": .number(usagePerHour),
+                "category": .string(category),
+                "isPackaging": .bool(isPackaging),
+            ]
+        }
+    }
+
+    @State private var opened: Form?
+
     private func fill() {
         guard let existing else { focused = true; return }
-        name = (existing.name ?? "")
-        stock = existing.onHand
-        unit = existing.unit ?? ""
-        cost = existing.cost ?? 0
-        minStock = existing.threshold
-        usagePerHour = existing.usagePerHour ?? 0
-        category = existing.category ?? ""
-        isPackaging = existing.isPackaging ?? false
+        let f = Form.opening(existing)
+        name = f.name
+        stock = f.stock
+        unit = f.unit
+        cost = f.cost
+        minStock = f.minStock
+        usagePerHour = f.usagePerHour
+        category = f.category
+        isPackaging = f.isPackaging
+        opened = f
         focused = true
     }
 
     private func commit() {
-        // Every field is sent, including the zeroes and the empty category:
-        // absent means "leave it alone" to the rule, so a shop clearing a
-        // category or a usage rate has to send the cleared value, not omit it.
-        let input: [String: JSONValue] = [
-            "name": .string(name),
-            "stock": .number(stock),
-            "unit": .string(unit),
-            "cost": .number(cost),
-            "minStock": .number(minStock),
-            "usagePerHour": .number(usagePerHour),
-            "category": .string(category),
-            "isPackaging": .bool(isPackaging),
-        ]
+        let input = Form(name: name, stock: stock, unit: unit, cost: cost, minStock: minStock,
+                         usagePerHour: usagePerHour, category: category,
+                         isPackaging: isPackaging).input
+        let was = opened?.input
         let id = existing?.id
         dismiss()
-        Task { await shop.saveConsumable(input, id: id) }
+        Task { await shop.saveConsumable(input, id: id, opened: was) }
     }
 }

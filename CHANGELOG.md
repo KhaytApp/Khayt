@@ -18,6 +18,25 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   until you press Send. With no mail app set up, the files are saved as a zip in
   Downloads and the address is copied. The same action is on the "shared rules
   did not load" banner and on a right-click of the last-crash notice.
+- **(Mac) Opening something and pressing Save no longer changes it.** Every
+  editor on the Mac (customers, suppliers, products, spools, consumables,
+  machines, a job's due date and priority, a job's part, maintenance tasks,
+  message templates, calculator presets, every settings pane, slicers, saved
+  reports and the web store settings) now saves only what you changed. Fields
+  you did not touch stay exactly as the book holds them, even when the Mac
+  shows them differently: a date with a time, a number stored as text, an
+  empty value, a choice the Mac has no menu item for, or a field the Mac does
+  not show at all. Before, such a save could quietly rewrite them. A spool
+  could gain a 200 g reorder point and a price-history entry, a printer's
+  colour name became blue, a supplier's zero-priced quote was dropped, a
+  job's due date was rewritten and logged as an edit, and a part's hours
+  stored as text were saved as 0 and re-costed at the shop's default rates.
+  Editing a part now also opens it on its own spool rather than the first
+  spool of the same material, and a changed part is costed at its own rates.
+  Records with numbers stored as text, such as a phone number or a
+  printer's port, now open on the Mac instead of being skipped. Colours
+  written as `#f80` and schedule dates stored with a time now open as
+  themselves.
 
 - **(Mac) One word for filament, and the sign-in link copied privately.** The
   two Arabic filament labels this app re-worded itself now come straight from

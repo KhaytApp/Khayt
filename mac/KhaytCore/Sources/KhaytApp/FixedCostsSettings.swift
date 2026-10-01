@@ -117,14 +117,21 @@ struct FixedCostsSettings: View {
         }
     }
 
-    private func save() async {
-        // SENT WHOLE. A row removed on screen has to be a row removed in the
-        // book, so this is the list and not a merge into the stored one.
-        await shop.saveSettings(["fixedCosts": .array(lines.map { line in
+    /// The list as the pane sends it. Also run over the list it opened with,
+    /// so a line nobody touched keeps every field the book gave it.
+    static func form(_ lines: [Line]) -> JSONValue {
+        .array(lines.map { line in
             .object(["id": .string(line.id),
                      "name": .string(line.name),
                      "amount": .number(line.amount)])
-        })])
+        })
+    }
+
+    private func save() async {
+        // SENT WHOLE. A row removed on screen has to be a row removed in the
+        // book, so this is the list and not a merge into the stored one.
+        await shop.saveSettings(["fixedCosts": Self.form(lines)],
+                                opened: ["fixedCosts": Self.form(original)])
         reload()
     }
 }

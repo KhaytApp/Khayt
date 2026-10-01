@@ -391,7 +391,11 @@ struct OnlinePane: View {
                                                    pin: draft.pin, bindLan: draft.bindLan,
                                                    intakeQuote: draft.quoteForm(),
                                                    storefrontSecrets: ["salla": draft.sallaSecret,
-                                                                       "zid": draft.zidSecret])
+                                                                       "zid": draft.zidSecret],
+                                                   opened: Shop.lanForm(
+                                                    enabled: original.enabled, port: original.portNumber,
+                                                    bindLan: original.bindLan,
+                                                    intakeQuote: original.quoteForm()))
                         reset()
                     } },
                     revert: { draft = original })

@@ -271,7 +271,7 @@ struct SettingsTests {
     @Test("the sample shop's settings cannot be saved, and it says so")
     func sampleRefused() async throws {
         let shop = try await Self.sample()
-        await shop.saveSettings(["phone": .string("055")])
+        await shop.saveSettings(["phone": .string("055")], opened: nil)
         #expect(shop.settingsProblem == shop.words.callIt("mac.settings_sample"))
         #expect(shop.settingsNote == nil)
     }

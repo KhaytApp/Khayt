@@ -173,6 +173,13 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         return out
     }
 
+    /// A stored row read the way the book is read — nil for one that is not a
+    /// customer this app can open.
+    static func decoding(_ raw: [String: JSONValue]) -> Client? {
+        guard let data = try? JSONEncoder().encode(JSONValue.object(raw)) else { return nil }
+        return try? JSONDecoder().decode(Client.self, from: data)
+    }
+
     /// Whichever name is filled in, English first. The SHOP's own language
     /// order is `KhaytContentLanguages`' answer and is resolved by the engine
     /// when the screen asks; this is the fallback for a list that has not.
@@ -341,6 +348,11 @@ struct Recurring: Hashable, Sendable {
     /// writes it. A schedule's date is a day in the shop's own calendar, not
     /// an instant, so UTC would put a Riyadh evening on the wrong date.
     static func day(_ s: String) -> Date? {
+        // A full ISO stamp is read as the shop's own day it names — the other
+        // app's `new Date(x)` reads one — rather than as nothing.
+        if s.count > 10, Calendar.instant(s) != nil {
+            return day(Calendar.localDay(ofInstant: s))
+        }
         let f = DateFormatter()
         f.calendar = Calendar(identifier: .gregorian)
         f.locale = Locale(identifier: "en_US_POSIX")

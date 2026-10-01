@@ -128,8 +128,10 @@ struct TelegramSettings: View {
         }
     }
 
-    private func save() async {
-        var telegram: [String: JSONValue] = [
+    /// What the pane sends, the token aside — also run over what it opened
+    /// with, so what was not touched is kept as stored.
+    static func form(_ draft: Draft) -> [String: JSONValue] {
+        [
             "chatId": .string(draft.chatId),
             "notifyOnComplete": .bool(draft.onComplete),
             "notifyOnHold": .bool(draft.onHold),
@@ -138,6 +140,10 @@ struct TelegramSettings: View {
             "notifyPrinterOffline": .bool(draft.printerOffline),
             "notifyPrinterStall": .bool(draft.printerStall),
         ]
+    }
+
+    private func save() async {
+        var telegram = Self.form(draft)
         guard let build = shop.source.build else {
             shop.settingsProblem = shop.words.callIt("mac.move_sample"); return
         }
@@ -153,7 +159,8 @@ struct TelegramSettings: View {
                 shop.settingsProblem = shop.words.callIt("mac.tg_unsealed"); return
             }
         }
-        await shop.saveSettings(["telegram": .object(telegram)])
+        await shop.saveSettings(["telegram": .object(telegram)],
+                                opened: ["telegram": .object(Self.form(original))])
         draft.token = ""
         draft.clearToken = false
         reload()

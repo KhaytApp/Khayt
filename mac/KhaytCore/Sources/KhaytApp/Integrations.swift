@@ -166,7 +166,7 @@ struct IntegrationsPane: View {
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
-                    save: { Task { await shop.saveSettings(draft.form()); reset() } },
+                    save: { Task { await shop.saveSettings(draft.form(), opened: original.form()); reset() } },
                     revert: { draft = original })
         }
         .task(id: shop.settingsValue) {

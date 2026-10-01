@@ -6525,6 +6525,21 @@ public actor KhaytEngine {
     /// `price` is a typed total — the last word on what the job costs the
     /// customer, after it was taken. Nil leaves the price alone; the rule
     /// writes how the price was reached and what follows for the money.
+    /// The same, handed only the fields to change. A key left out is left
+    /// alone by the rule (`lib/order-edit.js` reads `hasOwnProperty`), which
+    /// is how a sheet says "not this one" — sending the due date it merely
+    /// re-read would re-spell a stored instant as a day and log an edit
+    /// nobody made.
+    public func editJob(order: JSONValue, fields: [String: JSONValue],
+                        now: Date, editId: String) throws -> JobEdited {
+        try runtime.call2(
+            "(function(){ var o = ARG0;"
+          + " var r = KhaytOrderEdit.applyEdit(o, ARG1, { now: ARG2, id: ARG3 });"
+          + " return { order: o, changed: Object.keys(r.changes).length > 0 }; })()",
+            [order, .object(fields), .number(now.timeIntervalSince1970 * 1000), .string(editId)],
+            as: JobEdited.self)
+    }
+
     public func editJob(order: JSONValue, dueDate: String?, priorityLevel: String,
                         price: Double? = nil, now: Date, editId: String) throws -> JobEdited {
         try runtime.call2(

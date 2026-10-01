@@ -175,15 +175,17 @@ struct CustomReportPage: View {
         guard let next = try? await engine.addSavedReport(
             saved, name: name, fields: ordered, statusIn: statuses.sorted(),
             from: from, to: to, id: "RPT-" + UUID().uuidString.prefix(8)) else { return }
+        let was = saved
         saved = next
-        await shop.saveReports(next)
+        await shop.saveReports(next, opened: was)
     }
 
     private func drop(_ id: String) async {
         guard let engine = shop.engine,
               let next = try? await engine.removeSavedReport(saved, id: id) else { return }
+        let was = saved
         saved = next
-        await shop.saveReports(next)
+        await shop.saveReports(next, opened: was)
     }
 
     private func rebuild() async {

@@ -250,7 +250,7 @@ struct ConsumableShelfTests {
     func sampleRefuses() async throws {
         let shop = Shop()
         await shop.load(.sample)
-        await shop.saveConsumable(["name": .string("Glue")], id: nil)
+        await shop.saveConsumable(["name": .string("Glue")], id: nil, opened: nil)
         #expect(shop.spendProblem == shop.words.callIt("mac.move_sample"))
         await shop.deleteConsumable("anything")
         #expect(shop.spendProblem == shop.words.callIt("mac.move_sample"))

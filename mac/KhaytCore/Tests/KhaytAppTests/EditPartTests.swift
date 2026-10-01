@@ -197,8 +197,10 @@ struct EditPartTests {
         let (job, part) = try #require(Self.jobWithLinkedPart(shop))
         let before = part.printWeight
 
-        await shop.editPart(job.id, partId: part.id, name: part.name, spoolId: nil,
-                            grams: before * 5, hours: 1, qty: part.qty)
+        await shop.editPart(job.id, partId: part.id,
+                            .init(name: part.name, grams: String(before * 5), hours: "1",
+                                  qty: part.qty, spoolId: nil),
+                            opened: nil)
 
         let after = try #require(shop.orders.first { $0.id == job.id }?
             .parts.first { $0.id == part.id })

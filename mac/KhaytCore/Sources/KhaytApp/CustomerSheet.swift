@@ -67,11 +67,35 @@ struct CustomerSheet: View {
     init(shop: Shop, existing: Client) {
         self.shop = shop
         self.existing = existing
-        _draft = State(initialValue: existing)
-        _agreements = State(initialValue: existing.priceList.map(AgreementRow.init))
-        let rec = existing.recurring ?? .fresh
-        _schedule = State(initialValue: rec)
-        _hasEnd = State(initialValue: rec.endDate != nil)
+        let opened = Self.opening(existing)
+        _draft = State(initialValue: opened.draft)
+        _agreements = State(initialValue: opened.agreements)
+        _schedule = State(initialValue: opened.schedule)
+        _hasEnd = State(initialValue: opened.schedule.endDate != nil)
+    }
+
+    /// What the sheet holds while a customer is open.
+    struct Opened {
+        var draft: Client
+        var agreements: [AgreementRow]
+        var schedule: Recurring
+    }
+
+    /// A customer, as this sheet opens it. The one mapping from the record to
+    /// the form — `Shop.customerRecord` runs it again over the stored row to
+    /// learn what an untouched save would write.
+    static func opening(_ client: Client) -> Opened {
+        Opened(draft: client,
+               agreements: client.priceList.map(AgreementRow.init),
+               schedule: client.recurring ?? .fresh)
+    }
+
+    /// The customer Save hands the shop — blank price rows dropped, as the
+    /// other app drops them.
+    static func saving(_ opened: Opened) -> Client {
+        opened.draft
+            .replacing(priceList: opened.agreements.map(\.agreement).filter { !$0.isBlank })
+            .replacing(recurring: opened.schedule)
     }
 
     private var isNew: Bool { shop.clients.allSatisfy { $0.id != existing.id } }
@@ -102,9 +126,8 @@ struct CustomerSheet: View {
                 Button(shop.words.callIt("common.cancel")) { shop.editingCustomer = nil }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save")) {
-                    let saving = draft
-                        .replacing(priceList: agreements.map(\.agreement).filter { !$0.isBlank })
-                        .replacing(recurring: schedule)
+                    let saving = Self.saving(Opened(draft: draft, agreements: agreements,
+                                                    schedule: schedule))
                     Task { await shop.saveCustomer(saving) }
                 }
                 .keyboardShortcut(.defaultAction)

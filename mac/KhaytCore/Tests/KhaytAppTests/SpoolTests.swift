@@ -135,7 +135,7 @@ struct SpoolTests {
     func sampleRefuses() async throws {
         let shop = Shop()
         await shop.load(.sample)
-        await shop.saveSpool(["material": .string("PLA")], id: nil)
+        await shop.saveSpool(["material": .string("PLA")], id: nil, opened: nil)
         #expect(shop.spendProblem == shop.words.callIt("mac.move_sample"))
         await shop.deleteSpool("anything")
         #expect(shop.spendProblem == shop.words.callIt("mac.move_sample"))
