@@ -41,11 +41,13 @@ struct LibraryOrderTests {
 
 @MainActor
 struct LibraryFilterMenuTests {
-    @Test("the library opens as one flat grid of models, and filters are menus, not a row of chips")
+    @Test("the library opens on All models, and filters are menus, not a row of chips")
     func flatAndMenus() throws {
         let shop = try QuoteSheetStatusTests.source("Shop.swift")
         #expect(shop.contains("var libraryFlat = true"))
-        #expect(shop.contains("return libraryFlat && group == nil"))
+        // All models is decided in ONE place — see `GroupsReadClearlyTests`.
+        #expect(shop.contains("if group != nil || !flat { return LibraryEntry.top("))
+        #expect(shop.contains("group == nil && flat && showingMatches"))
         let bar = try QuoteSheetStatusTests.source("LibraryFilterBar.swift")
         #expect(bar.contains("Menu {"))
         #expect(!bar.contains("FilterBar(chips: chips"), "the library is back to a strip of chips")

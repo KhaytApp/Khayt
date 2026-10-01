@@ -22,6 +22,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   writes it there.** The setup's electricity answer becomes the shop's price
   instead of a new "Shop rates" calculator preset; a preset an earlier setup
   made is kept in step. Clearing the field goes back to Khayt's default.
+- **(Mac) Groups read as groups.** A group now says what it is: **one print
+  in parts** (several files that make one print — the default, and what every
+  existing group is read as) or **separate prints** kept together. In All
+  models a print in parts shows as one tile and a collection's models show one
+  by one, each naming its group with a link into it; a search or filter shows
+  every match flat, the way a Finder search does. The kind is chosen when a
+  group is named, and can be switched from the group's right-click menu or
+  beside its name when it is open; it is kept in the book's settings
+  (`settings.libraryGroups`) and moves with a folder. A group tile is now a
+  stack of cards with a badge (puzzle piece or stack, and the count) instead of
+  looking like a single model. A slash typed into a new group's name no longer
+  makes a group inside a group ("Luffy Card/Poster" is filed as "Luffy Card –
+  Poster", and the box says so before filing). Filing models into a group says
+  where they went, with Show Group.
 - **Deleting several print files warns when some of them are not on screen.**
   A selection is kept when you change the filter, so you can pick files from
   several groups. That also means Delete can include files you are no longer

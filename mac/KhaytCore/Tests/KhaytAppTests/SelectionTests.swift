@@ -5,7 +5,8 @@ import Testing
 /// Moving through the library with the keyboard.
 ///
 /// Against the sample shop, which is committed and therefore the same for
-/// everyone: fourteen models, sorted by name.
+/// everyone, over the model TILES it draws (`visibleFiles`): in All models
+/// its "Dental" group is one print in parts and so one tile, not two models.
 @MainActor
 struct SelectionTests {
 
@@ -21,12 +22,12 @@ struct SelectionTests {
         let shop = await Self.loadedShop()
         #expect(shop.fileSelection.isEmpty)
         #expect(shop.moveSelection(by: 1, extending: false))
-        #expect(shop.fileSelection == [shop.shownFiles.first!.id],
+        #expect(shop.fileSelection == [shop.visibleFiles.first!.id],
                 "a Finder window selects the first item, it does not sit there")
 
         let backwards = await Self.loadedShop()
         #expect(backwards.moveSelection(by: -1, extending: false))
-        #expect(backwards.fileSelection == [backwards.shownFiles.last!.id],
+        #expect(backwards.fileSelection == [backwards.visibleFiles.last!.id],
                 "arriving from the other direction should land on the other end")
     }
 
@@ -36,23 +37,23 @@ struct SelectionTests {
         // sets the keyboard's position, and a test that sets the selection
         // behind its back is testing a state the app cannot be in.
         let atStart = await Self.loadedShop()
-        atStart.select(atStart.shownFiles.first!, modifiers: .replace)
+        atStart.select(atStart.visibleFiles.first!, modifiers: .replace)
         #expect(!atStart.moveSelection(by: -1, extending: false),
                 "before the first must be unhandled, not silently clamped")
-        #expect(atStart.fileSelection == [atStart.shownFiles.first!.id], "and must not move")
+        #expect(atStart.fileSelection == [atStart.visibleFiles.first!.id], "and must not move")
         #expect(atStart.moveSelection(by: 1, extending: false), "forward from the first works")
 
         let atEnd = await Self.loadedShop()
-        atEnd.select(atEnd.shownFiles.last!, modifiers: .replace)
+        atEnd.select(atEnd.visibleFiles.last!, modifiers: .replace)
         #expect(!atEnd.moveSelection(by: 1, extending: false),
                 "past the last must be unhandled")
-        #expect(atEnd.fileSelection == [atEnd.shownFiles.last!.id], "and must not move")
+        #expect(atEnd.fileSelection == [atEnd.visibleFiles.last!.id], "and must not move")
     }
 
     @Test("a whole row down lands a row down, and past the bottom does nothing")
     func rowMoves() async {
         let shop = await Self.loadedShop()
-        let rows = shop.shownFiles
+        let rows = shop.visibleFiles
         shop.select(rows[0], modifiers: .replace)
         #expect(shop.moveSelection(by: 4, extending: false))
         #expect(shop.fileSelection == [rows[4].id])
@@ -66,7 +67,7 @@ struct SelectionTests {
     @Test("shift grows the selection, and shift back shrinks it again")
     func extending() async {
         let shop = await Self.loadedShop()
-        let rows = shop.shownFiles
+        let rows = shop.visibleFiles
         shop.select(rows[2], modifiers: .replace)
 
         _ = shop.moveSelection(by: 1, extending: true)
@@ -84,7 +85,7 @@ struct SelectionTests {
     func selectAllRespectsTheFilter() async {
         let shop = await Self.loadedShop()
         shop.shelf = .library("Saudi Kings")
-        let shown = shop.shownFiles
+        let shown = shop.visibleFiles
         #expect(shown.count < shop.files.count, "the group must actually be filtering")
         shop.selectAllShown()
         #expect(shop.fileSelection == Set(shown.map(\.id)),

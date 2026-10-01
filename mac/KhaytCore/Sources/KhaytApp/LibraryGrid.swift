@@ -67,7 +67,8 @@ struct LibraryGrid: View {
                             case .folder(let name, let path, let count, let cover):
                                 FolderCell(name: name, count: count,
                                            thumbnail: cover.flatMap { shop.thumbnail(for: $0) },
-                                           words: shop.words)
+                                           words: shop.words,
+                                           kind: shop.groupKind(path))
                                     .id(entry.id)
                                     // A folder OPENS. The shelf already filters
                                     // by group, so entering one is setting it —
@@ -83,6 +84,10 @@ struct LibraryGrid: View {
                                     // per folder, and a library imported flat
                                     // is a great many folders.
                                     .contextMenu {
+                                        // One print in parts, or separate
+                                        // prints: what decides how "All
+                                        // models" draws it.
+                                        GroupKindMenu(shop: shop, path: path)
                                         FolderMoveMenu(shop: shop, path: path)
                                         Divider()
                                         // A project folder is often exactly a
@@ -201,7 +206,9 @@ struct LibraryGrid: View {
         Cell(file: file,
              thumbnail: shop.thumbnail(for: file),
              selected: shop.fileSelection.contains(file.id),
-             words: shop.words)
+             words: shop.words,
+             group: Cell.groupShown(for: file, shelf: shop.shelf),
+             openGroup: { shop.showGroup($0) })
             .onTapGesture {
                 // SwiftUI's tap gesture does not report modifiers, so they are
                 // read from the event that is arriving. Without this, ⌘-click
@@ -223,12 +230,6 @@ struct LibraryGrid: View {
     }
 }
 
-/// A project, as a folder.
-///
-/// Deliberately the same shape as `Cell` — same square picture, same two lines
-/// of text — so a library of folders and files reads as one grid rather than
-/// two. What differs is what it says: a folder has no size and no print count,
-/// it has how many things are in it.
 /// Which folder the library is showing, and the way out of it.
 ///
 /// Reads as a path rather than a button: "Library / Saudi Kings", with the
@@ -290,6 +291,25 @@ private struct GroupCrumb: View {
 
             Text(verbatim: "/").foregroundStyle(.quaternary)
             Text(here).fontWeight(.medium).lineLimit(1)
+            // What this group is, and the way to change it, beside its name.
+            Menu {
+                ForEach(GroupKind.allCases, id: \.self) { kind in
+                    Button {
+                        Task { await shop.setGroupKind(group, kind) }
+                    } label: {
+                        if kind == shop.groupKind(group) {
+                            Label(shop.words.callIt(kind.wordKey), systemImage: "checkmark")
+                        } else { Text(shop.words.callIt(kind.wordKey)) }
+                    }
+                }
+            } label: {
+                Label(shop.words.callIt(shop.groupKind(group).wordKey),
+                      systemImage: shop.groupKind(group).symbol)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .disabled(!shop.canWrite)
+            .help(shop.words.callIt("mac.group_kind_menu"))
             // What is in it, so the count a shop tapped is still on screen.
             Text(verbatim: "\(shop.shownFiles.count)")
                 .monospacedDigit()
@@ -302,27 +322,38 @@ private struct GroupCrumb: View {
     }
 }
 
-private struct FolderCell: View {
+/// A group, as a folder.
+///
+/// ── IT HAS TO LOOK LIKE MORE THAN ONE THING ───────────────────────────────
+///
+/// This was "deliberately the same shape as `Cell`" with a 12-point folder
+/// glyph in a corner and "1 model" underneath — and a shop read it as a model.
+/// Reported: *"one group is now one file"*. A grid of folders and files is
+/// still one grid (same width, same two lines, same height), but a folder now
+/// wears a STACK: two cards peeking out behind its picture, the shape every
+/// photo app uses for "a set", and a badge with the kind's mark (a puzzle
+/// piece for one print in parts, a stack for separate prints) and the count
+/// where a file draws nothing. Its second line says "Group", not only a count.
+///
+/// The cards come out of the picture's own square rather than adding height,
+/// so a row holding folders and files stays level.
+struct FolderCell: View {
     let name: String
     let count: Int
     let thumbnail: ThumbnailSource?
     let words: Words
+    /// One print in parts (a puzzle piece) or separate prints (a stack): the
+    /// badge and the second line differ, so the two read differently.
+    var kind: GroupKind = .assumed
+
+    /// How far each card behind the picture shows above it.
+    static let peek: CGFloat = 4
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Thumbnail(source: thumbnail)
+            Color.clear
                 .aspectRatio(1, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                // The mark that says this is a place and not a thing. Bottom
-                // trailing, where a file puts nothing, so it never sits on top
-                // of the palette a file draws bottom-leading.
-                .overlay(alignment: .bottomTrailing) {
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white)
-                        .shadow(radius: 2)
-                        .padding(6)
-                }
+                .overlay { stack }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(TitleBreaks.soften(name))
@@ -331,9 +362,10 @@ private struct FolderCell: View {
                     .truncationMode(.tail)
                     .multilineTextAlignment(.leading)
                     .help(name)
-                    .accessibilityLabel(name)
-                // "1 model", not "1 models"; Arabic's one and two are words.
-                Text(words.counting(count, "mac.n_models"))
+                // "One print · 3 parts" or "Collection · 7 models", so the
+                // words say it as well as the picture. "1 model", not "1
+                // models"; Arabic's one and two are words.
+                Text(Self.caption(kind: kind, count: count, words: words))
                     .font(.caption2)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -345,16 +377,103 @@ private struct FolderCell: View {
         }
         .padding(6)
         .contentShape(RoundedRectangle(cornerRadius: 8))
+        // One element that says what it is: a group, its name, how many.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.accessibilityText(name: name, count: count, kind: kind, words: words))
+        .accessibilityAddTraits(.isButton)
+    }
+
+    /// What is in it, counted in the kind's own word: a print has PARTS, a
+    /// collection has models.
+    static func counted(kind: GroupKind, count: Int, words: Words) -> String {
+        words.counting(count, kind == .parts ? "mac.n_parts" : "mac.n_models")
+    }
+
+    static func caption(kind: GroupKind, count: Int, words: Words) -> String {
+        words.callIt(kind == .parts ? "mac.group_tile_parts" : "mac.group_tile_collection")
+            + " \u{00B7} " + counted(kind: kind, count: count, words: words)
+    }
+
+    static func accessibilityText(name: String, count: Int, kind: GroupKind, words: Words) -> String {
+        words.callIt("mac.group_tile_a11y", ["name": .string(name),
+                                             "kind": .string(words.callIt(kind.wordKey)),
+                                             "models": .string(counted(kind: kind, count: count, words: words))])
+    }
+
+    /// Two cards behind the picture, each narrower and higher than the one in
+    /// front of it. Centred, so they read the same way in either direction.
+    private var stack: some View {
+        ZStack(alignment: .top) {
+            card.padding(.horizontal, 14)
+                .opacity(0.6)
+            card.padding(.horizontal, 7)
+                .padding(.top, Self.peek)
+            Thumbnail(source: thumbnail)
+                // On the window's own ground: the thumbnail's grey is
+                // translucent, and without this the cards behind showed
+                // through it and the tile came out a different colour from a
+                // model's.
+                .background(Khayt.ground)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .padding(.top, Self.peek * 2)
+                // Bottom TRAILING, where a file puts nothing — so it never sits
+                // on the palette a file draws bottom-leading — and trailing
+                // flips with the window, so in Arabic it is bottom-left.
+                .overlay(alignment: .bottomTrailing) { badge }
+        }
+    }
+
+    /// Ink-relative rather than a palette surface, so the cards read on the
+    /// light ground and the dark one alike: `Role.surf3` all but vanished
+    /// into the light window.
+    private var card: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(Khayt.ground)
+            .overlay(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.12)))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.22), lineWidth: 1))
+    }
+
+    /// The kind's mark and the count, big enough to be read across the room.
+    private var badge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: kind.symbol)
+            Text(Format.count(count)).monospacedDigit()
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(.black.opacity(0.55), in: Capsule())
+        .padding(6)
     }
 }
 
-private struct Cell: View {
+struct Cell: View {
     let file: LibraryFile
     let thumbnail: ThumbnailSource?
     let selected: Bool
     /// The words rather than the whole shop: a cell needs to say four things
     /// and has no business being able to change the book to say them.
     let words: Words
+    /// The group to name on the tile, as a path — nil when there is nothing to
+    /// say. See `groupShown`.
+    var group: String? = nil
+    /// Opening that group. A closure rather than the shop, for the same reason
+    /// as `words`.
+    var openGroup: (String) -> Void = { _ in }
+
+    /// Which group a tile names: the model's own, unless the grid is already
+    /// INSIDE it.
+    ///
+    /// "All models" draws every model flat, so a model filed in a group looked
+    /// exactly like one filed nowhere — reported as *"the group I created still
+    /// appears as single models in All models"*. Inside the group the name
+    /// would only repeat the crumb above, so it is left off there.
+    static func groupShown(for file: LibraryFile, shelf: Shop.Shelf) -> String? {
+        guard let group = file.groupName else { return nil }
+        if case .library(let open?) = shelf, open == group { return nil }
+        return group
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -400,11 +519,19 @@ private struct Cell: View {
                     .multilineTextAlignment(.leading)
                     .help(file.title)
                     .accessibilityLabel(file.title)
-                Text(subtitle)
-                    .font(.caption2)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                // ONE line either way, so a row of grouped and ungrouped
+                // models stays level: the group goes at the head of the line
+                // the tile already had, and the rest of it gives way first.
+                HStack(spacing: 4) {
+                    if let group { groupLabel(group) }
+                    if group == nil || !subtitle.isEmpty {
+                        Text((group == nil ? "" : "\u{00B7} ") + subtitle)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.caption2)
+                .monospacedDigit()
+                .lineLimit(1)
             }
             .padding(.top, 6)
             .padding(.horizontal, 2)
@@ -414,6 +541,24 @@ private struct Cell: View {
         .background(selected ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
                     in: RoundedRectangle(cornerRadius: 8))
         .contentShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    /// The group, as a link to it: the folder mark and the group's own name
+    /// (its last level), with the whole path on hover.
+    private func groupLabel(_ path: String) -> some View {
+        let leaf = Shop.groupLeaf(path)
+        return Button { openGroup(path) } label: {
+            HStack(spacing: 2) {
+                Image(systemName: "folder.fill")
+                Text(leaf).truncationMode(.tail)
+            }
+            .foregroundStyle(Khayt.brand)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .layoutPriority(1)
+        .help(words.callIt("mac.open_group", ["name": .string(path)]))
+        .accessibilityLabel(words.callIt("mac.open_group", ["name": .string(leaf)]))
     }
 
     /// ── WHAT A TILE'S SECOND LINE IS FOR ─────────────────────────────────
