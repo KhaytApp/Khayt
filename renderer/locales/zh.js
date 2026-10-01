@@ -269,7 +269,7 @@
   "plib.bulk_count": "已选择 {n} 个文件。",
   "plib.bulk_del_btn": "删除 {n} 个文件",
   "plib.bulk_del_confirm": "要删除 {n} 个打印文件以及它们在磁盘上的全部内容吗？此操作无法撤销。",
-  "plib.bulk_del_hidden": "其中 {n} 个在当前筛选下未显示，已列在最前面。",
+  "plib.bulk_del_offscreen": "未删除任何内容：有 {n} 个已选文件未显示（{names}）。请先显示它们，或重新选择。",
   "plib.bulk_del_title": "删除所选文件",
   "plib.bulk_deleted": "已删除 {n} 个文件",
   "plib.bulk_filed": "已更新 {n} 个文件",

@@ -7,7 +7,9 @@
  * yesterday is only half a feature until a shop can select a set and act on it.
  *
  * What it proves:
- *   selection survives the filter moving — narrow, take, narrow again, take;
+ *   selection follows what is shown — narrowing the filter drops what it
+ *     hides, so Delete can never take a file that is off screen (the Mac lost
+ *     34 models to that; maintainer, 2026-10-01: refuse);
  *   bulk filing goes through lib/organise.js, so 200 records end up spelled the
  *     same rather than however each was typed;
  *   an empty box CLEARS rather than doing nothing;
@@ -50,24 +52,26 @@ async function on(window) {
   await window.waitForSelector('.pf-bulk');
 }
 
-async function testSelectionSurvivesTheFilterMoving(window) {
+async function testSelectionFollowsWhatIsShown(window) {
   await on(window);
   // Narrow to the busts and take all of them…
   await window.click('.pf-folderbar [data-cat="Busts"]');
   await window.click('[data-act="pf-pick-all"]');
   let txt = await bulkText(window);
   if (!/3 selected/.test(txt)) throw new Error(`after taking the busts: ${txt}`);
-  // …then to the minis, and take those too. THIS is how a big set is selected,
-  // and a count of "selected AND visible" would make it impossible to trust.
+  // …then move to the minis: the busts are no longer on screen, so they are no
+  // longer selected. Carrying them is how a Delete takes files nobody can see.
   await window.click('.pf-folderbar [data-cat="Minis"]');
+  txt = await bulkText(window);
+  if (!/0 selected/.test(txt)) throw new Error(`a selection outlived the filter that hid it: ${txt}`);
+  // With everything shown, take it all and drop one back off by its checkbox.
+  await window.click('.pf-folderbar [data-cat="Minis"]');   // clear the filter
   await window.click('[data-act="pf-pick-all"]');
   txt = await bulkText(window);
-  if (!/6 selected/.test(txt)) throw new Error(`the earlier selection was lost when the filter moved: ${txt}`);
-  // Drop one back off, by its own checkbox.
+  if (!/6 selected/.test(txt)) throw new Error(`taking everything shown: ${txt}`);
   await window.click('.pf-card[data-id="KEEP-1"] [data-act="pf-pick"]');
   txt = await bulkText(window);
   if (!/5 selected/.test(txt)) throw new Error(`unticking one card: ${txt}`);
-  await window.click('.pf-folderbar [data-cat="Minis"]');   // clear the filter
 }
 
 async function testBulkFilingUnifiesTheSpelling(window) {
@@ -128,13 +132,8 @@ async function testTaggingAddsWithoutDiscarding(window) {
 async function testBulkDeleteTakesExactlyTheHeldRecords(window) {
   const before = await ids(window);
   if (before.length !== 6) throw new Error(`expected 6 records before deleting, got ${before.length}`);
-  // Narrow the view so part of the held selection is off screen. The Mac lost
-  // 34 models to exactly this; the dialog has to say so.
-  await window.click('.pf-folderbar [data-cat="Busts"]');
   await window.click('[data-act="pf-bulk-del"]');
   await window.waitForSelector('.modal [data-act="save"]');
-  const hiddenNote = await window.evaluate(() => document.querySelector('.modal .pf-del-hidden')?.textContent || '');
-  if (!/\d/.test(hiddenNote)) throw new Error(`the dialog did not say part of the selection is off screen: "${hiddenNote}"`);
   // The count is in the sentence AND the button: this is the most expensive
   // mistake this screen can make.
   const label = await window.evaluate(() => document.querySelector('.modal [data-act="save"]').textContent.trim());
@@ -163,14 +162,14 @@ try {
   await switchTab(window, 'printfiles-tab');
   await seed(window);
 
-  await testSelectionSurvivesTheFilterMoving(window);
+  await testSelectionFollowsWhatIsShown(window);
   await testBulkFilingUnifiesTheSpelling(window);
   await testAnEmptyBoxClears(window);
   await testTaggingAddsWithoutDiscarding(window);
   await testBulkDeleteTakesExactlyTheHeldRecords(window);
   await testDoneLeavesSelectingBehind(window);
 
-  console.log('e2e-bulk-actions: ok (selection survives filtering, spelling unified, empty clears, tags add without discarding, delete takes exactly the held set)');
+  console.log('e2e-bulk-actions: ok (selection follows what is shown, spelling unified, empty clears, tags add without discarding, delete takes exactly the held set)');
 } finally {
   if (electronApp) await electronApp.close().catch(() => {});
   fs.rmSync(userData, { recursive: true, force: true });

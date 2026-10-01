@@ -4,12 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Deleting several print files warns when some of them are not on screen.**
-  A selection is kept when you change the filter, so you can pick files from
-  several groups. That also means Delete can include files you are no longer
-  looking at. The delete dialog now says how many of them the current filter
-  hides, in red, and lists those first. The Mac app lost 34 models to this
-  kind of hidden selection.
+- **Selecting print files only ever holds what is on screen.** Changing the
+  filter, the search or the view now drops any selected file it hides, and
+  Delete refuses outright if anything selected is not shown. A selection used
+  to be kept when you changed the filter, so Delete could take files you were
+  no longer looking at. The Mac app lost 34 models that way, and both apps now
+  work the same. To act on files from several groups, show them together (for
+  example, clear the filter) and select them there.
 
 - **(Mac) The spool sheet says each unit once, and an unset value is an empty
   box.** Print temp, bed temp and max speed read "Print temp (°C) … °C": the
