@@ -269,6 +269,7 @@
   "plib.bulk_count": "{n} dosya seçildi.",
   "plib.bulk_del_btn": "{n} dosyayı sil",
   "plib.bulk_del_confirm": "{n} baskı dosyası ve diskte tuttukları her şey kaldırılsın mı? Bu geri alınamaz.",
+  "plib.bulk_del_hidden": "Bunlardan {n} tanesi mevcut filtrede görünmüyor. Önce onlar listelendi.",
   "plib.bulk_del_title": "Seçili dosyaları sil",
   "plib.bulk_deleted": "{n} dosya silindi",
   "plib.bulk_filed": "{n} dosya güncellendi",

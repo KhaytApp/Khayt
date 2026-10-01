@@ -613,8 +613,15 @@
    * not be removed from disk must not read as gone.
    */
   function bulkDelete() {
-    const recs = selectedRecords();
-    if (!recs.length) return;
+    // The selection is kept across filter changes on purpose (bulkBarHtml), so
+    // it can hold files the shop is not looking at. On the Mac exactly that
+    // deleted 34 models nobody meant to (a selection carried into hidden
+    // groups). Say how many are off screen, and list those first.
+    const shownIds = new Set(filtered(_query).map((r) => r.id));
+    const all = selectedRecords();
+    if (!all.length) return;
+    const recs = all.filter((r) => !shownIds.has(r.id)).concat(all.filter((r) => shownIds.has(r.id)));
+    const hidden = recs.length - all.filter((r) => shownIds.has(r.id)).length;
     const n = recs.length;
     openFormModal({
       title: t('plib.bulk_del_title') || 'Delete the selected files',
@@ -622,6 +629,8 @@
       saveLabel: (t('plib.bulk_del_btn', { n: String(n) }) || `Delete ${n} files`),
       bodyHtml: `<p>${escapeHtml((t('plib.bulk_del_confirm', { n: String(n) })
         || `Remove ${n} print files and everything they hold on disk? This cannot be undone.`))}</p>
+        ${hidden ? `<p class="pf-del-hidden" style="color:var(--danger); font-weight:600;">${escapeHtml(t('plib.bulk_del_hidden', { n: String(hidden) })
+          || `${hidden} of these are not shown with the current filter. They are listed first.`)}</p>` : ''}
         <ul class="pf-del-list">${recs.slice(0, 8).map((r) => `<li>${escapeHtml(r.name || r.originalName || r.id)}</li>`).join('')}
         ${n > 8 ? `<li class="pf-del-more">${escapeHtml(t('plib.and_n_more', { n: String(n - 8) }) || `…and ${n - 8} more`)}</li>` : ''}</ul>`,
       async onSave() {

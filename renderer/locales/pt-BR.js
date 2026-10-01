@@ -270,6 +270,7 @@
   "plib.bulk_count": "{n} arquivos selecionados.",
   "plib.bulk_del_btn": "Excluir {n} arquivos",
   "plib.bulk_del_confirm": "Remover {n} arquivos de impressão e tudo o que ocupam no disco? Isso não pode ser desfeito.",
+  "plib.bulk_del_hidden": "{n} deles não aparecem com o filtro atual. Eles estão listados primeiro.",
   "plib.bulk_del_title": "Excluir os arquivos selecionados",
   "plib.bulk_deleted": "{n} arquivos excluídos",
   "plib.bulk_filed": "{n} arquivos atualizados",

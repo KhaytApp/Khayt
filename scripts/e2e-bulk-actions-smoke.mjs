@@ -128,8 +128,13 @@ async function testTaggingAddsWithoutDiscarding(window) {
 async function testBulkDeleteTakesExactlyTheHeldRecords(window) {
   const before = await ids(window);
   if (before.length !== 6) throw new Error(`expected 6 records before deleting, got ${before.length}`);
+  // Narrow the view so part of the held selection is off screen. The Mac lost
+  // 34 models to exactly this; the dialog has to say so.
+  await window.click('.pf-folderbar [data-cat="Busts"]');
   await window.click('[data-act="pf-bulk-del"]');
   await window.waitForSelector('.modal [data-act="save"]');
+  const hiddenNote = await window.evaluate(() => document.querySelector('.modal .pf-del-hidden')?.textContent || '');
+  if (!/\d/.test(hiddenNote)) throw new Error(`the dialog did not say part of the selection is off screen: "${hiddenNote}"`);
   // The count is in the sentence AND the button: this is the most expensive
   // mistake this screen can make.
   const label = await window.evaluate(() => document.querySelector('.modal [data-act="save"]').textContent.trim());

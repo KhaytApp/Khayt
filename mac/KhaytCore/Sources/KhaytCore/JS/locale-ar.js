@@ -269,6 +269,7 @@
   "plib.bulk_count": "{n} ملفات محددة.",
   "plib.bulk_del_btn": "حذف {n} ملفات",
   "plib.bulk_del_confirm": "إزالة {n} ملفات طباعة وكل ما تحتويه على القرص؟ لا يمكن التراجع عن هذا.",
+  "plib.bulk_del_hidden": "{n} منها غير ظاهرة مع عامل التصفية الحالي، وهي مذكورة أولًا.",
   "plib.bulk_del_title": "حذف الملفات المحددة",
   "plib.bulk_deleted": "حُذفت {n} ملفات",
   "plib.bulk_filed": "حُدِّثت {n} ملفات",

@@ -269,6 +269,7 @@
   "plib.bulk_count": "{n} Dateien ausgewählt.",
   "plib.bulk_del_btn": "{n} Dateien löschen",
   "plib.bulk_del_confirm": "{n} Druckdateien und alles, was sie auf der Festplatte belegen, entfernen? Das lässt sich nicht rückgängig machen.",
+  "plib.bulk_del_hidden": "{n} davon werden mit dem aktuellen Filter nicht angezeigt. Sie stehen zuerst in der Liste.",
   "plib.bulk_del_title": "Ausgewählte Dateien löschen",
   "plib.bulk_deleted": "{n} Dateien gelöscht",
   "plib.bulk_filed": "{n} Dateien aktualisiert",
