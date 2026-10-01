@@ -127,19 +127,24 @@ struct RestoreTests {
         #expect(after["printLog"] == .array([.object(["id": .string("P-1"), "rev": .number(1)])]), "the rest WAS restored")
     }
 
-    @Test("the phone and the cloud never see the ntfy topic or a webhook URL")
+    @Test("the phone and the cloud never see the ntfy topic, a webhook URL or the event webhook URL")
     func devicePrivateIsMasked() async throws {
         let engine = try KhaytEngine()
         let masked = try await engine.storeForCloud([
             "settings": .object(["ntfy": .object(["topic": .string("khayt-realtopic")]),
                                  "webhooks": .object(["subscriptions": .array([.object(["id": .string("w1"),
-                                                                                        "url": .string("https://hooks.example/x")])])])]),
+                                                                                        "url": .string("https://hooks.example/x")])])]),
+                                 "eventWebhooks": .object(["enabled": .bool(true),
+                                                           "url": .string("https://hooks.slack.com/services/T0/B0/evsecret")])]),
         ])
         guard case .object(let settings)? = masked["settings"], case .object(let ntfy)? = settings["ntfy"],
               case .object(let hooks)? = settings["webhooks"], case .array(let subs)? = hooks["subscriptions"],
               case .object(let sub)? = subs.first else { Issue.record("shape"); return }
         #expect(ntfy["topic"] != .string("khayt-realtopic"))
         #expect(sub["url"] != .string("https://hooks.example/x"))
+        guard case .object(let events)? = settings["eventWebhooks"] else { Issue.record("no eventWebhooks"); return }
+        #expect(events["url"] == .string("__KHAYT_MASKED__"), "the event webhook URL went to the cloud in full")
+        #expect(events["enabled"] == .bool(true), "the switch is not a secret and must survive")
     }
 
     @Test("a damaged backup is refused, and the book is untouched")

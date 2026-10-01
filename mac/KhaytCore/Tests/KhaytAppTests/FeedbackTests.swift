@@ -80,15 +80,48 @@ import KhaytCore
         }
     }
 
-    @Test("a fault's quoted expression is taken out")
-    func quotesAreScrubbed() {
-        let said = Feedback.scrubbed(
-            "TypeError: undefined is not an object (evaluating 'K.f({\"client\":\"Najd\"}).x')")
-        #expect(!said.contains("Najd"))
-        #expect(said.hasPrefix("TypeError: undefined is not an object"))
-        // An apostrophe inside a word is not a quote.
-        #expect(Feedback.scrubbed("ReferenceError: Can't find variable: KhaytX")
-                == "ReferenceError: Can't find variable: KhaytX")
+    @Test("a fault's message keeps its kind and nothing of what followed")
+    func messagesAreScrubbed() {
+        // Quoted data, as JavaScriptCore quotes the expression it evaluated.
+        #expect(Feedback.scrubbed(
+            "TypeError: undefined is not an object (evaluating 'K.f({\"client\":\"Najd\"}).x')") == "TypeError")
+        // UNQUOTED data, as a lib rule's own `throw new Error(`…${name}`)`
+        // puts it — what stripping quotes alone let through.
+        let said = Feedback.scrubbed("Error: no price for Najd Printing Co, phone 0551234567, total 1234.50")
+        #expect(said == "Error")
+        for leak in ["Najd", "0551234567", "1234.50"] { #expect(!said.contains(leak)) }
+        #expect(Feedback.scrubbed("RangeError: Maximum call stack size exceeded.") == "RangeError")
+        // No kind to keep: the whole message is free-form, so none of it goes.
+        #expect(Feedback.scrubbed("Najd Printing Co owes 1234.50") == Feedback.withheld)
+        #expect(Feedback.scrubbed("order for Najd: no price") == Feedback.withheld)
+        #expect(Feedback.scrubbed("") == Feedback.withheld)
+    }
+
+    @Test("old report folders are swept from the temporary directory, new ones and others are not")
+    func oldDraftsAreSwept() throws {
+        let fm = FileManager.default
+        let tmp = fm.temporaryDirectory.appending(path: "feedback-sweep-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try fm.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: tmp) }
+        func folder(_ name: String, age: TimeInterval) throws -> URL {
+            let url = tmp.appending(path: name, directoryHint: .isDirectory)
+            try fm.createDirectory(at: url, withIntermediateDirectories: true)
+            try Data("{}".utf8).write(to: url.appending(path: "book.json"))
+            try fm.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: url.path)
+            return url
+        }
+        let old = try folder("Khayt-feedback-2026-09-01-101010", age: 3 * 86_400)
+        let fresh = try folder("Khayt-feedback-2026-10-01-101010", age: 60)
+        let other = try folder("Someone-else-2026-09-01", age: 3 * 86_400)
+        let file = tmp.appending(path: "Khayt-feedback-2026-09-01.zip")
+        try Data([1]).write(to: file)
+        try fm.setAttributes([.modificationDate: Date().addingTimeInterval(-3 * 86_400)], ofItemAtPath: file.path)
+
+        Feedback.sweepOldDrafts(in: tmp)
+        #expect(!fm.fileExists(atPath: old.path), "a three-day-old report is still there")
+        #expect(fm.fileExists(atPath: fresh.path), "a report the mail app may still be reading was removed")
+        #expect(fm.fileExists(atPath: other.path), "another app's folder was removed")
+        #expect(fm.fileExists(atPath: file.path), "a file, not a report folder, was removed")
     }
 
     @Test("the book attachment masks every path in store-secret-paths")
@@ -110,6 +143,35 @@ import KhaytCore
         Self.plant(&root, path: "settings.someoneForgot.key", value: .string("__enc__c2VhbGVk"))
         planted.append("__enc__c2VhbGVk")
 
+        // What the cloud mask KEEPS and a stranger must not get: every
+        // order's capabilities (the portal link, approving a quote, answering
+        // a survey), the LAN API token hashes, a secret-bearing event webhook
+        // URL and the wrapped cloud data key.
+        guard case .array(let jobs)? = root["printLog"] else {
+            Issue.record("the sample book has no jobs"); return
+        }
+        #expect(jobs.count > 3)
+        root["printLog"] = .array(jobs.enumerated().map { index, job in
+            guard case .object(var o) = job else { return job }
+            o["trackingToken"] = .string("planted-tracking-\(index)-q9")
+            o["quoteApprovalToken"] = .string("planted-approval-\(index)-q9")
+            o["surveyToken"] = .string("planted-survey-\(index)-q9")
+            return .object(o)
+        })
+        for index in jobs.indices {
+            planted += ["planted-tracking-\(index)-q9", "planted-approval-\(index)-q9", "planted-survey-\(index)-q9"]
+        }
+        Self.plant(&root, path: "settings.lanApi.apiTokens", value: .array([
+            .object(["id": .string("tok1"), "label": .string("Zapier"),
+                     "hash": .string("planted-api-hash-5b1e"), "scopes": .array([.string("orders:read")])]),
+        ]))
+        Self.plant(&root, path: "settings.eventWebhooks.url",
+                   value: .string("https://hooks.slack.com/services/T000/B000/planted-hook-path-7c"))
+        Self.plant(&root, path: "settings.cloud.keyset",
+                   value: .object(["wrapped": .string("planted-keyset-wrapped-3d"), "salt": .string("planted-keyset-salt-3d")]))
+        planted += ["planted-api-hash-5b1e", "planted-hook-path-7c",
+                    "planted-keyset-wrapped-3d", "planted-keyset-salt-3d"]
+
         let data = try #require(await Feedback.maskedBook(root, engine: engine))
         let bytes = try #require(String(data: data, encoding: .utf8))
         for value in planted {
@@ -122,6 +184,21 @@ import KhaytCore
             }
             #expect(!Self.values(back, path: path).isEmpty, "\(path) went missing rather than masked")
         }
+        // Gone, not masked: a mask would be adopted AS the token.
+        for key in ["trackingToken", "quoteApprovalToken", "surveyToken"] {
+            #expect(!bytes.contains("\"\(key)\""), "book.json still has \(key)")
+        }
+        // Device-private since #1678, so the cloud mask takes it.
+        #expect(Self.values(back, path: "settings.eventWebhooks.url") == [Self.mask])
+        #expect(Self.values(back, path: "settings.cloud.keyset").isEmpty)
+        guard case .array(let tokens)? = Self.values(back, path: "settings.lanApi.apiTokens").first,
+              case .object(let token)? = tokens.first else {
+            Issue.record("the API token went missing"); return
+        }
+        #expect(token["hash"] == Self.mask)
+        // The token's label survives, so a report can still say which one.
+        #expect(bytes.contains("Zapier"))
+
         // Still the book: its customers are in it — that is why it is opt-in.
         let name = try #require(shop.clients.first?.nameEn)
         #expect(bytes.contains(name))
@@ -155,7 +232,7 @@ import KhaytCore
         // As it is in the app: a picture of the window was taken on the way in.
         shop.feedbackCapture = Feedback.Capture(png: Data([0x89]), size: CGSize(width: 1280, height: 800))
         let renderer = SnapshotTests()
-        let size = CGSize(width: SheetMetrics.outerWidth(FeedbackSheet.width), height: 470)
+        let size = CGSize(width: SheetMetrics.outerWidth(FeedbackSheet.width), height: 500)
         try renderer.render(FeedbackSheet(shop: shop), "90-feedback", size: size)
         try renderer.renderDark(FeedbackSheet(shop: shop), "90-feedback-dark", size: size)
     }

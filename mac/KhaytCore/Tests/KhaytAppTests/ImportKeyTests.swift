@@ -180,6 +180,7 @@ struct ImportKeyTests {
         SecretPasteboard.copy("khk_secret", to: board)
         #expect(board.string(forType: .string) == "khk_secret")
         #expect(board.types?.contains(.init("org.nspasteboard.ConcealedType")) == true)
+        #expect(board.types?.contains(.init("org.nspasteboard.TransientType")) == true)
         let source = try? String(contentsOf: URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/KhaytApp/ImportKey.swift"), encoding: .utf8)

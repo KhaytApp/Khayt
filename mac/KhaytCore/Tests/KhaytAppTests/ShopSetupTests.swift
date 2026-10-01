@@ -275,6 +275,30 @@ struct ShopSetupTests {
         #expect(!FileManager.default.fileExists(atPath: url.path))
     }
 
+    @Test("the empty book is created exclusively — a file already there is never replaced, and it is 0600")
+    func createNewNeverReplaces() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appending(path: "khayt-create-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appending(path: "khayt-store.json")
+
+        try Shop.createNew(Data("{}".utf8), at: url)
+        let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
+        #expect(mode == 0o600, "the new book is readable by others: \(String(mode ?? -1, radix: 8))")
+
+        // The race the check-then-write lost: the book appears AFTER any check
+        // a caller made. `createNew` is the part that must refuse on its own.
+        let real = Data(#"{"machines":[{"id":"M1"}]}"#.utf8)
+        try real.write(to: url)
+        #expect(throws: (any Error).self) { try Shop.createNew(Data("{}".utf8), at: url) }
+        #expect(try Data(contentsOf: url) == real)
+
+        // No temporary file left behind either way.
+        let left = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+        #expect(left == ["khayt-store.json"], "left behind: \(left)")
+    }
+
     // MARK: - It fits a laptop
 
     @Test("every step fits a 13-inch laptop, buttons included")

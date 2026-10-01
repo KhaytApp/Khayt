@@ -23,8 +23,15 @@ import KhaytCore
 ///   book.json        only when ticked. The book as it is stored, through the
 ///                    SAME mask the cloud push uses (`storeForCloud`): every
 ///                    path in `lib/store-secret-paths.js`, the device-private
-///                    ones, and anything sealed on disk. A second, Swift-side
-///                    list of what is secret is how two lists drift.
+///                    ones, and anything sealed on disk — and THEN through the
+///                    export redaction (`redactedExport`, `lib/store.js`),
+///                    which the cloud mask does not do: it deletes every
+///                    order's `trackingToken` and `quoteApprovalToken` (live
+///                    capabilities — the portal link, and approving a quote)
+///                    and masks the LAN API token hashes. A second, Swift-side
+///                    list of what is secret is how two lists drift, so the
+///                    only Swift-side additions are the few in `forFeedback`
+///                    that neither lib rule covers yet.
 enum Feedback {
 
     static let address = "support@khaytapp.com"
@@ -174,45 +181,78 @@ enum Feedback {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    /// A fault's message with anything quoted taken out.
+    /// A fault's message reduced to its KIND — "TypeError", "RangeError" —
+    /// and nothing of what followed.
     ///
-    /// `EngineFaults` already strips a call's arguments, but JavaScriptCore's
-    /// own message can quote the expression it was evaluating — and an engine
-    /// script carries its data INLINE, so that quote can hold a customer's
-    /// name. "Can't find variable: KhaytX" survives; "(evaluating '…')" is all
-    /// that is left of the rest.
+    /// `EngineFaults` already strips a call's arguments, and the rule that
+    /// failed is named by `fault.call` beside this. The message is the
+    /// problem: JavaScriptCore's own can quote the expression it was
+    /// evaluating, and an engine script carries its data INLINE; and a lib
+    /// rule's `throw new Error(`no price for ${name}`)` puts a customer in it
+    /// with no quotes at all. Taking quotes out (the first version of this)
+    /// caught the first and not the second. So only the text before the first
+    /// ':' is kept, and only when it looks like an error's name — anything
+    /// else, including a message with no ':' at all, is withheld whole.
     static func scrubbed(_ problem: String) -> String {
-        let characters = Array(problem)
-        let quotes: Set<Character> = ["'", "\"", "`"]
-        func wordy(_ at: Int) -> Bool {
-            at >= 0 && at < characters.count && (characters[at].isLetter || characters[at].isNumber)
-        }
-        var out = ""
-        var open: Character?
-        for (i, character) in characters.enumerated() {
-            if let quote = open {
-                // Closes only where a quote can end — "Najd's" does not.
-                if character == quote && !wordy(i + 1) { out.append("…"); out.append(character); open = nil }
-            } else if quotes.contains(character) && !wordy(i - 1) {
-                // Opens only where a quote can start — "Can't" does not.
-                out.append(character)
-                open = character
-            } else {
-                out.append(character)
-            }
-        }
-        if open != nil { out.append("…") }
-        return String(out.prefix(200))
+        guard let colon = problem.firstIndex(of: ":") else { return withheld }
+        let kind = problem[..<colon].trimmingCharacters(in: .whitespaces)
+        let nameish = CharacterSet(charactersIn:
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.$")
+        guard !kind.isEmpty, kind.count <= 60,
+              kind.unicodeScalars.allSatisfy(nameish.contains) else { return withheld }
+        return kind
     }
+
+    static let withheld = "(message withheld)"
 
     // MARK: - The book, masked
 
     /// The book exactly as this app stores it, with every secret masked the
-    /// way the cloud push masks it. Nil when there is no engine to mask with:
-    /// an unmasked book is never the fallback.
+    /// way the cloud push masks it AND redacted the way an export is. Nil when
+    /// there is no engine to mask with, or either rule fails: an unmasked book
+    /// is never the fallback.
+    ///
+    /// Both, because neither is a superset of the other. The cloud mask
+    /// (`lib/cloud-outbox.js forCloud`) keeps every order's tokens — the cloud
+    /// copy needs them, it is the shop's own — and the export redaction
+    /// (`lib/store.js buildExportPayload`) knows nothing of device-private
+    /// values or of anything sealed but unlisted. A feedback report is a file
+    /// emailed to a stranger, so it gets the union.
     static func maskedBook(_ root: [String: JSONValue], engine: KhaytEngine?) async -> Data? {
-        guard let engine, let masked = try? await engine.storeForCloud(root) else { return nil }
-        return try? JSONEncoder().encode(masked)
+        guard let engine,
+              let masked = try? await engine.storeForCloud(root),
+              let exported = try? await engine.redactedExport(masked) else { return nil }
+        return try? JSONEncoder().encode(forFeedback(exported))
+    }
+
+    /// What NEITHER lib rule takes out yet, taken out of the feedback copy
+    /// only. Kept short on purpose (see the note at the top) and reported to
+    /// the shared lib — once `lib/store.js` covers these, this goes.
+    ///
+    ///   printLog[].surveyToken     the key a customer's survey answer is
+    ///                              accepted with (LanServer); deleted, not
+    ///                              masked, for the reason `redactOrdersForExport`
+    ///                              gives — a mask would be adopted as a token
+    ///   settings.cloud.keyset      the shop's wrapped data key: sealed with the
+    ///                              passphrase, so offline-crackable, and a
+    ///                              report has no use for it
+    static func forFeedback(_ root: [String: JSONValue]) -> [String: JSONValue] {
+        var out = root
+        if case .array(let jobs)? = out["printLog"] {
+            out["printLog"] = .array(jobs.map { job in
+                guard case .object(var o) = job, o["surveyToken"] != nil else { return job }
+                o.removeValue(forKey: "surveyToken")
+                return .object(o)
+            })
+        }
+        if case .object(var settings)? = out["settings"] {
+            if case .object(var cloud)? = settings["cloud"], cloud["keyset"] != nil {
+                cloud.removeValue(forKey: "keyset")
+                settings["cloud"] = .object(cloud)
+            }
+            out["settings"] = .object(settings)
+        }
+        return out
     }
 
     /// The book as it is on disk, secrets still sealed — or the sample.
@@ -263,6 +303,7 @@ enum Feedback {
     /// Open a draft in the mail app, or — when there is none — leave a zip.
     @MainActor static func compose(_ parts: Parts, subject: String,
                                    fellBack: @escaping @MainActor (Outcome) -> Void) -> Outcome {
+        sweepOldDrafts()
         let folder = FileManager.default.temporaryDirectory
             .appending(path: "Khayt-feedback-\(stamp())", directoryHint: .isDirectory)
         var urls: [URL] = []
@@ -302,6 +343,29 @@ enum Feedback {
             return .saved(url)
         } catch {
             return .failed(String(describing: error))
+        }
+    }
+
+    /// Remove the folders earlier reports left in the temporary directory.
+    ///
+    /// Each holds a masked book and a picture of the window, and cannot be
+    /// removed right after `compose`: the mail app reads the attachments from
+    /// there, possibly minutes later. So they are swept the next time — at
+    /// launch and before a new report — once they are a day old, which no
+    /// draft still needs. Only this app's own `Khayt-feedback-*` folders, and
+    /// only folders.
+    static func sweepOldDrafts(in folder: URL = FileManager.default.temporaryDirectory,
+                               olderThan age: TimeInterval = 24 * 60 * 60, now: Date = Date()) {
+        let fm = FileManager.default
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey]
+        guard let entries = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys,
+                                                        options: [.skipsSubdirectoryDescendants]) else { return }
+        for entry in entries where entry.lastPathComponent.hasPrefix("Khayt-feedback-") {
+            guard let values = try? entry.resourceValues(forKeys: Set(keys)),
+                  values.isDirectory == true, values.isSymbolicLink != true,
+                  let modified = values.contentModificationDate,
+                  now.timeIntervalSince(modified) > age else { continue }
+            try? fm.removeItem(at: entry)
         }
     }
 

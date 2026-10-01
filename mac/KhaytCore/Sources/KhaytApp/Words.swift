@@ -3074,6 +3074,8 @@ final class Words {
                                    "ar": "ما الذي فعلته، وما الذي توقّعته، وما الذي ظهر بدلًا منه."],
         "mac.feedback_screenshot": ["en": "Include a screenshot of the window",
                                     "ar": "إرفاق صورة للنافذة"],
+        "mac.feedback_screenshot_note": ["en": "The picture shows what is on screen — customer names and prices included.",
+                                         "ar": "تُظهر الصورة ما على الشاشة، بما في ذلك أسماء العملاء والأسعار."],
         "mac.feedback_book":  ["en": "Include a copy of my book (private — only if asked)",
                                "ar": "إرفاق نسخة من دفتري (خاص — فقط إن طُلب منك)"],
         "mac.feedback_book_note": ["en": "Your book holds your customers and your prices. Passwords, keys and tokens are masked before it is attached.",
