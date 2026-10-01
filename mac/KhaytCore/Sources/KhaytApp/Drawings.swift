@@ -76,7 +76,7 @@ struct WearGauge: View {
             // number — the same treatment `BigFigure` gives a unit, for the
             // same reason.
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text("\(Int(shown.rounded()))")
+                Text("\(Int(saturating: shown.rounded()))")
                     .font(.system(size: size * 0.30, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     // The figure counts up with the ring rather than sitting at

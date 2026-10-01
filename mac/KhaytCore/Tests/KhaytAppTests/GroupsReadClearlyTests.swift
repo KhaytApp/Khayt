@@ -212,10 +212,41 @@ struct GroupsReadClearlyTests {
 
     // MARK: Where the kind is kept
 
-    static func book(_ groups: JSONValue?) -> [String: JSONValue] {
+    /// A book with files in `groups` (one file per path, id "f-<path>") and,
+    /// when given, a kind map. A kind is only kept while a file sits under
+    /// its path (`GroupKinds.prune`), so a test of the map needs the files.
+    static func book(_ groups: JSONValue?, files: [String] = []) -> [String: JSONValue] {
         var settings: [String: JSONValue] = ["currency": .string("SAR"), "vatRate": .string("15")]
         if let groups { settings["libraryGroups"] = groups }
-        return ["settings": .object(settings), "printFiles": .array([])]
+        let rows: [JSONValue] = files.map { path in
+            .object(["id": .string("f-" + path), "group": .string(path), "folder": .string(path)])
+        }
+        return ["settings": .object(settings), "printFiles": .array(rows)]
+    }
+
+    static func kinds(_ root: [String: JSONValue]) -> [String: GroupKind] {
+        GroupKinds.read(Shop.settings(root))
+    }
+
+    static func files(_ root: [String: JSONValue]) -> [(id: String, group: String?)] {
+        Shop.rows(root, "printFiles").compactMap { row in
+            guard case .object(let o) = row, case .string(let id)? = o["id"] else { return nil }
+            let folder: String? = { if case .string(let s)? = o["folder"] { s } else { nil } }()
+            let group: String? = { if case .string(let s)? = o["group"] { s } else { nil } }()
+            return (id, LibraryFile.groupName(folder: folder, group: group))
+        }
+    }
+
+    /// `Shop.moveFolder`'s write, on a book in memory: the same targets, the
+    /// same record change, the same `carry`, through the same `applyFileEdit`
+    /// whose result Undo restores.
+    static func move(_ path: String, to destination: String,
+                     in root: inout [String: JSONValue]) -> Shop.LibraryUndo {
+        let wanted = Shop.folderMoveTargets(path, to: destination, files: files(root))
+        let ids = Set(wanted.keys)
+        return Shop.applyFileEdit(&root, ids: ids, alsoRoot: { root in
+            GroupKinds.carry(from: path, to: destination, moving: ids, in: &root)
+        }) { record in Shop.moveRecord(&record, wanted: wanted) }
     }
 
     @Test("a kind is written to settings.libraryGroups, keeping everything else as the book spells it")
@@ -223,7 +254,7 @@ struct GroupsReadClearlyTests {
         var root = Self.book(.object([
             "Saudi Kings": .object(["kind": .string("collection"), "cover": .string("k1")]),
             "Luffy Card": .object(["kind": .string("parts"), "note": .string("kept")]),
-        ]))
+        ]), files: ["Saudi Kings", "Luffy Card", "New One"])
         GroupKinds.write(["Luffy Card": .collection, "New One": .parts], into: &root)
         guard case .object(let settings)? = root["settings"],
               case .object(let map)? = settings["libraryGroups"] else { Issue.record("no map"); return }
@@ -238,7 +269,7 @@ struct GroupsReadClearlyTests {
 
     @Test("a book with no map gets one; a malformed entry reads as the default")
     func noMapAndMalformed() {
-        var root = Self.book(nil)
+        var root = Self.book(nil, files: ["A"])
         GroupKinds.write(["A": .collection], into: &root)
         guard case .object(let settings)? = root["settings"] else { Issue.record("no settings"); return }
         #expect(GroupKinds.read(settings) == ["A": .collection])
@@ -248,41 +279,185 @@ struct GroupsReadClearlyTests {
         #expect(GroupKinds.read(odd) == ["C": .collection])
     }
 
-    @Test("moving a folder carries its kind and every kind beneath it")
+    @Test("moving a folder moves its kind and every kind beneath it")
     func moveCarriesKind() {
         var root = Self.book(.object([
             "Blue": .object(["kind": .string("collection")]),
             "Blue/left": .object(["kind": .string("parts"), "x": .number(1)]),
             "Bluefin": .object(["kind": .string("collection")]),
             "Helmet/Blue": .object(["kind": .string("parts")]),
-        ]))
-        GroupKinds.carry(from: "Blue", to: "Pose/Blue", in: &root)
-        guard case .object(let settings)? = root["settings"] else { Issue.record("no settings"); return }
-        let kinds = GroupKinds.read(settings)
+        ]), files: ["Blue", "Blue/left", "Bluefin", "Helmet/Blue", "Pose"])
+        _ = Self.move("Blue", to: "Pose/Blue", in: &root)
+        let kinds = Self.kinds(root)
         #expect(kinds["Pose/Blue"] == .collection)
         #expect(kinds["Pose/Blue/left"] == .parts)
         #expect(kinds["Pose/Bluefin"] == nil, "a sibling sharing the prefix came along")
-        #expect(kinds["Blue"] == .collection, "the old entry is kept so Undo finds it")
-        if case .object(let map)? = settings["libraryGroups"] {
-            #expect(map["Pose/Blue/left"] == .object(["kind": .string("parts"), "x": .number(1)]))
+        #expect(kinds["Bluefin"] == .collection, "a sibling sharing the prefix was touched")
+        #expect(kinds["Blue"] == nil && kinds["Blue/left"] == nil, "the kinds were copied, not moved")
+        if case .object(let map)? = Shop.settings(root)["libraryGroups"] {
+            #expect(map["Pose/Blue/left"] == .object(["kind": .string("parts"), "x": .number(1)]),
+                    "an entry moved lost a field beside its kind")
         }
-        // Into a group that already has a kind: that group keeps it.
-        GroupKinds.carry(from: "Blue", to: "Helmet/Blue", in: &root)
-        guard case .object(let after)? = root["settings"] else { return }
-        #expect(GroupKinds.read(after)["Helmet/Blue"] == .parts)
-        #expect(GroupKinds.read(after)["Helmet/Blue/left"] == .parts)
+        // Into a group that already holds other models: that group keeps its kind.
+        _ = Self.move("Pose/Blue", to: "Helmet/Blue", in: &root)
+        #expect(Self.kinds(root)["Helmet/Blue"] == .parts)
+        #expect(Self.kinds(root)["Helmet/Blue/left"] == .parts)
+    }
+
+    // MARK: Review fixes: a move overwrites leftovers, and Undo puts kinds back
+
+    @Test("move a collection under a parent, switch it to parts, move it back: it is parts")
+    func moveBackAfterSwitching() {
+        var root = Self.book(.object(["Kings": .object(["kind": .string("collection")])]),
+                             files: ["Kings", "Saudi"])
+        _ = Self.move("Kings", to: "Saudi/Kings", in: &root)
+        #expect(Self.kinds(root) == ["Saudi/Kings": .collection])
+        GroupKinds.write(["Saudi/Kings": .parts], into: &root)
+        _ = Self.move("Saudi/Kings", to: "Kings", in: &root)
+        #expect(Self.kinds(root)["Kings"] == .parts,
+                "the stale Kings = collection the first move left behind won")
+        #expect(Self.kinds(root)["Saudi/Kings"] == nil)
+    }
+
+    @Test("a folder moved onto a dead group's path does not inherit its kind")
+    func moveOverLeftover() {
+        // "Kings" was a collection whose models are gone; its entry is left.
+        var root = Self.book(.object(["Kings": .object(["kind": .string("collection")])]),
+                             files: ["Old/Kings"])
+        // The folder moving there has no entry of its own: it is parts, the
+        // default — not the dead collection.
+        _ = Self.move("Old/Kings", to: "Kings", in: &root)
+        #expect(Self.kinds(root)["Kings"] == nil)
+        #expect(GroupKinds.kind(of: "Kings", in: Self.kinds(root)) == .parts)
+    }
+
+    @Test("every write of the map prunes entries no model sits under, and leaves the rest as spelled")
+    func prunedOnWrite() {
+        var root = Self.book(.object([
+            "Dead": .object(["kind": .string("collection")]),
+            "Live": .object(["kind": .string("collection"), "cover": .string("c")]),
+            "Parent": .object(["kind": .string("collection")]),
+        ]), files: ["Live", "Parent/child", "Fresh"])
+        GroupKinds.write(["Fresh": .collection], into: &root)
+        guard case .object(let map)? = Shop.settings(root)["libraryGroups"] else {
+            Issue.record("no map"); return
+        }
+        #expect(map["Dead"] == nil, "a dead group's kind was kept for the next group of that name")
+        #expect(map["Live"] == .object(["kind": .string("collection"), "cover": .string("c")]))
+        #expect(map["Parent"] != nil, "a folder holding only folders is a group too")
+        #expect(map["Fresh"] == .object(["kind": .string("collection")]))
+        // A book this cannot read the library of is not pruned.
+        var odd: [String: JSONValue] = ["settings": .object([
+            "libraryGroups": .object(["Dead": .object(["kind": .string("collection")])])])]
+        GroupKinds.write(["New": .parts], into: &odd)
+        #expect(Self.kinds(odd) == ["Dead": .collection, "New": .parts])
+    }
+
+    @Test("a deleted group's name made again from the popover gets the popover's kind")
+    func reusedNameIsNew() {
+        // The deleted "Kings" collection's entry is still in the book.
+        var root = Self.book(.object(["Kings": .object(["kind": .string("collection")])]),
+                             files: ["Other"])
+        let existing = Self.files(root).map { $0.group }
+        let kinds = Shop.kindForFiling(.parts, into: "Kings", existing: existing)
+        #expect(kinds == ["Kings": .parts], "no model sits in Kings: filing makes it")
+        _ = Shop.applyFileEdit(&root, ids: ["f-Other"], alsoRoot: { GroupKinds.write(kinds, into: &$0) }) {
+            $0["group"] = .string("Kings"); $0["folder"] = .string("Kings")
+        }
+        #expect(Self.kinds(root) == ["Kings": .parts])
+    }
+
+    @Test("undoing a move puts the kinds back where they were, and redo moves them again")
+    func undoRestoresKinds() {
+        var root = Self.book(.object([
+            "Kings": .object(["kind": .string("collection"), "cover": .string("k")]),
+            "Kings/Faisal": .object(["kind": .string("parts")]),
+            "Saudi": .object(["kind": .string("collection")]),
+        ]), files: ["Kings", "Kings/Faisal", "Saudi"])
+        let original = root
+        let undo = Self.move("Kings", to: "Saudi/Kings", in: &root)
+        #expect(Self.kinds(root) == ["Saudi/Kings": .collection, "Saudi/Kings/Faisal": .parts,
+                                     "Saudi": .collection])
+        let redo = Shop.applyRestore(&root, undo)
+        #expect(Self.kinds(root) == Self.kinds(original))
+        #expect(Shop.settings(root)["libraryGroups"] == Shop.settings(original)["libraryGroups"],
+                "the undone map is not the map as the book spelled it")
+        #expect(Self.files(root).map { $0.group }.sorted { ($0 ?? "") < ($1 ?? "") }
+                == Self.files(original).map { $0.group }.sorted { ($0 ?? "") < ($1 ?? "") })
+        _ = Shop.applyRestore(&root, redo)
+        #expect(Self.kinds(root) == ["Saudi/Kings": .collection, "Saudi/Kings/Faisal": .parts,
+                                     "Saudi": .collection])
+    }
+
+    @Test("an edit that touches no kind leaves Undo nothing to put back in settings")
+    func plainEditHasNoKindUndo() {
+        var root = Self.book(.object(["Kings": .object(["kind": .string("collection")])]), files: ["Kings"])
+        let undo = Shop.applyFileEdit(&root, ids: ["f-Kings"], alsoRoot: nil) { $0["favorite"] = .bool(true) }
+        #expect(undo.groupEntries.isEmpty)
+        #expect(undo.files.count == 1)
+    }
+
+    // MARK: Review fix: whether a group is NEW is asked of the path the engine wrote
+
+    @Test("a name the engine files under an existing group never re-kinds it",
+          arguments: ["Saudi  Kings", "saudi kings", "  SAUDI\tKINGS  ", "Saudi Kings"])
+    func existingGroupKeepsKind(_ typed: String) async throws {
+        let engine = try KhaytEngine()
+        var root = Self.book(.object(["Saudi Kings": .object(["kind": .string("collection")])]),
+                             files: ["Saudi Kings", "Loose"])
+        let groups = ["Saudi Kings"]
+        let wanted = TypedGroupName.flatten(typed, known: groups)
+        let patch = try await engine.fileUnderGroup(wanted, known: groups)
+        guard case .string(let written)? = patch["group"] else { Issue.record("no group"); return }
+        #expect(written == "Saudi Kings", "the engine did not unify \(typed)")
+        let kinds = Shop.kindForFiling(.parts, into: written, existing: Self.files(root).map { $0.group })
+        #expect(kinds.isEmpty, "\(typed) would re-kind the existing collection")
+        _ = Shop.applyFileEdit(&root, ids: ["f-Loose"], alsoRoot: kinds.isEmpty ? nil : {
+            GroupKinds.write(kinds, into: &$0)
+        }) { record in for (k, v) in patch { record[k] = v } }
+        #expect(Self.kinds(root)["Saudi Kings"] == .collection)
+    }
+
+    @Test("a name past 60 characters that the engine cuts onto an existing group keeps its kind")
+    func longNameCutOntoExisting() async throws {
+        let engine = try KhaytEngine()
+        let sixty = String(repeating: "K", count: 30) + " " + String(repeating: "S", count: 29)
+        #expect(sixty.count == 60)
+        let typed = sixty + "extra words past the cut"
+        let patch = try await engine.fileUnderGroup(typed, known: [sixty])
+        guard case .string(let written)? = patch["group"] else { Issue.record("no group"); return }
+        #expect(written == sixty)
+        let existing: [String?] = [sixty]
+        #expect(Shop.kindForFiling(.parts, into: written, existing: existing).isEmpty)
+    }
+
+    @Test("a genuinely new name gets the popover's kind; nil and removal write none")
+    func newNameGetsKind() async throws {
+        let engine = try KhaytEngine()
+        let patch = try await engine.fileUnderGroup("Falcon  Hoods", known: ["Saudi Kings"])
+        guard case .string(let written)? = patch["group"] else { Issue.record("no group"); return }
+        #expect(Shop.kindForFiling(.collection, into: written, existing: ["Saudi Kings", nil])
+                == [written: .collection])
+        #expect(Shop.kindForFiling(nil, into: written, existing: []).isEmpty)
+        #expect(Shop.kindForFiling(.collection, into: "", existing: []).isEmpty)
+        // A parent folder holding only folders is an existing group too.
+        #expect(Shop.kindForFiling(.parts, into: "Saudi", existing: ["Saudi/Kings"]).isEmpty)
     }
 
     @Test("the folder move and New Group write the kind in the same write as the files")
     func kindWiring() throws {
         let shop = MenuCoverageTests.source("Shop.swift")
-        #expect(shop.contains("alsoRoot: { root in GroupKinds.carry(from: path, to: destination, in: &root) }"))
-        #expect(shop.contains("{ root in GroupKinds.write([written: kind], into: &root) }"))
+        #expect(shop.contains("GroupKinds.carry(from: path, to: destination, moving: ids, in: &root)"))
+        #expect(shop.contains("Self.kindForFiling(kind, into: written, existing: files.map(\\.groupName))"))
+        #expect(shop.contains("GroupKinds.write(kinds, into: &root)"))
         #expect(shop.contains("alsoRoot?(&root)"))
+        #expect(shop.contains("undo = Self.applyFileEdit(&root, ids: ids, alsoRoot: alsoRoot, change: change)"))
+        #expect(shop.contains("redo = Self.applyRestore(&root, snapshot)"))
         #expect(shop.contains("libraryGroupKinds = GroupKinds.read(Self.settings(root))"))
         let menu = try String(contentsOf: GroupFromRightClickTests.source("GroupMenu.swift"), encoding: .utf8)
         #expect(menu.contains("GroupKindChoice(words: words, kind: $kind)"))
-        #expect(menu.contains("fileSelection(under: wanted, kind: isNew ? kind : nil)"))
+        #expect(menu.contains("fileSelection(under: wanted, kind: kind)"))
+        #expect(!menu.contains("isNew"), "the popover decides new-ness on the typed name again")
         let grid = try String(contentsOf: GroupFromRightClickTests.source("LibraryGrid.swift"), encoding: .utf8)
         #expect(grid.contains("GroupKindMenu(shop: shop, path: path)"), "a group tile cannot be switched")
         #expect(grid.contains("shop.setGroupKind(group, kind)"), "the crumb cannot switch the group")

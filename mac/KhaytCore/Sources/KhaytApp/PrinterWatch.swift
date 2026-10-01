@@ -1045,7 +1045,7 @@ final class PrinterWatch {
     /// The shape of it now comes from `Words`; the numerals stay Western.
     @MainActor
     static func spell(_ seconds: Double, _ words: Words) -> String {
-        let total = Int(seconds.rounded())
+        let total = Int(saturating: seconds.rounded())
         let hours = total / 3600
         let minutes = (total % 3600) / 60
         if hours > 0 {
@@ -1097,7 +1097,7 @@ final class PrinterWatch {
         }
     }
 
-    static func degrees(_ value: Double) -> String { "\(Int(value.rounded()))°" }
+    static func degrees(_ value: Double) -> String { "\(Int(saturating: value.rounded()))°" }
 
     /// A failure in the vocabulary of the person who has to fix it.
     static func say(_ error: any Error) -> String {

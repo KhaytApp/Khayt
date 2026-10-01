@@ -53,10 +53,13 @@ struct GroupMenu: View {
                 shop.namingGroup = false
                 let wanted = TypedGroupName.flatten(name, known: shop.groups)
                 guard !wanted.isEmpty else { return }
-                // A name that is already a group keeps the kind it has: the
-                // popover's choice is for the group being MADE.
-                let isNew = !shop.groups.contains { $0.caseInsensitiveCompare(wanted) == .orderedSame }
-                Task { await shop.fileSelection(under: wanted, kind: isNew ? kind : nil) }
+                // The popover's choice is for the group being MADE. Whether
+                // this makes one is not decided here: the engine may file a
+                // name that matches no group as typed ("Saudi  Kings", a name
+                // past 60 characters) under one that exists, and that group
+                // keeps its kind. `Shop.kindForFiling` asks of the path the
+                // engine wrote.
+                Task { await shop.fileSelection(under: wanted, kind: kind) }
             }
         }
     }
