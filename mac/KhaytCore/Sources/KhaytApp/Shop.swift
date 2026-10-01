@@ -290,6 +290,10 @@ final class Shop {
 
     var selection: Order.ID?
     var fileSelection: Set<LibraryFile.ID> = []
+    /// Set by the model's right-click "New Group…": a context menu cannot
+    /// hold a text field, so it asks the toolbar's Group menu to open its
+    /// naming popover over the same selection.
+    var namingGroup = false
     /// The model the shop has asked to delete, until it confirms or backs out.
     /// A question in the window's `WindowSheets`, so both shells can ask it.
     var pendingLibraryDelete: LibraryFile?

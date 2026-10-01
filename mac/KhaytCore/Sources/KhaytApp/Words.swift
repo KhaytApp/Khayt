@@ -1590,8 +1590,8 @@ final class Words {
         "mac.together":      ["en": "Together",        "ar": "مجتمعة"],
         "mac.on_disk":       ["en": "On disk",         "ar": "على القرص"],
         "mac.not_on_this_mac": ["en": "Not on this Mac", "ar": "ليست على هذا الماك"],
-        "mac.group_hint":    ["en": "Use the Group button in the toolbar to file them together.",
-                              "ar": "استخدم زر التجميع في شريط الأدوات لحفظها معًا."],
+        "mac.group_hint":    ["en": "Select them, then choose Group above the library or right-click them.",
+                              "ar": "حدّدها ثم اختر «تجميع» أعلى المكتبة أو انقر عليها بزر الفأرة الأيمن."],
         // The library and the jobs table.
         "mac.is_favourite":  ["en": "Marked a favourite", "ar": "معلَّم كمفضّل"],
         "mac.make_favourite": ["en": "Mark a favourite", "ar": "علّمه كمفضّل"],

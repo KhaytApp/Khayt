@@ -160,6 +160,26 @@ struct ModelActions: View {
         Button(shop.words.callIt(allOn ? "mac.print_next_remove" : "mac.print_next_add")) {
             shop.setPrintNext(marked, on: !allOn)
         }
+        // Into a group: the same choices as the toolbar's Group menu, here
+        // because right-clicking the models is where a shop looks for it. A
+        // model right-clicked outside the selection becomes the selection
+        // first, so the item acts on what was clicked.
+        Menu(shop.words.callIt(shop.fileSelection.contains(file.id) && shop.fileSelection.count > 1
+                               ? "mac.group_n_models" : "mac.group",
+                               ["n": .number(Double(shop.fileSelection.count))])) {
+            ForEach(shop.groups, id: \.self) { group in
+                Button(group) { fileUnder(group) }
+            }
+            if !shop.groups.isEmpty { Divider() }
+            Button(shop.words.callIt("mac.new_group")) {
+                adoptSelection()
+                shop.namingGroup = true
+            }
+            if (shop.fileSelection.contains(file.id) ? shop.selectedFiles : [file]).contains(where: { $0.groupName != nil }) {
+                Button(shop.words.callIt("mac.remove_from_group")) { fileUnder("") }
+            }
+        }
+        .disabled(!shop.canWrite)
         // To the catalogue: this model — or, when it is one of several
         // selected, all of them, as one product or one each.
         let chosen = shop.fileSelection.contains(file.id) ? shop.selectedFiles : []
@@ -198,5 +218,17 @@ struct ModelActions: View {
                 shop.pendingLibraryDelete = file
             }
         }
+    }
+}
+
+extension ModelActions {
+    /// Right-clicking a model outside the selection acts on that model alone.
+    @MainActor fileprivate func adoptSelection() {
+        if !shop.fileSelection.contains(file.id) { shop.select(file, modifiers: .replace) }
+    }
+
+    @MainActor fileprivate func fileUnder(_ group: String) {
+        adoptSelection()
+        Task { await shop.fileSelection(under: group) }
     }
 }
