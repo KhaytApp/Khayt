@@ -188,6 +188,7 @@ import KhaytCore
         for key in ["trackingToken", "quoteApprovalToken", "surveyToken"] {
             #expect(!bytes.contains("\"\(key)\""), "book.json still has \(key)")
         }
+        // Device-private since #1678, so the cloud mask takes it.
         #expect(Self.values(back, path: "settings.eventWebhooks.url") == [Self.mask])
         #expect(Self.values(back, path: "settings.cloud.keyset").isEmpty)
         guard case .array(let tokens)? = Self.values(back, path: "settings.lanApi.apiTokens").first,

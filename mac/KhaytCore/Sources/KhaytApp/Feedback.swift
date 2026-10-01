@@ -233,9 +233,6 @@ enum Feedback {
     ///                              accepted with (LanServer); deleted, not
     ///                              masked, for the reason `redactOrdersForExport`
     ///                              gives — a mask would be adopted as a token
-    ///   settings.eventWebhooks.url a webhook URL carries its secret in the
-    ///                              path (Slack, Discord, Zapier), and only
-    ///                              `webhooks.*` URLs are device-private today
     ///   settings.cloud.keyset      the shop's wrapped data key: sealed with the
     ///                              passphrase, so offline-crackable, and a
     ///                              report has no use for it
@@ -249,11 +246,6 @@ enum Feedback {
             })
         }
         if case .object(var settings)? = out["settings"] {
-            if case .object(var hooks)? = settings["eventWebhooks"], case .string(let url)? = hooks["url"],
-               !url.isEmpty {
-                hooks["url"] = .string(secretMask)
-                settings["eventWebhooks"] = .object(hooks)
-            }
             if case .object(var cloud)? = settings["cloud"], cloud["keyset"] != nil {
                 cloud.removeValue(forKey: "keyset")
                 settings["cloud"] = .object(cloud)
@@ -262,9 +254,6 @@ enum Feedback {
         }
         return out
     }
-
-    /// `lib/store.js`'s `SECRET_MASK`.
-    static let secretMask = "__KHAYT_MASKED__"
 
     /// The book as it is on disk, secrets still sealed — or the sample.
     @MainActor static func storedBook(_ shop: Shop) throws -> [String: JSONValue] {

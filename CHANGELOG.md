@@ -9,8 +9,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   which keeps each job's customer-portal link, quote-approval link and survey
   link — so a report could hand a stranger the means to post as a customer or
   approve a quote. It now also goes through the export redaction (those links
-  removed, LAN API token hashes masked), and the event webhook URL and the
-  cloud's wrapped key are taken out. A failed rule is now reported by its
+  removed, LAN API token hashes masked), and the cloud's wrapped key and each
+  job's survey link are taken out. A failed rule is now reported by its
   error kind only, never the message, which could carry a customer's name.
   Report folders left in the temporary directory are removed after a day. The
   window picture says that it shows customer names and prices.
