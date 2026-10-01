@@ -5039,6 +5039,7 @@ function loadSettingsIntoForm() {
   renderContentFields();
   $('#set_vat').value       = settings.vat       || '';
   $('#set_cr').value        = settings.cr        || '';
+  if ($('#set_elecRate')) $('#set_elecRate').value = settings.elecRate != null ? settings.elecRate : '';
   $('#set_phone').value     = settings.phone     || '';
   $('#set_email').value     = settings.email     || '';
   $('#set_lang').value      = settings.lang      || 'en';
@@ -5437,7 +5438,7 @@ function readSettingsForm() {
     monthlyGoal: opt('#set_monthlyGoal'), supplierPhone: opt('#set_supplierPhone'),
     currency: opt('#set_currency'), enableZatca: tick('#set_enableZatca'),
     taxMode: opt('#set_taxMode'), taxCountry: opt('#set_taxCountry'),
-    minMarginPct: opt('#set_minMarginPct'),
+    minMarginPct: opt('#set_minMarginPct'), elecRate: opt('#set_elecRate'),
     budgets: Object.fromEntries(EXP_CATEGORIES.map(c => [c, opt(`#set_budget_${c}`)])),
     workingHours: Object.fromEntries(['mon','tue','wed','thu','fri','sat','sun'].map(d => [d, opt(`#wh_${d}`)])),
     operatorLock: tick('#set_operatorLock'), loyaltyEnabled: tick('#set_loyaltyEnabled'),
@@ -5470,11 +5471,14 @@ function saveSettingsFromForm() {
   // only this window could change a setting. The legacy webhook secrets are
   // moved under lanApi FIRST, because the rule preserves lanApi as it finds it.
   migrateLanApiSettings();
+  const elecBefore = typeof shopRateDefaults === 'function' ? shopRateDefaults().elecRate : null;
   settings = KhaytSettingsEdit.apply(settings, readSettingsForm(), {
     year: new Date().getFullYear(),
     themeLowStockColor: themeLowStockColor(),
     expenseCategories: EXP_CATEGORIES,
   });
+  // A calculator still showing the old shop price follows the new one.
+  if (typeof seedCalcElecRate === 'function') seedCalcElecRate(elecBefore);
   saveAll();
   syncUpdaterOptionsFromSettings();
   i18n.set(settings.lang);

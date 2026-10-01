@@ -77,8 +77,35 @@ function electricityRateForCountry(countryCode) {
   return { rate: tar.rate, currency: tar.currency, converted: false, noConvert: true };
 }
 
-/** Calculator "📍 Auto": ask the user for their country, then fill #elecRate. */
-function openElecRatePicker() {
+/** The shop's default rates: Khayt's, with the shop's own electricity price
+ *  (settings.elecRate) applied. lib/print-rates.js, the rule the Mac uses. */
+function shopRateDefaults() {
+  const s = (typeof settings !== 'undefined' && settings) || {};
+  return (typeof KhaytPrintRates !== 'undefined')
+    ? KhaytPrintRates.defaultsFor(s)
+    : { wearRate: 0.75, powerDraw: 150, elecRate: 0.18, prepTime: 0.25, postTime: 0.5, laborRate: 90, failureRate: 10 };
+}
+
+/**
+ * Put the shop's electricity price in the calculator, unless someone has typed
+ * their own there. `prevDefault` is what the field would have held before (the
+ * old shop price, or Khayt's 0.18 on first load): a field still showing it, or
+ * empty, follows the shop's price; anything else was typed and is kept.
+ */
+function seedCalcElecRate(prevDefault) {
+  const input = typeof document !== 'undefined' && document.getElementById('elecRate');
+  if (!input) return;
+  const prev = prevDefault != null ? prevDefault : 0.18;
+  const cur = String(input.value).trim();
+  if (cur !== '' && Number(cur) !== Number(prev)) return;
+  input.value = shopRateDefaults().elecRate;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/** "📍 Auto": ask the user for their country, then fill an electricity field —
+ *  the calculator's (#elecRate) unless another is named (Settings uses it). */
+function openElecRatePicker(target) {
+  const fieldSel = typeof target === 'string' ? target : '#elecRate';
   const base = (typeof settings !== 'undefined' && settings.currency) || 'SAR';
   const defCountry = CURRENCY_DEFAULT_COUNTRY[base] || 'SA';
   const opts = Object.entries(ELEC_TARIFFS)
@@ -117,7 +144,7 @@ function openElecRatePicker() {
       const sel = $('#elecCountrySel');
       const r = sel && electricityRateForCountry(sel.value);
       if (!r) return true;
-      const input = $('#elecRate');
+      const input = $(fieldSel);
       if (input) {
         input.value = r.rate;
         input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -133,7 +160,8 @@ function openElecRatePicker() {
 
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('btnElecAuto')?.addEventListener('click', openElecRatePicker);
+    document.getElementById('btnElecAuto')?.addEventListener('click', () => openElecRatePicker('#elecRate'));
+    document.getElementById('btnSetElecAuto')?.addEventListener('click', () => openElecRatePicker('#set_elecRate'));
   }, { once: true });
 }
 
@@ -1037,7 +1065,7 @@ function saveCurrentAsPreset() {
         name,
         wearRate:    num($('#wearRate').value,    0.75),
         powerDraw:   num($('#powerDraw').value,   150),
-        elecRate:    num($('#elecRate').value,     0.18),
+        elecRate:    num($('#elecRate').value,     shopRateDefaults().elecRate),
         laborRate:   num($('#laborRate').value,    90),
         failureRate: num($('#failureRate').value,  10),
         prepTime:    num($('#prepTime').value,     0.25),
@@ -1504,7 +1532,7 @@ function updateResinFieldsVisibility() {
           };
           const client = KhaytAiQuote.createAiQuoteClient({ transport, model: settings.ai.model });
           const draft = await client.extract(desc, { materials: inventory });
-          const { part, assumptions } = KhaytAiQuote.draftToPart(draft, { inventory, defaults: {} });
+          const { part, assumptions } = KhaytAiQuote.draftToPart(draft, { inventory, defaults: shopRateDefaults() });
           // No /60 any more: `draftToPart` returns HOURS, like every other
           // part in the app. It used to hand back the model's minutes in a
           // field named `printTime`, and this line was the only thing standing
@@ -1587,6 +1615,8 @@ function updateResinFieldsVisibility() {
   }
 
   const api = {
+    shopRateDefaults,
+    seedCalcElecRate,
     saveBuildDraft,
     aiQuoteAssist,
     aiSuggestPrice,

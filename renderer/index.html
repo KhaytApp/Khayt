@@ -1553,6 +1553,16 @@
           </div>
         </div>
 
+        <div class="card settings-card">
+          <div class="settings-section-head" data-i18n="set.running_costs">Running costs</div>
+          <label for="set_elecRate" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+            <span><span data-i18n="set.elec_rate">Electricity price</span> (<span data-i18n="common.currency">SAR</span> <span data-i18n="calc.machine.per_kwh">/ kWh</span>)</span>
+            <button type="button" id="btnSetElecAuto" class="btn small ghost" style="font-size:11px;padding:2px 7px;">📍 <span data-i18n="calc.elec_auto">Auto</span></button>
+          </label>
+          <input type="number" id="set_elecRate" min="0" step="0.001" placeholder="0.18">
+          <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.elec_rate_hint">What a kWh costs your shop. Quotes, failed prints and power reports use it unless a printer preset sets its own. Leave it empty for Khayt's default.</p>
+        </div>
+
         <div class="settings-save-row">
           <button class="btn primary" id="btnSaveSettings" data-i18n="common.save">Save</button>
         </div>
@@ -2784,6 +2794,8 @@
 <script src="../lib/webcam.js"></script>
 <script src="../lib/csv-bundle.js"></script>
 <script src="../lib/depreciation.js"></script>
+<!-- The shop's default rates, its own electricity price applied (settings.elecRate). -->
+<script src="../lib/print-rates.js"></script>
 <script src="../lib/pnl-report.js"></script>
 <script src="../lib/machine-pl.js"></script>
 <script src="../lib/receivables.js"></script>

@@ -3712,7 +3712,7 @@ function openProductEditor(productId = null) {
           printTime: 0,
           wearRate:    num($('#wearRate').value, 0.75),
           powerDraw:   num($('#powerDraw').value, 150),
-          elecRate:    num($('#elecRate').value, 0.18),
+          elecRate:    num($('#elecRate').value, (typeof shopRateDefaults === 'function' ? shopRateDefaults() : { elecRate: 0.18 }).elecRate),
           prepTime: 0.1,
           postTime: 0.2,
           laborRate:   num($('#laborRate').value, 90),

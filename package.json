@@ -101,7 +101,8 @@
     "capture:store-screenshots": "node scripts/capture-store-screenshots.mjs",
     "test:e2e:cloudstorage": "node scripts/e2e-cloud-storage-smoke.mjs",
     "test:e2e:cloudsignup": "node scripts/e2e-cloud-signup-smoke.mjs",
-    "test:e2e:productimages": "node scripts/e2e-product-images-smoke.mjs"
+    "test:e2e:productimages": "node scripts/e2e-product-images-smoke.mjs",
+    "test:e2e:elecrate": "node scripts/e2e-shop-elec-rate-smoke.mjs"
   },
   "dependencies": {
     "@sentry/electron": "^7.16.0",
