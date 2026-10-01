@@ -247,6 +247,23 @@ test('a price change is remembered, and an unchanged price is not', () => {
   assert.equal(spool.cost, 95);
 });
 
+test('a price stored as text is the same price, and its real change is remembered', () => {
+  // Another writer left `cost: "85"`. Re-saving 85 is not a price change, and
+  // a change to 90 records the old price once — the phantom entry made the
+  // Mac's untouched-save baseline carry the same history as the real edit,
+  // so the real entry was dropped.
+  const same = { material: 'PLA', cost: '85' };
+  applyEdit(same, { cost: 85 }, { today: '2026-09-05' });
+  assert.equal(same.priceHistory, undefined, 'the same price, spelled differently, is not a change');
+  const changed = { material: 'PLA', cost: '85' };
+  applyEdit(changed, { cost: 90 }, { today: '2026-09-05' });
+  assert.deepEqual(changed.priceHistory, [{ cost: '85', date: '2026-09-05' }]);
+  // A spool that never had a price gains one: that is a change, as it was.
+  const unpriced = { material: 'PLA' };
+  applyEdit(unpriced, { cost: 40 }, { today: '2026-09-05' });
+  assert.equal(unpriced.priceHistory.length, 1);
+});
+
 test('a colour variant is added to the shop\'s library once, under the material it was typed for', () => {
   const settings = {};
   const spool = { material: 'PLA' };

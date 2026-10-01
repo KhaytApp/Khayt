@@ -180,6 +180,60 @@ struct ShopSetupTests {
         #expect((presets.first?.rates["failureRate"] ?? 0) > 0)
     }
 
+    @Test("re-running the setup changes only the tariff on a preset the shop customised")
+    func setupKeepsCustomisedPreset() async throws {
+        let engine = try KhaytEngine()
+        let was: [String: JSONValue] = [
+            "id": .string("PRNTR-OWN"), "name": .string("Shop rates"),
+            "wearRate": .string("0.5"), "powerDraw": .number(200), "elecRate": .number(0.1),
+            "laborRate": .number(120), "failureRate": .number(25), "prepTime": .number(0.3),
+            "postTime": .number(0.2), "slicerProfile": .string("fine"),
+        ]
+        var root: [String: JSONValue] = ["printers": .array([.object(was)])]
+        var setup = ShopSetup()
+        setup.electricity = 0.3
+        try await ShopSetup.apply(setup, to: &root, engine: engine, presetName: "Shop rates")
+        let rows = Shop.rows(root, "printers")
+        #expect(rows.count == 1)
+        guard case .object(let now)? = rows.first else { return }
+        #expect(now["elecRate"] == .number(0.3))
+        var others = now
+        others.removeValue(forKey: "elecRate")
+        others.removeValue(forKey: Shop.setupPresetMarker)
+        var before = was
+        before.removeValue(forKey: "elecRate")
+        #expect(others == before, "the shop's own rates were reset to Khayt's openers")
+    }
+
+    @Test("the setup run in English then Arabic keeps one preset")
+    func setupPresetAcrossLanguages() async throws {
+        let engine = try KhaytEngine()
+        let names = Words.own["mac.setup_preset_name"] ?? [:]
+        let en = try #require(names["en"]), ar = try #require(names["ar"])
+        #expect(ShopSetup.presetNames.contains(en) && ShopSetup.presetNames.contains(ar))
+
+        var root: [String: JSONValue] = [:]
+        var setup = ShopSetup()
+        setup.electricity = 0.25
+        try await ShopSetup.apply(setup, to: &root, engine: engine, presetName: en)
+        setup.electricity = 0.3
+        try await ShopSetup.apply(setup, to: &root, engine: engine, presetName: ar)
+        var presets = Shop.rows(root, "printers").compactMap(Shop.Preset.from)
+        #expect(presets.count == 1, "two presets: \(presets.map(\.name))")
+        #expect(presets.first?.name == en, "the preset was renamed")
+        #expect(presets.first?.rates["elecRate"] == 0.3)
+
+        // A preset made before the marker existed is found by its Arabic name.
+        var legacy: [String: JSONValue] = [
+            "printers": .array([.object(["id": .string("PRNTR-AR"), "name": .string(ar),
+                                         "elecRate": .number(0.1), "laborRate": .number(70)])])]
+        try await ShopSetup.apply(setup, to: &legacy, engine: engine, presetName: en)
+        presets = Shop.rows(legacy, "printers").compactMap(Shop.Preset.from)
+        #expect(presets.map(\.id) == ["PRNTR-AR"])
+        #expect(presets.first?.rates["laborRate"] == 70)
+        #expect(presets.first?.rates["elecRate"] == 0.3)
+    }
+
     @Test("the filament becomes the first spool, through the spool rule")
     func filamentSpool() async throws {
         let engine = try KhaytEngine()

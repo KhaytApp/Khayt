@@ -143,13 +143,6 @@ struct ShopSetup: Equatable {
         ]
     }
 
-    /// The preset's seven figures: Khayt's openers, with the shop's tariff.
-    func presetRates(openers: [String: Double]) -> [String: Double]? {
-        guard writesElectricity, let tariff = electricity else { return nil }
-        var rates = openers
-        rates["elecRate"] = tariff
-        return rates
-    }
 
     /// Would Finish write anything at all?
     func writesAnything(currentCurrency: String, currentlyChargesVat: Bool,
@@ -184,14 +177,21 @@ struct ShopSetup: Equatable {
                                         catalogId: setup.printer?.catalogId, opened: nil,
                                         engine: engine, newId: machineId)
         }
-        if let openers = try? await engine.printRates(),
-           let preset = setup.presetRates(openers: openers) {
-            Shop.writePreset(into: &root, name: presetName, rates: preset)
+        if setup.writesElectricity, let tariff = setup.electricity {
+            Shop.writeSetupPreset(into: &root, name: presetName, aliases: Self.presetNames,
+                                  tariff: tariff, openers: try? await engine.printRates())
         }
         if let input = setup.spoolInput {
             _ = try await Shop.writeNewSpool(into: &root, input: input, engine: engine,
                                              newId: spoolId, today: today)
         }
+    }
+
+    /// Every name the setup's preset has gone by, in every language this app
+    /// speaks. The name is localised, so a shop that ran the setup in English
+    /// and again in Arabic must still find the ONE preset it made.
+    static var presetNames: [String] {
+        Words.own["mac.setup_preset_name"].map { Array($0.values) } ?? []
     }
 
     /// The three settings step 1 compares against, as the book holds them.

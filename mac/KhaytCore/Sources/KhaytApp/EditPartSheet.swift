@@ -136,9 +136,13 @@ struct EditPartSheet: View {
         }
         // Re-costed as the figures change, so the price on the button is the
         // price that will be written rather than the one it had on open.
-        .task(id: "\(grams)|\(hours)|\(qty)|\(spoolId ?? "")") {
-            preview = await shop.costedPart(spoolId: spoolId, grams: Double(grams) ?? 0,
-                                            hours: Double(hours) ?? 0, qty: qty)
+        .task(id: "\(grams)|\(hours)|\(qty)|\(spoolId ?? "")|\(opened != nil)") {
+            // Through the save's own costing — the part's own rates and the
+            // same spool — or the preview priced a part with its own labour
+            // rate at the machine's, and Save wrote a different figure.
+            let now = Opened(name: name, grams: grams, hours: hours, qty: qty, spoolId: spoolId)
+            preview = await shop.partEditCost(raw: shop.rawPart(orderId, partId: part.id),
+                                              now, opened: opened).costed
         }
     }
 
