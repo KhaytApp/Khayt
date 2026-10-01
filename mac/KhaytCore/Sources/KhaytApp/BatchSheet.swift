@@ -167,7 +167,7 @@ struct BatchSheet: View {
     private func weight(_ grams: Double) -> String {
         // Whole grams. A plate is planned to the gram at best, and 0.1 g of
         // float residue is not a measurement.
-        String(Int(grams.rounded())) + " " + shop.words.callIt("common.grams")
+        String(Int(saturating: grams.rounded())) + " " + shop.words.callIt("common.grams")
     }
 
     private func hours(_ value: Double) -> String {

@@ -1347,7 +1347,7 @@ struct SpoolCard: View {
                 // in the colour that means "no hurry". A reader cannot see the
                 // .2, and a figure that argues with its own colour is worse
                 // than either alone.
-                let shown = Int(days.rounded())
+                let shown = Int(saturating: days.rounded())
                 Text(shown < 1
                      ? shop.words.callIt("mac.empty_now")
                      : shop.words.callIt("mac.empty_in") + " "

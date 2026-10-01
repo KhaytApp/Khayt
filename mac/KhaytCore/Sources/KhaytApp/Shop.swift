@@ -1503,9 +1503,11 @@ final class Shop {
     /// one at a time is seven read-modify-writes, seven `.prev` generations, and
     /// six windows in which a crash leaves the collection half made.
     ///
-    /// `kind` is what a NEW group is (the naming popover asks); nil leaves the
-    /// group's kind as it is. It is written in the same store write as the
-    /// files, so a group never exists for a moment with the wrong kind.
+    /// `kind` is what the group is IF this filing makes it (the naming popover
+    /// asks); a group that already exists keeps the kind it has, and nil never
+    /// writes one. Written in the same store write as the files, so a group
+    /// never exists for a moment with the wrong kind. Whether the group is new
+    /// is decided HERE, on the path the engine resolved — see `kindForFiling`.
     func fileSelection(under name: String, kind: GroupKind? = nil) async {
         clearLastOutcome()
         let ids = selectedIds
@@ -1524,8 +1526,9 @@ final class Shop {
         // when `unify` adopted one — and so the path the kind belongs to.
         var written = name
         if case .string(let g)? = patch["group"], !g.isEmpty { written = g }
-        let wrote = editFiles(ids, named: named, alsoRoot: kind.map { kind in
-            { root in GroupKinds.write([written: kind], into: &root) }
+        let kinds = Self.kindForFiling(kind, into: written, existing: files.map(\.groupName))
+        let wrote = editFiles(ids, named: named, alsoRoot: kinds.isEmpty ? nil : { root in
+            GroupKinds.write(kinds, into: &root)
         }) { record in
             for (key, value) in patch { record[key] = value }
         }
@@ -1541,6 +1544,27 @@ final class Shop {
                 "models": .string(words.counting(ids.count, "mac.n_models")),
                 "name": .string(Self.groupLeaf(written))]),
             path: written)
+    }
+
+    /// The kind filing writes: `kind` for `written`, only when no model sits
+    /// at or beneath that path yet.
+    ///
+    /// ── WHY ON THE RESOLVED PATH, NOT THE TYPED NAME ──────────────────────
+    ///
+    /// The popover used to decide "new" by comparing the name as typed (only
+    /// trimmed) with the shop's groups. The engine's `unify` does more: it
+    /// collapses runs of spaces and cuts at 60 characters (`lib/organise.js`
+    /// `normalise`). "Saudi  Kings", with two spaces, matched no group in the
+    /// popover, so it was "new" and carried the popover's default — parts —
+    /// while the engine filed it under the existing "Saudi Kings", and the
+    /// shop's collection silently became parts. `written` is the path the
+    /// engine actually wrote, so the question is asked of the group the
+    /// models really landed in.
+    nonisolated static func kindForFiling(_ kind: GroupKind?, into written: String,
+                                          existing: [String?]) -> [String: GroupKind] {
+        guard let kind, !written.isEmpty,
+              !existing.contains(where: { isUnder($0, written) }) else { return [:] }
+        return [written: kind]
     }
 
     /// What filing models into a group had to say, and the group to show.
@@ -1640,52 +1664,122 @@ final class Shop {
 
         // Each file keeps its own depth BELOW the folder being moved, so a
         // three-level project arrives as a three-level project.
-        var wanted: [LibraryFile.ID: String] = [:]
-        for file in moving {
-            let rest = (file.groupName ?? "").dropFirst(path.count)
-            wanted[file.id] = destination + rest
-        }
+        let wanted = Self.folderMoveTargets(path, to: destination,
+                                            files: moving.map { ($0.id, $0.groupName) })
         // The folder's kind, and every kind beneath it, go with it — or a
         // collection moved under a new parent would read as parts there.
-        editFiles(Set(moving.map(\.id)),
+        let ids = Set(wanted.keys)
+        editFiles(ids,
                   named: words.callIt("mac.file_in", ["name": .string(destination)]),
-                  alsoRoot: { root in GroupKinds.carry(from: path, to: destination, in: &root) }) { record in
-            guard case .string(let id)? = record["id"], let to = wanted[id] else { return }
-            // BOTH fields, as `KhaytOrganise.assign` writes them — the older
-            // build's dialog writes only `folder`, and sync merges whole
-            // records last-writer-wins.
-            record["group"] = .string(to)
-            record["folder"] = .string(to)
+                  alsoRoot: { root in GroupKinds.carry(from: path, to: destination, moving: ids, in: &root) }) { record in
+            Self.moveRecord(&record, wanted: wanted)
         }
     }
 
+    /// Where each file under `path` lands when that folder moves to
+    /// `destination`, by id: its own depth below the folder kept.
+    nonisolated static func folderMoveTargets(_ path: String, to destination: String,
+                                              files: [(id: String, group: String?)]) -> [String: String] {
+        var wanted: [String: String] = [:]
+        for file in files where isUnder(file.group, path) {
+            wanted[file.id] = destination + (file.group ?? "").dropFirst(path.count)
+        }
+        return wanted
+    }
+
+    /// One file's record, moved to where `folderMoveTargets` put it.
+    nonisolated static func moveRecord(_ record: inout [String: JSONValue], wanted: [String: String]) {
+        guard case .string(let id)? = record["id"], let to = wanted[id] else { return }
+        // BOTH fields, as `KhaytOrganise.assign` writes them — the older
+        // build's dialog writes only `folder`, and sync merges whole
+        // records last-writer-wins.
+        record["group"] = .string(to)
+        record["folder"] = .string(to)
+    }
+
+    /// What an edit to the library changed, to put back on Undo: each file
+    /// record whole, and each group-kind entry (`settings.libraryGroups`) it
+    /// touched — nil for an entry that was not there.
+    ///
+    /// The kinds are part of it because a folder move MOVES them
+    /// (`GroupKinds.carry`): without them an undone move would put the files
+    /// back under paths whose kinds had gone.
+    struct LibraryUndo {
+        var files: [String: [String: JSONValue]] = [:]
+        var groupEntries: [String: JSONValue?] = [:]
+        var isEmpty: Bool { files.isEmpty && groupEntries.isEmpty }
+    }
+
+    /// The entries of the kind map that differ between two readings, as the
+    /// FIRST had them.
+    nonisolated static func groupEntriesChanged(from old: [String: JSONValue],
+                                                to new: [String: JSONValue]) -> [String: JSONValue?] {
+        var out: [String: JSONValue?] = [:]
+        for key in Set(old.keys).union(new.keys) where old[key] != new[key] {
+            out[key] = .some(old[key])
+        }
+        return out
+    }
+
+    /// The store write `editFiles` makes, on a book in memory: change those
+    /// records, then `alsoRoot`. Returns what Undo needs.
+    static func applyFileEdit(_ root: inout [String: JSONValue], ids: Set<String>,
+                              alsoRoot: ((inout [String: JSONValue]) -> Void)?,
+                              change: (inout [String: JSONValue]) -> Void) -> LibraryUndo {
+        var undo = LibraryUndo()
+        guard case .array(var rows)? = root["printFiles"] else { return undo }
+        let kindsBefore = GroupKinds.entries(root)
+        for i in rows.indices {
+            guard case .object(var record) = rows[i],
+                  case .string(let id)? = record["id"], ids.contains(id) else { continue }
+            undo.files[id] = record
+            change(&record)
+            StoreWriter.stamp(&record)
+            rows[i] = .object(record)
+        }
+        root["printFiles"] = .array(rows)
+        alsoRoot?(&root)
+        undo.groupEntries = groupEntriesChanged(from: kindsBefore, to: GroupKinds.entries(root))
+        return undo
+    }
+
+    /// The store write an Undo makes, on a book in memory: the records and
+    /// the kind entries put back. Returns what Redo needs.
+    static func applyRestore(_ root: inout [String: JSONValue], _ snapshot: LibraryUndo) -> LibraryUndo {
+        var redo = LibraryUndo()
+        guard case .array(var rows)? = root["printFiles"] else { return redo }
+        let kindsBefore = GroupKinds.entries(root)
+        for i in rows.indices {
+            guard case .object(let current) = rows[i],
+                  case .string(let id)? = current["id"],
+                  let wanted = snapshot.files[id] else { continue }
+            redo.files[id] = current
+            rows[i] = .object(StoreWriter.restoring(wanted, over: current))
+        }
+        root["printFiles"] = .array(rows)
+        GroupKinds.restore(snapshot.groupEntries, into: &root)
+        redo.groupEntries = groupEntriesChanged(from: kindsBefore, to: GroupKinds.entries(root))
+        return redo
+    }
+
     /// True when the change was written.
-    @discardableResult
     ///
     /// `alsoRoot` is a change to the rest of the book made in the SAME write —
     /// a group's kind, which lives in settings and must not land a write apart
-    /// from the files it describes.
+    /// from the files it describes. What it changes in the kind map is undone
+    /// with the files (`LibraryUndo`).
+    @discardableResult
     private func editFiles(_ ids: Set<LibraryFile.ID>, named actionName: String,
                            alsoRoot: ((inout [String: JSONValue]) -> Void)? = nil,
                            change: @escaping (inout [String: JSONValue]) -> Void) -> Bool {
         guard let build = source.build, !ids.isEmpty else { return false }
-        var before: [String: [String: JSONValue]] = [:]
+        var undo = LibraryUndo()
         do {
             try StoreWriter.update(build) { root in
-                guard case .array(var rows)? = root["printFiles"] else { return }
-                for i in rows.indices {
-                    guard case .object(var record) = rows[i],
-                          case .string(let id)? = record["id"], ids.contains(id) else { continue }
-                    before[id] = record
-                    change(&record)
-                    StoreWriter.stamp(&record)
-                    rows[i] = .object(record)
-                }
-                root["printFiles"] = .array(rows)
-                alsoRoot?(&root)
+                undo = Self.applyFileEdit(&root, ids: ids, alsoRoot: alsoRoot, change: change)
             }
             writeProblem = nil
-            registerUndo(of: before, named: actionName)
+            registerUndo(of: undo, named: actionName)
             Task { await load(source) }
             return true
         } catch {
@@ -1695,7 +1789,7 @@ final class Shop {
     }
 
     /// Put those records back exactly as they were, and make THAT undoable too.
-    private func registerUndo(of before: [String: [String: JSONValue]], named actionName: String) {
+    private func registerUndo(of before: LibraryUndo, named actionName: String) {
         guard let undoManager, !before.isEmpty else { return }
         undoManager.setActionName(actionName)
         undoManager.registerUndo(withTarget: self) { shop in
@@ -1703,23 +1797,15 @@ final class Shop {
         }
     }
 
-    private func restore(_ snapshot: [String: [String: JSONValue]], named actionName: String) {
+    private func restore(_ snapshot: LibraryUndo, named actionName: String) {
         guard let build = source.build else { return }
-        var before: [String: [String: JSONValue]] = [:]
+        var redo = LibraryUndo()
         do {
             try StoreWriter.update(build) { root in
-                guard case .array(var rows)? = root["printFiles"] else { return }
-                for i in rows.indices {
-                    guard case .object(let current) = rows[i],
-                          case .string(let id)? = current["id"],
-                          let wanted = snapshot[id] else { continue }
-                    before[id] = current
-                    rows[i] = .object(StoreWriter.restoring(wanted, over: current))
-                }
-                root["printFiles"] = .array(rows)
+                redo = Self.applyRestore(&root, snapshot)
             }
             writeProblem = nil
-            registerUndo(of: before, named: actionName)
+            registerUndo(of: redo, named: actionName)
             Task { await load(source) }
         } catch {
             // An undo that cannot be applied — the book changed hands while the
@@ -8922,8 +9008,8 @@ final class Shop {
             var line = words.callIt("mac.history_read") + " \(kept)"
             if added > 0 { line += " (+\(added))" }
             if let totals {
-                line += " · \(Int(totals.grams)) \(words.callIt("common.grams"))"
-                line += " · \(Int(totals.hours)) \(words.callIt("common.hours"))"
+                line += " · \(Int(saturating: totals.grams)) \(words.callIt("common.grams"))"
+                line += " · \(Int(saturating: totals.hours)) \(words.callIt("common.hours"))"
             }
             spendNote = line
         } catch {
@@ -15623,7 +15709,7 @@ final class Shop {
     var bandSignature: String {
         printers.readings.keys.sorted().map { id in
             guard let s = printers.readings[id]?.status, PrinterWatch.isPrinting(s.state) else { return "\(id):-" }
-            return "\(id):\(s.progress):\(s.timeRemaining.map { String(Int($0 / 60)) } ?? "-")"
+            return "\(id):\(s.progress):\(s.timeRemaining.map { String(Int(saturating: $0 / 60)) } ?? "-")"
         }.joined(separator: "|")
     }
 

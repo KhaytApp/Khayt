@@ -129,7 +129,7 @@ struct Supplier: Identifiable, Hashable, Sendable {
         // A lead time of zero is the shop saying nothing, which is how the
         // other app writes it: `leadDays: num(...) || null`.
         let lead = Shop.plainNumber(o["leadDays"]) ?? 0
-        self.leadDays = lead > 0 ? Int(lead.rounded()) : nil
+        self.leadDays = lead > 0 ? Int(saturating: lead.rounded()) : nil
         self.website = Shop.plainString(o["website"]) ?? ""
         self.notes = Shop.plainString(o["notes"]) ?? ""
         if case .array(let quoted)? = o["priceList"] {

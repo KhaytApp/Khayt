@@ -168,6 +168,54 @@ struct MachineBandTests {
         #expect(Hours.spell(-5) == "0:00", "a negative stretch is not a stretch")
     }
 
+    /// `Int(_: Double)` traps on NaN, infinity and anything past `Int.max`,
+    /// and the book can hand the band all three: the lenient order decode reads
+    /// a `printTime` of `"1e300"` as the number it spells.
+    @Test("a figure no Int can hold is spelled, not a crash")
+    func hugeFiguresDoNotTrap() {
+        for minutes in [Double.nan, .infinity, -.infinity, 1e300, -1e300, Double(Int.max), 6e301] {
+            let spelled = Hours.spell(minutes)
+            #expect(spelled.contains(":"), "\(minutes) → \(spelled)")
+        }
+        #expect(Hours.spell(.nan) == "0:00")
+        #expect(Int(saturating: .nan) == 0)
+        #expect(Int(saturating: .infinity) == 0)
+        #expect(Int(saturating: 1e300) == Int.saturationLimit)
+        #expect(Int(saturating: -1e300) == -Int.saturationLimit)
+        #expect(Int(saturating: 41.6) == 41)
+    }
+
+    @Test("a 1e300-hour job goes through the order decode, the band and every caption", arguments: [
+        JSONValue.string("1e300"), .number(1e300),
+    ])
+    func absurdPrintTimeThroughTheBand(_ printTime: JSONValue) async throws {
+        // The decode the board reads orders through accepts it.
+        let raw: JSONValue = .object(["id": .string("huge"), "machineId": .string("M1"),
+                                      "printTime": printTime, "status": .string("pending"),
+                                      "project": .string("huge"), "parts": .array([])])
+        let order = try JSONDecoder().decode(Order.self, from: JSONEncoder().encode(raw))
+        #expect(order.printTime == 1e300)
+        // The band built from it, and every figure the band spells.
+        let b = try await Self.band(
+            machines: [Self.machine("M1", "U1"), Self.machine("M2", "Prusa")],
+            orders: [raw, Self.job("run", machine: "M2", hours: 1e300, status: "printing")],
+            live: ["M1": .object([:]),
+                   "M2": .object(["timeRemaining": .number(1e300)])])
+        for row in b.rows {
+            _ = Hours.spell(row.freeMinutes)
+            for block in row.blocks {
+                _ = Hours.spell(block.minutes)
+                _ = Hours.spell(block.afterMinutes)
+                _ = Hours.spell(block.beforeMinutes)
+            }
+        }
+        let line = MachineBandView.sum(b, Words())
+        #expect(!line.isEmpty)
+        // The printer-side spelling of the same figure.
+        #expect(!PrinterWatch.spell(1e300 * 3600, Words()).isEmpty)
+        #expect(!PrinterWatch.spell(.nan, Words()).isEmpty)
+    }
+
     /// The marks land on the CLOCK, not on the band's own start.
     ///
     /// Spaced every six hours from the moment the window opens, the ruler read

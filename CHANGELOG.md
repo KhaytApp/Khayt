@@ -60,6 +60,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   makes a group inside a group ("Luffy Card/Poster" is filed as "Luffy Card –
   Poster", and the box says so before filing). Filing models into a group says
   where they went, with Show Group.
+- **(Mac) A group keeps its kind when a name lands on it.** Typing a name the
+  engine files under an existing group — "Saudi  Kings" with two spaces, a
+  different case, or a name past 60 characters — no longer turns that group
+  into the kind the naming box offered; only a group the filing actually makes
+  takes it. Moving a folder now moves its kinds instead of copying them, so
+  moving a group back after switching its kind keeps the new kind, and a
+  folder moved onto a deleted group's name does not inherit that group's kind.
+  Kinds for groups no model sits in any more are tidied away whenever the
+  kinds are written, and Undo of a move puts the kinds back with the files.
+- **(Mac) An absurd print time no longer crashes the app.** A job whose
+  `printTime` is something like `1e300` used to quit the app while drawing the
+  machine band; times, weights and day counts turned into whole numbers are now
+  held to a sane range.
 - **Deleting several print files warns when some of them are not on screen.**
   A selection is kept when you change the filter, so you can pick files from
   several groups. That also means Delete can include files you are no longer

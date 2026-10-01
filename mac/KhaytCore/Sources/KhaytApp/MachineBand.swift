@@ -594,7 +594,28 @@ struct MachineBandView: View {
 /// which was innocent.
 enum Hours {
     static func spell(_ minutes: Double) -> String {
-        let whole = max(0, Int(minutes.rounded()))
+        let whole = max(0, Int(saturating: minutes.rounded()))
         return String(format: "%d:%02d", whole / 60, whole % 60)
+    }
+}
+
+extension Int {
+    /// The biggest figure a time, a weight or a count of days is turned into.
+    /// A trillion: far past anything a shop prints, far inside `Int`.
+    static let saturationLimit = 1_000_000_000_000
+
+    /// `Int(value)`, without the trap.
+    ///
+    /// `Int(_: Double)` crashes the app on NaN, on infinity and on anything
+    /// past `Int.max` — and the book can hand it all three. The lenient order
+    /// decode reads a `printTime` of `"1e300"` as the number it spells, and a
+    /// board summing one such job got minutes no `Int` can hold: one bad
+    /// field from another app, an import or a hand edit, and every window
+    /// drawing the machine band quit. Not finite reads as 0; anything else is
+    /// clamped to ±`saturationLimit` before the conversion.
+    init(saturating value: Double) {
+        guard value.isFinite else { self = 0; return }
+        let limit = Double(Int.saturationLimit)
+        self = Int(Swift.min(Swift.max(value, -limit), limit))
     }
 }
