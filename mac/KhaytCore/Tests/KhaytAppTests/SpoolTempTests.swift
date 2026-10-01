@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import KhaytCore
+import SwiftUI
 @testable import KhaytApp
 
 /// What a filament wants to be printed at.
@@ -69,13 +70,27 @@ struct SpoolTempTests {
         #expect(spool.maxSpeed == nil)
     }
 
+    @Test("an unset value draws an empty box, and emptying a box sets it back to nought")
+    func blankBox() {
+        // Display only: the form keeps 0 for "nobody has said", which is what
+        // Save sends and what the save compares with the form as it opened.
+        final class Box { var v: Double = 0 }
+        let box = Box()
+        let field = SpoolSheet.blankWhenZero(.init(get: { box.v }, set: { box.v = $0 }))
+        #expect(field.wrappedValue == nil)
+        field.wrappedValue = 215
+        #expect(box.v == 215 && field.wrappedValue == 215)
+        field.wrappedValue = nil
+        #expect(box.v == 0)
+    }
+
     @Test("the sheet offers all three, and sends them")
     func wired() throws {
         let sheet = try String(contentsOf: URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp/SpoolSheet.swift"), encoding: .utf8)
-        for key in ["inv.print_temp", "inv.bed_temp", "inv.max_speed"] {
+        for key in ["mac.spool_print_temp", "mac.spool_bed_temp", "mac.spool_max_speed"] {
             #expect(sheet.contains(key), Comment(rawValue: "\(key) has no field"))
         }
         for field in ["\"printTemp\": .number(printTemp)",
@@ -84,8 +99,14 @@ struct SpoolTempTests {
             #expect(sheet.contains(field), Comment(rawValue:
                 "the sheet draws a box for \(field) and does not send what is in it"))
         }
-        // The words are the other app's — nine languages rather than two.
-        #expect(!sheet.contains("\"mac.print_temp\""),
-                "a Mac-only word was written where a shared one exists")
+        // Not the shared words: they carry (°C) / (mm/s) in brackets, and
+        // this sheet draws the unit after the box, so it said it twice.
+        for key in ["inv.print_temp", "inv.bed_temp", "inv.max_speed"] {
+            #expect(!sheet.contains("\"\(key)\""), Comment(rawValue:
+                "\(key) carries its unit in brackets and the sheet draws one after the box"))
+        }
+        // An unset value is an empty box, not "0".
+        #expect(sheet.contains("degrees($printTemp)") && sheet.contains("Self.blankWhenZero(value)"))
+        #expect(sheet.contains("Self.blankWhenZero($maxSpeed)"))
     }
 }

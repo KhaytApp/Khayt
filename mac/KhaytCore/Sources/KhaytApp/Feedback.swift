@@ -28,10 +28,10 @@ import KhaytCore
 ///                    which the cloud mask does not do: it deletes every
 ///                    order's `trackingToken` and `quoteApprovalToken` (live
 ///                    capabilities — the portal link, and approving a quote)
-///                    and masks the LAN API token hashes. A second, Swift-side
-///                    list of what is secret is how two lists drift, so the
-///                    only Swift-side additions are the few in `forFeedback`
-///                    that neither lib rule covers yet.
+///                    and masks the LAN API token hashes; deletes every print
+///                    job's `surveyToken`; and deletes `settings.cloud.keyset`
+///                    (the wrapped data key). There is no Swift-side list of
+///                    what is secret: a second list is how two lists drift.
 enum Feedback {
 
     static let address = "support@khaytapp.com"
@@ -222,37 +222,7 @@ enum Feedback {
         guard let engine,
               let masked = try? await engine.storeForCloud(root),
               let exported = try? await engine.redactedExport(masked) else { return nil }
-        return try? JSONEncoder().encode(forFeedback(exported))
-    }
-
-    /// What NEITHER lib rule takes out yet, taken out of the feedback copy
-    /// only. Kept short on purpose (see the note at the top) and reported to
-    /// the shared lib — once `lib/store.js` covers these, this goes.
-    ///
-    ///   printLog[].surveyToken     the key a customer's survey answer is
-    ///                              accepted with (LanServer); deleted, not
-    ///                              masked, for the reason `redactOrdersForExport`
-    ///                              gives — a mask would be adopted as a token
-    ///   settings.cloud.keyset      the shop's wrapped data key: sealed with the
-    ///                              passphrase, so offline-crackable, and a
-    ///                              report has no use for it
-    static func forFeedback(_ root: [String: JSONValue]) -> [String: JSONValue] {
-        var out = root
-        if case .array(let jobs)? = out["printLog"] {
-            out["printLog"] = .array(jobs.map { job in
-                guard case .object(var o) = job, o["surveyToken"] != nil else { return job }
-                o.removeValue(forKey: "surveyToken")
-                return .object(o)
-            })
-        }
-        if case .object(var settings)? = out["settings"] {
-            if case .object(var cloud)? = settings["cloud"], cloud["keyset"] != nil {
-                cloud.removeValue(forKey: "keyset")
-                settings["cloud"] = .object(cloud)
-            }
-            out["settings"] = .object(settings)
-        }
-        return out
+        return try? JSONEncoder().encode(exported)
     }
 
     /// The book as it is on disk, secrets still sealed — or the sample.

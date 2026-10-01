@@ -11,6 +11,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   hides, in red, and lists those first. The Mac app lost 34 models to this
   kind of hidden selection.
 
+- **(Mac) The spool sheet says each unit once, and an unset value is an empty
+  box.** Print temp, bed temp and max speed read "Print temp (°C) … °C": the
+  shared labels carry the unit in brackets and the sheet also draws it after the
+  box. The labels are now the Mac's own, without the brackets, in English and
+  Arabic (°م, مم/ث after the box). A temperature, speed or order quantity
+  nobody has set showed "0"; it now shows an empty box, and saving it untouched
+  still writes nothing.
+- **(Mac) Feedback relies on the shared export redaction alone.** The shared
+  rule now deletes each job's survey link and the cloud's wrapped key itself, so
+  the Mac's own copy of that step is gone; the feedback test still plants every
+  token and checks none survives.
 - **(Mac) A feedback report's book carries no live links or keys.** The
   "include a copy of my book" attachment was masked the way the cloud copy is,
   which keeps each job's customer-portal link, quote-approval link and survey
