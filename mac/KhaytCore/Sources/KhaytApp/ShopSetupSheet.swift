@@ -242,7 +242,7 @@ struct ShopSetupSheet: View {
             }
             GridRow {
                 Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-                hint("mac.setup_electricity_hint", ["name": .string(words.callIt("mac.setup_preset_name"))])
+                hint("mac.setup_electricity_hint")
             }
             GridRow {
                 label("mac.setup_vat")
@@ -427,7 +427,6 @@ struct ShopSetupSheet: View {
         if s.writesElectricity, let tariff = s.electricity {
             lines.append(words.callIt("mac.setup_sum_electricity", [
                 "rate": .string(Self.isolated(Words.plain(.number(tariff)) + " " + Money.mark(currency))),
-                "name": .string(words.callIt("mac.setup_preset_name")),
             ]))
         }
         if s.writesPrinter, let p = s.printer {

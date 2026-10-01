@@ -711,7 +711,8 @@ struct Reports: View {
         accuracy = (try? await engine.machineAccuracy(orders: shop.orderRows, minSamples: 1)) ?? []
         shopAccuracy = try? await engine.shopAccuracy(orders: shop.orderRows, minSamples: 1)
         // Electricity, quoted and metered — beside the time, off the same book.
-        power = (try? await engine.powerByMachine(orders: shop.orderRows, machines: shop.machineRows)) ?? []
+        power = (try? await engine.powerByMachine(orders: shop.orderRows, machines: shop.machineRows,
+                                                  settings: shop.settingsDict)) ?? []
     }
 
     private func recomputeVariance() async {

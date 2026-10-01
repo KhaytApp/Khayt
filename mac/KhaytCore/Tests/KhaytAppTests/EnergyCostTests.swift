@@ -222,6 +222,41 @@ struct EnergyCostTests {
         #expect(decoded.costMachine == 10)
     }
 
+    @Test("a failed print with no preset is charged the shop's tariff, not 0.18")
+    func shopTariffOnWaste() async throws {
+        let engine = try KhaytEngine()
+        let shelf: [JSONValue] = [.object(["id": .string("s1"), "material": .string("PLA"),
+                                           "cost": .number(80), "weight": .number(1000),
+                                           "spoolWeight": .number(1000)])]
+        let input: [String: JSONValue] = ["material": .string("PLA"), "weight": .number(100),
+                                          "cost": .number(8), "orderId": .string("J1")]
+        // A job whose part says nothing about electricity.
+        var job = Self.order
+        job["parts"] = .array([.object(["printTime": .number(10)])])
+        let ended = FinishCamera.Ended(machineId: "M1", machineName: "U1", orderId: "J1",
+                                       outcome: "failed", durationS: 4 * 3600, photoTaken: false,
+                                       filename: "lamp.gcode")
+        let tariff: [String: JSONValue] = ["elecRate": .number(0.3), "currency": .string("SAR")]
+        let costing = Shop.failedCosting(order: job, machines: Self.machines, settings: tariff,
+                                         ended: ended, live: nil, attempt: nil, inspected: false)
+        guard case .object(let c) = costing else { Issue.record("not an object"); return }
+        #expect(c["settings"] == .object(["elecRate": .number(0.3)]), "only the tariff travels")
+        let made = try await engine.newWasteEntry(input, id: "W1", today: "2026-10-01", inventory: shelf,
+                                                  order: .object(job), costing: costing)
+        guard case .object(let w)? = made.entry else { Issue.record("no entry"); return }
+        #expect(w["costPower"] == .number(0.3))   // 4 h × 0.25 kW × 0.3
+
+        // A book without the key: exactly what it was.
+        let none = Shop.failedCosting(order: job, machines: Self.machines, settings: [:],
+                                      ended: ended, live: nil, attempt: nil, inspected: false)
+        guard case .object(let n) = none else { return }
+        #expect(n["settings"] == nil)
+        let old = try await engine.newWasteEntry(input, id: "W2", today: "2026-10-01", inventory: shelf,
+                                                 order: .object(job), costing: none)
+        guard case .object(let o)? = old.entry else { Issue.record("no entry"); return }
+        #expect(o["costPower"] == .number(0.18))  // 4 h × 0.25 kW × 0.18
+    }
+
     @Test("a QC failure is costed whole: the entire print's time")
     func qcFailure() async throws {
         let engine = try KhaytEngine()

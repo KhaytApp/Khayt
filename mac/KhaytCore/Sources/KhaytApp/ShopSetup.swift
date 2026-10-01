@@ -25,7 +25,7 @@ import KhaytCore
 /// |-----------------------|-------------------------|--------------------------|
 /// | currency, VAT         | `Shop.applySettings`    | Settings → Business      |
 /// | a printer, its value  | `Shop.writeMachine`     | the Machine sheet        |
-/// | electricity per kWh   | `Shop.writePreset`      | Calculator → Save preset |
+/// | electricity per kWh   | `Shop.applySettings`    | Settings → Business      |
 /// | a spool and its price | `Shop.writeNewSpool`    | the Spool sheet          |
 ///
 /// and the machine's input is the sheet's own `MachineSheet.Form`, as a new
@@ -34,19 +34,24 @@ import KhaytCore
 ///
 /// ── WHERE THE ELECTRICITY GOES, AND WHY THERE ─────────────────────────────
 ///
-/// Neither app has a shop-wide tariff. `lib/print-rates.js` takes `elecRate`
-/// from Khayt's opening figures (0.18) or from a calculator preset, and the
-/// preset is the only place a shop has ever been able to write its own down.
-/// So the tariff is saved as a preset carrying Khayt's openers for the other
-/// six figures — the Calculator and the online quote offer it by name. The
-/// step says so rather than implying every job is now costed at it.
+/// Into `settings.elecRate`, the SHOP'S tariff. `lib/print-rates.js` layers it
+/// between Khayt's opening figures (0.18) and a calculator preset, so every
+/// costing — a job, a quote, a failed print, power by machine — is charged it
+/// unless a preset says otherwise.
+///
+/// It used to be saved as a preset ("Shop rates"), because a preset was the
+/// only place a shop could write a tariff down — and a preset applies only
+/// where one is picked, so a failed print was still charged 0.18. The setup
+/// no longer makes a preset. One it made before (`Shop.setupPresetMarker`, or
+/// an older one by name) is kept in step, because a preset's tariff beats the
+/// shop's and a stale one would quietly undo the answer.
 @MainActor
 struct ShopSetup: Equatable {
 
     // ── Step 1: the shop ─────────────────────────────────────────────────
     /// Nil leaves the book's currency as it is.
     var currency: String?
-    /// Per kWh, in the shop's currency. Nil or zero writes no preset.
+    /// Per kWh, in the shop's currency. Nil or zero writes no tariff.
     var electricity: Double?
     /// Nil leaves VAT as it is; set means the shop answered the question.
     var chargesVat: Bool?
@@ -104,6 +109,8 @@ struct ShopSetup: Equatable {
                       currentVatRate: Double) -> [String: JSONValue]? {
         var form: [String: JSONValue] = [:]
         if let currency, currency != currentCurrency { form["currency"] = .string(currency) }
+        // The shop's tariff, through the same rule the Business pane saves it by.
+        if writesElectricity, let electricity { form["elecRate"] = .number(electricity) }
         if let chargesVat, chargesVat != currentlyChargesVat
             || (chargesVat && vatRate != currentVatRate) {
             form["enableVat"] = .bool(chargesVat)
@@ -177,9 +184,11 @@ struct ShopSetup: Equatable {
                                         catalogId: setup.printer?.catalogId, opened: nil,
                                         engine: engine, newId: machineId)
         }
+        // The tariff itself went in with the settings above. A preset an
+        // earlier setup made is kept in step — never a new one (`openers: nil`).
         if setup.writesElectricity, let tariff = setup.electricity {
             Shop.writeSetupPreset(into: &root, name: presetName, aliases: Self.presetNames,
-                                  tariff: tariff, openers: try? await engine.printRates())
+                                  tariff: tariff, openers: nil)
         }
         if let input = setup.spoolInput {
             _ = try await Shop.writeNewSpool(into: &root, input: input, engine: engine,

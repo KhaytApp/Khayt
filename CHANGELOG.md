@@ -11,6 +11,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   no longer looking at. The Mac app lost 34 models that way, and both apps now
   work the same. To act on files from several groups, show them together (for
   example, clear the filter) and select them there.
+- **One electricity price for the whole shop.** A shop can now say what a
+  kWh costs it once (`settings.elecRate`), and every costing uses it unless a
+  calculator preset sets its own: a job on a machine, a failed print, the
+  electricity-by-machine report, and an online quote whose preset leaves
+  electricity blank. Until now a tariff lived only on a preset, so anything
+  costed without one — every failed print — was charged 0.18. A shop that has
+  not set it is costed exactly as before.
+- **(Mac) Electricity per kWh in Settings › Business, and the first-run setup
+  writes it there.** The setup's electricity answer becomes the shop's price
+  instead of a new "Shop rates" calculator preset; a preset an earlier setup
+  made is kept in step. Clearing the field goes back to Khayt's default.
+- **Deleting several print files warns when some of them are not on screen.**
+  A selection is kept when you change the filter, so you can pick files from
+  several groups. That also means Delete can include files you are no longer
+  looking at. The delete dialog now says how many of them the current filter
+  hides, in red, and lists those first. The Mac app lost 34 models to this
+  kind of hidden selection.
 
 - **(Mac) The spool sheet says each unit once, and an unset value is an empty
   box.** Print temp, bed temp and max speed read "Print temp (°C) … °C": the

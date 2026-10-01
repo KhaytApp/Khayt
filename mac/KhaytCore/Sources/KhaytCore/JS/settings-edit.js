@@ -260,6 +260,19 @@
     if (has(f, 'rushFeeEnabled'))       out.rushFeeEnabled       = !!f.rushFeeEnabled;
     if (has(f, 'rushFeePct'))           out.rushFeePct           = clamp(0, 500, num(f.rushFeePct, 25));
     if (has(f, 'defaultPackagingCost')) out.defaultPackagingCost = Math.max(0, num(f.defaultPackagingCost, 0));
+    // The shop's own electricity tariff, per kWh (lib/print-rates.js). Every
+    // costing reads it between Khayt's 0.18 and a preset. BLANK DELETES THE
+    // KEY rather than storing 0: 0 is a real answer (a shop on solar), and
+    // "not said" must go back to the default. Anything that is not a number
+    // keeps what was stored.
+    if (has(f, 'elecRate')) {
+      const raw = f.elecRate;
+      if (raw === null || String(raw).trim() === '') delete out.elecRate;
+      else {
+        const n = num(raw, NaN);
+        if (Number.isFinite(n)) out.elecRate = clamp(0, 100, n);
+      }
+    }
     if (has(f, 'wip')) {
       const wip = { ...(s.wipLimits || {}) };
       WIP_COLUMNS.forEach((col) => {
