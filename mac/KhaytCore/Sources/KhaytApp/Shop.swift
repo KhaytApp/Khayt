@@ -10873,7 +10873,7 @@ final class Shop {
     /// 0600. Throws `fileWriteFileExists` when something is there.
     static func createNew(_ body: Data, at url: URL) throws {
         let dir = url.deletingLastPathComponent()
-        let tmp = dir.appending(path: ".\(url.lastPathComponent).new.\(UUID().uuidString)")
+        let tmp = dir.appending(path: ".\(url.lastPathComponent).creating.\(UUID().uuidString)")
         let fd = Darwin.open(tmp.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
         guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         defer { Darwin.unlink(tmp.path) }
