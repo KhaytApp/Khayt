@@ -80,3 +80,26 @@ test('the desktop\'s own cloud push goes through forCloud', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'cloud-backend.js'), 'utf8');
   assert.match(src, /crypto\.encryptStore\(forCloud\(snapshot\), getDek\(\)\)/);
 });
+
+test('the event webhook URL is device-private too: masked for the cloud and the phone, kept on restore', () => {
+  const d = { settings: { eventWebhooks: { enabled: true, url: 'https://hooks.slack.com/services/T/B/secret', secret: 's' } } };
+  const seen = [];
+  P.forEachDevicePrivate(d, (v, set) => { seen.push(v); set(M); });
+  assert.deepEqual(seen, ['https://hooks.slack.com/services/T/B/secret']);
+  assert.equal(d.settings.eventWebhooks.url, M);
+  assert.equal(d.settings.eventWebhooks.secret, 's', 'the signing secret is SECRET_PATHS business');
+
+  const local = { settings: { eventWebhooks: { url: 'https://mine/hook' } } };
+  const fromCloud = { settings: { eventWebhooks: { enabled: true, url: M } } };
+  assert.equal(P.keepMachineLocal(local, fromCloud, M).settings.eventWebhooks.url, 'https://mine/hook');
+  assert.equal(P.keepMachineLocal({ settings: {} }, { settings: { eventWebhooks: { url: M } } }, M).settings.eventWebhooks.url, '',
+    'a mask with no local counterpart is emptied, never kept as an address');
+  assert.equal(P.keepMachineLocal(local, { settings: { eventWebhooks: { url: 'https://backup/hook' } } }, M).settings.eventWebhooks.url,
+    'https://backup/hook', 'a real one from a backup is taken as it came');
+});
+
+test('the cloud push masks the event webhook URL', () => {
+  const { forCloud } = require('../lib/cloud-outbox.js');
+  const out = forCloud({ settings: { eventWebhooks: { url: 'https://discord.com/api/webhooks/1/tok' } } });
+  assert.notEqual(out.settings.eventWebhooks.url, 'https://discord.com/api/webhooks/1/tok');
+});
