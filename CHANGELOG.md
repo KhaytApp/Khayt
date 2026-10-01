@@ -4772,6 +4772,96 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.57] - 2026-10-02
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Library groups as one print or separate prints, a selection that only reaches what
+is on screen, one electricity price for the shop, and every job shown.
+
+### Changed and fixed
+
+- **(Mac) Changing the electricity price in Settings › Business also updates
+  the "Shop rates" preset that an earlier first-run setup made.** That preset's
+  old price was used instead of the new one wherever the preset was picked.
+  Clearing the price removes it from that preset too, so it falls back to the
+  shop's price. A preset the shop named itself is left alone. Saving the pane
+  without touching the price keeps whatever was stored exactly as it was.
+
+- **(Mac) Electricity per kWh in Settings › Business, and the first-run setup
+  writes it there.** The setup's electricity answer becomes the shop's price
+  instead of a new "Shop rates" calculator preset; a preset an earlier setup
+  made is kept in step. Clearing the field goes back to Khayt's default.
+
+- **(Mac) Groups read as groups.** A group now says what it is: **one print
+  in parts** (several files that make one print — the default, and what every
+  existing group is read as) or **separate prints** kept together. In All
+  models a print in parts shows as one tile and a collection's models show one
+  by one, each naming its group with a link into it; a search or filter shows
+  every match flat, the way a Finder search does. The kind is chosen when a
+  group is named, and can be switched from the group's right-click menu or
+  beside its name when it is open; it is kept in the book's settings
+  (`settings.libraryGroups`) and moves with a folder. A group tile is now a
+  stack of cards with a badge (puzzle piece or stack, and the count) instead of
+  looking like a single model. A slash typed into a new group's name no longer
+  makes a group inside a group ("Luffy Card/Poster" is filed as "Luffy Card –
+  Poster", and the box says so before filing). Filing models into a group says
+  where they went, with Show Group.
+
+- **(Mac) A group keeps its kind when a name lands on it.** Typing a name the
+  engine files under an existing group — "Saudi  Kings" with two spaces, a
+  different case, or a name past 60 characters — no longer turns that group
+  into the kind the naming box offered; only a group the filing actually makes
+  takes it. Moving a folder now moves its kinds instead of copying them, so
+  moving a group back after switching its kind keeps the new kind, and a
+  folder moved onto a deleted group's name does not inherit that group's kind.
+  Kinds for groups no model sits in any more are tidied away whenever the
+  kinds are written, and Undo of a move puts the kinds back with the files.
+
+- **(Mac) An absurd print time no longer crashes the app.** A job whose
+  `printTime` is something like `1e300` used to quit the app while drawing the
+  machine band; times, weights and day counts turned into whole numbers are now
+  held to a sane range.
+
+- **(Mac) The spool sheet says each unit once, and an unset value is an empty
+  box.** Print temp, bed temp and max speed read "Print temp (°C) … °C": the
+  shared labels carry the unit in brackets and the sheet also draws it after the
+  box. The labels are now the Mac's own, without the brackets, in English and
+  Arabic (°م, مم/ث after the box). A temperature, speed or order quantity
+  nobody has set showed "0"; it now shows an empty box, and saving it untouched
+  still writes nothing.
+
+- **(Mac) Feedback relies on the shared export redaction alone.** The shared
+  rule now deletes each job's survey link and the cloud's wrapped key itself, so
+  the Mac's own copy of that step is gone; the feedback test still plants every
+  token and checks none survives.
+
+- **(Mac) Jobs with a missing field or a price written as text show up.** A
+  job without a date, status, project name, price, amount paid, payment
+  status, print time, priority or notes, or with a number stored as text
+  (`"price": "120"`), was left off every screen and only counted as "could
+  not be read". Khayt for Windows/Linux showed it. The Mac now reads these
+  jobs the same way Khayt does: a missing or blank number is 0, a number
+  written as text is that number, missing text is empty, and a job with no
+  status goes in the board's "no column for this stage" note. These defaults
+  are only for display. Opening such a job and saving it without changes
+  leaves it exactly as it was in the book. A job with no id still can't be
+  read, and the app still says how many there are.
+
+- **(Mac) Selecting models in the library can no longer reach models you
+  cannot see.** In the Groups view, Select All (⌘A), a Shift-click range and
+  Shift-arrow also picked every model hidden inside the group folders, and the
+  selection was kept when you switched views, opened or left a folder, searched
+  or filtered — so a right-click "Delete N Models…" on one visible model could
+  delete a whole group (a shop lost a 34-model group this way). The selection
+  now holds only the model tiles on screen: folders are never selected, and
+  changing view, folder, search or filter drops whatever leaves the screen.
+  Grouping, category, licence, source, tags, Print next and Add to Catalogue
+  act on the same on-screen selection. Deleting several models now lists them
+  by name (the first eight, then how many more) and says how many are in a
+  group, and refuses outright if any of them is not on screen.
+
 ## [4.0.0-alpha.56] - 2026-10-01
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
