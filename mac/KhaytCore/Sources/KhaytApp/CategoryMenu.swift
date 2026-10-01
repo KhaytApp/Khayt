@@ -29,7 +29,7 @@ struct CategoryMenu: View {
     @State private var typed = ""
     @State private var typedTags = ""
 
-    private var count: Int { shop.fileSelection.count }
+    private var count: Int { shop.selectedIds.count }
 
     var body: some View {
         Menu {

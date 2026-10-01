@@ -12,7 +12,7 @@ struct GroupMenu: View {
     @Bindable var shop: Shop
     @State private var typed = ""
 
-    private var count: Int { shop.fileSelection.count }
+    private var count: Int { shop.selectedIds.count }
 
     var body: some View {
         Menu {

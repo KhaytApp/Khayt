@@ -45,7 +45,7 @@ struct LibraryFilterMenuTests {
     func flatAndMenus() throws {
         let shop = try QuoteSheetStatusTests.source("Shop.swift")
         #expect(shop.contains("var libraryFlat = true"))
-        #expect(shop.contains("if libraryFlat, group == nil"))
+        #expect(shop.contains("return libraryFlat && group == nil"))
         let bar = try QuoteSheetStatusTests.source("LibraryFilterBar.swift")
         #expect(bar.contains("Menu {"))
         #expect(!bar.contains("FilterBar(chips: chips"), "the library is back to a strip of chips")

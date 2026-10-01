@@ -154,8 +154,11 @@ struct ModelActions: View {
             Divider()
         }
         // On or off the Print next list — this model, or every one selected.
-        let marked = shop.fileSelection.contains(file.id) && shop.fileSelection.count > 1
-            ? shop.fileSelection : [file.id]
+        //
+        // "Every one selected" is every one selected AND ON SCREEN — never a
+        // model inside a folder tile or behind a filter (`Shop.selectedIds`).
+        let picked = shop.selectedIds
+        let marked = picked.contains(file.id) && picked.count > 1 ? picked : [file.id]
         let allOn = shop.files.filter { marked.contains($0.id) }.allSatisfy(\.isPrintNext)
         Button(shop.words.callIt(allOn ? "mac.print_next_remove" : "mac.print_next_add")) {
             shop.setPrintNext(marked, on: !allOn)
@@ -164,9 +167,9 @@ struct ModelActions: View {
         // because right-clicking the models is where a shop looks for it. A
         // model right-clicked outside the selection becomes the selection
         // first, so the item acts on what was clicked.
-        Menu(shop.words.callIt(shop.fileSelection.contains(file.id) && shop.fileSelection.count > 1
+        Menu(shop.words.callIt(picked.contains(file.id) && picked.count > 1
                                ? "mac.group_n_models" : "mac.group",
-                               ["n": .number(Double(shop.fileSelection.count))])) {
+                               ["n": .number(Double(picked.count))])) {
             ForEach(shop.groups, id: \.self) { group in
                 Button(group) { fileUnder(group) }
             }
@@ -175,14 +178,14 @@ struct ModelActions: View {
                 adoptSelection()
                 shop.namingGroup = true
             }
-            if (shop.fileSelection.contains(file.id) ? shop.selectedFiles : [file]).contains(where: { $0.groupName != nil }) {
+            if (picked.contains(file.id) ? shop.selectedFiles : [file]).contains(where: { $0.groupName != nil }) {
                 Button(shop.words.callIt("mac.remove_from_group")) { fileUnder("") }
             }
         }
         .disabled(!shop.canWrite)
         // To the catalogue: this model — or, when it is one of several
         // selected, all of them, as one product or one each.
-        let chosen = shop.fileSelection.contains(file.id) ? shop.selectedFiles : []
+        let chosen = picked.contains(file.id) ? shop.selectedFiles : []
         if chosen.count > 1 {
             let n: [String: JSONValue] = ["n": .number(Double(chosen.count))]
             Button(shop.words.callIt("mac.catalogue_add_as_one", n) + "\u{2026}") {
@@ -206,12 +209,14 @@ struct ModelActions: View {
         // The ellipsis is the promise that it asks first — see `WindowSheets`.
         // Every selected model when this one is part of a selection, as the
         // group, tag and catalogue items above already do.
-        let chosenForDelete = shop.fileSelection.contains(file.id) ? shop.selectedFiles : []
+        // Asked through `askToDeleteFromLibrary`, which refuses any model not
+        // on screen rather than trusting the selection to hold none.
+        let chosenForDelete = picked.contains(file.id) ? shop.selectedFiles : []
         if chosenForDelete.count > 1 {
             Button(shop.words.callIt("mac.delete_n_models",
                                      ["n": .number(Double(chosenForDelete.count))]) + "\u{2026}",
                    role: .destructive) {
-                shop.pendingLibraryDeletes = chosenForDelete
+                shop.askToDeleteFromLibrary(chosenForDelete)
             }
         } else {
             Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {

@@ -48,7 +48,9 @@ final class Shop {
     private(set) var files: [LibraryFile] = []
 
     /// Show the models that have been put aside. Off: they are still there.
-    var libraryShowArchived = false
+    var libraryShowArchived = false {
+        didSet { if libraryShowArchived != oldValue { pruneSelectionToVisible() } }
+    }
 
     /// How many are hidden right now, so the library can offer to show them
     /// rather than leave a shop wondering where a model went.
@@ -281,6 +283,12 @@ final class Shop {
         settingsValue = .object(held)
     }
 
+    /// Give the shop a library, for a test. The book on disk is not touched.
+    func pretendLibrary(_ rows: [JSONValue]) {
+        files = Self.decodeFiles(["printFiles": .array(rows)]).items
+        clearLibrarySelection()
+    }
+
     /// Put a shop into a mode, for a test. The book on disk is not touched.
     func pretendMode(_ mode: String?) {
         var held: [String: JSONValue] = settingsDict
@@ -310,6 +318,12 @@ final class Shop {
     var shelf: Shelf = .dashboard {
         didSet {
             guard shelf != oldValue else { return }
+            // A selection belongs to the view it was made in. Carried into
+            // another folder — or out of one — it holds models that are not on
+            // the screen, and a right-click on the one that is offers to act
+            // on all of them. That is how a shop lost a 34-model group to a
+            // delete it never chose (27 Sep 2026).
+            clearLibrarySelection()
             if case .library = shelf { recountLibrarySoon() }
             else if case .library = oldValue { recountLibrarySoon() }
         }
@@ -322,7 +336,7 @@ final class Shop {
     var search = "" {
         didSet {
             guard search != oldValue else { return }
-            if case .library = shelf { recountLibrarySoon() }
+            if case .library = shelf { recountLibrarySoon(); pruneSelectionToVisible() }
             if case .catalogue = shelf { recountCatalogueSoon() }
         }
     }
@@ -1386,7 +1400,7 @@ final class Shop {
 
     func open(_ next: Source) { Task { await load(next) } }
 
-    var canEditSelection: Bool { canWrite && !fileSelection.isEmpty }
+    var canEditSelection: Bool { canWrite && !selectedFiles.isEmpty }
 
     var selectionIsOnThisMac: Bool {
         guard let one = selectedFile else { return false }
@@ -1481,8 +1495,8 @@ final class Shop {
     /// one at a time is seven read-modify-writes, seven `.prev` generations, and
     /// six windows in which a crash leaves the collection half made.
     func fileSelection(under name: String) async {
-        guard !fileSelection.isEmpty else { return }
-        let ids = fileSelection
+        let ids = selectedIds
+        guard !ids.isEmpty else { return }
         // Through the engine, so a name matching one the shop already uses
         // adopts that spelling rather than becoming a second chip holding part
         // of the same collection.
@@ -12992,8 +13006,8 @@ final class Shop {
 
     /// File the selected models under a category, or clear it with "".
     func fileSelection(underCategory name: String) async {
-        guard !fileSelection.isEmpty else { return }
-        let ids = fileSelection
+        let ids = selectedIds
+        guard !ids.isEmpty else { return }
         // Through the engine, for the same reason as the group above: a name
         // matching one the shop already uses adopts that spelling rather than
         // becoming a second chip holding part of the same idea.
@@ -13019,8 +13033,8 @@ final class Shop {
     /// they all end up with, which is the only version of this a person can
     /// predict.
     func tagSelection(_ typed: String) async {
-        guard !fileSelection.isEmpty else { return }
-        let ids = fileSelection
+        let ids = selectedIds
+        guard !ids.isEmpty else { return }
         guard let engine, let tags = try? await engine.normaliseTags(typed, known: tagsInUse)
         else {
             writeProblem = words.callIt("mac.group_unknown")
@@ -13088,7 +13102,8 @@ final class Shop {
     /// not the same as "may not be sold" and must stay reachable, because a
     /// licence set by mistake is worse than no licence at all.
     func fileSelection(licence: String) async {
-        guard !fileSelection.isEmpty else { return }
+        let ids = selectedIds
+        guard !ids.isEmpty else { return }
         // Through `ModelLicence`, so a value this app cannot name never reaches
         // the book: the id stored is the module's own spelling of it.
         let id = ModelLicence.find(licence)?.id ?? ""
@@ -13097,7 +13112,7 @@ final class Shop {
         }
         let named = id.isEmpty ? words.callIt("mac.licence_cleared")
                                : words.callIt("mac.licence_set")
-        editFiles(fileSelection, named: named) { record in
+        editFiles(ids, named: named) { record in
             record["licence"] = .string(id)
         }
     }
@@ -13222,11 +13237,12 @@ final class Shop {
     /// Record where a model came from — a model-site URL, or the shop's own
     /// name for it. Free text on purpose: it is a note to a person.
     func setSourceOnSelection(_ typed: String) async {
-        guard !fileSelection.isEmpty else { return }
+        let ids = selectedIds
+        guard !ids.isEmpty else { return }
         // Trimmed and capped at the other app's own `maxlength`, so a source
         // typed here is one it will show back.
         let source = String(typed.trimmingCharacters(in: .whitespacesAndNewlines).prefix(300))
-        editFiles(fileSelection, named: words.callIt("mac.source_set")) { record in
+        editFiles(ids, named: words.callIt("mac.source_set")) { record in
             record["source"] = .string(source)
         }
     }
@@ -13280,12 +13296,13 @@ final class Shop {
     }
 
     var shownEntries: [LibraryEntry] {
-        guard case .library(let group) = shelf else {
-            return shownFiles.map { LibraryEntry.file($0) }
-        }
         // Every model, flat, at the top of the library. Inside a folder the
-        // folder's own levels still show.
-        if libraryFlat, group == nil {
+        // folder's own levels still show. See `libraryShowsFlat`.
+        //
+        // THE ONE BUILDER of what the grid draws: the selection
+        // (`visibleFiles`) is read from this list, so a new way of drawing
+        // the flat view belongs here and nowhere else.
+        guard !libraryShowsFlat, case .library(let group) = shelf else {
             return shownFiles.map { LibraryEntry.file($0) }
         }
         // INSIDE a folder as well as at the top. A project with levels shows
@@ -13538,25 +13555,46 @@ final class Shop {
     /// folder now and opening one is navigating rather than filtering. Unfiled
     /// is the exception and lives here, since there is no folder to open for
     /// models that are in none.
-    var libraryCategory: FilterChoice? { didSet { recountLibrarySoon() } }
-    var libraryTag: String? { didSet { recountLibrarySoon() } }
+    var libraryCategory: FilterChoice? { didSet { libraryViewChanged() } }
+    var libraryTag: String? { didSet { libraryViewChanged() } }
     /// Models in no project at all — the answer to "what have I not filed yet".
-    var libraryUnfiledOnly = false { didSet { recountLibrarySoon() } }
+    var libraryUnfiledOnly = false { didSet { libraryViewChanged() } }
     /// Models the shop has never made. See `LibraryFacets.neverPrinted`.
-    var libraryNeverPrintedOnly = false { didSet { recountLibrarySoon() } }
+    var libraryNeverPrintedOnly = false { didSet { libraryViewChanged() } }
 
     /// Models that can start on this machine now, with what it has loaded.
-    var libraryReadyOn: String? { didSet { recountLibrarySoon() } }
+    var libraryReadyOn: String? { didSet { libraryViewChanged() } }
     /// One creator's models. See `LibraryFile.creator`.
-    var libraryCreator: String? { didSet { recountLibrarySoon() } }
+    var libraryCreator: String? { didSet { libraryViewChanged() } }
     /// The library as one flat grid of models (true, the default) or as
     /// folders. Flat by default so a model just added is on screen at once,
     /// newest first, rather than inside a folder named after a sub-folder.
-    var libraryFlat = true
+    var libraryFlat = true {
+        didSet { if libraryFlat != oldValue { pruneSelectionToVisible() } }
+    }
+
+    /// Does the library draw every shown model as a tile (true), or folder
+    /// tiles plus the models loose at this level (false)?
+    ///
+    /// THE ONE PLACE that decides it. `shownEntries` draws from it and
+    /// `visibleFiles` — which every selection reads — is derived from the same
+    /// entries, so what can be selected can never drift from what is drawn.
+    /// Outside the library everything shown is a plain row.
+    var libraryShowsFlat: Bool {
+        guard case .library(let group) = shelf else { return true }
+        return libraryFlat && group == nil
+    }
+
+    /// A filter axis changed: recount the chips, and drop from the selection
+    /// anything the change has taken off the screen.
+    private func libraryViewChanged() {
+        recountLibrarySoon()
+        pruneSelectionToVisible()
+    }
     /// The shop's Print next list.
-    var libraryPrintNextOnly = false { didSet { recountLibrarySoon() } }
+    var libraryPrintNextOnly = false { didSet { libraryViewChanged() } }
     /// Models that are the same file, or the same mesh, as another.
-    var libraryDuplicatesOnly = false { didSet { recountLibrarySoon() } }
+    var libraryDuplicatesOnly = false { didSet { libraryViewChanged() } }
     /// Which models are ready on which machine, from the last recount.
     private(set) var readyByMachine: [String: Set<String>] = [:]
 
@@ -13688,10 +13726,62 @@ final class Shop {
 
     /// The inspector shows one model. More than one selected is a different
     /// screen — what they have in common, and what can be done to all of them.
+    ///
+    /// ── ONLY WHAT IS ON SCREEN ────────────────────────────────────────────
+    ///
+    /// Both read through `visibleFiles`, never `files` or `shownFiles`. In the
+    /// grouped view `shownFiles` also holds every model INSIDE the folder
+    /// tiles, and a selection read from it acted on models nobody could see:
+    /// ⌘A, a ⇧-click range and a ⇧-arrow all reached into the folders, and a
+    /// right-click "Delete 34 Models…" deleted a whole group the shop never
+    /// chose (27 Sep 2026). A folder tile is not a selected model.
     var selectedFile: LibraryFile? {
-        fileSelection.count == 1 ? files.first { fileSelection.contains($0.id) } : nil
+        guard fileSelection.count == 1 else { return nil }
+        let chosen = selectedFiles
+        return chosen.count == 1 ? chosen[0] : nil
     }
-    var selectedFiles: [LibraryFile] { shownFiles.filter { fileSelection.contains($0.id) } }
+    var selectedFiles: [LibraryFile] {
+        let chosen = fileSelection
+        guard !chosen.isEmpty else { return [] }
+        return visibleFiles.filter { chosen.contains($0.id) }
+    }
+    /// The ids every "these models" action writes to. See `selectedFiles`.
+    var selectedIds: Set<LibraryFile.ID> { Set(selectedFiles.map(\.id)) }
+
+    /// The models drawn as model tiles right now, in the order they are drawn.
+    ///
+    /// ALWAYS derived from `shownEntries` — the very list the grid draws —
+    /// and never from `shownFiles`. Grouped: the models loose at this level;
+    /// whatever sits inside a folder tile is not here. Flat: every shown
+    /// model. Whatever `shownEntries` comes to draw (a group shown as one tile
+    /// in the flat view, say), this follows without being told.
+    var visibleFiles: [LibraryFile] { Self.modelTiles(shownEntries) }
+
+    /// The `.file` entries of a drawn list — the only things a selection may
+    /// hold. A folder tile is not a selected model.
+    static func modelTiles(_ entries: [LibraryEntry]) -> [LibraryFile] {
+        entries.compactMap { entry in
+            if case .file(let f) = entry { return f }
+            return nil
+        }
+    }
+
+    /// Drop from the selection anything no longer drawn as a model tile.
+    func pruneSelectionToVisible() {
+        guard !fileSelection.isEmpty || anchor != nil || cursor != nil else { return }
+        let visible = Set(visibleFiles.map(\.id))
+        let kept = fileSelection.intersection(visible)
+        if kept != fileSelection { fileSelection = kept }
+        if let a = anchor, !visible.contains(a) { anchor = nil }
+        if let c = cursor, !visible.contains(c) { cursor = nil }
+    }
+
+    /// Nothing selected, and the keyboard standing nowhere.
+    func clearLibrarySelection() {
+        if !fileSelection.isEmpty { fileSelection = [] }
+        anchor = nil
+        cursor = nil
+    }
 
     /// Click, ⌘-click, ⇧-click. Written out because a grid is not a `List` and
     /// gets none of this for free — and a Mac app where ⌘-click does not extend
@@ -13707,7 +13797,7 @@ final class Shop {
             else { fileSelection.insert(file.id); anchor = file.id }
             cursor = file.id
         case .extend:
-            let rows = shownFiles
+            let rows = visibleFiles
             guard let end = rows.firstIndex(where: { $0.id == file.id }) else { return }
             let start = anchor.flatMap { a in rows.firstIndex { $0.id == a } } ?? end
             let range = start <= end ? start...end : end...start
@@ -13736,7 +13826,7 @@ final class Shop {
     /// the system beep can do its job.
     @discardableResult
     func moveSelection(by step: Int, extending: Bool) -> Bool {
-        let rows = shownFiles
+        let rows = visibleFiles
         guard !rows.isEmpty else { return false }
 
         guard let here = cursor.flatMap({ c in rows.firstIndex { $0.id == c } }) else {
@@ -13763,9 +13853,11 @@ final class Shop {
         return true
     }
 
+    /// ⌘A: every model tile on screen — never what is inside a folder tile.
     func selectAllShown() {
-        fileSelection = Set(shownFiles.map(\.id))
-        anchor = shownFiles.first?.id
+        let rows = visibleFiles
+        fileSelection = Set(rows.map(\.id))
+        anchor = rows.first?.id
         cursor = anchor
     }
 
@@ -13809,10 +13901,10 @@ final class Shop {
     func reveal(fileId: String) -> Bool {
         guard let file = files.first(where: { $0.id == fileId }) else { return false }
         search = ""
-        libraryCategory = nil
-        libraryTag = nil
-        libraryUnfiledOnly = false
-        libraryNeverPrintedOnly = false
+        // Every axis, not some: a filter left on (ready on a machine, a
+        // creator, Print next, duplicates) can hide the model, and a model not
+        // on screen cannot be the selection — see `selectedFiles`.
+        clearLibraryFilter()
         if file.isArchived { libraryShowArchived = true }
         // Into its own project if it has one: that is where the model lives,
         // and opening the library at the top with one tile selected somewhere
@@ -14488,6 +14580,80 @@ final class Shop {
 
     func deleteLibraryFile(_ file: LibraryFile) async {
         await deleteLibraryFiles([file])
+    }
+
+    /// ── SEVERAL MODELS, FROM THE LIBRARY SCREEN ──────────────────────────
+    ///
+    /// The door every multi-delete the shop asks for goes through. It refuses
+    /// outright when any model chosen is not drawn as a tile on screen right
+    /// now — inside a folder tile, behind a search or a filter. The selection
+    /// should never hold one (see `selectedFiles`); this is the second lock,
+    /// because the first one failing cost a shop a 34-model group (27 Sep
+    /// 2026), and a delete is the one library action that cannot be undone.
+    ///
+    /// Returns the models not on screen; empty means the question was asked.
+    @discardableResult
+    func askToDeleteFromLibrary(_ chosen: [LibraryFile]) -> [LibraryFile] {
+        let hidden = notOnScreen(chosen)
+        guard hidden.isEmpty else {
+            pendingLibraryDeletes = []
+            importProblem = words.callIt("mac.delete_not_on_screen",
+                                         ["n": .number(Double(hidden.count))])
+            return hidden
+        }
+        pendingLibraryDeletes = chosen
+        return []
+    }
+
+    /// The confirmation's Delete: checked again, because a question can sit
+    /// open while the library underneath it changes.
+    func confirmLibraryDeletes() async {
+        let chosen = pendingLibraryDeletes
+        let hidden = notOnScreen(chosen)
+        guard hidden.isEmpty else {
+            pendingLibraryDeletes = []
+            importProblem = words.callIt("mac.delete_not_on_screen",
+                                         ["n": .number(Double(hidden.count))])
+            return
+        }
+        await deleteLibraryFiles(chosen)
+    }
+
+    /// Which of these are not drawn as a model tile right now.
+    func notOnScreen(_ chosen: [LibraryFile]) -> [LibraryFile] {
+        let visible = Set(visibleFiles.map(\.id))
+        return chosen.filter { !visible.contains($0.id) }
+    }
+
+    /// What the multi-delete question says: how many, WHICH — the first
+    /// eight by name, then how many more — and how many of them are filed in
+    /// a group. A count alone is what a shop said yes to on 27 Sep 2026
+    /// without seeing that it was a whole group.
+    func libraryDeleteMessage(_ chosen: [LibraryFile]) -> String {
+        Self.libraryDeleteLines(chosen, words: words).joined(separator: "\n")
+    }
+
+    static let deleteNamesShown = 8
+
+    static func libraryDeleteLines(_ chosen: [LibraryFile], words: Words) -> [String] {
+        var lines = [words.callIt("mac.delete_n_confirm", ["n": .number(Double(chosen.count))])]
+        lines.append("")
+        lines += chosen.prefix(deleteNamesShown).map { "\u{2022} " + $0.title }
+        if chosen.count > deleteNamesShown {
+            lines.append(words.callIt("mac.delete_and_more",
+                                      ["n": .number(Double(chosen.count - deleteNamesShown))]))
+        }
+        let grouped = chosen.filter { !($0.groupName ?? "").isEmpty }
+        if !grouped.isEmpty {
+            var names: [String] = []
+            for g in grouped.compactMap(\.groupName) where !names.contains(g) { names.append(g) }
+            lines.append("")
+            lines.append(words.callIt("mac.delete_in_groups",
+                                      ["n": .number(Double(grouped.count)),
+                                       "groups": .string(names.prefix(3).joined(separator: ", ")
+                                                         + (names.count > 3 ? "\u{2026}" : ""))]))
+        }
+        return lines
     }
 
     /// Delete several models at once: every folder to the Trash, then ONE
