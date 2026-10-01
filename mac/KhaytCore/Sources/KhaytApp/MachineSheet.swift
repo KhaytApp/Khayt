@@ -153,7 +153,8 @@ struct MachineSheet: View {
         // The tallest sheet in the app — 36 fields. A sheet cannot be moved, so
         // without this its buttons sit below the screen. See `SheetFrame`.
         SheetFrame(width: Self.width) {
-            Text(shop.words.callIt(isNew ? "mach.add" : "mach.edit")).font(.headline)
+            Text(said(isNew ? "mach.add" : "mach.edit",
+                       isNew ? "mac.mach_add_machine" : "mac.mach_edit_machine")).font(.headline)
 
             // §6: TABS ABOVE TWELVE FIELDS, AND NEVER AT OR BELOW.
             //
@@ -164,7 +165,7 @@ struct MachineSheet: View {
             // fields would be §6 failing in the other direction, a short form
             // pretending to be a preferences window.
             if tabbed {
-                SheetPanes(panes: Self.panes, chosen: $pane, words: shop.words) { id in
+                SheetPanes(panes: panesForKind, chosen: $pane, words: shop.words) { id in
                     VStack(alignment: .leading, spacing: 14) {
                         switch id {
                         case "connection": connectionPane
@@ -214,6 +215,23 @@ struct MachineSheet: View {
         .init(id: "value", titleKey: "mac.pane_value"),
     ]
 
+    /// The same panes, the first one named for what the machine is.
+    private var panesForKind: [Pane] {
+        Self.panes.map { $0.id == "printer" && !Self.isPrinter(kind)
+            ? Pane(id: $0.id, titleKey: "mac.pane_machine", problems: $0.problems) : $0 }
+    }
+
+    /// Is a machine of this kind a PRINTER? A laser cutter and a CNC router
+    /// are not (`lib/machine-kinds.js`), and the sheet called a laser "Edit
+    /// Printer", "Printer name", "Printer model" (alpha.56 review). Filament,
+    /// resin and UV are all printers.
+    static func isPrinter(_ kind: String) -> Bool { ["fdm", "resin", "uv"].contains(kind) }
+
+    /// The printer's word, or the machine's, by the kind being edited.
+    private func said(_ printerKey: String, _ machineKey: String) -> String {
+        shop.words.callIt(Self.isPrinter(kind) ? printerKey : machineKey)
+    }
+
     /// What this sheet is actually asking, which is not a constant.
     ///
     /// The design's table counted 13. That is the filament-printer-with-a-
@@ -238,8 +256,8 @@ struct MachineSheet: View {
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
-                    Text(shop.words.callIt("mach.name")).foregroundStyle(.secondary)
-                    TextField(shop.words.callIt("mach.name_ph"), text: $name)
+                    Text(said("mach.name", "mac.mach_name_machine")).foregroundStyle(.secondary)
+                    TextField(said("mach.name_ph", "mac.mach_name_ph_machine"), text: $name)
                         .textFieldStyle(.roundedBorder).focused($focused)
                 }
                 // FIRST, because it decides what the rest of this sheet is
@@ -257,10 +275,10 @@ struct MachineSheet: View {
                     .fixedSize()
                 }
                 GridRow {
-                    Text(shop.words.callIt("mach.printer_model")).foregroundStyle(.secondary)
+                    Text(said("mach.printer_model", "mac.mach_model_machine")).foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
-                            TextField(shop.words.callIt("mach.printer_model_ph"), text: $search)
+                            TextField(said("mach.printer_model_ph", "mac.mach_model_ph_machine"), text: $search)
                                 .textFieldStyle(.roundedBorder)
                             Menu {
                                 if matches.isEmpty {
@@ -277,7 +295,7 @@ struct MachineSheet: View {
                         }
                         // What the catalogue has checked about the model —
                         // and, by what is missing, what it has not.
-                        Text(model.isEmpty ? shop.words.callIt("mach.printer_model_hint") : model)
+                        Text(model.isEmpty ? said("mach.printer_model_hint", "mac.mach_model_hint_machine") : model)
                             .font(.callout).foregroundStyle(.secondary).lineLimit(2)
                     }
                 }
@@ -545,7 +563,7 @@ struct MachineSheet: View {
     @ViewBuilder private var valuePane: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(shop.words.callIt("mac.dep_title")).font(.subheadline.weight(.semibold))
-            Text(shop.words.callIt("mac.dep_what"))
+            Text(said("mac.dep_what", "mac.dep_what_machine"))
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
@@ -1463,7 +1481,10 @@ struct DowntimeEditor: View {
                 HStack(spacing: 8) {
                     DatePicker("", selection: binding(at, \.from), displayedComponents: [.date, .hourAndMinute])
                         .labelsHidden().datePickerStyle(.compact)
-                    Text("→").foregroundStyle(.tertiary)
+                    // A symbol, not a typed "→": the symbol turns round in a
+                    // right-to-left window and the character does not, so the
+                    // Arabic row pointed from the end back to the start.
+                    Image(systemName: "arrow.forward").foregroundStyle(.tertiary)
                     DatePicker("", selection: binding(at, \.to), displayedComponents: [.date, .hourAndMinute])
                         .labelsHidden().datePickerStyle(.compact)
                     TextField(words.callIt("mach.downtime_reason"), text: reason(at))
@@ -1474,6 +1495,10 @@ struct DowntimeEditor: View {
                         .buttonStyle(.borderless)
                         .help(words.callIt("common.delete"))
                 }
+                // The pickers read in the SHOP's language, as every date this
+                // app writes does (`Words.say`) — they took this Mac's, so an
+                // Arabic sheet showed an English date and AM/PM.
+                .environment(\.locale, words.locale)
                 // A window that reads backwards is dropped on save by the
                 // shared rule, silently — which would be a shop typing
                 // something and finding nothing there. It is said here instead,

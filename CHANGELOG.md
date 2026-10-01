@@ -62,6 +62,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   changes only the electricity price, and finds the same preset whether the
   setup was run in English or Arabic.
 
+- **(Mac) Fixes from the alpha.56 review.** The currency menu (Settings and
+  the first-run setup) and the tax-country menu now name each entry in the
+  shop's language and sort in it, rather than in English. The setup's summary
+  groups a printer's life hours (5,000), says in a sentence why Finish could
+  not save instead of showing Swift's error text, forgets that message when
+  the sheet closes, and no longer offers "Try the sample shop" while the
+  sample is what is already open. The machine sheet calls a laser cutter or a
+  CNC router a machine ("Edit Machine", "Machine name", "Machine model") and
+  not a printer; its downtime arrow turns round in Arabic and its date
+  pickers read in the shop's language. The spool sheet writes its unit as a
+  word (غ, not "g") and no longer repeats the unit in brackets beside the
+  reorder boxes; a consumable's unit cost carries the currency mark after the
+  box instead of "(SAR)" in the label; the Edit Job sheet is wider so its
+  priority control no longer runs into the right margin; and the feedback
+  sheet's wording is clearer about what the diagnostics file holds and when to
+  attach the book.
 - **(Mac) A first-run setup for a new shop.** An empty book, or a Mac with no
   book at all, now opens a short setup: your currency, VAT and electricity
   price; your printer (pick the model and its power is filled in), what it

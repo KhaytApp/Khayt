@@ -447,12 +447,16 @@ struct InvoicePane: View {
     @State private var example = ""
 
     private var countries: [(code: String, name: String)] {
-        shop.taxPresets.keys.map { code in
-            (code, Locale.current.localizedString(forRegionCode: code) ?? code)
-        }.sorted { $0.name < $1.name }
+        // The SHOP's language, not this Mac's — `Locale.current` named the
+        // countries in English under an Arabic window.
+        let locale = shop.words.locale
+        return shop.taxPresets.keys.map { code in
+            (code, locale.localizedString(forRegionCode: code) ?? code)
+        }.sorted { $0.name.compare($1.name, options: [.caseInsensitive], range: nil, locale: locale) == .orderedAscending }
     }
     private var currencies: [(code: String, label: String)] {
-        shop.currencies.map { ($0.key, $0.value.label) }.sorted { $0.label < $1.label }
+        // In the shop's language and sorted in it, like the first-run setup.
+        shop.words.currencyChoices(shop.currencies.mapValues(\.label), current: draft.currency)
     }
 
     var body: some View {

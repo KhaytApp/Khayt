@@ -12,8 +12,10 @@ import KhaytCore
 ///   step, and Skip clears that step's answers before moving on.
 /// - **Nothing is written until Finish**, and then in one write. Closing it
 ///   ("Not now", Escape) or choosing the sample writes nothing at all.
-/// - **A way out on every step**: the sample shop, for somebody who wants to
-///   see the app working before typing anything of their own.
+/// - **A way out on every step**: "Not now", and — on a real book — the
+///   sample shop, for somebody who wants to see the app working before typing
+///   anything of their own. With no book the sample is already open behind the
+///   sheet, so it is not offered again.
 /// - **It fits a 13-inch laptop.** A sheet cannot be moved, so it sits in
 ///   `SheetFrame`, which scrolls the questions and pins the buttons.
 struct ShopSetupSheet: View {
@@ -102,6 +104,10 @@ struct ShopSetupSheet: View {
             footer
         }
         .task { await shop.readCatalog() }
+        // What stopped the LAST Finish is not news to the next opening: it
+        // stayed on the sheet across a close and a reopen (alpha.56 review).
+        .onAppear { shop.setupProblem = nil }
+        .onDisappear { shop.setupProblem = nil }
     }
 
     // MARK: - The frame of every step
@@ -150,13 +156,18 @@ struct ShopSetupSheet: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            // The escape hatch, on every step.
-            Button(words.callIt("mac.setup_try_sample")) {
-                Task { await shop.setupChoseSample() }
+            // The escape hatch, on every step — while there is a real book to
+            // leave. On a Mac with no book the sample is ALREADY what is open
+            // behind this sheet, so "Try the sample shop instead" offered the
+            // thing on screen; "Not now" is the way out there.
+            if shop.source.isReal {
+                Button(words.callIt("mac.setup_try_sample")) {
+                    Task { await shop.setupChoseSample() }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Role.accInk)
+                .fixedSize()
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(Role.accInk)
-            .fixedSize()
             Spacer(minLength: 8)
             if step != .shop {
                 Button(words.callIt("mac.setup_back")) { move(-1) }
@@ -203,10 +214,9 @@ struct ShopSetupSheet: View {
     // MARK: - Step 1: the shop
 
     private var currencies: [(code: String, label: String)] {
-        let known = shop.currencies.map { ($0.key, $0.value.label) }.sorted { $0.1 < $1.1 }
-        // The book's own, even if the table has never heard of it, so the
-        // picker is never blank.
-        return known.contains { $0.0 == currency } ? known : [(currency, currency)] + known
+        // In the shop's language, sorted in it — and the book's own, even if
+        // the table has never heard of it, so the picker is never blank.
+        words.currencyChoices(shop.currencies.mapValues(\.label), current: currency)
     }
 
     @ViewBuilder private var shopStep: some View {
@@ -425,7 +435,8 @@ struct ShopSetupSheet: View {
                 ? words.callIt("mac.setup_sum_printer_value", [
                     "name": .string(Self.named(s.printerName)),
                     "price": .string(Self.isolated(Money.text(p.price, currency))),
-                    "hours": .string(Self.isolated(Words.plain(.number(p.lifeHours)))),
+                    // Grouped, like every other figure on screen: "5,000", not "5000".
+                    "hours": .string(Self.isolated(Money.quantity(p.lifeHours))),
                 ])
                 : words.callIt("mac.setup_sum_printer", ["name": .string(Self.named(s.printerName))]))
         }

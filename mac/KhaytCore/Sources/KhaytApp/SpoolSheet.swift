@@ -206,7 +206,7 @@ struct SpoolSheet: View {
                     }
                 }
                 GridRow {
-                    Text(shop.words.callIt("inv.reorder_point")).foregroundStyle(.secondary)
+                    Text(shop.words.callIt("mac.spool_reorder_point")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
                         TextField("", value: $reorderPoint, format: .number.precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
@@ -237,12 +237,16 @@ struct SpoolSheet: View {
                 // rule's to choose, and a nought written here would be this
                 // app deciding to order nothing.
                 GridRow {
-                    Text(shop.words.callIt("inv.reorder_qty")).foregroundStyle(.secondary)
+                    // Not the shared `inv.reorder_qty`: it carries the unit
+                    // in brackets beside the word after the box, and in
+                    // Arabic it says (كغ) over a box counted in grams.
+                    Text(shop.words.callIt("mac.spool_reorder_qty")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
                         TextField("", value: $reorderQty, format: .number.precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
-                        Text(unit.isEmpty ? shop.words.callIt("common.grams") : unit)
-                            .foregroundStyle(.secondary)
+                        // The unit's WORD, not its code — "g" sat in Latin
+                        // after an Arabic label.
+                        Text(shop.words.callIt(unitKey)).foregroundStyle(.secondary)
                     }
                 }
                 GridRow {
