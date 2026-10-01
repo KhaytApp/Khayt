@@ -62,53 +62,14 @@ struct OrdersTable: View {
         }
     }
 
+    /// The job cell's floor: the thumbnail's own height.
+    static let jobRowHeight: CGFloat = 20
+
     private var table: some View {
         Table(rows, selection: $shop.selection, sortOrder: $order,
               columnCustomization: $columns) {
             TableColumn(shop.words.callIt("mac.job"), value: \.project) { job in
-                HStack(spacing: 8) {
-                    if job.priority {
-                        Image(systemName: "flag.fill")
-                            .foregroundStyle(Khayt.attention)
-                            .help(shop.words.callIt("mac.is_urgent"))
-                    }
-                    // WHAT IT LOOKED LIKE. A shop scanning this table is
-                    // looking for the thing it made, and the picture was in the
-                    // library all along — every other screen showed it and this
-                    // one, the one people live in, did not. Absent for a job
-                    // that never named a model, and the row simply starts at
-                    // its title, so a book with no links is not a column of
-                    // grey squares.
-                    if let thumb = shop.modelThumbnail(for: job) {
-                        Thumbnail(source: thumb)
-                            .frame(width: 20, height: 20)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                    }
-                    // ONE LINE, NOT TWO.
-                    //
-                    // The name over the order number made every row 55pt tall,
-                    // so a 900pt window showed twelve jobs where the same table
-                    // ruled at 28 shows twenty-two. This is the screen a shop
-                    // lives in, and the thing it wants from it is to see the
-                    // work — the number is a reference you read once you have
-                    // found the row, not something you scan down.
-                    Text(job.project).lineLimit(1)
-                    Text(job.id)
-                        .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
-                        .layoutPriority(-1).lineLimit(1)
-                    // The colours it was printed in, as WORDS — the shop's own,
-                    // which is how it would be asked for over the counter. Not
-                    // swatches: nothing here maps "sand" to a colour, and a
-                    // guess would be this app's opinion of a physical thing.
-                    ForEach(shop.partColours(of: job).prefix(2), id: \.self) { colour in
-                        Text(colour)
-                            .font(.caption2)
-                            .padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(Khayt.recessed, in: Capsule())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1).layoutPriority(-1)
-                    }
-                }
+                JobTitleCell(shop: shop, job: job, thumbnail: shop.modelThumbnail(for: job))
             }
             // ── IDEALS THAT FIT, BECAUSE THEY ARE A FLOOR ────────────────────
             //
@@ -207,6 +168,80 @@ struct OrdersTable: View {
         }
         .background(Khayt.ground)
         .screenToolbar { NewJobButton(shop: shop) }
+    }
+}
+
+/// The Job column's cell: picture, title, why-no-money tag, number, colours.
+/// Its own view so it can be photographed — a `Table` cannot be.
+struct JobTitleCell: View {
+    let shop: Shop
+    let job: Order
+    /// `Shop.modelThumbnail(for:)`, handed in.
+    let thumbnail: ThumbnailSource?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if job.priority {
+                Image(systemName: "flag.fill")
+                    .foregroundStyle(Khayt.attention)
+                    .help(shop.words.callIt("mac.is_urgent"))
+            }
+            // WHAT IT LOOKED LIKE. A shop scanning this table is
+            // looking for the thing it made, and the picture was in the
+            // library all along — every other screen showed it and this
+            // one, the one people live in, did not. Absent for a job
+            // that never named a model, and the row simply starts at
+            // its title, so a book with no links is not a column of
+            // grey squares.
+            if let thumb = thumbnail {
+                Thumbnail(source: thumb)
+                    .frame(width: OrdersTable.jobRowHeight, height: OrdersTable.jobRowHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+            // ONE LINE, NOT TWO.
+            //
+            // The name over the order number made every row 55pt tall,
+            // so a 900pt window showed twelve jobs where the same table
+            // ruled at 28 shows twenty-two. This is the screen a shop
+            // lives in, and the thing it wants from it is to see the
+            // work — the number is a reference you read once you have
+            // found the row, not something you scan down.
+            // Never a printer's hash — see `JobTitle`. Display only.
+            Text(shop.shownTitle(of: job)).lineLimit(1)
+            // WHY ITS MONEY COLUMNS ARE DASHES. A job kept out of the
+            // business has no due date, total or balance to show, and
+            // three dashes with nothing beside them read as missing
+            // data. Never truncated: the title gives way first.
+            if job.nonBusiness == true {
+                Text(shop.words.callIt("mac.own_print"))
+                    .font(.caption2)
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .overlay(Capsule().strokeBorder(.tertiary, lineWidth: 1))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1).fixedSize()
+                    .help(shop.words.callIt("oe.non_business"))
+            }
+            Text(job.id)
+                .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                .layoutPriority(-1).lineLimit(1)
+            // The colours it was printed in, as WORDS — the shop's own,
+            // which is how it would be asked for over the counter. Not
+            // swatches: nothing here maps "sand" to a colour, and a
+            // guess would be this app's opinion of a physical thing.
+            ForEach(shop.partColours(of: job).prefix(2), id: \.self) { colour in
+                Text(colour)
+                    .font(.caption2)
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(Khayt.recessed, in: Capsule())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1).layoutPriority(-1)
+            }
+        }
+        // ONE ROW HEIGHT. The thumbnail is 20pt and a line of text is
+        // less, so a job with a picture stood about 6pt taller than
+        // one without and the table read ragged. Every row is at least
+        // the picture's height, with or without one.
+        .frame(minHeight: OrdersTable.jobRowHeight)
     }
 }
 

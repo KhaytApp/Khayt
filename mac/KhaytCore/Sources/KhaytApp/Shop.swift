@@ -14901,8 +14901,7 @@ final class Shop {
         let hidden = notOnScreen(chosen)
         guard hidden.isEmpty else {
             pendingLibraryDeletes = []
-            importProblem = words.callIt("mac.delete_not_on_screen",
-                                         ["n": .number(Double(hidden.count))])
+            importProblem = words.counting(hidden.count, "mac.delete_not_on_screen")
             return hidden
         }
         pendingLibraryDeletes = chosen
@@ -14916,8 +14915,7 @@ final class Shop {
         let hidden = notOnScreen(chosen)
         guard hidden.isEmpty else {
             pendingLibraryDeletes = []
-            importProblem = words.callIt("mac.delete_not_on_screen",
-                                         ["n": .number(Double(hidden.count))])
+            importProblem = words.counting(hidden.count, "mac.delete_not_on_screen")
             return
         }
         await deleteLibraryFiles(chosen)

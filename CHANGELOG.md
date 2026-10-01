@@ -28,6 +28,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Clearing the price removes it from that preset too, so it falls back to the
   shop's price. A preset the shop named itself is left alone. Saving the pane
   without touching the price keeps whatever was stored exactly as it was.
+- **Mac: fixes from the alpha.57 review.** A group tile inside another group
+  now names where it lives ("Set A · in Collection X"), and its picture lines
+  up with the model tiles beside it. The All models / Groups switch is hidden
+  inside an open group, where it did nothing. The kind menu beside a group's
+  name is drawn as a link instead of a greyed-out control. In Arabic, the
+  collection tile says "separate prints" instead of the word for "group". The
+  electricity hint shows its currency. A job logged from a printer with a hash
+  for its name is shown under its model's or file's name, or "Untitled print"
+  (the book is not changed). Every job row is the same height, and a job kept
+  out of the business is tagged "Own print". The off-screen delete refusal and
+  the multi-delete title count correctly in English and Arabic. The two kinds in
+  New Group line up, and the sync status in the title strip no longer breaks
+  mid-word.
 - **Selecting print files only ever holds what is on screen.** Changing the
   filter, the search or the view now drops any selected file it hides, and
   Delete refuses outright if anything selected is not shown. A selection used

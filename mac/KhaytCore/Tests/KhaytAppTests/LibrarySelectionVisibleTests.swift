@@ -203,14 +203,14 @@ struct LibrarySelectionVisibleTests {
         let hidden = shop.askToDeleteFromLibrary(everything)
         #expect(hidden.count == 30)
         #expect(shop.pendingLibraryDeletes.isEmpty)
-        #expect(shop.importProblem == shop.words.callIt("mac.delete_not_on_screen", ["n": .number(30)]))
+        #expect(shop.importProblem == shop.words.counting(30, "mac.delete_not_on_screen"))
 
         // And at Delete itself, should a question ever be open over them.
         shop.importProblem = nil
         shop.pendingLibraryDeletes = everything
         await shop.confirmLibraryDeletes()
         #expect(shop.pendingLibraryDeletes.isEmpty)
-        #expect(shop.importProblem == shop.words.callIt("mac.delete_not_on_screen", ["n": .number(30)]),
+        #expect(shop.importProblem == shop.words.counting(30, "mac.delete_not_on_screen"),
                 "went on to delete — on a sample book the refusal would be mac.move_sample")
         #expect(shop.files.count == 33)
     }

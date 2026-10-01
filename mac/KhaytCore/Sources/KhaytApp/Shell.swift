@@ -106,8 +106,11 @@ struct ShellTitleBar: View {
 
             Spacer(minLength: Space.md)
 
+            // Gives way before any word does: at 290 fixed, a library with
+            // several models selected (wider actions) squeezed the wordmark
+            // and the status into breaking mid-word.
             CommandField(shop: shop, wanted: $searchWanted)
-                .frame(width: 290)
+                .frame(minWidth: 160, maxWidth: 290)
 
             Spacer(minLength: Space.md)
 
@@ -119,6 +122,8 @@ struct ShellTitleBar: View {
                 .font(TypeScale.label(10))
                 .tracking(shop.words.language == "ar" ? 0 : 2.4)
                 .foregroundStyle(Role.onNavy3)
+                .lineLimit(1)
+                .fixedSize()
 
             // What this screen can do. The window has no title bar to put a
             // toolbar in any more, so the items its screens used to declare are
@@ -126,11 +131,20 @@ struct ShellTitleBar: View {
             ScreenActions(shop: shop)
 
             // What the book is doing. Two `Text`s, never one string — see §5.
+            //
+            // ONE LINE, EACH WORD WHOLE. When a selection widened the screen's
+            // actions, the strip squeezed this and "synced" broke mid-word onto
+            // two lines ("sync / ed", 04b-many-selected). The state word never
+            // gives way; the time after it is what truncates.
             HStack(spacing: Space.xs) {
                 Text(shop.words.callIt(shop.isCloudLinked ? "mac.synced" : "mac.offline"))
-                Text("·")
+                    .fixedSize()
+                Text("·").fixedSize()
                 Text(shop.lastSavedLabel)
+                    .truncationMode(.tail)
+                    .layoutPriority(-1)
             }
+            .lineLimit(1)
             .font(TypeScale.figure(10.5))
             .foregroundStyle(Role.onNavy3)
         }

@@ -399,7 +399,10 @@ struct BusinessPane: View {
                         }
                     }
                     Text(shop.words.callIt("mac.set_elec_rate_hint",
-                                           ["rate": .string(defaultElecRate.map { Money.fieldValue($0) } ?? "")]))
+                                           // With its currency, as every other money hint
+                                           // in Settings is: "Khayt's 0.18" said nothing
+                                           // about what 0.18 was.
+                                           ["rate": .string(defaultElecRate.map { Money.text($0, shop.currency) } ?? "")]))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

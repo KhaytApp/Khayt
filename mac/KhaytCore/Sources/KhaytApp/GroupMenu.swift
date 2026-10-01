@@ -111,7 +111,8 @@ enum TypedGroupName {
     }
 }
 
-private struct NameAGroup: View {
+/// Internal rather than private so its snapshot can be drawn.
+struct NameAGroup: View {
     let words: Words
     @Binding var typed: String
     /// The shop's groups, so the preview below says what will REALLY be
@@ -225,7 +226,15 @@ struct GroupKindChoice: View {
         VStack(alignment: .leading, spacing: 4) {
             Picker(selection: $kind) {
                 ForEach(GroupKind.allCases, id: \.self) { kind in
-                    Label(words.callIt(kind.wordKey), systemImage: kind.symbol).tag(kind)
+                    // The mark in a fixed-width slot: the puzzle piece is
+                    // wider than the stack, and the two names started at
+                    // different places (alpha.57 snapshot).
+                    Label {
+                        Text(words.callIt(kind.wordKey))
+                    } icon: {
+                        Image(systemName: kind.symbol).frame(width: 18)
+                    }
+                    .tag(kind)
                 }
             } label: {
                 EmptyView()
