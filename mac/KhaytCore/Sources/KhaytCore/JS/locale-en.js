@@ -269,7 +269,7 @@
   "plib.bulk_count": "{n} files selected.",
   "plib.bulk_del_btn": "Delete {n} files",
   "plib.bulk_del_confirm": "Remove {n} print files and everything they hold on disk? This cannot be undone.",
-  "plib.bulk_del_hidden": "{n} of these are not shown with the current filter. They are listed first.",
+  "plib.bulk_del_offscreen": "Nothing was deleted: {n} selected files are not shown ({names}). Show them, or select again.",
   "plib.bulk_del_title": "Delete the selected files",
   "plib.bulk_deleted": "{n} files deleted",
   "plib.bulk_filed": "{n} files updated",

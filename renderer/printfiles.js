@@ -422,9 +422,12 @@
   /**
    * The bar that appears once selecting is on.
    *
-   * It says how many are held even when the filter has moved on, because the
-   * alternative — a count of what is both selected and visible — would make
-   * "select the busts, then also the minis" impossible to trust.
+   * The selection only ever holds what is shown: narrowing the filter, the
+   * search or the view drops whatever it hides (pruneSelectionToShown). It used
+   * to be kept across filter changes so "the busts, then also the minis" could
+   * be gathered, and that is how the Mac deleted 34 models nobody meant to: a
+   * Delete over files that were not on screen. The maintainer's decision
+   * (2026-10-01): both apps refuse that.
    */
   function bulkBarHtml() {
     /* Not in the gallery. Its figures have no checkbox and no picked state, so
@@ -613,15 +616,19 @@
    * not be removed from disk must not read as gone.
    */
   function bulkDelete() {
-    // The selection is kept across filter changes on purpose (bulkBarHtml), so
-    // it can hold files the shop is not looking at. On the Mac exactly that
-    // deleted 34 models nobody meant to (a selection carried into hidden
-    // groups). Say how many are off screen, and list those first.
+    // Never over a file that is not on screen (see bulkBarHtml). Pruning makes
+    // this unreachable from the UI; it stays as the last line, because this is
+    // the one action here that cannot be taken back from inside Khayt.
     const shownIds = new Set(filtered(_query).map((r) => r.id));
-    const all = selectedRecords();
-    if (!all.length) return;
-    const recs = all.filter((r) => !shownIds.has(r.id)).concat(all.filter((r) => shownIds.has(r.id)));
-    const hidden = recs.length - all.filter((r) => shownIds.has(r.id)).length;
+    const recs = selectedRecords();
+    if (!recs.length) return;
+    const offscreen = recs.filter((r) => !shownIds.has(r.id));
+    if (offscreen.length) {
+      const names = offscreen.slice(0, 5).map((r) => r.name || r.originalName || r.id).join(', ');
+      toast((t('plib.bulk_del_offscreen', { n: String(offscreen.length), names })
+        || `Nothing was deleted: ${offscreen.length} selected files are not shown (${names}). Show them, or select again.`), 'error', 9000);
+      return;
+    }
     const n = recs.length;
     openFormModal({
       title: t('plib.bulk_del_title') || 'Delete the selected files',
@@ -629,8 +636,7 @@
       saveLabel: (t('plib.bulk_del_btn', { n: String(n) }) || `Delete ${n} files`),
       bodyHtml: `<p>${escapeHtml((t('plib.bulk_del_confirm', { n: String(n) })
         || `Remove ${n} print files and everything they hold on disk? This cannot be undone.`))}</p>
-        ${hidden ? `<p class="pf-del-hidden" style="color:var(--danger); font-weight:600;">${escapeHtml(t('plib.bulk_del_hidden', { n: String(hidden) })
-          || `${hidden} of these are not shown with the current filter. They are listed first.`)}</p>` : ''}
+
         <ul class="pf-del-list">${recs.slice(0, 8).map((r) => `<li>${escapeHtml(r.name || r.originalName || r.id)}</li>`).join('')}
         ${n > 8 ? `<li class="pf-del-more">${escapeHtml(t('plib.and_n_more', { n: String(n - 8) }) || `…and ${n - 8} more`)}</li>` : ''}</ul>`,
       async onSave() {
@@ -870,9 +876,19 @@
     return fileBarHtml('group') + fileBarHtml('category') + tagBarHtml() + grid;
   }
 
+  /** Drop from the selection whatever the current filter, search or view
+   *  hides. Called after every redraw of the list, so a selection can never
+   *  hold a file the shop cannot see. */
+  function pruneSelectionToShown() {
+    if (!_selected.size) return;
+    const shown = new Set(filtered(_query).map((r) => r.id));
+    for (const id of [..._selected]) if (!shown.has(id)) _selected.delete(id);
+  }
+
   function renderList() {
     const list = document.getElementById('pfList');
     if (list) list.innerHTML = listInnerHtml();
+    pruneSelectionToShown();
     // The pictures for WHAT WAS JUST DRAWN. This asked for every match — 3,415
     // thumbnails off disk to fill in 120 cards, on every keystroke.
     warmThumbs(visibleRows().slice(0, _page));
@@ -930,6 +946,7 @@
      *
      * The bar still renders above the grid; only the ORDER OF EVALUATION moved. */
     const listHtml = listInnerHtml();
+    pruneSelectionToShown();
     const bulkBar = bulkBarHtml();
     el.innerHTML = `
       <div class="pf-wrap">
