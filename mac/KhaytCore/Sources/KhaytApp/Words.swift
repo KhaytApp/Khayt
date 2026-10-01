@@ -1345,6 +1345,13 @@ final class Words {
         // shared `inv.reorder_qty` says (كغ) in Arabic over a box in grams.
         "mac.spool_reorder_point": ["en": "Reorder when below", "ar": "أعد الطلب عند أقل من"],
         "mac.spool_reorder_qty": ["en": "Default order quantity", "ar": "كمية الطلب الافتراضية"],
+        // The filament settings, for the same reason: the shared `inv.print_temp`,
+        // `inv.bed_temp` and `inv.max_speed` carry (°C) / (mm/s) in brackets
+        // because the other app draws no unit after the box. This sheet does
+        // (`mac.celsius`, `mac.mm_s`), so the shared words said it twice.
+        "mac.spool_print_temp": ["en": "Print temp", "ar": "حرارة الطباعة"],
+        "mac.spool_bed_temp": ["en": "Bed temp", "ar": "حرارة السطح"],
+        "mac.spool_max_speed": ["en": "Max speed", "ar": "السرعة القصوى"],
         "mac.first": ["en": "First", "ar": "أولًا"],
         "mac.then": ["en": "Then", "ar": "ثم"],
         "mac.add_a_machine": ["en": "Add a machine", "ar": "أضف آلة"],

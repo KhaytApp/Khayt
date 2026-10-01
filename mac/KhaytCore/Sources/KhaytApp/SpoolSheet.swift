@@ -242,7 +242,7 @@ struct SpoolSheet: View {
                     // Arabic it says (كغ) over a box counted in grams.
                     Text(shop.words.callIt("mac.spool_reorder_qty")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $reorderQty, format: .number.precision(.fractionLength(0)))
+                        TextField("", value: Self.blankWhenZero($reorderQty), format: .number.precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                         // The unit's WORD, not its code — "g" sat in Latin
                         // after an Arabic label.
@@ -250,17 +250,17 @@ struct SpoolSheet: View {
                     }
                 }
                 GridRow {
-                    Text(shop.words.callIt("inv.print_temp")).foregroundStyle(.secondary)
+                    Text(shop.words.callIt("mac.spool_print_temp")).foregroundStyle(.secondary)
                     degrees($printTemp)
                 }
                 GridRow {
-                    Text(shop.words.callIt("inv.bed_temp")).foregroundStyle(.secondary)
+                    Text(shop.words.callIt("mac.spool_bed_temp")).foregroundStyle(.secondary)
                     degrees($bedTemp)
                 }
                 GridRow {
-                    Text(shop.words.callIt("inv.max_speed")).foregroundStyle(.secondary)
+                    Text(shop.words.callIt("mac.spool_max_speed")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $maxSpeed, format: .number.precision(.fractionLength(0)))
+                        TextField("", value: Self.blankWhenZero($maxSpeed), format: .number.precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                         Text(shop.words.callIt("mac.mm_s")).foregroundStyle(.secondary)
                     }
@@ -495,10 +495,20 @@ struct SpoolSheet: View {
     /// A temperature box: the number, then °C. Empty when nobody has said.
     private func degrees(_ value: Binding<Double>) -> some View {
         HStack(spacing: 4) {
-            TextField("", value: value, format: .number.precision(.fractionLength(0)))
+            TextField("", value: Self.blankWhenZero(value), format: .number.precision(.fractionLength(0)))
                 .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
             Text(shop.words.callIt("mac.celsius")).foregroundStyle(.secondary)
         }
+    }
+
+    /// The box's view of a value where zero means "nobody has said": empty
+    /// rather than "0". Display only — the form still holds 0, so what Save
+    /// sends, and what `Shop.saveSpool` compares with the form as it opened,
+    /// is unchanged; emptying the box sets it back to 0, which is how the
+    /// rule is told to clear it.
+    static func blankWhenZero(_ value: Binding<Double>) -> Binding<Double?> {
+        Binding(get: { value.wrappedValue == 0 ? nil : value.wrappedValue },
+                set: { value.wrappedValue = $0 ?? 0 })
     }
 
     private func commit() {
