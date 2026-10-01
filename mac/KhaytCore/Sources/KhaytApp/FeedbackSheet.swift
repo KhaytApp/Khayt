@@ -45,8 +45,16 @@ struct FeedbackSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Toggle(shop.words.callIt("mac.feedback_screenshot"), isOn: $screenshot)
-                .disabled(shop.feedbackCapture?.png == nil)
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle(shop.words.callIt("mac.feedback_screenshot"), isOn: $screenshot)
+                    .disabled(shop.feedbackCapture?.png == nil)
+                // On by default, because it is the most useful thing in a
+                // report — so it says what it shows.
+                Text(shop.words.callIt("mac.feedback_screenshot_note"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 20)
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Toggle(shop.words.callIt("mac.feedback_book"), isOn: $book)

@@ -10847,6 +10847,17 @@ final class Shop {
     /// the caller. The book is `{}`: every collection is absent, which both
     /// apps read as empty, and the other app merges its default settings over
     /// whatever `settings` is there.
+    ///
+    /// AND THE REFUSAL IS ATOMIC. The first version checked `fileExists` and
+    /// then wrote with `StoreWriter.atomicWrite`, whose rename(2) REPLACES
+    /// whatever is at the path — so a book that appeared between the check and
+    /// the write (the other app's first save, a restore, a sync) was replaced
+    /// by `{}`. Now the empty book is written to a temporary file and moved in
+    /// with `renamex_np(RENAME_EXCL)`, which the kernel refuses with EEXIST if
+    /// anything is there by then; where the volume does not support that, a
+    /// hard link, which refuses the same way. Created 0600: a book is the
+    /// shop's customers and prices, and nobody else on this Mac needs it.
+    /// The `.prev` check stays a check — `.prev` is never written by this.
     static func startEmptyBook(at url: URL) throws {
         let fm = FileManager.default
         let prev = url.appendingPathExtension("prev")
@@ -10854,7 +10865,41 @@ final class Shop {
             throw CocoaError(.fileWriteFileExists)
         }
         try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try StoreWriter.atomicWrite(Data("{}".utf8), to: url)
+        try createNew(Data("{}".utf8), at: url)
+    }
+
+    /// Write `body` to `url` only if nothing is there, decided by the kernel at
+    /// the moment the file appears — never a check followed by a write. Mode
+    /// 0600. Throws `fileWriteFileExists` when something is there.
+    static func createNew(_ body: Data, at url: URL) throws {
+        let dir = url.deletingLastPathComponent()
+        let tmp = dir.appending(path: ".\(url.lastPathComponent).new.\(UUID().uuidString)")
+        let fd = Darwin.open(tmp.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        defer { Darwin.unlink(tmp.path) }
+        let wrote = body.withUnsafeBytes { bytes -> Bool in
+            var at = 0
+            while at < bytes.count {
+                let n = Darwin.write(fd, bytes.baseAddress! + at, bytes.count - at)
+                if n < 0 { if errno == EINTR { continue }; return false }
+                at += n
+            }
+            return true
+        }
+        let synced = Darwin.fsync(fd)
+        Darwin.close(fd)
+        guard wrote, synced == 0 else { throw POSIXError(.EIO) }
+        if Darwin.renamex_np(tmp.path, url.path, UInt32(RENAME_EXCL)) == 0 { return }
+        let failed = errno
+        if failed == EEXIST { throw CocoaError(.fileWriteFileExists) }
+        guard failed == ENOTSUP || failed == EINVAL else {
+            throw POSIXError(POSIXErrorCode(rawValue: failed) ?? .EIO)
+        }
+        // No RENAME_EXCL on this volume: link(2) never replaces either.
+        guard Darwin.link(tmp.path, url.path) == 0 else {
+            if errno == EEXIST { throw CocoaError(.fileWriteFileExists) }
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
     }
 
     // MARK: - The shop's own settings
