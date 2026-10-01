@@ -12710,7 +12710,7 @@ final class Shop {
         return rows.compactMap { try? decoder.decode(Client.self, from: encoder.encode($0)) }
     }
 
-    private static func decodeOrders(_ root: [String: JSONValue]) throws -> (items: [Order], skipped: [String]) {
+    static func decodeOrders(_ root: [String: JSONValue]) throws -> (items: [Order], skipped: [String]) {
         guard case .array(let rows)? = root["printLog"] else { return ([], []) }
         let encoder = JSONEncoder(), decoder = JSONDecoder()
         var items: [Order] = [], skipped: [String] = []

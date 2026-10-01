@@ -290,10 +290,13 @@ struct OrderDecodingTests {
         #expect(job.parts.isEmpty)
     }
 
-    @Test("and strict where a missing field would be a guess")
-    func strictWhereItMatters() {
-        // A row with no id, price or status is not a job with defaults — it is a
-        // row this app should refuse rather than invent an answer for.
+    @Test("strict only where nothing could find the job again: its id")
+    func strictWhereItMatters() throws {
+        // A row with no id cannot be written to — every write finds its record
+        // by id — so it is refused and counted. A row with no price or status
+        // is read the way `lib/` reads it (`+o.price || 0`, `stageOf` → none),
+        // because Khayt shows that job and this app hiding it was the fault.
+        // See `LenientOrderReadTests` for every field and the untouched save.
         for missing in ["id", "price", "status", "paymentStatus"] {
             var fields: [String: JSONValue] = [
                 "id": .string("J1"), "date": .string("2026-09-04"), "status": .string("pending"),
@@ -302,8 +305,15 @@ struct OrderDecodingTests {
                 "priority": .bool(false), "notes": .string(""),
             ]
             fields.removeValue(forKey: missing)
-            #expect((try? Self.decode(fields)) == nil, "a row with no \(missing) was accepted")
+            let job = try? Self.decode(fields)
+            if missing == "id" {
+                #expect(job == nil, "a row with no id was accepted")
+            } else {
+                #expect(job != nil, "a row with no \(missing) was refused")
+            }
         }
+        let noPrice = try Self.decode(["id": .string("J2")])
+        #expect(noPrice.price == 0 && noPrice.status == "" && Stage.of(noPrice) == nil)
     }
 
     @Test("a part with no id of its own still reads")

@@ -22,6 +22,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rule now deletes each job's survey link and the cloud's wrapped key itself, so
   the Mac's own copy of that step is gone; the feedback test still plants every
   token and checks none survives.
+- **(Mac) Jobs with a missing field or a price written as text show up.** A
+  job without a date, status, project name, price, amount paid, payment
+  status, print time, priority or notes, or with a number stored as text
+  (`"price": "120"`), was left off every screen and only counted as "could
+  not be read". Khayt for Windows/Linux showed it. The Mac now reads these
+  jobs the same way Khayt does: a missing or blank number is 0, a number
+  written as text is that number, missing text is empty, and a job with no
+  status goes in the board's "no column for this stage" note. These defaults
+  are only for display. Opening such a job and saving it without changes
+  leaves it exactly as it was in the book. A job with no id still can't be
+  read, and the app still says how many there are.
 - **(Mac) A feedback report's book carries no live links or keys.** The
   "include a copy of my book" attachment was masked the way the cloud copy is,
   which keeps each job's customer-portal link, quote-approval link and survey
