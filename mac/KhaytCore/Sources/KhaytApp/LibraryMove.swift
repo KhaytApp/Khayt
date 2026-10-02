@@ -124,6 +124,25 @@ enum LibraryMove {
         return out
     }
 
+    /// Only the files inside a RECORD's folder — `<root>/<item dir>/…`, where
+    /// the item dir is one the book names (`LibraryLocation.itemDirName` of a
+    /// record's id) or Khayt's own `PF-…` shape.
+    ///
+    /// ── A PAST ROOT IS NOT KHAYT'S WHOLE FOLDER ──────────────────────────
+    ///
+    /// A shop that once pointed the library at `~/Documents` or a Dropbox
+    /// folder, then moved it, had EVERY file under that folder walked, copied
+    /// into the new library and its original sent to the Trash — tax returns
+    /// and photos included, and from a synced folder, on every device. What
+    /// Khayt put there is the record folders; that is all it may take back.
+    static func walk(_ root: String, recordDirs: Set<String>) -> [Item] {
+        walk(root).filter { item in
+            let parts = item.rel.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2, let dir = parts.first.map(String.init) else { return false }
+            return recordDirs.contains(dir) || dir.hasPrefix("PF-")
+        }
+    }
+
     static func sha256(_ url: URL) throws -> String {
         let h = try FileHandle(forReadingFrom: url)
         defer { try? h.close() }
@@ -222,7 +241,10 @@ extension Shop {
         guard let roots = libraryRoots else { return }
         let primary = roots.primary
         let from = LibraryMove.sources(roots: roots.roots, primary: primary, mirror: roots.mirror)
-        let items = await Task.detached { from.flatMap(LibraryMove.walk) }.value
+        // Every record's folder, archived ones included: their files are
+        // still the book's. Nothing else under an old root is ours to move.
+        let recordDirs = Set(files.map { LibraryLocation.itemDirName($0.id) })
+        let items = await Task.detached { from.flatMap { LibraryMove.walk($0, recordDirs: recordDirs) } }.value
         guard !items.isEmpty else {
             libraryMoveNote = words.callIt("mac.libmove_nothing"); return
         }

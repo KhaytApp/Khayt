@@ -12,6 +12,8 @@ import KhaytCore
 struct LibraryLocationSettings: View {
     let shop: Shop
     @State private var pending: URL?
+    /// `Shop.importMovesOriginals` — the same default the Add panel asks.
+    @AppStorage(Shop.importMovesOriginalsKey) private var movesOriginals = false
 
     private var here: String { shop.libraryRoots?.primary ?? "" }
     private var inICloud: Bool {
@@ -47,6 +49,14 @@ struct LibraryLocationSettings: View {
             .disabled(shop.libraryMoveBusy || !shop.canMoveJobs)
             if !shop.canMoveJobs { BookLockedNote(shop: shop) }
             Text(shop.words.callIt("mac.libmove_hint"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            // ── WHAT ADDING A MODEL DOES TO THE ORIGINAL ─────────────────
+            Picker(shop.words.callIt("mac.import_originals_title"), selection: $movesOriginals) {
+                Text(shop.words.callIt("mac.import_keep_originals")).tag(false)
+                Text(shop.words.callIt("mac.import_move_originals")).tag(true)
+            }
+            Text(shop.words.callIt("mac.import_originals_hint"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             // ── FOLDERS INDEXED WHERE THEY ARE ───────────────────────────

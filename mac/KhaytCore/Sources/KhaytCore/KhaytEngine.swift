@@ -8459,8 +8459,16 @@ public actor KhaytEngine {
         public let size: Double
         public let mtimeMs: Double
         public let id: String?
-        public init(filename: String, fullPath: String, size: Double, mtimeMs: Double, id: String?) {
+        /// The latest of the import, the last print and the last open, when
+        /// the caller knows them — a copied file keeps the download's mtime,
+        /// so the mtime alone ages a model imported yesterday by years.
+        public var lastUsedMs: Double?
+        /// A job not yet finished needs this model: never moved off.
+        public var inUse: Bool?
+        public init(filename: String, fullPath: String, size: Double, mtimeMs: Double, id: String?,
+                    lastUsedMs: Double? = nil, inUse: Bool? = nil) {
             self.filename = filename; self.fullPath = fullPath; self.size = size; self.mtimeMs = mtimeMs; self.id = id
+            self.lastUsedMs = lastUsedMs; self.inUse = inUse
         }
     }
 

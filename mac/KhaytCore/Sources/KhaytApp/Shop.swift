@@ -107,6 +107,9 @@ final class Shop {
     var cloudLibraryProblem: String?
     var cloudLibraryBusy = false
     var cloudProgress: (done: Int, total: Int, name: String)?
+    /// Models moved off this Mac whose online copy is no longer there — see
+    /// `verifyCloudCopies`. Said on every screen until it is empty.
+    var cloudMissing: [MissingCopy] = []
     /// Who has this book open, when that is somebody else. Nil when nothing
     /// claims it — which is the ordinary case, and says nothing on screen.
     private(set) var owner: String?
@@ -9091,8 +9094,36 @@ final class Shop {
         // slicer, and a panel that will open nothing is worse than one that
         // opens too much.
         panel.allowsOtherFileTypes = true
+        // WHAT HAPPENS TO THE ORIGINALS, asked in the same panel and
+        // remembered — see `importMovesOriginals`. Keeping them is the default.
+        let choice = NSPopUpButton(frame: NSRect(x: 12, y: 5, width: 420, height: 24), pullsDown: false)
+        choice.addItems(withTitles: [words.callIt("mac.import_keep_originals"),
+                                     words.callIt("mac.import_move_originals")])
+        choice.selectItem(at: importMovesOriginals ? 1 : 0)
+        let holder = NSView(frame: NSRect(x: 0, y: 0, width: 444, height: 34))
+        holder.addSubview(choice)
+        panel.accessoryView = holder
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
-        await addModelsToLibrary(panel.urls)
+        let moves = choice.indexOfSelectedItem == 1
+        UserDefaults.standard.set(moves, forKey: Self.importMovesOriginalsKey)
+        await addModelsToLibrary(panel.urls, movesOriginals: moves)
+    }
+
+    /// Where the shop's answer to "keep my original files?" is remembered —
+    /// this Mac's own defaults, not the book: it is about this Mac's folders.
+    static let importMovesOriginalsKey = "libraryImportMovesOriginals"
+
+    /// Adding models MOVES the originals in (they go to the Trash) only when
+    /// the shop chose that. Absent is keep.
+    ///
+    /// ── WHY KEEP IS THE DEFAULT ───────────────────────────────────────────
+    ///
+    /// Every import used to trash its source. For a model in iCloud Drive or
+    /// Dropbox that is a delete on every device the folder syncs to — the
+    /// shop's other Mac, a partner's laptop — for a file it only meant to add
+    /// here. A duplicate in Downloads is the recoverable half of that trade.
+    var importMovesOriginals: Bool {
+        UserDefaults.standard.bool(forKey: Self.importMovesOriginalsKey)
     }
 
     /// Every model under what was chosen, in a stable order.
@@ -9159,7 +9190,8 @@ final class Shop {
     ///
     /// `known` grows as it goes, so two copies of the same model inside one
     /// selection do not both get in.
-    func addModelsToLibrary(_ chosen: [URL]) async {
+    func addModelsToLibrary(_ chosen: [URL], movesOriginals: Bool? = nil) async {
+        let keepOriginal = !(movesOriginals ?? importMovesOriginals)
         clearLastOutcome()
         importCancelled = false
         guard let build = source.build, StoreLock.weOwnIt(build) else {
@@ -9178,7 +9210,9 @@ final class Shop {
         //
         // The archive itself is never consumed: it stays where the shop put it,
         // and only copies of the models inside are moved into the vault.
-        var files = Self.modelsUnder(chosen, skippingAll: roots.roots + [roots.primary])
+        // Linked folders too: their files are indexed WHERE THEY ARE, and an
+        // import from inside one would pull a file out from under its record.
+        var files = Self.modelsUnder(chosen, skippingAll: roots.roots + [roots.primary] + linkedFolders)
         var scratches: [URL] = []
         var refusals: [String] = []
         for url in chosen where ArchiveImport.kinds.contains(url.pathExtension.lowercased()) {
@@ -9228,6 +9262,7 @@ final class Shop {
             knownHashes: Set(self.files.compactMap(\.contentHash)),
             nameOfExisting: { titles[$0] },
             engine: engine,
+            keepOriginal: keepOriginal,
             analyseRisk: analysesRiskAtImport,
             owns: { StoreLock.weOwnIt(build) },
             whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
@@ -9244,7 +9279,7 @@ final class Shop {
             let ids = report.addedIds
             Task { [weak self] in await self?.backUpToCloud(ids: ids) }
         }
-        importNote = words.callIt("mac.import_done", [
+        importNote = words.callIt(keepOriginal ? "mac.import_done_kept" : "mac.import_done", [
             "moved": .number(Double(report.moved)),
             "duplicates": .number(Double(report.duplicates)),
             "failed": .number(Double(report.failures.count)),

@@ -392,27 +392,143 @@ enum CloudLibrary {
     /// Bring a model that was moved to the cloud back to where it was. A model
     /// that is here already is left alone. Size then SHA-256 must match what
     /// the sidecar recorded, or nothing is written.
+    ///
+    /// The one remote it is given, whatever the sidecar says — kept for the
+    /// callers that have only one. The shop's own path is `remotes:` below.
     static func bringBack(_ model: URL, config: Config?, engine: KhaytEngine) async throws {
+        try await bringBack(model, remotes: { _ in config.map { [$0.remote] } ?? [] }, engine: engine)
+    }
+
+    /// The same, asking `remotes` WHERE the sidecar says the model went.
+    ///
+    /// ── THE SIDECAR NAMES ITS PROVIDER ─────────────────────────────────────
+    ///
+    /// It used to fetch from whichever remote is in use TODAY. A model moved
+    /// to a bucket, then the library switched to Google Drive: every bring-back
+    /// asked Drive, Drive had nothing, and the shop was told the cloud had lost
+    /// a model that was sitting in the bucket the whole time. The sidecar's
+    /// `provider` is asked first now (`remoteOrder`), then the other one — the
+    /// other app writes the BUCKET's endpoint there even for a Drive move, so
+    /// the field is a first guess, not a promise. Trying the second is safe:
+    /// the hash below refuses anything that is not these exact bytes.
+    static func bringBack(_ model: URL, remotes: (KhaytEngine.Sidecar) async -> [LibraryRemote],
+                          engine: KhaytEngine) async throws {
         let fm = FileManager.default
         if fm.fileExists(atPath: model.path) { return }
         let sideURL = sidecar(for: model)
         guard let text = try? String(contentsOf: sideURL, encoding: .utf8),
               let side = try await engine.parseSidecar(text) else { throw Failure.noSidecar }
-        guard let config else { throw S3.Failure.notConfigured }
-        // The key the SIDECAR recorded, not one rebuilt from today's prefix.
-        guard let data = try await config.remote.get(side.key, fetch: fetch) else {
-            throw Failure.bucketLostIt
+        let candidates = await remotes(side)
+        guard !candidates.isEmpty else { throw S3.Failure.notConfigured }
+        var problem: Error?
+        for remote in candidates {
+            do {
+                // The key the SIDECAR recorded, not one rebuilt from today's prefix.
+                guard let data = try await remote.get(side.key, fetch: fetch) else { continue }
+                let verdict = try await engine.verifyRehydrate(side, size: data.count, sha256: S3.sha256Hex(data))
+                guard verdict.ok else { problem = Failure.badDownload(verdict.error); continue }
+                let part = model.deletingLastPathComponent()
+                    .appending(path: model.lastPathComponent + ".part-\(ProcessInfo.processInfo.processIdentifier)")
+                try data.write(to: part, options: .atomic)
+                if rename(part.path, model.path) != 0 {
+                    try? fm.removeItem(at: part)
+                    throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                }
+                try? fm.removeItem(at: sideURL)
+                return
+            } catch let e as POSIXError {
+                throw e
+            } catch {
+                problem = error
+            }
         }
-        let verdict = try await engine.verifyRehydrate(side, size: data.count, sha256: S3.sha256Hex(data))
-        guard verdict.ok else { throw Failure.badDownload(verdict.error) }
-        let part = model.deletingLastPathComponent()
-            .appending(path: model.lastPathComponent + ".part-\(ProcessInfo.processInfo.processIdentifier)")
-        try data.write(to: part, options: .atomic)
-        if rename(part.path, model.path) != 0 {
-            try? fm.removeItem(at: part)
-            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        throw problem ?? Failure.bucketLostIt
+    }
+
+    /// Which remote a sidecar's `provider` names: `gdrive` is Drive; any other
+    /// non-empty value is a bucket's endpoint; empty says nothing (nil).
+    nonisolated static func route(provider: String?) -> Remote? {
+        let p = (provider ?? "").trimmingCharacters(in: .whitespaces)
+        if p.isEmpty { return nil }
+        return p == "gdrive" ? .drive : .bucket
+    }
+
+    /// The remotes to ask for a moved model, in order: the one its sidecar
+    /// names (else the one in use), then the other.
+    nonisolated static func remoteOrder(provider: String?, current: Remote) -> [Remote] {
+        let first = route(provider: provider) ?? (current == .drive ? .drive : .bucket)
+        return first == .drive ? [.drive, .bucket] : [.bucket, .drive]
+    }
+
+    /// How many moved models switching to `target` would leave on the OTHER
+    /// remote — the ones whose sidecar names a remote that is not `target`.
+    /// A sidecar that names none is counted as the remote in use.
+    nonisolated static func stranded(switchingTo target: Remote, providers: [String?], current: Remote) -> Int {
+        guard target != .none else { return 0 }
+        return providers.filter { remoteOrder(provider: $0, current: current).first != target }.count
+    }
+
+    // MARK: - How long since a model was last needed
+
+    /// What the book knows about one record's use, keyed by its folder name.
+    struct Usage: Equatable, Sendable {
+        /// The latest of: added to the library, last printed, last on a job.
+        var lastUsedMs: Double
+        /// A job that is not finished has it on a part.
+        var inUse: Bool
+        var title: String
+    }
+
+    /// A job in one of these is over — the model may leave this Mac.
+    /// `Shop.finishedStatuses` plus the two ways a job ends without one.
+    static let doneStatuses: Set<String> = Shop.finishedStatuses.union(["cancelled", "canceled", "shipped"])
+
+    /// Every record's use, from the book alone.
+    ///
+    /// ── WHY NOT THE FILE'S MTIME ─────────────────────────────────────────
+    ///
+    /// `copyItem` keeps the original's modification time, so a model the shop
+    /// downloaded in 2024 and imported last week read as two years unused:
+    /// 113 of one shop's 328 models (1.39 GB), all imported in Sep 2026, were
+    /// offered for "Free up space now". The record's own date, its last print
+    /// and the jobs that name it are what "used" means; the mtime is only one
+    /// more vote (`lib/print-library-tier.js evictable`, the newest wins).
+    static func usage(files: [LibraryFile], orders: [Order]) -> [String: Usage] {
+        var out: [String: Usage] = [:]
+        let ms = { (d: Date?) -> Double in (d?.timeIntervalSince1970 ?? 0) * 1000 }
+        for f in files {
+            let last = max(ms(f.createdAt?.date), ms(f.lastPrintedDate))
+            out[LibraryLocation.itemDirName(f.id)] = Usage(lastUsedMs: last, inUse: false, title: f.title)
         }
-        try? fm.removeItem(at: sideURL)
+        for o in orders {
+            let open = !doneStatuses.contains(o.status)
+            let when = max(ms(Order.day(o.date)), ms(Order.day(o.completedAt)))
+            for id in Set(o.parts.compactMap(\.printFileId)) where !id.isEmpty {
+                let dir = LibraryLocation.itemDirName(id)
+                var u = out[dir] ?? Usage(lastUsedMs: 0, inUse: false, title: id)
+                u.lastUsedMs = max(u.lastUsedMs, when)
+                if open { u.inUse = true }
+                out[dir] = u
+            }
+        }
+        return out
+    }
+
+    /// The listing with what the book knows folded in, for the shared rule.
+    nonisolated static func annotate(_ files: [KhaytEngine.TierFile], usage: [String: Usage]) -> [KhaytEngine.TierFile] {
+        files.map { f in
+            guard let u = usage[f.id ?? ""] else { return f }
+            var g = f
+            g.lastUsedMs = max(f.lastUsedMs ?? 0, u.lastUsedMs)
+            g.inUse = u.inUse
+            return g
+        }
+    }
+
+    /// "a, b, c and 4 more" — the first few names in a confirmation.
+    nonisolated static func firstNames(_ names: [String], shown: Int = 5, more: (Int) -> String) -> String {
+        let head = names.prefix(shown).joined(separator: ", ")
+        return names.count > shown ? head + " " + more(names.count - shown) : head
     }
 
     /// The model files in the library, one level down (`<root>/<item>/<file>`)
@@ -426,15 +542,20 @@ enum CloudLibrary {
         var out: [KhaytEngine.TierFile] = []
         for item in items {
             guard (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
-            let files = (try? fm.contentsOfDirectory(at: item, includingPropertiesForKeys:
-                            [.fileSizeKey, .contentModificationDateKey], options: [.skipsHiddenFiles])) ?? []
+            let keys: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey, .addedToDirectoryDateKey,
+                                             .isDirectoryKey]
+            let files = (try? fm.contentsOfDirectory(at: item, includingPropertiesForKeys: Array(keys),
+                                                     options: [.skipsHiddenFiles])) ?? []
             for file in files {
-                let values = try? file.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .isDirectoryKey])
+                let values = try? file.resourceValues(forKeys: keys)
                 guard values?.isDirectory != true else { continue }
+                // When the file landed in its folder — the import, for a copy
+                // whose mtime is still the download's. See `usage`.
+                let added = values?.addedToDirectoryDate.map { $0.timeIntervalSince1970 * 1000 }
                 out.append(.init(filename: file.lastPathComponent, fullPath: file.path,
                                  size: Double(values?.fileSize ?? 0),
                                  mtimeMs: (values?.contentModificationDate ?? Date()).timeIntervalSince1970 * 1000,
-                                 id: item.lastPathComponent))
+                                 id: item.lastPathComponent, lastUsedMs: added))
             }
         }
         return out
@@ -522,10 +643,53 @@ extension Shop {
         if failed > 0 { cloudLibraryProblem = words.callIt("mac.cloudlib_backup_some_failed", ["n": .number(Double(failed))]) }
     }
 
+    /// What the shared rule plans, with what the book knows folded in: the
+    /// import date, the last print, the jobs still open — see
+    /// `CloudLibrary.usage`.
+    private func tierPlan(engine: KhaytEngine, config: CloudLibrary.Config,
+                          roots: LibraryLocation.Roots) async -> KhaytEngine.TierPlan? {
+        let listed = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value
+        let all = CloudLibrary.annotate(listed, usage: CloudLibrary.usage(files: files, orders: orders))
+        return try? await engine.tierPlan(all, policy: config.tier, now: Date())
+    }
+
+    /// What "Free up space now" would do, for the shop to confirm FIRST: how
+    /// many models, how much, and the first few by name. Nil when nothing is
+    /// set up; a preview with no paths when nothing qualifies.
+    struct FreeUpPreview: Equatable, Sendable {
+        var count: Int
+        var size: String
+        var names: [String]
+        /// Exactly these, and no others, are moved when the shop says yes.
+        var paths: Set<String>
+        var destination: String
+    }
+
+    func freeUpSpacePreview() async -> FreeUpPreview? {
+        cloudLibraryProblem = nil
+        cloudLibraryNote = nil
+        guard let engine, let config = await cloudConfig(), let roots = libraryRoots else {
+            cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return nil
+        }
+        guard config.tierEnabled else { cloudLibraryProblem = words.callIt("mac.cloudlib_tier_off"); return nil }
+        guard let plan = await tierPlan(engine: engine, config: config, roots: roots) else { return nil }
+        let titles = Dictionary(files.map { (LibraryLocation.itemDirName($0.id), $0.title) },
+                                uniquingKeysWith: { a, _ in a })
+        return FreeUpPreview(count: plan.candidates.count,
+                             size: (try? await engine.formatBytes(plan.bytes)) ?? "",
+                             names: plan.candidates.map { titles[$0.id ?? ""] ?? $0.filename },
+                             paths: Set(plan.candidates.map(\.fullPath)),
+                             destination: words.callIt(config.isDrive ? "mac.cloudlib_where_drive" : "mac.cloudlib_where_bucket"))
+    }
+
     /// Move the models nobody has used for a while to the cloud, freeing this
     /// Mac's disk. Each is proved to be in the bucket before its local copy
     /// goes; see `CloudLibrary.ensureInBucket`.
-    func freeUpSpace() async {
+    ///
+    /// Only the models the shop CONFIRMED (`only`, from `freeUpSpacePreview`),
+    /// and of those only the ones the rule still picks now — a job opened
+    /// since the preview keeps its model.
+    func freeUpSpace(only confirmed: Set<String>) async {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
         guard let engine, let config = await cloudConfig(), let roots = libraryRoots else {
@@ -534,12 +698,12 @@ extension Shop {
         guard config.tierEnabled else { cloudLibraryProblem = words.callIt("mac.cloudlib_tier_off"); return }
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false; cloudProgress = nil }
-        let all = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value
-        guard let plan = try? await engine.tierPlan(all, policy: config.tier, now: Date()) else { return }
+        guard let plan = await tierPlan(engine: engine, config: config, roots: roots) else { return }
+        let candidates = plan.candidates.filter { confirmed.contains($0.fullPath) }
         var moved = 0, freed = 0.0
         var failures: [String] = []
-        for (i, file) in plan.candidates.enumerated() {
-            cloudProgress = (done: i, total: plan.candidates.count, name: file.filename)
+        for (i, file) in candidates.enumerated() {
+            cloudProgress = (done: i, total: candidates.count, name: file.filename)
             let url = URL(fileURLWithPath: file.fullPath)
             let key = S3.objectKey(prefix: config.prefix, id: file.id ?? "", filename: file.filename)
             do {
@@ -560,10 +724,32 @@ extension Shop {
         }
         let human = (try? await engine.formatBytes(freed)) ?? ""
         cloudLibraryNote = words.callIt("mac.cloudlib_freed", ["n": .number(Double(moved)),
-                                                     "total": .number(Double(plan.candidates.count)),
+                                                     "total": .number(Double(candidates.count)),
                                                      "size": .string(human)])
         if !failures.isEmpty { cloudLibraryProblem = failures.prefix(3).joined(separator: "\n") }
         await load(source)
+    }
+
+    /// The remotes a moved model may be on, the one its sidecar names first
+    /// — see `CloudLibrary.bringBack(_:remotes:engine:)`. Each is opened
+    /// whether or not it is the one in use: a bucket switched off still
+    /// holds what was moved to it.
+    func cloudRemotes(for side: KhaytEngine.Sidecar) async -> [LibraryRemote] {
+        let settings = settingsDict, build = source.build
+        let current = await CloudLibrary.remoteInUse(settings, build: build)
+        var out: [LibraryRemote] = []
+        for r in CloudLibrary.remoteOrder(provider: side.provider, current: current) {
+            switch r {
+            case .bucket:
+                if let c = await CloudLibrary.libraryBucket(settings: settings, build: build) { out.append(.bucket(c)) }
+            case .drive:
+                if let d = await CloudLibrary.libraryDrive(settings: settings, build: build) {
+                    out.append(.drive(DriveClient(d.config, fetch: CloudLibrary.fetch)))
+                }
+            case .none: break
+            }
+        }
+        return out
     }
 
     /// Bring one model back from the cloud, for a shop about to use it.
@@ -574,10 +760,9 @@ extension Shop {
             .filter { $0.hasSuffix(".cloud") }
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false }
-        let config = await cloudConfig()
         for name in sidecars {
             let model = dir.appending(path: String(name.dropLast(".cloud".count)))
-            do { try await CloudLibrary.bringBack(model, config: config, engine: engine) }
+            do { try await CloudLibrary.bringBack(model, remotes: { await self.cloudRemotes(for: $0) }, engine: engine) }
             catch { cloudLibraryProblem = words.callIt("mac.cloudlib_bring_back_failed") + " " + cloudSay(error) }
         }
         await load(source)
@@ -588,7 +773,6 @@ extension Shop {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
         guard let engine, let roots = libraryRoots else { return }
-        let config = await cloudConfig()
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false; cloudProgress = nil }
         let sidecars = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value
@@ -598,12 +782,15 @@ extension Shop {
         for (i, side) in sidecars.enumerated() {
             cloudProgress = (done: i, total: sidecars.count, name: side.filename)
             let model = URL(fileURLWithPath: String(side.fullPath.dropLast(".cloud".count)))
-            do { try await CloudLibrary.bringBack(model, config: config, engine: engine); back += 1 }
-            catch { failures.append(model.lastPathComponent + ": " + cloudSay(error)) }
+            do {
+                try await CloudLibrary.bringBack(model, remotes: { await self.cloudRemotes(for: $0) }, engine: engine)
+                back += 1
+            } catch { failures.append(model.lastPathComponent + ": " + cloudSay(error)) }
         }
         cloudLibraryNote = words.callIt("mac.cloudlib_brought_back", ["n": .number(Double(back))])
         if !failures.isEmpty { cloudLibraryProblem = failures.prefix(3).joined(separator: "\n") }
         await load(source)
+        await verifyCloudCopies()
     }
 
     /// What the settings pane shows before anything is pressed: how many
@@ -612,8 +799,127 @@ extension Shop {
         guard let engine, let roots = libraryRoots, let config = await cloudConfig() else { return nil }
         let all = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value
         let inCloud = all.filter { $0.filename.hasSuffix(".cloud") }.count
-        guard let plan = try? await engine.tierPlan(all, policy: config.tier, now: Date()) else { return nil }
+        guard let plan = await tierPlan(engine: engine, config: config, roots: roots) else { return nil }
         return (plan.candidates.count, (try? await engine.formatBytes(plan.bytes)) ?? "", inCloud)
+    }
+
+    // MARK: - Is every moved model still there?
+
+    /// One moved model whose online copy did not answer.
+    struct MissingCopy: Identifiable, Equatable, Sendable {
+        /// Where the model was on this Mac.
+        var id: String
+        var name: String
+        var key: String
+        /// In Drive's Trash: it can be restored from there.
+        var inTrash: Bool
+    }
+
+    /// The sidecars under the library, read: where each model went.
+    private func movedModels(engine: KhaytEngine, roots: LibraryLocation.Roots) async
+        -> [(model: URL, side: KhaytEngine.Sidecar)] {
+        let listed = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value
+            .filter { $0.filename.hasSuffix(".cloud") }
+        var out: [(URL, KhaytEngine.Sidecar)] = []
+        for s in listed {
+            guard let text = try? String(contentsOfFile: s.fullPath, encoding: .utf8),
+                  let side = try? await engine.parseSidecar(text) else { continue }
+            out.append((URL(fileURLWithPath: String(s.fullPath.dropLast(".cloud".count))), side))
+        }
+        return out
+    }
+
+    /// Ask the cloud, for every model moved off this Mac, whether it still
+    /// holds it — at the size the sidecar recorded.
+    ///
+    /// ── AFTER A MOVE, THE CLOUD IS THE ONLY COPY ─────────────────────────
+    ///
+    /// Freeing space proves the copy before it deletes the local one, and then
+    /// nothing ever looked again. A Drive file trashed by hand, a bucket
+    /// lifecycle rule, a prefix changed — the model is gone and the library
+    /// still shows it as "In the cloud" until the day a job needs it. Asked
+    /// on launch and once a day after (`verifyCloudCopiesIfDue`), and said on
+    /// every screen (`MoveBanners`) until it is dealt with.
+    ///
+    /// A remote that cannot be asked (offline, a sign-in that has lapsed) is
+    /// NOT "missing": only an answer of "not there" or "wrong size" is.
+    func verifyCloudCopies() async {
+        guard source.build != nil, let engine, let roots = libraryRoots else { return }
+        let moved = await movedModels(engine: engine, roots: roots)
+        var missing: [MissingCopy] = []
+        let titles = Dictionary(files.map { (LibraryLocation.itemDirName($0.id), $0.title) },
+                                uniquingKeysWith: { a, _ in a })
+        for (model, side) in moved {
+            let remotes = await cloudRemotes(for: side)
+            guard !remotes.isEmpty else { continue }
+            var found = false, unasked = false, inTrash = false
+            for remote in remotes {
+                do {
+                    if let head = try await remote.head(side.key, fetch: CloudLibrary.fetch),
+                       Double(head.size) == side.size {
+                        found = true; break
+                    }
+                    if try await remote.trashedCopy(side.key, fetch: CloudLibrary.fetch) != nil { inTrash = true }
+                } catch {
+                    unasked = true
+                }
+            }
+            // Missing only when EVERY remote answered and none has it.
+            guard !found, !unasked else { continue }
+            let dir = model.deletingLastPathComponent().lastPathComponent
+            missing.append(MissingCopy(id: model.path, name: titles[dir] ?? model.lastPathComponent,
+                                       key: side.key, inTrash: inTrash))
+        }
+        cloudMissing = missing
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.cloudCheckedKey)
+    }
+
+    static let cloudCheckedKey = "cloudLibraryCopiesCheckedAt"
+
+    /// `verifyCloudCopies`, when a day has passed since the last time — on
+    /// launch, and from the loop the window keeps while it is open.
+    func verifyCloudCopiesIfDue(now: Date = Date()) async {
+        let last = UserDefaults.standard.double(forKey: Self.cloudCheckedKey)
+        guard now.timeIntervalSince1970 - last >= 86_400 || !cloudMissing.isEmpty else { return }
+        await verifyCloudCopies()
+    }
+
+    /// Take every missing model that is in Drive's Trash back out of it, then
+    /// look again.
+    func restoreMissingFromDriveTrash() async {
+        cloudLibraryProblem = nil
+        guard let d = await CloudLibrary.libraryDrive(settings: settingsDict, build: source.build) else {
+            cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return
+        }
+        let drive = LibraryRemote.drive(DriveClient(d.config, fetch: CloudLibrary.fetch))
+        cloudLibraryBusy = true
+        defer { cloudLibraryBusy = false }
+        var restored = 0
+        for m in cloudMissing where m.inTrash {
+            do { if try await drive.restoreFromTrash(m.key, fetch: CloudLibrary.fetch) { restored += 1 } }
+            catch { cloudLibraryProblem = cloudSay(error) }
+        }
+        cloudLibraryNote = words.callIt("mac.cloudlib_restored_from_trash", ["n": .number(Double(restored))])
+        await verifyCloudCopies()
+    }
+
+    /// Moved models whose sidecar names a remote other than `target` — what
+    /// switching to it would leave behind.
+    func cloudStranded(switchingTo target: CloudLibrary.Remote) async -> Int {
+        guard let engine, let roots = libraryRoots else { return 0 }
+        let current = await CloudLibrary.remoteInUse(settingsDict, build: source.build)
+        guard target != current else { return 0 }
+        let providers = await movedModels(engine: engine, roots: roots).map { $0.side.provider }
+        return CloudLibrary.stranded(switchingTo: target, providers: providers, current: current)
+    }
+
+    /// Refuse a switch that would leave moved models on the remote being left:
+    /// says why, and what to press first. True when the switch may go ahead.
+    private func maySwitchRemote(to target: CloudLibrary.Remote) async -> Bool {
+        let n = await cloudStranded(switchingTo: target)
+        guard n > 0 else { return true }
+        cloudLibraryProblem = words.callIt("mac.cloudlib_switch_blocked", ["n": .number(Double(n))])
+        return false
     }
 
     // MARK: - Google Drive
@@ -710,6 +1016,8 @@ extension Shop {
         let id = clientId.trimmingCharacters(in: .whitespaces)
         guard !id.isEmpty else { cloudLibraryProblem = words.callIt("mac.gdrive_need_client"); return }
         guard !cloudLibraryBusy else { return }
+        // Connecting chooses Drive — see `chooseLibraryRemote`.
+        guard await maySwitchRemote(to: .drive) else { return }
         cloudLibraryBusy = true
         cloudLibraryNote = words.callIt("mac.gdrive_waiting")
         defer { cloudLibraryBusy = false }
@@ -757,6 +1065,9 @@ extension Shop {
     func chooseLibraryRemote(_ remote: CloudLibrary.Remote) async {
         cloudLibraryProblem = nil
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
+        // Models moved to the remote being left would be stranded there:
+        // nothing checks them, and it is the remote a shop then disconnects.
+        guard await maySwitchRemote(to: remote) else { return }
         do {
             try StoreWriter.update(build) { root in
                 var settings = Self.settings(root)
@@ -838,6 +1149,8 @@ extension Shop {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
+        // Saving the bucket chooses it — see `chooseLibraryRemote`.
+        guard await maySwitchRemote(to: .bucket) else { return }
         var sealed: String?
         if !typedSecret.isEmpty {
             do { sealed = try await Secrets.seal(typedSecret, for: build) }

@@ -166,6 +166,15 @@ struct MoveBanners: View {
                 BannerClose(words: shop.words) { shop.slicerProblem = nil }
             }
         }
+        // MOVED MODELS THE CLOUD NO LONGER HAS. Their only copy was online,
+        // and it did not answer — see `Shop.verifyCloudCopies`. On every
+        // screen, because the day it matters is the day a job opens one.
+        if !shop.cloudMissing.isEmpty {
+            Banner(text: shop.words.callIt("mac.cloudlib_missing", ["n": .number(Double(shop.cloudMissing.count))]),
+                   symbol: "exclamationmark.icloud", tint: Khayt.attention) {
+                SettingsLink { Text(shop.words.callIt("mac.review") + "\u{2026}") }
+            }
+        }
         // By position, not by text: two spools running low can produce the same
         // sentence, and a ForEach with two identical ids draws one.
         //

@@ -97,6 +97,8 @@ struct CloudLibrarySettings: View {
     @State private var connecting = false
     @State private var providers: [KhaytEngine.StorageProvider] = []
     @State private var summary: (count: Int, size: String, inCloud: Int)?
+    /// What "Free up space now" would move, held while the shop confirms it.
+    @State private var freeUp: Shop.FreeUpPreview?
 
     /// Read from the book on the first frame, not in `.task`: the screen must
     /// not open on the wrong state and then jump. `status` is for pictures of
@@ -453,7 +455,16 @@ struct CloudLibrarySettings: View {
         HStack {
             Button(shop.words.callIt("mac.cloudlib_back_up_all")) { Task { await shop.backUpWholeLibrary(); await refresh() } }
             if options.tierOn {
-                Button(shop.words.callIt("mac.cloudlib_free_now")) { Task { await shop.freeUpSpace(); await refresh() } }
+                // ASKED FIRST. It deletes the local copy of every model it
+                // picks, so the shop sees how many, how much and which before
+                // anything leaves — see `Shop.freeUpSpacePreview`.
+                Button(shop.words.callIt("mac.cloudlib_free_now") + "\u{2026}") {
+                    Task {
+                        guard let p = await shop.freeUpSpacePreview() else { return }
+                        if p.count == 0 { shop.cloudLibraryNote = shop.words.callIt("mac.cloudlib_nothing_to_move") }
+                        else { freeUp = p }
+                    }
+                }
             }
             if (summary?.inCloud ?? 0) > 0 {
                 Button(shop.words.callIt("mac.cloudlib_bring_all")) { Task { await shop.bringEverythingBack(); await refresh() } }
@@ -461,6 +472,23 @@ struct CloudLibrarySettings: View {
             Spacer()
         }
         .disabled(locked)
+        .confirmationDialog(shop.words.callIt("mac.cloudlib_free_confirm_title",
+                                              ["n": .number(Double(freeUp?.count ?? 0)), "size": .string(freeUp?.size ?? "")]),
+                            isPresented: Binding(get: { freeUp != nil }, set: { if !$0 { freeUp = nil } }),
+                            presenting: freeUp) { p in
+            Button(shop.words.callIt("mac.cloudlib_free_confirm"), role: .destructive) {
+                Task { await shop.freeUpSpace(only: p.paths); await refresh() }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        } message: { p in
+            Text(shop.words.callIt("mac.cloudlib_free_confirm_body", [
+                "where": .string(p.destination),
+                "names": .string(CloudLibrary.firstNames(p.names) {
+                    shop.words.callIt("mac.cloudlib_and_more", ["n": .number(Double($0))])
+                }),
+            ]))
+        }
+        missingBlock
         if let summary, options.tierOn {
             Text(shop.words.callIt("mac.cloudlib_could_move", ["n": .number(Double(summary.count)),
                                                               "size": .string(summary.size),
@@ -472,6 +500,33 @@ struct CloudLibrarySettings: View {
                 Text(shop.words.callIt("mac.cloudlib_progress", ["name": .string(p.name), "done": .number(Double(p.done)),
                                                                "total": .number(Double(p.total))]))
                     .font(.caption).lineLimit(1).truncationMode(.middle)
+            }
+        }
+    }
+
+    /// Moved models the cloud no longer has — `Shop.verifyCloudCopies`.
+    @ViewBuilder private var missingBlock: some View {
+        if !shop.cloudMissing.isEmpty {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Label(shop.words.callIt("mac.cloudlib_missing", ["n": .number(Double(shop.cloudMissing.count))]),
+                      systemImage: "exclamationmark.icloud")
+                    .foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: CloudLibrary.firstNames(shop.cloudMissing.map(\.name)) {
+                    shop.words.callIt("mac.cloudlib_and_more", ["n": .number(Double($0))])
+                })
+                .font(.caption).foregroundStyle(Role.text2)
+                .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    if shop.cloudMissing.contains(where: \.inTrash) {
+                        Button(shop.words.callIt("mac.cloudlib_restore_trash")) {
+                            Task { await shop.restoreMissingFromDriveTrash(); await refresh() }
+                        }
+                    }
+                    Button(shop.words.callIt("mac.cloudlib_check_again")) { Task { await shop.verifyCloudCopies() } }
+                    Spacer()
+                }
+                .disabled(locked)
             }
         }
     }

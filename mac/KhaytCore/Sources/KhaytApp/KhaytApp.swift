@@ -112,6 +112,14 @@ struct KhaytApp: App {
                     // A new shop — an empty book, or no book on this Mac at
                     // all — is offered the setup, once. See `ShopSetup.offers`.
                     shop.offerSetupIfNew()
+                    // EVERY MOVED MODEL, ASKED FOR: on launch and once a day
+                    // while the app is open. After "Free up space" the cloud
+                    // holds the only copy, and nothing else ever looks again —
+                    // see `Shop.verifyCloudCopies`.
+                    while !Task.isCancelled {
+                        await shop.verifyCloudCopiesIfDue()
+                        try? await Task.sleep(for: .seconds(3600))
+                    }
                 }
 
                 // CHOOSING A MODEL IN SPOTLIGHT OPENS IT HERE.
