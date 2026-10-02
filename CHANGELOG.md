@@ -11,6 +11,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   phone already paired says the same in its connection strip. The phone
   does not enforce the minimum itself: the Electron desktop has none, and a
   shop there with a short PIN would be locked out for nothing.
+- **Security: your book file is readable only by you.** On macOS and Linux,
+  each save wrote your data file so that any other account on the same
+  computer could read it, with every customer and price in it. The book and
+  its previous copy are now readable by your account only. The Mac app does
+  the same.
 
 - **A model moved to Google Drive to save space comes back.** When old models
   were moved off this computer to free space, the desktop recorded every one
