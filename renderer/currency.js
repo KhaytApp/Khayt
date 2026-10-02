@@ -110,7 +110,18 @@
    * SAR 3,000 across three payments on a job with SAR 2,000 left to pay.
    */
   function orderOwedRaw(o) {
-    return M().orderOwedRaw(o);
+    // ctx() carries the shop's settings: a tax-added shop is owed the tax too.
+    return M().orderOwedRaw(o, ctx());
+  }
+
+  /**
+   * What an order EARNED the shop: its revenue in base currency, net of the
+   * tax collected for the government (lib/order-money.js orderEarnedBase).
+   * For profit and margin screens. Revenue and cash screens keep
+   * orderNetRevenueBase, which is what the customer was charged.
+   */
+  function orderEarnedBase(o) {
+    return M().orderEarnedBase(o, ctx(), CURRENCIES);
   }
 
   function orderOwedBase(o) {
@@ -136,6 +147,7 @@
     orderCreditedRaw,
     orderCreditedBase,
     orderNetRevenueBase,
+    orderEarnedBase,
     orderOwedBase,
     orderOwedRaw,
     refreshCurrencyLabels,

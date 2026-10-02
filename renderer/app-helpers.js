@@ -76,7 +76,9 @@ function altLocalName(obj) {
 function payStatus(order) {
   const rules = (typeof globalThis !== 'undefined' && globalThis.KhaytOrderPayment)
     || (() => { try { return require('../lib/order-payment.js'); } catch (e) { return null; } })();
-  return rules ? rules.statusOf(order) : 'unpaid';
+  // With the shop's settings, so a shop that adds tax on top is paid when the
+  // customer has paid the price AND the tax (lib/order-money.js orderGrossRaw).
+  return rules ? rules.statusOf(order, { settings: (typeof settings !== 'undefined') ? settings : undefined }) : 'unpaid';
 }
 /* csvFormulaNeutralize — renderer/format.js */
 /** Escape a value for CSV (RFC 4180). */

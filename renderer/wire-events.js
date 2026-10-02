@@ -1152,7 +1152,7 @@ function wireEvents() {
       { danger: false },
     );
     if (!okToRestore) return;
-    const res = A.restoreDeposit(entry);
+    const res = A.restoreDeposit(entry, { settings });
     if (!res.ok) { toast(res.error, 'error'); return; }
     saveAll();
     renderLogs(); renderKanban(); renderDashboard();

@@ -4,6 +4,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Shops that add tax on top are paid on the right amount.** If your prices
+  are before tax, a $100 job with 8.25% tax is $108.25. Khayt already showed
+  $108.25 owed, but capped a payment at $100 and called the job paid at
+  $100. Now a payment can cover the tax, a job is paid when the tax is paid,
+  and editing the price or restoring a deposit keeps that true. The customer
+  portal agrees.
+- **Profit no longer counts the tax you collect.** Machine profit, product
+  profit and break-even counted VAT as money the shop made, so a job charged
+  115 that cost 80 showed 35 profit instead of 20. They now use what the job
+  earned, as the P&L already did. So do the forecast, customer mix, client
+  value, cost trends and client sources reports. Cash flow and the revenue
+  totals still show what customers were charged.
+- **A gift card plus a payment plan can reach "paid".** Such a job stayed
+  "partial" after its last instalment, because the plan ignored the gift card
+  and any credit note.
+- **The invoice Subtotal line uses the same rule as the Mac.** It is the
+  items before any discount, so Subtotal, Rush, Shipping and Total add up.
+
 - **(iOS) A PIN the Mac finds too short is said as one.** The native Mac now
   refuses an owner PIN shorter than 8 characters (#1713). Pairing with one
   used to read "That PIN was refused" — true, and no help, since the PIN was

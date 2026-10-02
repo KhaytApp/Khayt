@@ -182,7 +182,7 @@ function computeHandoffMachineRows() {
     orders: printLog,
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     // Only what was stocked: wear reaches this table as depreciation, once.
     partCostOf: stockedPartCost,
   });
@@ -606,7 +606,7 @@ function renderClientSourceChart() {
   const report = KhaytClientSources.byClient(
     { clients: clients || [], orders: printLog || [] },
     {
-      revenueOf: orderNetRevenueBase,
+      revenueOf: orderEarnedBase,
       isFinished: (o) => KhaytOrderStatus.isFinished(o),
       countsForBusiness: _countsForBusiness,
     },
@@ -810,7 +810,7 @@ function renderRevenueForecast() {
   const el = $('#revenueForecastChart');
   if (!el) return;
   if (typeof KhaytForecast === 'undefined') { el.innerHTML = ''; return; }
-  const f = KhaytForecast.forecast(printLog, { now: Date.now(), months: 6, periods: 3, revenueOf: orderNetRevenueBase });
+  const f = KhaytForecast.forecast(printLog, { now: Date.now(), months: 6, periods: 3, revenueOf: orderEarnedBase });
   if (f.method === 'none') { el.innerHTML = ''; return; } // nothing to forecast yet
 
   const monShort = (label) => { try { return new Date(label + '-01').toLocaleDateString(localeTag(), { month: 'short' }); } catch { return label; } };
@@ -880,7 +880,7 @@ function renderMachineRevenueChart() {
     if (!machMap[o.machineId]) {
       machMap[o.machineId] = { name: o.machine || o.machineId, color: '#6b7280', revenue: 0, count: 0 };
     }
-    machMap[o.machineId].revenue += orderNetRevenueBase(o);
+    machMap[o.machineId].revenue += orderEarnedBase(o);
     machMap[o.machineId].count++;
   }
 
@@ -1296,7 +1296,7 @@ function renderClientLtvTable() {
   const report = KhaytClientValue.clientValue({
     clients: clients || [], orders: printLog || [], now: Date.now(), limit: 10,
   }, {
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     countsForBusiness: _countsForBusiness,
   });
   const ltvData = report.rows.map((r) => ({
@@ -1519,7 +1519,7 @@ function renderNewVsReturning() {
   // The window is applied by the module; history is handed over whole, because
   // who is NEW cannot be decided from a slice of it.
   const mix = KhaytCustomerMix.customerMix({ orders: printLog || [] }, {
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     countsForBusiness: _countsForBusiness,
     // The range picker's own predicate. It offers named periods — "this
     // quarter" — and `lib/date-range.js` already answers what they mean, so
@@ -1596,7 +1596,7 @@ function renderPrinterUtilizationChart() {
     orders: printLog,
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     // Only what was stocked: wear reaches this table as depreciation, once.
     partCostOf: stockedPartCost,
   });
@@ -1770,7 +1770,7 @@ function renderProductProfitability() {
     orders: (printLog || []).filter(o => inRange(o.date, analyticsRange, 'analytics')),
     products: products || [], expenses: expenses || [], untagged: t('an.untagged'),
   }, {
-    revenueOf: orderNetRevenueBase, partCostOf: partTotalCost,
+    revenueOf: orderEarnedBase, partCostOf: partTotalCost,
     nameOf: localName, countsForBusiness: _countsForBusiness,
   });
   if (report.rows.length === 0) {
@@ -1979,7 +1979,7 @@ function renderMachinePL() {
     orders: printLog,
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     // Only what was stocked: wear reaches this table as depreciation, once.
     partCostOf: stockedPartCost,
   });
@@ -2442,7 +2442,7 @@ function renderCostTrends() {
   // times over.
   const trends = KhaytCostTrends.costTrends(printLog, inventory, {
     now: Date.now(), months: 12,
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     countsForBusiness: (o) => _countsForBusiness(o),
   });
   const months = trends.months.map((m) => {
@@ -3346,7 +3346,7 @@ function computeBreakEven() {
     completed: printLog.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o)),
     since: localDateStr(cutoff),
     month: localMonthStr(new Date()),
-  }, { revenueOf: orderNetRevenueBase, partCostOf: partTotalCost });
+  }, { revenueOf: orderEarnedBase, partCostOf: partTotalCost });
   // The callers below have always read `null` as "no fixed costs at all".
   return r.totalFixed === 0 ? null : {
     totalFixed: r.totalFixed,
